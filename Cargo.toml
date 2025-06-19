@@ -1,0 +1,18 @@
+[package]
+name = "rs-llmspell"
+version = "0.1.0"
+edition = "2021"
+authors = ["Lex Lapax<lexlapax@gmail.com>"]
+description = "Cast scripting spells to animate LLM golems - A Rust library for scriptable LLM interactions"
+repository = "https://github.com/lexlapax/rs-llmspell"
+license = "MIT OR Apache-2.0"
+keywords = ["llm", "ai", "agents", "scripting", "automation"]
+categories = ["text-processing", "api-bindings", "automation"]
+
+[dependencies]
+
+[dev-dependencies]
+
+[lib]
+name = "rs_llmspell"
+path = "src/lib.rs"
