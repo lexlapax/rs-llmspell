@@ -722,33 +722,86 @@ Comprehensive refinement of rs-llmspell architecture based on go-llms and Google
     - Async patterns covering all major concurrency scenarios
 
 ### Phase 9: Research Advanced Patterns (🔍 Research)
-- [ ] **Task 9.1**: Advanced orchestration patterns
-  - [ ] Multi-agent collaboration patterns
-  - [ ] Dynamic workflow composition
-  - [ ] Real-time event-driven automation
+- [x] **Task 9.1**: Advanced orchestration patterns - 2025-06-20T14:30:00-08:00
+  - [x] Multi-agent collaboration patterns
+    - Swarm Intelligence Pattern for distributed processing with consensus building
+    - Hierarchical Delegation Pattern with supervisor/specialist architecture
+    - Consensus Building Pattern for complex decision making with voting mechanisms
+  - [x] Dynamic workflow composition
+    - Adaptive Workflow Pattern that modifies structure based on results
+    - Pipeline Composition Pattern for dynamic data transformation chains
+    - Rule-based workflow adaptation with insertion, skipping, and looping
+  - [x] Real-time event-driven automation
+    - Event Stream Processing Pattern with continuous agent reactions
+    - Reactive Agent Network Pattern for cascading event-driven behaviors
+    - Real-time processing modes: immediate, batched, and scheduled
+  - [x] Created comprehensive research document at /docs/technical/advanced_orchestration_patterns.md
 
-- [ ] **Task 9.2**: Performance optimization patterns
-  - [ ] Efficient hook execution
-  - [ ] Event system optimization
-  - [ ] Tool execution pooling
+- [x] **Task 9.2**: Performance optimization patterns - 2025-06-20T15:00:00-08:00
+  - [x] Efficient hook execution
+    - Hook Execution Pipeline Optimization with parallel execution and caching
+    - Hook Dependency Graph Optimization for efficient execution paths
+    - Adaptive execution strategies with performance budgets
+  - [x] Event system optimization
+    - High-Performance Event Bus with lock-free multi-producer/consumer design
+    - Event Stream Backpressure Management with adaptive rate limiting
+    - Smart routing with bloom filters and pattern matching
+  - [x] Tool execution pooling
+    - Intelligent Tool Pool Management with warm-up and scaling
+    - Adaptive scaling policies based on utilization and load prediction
+    - Pool health monitoring and automatic instance retirement
+  - [x] Created comprehensive research document at /docs/technical/performance_optimization_patterns.md
 
-- [ ] **Task 9.3**: Model Control Protol Support (MCP)
-  - [ ] MCP client support for rs-llmspell agents to add / use / call external MCP Tools
-  - [ ] MCP server support for tools in rs-llmspell to be exposed as MCP Servers
-    - [ ] straight exposure of builtin tool as MCP
-    - [ ] exposure of Agents as tools via MCP
-  - [ ] crates and libraries to support MCP
+- [x] **Task 9.3**: Model Control Protocol Support (MCP) - 2025-06-20T15:30:00-08:00
+  - [x] MCP client support for rs-llmspell agents to add / use / call external MCP Tools
+    - MCPClientManager for discovering and connecting to external MCP servers
+    - MCPToolAdapter bridge pattern for seamless integration with rs-llmspell tools
+    - Support for HTTP, WebSocket, and stdio MCP transports
+  - [x] MCP server support for tools in rs-llmspell to be exposed as MCP Servers
+    - [x] straight exposure of builtin tool as MCP
+    - [x] exposure of Agents as tools via MCP
+    - MCPServer implementation with authentication and rate limiting
+    - MCPAgentWrapper for exposing agents as discoverable MCP tools
+  - [x] crates and libraries to support MCP
+    - Research of mcp-rs ecosystem and integration architecture
+    - Planned crate structure: llmspell-mcp, llmspell-mcp-client, llmspell-mcp-server
+  - [x] Created comprehensive research document at /docs/technical/mcp_support_research.md
 
-- [ ] **Task 9.4**: Agent to Agent Protocol Support (A2A)
-  - [ ] A2A client support - rs-llmspell able to call or use other Agents in workflows or Agent handoffs
-  - [ ] A2A server support - export rs-llmspell built agents or workflows to be called via A2A
-  - [ ] crates and libraries to support A2A
+- [x] **Task 9.4**: Agent to Agent Protocol Support (A2A) - 2025-06-20T16:00:00-08:00
+  - [x] A2A client support - rs-llmspell able to call or use other Agents in workflows or Agent handoffs
+    - A2AAgentRegistry for discovering and ranking external agents
+    - A2AAgentProxy for seamless integration of external agents
+    - Multi-agent conversation management and coordination
+  - [x] A2A server support - export rs-llmspell built agents or workflows to be called via A2A
+    - A2AServer implementation with discovery beacon and connection management
+    - Agent and workflow exposure via A2A protocol
+    - Enterprise features: access control, rate limiting, monitoring
+  - [x] crates and libraries to support A2A
+    - Proposed a2a-protocol ecosystem with client/server implementations
+    - Integration architecture for llmspell-a2a crate family
+  - [x] Created comprehensive research document at /docs/technical/a2a_protocol_research.md
 
-- [ ] **Task 9.5**: scripting language module support
-  - [ ] concept research on not only embedding the language runtime (eg. mlua) but exposing agent, tools, etc functionality as a module back to be used as a module in regular lua
-  - [ ] lua research
-  - [ ] javascript research
-  - [ ] changes to or augmentation to library layout , architecture, sub-crates because of this.
+- [x] **Task 9.5**: scripting language module support - 2025-06-20T16:30:00-08:00
+  - [x] concept research on not only embedding the language runtime (eg. mlua) but exposing agent, tools, etc functionality as a module back to be used as a module in regular lua
+    - Bidirectional integration concept: embedded runtimes + external module support
+    - Four approaches: Native modules, C API bridge, WebAssembly, and IPC
+    - Benefits and trade-offs for each approach analyzed
+  - [x] lua research
+    - Lua C module implementation using Lua C API
+    - LuaRocks package distribution strategy
+    - OpenResty/nginx integration examples
+    - Agent, Tool, and Workflow wrappers with proper memory management
+  - [x] javascript research
+    - Node.js native addon implementation using N-API
+    - NPM package distribution with prebuild binaries
+    - TypeScript definitions for full type safety
+    - Express.js and React integration examples
+  - [x] changes to or augmentation to library layout , architecture, sub-crates because of this
+    - New crate structure: llmspell-c-api, llmspell-module-core, bindings/
+    - C API design for stable ABI across language bindings
+    - Module interface abstractions and registry system
+    - Separation of embedded vs external module functionality
+  - [x] Created comprehensive research document at /docs/technical/scripting_module_support_research.md
 
 ### Phase 10: Analyze Testing Strategy (🔬 Analyze)
 - [ ] **Task 10.1**: Testing strategy for new concepts
