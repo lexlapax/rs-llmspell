@@ -499,33 +499,113 @@ Comprehensive refinement of rs-llmspell architecture based on go-llms and Google
   - [x] Created comprehensive decision matrix at /docs/technical/build_vs_buy_decision_matrix.md
 
 ### Phase 6: Synthesize Complete System (⚡ Synthesize)
-- [ ] **Task 6.1**: Complete component ecosystem design
-  - [ ] Full trait hierarchy with relationships
-  - [ ] Built-in component library structure
-  - [ ] Hook/event system integration
-  - [ ] Composition and orchestration patterns
+- [x] **Task 6.1**: Complete component ecosystem design - 2025-06-20T11:45:00-08:00
+  - [x] Full trait hierarchy with relationships
+    - BaseAgent as foundation with tool handling
+    - Agent extends BaseAgent with LLM capabilities
+    - Tool trait for LLM-callable functions
+    - Workflow trait for deterministic patterns
+    - Composition traits: Composable, Observable, Hookable, Scriptable
+  - [x] Built-in component library structure
+    - 40+ built-in tools across 9 categories
+    - 6 agent templates (Chat, Research, Code, Data, Planner, Orchestrator)
+    - 6 workflow types (Sequential, Parallel, Conditional, Loop, MapReduce, Pipeline)
+  - [x] Hook/event system integration
+    - 20+ hook points throughout lifecycle
+    - Comprehensive event types and handlers
+    - Built-in hooks for logging, metrics, tracing, rate limiting, caching
+    - Hybrid EventBus using tokio + crossbeam
+  - [x] Composition and orchestration patterns
+    - Tool-wrapped agent pattern
+    - Composite, Pipeline, and Hierarchical agents
+    - Agent pools, mesh, and saga patterns
+    - State handoff and synchronization
+  - [x] Created comprehensive design at /docs/technical/component_ecosystem_design.md
 
-- [ ] **Task 6.2**: Script interface design
-  - [ ] Lua/JavaScript API for new concepts
-  - [ ] Hook registration in scripts
-  - [ ] Event handling in scripts
-  - [ ] Built-in component access
-  - [ ] **ASYNC PATTERNS**: Promise/Future-like abstractions for scripts
-  - [ ] **ASYNC PATTERNS**: Cooperative scheduling API design
-  - [ ] **ASYNC PATTERNS**: Cross-engine async compatibility layer
+- [x] **Task 6.2**: Script interface design - 2025-06-20T12:00:00-08:00
+  - [x] Lua/JavaScript API for new concepts
+    - Language-idiomatic APIs (tables for Lua, objects for JS)
+    - Agent creation with builders and configuration objects
+    - Tool definition with handlers and validation
+    - Workflow definitions (sequential, conditional, parallel)
+  - [x] Hook registration in scripts
+    - Global and agent-specific hooks
+    - Priority-based execution
+    - Conditional hooks with filters
+    - Middleware-style composition in JS
+  - [x] Event handling in scripts
+    - Event emitter patterns for both languages
+    - Async event handlers
+    - Pattern matching and wildcards
+    - Event aggregation and replay
+  - [x] Built-in component access
+    - Organized tool library by category
+    - Agent template instantiation
+    - Dynamic loading and extension
+    - Custom component registration
+  - [x] **ASYNC PATTERNS**: Promise/Future-like abstractions for scripts
+    - Lua Promise implementation with then/catch
+    - Native JS promises and combinators
+    - Unified error handling
+  - [x] **ASYNC PATTERNS**: Cooperative scheduling API design
+    - Lua coroutine-based scheduler
+    - JS async generators with backpressure
+    - Yield points for long operations
+  - [x] **ASYNC PATTERNS**: Cross-engine async compatibility layer
+    - Stream processing abstractions
+    - Batch processing with flow control
+    - Timeout and cancellation support
+  - [x] Created comprehensive design at /docs/technical/script_interface_design.md
 
 ### Phase 7: Collate Architecture (📋 Collate)
-- [ ] **Task 7.1**: Organize all concepts into coherent architecture
-  - [ ] Resolve conflicts between concepts
-  - [ ] Ensure consistent terminology
-  - [ ] Validate against go-llms/ADK patterns
-  - [ ] Create comprehensive component map
+- [x] **Task 7.1**: Organize all concepts into coherent architecture - 2025-06-20T12:15:00-08:00
+  - [x] Resolve conflicts between concepts
+    - BaseAgent vs Agent hierarchy clarified
+    - Async patterns unified across languages
+    - State management boundaries defined
+    - Tool vs Agent criteria established
+  - [x] Ensure consistent terminology
+    - Core terms defined (BaseAgent, Agent, Tool, Workflow, etc.)
+    - Naming conventions for Rust and scripts
+    - Language-specific API conventions
+  - [x] Validate against go-llms/ADK patterns
+    - BaseAgent pattern ✓ aligned
+    - Tool-wrapped agent pattern ✓ implemented
+    - State-driven execution ✓ enhanced
+    - All ADK concepts mapped and validated
+  - [x] Create comprehensive component map
+    - 6-layer architecture diagram
+    - Component relationship graph
+    - Data flow visualization
+    - Module organization defined
+  - [x] Created collated architecture at /docs/technical/collated_architecture.md
 
-- [ ] **Task 7.2**: Validate against use cases
-  - [ ] Simple tool execution scenarios
-  - [ ] Complex multi-agent workflows
-  - [ ] Hook/event driven automation
-  - [ ] Built-in component usage
+- [x] **Task 7.2**: Validate against use cases - 2025-06-20T12:30:00-08:00
+  - [x] Simple tool execution scenarios
+    - Calculator tool with natural language
+    - File operations with safety checks
+    - Web search with rate limiting and caching
+    - All scenarios show clean API and proper safety
+  - [x] Complex multi-agent workflows
+    - Blog creation pipeline (4 agents, sequential)
+    - Parallel analysis with aggregation
+    - Conditional routing based on content
+    - Demonstrates data flow and orchestration
+  - [x] Hook/event driven automation
+    - Automatic error recovery with backoff
+    - Real-time progress streaming
+    - Compliance and audit logging
+    - Shows power of hook/event system
+  - [x] Built-in component usage
+    - Tool composition from built-ins
+    - Agent template extension
+    - Workflow template customization
+    - Validates extensibility patterns
+  - [x] Additional validation scenarios:
+    - High-throughput with batching
+    - Memory-efficient streaming
+    - Multi-provider fallback
+  - [x] Created validation document at /docs/technical/use_case_validation.md
 
 ### Phase 8: Update Architecture Document (📝 Update)
 - [ ] **Task 8.1**: Update core concepts and philosophy
@@ -564,6 +644,18 @@ Comprehensive refinement of rs-llmspell architecture based on go-llms and Google
   - [ ] Efficient hook execution
   - [ ] Event system optimization
   - [ ] Tool execution pooling
+
+- [ ] **Task 9.3**: Model Control Protol Support (MCP)
+  - [ ] MCP client support for rs-llmspell agents to add / use / call external MCP Tools
+  - [ ] MCP server support for tools in rs-llmspell to be exposed as MCP Servers
+    - [ ] straight exposure of builtin tool as MCP
+    - [ ] exposure of Agents as tools via MCP
+  - [ ] crates and libraries to support MCP
+
+- [ ] **Task 9.4**: Agent to Agent Protocol Support (A2A)
+  - [ ] A2A client support - rs-llmspell able to call or use other Agents in workflows or Agent handoffs
+  - [ ] A2A server support - export rs-llmspell built agents or workflows to be called via A2A
+  - [ ] crates and libraries to support A2A
 
 ### Phase 10: Analyze Testing Strategy (🔬 Analyze)
 - [ ] **Task 10.1**: Testing strategy for new concepts
