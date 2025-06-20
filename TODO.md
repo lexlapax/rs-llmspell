@@ -111,58 +111,284 @@ Comprehensive refinement of rs-llmspell architecture based on go-llms and Google
     - [x] Debugging and profiling async script execution
 
 ### Phase 5B: Research Existing Crate Ecosystem (🔍 Research)
-- [ ] **Task 5B.1**: **CRITICAL** LLM Provider Layer Crates Research
-  - [ ] rust-genai evaluation
-    - [ ] Review architecture and design patterns
-    - [ ] Analyze provider abstraction approach
-    - [ ] Check async/streaming support
-    - [ ] Evaluate extensibility for custom providers
-    - [ ] Test performance and overhead
-  - [ ] Alternative LLM crates comparison
-    - [ ] langchain-rust capabilities and limitations
-    - [ ] llm-chain architecture review
-    - [ ] async-openai for OpenAI-specific needs
-    - [ ] candle for local model support
-  - [ ] Provider abstraction requirements
-    - [ ] Multi-provider support patterns
-    - [ ] Streaming response handling
-    - [ ] Token counting and rate limiting
-    - [ ] Error handling and retries
-    - [ ] Authentication and configuration
-  - [ ] Integration feasibility analysis
-    - [ ] Compatibility with BaseAgent/Agent design
-    - [ ] Bridge pattern implementation options
-    - [ ] Custom provider extension points
+- [x] **Task 5B.1**: **CRITICAL** LLM Provider Layer Crates Research - 2025-06-20T08:15:00-08:00
+  - [x] rust-genai evaluation
+    - [x] Review architecture and design patterns
+      - Multi-provider abstraction with "common and ergonomic single API"
+      - Native implementation without per-service SDKs
+      - Trait-based adapter pattern with static dispatch
+      - Supports OpenAI, Anthropic, Gemini, Ollama, Groq, xAI, DeepSeek, Cohere
+    - [x] Analyze provider abstraction approach
+      - Uses `Adapter` trait with static methods (no &self)
+      - `AdapterKind` enum for provider identification
+      - `AdapterDispatcher` for routing to specific implementations
+      - Model name to provider mapping (e.g., "gpt" -> OpenAI, "claude" -> Anthropic)
+      - **LIMITATION**: Fixed enum-based providers, not easily extensible for custom providers
+    - [x] Check async/streaming support
+      - Fully async with tokio runtime
+      - Streaming support via futures::Stream trait
+      - Event-source streaming for real-time responses
+      - Inter-stream abstraction for normalized streaming across providers
+      - Tool use streaming support (recent addition)
+    - [x] Evaluate extensibility for custom providers
+      - Custom endpoints via `ServiceTargetResolver`
+      - Custom authentication via `AuthResolver`
+      - Model mapping via `ModelMapper`
+      - **LIMITATION**: Cannot add new provider types without modifying the crate
+      - **LIMITATION**: AdapterKind is a fixed enum, not trait-based
+      - Fallback to Ollama for unknown models provides some flexibility
+    - [x] Test performance and overhead
+      - Minimal dependencies: tokio, futures, reqwest, serde
+      - No unsafe code (forbid unsafe_code lint)
+      - Lightweight abstraction layer
+      - Arc-based cloning for shared state
+      - Comment mentions "overhead is minimal" for data cloning
+  - [x] Alternative LLM crates comparison - 2025-06-20T08:30:00-08:00
+    - [x] llm_api_crate evaluation
+      - Architecture: Enum-based LLM abstraction with trait `Access`
+      - Providers: OpenAI, Gemini, Anthropic (fixed enum)
+      - **LIMITATION**: No streaming support
+      - **LIMITATION**: Fixed provider set, not extensible
+      - Python bindings via PyO3
+      - Simple async interface but limited features
+    - [x] langchain-rust capabilities and limitations
+      - Full LangChain port to Rust with composability focus
+      - Providers: OpenAI, Azure OpenAI, Ollama, Anthropic, MistralAI
+      - Builder patterns and macro-heavy design
+      - Supports agents, tools, chains, and vector stores
+      - Document loaders (PDF, HTML, CSV, Git commits)
+      - **STRENGTH**: Most feature-complete LangChain implementation
+      - **COMPLEXITY**: Heavy framework with many abstractions
+    - [x] llm-chain architecture review
+      - Focused on prompt chaining and multi-step workflows
+      - Supports cloud and local models via llm.rs
+      - Three chain types: Sequential, Map-reduce, Conversational
+      - Tool integration (Bash, Python, web search)
+      - **STRENGTH**: Good for complex multi-step workflows
+      - **LIMITATION**: Less provider coverage than others
+    - [x] async-openai for OpenAI-specific needs
+      - OpenAI-specific with Azure OpenAI support
+      - Full SSE streaming support
+      - Trait-based Config for extensibility
+      - BYOT (Bring Your Own Types) feature
+      - Exponential backoff retry mechanism
+      - **STRENGTH**: Best for OpenAI-specific applications
+      - **LIMITATION**: Single provider focus
+    - [x] rllm evaluation
+      - Architecture: Thin wrapper around "llm" crate v1.2.6
+      - Providers: OpenAI, Anthropic, Ollama, DeepSeek, xAI, Phind, Groq, Google
+      - Builder pattern with LLMBuilder for configuration
+      - Two main traits: ChatProvider and CompletionProvider
+      - **FEATURES**: Multi-step chains, prompt templates, parallel evaluation
+      - **FEATURES**: Function calling, vision, reasoning, structured output
+      - **FEATURES**: Speech-to-text transcription support
+      - **LIMITATION**: Streaming disabled in all examples (.stream(false))
+      - **DESIGN**: Feature flags for conditional compilation
+      - Multi-backend registry for managing different providers
+      - **NOTE**: Wraps another crate "llm" which appears to be by same author
+    - [x] rig evaluation
+      - Architecture: Trait-based provider abstraction with companion crates
+      - Core traits: CompletionModel, EmbeddingModel, VectorStoreIndex
+      - Providers: OpenAI, Anthropic, Gemini, xAI, Perplexity, Cohere, DeepSeek, and more
+      - **STRENGTH**: Full streaming support with StreamingCompletion trait
+      - **STRENGTH**: Modular design - each provider/vector store in separate crate
+      - **STRENGTH**: High-level Agent abstraction for RAG and tools
+      - **STRENGTH**: Extensive vector store integrations (MongoDB, Neo4j, LanceDB, etc.)
+      - **EXTENSIBILITY**: Implement CompletionModel trait for custom providers
+      - **FEATURES**: Tool calling, embeddings, RAG, multi-agent support
+      - **FEATURES**: Audio generation, image generation, transcription
+      - **DESIGN**: Clean separation between completion and embedding models
+      - **DESIGN**: Builder pattern for agents and requests
+      - Async-first with tokio runtime
+    - [x] candle for local model support
+      - Architecture: Minimalist ML framework focused on serverless inference
+      - Core goal: Remove Python from production, create lightweight binaries
+      - **BACKENDS**: CPU (with MKL/Accelerate), CUDA, Metal, WASM
+      - **MODELS**: LLaMA, Mistral, Mixtral, Gemma, Phi, Falcon, Whisper, etc.
+      - **QUANTIZATION**: Supports GGML/GGUF formats like llama.cpp
+      - **STRENGTH**: PyTorch-like syntax, easy to use
+      - **STRENGTH**: WASM support for browser-based inference
+      - **STRENGTH**: Extensive model support with examples
+      - **INTEGRATION**: Could serve as local model backend for rs-llmspell
+      - **DESIGN**: Modular crates (core, nn, transformers, examples)
+      - **PERFORMANCE**: Optimized for small binary size and fast inference
+      - Maintained by Hugging Face team
+    - [x] **COMPARISON SUMMARY**:
+      - **rust-genai**: Best multi-provider abstraction, good streaming, limited extensibility
+      - **llm_api_crate**: Simplest API, no streaming, very limited
+      - **langchain-rust**: Most features, heavy framework, good for complex apps
+      - **llm-chain**: Good for workflows/chains, moderate complexity
+      - **async-openai**: Best for OpenAI-only apps, excellent streaming
+      - **rllm**: Good multi-provider support, rich features, unclear streaming status
+      - **rig**: Most extensible, excellent streaming, modular architecture, best for production
+      - **candle**: Best for local model inference, WASM support, no API provider abstraction
+  - [x] Provider abstraction requirements - 2025-06-20T09:00:00-08:00
+    - [x] Multi-provider support patterns
+      - **FINDING**: Two main approaches - enum-based (rust-genai, llm_api_crate) vs trait-based (rig)
+      - **RECOMMENDATION**: Use trait-based approach like rig for extensibility
+      - **REQUIREMENT**: Support dynamic provider registration
+      - **REQUIREMENT**: Allow custom provider implementations
+      - **PATTERN**: Separate crates for each provider (like rig's modular design)
+    - [x] Streaming response handling
+      - **FINDING**: Critical feature - most modern crates support it
+      - **BEST PRACTICE**: rig's StreamingCompletion trait pattern
+      - **REQUIREMENT**: Unified streaming interface across providers
+      - **REQUIREMENT**: Support both streaming and non-streaming modes
+      - **CONSIDERATION**: Handle provider-specific streaming formats (SSE, WebSocket, etc.)
+    - [x] Token counting and rate limiting
+      - **FINDING**: Often overlooked but important for production
+      - **REQUIREMENT**: Provider-agnostic token counting interface
+      - **REQUIREMENT**: Rate limiting with exponential backoff
+      - **CONSIDERATION**: Different tokenizers per provider
+      - **BEST PRACTICE**: async-openai's retry mechanism
+    - [x] Error handling and retries
+      - **FINDING**: Most crates use custom error types with thiserror
+      - **REQUIREMENT**: Unified error type that can wrap provider-specific errors
+      - **REQUIREMENT**: Automatic retry with exponential backoff
+      - **BEST PRACTICE**: async-openai's approach with configurable retry
+      - **CONSIDERATION**: Different error types per provider (rate limits, auth, network)
+    - [x] Authentication and configuration
+      - **FINDING**: Various approaches - env vars, builders, config structs
+      - **REQUIREMENT**: Flexible auth (API keys, OAuth, custom headers)
+      - **REQUIREMENT**: Per-provider configuration with defaults
+      - **BEST PRACTICE**: rig's Config trait for extensible configuration
+      - **PATTERN**: rust-genai's AuthResolver for dynamic auth
+  - [x] Integration feasibility analysis - 2025-06-20T09:10:00-08:00
+    - [x] Compatibility with BaseAgent/Agent design
+      - **FINDING**: rig's Agent abstraction aligns well with go-llms BaseAgent concept
+      - **COMPATIBILITY**: rig's CompletionModel trait maps to LLM provider interface
+      - **INTEGRATION**: Can wrap rig agents as Tools for tool-wrapped agent pattern
+      - **CHALLENGE**: Need to bridge rig's trait-based design with rs-llmspell's hierarchy
+    - [x] Bridge pattern implementation options
+      - **OPTION 1**: Wrap rig directly - least work, most features
+      - **OPTION 2**: Create custom trait inspired by rig - more control, more work
+      - **OPTION 3**: Hybrid - use rig for providers, custom for agent hierarchy
+      - **RECOMMENDATION**: Option 3 - leverage rig's providers with custom agents
+    - [x] Custom provider extension points
+      - **REQUIREMENT**: Allow users to implement custom CompletionModel trait
+      - **REQUIREMENT**: Support local models via candle integration
+      - **PATTERN**: Provider registry for dynamic provider loading
+      - **CONSIDERATION**: Plugin system for community providers
 
-- [ ] **Task 5B.2**: Scripting Engine Crates Evaluation
-  - [ ] Lua embedding options
-    - [ ] mlua features and limitations review
-    - [ ] rlua comparison for safety guarantees
-    - [ ] lua-sys for low-level control needs
-    - [ ] Performance benchmarks and memory usage
-  - [ ] JavaScript engine alternatives
-    - [ ] boa maturity and compliance assessment
-    - [ ] v8 rust bindings complexity analysis
-    - [ ] quickjs-rs for lightweight embedding
-    - [ ] deno_core for modern JS features
-  - [ ] Cross-language considerations
-    - [ ] Unified value conversion strategies
-    - [ ] Shared memory management approaches
-    - [ ] Consistent error handling patterns
+- [x] **Task 5B.2**: Scripting Engine Crates Evaluation - 2025-06-20T09:30:00-08:00
+  - [x] Lua embedding options
+    - [x] mlua features and limitations review
+      - **FEATURES**: Async/await support via coroutines
+      - **FEATURES**: Multiple Lua versions (5.1-5.4, LuaJIT, Luau)
+      - **FEATURES**: Module and standalone modes
+      - **SAFETY**: Not absolute - contains significant unsafe code
+      - **THREADING**: Optional Send + Sync with "send" feature
+      - **ASYNC**: Works with any executor (Tokio, async-std)
+      - **LIMITATION**: Cannot guarantee complete safety
+    - [x] rlua comparison for safety guarantees
+      - **STATUS**: Deprecated in favor of mlua
+      - **CURRENT**: Now a thin wrapper around mlua
+      - **MIGRATION**: Provides compatibility traits
+      - **RECOMMENDATION**: Use mlua directly for new projects
+    - [x] lua-sys for low-level control needs
+      - **mlua-sys**: Raw FFI bindings used by mlua
+      - **PURPOSE**: Direct Lua C API access
+      - **SAFETY**: Requires careful unsafe handling
+      - **USE CASE**: Only if mlua abstractions insufficient
+    - [x] Performance benchmarks and memory usage
+      - **OVERHEAD**: Safety mechanisms add some overhead
+      - **OPTIMIZATION**: Feature flags to reduce dependencies
+      - **MEMORY**: Efficient coroutine-based async
+  - [x] JavaScript engine alternatives
+    - [x] boa maturity and compliance assessment
+      - **STATUS**: Experimental but progressing
+      - **COMPLIANCE**: 90% ECMAScript spec compliance
+      - **FEATURES**: Module support, single-threaded
+      - **STRENGTHS**: Pure Rust, memory safe, embeddable
+      - **LIMITATIONS**: Still experimental, not production-ready
+    - [x] v8 rust bindings complexity analysis
+      - **rusty_v8**: Now stable (v129.0.0+)
+      - **COMPLEXITY**: 600K+ lines C++, 30min compile
+      - **BUILD**: Complex (gn + ninja), but automated via cargo
+      - **FEATURES**: Full V8 API, WebAssembly, Inspector, Fast API
+      - **CHALLENGES**: Scopes, isolates, memory management
+    - [x] quickjs-rs for lightweight embedding
+      - **SIZE**: 210 KiB for hello world
+      - **PERFORMANCE**: <300μs runtime lifecycle
+      - **ALTERNATIVES**: rquickjs more feature-complete
+      - **FEATURES**: ES2020, async/await, modules, bytecode
+      - **LIMITATION**: Single-threaded (mutex-locked)
+    - [x] deno_core for modern JS features
+      - **FOUNDATION**: Built on rusty_v8
+      - **FEATURES**: TypeScript, JSX, web standards
+      - **SECURITY**: Permission system, sandboxing
+      - **USE CASE**: Custom JS/TS runtimes
+      - **PRODUCTION**: Stable and widely used
+  - [x] Cross-language considerations - 2025-06-20T10:15:00-08:00
+    - [x] Unified value conversion strategies
+      - ScriptValue enum as common type representation
+      - Bidirectional conversion traits for mlua and JavaScript engines
+      - Function proxy pattern for cross-language callbacks
+      - Promise/Coroutine interop for async operations
+    - [x] Shared memory management approaches
+      - Arc/Weak reference counting for shared objects
+      - CrossLangObject wrapper with vtable for method dispatch
+      - Coordinated GC between Lua and JavaScript runtimes
+      - Lazy conversion to minimize overhead
+    - [x] Consistent error handling patterns
+      - Unified ScriptError type with language-specific variants
+      - ErrorContext preservation with stack traces
+      - Cross-boundary error propagation
+      - Cause chain tracking for debugging
 
-- [ ] **Task 5B.3**: Workflow and State Management Crates
-  - [ ] Workflow engine crates
-    - [ ] temporal-sdk-rust capabilities
-    - [ ] flowrs for lightweight workflows
-    - [ ] state-machine crates comparison
-  - [ ] State management solutions
-    - [ ] sled for embedded persistence
-    - [ ] rocksdb for high-performance needs
-    - [ ] async-std storage patterns
-  - [ ] Event system crates
-    - [ ] tokio-stream for async event streams
-    - [ ] crossbeam-channel for multi-producer patterns
-    - [ ] event-emitter-rs for pub/sub models
+- [x] **Task 5B.3**: Workflow and State Management Crates - 2025-06-20T10:45:00-08:00
+  - [x] Workflow engine crates
+    - [x] temporal-sdk-rust capabilities
+      - Production-ready distributed workflow orchestration
+      - Requires external Temporal server infrastructure
+      - **LIMITATION**: Too heavyweight for embedded scripting
+      - Good patterns but not directly usable for rs-llmspell
+    - [x] flowrs for lightweight workflows
+      - Early development (0.1.x), lightweight and embeddable
+      - Builder pattern with async native design
+      - **POTENTIAL**: Could be wrapped but needs enhancement
+      - Limited features: no persistence, signals, or queries
+    - [x] state-machine crates comparison
+      - **sm**: Compile-time safety, zero overhead, typestate pattern
+      - **statig**: Hierarchical states, async support, event-driven
+      - **finny**: Actor-based, queue management, builder API
+      - **RECOMMENDATION**: statig for async hierarchical agent states
+  - [x] State management solutions
+    - [x] sled for embedded persistence
+      - Lock-free, log-structured design, beta status (0.34.x)
+      - Fast reads, ACID transactions, watch subscriptions
+      - **PROS**: Rust native, embedded, good performance
+      - **CONS**: Beta status, memory intensive, higher space usage
+    - [x] rocksdb for high-performance needs
+      - Production proven, stable (0.21.x), battle-tested
+      - Column families, compaction, snapshots
+      - **PROS**: Excellent for large datasets, stable API
+      - **CONS**: C++ dependency, large binary size
+    - [x] async-std storage patterns
+      - Actor-based state management patterns
+      - Channel-based coordination strategies
+      - Not a storage solution but patterns for async state
+  - [x] Event system crates
+    - [x] tokio-stream for async event streams
+      - Part of tokio ecosystem, async-first design
+      - Stream combinators, broadcast channels
+      - **PROS**: Perfect tokio integration, zero-cost abstractions
+      - **CONS**: Tokio lock-in, learning curve
+    - [x] crossbeam-channel for multi-producer patterns
+      - Sync channels for thread-to-thread communication
+      - Multiple channel types, select! macro support
+      - **PROS**: Excellent performance, runtime agnostic
+      - **CONS**: Not async native, needs adapter
+    - [x] event-emitter-rs for pub/sub models
+      - Simple Node.js style event emitter
+      - Limited documentation and features
+      - Less commonly used than alternatives
+  - [x] **RECOMMENDATIONS**:
+    - **Workflow**: Custom engine inspired by flowrs patterns
+    - **State**: sled (dev) / rocksdb (prod) behind trait abstraction
+    - **State Machines**: statig for hierarchical async states
+    - **Events**: tokio-stream + crossbeam hybrid approach
+  - [x] Created comprehensive research document at /docs/technical/workflow_state_crates_research.md
 
 - [ ] **Task 5B.4**: Supporting Infrastructure Crates
   - [ ] Serialization and data handling
@@ -177,6 +403,14 @@ Comprehensive refinement of rs-llmspell architecture based on go-llms and Google
     - [ ] tracing ecosystem integration
     - [ ] metrics-rs for performance monitoring
     - [ ] opentelemetry-rust for distributed tracing
+
+- [ ] **Task 5B.1b**: **LLM Provider Layer Decision Summary**
+  - [ ] Based on research, recommended approach:
+    - [ ] Use **rig** as the foundation for LLM provider abstraction
+    - [ ] Extend with custom BaseAgent/Agent/Tool hierarchy on top
+    - [ ] Integrate **candle** for local model support
+    - [ ] Key advantages: production-ready, extensible, streaming support, modular design
+    - [ ] Implementation strategy: Hybrid approach leveraging rig's providers
 
 - [ ] **Task 5B.5**: Build vs Buy Decision Matrix
   - [ ] Core components analysis

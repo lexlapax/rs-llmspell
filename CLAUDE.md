@@ -64,6 +64,7 @@ cargo build    # Build project
 - Do what's asked; nothing more, nothing less
 - Prefer editing existing files over creating new ones
 - Update TODO.md with task completion timestamps as tasks get completed
+- **Created documentation should be put in `/docs/technical/`**
 
 ## Current Research Documents
 
