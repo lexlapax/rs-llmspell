@@ -390,45 +390,113 @@ Comprehensive refinement of rs-llmspell architecture based on go-llms and Google
     - **Events**: tokio-stream + crossbeam hybrid approach
   - [x] Created comprehensive research document at /docs/technical/workflow_state_crates_research.md
 
-- [ ] **Task 5B.4**: Supporting Infrastructure Crates
-  - [ ] Serialization and data handling
-    - [ ] serde ecosystem integration
-    - [ ] rkyv for zero-copy deserialization
-    - [ ] bincode for efficient binary formats
-  - [ ] Testing and mocking frameworks
-    - [ ] mockall for trait mocking
-    - [ ] proptest for property-based testing
-    - [ ] criterion for benchmarking
-  - [ ] Logging and observability
-    - [ ] tracing ecosystem integration
-    - [ ] metrics-rs for performance monitoring
-    - [ ] opentelemetry-rust for distributed tracing
+- [x] **Task 5B.4**: Supporting Infrastructure Crates - 2025-06-20T11:00:00-08:00
+  - [x] Serialization and data handling
+    - [x] serde ecosystem integration
+      - Industry standard, de facto serialization framework
+      - Format agnostic (JSON, YAML, TOML, MessagePack, etc.)
+      - **ESSENTIAL** for LLM JSON communication and config parsing
+    - [x] rkyv for zero-copy deserialization
+      - 10-100x faster than serde for some use cases
+      - True zero-copy access without parsing
+      - **USE CASE**: State snapshots, high-performance caching
+      - **LIMITATION**: Binary format only, more complex API
+    - [x] bincode for efficient binary formats
+      - Simple serde-based binary serialization
+      - Fast and compact, deterministic output
+      - **USE CASE**: Internal message passing between components
+  - [x] Testing and mocking frameworks
+    - [x] mockall for trait mocking
+      - Most feature-rich Rust mocking library
+      - #[automock] for automatic mock generation
+      - Supports async, static methods, complex expectations
+      - **PRIMARY CHOICE** for unit testing with mocks
+    - [x] proptest for property-based testing
+      - Automatically discovers edge cases
+      - Shrinking to minimal failing inputs
+      - **USE CASE**: Test invariants, serialization roundtrips
+    - [x] criterion for benchmarking
+      - Statistical rigor with confidence intervals
+      - Beautiful HTML reports with graphs
+      - **USE CASE**: Performance tracking over time
+  - [x] Logging and observability
+    - [x] tracing ecosystem integration
+      - Structured logging with spans for async context
+      - Zero overhead when disabled
+      - **SUPERIOR** to log crate for async applications
+      - Tracks context across async boundaries
+    - [x] metrics-rs for performance monitoring
+      - Lightweight metrics facade
+      - Multiple backends (Prometheus, StatsD)
+      - **USE CASE**: Runtime performance metrics
+    - [x] opentelemetry-rust for distributed tracing
+      - Full observability stack (traces, metrics, logs)
+      - Industry standard protocol
+      - **USE CASE**: Production distributed systems
+  - [x] **RECOMMENDATIONS**:
+    - **Serialization**: serde (general) + rkyv (performance) + bincode (internal)
+    - **Testing**: mockall + proptest + criterion comprehensive stack
+    - **Observability**: tracing (mandatory) + metrics (production) + opentelemetry (optional)
+  - [x] Created comprehensive research document at /docs/technical/supporting_infrastructure_crates_research.md
 
-- [ ] **Task 5B.1b**: **LLM Provider Layer Decision Summary**
-  - [ ] Based on research, recommended approach:
-    - [ ] Use **rig** as the foundation for LLM provider abstraction
-    - [ ] Extend with custom BaseAgent/Agent/Tool hierarchy on top
-    - [ ] Integrate **candle** for local model support
-    - [ ] Key advantages: production-ready, extensible, streaming support, modular design
-    - [ ] Implementation strategy: Hybrid approach leveraging rig's providers
+- [x] **Task 5B.1b**: **LLM Provider Layer Decision Summary** - 2025-06-20T11:15:00-08:00
+  - [x] Based on research, recommended approach:
+    - [x] Use **rig** as the foundation for LLM provider abstraction
+    - [x] Extend with custom BaseAgent/Agent/Tool hierarchy on top
+    - [x] Integrate **candle** for local model support
+    - [x] Key advantages: production-ready, extensible, streaming support, modular design
+    - [x] Implementation strategy: Hybrid approach leveraging rig's providers
+  - [x] Created decision document at /docs/technical/llm_provider_decision_summary.md
 
-- [ ] **Task 5B.5**: Build vs Buy Decision Matrix
-  - [ ] Core components analysis
-    - [ ] What must be built custom (bridge layer, agent hierarchy)
-    - [ ] What can be wrapped (LLM providers, script engines)
-    - [ ] What can be used as-is (serialization, logging)
-  - [ ] Integration complexity assessment
-    - [ ] API compatibility requirements
-    - [ ] Performance overhead considerations
-    - [ ] Maintenance burden evaluation
-  - [ ] Dependency risk analysis
-    - [ ] Crate maturity and maintenance status
-    - [ ] License compatibility checks
-    - [ ] Community support evaluation
-  - [ ] Final recommendations document
-    - [ ] Recommended crates for each component
-    - [ ] Integration patterns and best practices
-    - [ ] Risk mitigation strategies
+- [x] **Task 5B.5**: Build vs Buy Decision Matrix - 2025-06-20T11:30:00-08:00
+  - [x] Core components analysis
+    - [x] What must be built custom (bridge layer, agent hierarchy)
+      - Bridge layer: 100% custom, core differentiator
+      - Agent hierarchy: 100% custom, implements go-llms patterns
+      - Script API: 100% custom, unique experience
+    - [x] What can be wrapped (LLM providers, script engines)
+      - LLM providers: Wrap rig (70% reuse, 30% custom)
+      - State storage: Wrap sled/rocksdb behind traits
+      - Local models: Wrap candle for inference
+    - [x] What can be used as-is (serialization, logging)
+      - Serialization: serde, rkyv, bincode (95% as-is)
+      - Testing: mockall, proptest, criterion
+      - Observability: tracing, metrics-rs
+  - [x] Integration complexity assessment
+    - [x] API compatibility requirements
+      - Low: serde, tracing, standard infrastructure
+      - Medium: mlua async, state storage, rig wrapping
+      - High: JS engine, cross-language async, events
+    - [x] Performance overhead considerations
+      - Acceptable: serde, tracing, storage abstractions
+      - Critical: Bridge conversions, event routing, streaming
+      - Optimization: rkyv snapshots, batch processing
+    - [x] Maintenance burden evaluation
+      - Low risk: serde, tokio, tracing (stable)
+      - Medium risk: rig, mlua, statig (active)
+      - High risk: quickjs, experimental crates
+  - [x] Dependency risk analysis
+    - [x] Crate maturity and maintenance status
+      - Industry standard: serde, tokio ecosystem
+      - Production ready: rocksdb, criterion
+      - Growing: rig, statig, rkyv
+    - [x] License compatibility checks
+      - All recommended crates MIT/Apache-2.0 compatible
+    - [x] Community support evaluation
+      - Strong: serde, tokio, tracing communities
+      - Moderate: rig, mlua communities
+      - Growing: candle (Hugging Face support)
+  - [x] Final recommendations document
+    - [x] Recommended crates for each component
+      - Decision matrix with BUILD/WRAP/USE classifications
+      - 14 components analyzed with clear decisions
+    - [x] Integration patterns and best practices
+      - Abstraction layers for flexibility
+      - Feature flags for optional dependencies
+      - Phased implementation roadmap
+    - [x] Risk mitigation strategies
+      - Facade patterns, fallback options, regular updates
+  - [x] Created comprehensive decision matrix at /docs/technical/build_vs_buy_decision_matrix.md
 
 ### Phase 6: Synthesize Complete System (⚡ Synthesize)
 - [ ] **Task 6.1**: Complete component ecosystem design
