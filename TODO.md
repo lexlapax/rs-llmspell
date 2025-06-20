@@ -7,928 +7,197 @@ Comprehensive refinement of rs-llmspell architecture based on go-llms and Google
 
 ### Phase 1: Research Foundation (🔍 Research)
 - [x] **Task 1.1**: Deep study of go-llms architecture
-  - [x] Study core concepts: BaseAgent, Agent, Tool, Workflow relationships
-  - [x] Understand tool-wrapped agents pattern
-  - [x] Analyze hooks and events system implementation
-  - [x] Document component hierarchy patterns
-
 - [x] **Task 1.2**: Study Google Agent Development Kit (ADK) 
-  - [x] Core agent/tool/workflow concepts
-  - [x] Hook and event patterns
-  - [x] Built-in component strategies
-  - [x] Orchestration patterns
-
 - [x] **Task 1.3**: **CRITICAL** Research state management and agent handoff patterns
-  - [x] Study go-llms state structure design and usage
-  - [x] Understand agent-to-agent handoff without workflows
-  - [x] Analyze state-driven execution vs message-driven execution
-  - [x] Document state preservation and context passing patterns
-  - [x] Understand state-based debugging and observability
-
 - [x] **Task 1.4**: Research existing Rust patterns for similar systems
-  - [x] Event systems (tokio, async-std patterns)
-  - [x] Hook/plugin architectures
-  - [x] Tool composition patterns
-  - [x] State management patterns in Rust
-
 ### Phase 2: Analyze Current State (🔬 Analyze)
 - [x] **Task 2.1**: Map current rs-llmspell concepts to go-llms/ADK
-  - [x] Identify gaps in current architecture
-  - [x] Map existing traits to new hierarchy
-  - [x] Identify breaking changes needed
-
 - [x] **Task 2.2**: Analyze scripting interface implications
-  - [x] How BaseAgent/Agent/Tool hierarchy exposes to Lua/JS
-  - [x] Hook registration patterns in scripts
-  - [x] Event handling in scripting context
-
 ### Phase 3: Synthesize Core Architecture (⚡ Synthesize)
 - [x] **Task 3.1**: Design BaseAgent/Agent/Tool/Workflow hierarchy
-  - [x] BaseAgent trait - fundamental tool-handling capabilities
-  - [x] Agent trait - LLM wrapper with specialized prompts
-  - [x] Tool trait - callable functions for LLMs
-  - [x] Workflow trait - deterministic agent types
-  - [x] Tool-wrapped agent pattern
-
 - [x] **Task 3.2**: Design hooks and events system
-  - [x] Hook points: pre-llm, post-llm, pre-tool, post-tool, etc.
-  - [x] Event emit/publish/subscribe system
-  - [x] Built-in hooks for logging, metrics, debugging
-  - [x] Script-accessible hook registration
-
 ### Phase 4: Research Implementation Patterns (🔍 Research)
 - [x] **Task 4.1**: Built-in components research
-  - [x] Identify 30-40 essential built-in tools
-  - [x] Design built-in agent patterns
-  - [x] Custom workflow definition patterns
-
 - [x] **Task 4.2**: Composition and orchestration research
-  - [x] Agent composition patterns
-  - [x] Tool chaining strategies
-  - [x] Workflow nesting capabilities
-
 ### Phase 5: Analyze Integration Points (🔬 Analyze)
 - [x] **Task 5.1**: Bridge integration analysis
-  - [x] How new hierarchy maps to bridge layer
-  - [x] Script engine implications
-  - [x] Testing strategy updates needed
-
 - [x] **Task 5.2**: Performance and security analysis
-  - [x] Hook overhead considerations
-  - [x] Event system performance impact
-  - [x] Security implications of tool-wrapped agents
-
 - [x] **Task 5.3**: **CRITICAL** Scripting engine concurrency and async patterns research
-  - [x] Lua threading limitations and workarounds
-    - [x] mlua async support capabilities and limitations
-    - [x] Lua coroutines vs true async patterns
-    - [x] Cooperative scheduling implementation strategies
-    - [x] Yield-based programming models for long operations
-  - [x] JavaScript async patterns in embedded engines
-    - [x] Promise implementation in Rust JS engines (boa, v8)
-    - [x] Event loop integration with Tokio runtime
-    - [x] async/await simulation patterns
-    - [x] Worker thread alternatives for CPU-intensive tasks
-  - [x] Cross-engine async pattern standardization
-    - [x] Common async interface for Lua and JavaScript
-    - [x] Promise/Future-like abstractions for scripts
-    - [x] Error handling in async script contexts
-    - [x] Resource cleanup in interrupted async operations
-  - [x] Agent orchestration async patterns
-    - [x] Parallel agent execution without true threading
-    - [x] Tool execution scheduling and queuing
-    - [x] Stream processing with cooperative yielding
-    - [x] Hook system non-blocking execution
-  - [x] Workflow engine async design
-    - [x] Parallel workflow step execution strategies
-    - [x] Sequential workflow with async steps
-    - [x] Conditional workflows with async predicates
-    - [x] Loop workflows with async conditions and bodies
-  - [x] Performance and fairness considerations
-    - [x] Script execution time slicing
-    - [x] Resource allocation between concurrent scripts
-    - [x] Memory management in long-running async operations
-    - [x] Debugging and profiling async script execution
-
 ### Phase 5B: Research Existing Crate Ecosystem (🔍 Research)
 - [x] **Task 5B.1**: **CRITICAL** LLM Provider Layer Crates Research - 2025-06-20T08:15:00-08:00
-  - [x] rust-genai evaluation
-    - [x] Review architecture and design patterns
-      - Multi-provider abstraction with "common and ergonomic single API"
-      - Native implementation without per-service SDKs
-      - Trait-based adapter pattern with static dispatch
-      - Supports OpenAI, Anthropic, Gemini, Ollama, Groq, xAI, DeepSeek, Cohere
-    - [x] Analyze provider abstraction approach
-      - Uses `Adapter` trait with static methods (no &self)
-      - `AdapterKind` enum for provider identification
-      - `AdapterDispatcher` for routing to specific implementations
-      - Model name to provider mapping (e.g., "gpt" -> OpenAI, "claude" -> Anthropic)
-      - **LIMITATION**: Fixed enum-based providers, not easily extensible for custom providers
-    - [x] Check async/streaming support
-      - Fully async with tokio runtime
-      - Streaming support via futures::Stream trait
-      - Event-source streaming for real-time responses
-      - Inter-stream abstraction for normalized streaming across providers
-      - Tool use streaming support (recent addition)
-    - [x] Evaluate extensibility for custom providers
-      - Custom endpoints via `ServiceTargetResolver`
-      - Custom authentication via `AuthResolver`
-      - Model mapping via `ModelMapper`
-      - **LIMITATION**: Cannot add new provider types without modifying the crate
-      - **LIMITATION**: AdapterKind is a fixed enum, not trait-based
-      - Fallback to Ollama for unknown models provides some flexibility
-    - [x] Test performance and overhead
-      - Minimal dependencies: tokio, futures, reqwest, serde
-      - No unsafe code (forbid unsafe_code lint)
-      - Lightweight abstraction layer
-      - Arc-based cloning for shared state
-      - Comment mentions "overhead is minimal" for data cloning
-  - [x] Alternative LLM crates comparison - 2025-06-20T08:30:00-08:00
-    - [x] llm_api_crate evaluation
-      - Architecture: Enum-based LLM abstraction with trait `Access`
-      - Providers: OpenAI, Gemini, Anthropic (fixed enum)
-      - **LIMITATION**: No streaming support
-      - **LIMITATION**: Fixed provider set, not extensible
-      - Python bindings via PyO3
-      - Simple async interface but limited features
-    - [x] langchain-rust capabilities and limitations
-      - Full LangChain port to Rust with composability focus
-      - Providers: OpenAI, Azure OpenAI, Ollama, Anthropic, MistralAI
-      - Builder patterns and macro-heavy design
-      - Supports agents, tools, chains, and vector stores
-      - Document loaders (PDF, HTML, CSV, Git commits)
-      - **STRENGTH**: Most feature-complete LangChain implementation
-      - **COMPLEXITY**: Heavy framework with many abstractions
-    - [x] llm-chain architecture review
-      - Focused on prompt chaining and multi-step workflows
-      - Supports cloud and local models via llm.rs
-      - Three chain types: Sequential, Map-reduce, Conversational
-      - Tool integration (Bash, Python, web search)
-      - **STRENGTH**: Good for complex multi-step workflows
-      - **LIMITATION**: Less provider coverage than others
-    - [x] async-openai for OpenAI-specific needs
-      - OpenAI-specific with Azure OpenAI support
-      - Full SSE streaming support
-      - Trait-based Config for extensibility
-      - BYOT (Bring Your Own Types) feature
-      - Exponential backoff retry mechanism
-      - **STRENGTH**: Best for OpenAI-specific applications
-      - **LIMITATION**: Single provider focus
-    - [x] rllm evaluation
-      - Architecture: Thin wrapper around "llm" crate v1.2.6
-      - Providers: OpenAI, Anthropic, Ollama, DeepSeek, xAI, Phind, Groq, Google
-      - Builder pattern with LLMBuilder for configuration
-      - Two main traits: ChatProvider and CompletionProvider
-      - **FEATURES**: Multi-step chains, prompt templates, parallel evaluation
-      - **FEATURES**: Function calling, vision, reasoning, structured output
-      - **FEATURES**: Speech-to-text transcription support
-      - **LIMITATION**: Streaming disabled in all examples (.stream(false))
-      - **DESIGN**: Feature flags for conditional compilation
-      - Multi-backend registry for managing different providers
-      - **NOTE**: Wraps another crate "llm" which appears to be by same author
-    - [x] rig evaluation
-      - Architecture: Trait-based provider abstraction with companion crates
-      - Core traits: CompletionModel, EmbeddingModel, VectorStoreIndex
-      - Providers: OpenAI, Anthropic, Gemini, xAI, Perplexity, Cohere, DeepSeek, and more
-      - **STRENGTH**: Full streaming support with StreamingCompletion trait
-      - **STRENGTH**: Modular design - each provider/vector store in separate crate
-      - **STRENGTH**: High-level Agent abstraction for RAG and tools
-      - **STRENGTH**: Extensive vector store integrations (MongoDB, Neo4j, LanceDB, etc.)
-      - **EXTENSIBILITY**: Implement CompletionModel trait for custom providers
-      - **FEATURES**: Tool calling, embeddings, RAG, multi-agent support
-      - **FEATURES**: Audio generation, image generation, transcription
-      - **DESIGN**: Clean separation between completion and embedding models
-      - **DESIGN**: Builder pattern for agents and requests
-      - Async-first with tokio runtime
-    - [x] candle for local model support
-      - Architecture: Minimalist ML framework focused on serverless inference
-      - Core goal: Remove Python from production, create lightweight binaries
-      - **BACKENDS**: CPU (with MKL/Accelerate), CUDA, Metal, WASM
-      - **MODELS**: LLaMA, Mistral, Mixtral, Gemma, Phi, Falcon, Whisper, etc.
-      - **QUANTIZATION**: Supports GGML/GGUF formats like llama.cpp
-      - **STRENGTH**: PyTorch-like syntax, easy to use
-      - **STRENGTH**: WASM support for browser-based inference
-      - **STRENGTH**: Extensive model support with examples
-      - **INTEGRATION**: Could serve as local model backend for rs-llmspell
-      - **DESIGN**: Modular crates (core, nn, transformers, examples)
-      - **PERFORMANCE**: Optimized for small binary size and fast inference
-      - Maintained by Hugging Face team
-    - [x] **COMPARISON SUMMARY**:
-      - **rust-genai**: Best multi-provider abstraction, good streaming, limited extensibility
-      - **llm_api_crate**: Simplest API, no streaming, very limited
-      - **langchain-rust**: Most features, heavy framework, good for complex apps
-      - **llm-chain**: Good for workflows/chains, moderate complexity
-      - **async-openai**: Best for OpenAI-only apps, excellent streaming
-      - **rllm**: Good multi-provider support, rich features, unclear streaming status
-      - **rig**: Most extensible, excellent streaming, modular architecture, best for production
-      - **candle**: Best for local model inference, WASM support, no API provider abstraction
-  - [x] Provider abstraction requirements - 2025-06-20T09:00:00-08:00
-    - [x] Multi-provider support patterns
-      - **FINDING**: Two main approaches - enum-based (rust-genai, llm_api_crate) vs trait-based (rig)
-      - **RECOMMENDATION**: Use trait-based approach like rig for extensibility
-      - **REQUIREMENT**: Support dynamic provider registration
-      - **REQUIREMENT**: Allow custom provider implementations
-      - **PATTERN**: Separate crates for each provider (like rig's modular design)
-    - [x] Streaming response handling
-      - **FINDING**: Critical feature - most modern crates support it
-      - **BEST PRACTICE**: rig's StreamingCompletion trait pattern
-      - **REQUIREMENT**: Unified streaming interface across providers
-      - **REQUIREMENT**: Support both streaming and non-streaming modes
-      - **CONSIDERATION**: Handle provider-specific streaming formats (SSE, WebSocket, etc.)
-    - [x] Token counting and rate limiting
-      - **FINDING**: Often overlooked but important for production
-      - **REQUIREMENT**: Provider-agnostic token counting interface
-      - **REQUIREMENT**: Rate limiting with exponential backoff
-      - **CONSIDERATION**: Different tokenizers per provider
-      - **BEST PRACTICE**: async-openai's retry mechanism
-    - [x] Error handling and retries
-      - **FINDING**: Most crates use custom error types with thiserror
-      - **REQUIREMENT**: Unified error type that can wrap provider-specific errors
-      - **REQUIREMENT**: Automatic retry with exponential backoff
-      - **BEST PRACTICE**: async-openai's approach with configurable retry
-      - **CONSIDERATION**: Different error types per provider (rate limits, auth, network)
-    - [x] Authentication and configuration
-      - **FINDING**: Various approaches - env vars, builders, config structs
-      - **REQUIREMENT**: Flexible auth (API keys, OAuth, custom headers)
-      - **REQUIREMENT**: Per-provider configuration with defaults
-      - **BEST PRACTICE**: rig's Config trait for extensible configuration
-      - **PATTERN**: rust-genai's AuthResolver for dynamic auth
-  - [x] Integration feasibility analysis - 2025-06-20T09:10:00-08:00
-    - [x] Compatibility with BaseAgent/Agent design
-      - **FINDING**: rig's Agent abstraction aligns well with go-llms BaseAgent concept
-      - **COMPATIBILITY**: rig's CompletionModel trait maps to LLM provider interface
-      - **INTEGRATION**: Can wrap rig agents as Tools for tool-wrapped agent pattern
-      - **CHALLENGE**: Need to bridge rig's trait-based design with rs-llmspell's hierarchy
-    - [x] Bridge pattern implementation options
-      - **OPTION 1**: Wrap rig directly - least work, most features
-      - **OPTION 2**: Create custom trait inspired by rig - more control, more work
-      - **OPTION 3**: Hybrid - use rig for providers, custom for agent hierarchy
-      - **RECOMMENDATION**: Option 3 - leverage rig's providers with custom agents
-    - [x] Custom provider extension points
-      - **REQUIREMENT**: Allow users to implement custom CompletionModel trait
-      - **REQUIREMENT**: Support local models via candle integration
-      - **PATTERN**: Provider registry for dynamic provider loading
-      - **CONSIDERATION**: Plugin system for community providers
-
 - [x] **Task 5B.2**: Scripting Engine Crates Evaluation - 2025-06-20T09:30:00-08:00
-  - [x] Lua embedding options
-    - [x] mlua features and limitations review
-      - **FEATURES**: Async/await support via coroutines
-      - **FEATURES**: Multiple Lua versions (5.1-5.4, LuaJIT, Luau)
-      - **FEATURES**: Module and standalone modes
-      - **SAFETY**: Not absolute - contains significant unsafe code
-      - **THREADING**: Optional Send + Sync with "send" feature
-      - **ASYNC**: Works with any executor (Tokio, async-std)
-      - **LIMITATION**: Cannot guarantee complete safety
-    - [x] rlua comparison for safety guarantees
-      - **STATUS**: Deprecated in favor of mlua
-      - **CURRENT**: Now a thin wrapper around mlua
-      - **MIGRATION**: Provides compatibility traits
-      - **RECOMMENDATION**: Use mlua directly for new projects
-    - [x] lua-sys for low-level control needs
-      - **mlua-sys**: Raw FFI bindings used by mlua
-      - **PURPOSE**: Direct Lua C API access
-      - **SAFETY**: Requires careful unsafe handling
-      - **USE CASE**: Only if mlua abstractions insufficient
-    - [x] Performance benchmarks and memory usage
-      - **OVERHEAD**: Safety mechanisms add some overhead
-      - **OPTIMIZATION**: Feature flags to reduce dependencies
-      - **MEMORY**: Efficient coroutine-based async
-  - [x] JavaScript engine alternatives
-    - [x] boa maturity and compliance assessment
-      - **STATUS**: Experimental but progressing
-      - **COMPLIANCE**: 90% ECMAScript spec compliance
-      - **FEATURES**: Module support, single-threaded
-      - **STRENGTHS**: Pure Rust, memory safe, embeddable
-      - **LIMITATIONS**: Still experimental, not production-ready
-    - [x] v8 rust bindings complexity analysis
-      - **rusty_v8**: Now stable (v129.0.0+)
-      - **COMPLEXITY**: 600K+ lines C++, 30min compile
-      - **BUILD**: Complex (gn + ninja), but automated via cargo
-      - **FEATURES**: Full V8 API, WebAssembly, Inspector, Fast API
-      - **CHALLENGES**: Scopes, isolates, memory management
-    - [x] quickjs-rs for lightweight embedding
-      - **SIZE**: 210 KiB for hello world
-      - **PERFORMANCE**: <300μs runtime lifecycle
-      - **ALTERNATIVES**: rquickjs more feature-complete
-      - **FEATURES**: ES2020, async/await, modules, bytecode
-      - **LIMITATION**: Single-threaded (mutex-locked)
-    - [x] deno_core for modern JS features
-      - **FOUNDATION**: Built on rusty_v8
-      - **FEATURES**: TypeScript, JSX, web standards
-      - **SECURITY**: Permission system, sandboxing
-      - **USE CASE**: Custom JS/TS runtimes
-      - **PRODUCTION**: Stable and widely used
-  - [x] Cross-language considerations - 2025-06-20T10:15:00-08:00
-    - [x] Unified value conversion strategies
-      - ScriptValue enum as common type representation
-      - Bidirectional conversion traits for mlua and JavaScript engines
-      - Function proxy pattern for cross-language callbacks
-      - Promise/Coroutine interop for async operations
-    - [x] Shared memory management approaches
-      - Arc/Weak reference counting for shared objects
-      - CrossLangObject wrapper with vtable for method dispatch
-      - Coordinated GC between Lua and JavaScript runtimes
-      - Lazy conversion to minimize overhead
-    - [x] Consistent error handling patterns
-      - Unified ScriptError type with language-specific variants
-      - ErrorContext preservation with stack traces
-      - Cross-boundary error propagation
-      - Cause chain tracking for debugging
-
 - [x] **Task 5B.3**: Workflow and State Management Crates - 2025-06-20T10:45:00-08:00
-  - [x] Workflow engine crates
-    - [x] temporal-sdk-rust capabilities
-      - Production-ready distributed workflow orchestration
-      - Requires external Temporal server infrastructure
-      - **LIMITATION**: Too heavyweight for embedded scripting
-      - Good patterns but not directly usable for rs-llmspell
-    - [x] flowrs for lightweight workflows
-      - Early development (0.1.x), lightweight and embeddable
-      - Builder pattern with async native design
-      - **POTENTIAL**: Could be wrapped but needs enhancement
-      - Limited features: no persistence, signals, or queries
-    - [x] state-machine crates comparison
-      - **sm**: Compile-time safety, zero overhead, typestate pattern
-      - **statig**: Hierarchical states, async support, event-driven
-      - **finny**: Actor-based, queue management, builder API
-      - **RECOMMENDATION**: statig for async hierarchical agent states
-  - [x] State management solutions
-    - [x] sled for embedded persistence
-      - Lock-free, log-structured design, beta status (0.34.x)
-      - Fast reads, ACID transactions, watch subscriptions
-      - **PROS**: Rust native, embedded, good performance
-      - **CONS**: Beta status, memory intensive, higher space usage
-    - [x] rocksdb for high-performance needs
-      - Production proven, stable (0.21.x), battle-tested
-      - Column families, compaction, snapshots
-      - **PROS**: Excellent for large datasets, stable API
-      - **CONS**: C++ dependency, large binary size
-    - [x] async-std storage patterns
-      - Actor-based state management patterns
-      - Channel-based coordination strategies
-      - Not a storage solution but patterns for async state
-  - [x] Event system crates
-    - [x] tokio-stream for async event streams
-      - Part of tokio ecosystem, async-first design
-      - Stream combinators, broadcast channels
-      - **PROS**: Perfect tokio integration, zero-cost abstractions
-      - **CONS**: Tokio lock-in, learning curve
-    - [x] crossbeam-channel for multi-producer patterns
-      - Sync channels for thread-to-thread communication
-      - Multiple channel types, select! macro support
-      - **PROS**: Excellent performance, runtime agnostic
-      - **CONS**: Not async native, needs adapter
-    - [x] event-emitter-rs for pub/sub models
-      - Simple Node.js style event emitter
-      - Limited documentation and features
-      - Less commonly used than alternatives
-  - [x] **RECOMMENDATIONS**:
-    - **Workflow**: Custom engine inspired by flowrs patterns
-    - **State**: sled (dev) / rocksdb (prod) behind trait abstraction
-    - **State Machines**: statig for hierarchical async states
-    - **Events**: tokio-stream + crossbeam hybrid approach
-  - [x] Created comprehensive research document at /docs/technical/workflow_state_crates_research.md
-
 - [x] **Task 5B.4**: Supporting Infrastructure Crates - 2025-06-20T11:00:00-08:00
-  - [x] Serialization and data handling
-    - [x] serde ecosystem integration
-      - Industry standard, de facto serialization framework
-      - Format agnostic (JSON, YAML, TOML, MessagePack, etc.)
-      - **ESSENTIAL** for LLM JSON communication and config parsing
-    - [x] rkyv for zero-copy deserialization
-      - 10-100x faster than serde for some use cases
-      - True zero-copy access without parsing
-      - **USE CASE**: State snapshots, high-performance caching
-      - **LIMITATION**: Binary format only, more complex API
-    - [x] bincode for efficient binary formats
-      - Simple serde-based binary serialization
-      - Fast and compact, deterministic output
-      - **USE CASE**: Internal message passing between components
-  - [x] Testing and mocking frameworks
-    - [x] mockall for trait mocking
-      - Most feature-rich Rust mocking library
-      - #[automock] for automatic mock generation
-      - Supports async, static methods, complex expectations
-      - **PRIMARY CHOICE** for unit testing with mocks
-    - [x] proptest for property-based testing
-      - Automatically discovers edge cases
-      - Shrinking to minimal failing inputs
-      - **USE CASE**: Test invariants, serialization roundtrips
-    - [x] criterion for benchmarking
-      - Statistical rigor with confidence intervals
-      - Beautiful HTML reports with graphs
-      - **USE CASE**: Performance tracking over time
-  - [x] Logging and observability
-    - [x] tracing ecosystem integration
-      - Structured logging with spans for async context
-      - Zero overhead when disabled
-      - **SUPERIOR** to log crate for async applications
-      - Tracks context across async boundaries
-    - [x] metrics-rs for performance monitoring
-      - Lightweight metrics facade
-      - Multiple backends (Prometheus, StatsD)
-      - **USE CASE**: Runtime performance metrics
-    - [x] opentelemetry-rust for distributed tracing
-      - Full observability stack (traces, metrics, logs)
-      - Industry standard protocol
-      - **USE CASE**: Production distributed systems
-  - [x] **RECOMMENDATIONS**:
-    - **Serialization**: serde (general) + rkyv (performance) + bincode (internal)
-    - **Testing**: mockall + proptest + criterion comprehensive stack
-    - **Observability**: tracing (mandatory) + metrics (production) + opentelemetry (optional)
-  - [x] Created comprehensive research document at /docs/technical/supporting_infrastructure_crates_research.md
-
 - [x] **Task 5B.1b**: **LLM Provider Layer Decision Summary** - 2025-06-20T11:15:00-08:00
-  - [x] Based on research, recommended approach:
-    - [x] Use **rig** as the foundation for LLM provider abstraction
-    - [x] Extend with custom BaseAgent/Agent/Tool hierarchy on top
-    - [x] Integrate **candle** for local model support
-    - [x] Key advantages: production-ready, extensible, streaming support, modular design
-    - [x] Implementation strategy: Hybrid approach leveraging rig's providers
-  - [x] Created decision document at /docs/technical/llm_provider_decision_summary.md
-
 - [x] **Task 5B.5**: Build vs Buy Decision Matrix - 2025-06-20T11:30:00-08:00
-  - [x] Core components analysis
-    - [x] What must be built custom (bridge layer, agent hierarchy)
-      - Bridge layer: 100% custom, core differentiator
-      - Agent hierarchy: 100% custom, implements go-llms patterns
-      - Script API: 100% custom, unique experience
-    - [x] What can be wrapped (LLM providers, script engines)
-      - LLM providers: Wrap rig (70% reuse, 30% custom)
-      - State storage: Wrap sled/rocksdb behind traits
-      - Local models: Wrap candle for inference
-    - [x] What can be used as-is (serialization, logging)
-      - Serialization: serde, rkyv, bincode (95% as-is)
-      - Testing: mockall, proptest, criterion
-      - Observability: tracing, metrics-rs
-  - [x] Integration complexity assessment
-    - [x] API compatibility requirements
-      - Low: serde, tracing, standard infrastructure
-      - Medium: mlua async, state storage, rig wrapping
-      - High: JS engine, cross-language async, events
-    - [x] Performance overhead considerations
-      - Acceptable: serde, tracing, storage abstractions
-      - Critical: Bridge conversions, event routing, streaming
-      - Optimization: rkyv snapshots, batch processing
-    - [x] Maintenance burden evaluation
-      - Low risk: serde, tokio, tracing (stable)
-      - Medium risk: rig, mlua, statig (active)
-      - High risk: quickjs, experimental crates
-  - [x] Dependency risk analysis
-    - [x] Crate maturity and maintenance status
-      - Industry standard: serde, tokio ecosystem
-      - Production ready: rocksdb, criterion
-      - Growing: rig, statig, rkyv
-    - [x] License compatibility checks
-      - All recommended crates MIT/Apache-2.0 compatible
-    - [x] Community support evaluation
-      - Strong: serde, tokio, tracing communities
-      - Moderate: rig, mlua communities
-      - Growing: candle (Hugging Face support)
-  - [x] Final recommendations document
-    - [x] Recommended crates for each component
-      - Decision matrix with BUILD/WRAP/USE classifications
-      - 14 components analyzed with clear decisions
-    - [x] Integration patterns and best practices
-      - Abstraction layers for flexibility
-      - Feature flags for optional dependencies
-      - Phased implementation roadmap
-    - [x] Risk mitigation strategies
-      - Facade patterns, fallback options, regular updates
-  - [x] Created comprehensive decision matrix at /docs/technical/build_vs_buy_decision_matrix.md
-
 ### Phase 6: Synthesize Complete System (⚡ Synthesize)
 - [x] **Task 6.1**: Complete component ecosystem design - 2025-06-20T11:45:00-08:00
-  - [x] Full trait hierarchy with relationships
-    - BaseAgent as foundation with tool handling
-    - Agent extends BaseAgent with LLM capabilities
-    - Tool trait for LLM-callable functions
-    - Workflow trait for deterministic patterns
-    - Composition traits: Composable, Observable, Hookable, Scriptable
-  - [x] Built-in component library structure
-    - 40+ built-in tools across 9 categories
-    - 6 agent templates (Chat, Research, Code, Data, Planner, Orchestrator)
-    - 6 workflow types (Sequential, Parallel, Conditional, Loop, MapReduce, Pipeline)
-  - [x] Hook/event system integration
-    - 20+ hook points throughout lifecycle
-    - Comprehensive event types and handlers
-    - Built-in hooks for logging, metrics, tracing, rate limiting, caching
-    - Hybrid EventBus using tokio + crossbeam
-  - [x] Composition and orchestration patterns
-    - Tool-wrapped agent pattern
-    - Composite, Pipeline, and Hierarchical agents
-    - Agent pools, mesh, and saga patterns
-    - State handoff and synchronization
-  - [x] Created comprehensive design at /docs/technical/component_ecosystem_design.md
-
 - [x] **Task 6.2**: Script interface design - 2025-06-20T12:00:00-08:00
-  - [x] Lua/JavaScript API for new concepts
-    - Language-idiomatic APIs (tables for Lua, objects for JS)
-    - Agent creation with builders and configuration objects
-    - Tool definition with handlers and validation
-    - Workflow definitions (sequential, conditional, parallel)
-  - [x] Hook registration in scripts
-    - Global and agent-specific hooks
-    - Priority-based execution
-    - Conditional hooks with filters
-    - Middleware-style composition in JS
-  - [x] Event handling in scripts
-    - Event emitter patterns for both languages
-    - Async event handlers
-    - Pattern matching and wildcards
-    - Event aggregation and replay
-  - [x] Built-in component access
-    - Organized tool library by category
-    - Agent template instantiation
-    - Dynamic loading and extension
-    - Custom component registration
-  - [x] **ASYNC PATTERNS**: Promise/Future-like abstractions for scripts
-    - Lua Promise implementation with then/catch
-    - Native JS promises and combinators
-    - Unified error handling
-  - [x] **ASYNC PATTERNS**: Cooperative scheduling API design
-    - Lua coroutine-based scheduler
-    - JS async generators with backpressure
-    - Yield points for long operations
-  - [x] **ASYNC PATTERNS**: Cross-engine async compatibility layer
-    - Stream processing abstractions
-    - Batch processing with flow control
-    - Timeout and cancellation support
-  - [x] Created comprehensive design at /docs/technical/script_interface_design.md
-
 ### Phase 7: Collate Architecture (📋 Collate)
 - [x] **Task 7.1**: Organize all concepts into coherent architecture - 2025-06-20T12:15:00-08:00
-  - [x] Resolve conflicts between concepts
-    - BaseAgent vs Agent hierarchy clarified
-    - Async patterns unified across languages
-    - State management boundaries defined
-    - Tool vs Agent criteria established
-  - [x] Ensure consistent terminology
-    - Core terms defined (BaseAgent, Agent, Tool, Workflow, etc.)
-    - Naming conventions for Rust and scripts
-    - Language-specific API conventions
-  - [x] Validate against go-llms/ADK patterns
-    - BaseAgent pattern ✓ aligned
-    - Tool-wrapped agent pattern ✓ implemented
-    - State-driven execution ✓ enhanced
-    - All ADK concepts mapped and validated
-  - [x] Create comprehensive component map
-    - 6-layer architecture diagram
-    - Component relationship graph
-    - Data flow visualization
-    - Module organization defined
-  - [x] Created collated architecture at /docs/technical/collated_architecture.md
-
 - [x] **Task 7.2**: Validate against use cases - 2025-06-20T12:30:00-08:00
-  - [x] Simple tool execution scenarios
-    - Calculator tool with natural language
-    - File operations with safety checks
-    - Web search with rate limiting and caching
-    - All scenarios show clean API and proper safety
-  - [x] Complex multi-agent workflows
-    - Blog creation pipeline (4 agents, sequential)
-    - Parallel analysis with aggregation
-    - Conditional routing based on content
-    - Demonstrates data flow and orchestration
-  - [x] Hook/event driven automation
-    - Automatic error recovery with backoff
-    - Real-time progress streaming
-    - Compliance and audit logging
-    - Shows power of hook/event system
-  - [x] Built-in component usage
-    - Tool composition from built-ins
-    - Agent template extension
-    - Workflow template customization
-    - Validates extensibility patterns
-  - [x] Additional validation scenarios:
-    - High-throughput with batching
-    - Memory-efficient streaming
-    - Multi-provider fallback
-  - [x] Created validation document at /docs/technical/use_case_validation.md
-
 ### Phase 8: Update Architecture Document (📝 Update)
 - [x] **Task 8.1**: Update core concepts and philosophy - 2025-06-20T12:45:00-08:00
-  - [x] Revise core philosophy section
-    - Bridge-first principle with specific crate choices
-    - Go-llms patterns adapted for Rust
-    - Production-first design philosophy
-    - Language-idiomatic API approach
-  - [x] Update architecture overview
-    - 5-layer architecture diagram
-    - Clear data flow visualization
-    - Component hierarchy explanation
-    - External dependency mapping
-  - [x] Refine bridge-first design section
-    - Specific bridge targets (rig, mlua, sled, tracing)
-    - Type conversion strategy with ScriptValue
-    - Async pattern handling per language
-    - Performance and safety considerations
-  - [x] Complete architecture.md rewrite with:
-    - Go-llms inspired component model
-    - 40+ built-in tools across 8 categories
-    - Hook/event system with 20+ points
-    - Production-ready infrastructure
-    - Comprehensive examples and roadmap
-
 - [x] **Task 8.2**: Update component architecture sections - 2025-06-20T13:00:00-08:00
-  - [x] BaseAgent/Agent/Tool/Workflow hierarchy
-    - Detailed trait definitions with complete method signatures
-    - ChatAgent implementation example with hooks integration
-    - CalculatorTool implementation with schema validation
-    - SequentialWorkflow implementation with context management
-  - [x] Hooks and events system
-    - Integrated throughout all component examples
-    - Hook execution in agent chat method
-    - Event emission and handling patterns
-    - Built-in hook types covered
-  - [x] Built-in components
-    - Component examples within trait implementations
-    - Tool categories and organization
-    - Agent template patterns
-    - Workflow type implementations
-  - [x] Tool-wrapped agents
-    - Complete AgentAsTool implementation
-    - Generic wrapper pattern for any agent
-    - Usage examples in Lua for orchestration
-    - Composition pattern explanations
-  - [x] Composition patterns
-    - Hierarchical agent delegation
-    - Pipeline agent transformation
-    - Multi-agent coordination examples
-  - [x] Added comprehensive "Detailed Component Architecture" section to architecture.md
-
 - [x] **Task 8.3**: Update directory structure - 2025-06-20T13:15:00-08:00
-  - [x] Add built-in components crates
-    - llmspell-tools/ with 8 tool categories (40+ tools)
-    - llmspell-agents/ with 6 agent templates
-    - llmspell-workflows/ with 6 workflow types
-    - Organized by functionality with feature flags
-  - [x] Add hooks/events system crates
-    - llmspell-infra/hooks/ with HookManager and built-in hooks
-    - llmspell-infra/events/ with EventBus and streaming
-    - llmspell-infra/security/ for sandboxing and audit
-    - Complete infrastructure layer organization
-  - [x] Update testing strategy for new concepts
-    - llmspell-testing/ crate with mocks, fixtures, harness
-    - Unit testing examples for all component types
-    - Integration testing patterns
-    - Script testing harness for Lua/JS
-    - Performance benchmarking structure
-  - [x] Added comprehensive directory structure section:
-    - 12 main crates with detailed file organization
-    - Feature flags for conditional compilation
-    - Development workflow and CI/CD integration
-    - Complete build and testing commands
-
 - [x] **Task 8.4**: Update examples section - 2025-06-20T14:00:00-08:00
-  - [x] Show BaseAgent usage in scripts
-    - Custom DataProcessingWorkflow (Lua) with coroutine-based execution
-    - MultiAgentOrchestrator (JavaScript) with parallel agent coordination
-    - Tool-handling capabilities and state management
-  - [x] Demonstrate hook registration
-    - Global hooks for performance monitoring and error handling
-    - Agent-specific hooks for validation, security, and audit logging
-    - Hook priority and execution order examples
-  - [x] Event-driven workflow examples
-    - Event-based multi-agent research coordination (Lua)
-    - Real-time activity monitoring with streaming (JavaScript)
-    - Event emission and subscription patterns
-  - [x] Built-in tool usage examples
-    - Tool composition with security validation and sandboxing
-    - Multi-tool research workflows with comprehensive tool suite
-    - Rate limiting, content filtering, and audit integration
-  - [x] **ASYNC PATTERNS**: Parallel agent execution examples
-    - Cooperative scheduling with Lua coroutines
-    - Promise-based coordination with controlled concurrency
-    - Task queuing and execution management
-  - [x] **ASYNC PATTERNS**: Long-running tool execution with yielding
-    - Coroutine yielding for cooperative multitasking
-    - Progress tracking and streaming updates
-    - Resource management in long operations
-  - [x] **ASYNC PATTERNS**: Stream processing examples
-    - Real-time result streaming with AsyncAgentCoordinator
-    - Event stream processing with monitoring
-    - Memory-efficient document processing
-  - [x] **ASYNC PATTERNS**: Error handling in async contexts
-    - Retry logic with exponential backoff
-    - Timeout handling and graceful degradation
-    - Pipeline error recovery and continuation
-  - [x] Added comprehensive examples section with 5 major categories:
-    - BaseAgent usage showing custom implementations and composition
-    - Hook registration demonstrating global and agent-specific patterns
-    - Event-driven workflows with real-time coordination
-    - Built-in tool usage with security and validation
-    - Async patterns covering all major concurrency scenarios
-
 ### Phase 9: Research Advanced Patterns (🔍 Research)
 - [x] **Task 9.1**: Advanced orchestration patterns - 2025-06-20T14:30:00-08:00
-  - [x] Multi-agent collaboration patterns
-    - Swarm Intelligence Pattern for distributed processing with consensus building
-    - Hierarchical Delegation Pattern with supervisor/specialist architecture
-    - Consensus Building Pattern for complex decision making with voting mechanisms
-  - [x] Dynamic workflow composition
-    - Adaptive Workflow Pattern that modifies structure based on results
-    - Pipeline Composition Pattern for dynamic data transformation chains
-    - Rule-based workflow adaptation with insertion, skipping, and looping
-  - [x] Real-time event-driven automation
-    - Event Stream Processing Pattern with continuous agent reactions
-    - Reactive Agent Network Pattern for cascading event-driven behaviors
-    - Real-time processing modes: immediate, batched, and scheduled
-  - [x] Created comprehensive research document at /docs/technical/advanced_orchestration_patterns.md
-
 - [x] **Task 9.2**: Performance optimization patterns - 2025-06-20T15:00:00-08:00
-  - [x] Efficient hook execution
-    - Hook Execution Pipeline Optimization with parallel execution and caching
-    - Hook Dependency Graph Optimization for efficient execution paths
-    - Adaptive execution strategies with performance budgets
-  - [x] Event system optimization
-    - High-Performance Event Bus with lock-free multi-producer/consumer design
-    - Event Stream Backpressure Management with adaptive rate limiting
-    - Smart routing with bloom filters and pattern matching
-  - [x] Tool execution pooling
-    - Intelligent Tool Pool Management with warm-up and scaling
-    - Adaptive scaling policies based on utilization and load prediction
-    - Pool health monitoring and automatic instance retirement
-  - [x] Created comprehensive research document at /docs/technical/performance_optimization_patterns.md
-
 - [x] **Task 9.3**: Model Control Protocol Support (MCP) - 2025-06-20T15:30:00-08:00
-  - [x] MCP client support for rs-llmspell agents to add / use / call external MCP Tools
-    - MCPClientManager for discovering and connecting to external MCP servers
-    - MCPToolAdapter bridge pattern for seamless integration with rs-llmspell tools
-    - Support for HTTP, WebSocket, and stdio MCP transports
-  - [x] MCP server support for tools in rs-llmspell to be exposed as MCP Servers
-    - [x] straight exposure of builtin tool as MCP
-    - [x] exposure of Agents as tools via MCP
-    - MCPServer implementation with authentication and rate limiting
-    - MCPAgentWrapper for exposing agents as discoverable MCP tools
-  - [x] crates and libraries to support MCP
-    - Research of mcp-rs ecosystem and integration architecture
-    - Planned crate structure: llmspell-mcp, llmspell-mcp-client, llmspell-mcp-server
-  - [x] Created comprehensive research document at /docs/technical/mcp_support_research.md
-
 - [x] **Task 9.4**: Agent to Agent Protocol Support (A2A) - 2025-06-20T16:00:00-08:00
-  - [x] A2A client support - rs-llmspell able to call or use other Agents in workflows or Agent handoffs
-    - A2AAgentRegistry for discovering and ranking external agents
-    - A2AAgentProxy for seamless integration of external agents
-    - Multi-agent conversation management and coordination
-  - [x] A2A server support - export rs-llmspell built agents or workflows to be called via A2A
-    - A2AServer implementation with discovery beacon and connection management
-    - Agent and workflow exposure via A2A protocol
-    - Enterprise features: access control, rate limiting, monitoring
-  - [x] crates and libraries to support A2A
-    - Proposed a2a-protocol ecosystem with client/server implementations
-    - Integration architecture for llmspell-a2a crate family
-  - [x] Created comprehensive research document at /docs/technical/a2a_protocol_research.md
-
 - [x] **Task 9.5**: scripting language module support - 2025-06-20T16:30:00-08:00
-  - [x] concept research on not only embedding the language runtime (eg. mlua) but exposing agent, tools, etc functionality as a module back to be used as a module in regular lua
-    - Bidirectional integration concept: embedded runtimes + external module support
-    - Four approaches: Native modules, C API bridge, WebAssembly, and IPC
-    - Benefits and trade-offs for each approach analyzed
-  - [x] lua research
-    - Lua C module implementation using Lua C API
-    - LuaRocks package distribution strategy
-    - OpenResty/nginx integration examples
-    - Agent, Tool, and Workflow wrappers with proper memory management
-  - [x] javascript research
-    - Node.js native addon implementation using N-API
-    - NPM package distribution with prebuild binaries
-    - TypeScript definitions for full type safety
-    - Express.js and React integration examples
-  - [x] changes to or augmentation to library layout , architecture, sub-crates because of this
-    - New crate structure: llmspell-c-api, llmspell-module-core, bindings/
-    - C API design for stable ABI across language bindings
-    - Module interface abstractions and registry system
-    - Separation of embedded vs external module functionality
-  - [x] Created comprehensive research document at /docs/technical/scripting_module_support_research.md
-
 ### Phase 10: Analyze Testing Strategy (🔬 Analyze)
 - [x] **Task 10.1**: Testing strategy for new concepts - 2025-06-20T17:00:00-08:00
-  - [x] Hook system testing patterns
-    - Hook registration and execution testing with priority ordering
-    - Hook failure isolation and error handling
-    - Parallel hook execution testing
-    - Hook context isolation and modification testing
-    - Performance benchmarks for hook execution strategies
-  - [x] Event system testing
-    - Event delivery testing across multiple subscribers
-    - Event bus throughput testing (10,000+ events/sec)
-    - Circuit breaker behavior under failure conditions
-    - Backpressure handling and rate limiting
-  - [x] Tool-wrapped agent testing
-    - Agent-as-tool basic functionality and parameter validation
-    - Tool composition and orchestration testing
-    - Error handling and failure isolation
-    - Recursive agent tool prevention
-  - [x] Built-in component testing
-    - Data tools integration (CSV, JSON, XML)
-    - File system security and path validation
-    - Web tools rate limiting behavior
-    - Tool chain execution and composition
-  - [x] **ASYNC PATTERNS**: Async script execution testing
-    - Lua coroutine cooperative scheduling
-    - JavaScript Promise coordination and error handling
-    - Stream processing with controlled concurrency
-    - Resource cleanup in interrupted operations
-  - [x] **ASYNC PATTERNS**: Cooperative scheduling test scenarios
-    - Interleaved execution verification
-    - Task priority and ordering
-    - Yield-based programming validation
-  - [x] **ASYNC PATTERNS**: Resource cleanup in interrupted operations
-    - Memory leak prevention
-    - Proper cleanup on task cancellation
-    - Resource tracking and monitoring
-  - [x] **ASYNC PATTERNS**: Performance testing for async patterns
-    - Parallel vs sequential execution timing
-    - Memory usage under concurrent load
-    - Throughput testing with backpressure
-  - [x] Created comprehensive testing document at /docs/technical/testing_strategy_analysis.md
-
 - [x] **Task 10.2**: Cross-engine compatibility analysis - 2025-06-20T17:30:00-08:00
-  - [x] Hook registration across engines
-    - Lua function-based and table-based hook registration patterns
-    - JavaScript object-based and class-based hook registration
-    - Cross-engine hook registry with context translation
-    - Compatibility layer for unified hook execution
-  - [x] Event handling differences
-    - Lua coroutine-based async event handling
-    - JavaScript Promise-based and stream-based event patterns
-    - Cross-engine event bus with automatic translation
-    - Wildcard and replay event handling across engines
-  - [x] Tool execution consistency
-    - Unified tool interface across scripting engines
-    - Parameter validation and error handling standardization
-    - Tool result translation and metadata preservation
-    - Performance monitoring across engine boundaries
-  - [x] **ASYNC PATTERNS**: Async pattern compatibility across Lua/JS
-    - Coroutine vs Promise execution model mapping
-    - Cooperative scheduling vs event loop integration
-    - Cross-engine async context management
-  - [x] **ASYNC PATTERNS**: Promise/Future behavior consistency
-    - Lua coroutine wrapper for Promise-like behavior
-    - JavaScript Promise adaptation for cooperative scheduling
-    - Error handling standardization across async patterns
-  - [x] **ASYNC PATTERNS**: Error propagation in async contexts
-    - Cross-engine error translation and formatting
-    - Stack trace preservation across language boundaries
-    - Async error recovery and fallback strategies
-  - [x] Created comprehensive compatibility document at /docs/technical/cross_engine_compatibility_analysis.md
-
 ### Phase 11: Synthesize Final Architecture (⚡ Synthesize)
 - [x] **Task 11.1**: Complete architecture integration - 2025-06-20T17:45:00-08:00
-  - [x] Finalize all trait relationships
-  - [x] Complete hook/event integration
-  - [x] Finalize built-in component strategy
-  - [x] **ASYNC PATTERNS**: Integrate async patterns into core architecture
-  - [x] **ASYNC PATTERNS**: Finalize cooperative scheduling design
-  - [x] **ASYNC PATTERNS**: Complete async error handling strategy
-  - [x] Created `/docs/technical/final_architecture_synthesis.md` - Complete integration document
-  - [x] Created `/docs/technical/hook_event_integration_complete.md` - Production-ready hook/event system
-  - [x] Created `/docs/technical/builtin_component_strategy_complete.md` - 40+ tools, templates, discovery
-  - [x] Created `/docs/technical/async_patterns_integration_complete.md` - Unified async across engines
-  - [x] Created `/docs/technical/error_handling_strategy_complete.md` - Comprehensive error management
-
 - [x] **Task 11.2**: Future evolution strategy - 2025-06-20T18:15:00-08:00
-  - [x] Extension points for new concepts
-  - [x] Backward compatibility strategy
-  - [x] Migration path from current design
-  - [x] Created `/docs/technical/future_evolution_strategy.md` - Comprehensive evolution roadmap
-
 ### Phase 12: Collate Final Documentation (📋 Collate)
 - [x] **Task 12.1**: Final documentation review - 2025-06-20T18:30:00-08:00
-  - [x] Ensure all concepts are covered
-  - [x] Validate examples work with new design
-  - [x] Check consistency across sections
-  - [x] Created `/docs/technical/final_documentation_review.md` - Comprehensive documentation validation
-  - [x] Reviewed all 30 technical documents for consistency and completeness
-  - [x] Validated all code examples across documents
-  - [x] Created cross-reference matrix for core concepts
-  - [x] Confirmed implementation readiness with clear priority guidance
 
-- [x] **Task 12.2**: **CRITICAL** Create Complete Standalone Architecture Document - **COMPLETED** 2025-06-20T22:00:00-08:00
-  - [x] Synthesize ALL 30+ technical documents into one comprehensive standalone guide
-  - [x] Include complete built-in components catalog (40+ tools across 8 categories)
-  - [x] Comprehensive API reference for all scripting engines (Lua, JavaScript, future Python)
-  - [x] Complete technology decision matrix with rationale for all 14 components
-  - [x] Detailed configuration schemas and examples for all components
-  - [x] Production-ready security model with threat analysis and mitigations
-  - [x] Performance benchmarks, optimization patterns, and resource requirements
-  - [x] Complete testing strategy with examples for unit, integration, and e2e tests
-  - [x] Comprehensive error handling with all error types and recovery strategies
-  - [x] Advanced orchestration patterns with real-world workflow examples
-  - [x] Protocol integration details (MCP, A2A) with complete implementation guides
-  - [x] Cross-engine compatibility matrix with feature parity guarantees
-  - [x] Migration strategies and backward compatibility frameworks
-  - [x] Development workflow, contribution guidelines, and extension patterns
-  - [x] Troubleshooting guide with common issues and diagnostic procedures
-  - [x] **REQUIREMENT**: Document must be 2x+ larger than current architecture.md - **ACHIEVED: 15,034+ lines**
-  - [x] **REQUIREMENT**: Must be completely standalone (no external doc references) - **ACHIEVED**
-  - [x] **Deliverable**: `/docs/rs-llmspell-complete-architecture.md` - The definitive guide - **DELIVERED**
-
-  - [ ] **Task 12.3**: Manual Review of Final documentation 
-    - [ ] Manual human review and correction lists
-    - [ ] correction list subtask example
+- [x] **Task 12.2**: **CRITICAL** Create Complete Standalone Architecture Document - **COMPLETED** 
+- [ ] **Task 12.3**: Manual Review of Final documentation 
+  - [ ] Manual human review and correction lists - my prompt for this
+    **now I'm going to ask you a series of questions about the architecture documented in @docs/rs-llmspell-complete-architecture.md . for each question, document the question in Section 12.3 of Phase 2. for each question, document the question under the Task/question 12.3.1 heading. for that question review the architecture document and find the answer and document the answer under - [ ] Answer: . if you do not find the answer, document it as such. if you figure out what needs to be done, document in - [ ] Todo: subtask. Once that's done, prompt me for another answer. To understand this read the TODO.md document and make sure you understand the section **Task 12.3** and what I'm saying here. think hard and reason. do what I'm asking in this prompt and come back and tell me that you understand.** 
+  - [ ] **Task/question 12.3.1** Does the architecture allow for agent handoff from one agent to another without resorting to workflows or resorting to the A2A protocol?
+    - [ ] Answer: Yes, the architecture supports agent handoff through multiple mechanisms:
+      1. **AgentWrappedTool pattern**: Any agent can be wrapped as a tool that other agents can invoke
+      2. **Direct invocation**: Agents can directly call other agents via Agent.execute() in scripts
+      3. **State-based handoff**: Agents can save/restore state and share context through the Storage module
+      4. **Tool composition**: Since agents can use tools, and agents can be wrapped as tools, this enables agent-to-agent communication
+    - [ ] Todo: Consider documenting these handoff patterns more explicitly in a dedicated section of the architecture document
+  - [ ] **Task/question 12.3.2** Does the architecture allow for rs-llmspell to be used as a module in lua or in javascript to take advantage of tools, agents, workflows, events?
+    - [ ] Answer: No, not in the current implementation. Module support is comprehensively planned but not yet implemented. Currently:
+      - Rs-llmspell only supports **embedded scripting** where it hosts Lua/JS runtimes internally
+      - Cannot be imported as `require("llmspell")` in external Lua or `import from '@rs/llmspell'` in Node.js
+      - The architecture research includes detailed plans for future module support via:
+        1. Native modules (Lua C API, Node.js N-API)
+        2. C API bridge approach
+        3. WebAssembly modules
+        4. IPC approach
+      - Would require new crates: llmspell-c-api, llmspell-module-core, language bindings
+    - [ ] Todo: 
+      - [ ] Clarify in architecture doc that module support is future work, not current capability
+      - [ ] Consider prioritizing module support in Phase 13 implementation roadmap
+      - [ ] Document that current usage is embedded-only (scripts run inside rs-llmspell)
+  - [ ] **Task/question 12.3.3** Is the architecture laid out in a modular way such that implementation can occur in verticals or layers across the top to bottom stacks as suggested in the MVP roadmap?
+    - [ ] Answer: Yes, the architecture is explicitly designed for modular, layered implementation. Key evidence:
+      1. **Four-Layer Architecture**: Script → Bridge → Application → Infrastructure layers with clear boundaries
+      2. **Trait-based design**: Composable traits enable incremental implementation
+      3. **Bridge-first philosophy**: Build on existing crates, allowing gradual capability addition
+      4. **Explicit phased roadmap**: 4-phase implementation plan (Foundation → Scripting/Tools → Advanced → Production)
+      5. **Component hierarchy**: BaseAgent/Agent/Tool/Workflow supports independent development
+      6. **Production infrastructure at each layer**: Hooks, events, logging built-in from start
+      The architecture fully supports the suggested MVP approach: providers+bridge+scripting → add tools → add built-ins → add agents/workflows
+    - [ ] Todo: 
+      - [ ] Ensure Phase 13 implementation roadmap aligns with the 4-phase plan in the architecture doc
+      - [ ] Consider documenting which traits/interfaces are minimal for MVP vs later phases
+  - [ ] **Task/question 12.3.4** If we were to create a command line executable with a script argument, would the architecture be able to detect the script type (say lua, javascript) and instantiate the right engine and run the script? If not what changes to the architecture to support that?
+    - [ ] Answer: Yes, the architecture already includes this capability. Evidence:
+      1. **llmspell-cli**: A dedicated CLI crate is part of the architecture
+      2. **Script execution**: `llmspell run hello_world.lua` or `llmspell run script.js` 
+      3. **ScriptEngine enum**: Supports Lua, JavaScript, Python (future)
+      4. **Automatic detection**: Based on file extensions (.lua, .js)
+      5. **Unified execution**: `execute_sandboxed_script` with engine type parameter
+      6. **Type conversion**: TypeConverter handles cross-engine type mapping
+      The architecture includes all necessary components for CLI-based script execution with automatic type detection
+    - [ ] Todo: 
+      - [ ] Ensure CLI implementation includes robust file extension detection (.lua, .js, .mjs, etc.)
+      - [ ] Consider supporting shebang detection for script type (#!/usr/bin/env lua)
+      - [ ] Document CLI usage patterns in the Quick Start section
+  - [ ] **Task/question 12.3.5** Does the architecture allow for constructs to run a script in a cron job perhaps as a long running/always running daemon using perhaps workflow loop agent + mcp server, or a2a server or a tcp listener tool etc?
+    - [ ] Answer: Yes, the architecture supports daemon/long-running service modes through multiple mechanisms:
+      1. **Server Mode**: `rs-llmspell serve` command for running as daemon
+      2. **LoopWorkflow**: Continuous workflow execution component
+      3. **Cooperative Scheduler**: Manages long-running async tasks with configurable tick duration
+      4. **Protocol Servers**: Both MCP and A2A can run as servers
+      5. **Container Deployment**: Dockerfile shows service deployment with exposed ports
+      6. **Event-driven core**: Built for continuous operation with event bus
+      However, explicit cron-like scheduling and built-in TCP server tools are not documented (though infrastructure supports adding them)
+    - [ ] Todo: 
+      - [ ] Consider adding scheduled/timer-based workflow triggers for cron-like functionality
+      - [ ] Document daemon mode usage patterns and examples
+      - [ ] Consider adding TCP/Unix socket server tools to built-in catalog
+      - [ ] Add examples of long-running workflow patterns
+  - [ ] **Task/question 12.3.6** Does the framework allow me to easily create a new tool in a script or an app using rust? Or create a new tool to add to the library of builtin tools into rs-llmspell directly?
+    - [ ] Answer: Yes, the framework provides multiple ways to create custom tools:
+      1. **Script-level tools**: Easy creation using `Tools.create()` in Lua/JavaScript with configuration object
+      2. **Rust applications**: Implement the `Tool` trait with required methods (name, schema, execute_tool)
+      3. **Built-in library**: Add tools directly to rs-llmspell by implementing in `llmspell-tools/src/category/`
+      4. **Tool registration**: `Tools.register()` in scripts or `agent.register_tool()` in Rust
+      5. **Tool composition**: Chain tools together with pipelines and sequential execution
+      6. **Plugin system**: Dynamic tool loading for advanced extensibility
+      The architecture fully supports tool creation at all levels from simple script functions to complex Rust implementations
+    - [ ] Todo: 
+      - [ ] Create tool creation tutorial with examples for each approach
+      - [ ] Document tool trait requirements and best practices
+      - [ ] Add tool template/scaffolding generator
+      - [ ] Consider simplified tool creation API for common patterns
+  - [ ] **Task/question 12.3.7** Does the framework allow me to easily create a new agent to add to the library of builtin agents into rs-llmspell directly?
+    - [ ] Answer: Yes, the framework provides clear mechanisms for adding built-in agents:
+      1. **Location**: Create in `crates/builtin/src/agents/` directory
+      2. **Templates**: Extend existing templates (Chat, Research, Code, Content Creator)
+      3. **From scratch**: Implement BaseAgent and Agent traits directly
+      4. **Registration**: Add to `register_builtin_agents()` in module
+      5. **Factory pattern**: Use AgentTemplateFactory for dynamic creation
+      6. **Auto-availability**: Once registered, automatically available in Lua/JS scripts
+      Example: Extend ResearchAgent template for MarketResearchAgent with specialized tools and prompts
+    - [ ] Todo: 
+      - [ ] Create agent template scaffolding tool
+      - [ ] Document agent template customization options
+      - [ ] Add more specialized agent templates (e.g., DataAnalyst, CustomerService)
+      - [ ] Create agent testing framework and examples
+  - [ ] **Task/question 12.3.8** Does the architecture security allow for configurable security for a script engine, say lua, where in one script we may want to allow io library access, and in another both io, os and a few other "insecure" libraries? Does it allow for templated security profiles like low, medium, high? If not what are the todos to change the architecture to allow that?
+    - [ ] Answer: Yes, the architecture supports configurable security but not pre-defined profiles:
+      1. **Per-script security**: Each agent/script can have its own SecurityConfig
+      2. **Library access control**: `stdlib_access` in LuaEngineConfig controls which Lua modules are allowed
+      3. **Fine-grained controls**: Filesystem, network, system calls all configurable
+      4. **Sandboxing**: Can be enabled/disabled per script via `script_sandbox_mode`
+      5. **Resource limits**: Memory, CPU, execution time configurable
+      However, pre-defined security profiles (low/medium/high) are NOT currently implemented
+    - [ ] Todo: 
+      - [ ] Create pre-defined security profiles (low/medium/high):
+        - Low: All libraries, minimal restrictions
+        - Medium: No os.execute, io.popen, limited filesystem
+        - High: Only safe libraries (math, string, table)
+      - [ ] Add SecurityProfile enum with preset configurations
+      - [ ] Create profile builder/factory for easy security setup
+      - [ ] Document security best practices and profile usage
+      - [ ] Add per-script security override examples
+  - [ ] **Task/question 12.3.9** Does the architecture spell out configuration for prompts, api keys, security profiles etc via configuration files like yaml or environment variables? If not what todos do we have to add to spell that out?
+    - [ ] Answer: Yes, the architecture has comprehensive configuration management:
+      1. **File formats**: TOML (default), YAML, JSON all supported
+      2. **Main config file**: `llmspell.toml` with complete schema documented
+      3. **Environment variables**: `LLMSPELL_` prefix with `__` for nesting
+      4. **API keys**: Via env vars (`OPENAI_API_KEY`) or encrypted storage
+      5. **Hierarchical loading**: Default → Environment-specific → User → Env vars
+      6. **Hot reload**: Configuration changes without restart
+      7. **Security profiles**: Configurable via `[security]` and `[security.sandbox]` sections
+      8. **Validation**: All configs validated with helpful error messages
+      However, prompt templates configuration is not explicitly shown in config files
+    - [ ] Todo: 
+      - [ ] Add `[prompts]` section to config for system/agent prompt templates
+      - [ ] Document prompt template variables and interpolation
+      - [ ] Add examples of security profile configurations in config file
+      - [ ] Create config generator/validator CLI tool
+      - [ ] Add configuration migration tool for version upgrades
+  - [ ] **Task/question 12.3.10** Does the framework or architecture spell out standard library for methods in rs-llmspell for respective script engine to load e.g. for lua promise.lua, llm.lua or provider.lua, agent.lua etc, or are they all assumed to be available? Can the scripts load other lua modules? Same goes for javascript. If not what todos do we need to add to have the architecture spell that out?
+    - [ ] Answer: No standard library modules exist. The architecture uses global object injection:
+      1. **Global APIs**: Agent, Tool, Tools, Workflow, etc. are pre-injected as globals
+      2. **No module loading**: Cannot use `require()` or `import` for rs-llmspell APIs
+      3. **External modules restricted**: Sandboxing prevents loading arbitrary modules
+      4. **Limited npm support**: JavaScript can import pre-approved packages only
+      5. **No promise.lua**: Lua uses native coroutines, not a promise library
+      6. **Security-first design**: Module loading is intentionally restricted for security
+    - [ ] Todo: 
+      - [ ] Document the global API injection model explicitly
+      - [ ] Create a "Script API Reference" section listing all global objects
+      - [ ] Consider adding controlled module loading with whitelist
+      - [ ] Add custom module path configuration for trusted environments
+      - [ ] Document how to package reusable script code without modules
+      - [ ] Consider implementing require() with sandboxed module loader
+      - [ ] Add examples of code organization patterns without modules
 
 
 ### Phase 13: Implementation Roadmap 
