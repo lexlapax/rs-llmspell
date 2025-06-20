@@ -4,17 +4,18 @@ rs-llmspell: **Scriptable LLM interactions** via Lua, JavaScript - Cast scriptin
 
 ## Current Status
 
-🚧 **Phase 5 ACTIVE**: Analyze Integration Points
-- **Completed**: BaseAgent/Agent/Tool/Workflow hierarchy design, built-in components research, bridge integration analysis
-- **Current**: Task 5.2 - Performance and security analysis 
-- **Next**: Task 5.3 - **CRITICAL** Scripting engine concurrency and async patterns research
+🚧 **Phase 5B ACTIVE**: Research Existing Crate Ecosystem
+- **Completed**: Phase 5 - All integration analysis including async patterns
+- **Current**: Task 5B.1 - **CRITICAL** LLM Provider Layer Crates Research (rust-genai evaluation)
+- **Next**: Task 5B.2 - Scripting Engine Crates Evaluation
 
-**Architecture Progress**: 10/13 phases completed in research/design cycle
+**Architecture Progress**: 10/14 phases completed in research/design cycle
 - ✅ Phase 1: Research Foundation (go-llms, ADK, state management, Rust patterns)
 - ✅ Phase 2: Analyze Current State (architecture mapping, scripting implications)  
 - ✅ Phase 3: Synthesize Core Architecture (hierarchy design, hooks/events)
 - ✅ Phase 4: Research Implementation Patterns (built-in components, orchestration)
-- 🚧 Phase 5: Analyze Integration Points (bridge analysis, **async patterns pending**)
+- ✅ Phase 5: Analyze Integration Points (bridge analysis, async patterns completed)
+- 🚧 Phase 5B: Research Existing Crate Ecosystem (LLM providers, script engines, infrastructure)
 
 ## Architecture
 
@@ -59,9 +60,10 @@ cargo build    # Build project
 - **Bridge everything** - If it's in underlying library, bridge it - don't reimplement
 - **State-first architecture** - Agent handoff via shared state, not just messages
 - **Tool-wrapped agents** - Agents can be wrapped as tools for composition
+- **No backward compatibility** requirements until we reach version 1.0.0
 - Do what's asked; nothing more, nothing less
 - Prefer editing existing files over creating new ones
-- Update TODO.md with task completion timestamps
+- Update TODO.md with task completion timestamps as tasks get completed
 
 ## Current Research Documents
 

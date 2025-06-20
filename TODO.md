@@ -73,42 +73,128 @@ Comprehensive refinement of rs-llmspell architecture based on go-llms and Google
   - [x] Script engine implications
   - [x] Testing strategy updates needed
 
-- [ ] **Task 5.2**: Performance and security analysis
-  - [ ] Hook overhead considerations
-  - [ ] Event system performance impact
-  - [ ] Security implications of tool-wrapped agents
+- [x] **Task 5.2**: Performance and security analysis
+  - [x] Hook overhead considerations
+  - [x] Event system performance impact
+  - [x] Security implications of tool-wrapped agents
 
-- [ ] **Task 5.3**: **CRITICAL** Scripting engine concurrency and async patterns research
-  - [ ] Lua threading limitations and workarounds
-    - [ ] mlua async support capabilities and limitations
-    - [ ] Lua coroutines vs true async patterns
-    - [ ] Cooperative scheduling implementation strategies
-    - [ ] Yield-based programming models for long operations
-  - [ ] JavaScript async patterns in embedded engines
-    - [ ] Promise implementation in Rust JS engines (boa, v8)
-    - [ ] Event loop integration with Tokio runtime
-    - [ ] async/await simulation patterns
-    - [ ] Worker thread alternatives for CPU-intensive tasks
-  - [ ] Cross-engine async pattern standardization
-    - [ ] Common async interface for Lua and JavaScript
-    - [ ] Promise/Future-like abstractions for scripts
-    - [ ] Error handling in async script contexts
-    - [ ] Resource cleanup in interrupted async operations
-  - [ ] Agent orchestration async patterns
-    - [ ] Parallel agent execution without true threading
-    - [ ] Tool execution scheduling and queuing
-    - [ ] Stream processing with cooperative yielding
-    - [ ] Hook system non-blocking execution
-  - [ ] Workflow engine async design
-    - [ ] Parallel workflow step execution strategies
-    - [ ] Sequential workflow with async steps
-    - [ ] Conditional workflows with async predicates
-    - [ ] Loop workflows with async conditions and bodies
-  - [ ] Performance and fairness considerations
-    - [ ] Script execution time slicing
-    - [ ] Resource allocation between concurrent scripts
-    - [ ] Memory management in long-running async operations
-    - [ ] Debugging and profiling async script execution
+- [x] **Task 5.3**: **CRITICAL** Scripting engine concurrency and async patterns research
+  - [x] Lua threading limitations and workarounds
+    - [x] mlua async support capabilities and limitations
+    - [x] Lua coroutines vs true async patterns
+    - [x] Cooperative scheduling implementation strategies
+    - [x] Yield-based programming models for long operations
+  - [x] JavaScript async patterns in embedded engines
+    - [x] Promise implementation in Rust JS engines (boa, v8)
+    - [x] Event loop integration with Tokio runtime
+    - [x] async/await simulation patterns
+    - [x] Worker thread alternatives for CPU-intensive tasks
+  - [x] Cross-engine async pattern standardization
+    - [x] Common async interface for Lua and JavaScript
+    - [x] Promise/Future-like abstractions for scripts
+    - [x] Error handling in async script contexts
+    - [x] Resource cleanup in interrupted async operations
+  - [x] Agent orchestration async patterns
+    - [x] Parallel agent execution without true threading
+    - [x] Tool execution scheduling and queuing
+    - [x] Stream processing with cooperative yielding
+    - [x] Hook system non-blocking execution
+  - [x] Workflow engine async design
+    - [x] Parallel workflow step execution strategies
+    - [x] Sequential workflow with async steps
+    - [x] Conditional workflows with async predicates
+    - [x] Loop workflows with async conditions and bodies
+  - [x] Performance and fairness considerations
+    - [x] Script execution time slicing
+    - [x] Resource allocation between concurrent scripts
+    - [x] Memory management in long-running async operations
+    - [x] Debugging and profiling async script execution
+
+### Phase 5B: Research Existing Crate Ecosystem (🔍 Research)
+- [ ] **Task 5B.1**: **CRITICAL** LLM Provider Layer Crates Research
+  - [ ] rust-genai evaluation
+    - [ ] Review architecture and design patterns
+    - [ ] Analyze provider abstraction approach
+    - [ ] Check async/streaming support
+    - [ ] Evaluate extensibility for custom providers
+    - [ ] Test performance and overhead
+  - [ ] Alternative LLM crates comparison
+    - [ ] langchain-rust capabilities and limitations
+    - [ ] llm-chain architecture review
+    - [ ] async-openai for OpenAI-specific needs
+    - [ ] candle for local model support
+  - [ ] Provider abstraction requirements
+    - [ ] Multi-provider support patterns
+    - [ ] Streaming response handling
+    - [ ] Token counting and rate limiting
+    - [ ] Error handling and retries
+    - [ ] Authentication and configuration
+  - [ ] Integration feasibility analysis
+    - [ ] Compatibility with BaseAgent/Agent design
+    - [ ] Bridge pattern implementation options
+    - [ ] Custom provider extension points
+
+- [ ] **Task 5B.2**: Scripting Engine Crates Evaluation
+  - [ ] Lua embedding options
+    - [ ] mlua features and limitations review
+    - [ ] rlua comparison for safety guarantees
+    - [ ] lua-sys for low-level control needs
+    - [ ] Performance benchmarks and memory usage
+  - [ ] JavaScript engine alternatives
+    - [ ] boa maturity and compliance assessment
+    - [ ] v8 rust bindings complexity analysis
+    - [ ] quickjs-rs for lightweight embedding
+    - [ ] deno_core for modern JS features
+  - [ ] Cross-language considerations
+    - [ ] Unified value conversion strategies
+    - [ ] Shared memory management approaches
+    - [ ] Consistent error handling patterns
+
+- [ ] **Task 5B.3**: Workflow and State Management Crates
+  - [ ] Workflow engine crates
+    - [ ] temporal-sdk-rust capabilities
+    - [ ] flowrs for lightweight workflows
+    - [ ] state-machine crates comparison
+  - [ ] State management solutions
+    - [ ] sled for embedded persistence
+    - [ ] rocksdb for high-performance needs
+    - [ ] async-std storage patterns
+  - [ ] Event system crates
+    - [ ] tokio-stream for async event streams
+    - [ ] crossbeam-channel for multi-producer patterns
+    - [ ] event-emitter-rs for pub/sub models
+
+- [ ] **Task 5B.4**: Supporting Infrastructure Crates
+  - [ ] Serialization and data handling
+    - [ ] serde ecosystem integration
+    - [ ] rkyv for zero-copy deserialization
+    - [ ] bincode for efficient binary formats
+  - [ ] Testing and mocking frameworks
+    - [ ] mockall for trait mocking
+    - [ ] proptest for property-based testing
+    - [ ] criterion for benchmarking
+  - [ ] Logging and observability
+    - [ ] tracing ecosystem integration
+    - [ ] metrics-rs for performance monitoring
+    - [ ] opentelemetry-rust for distributed tracing
+
+- [ ] **Task 5B.5**: Build vs Buy Decision Matrix
+  - [ ] Core components analysis
+    - [ ] What must be built custom (bridge layer, agent hierarchy)
+    - [ ] What can be wrapped (LLM providers, script engines)
+    - [ ] What can be used as-is (serialization, logging)
+  - [ ] Integration complexity assessment
+    - [ ] API compatibility requirements
+    - [ ] Performance overhead considerations
+    - [ ] Maintenance burden evaluation
+  - [ ] Dependency risk analysis
+    - [ ] Crate maturity and maintenance status
+    - [ ] License compatibility checks
+    - [ ] Community support evaluation
+  - [ ] Final recommendations document
+    - [ ] Recommended crates for each component
+    - [ ] Integration patterns and best practices
+    - [ ] Risk mitigation strategies
 
 ### Phase 6: Synthesize Complete System (⚡ Synthesize)
 - [ ] **Task 6.1**: Complete component ecosystem design
