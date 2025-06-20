@@ -608,31 +608,118 @@ Comprehensive refinement of rs-llmspell architecture based on go-llms and Google
   - [x] Created validation document at /docs/technical/use_case_validation.md
 
 ### Phase 8: Update Architecture Document (📝 Update)
-- [ ] **Task 8.1**: Update core concepts and philosophy
-  - [ ] Revise core philosophy section
-  - [ ] Update architecture overview
-  - [ ] Refine bridge-first design section
+- [x] **Task 8.1**: Update core concepts and philosophy - 2025-06-20T12:45:00-08:00
+  - [x] Revise core philosophy section
+    - Bridge-first principle with specific crate choices
+    - Go-llms patterns adapted for Rust
+    - Production-first design philosophy
+    - Language-idiomatic API approach
+  - [x] Update architecture overview
+    - 5-layer architecture diagram
+    - Clear data flow visualization
+    - Component hierarchy explanation
+    - External dependency mapping
+  - [x] Refine bridge-first design section
+    - Specific bridge targets (rig, mlua, sled, tracing)
+    - Type conversion strategy with ScriptValue
+    - Async pattern handling per language
+    - Performance and safety considerations
+  - [x] Complete architecture.md rewrite with:
+    - Go-llms inspired component model
+    - 40+ built-in tools across 8 categories
+    - Hook/event system with 20+ points
+    - Production-ready infrastructure
+    - Comprehensive examples and roadmap
 
-- [ ] **Task 8.2**: Update component architecture sections
-  - [ ] BaseAgent/Agent/Tool/Workflow hierarchy
-  - [ ] Hooks and events system
-  - [ ] Built-in components
-  - [ ] Tool-wrapped agents
+- [x] **Task 8.2**: Update component architecture sections - 2025-06-20T13:00:00-08:00
+  - [x] BaseAgent/Agent/Tool/Workflow hierarchy
+    - Detailed trait definitions with complete method signatures
+    - ChatAgent implementation example with hooks integration
+    - CalculatorTool implementation with schema validation
+    - SequentialWorkflow implementation with context management
+  - [x] Hooks and events system
+    - Integrated throughout all component examples
+    - Hook execution in agent chat method
+    - Event emission and handling patterns
+    - Built-in hook types covered
+  - [x] Built-in components
+    - Component examples within trait implementations
+    - Tool categories and organization
+    - Agent template patterns
+    - Workflow type implementations
+  - [x] Tool-wrapped agents
+    - Complete AgentAsTool implementation
+    - Generic wrapper pattern for any agent
+    - Usage examples in Lua for orchestration
+    - Composition pattern explanations
+  - [x] Composition patterns
+    - Hierarchical agent delegation
+    - Pipeline agent transformation
+    - Multi-agent coordination examples
+  - [x] Added comprehensive "Detailed Component Architecture" section to architecture.md
 
-- [ ] **Task 8.3**: Update directory structure
-  - [ ] Add built-in components crates
-  - [ ] Add hooks/events system crates
-  - [ ] Update testing strategy for new concepts
+- [x] **Task 8.3**: Update directory structure - 2025-06-20T13:15:00-08:00
+  - [x] Add built-in components crates
+    - llmspell-tools/ with 8 tool categories (40+ tools)
+    - llmspell-agents/ with 6 agent templates
+    - llmspell-workflows/ with 6 workflow types
+    - Organized by functionality with feature flags
+  - [x] Add hooks/events system crates
+    - llmspell-infra/hooks/ with HookManager and built-in hooks
+    - llmspell-infra/events/ with EventBus and streaming
+    - llmspell-infra/security/ for sandboxing and audit
+    - Complete infrastructure layer organization
+  - [x] Update testing strategy for new concepts
+    - llmspell-testing/ crate with mocks, fixtures, harness
+    - Unit testing examples for all component types
+    - Integration testing patterns
+    - Script testing harness for Lua/JS
+    - Performance benchmarking structure
+  - [x] Added comprehensive directory structure section:
+    - 12 main crates with detailed file organization
+    - Feature flags for conditional compilation
+    - Development workflow and CI/CD integration
+    - Complete build and testing commands
 
-- [ ] **Task 8.4**: Update examples section
-  - [ ] Show BaseAgent usage in scripts
-  - [ ] Demonstrate hook registration
-  - [ ] Event-driven workflow examples
-  - [ ] Built-in tool usage examples
-  - [ ] **ASYNC PATTERNS**: Parallel agent execution examples
-  - [ ] **ASYNC PATTERNS**: Long-running tool execution with yielding
-  - [ ] **ASYNC PATTERNS**: Stream processing examples
-  - [ ] **ASYNC PATTERNS**: Error handling in async contexts
+- [x] **Task 8.4**: Update examples section - 2025-06-20T14:00:00-08:00
+  - [x] Show BaseAgent usage in scripts
+    - Custom DataProcessingWorkflow (Lua) with coroutine-based execution
+    - MultiAgentOrchestrator (JavaScript) with parallel agent coordination
+    - Tool-handling capabilities and state management
+  - [x] Demonstrate hook registration
+    - Global hooks for performance monitoring and error handling
+    - Agent-specific hooks for validation, security, and audit logging
+    - Hook priority and execution order examples
+  - [x] Event-driven workflow examples
+    - Event-based multi-agent research coordination (Lua)
+    - Real-time activity monitoring with streaming (JavaScript)
+    - Event emission and subscription patterns
+  - [x] Built-in tool usage examples
+    - Tool composition with security validation and sandboxing
+    - Multi-tool research workflows with comprehensive tool suite
+    - Rate limiting, content filtering, and audit integration
+  - [x] **ASYNC PATTERNS**: Parallel agent execution examples
+    - Cooperative scheduling with Lua coroutines
+    - Promise-based coordination with controlled concurrency
+    - Task queuing and execution management
+  - [x] **ASYNC PATTERNS**: Long-running tool execution with yielding
+    - Coroutine yielding for cooperative multitasking
+    - Progress tracking and streaming updates
+    - Resource management in long operations
+  - [x] **ASYNC PATTERNS**: Stream processing examples
+    - Real-time result streaming with AsyncAgentCoordinator
+    - Event stream processing with monitoring
+    - Memory-efficient document processing
+  - [x] **ASYNC PATTERNS**: Error handling in async contexts
+    - Retry logic with exponential backoff
+    - Timeout handling and graceful degradation
+    - Pipeline error recovery and continuation
+  - [x] Added comprehensive examples section with 5 major categories:
+    - BaseAgent usage showing custom implementations and composition
+    - Hook registration demonstrating global and agent-specific patterns
+    - Event-driven workflows with real-time coordination
+    - Built-in tool usage with security and validation
+    - Async patterns covering all major concurrency scenarios
 
 ### Phase 9: Research Advanced Patterns (🔍 Research)
 - [ ] **Task 9.1**: Advanced orchestration patterns
@@ -656,6 +743,12 @@ Comprehensive refinement of rs-llmspell architecture based on go-llms and Google
   - [ ] A2A client support - rs-llmspell able to call or use other Agents in workflows or Agent handoffs
   - [ ] A2A server support - export rs-llmspell built agents or workflows to be called via A2A
   - [ ] crates and libraries to support A2A
+
+- [ ] **Task 9.5**: scripting language module support
+  - [ ] concept research on not only embedding the language runtime (eg. mlua) but exposing agent, tools, etc functionality as a module back to be used as a module in regular lua
+  - [ ] lua research
+  - [ ] javascript research
+  - [ ] changes to or augmentation to library layout , architecture, sub-crates because of this.
 
 ### Phase 10: Analyze Testing Strategy (🔬 Analyze)
 - [ ] **Task 10.1**: Testing strategy for new concepts

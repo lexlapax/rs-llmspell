@@ -1,4 +1,4 @@
-# Rs-LLMSpell Architecture
+# Rs-LLMSpell Architecture (v2)
 
 ## Table of Contents
 
@@ -6,1991 +6,2614 @@
 2. [Why Rs-LLMSpell Exists](#why-rs-llmspell-exists)
 3. [Core Philosophy](#core-philosophy)
 4. [Architecture Overview](#architecture-overview)
-5. [Bridge-First Design](#bridge-first-design)
-6. [Script Engine System](#script-engine-system)
-7. [Type Safety & Error Handling](#type-safety--error-handling)
-8. [Component Architecture](#component-architecture)
-9. [Testing Architecture](#testing-architecture)
-10. [Security Model](#security-model)
-11. [Examples](#examples)
-12. [Future Considerations](#future-considerations)
+5. [Component Hierarchy](#component-hierarchy)
+6. [Bridge-First Design](#bridge-first-design)
+7. [Script Interface](#script-interface)
+8. [Hook and Event System](#hook-and-event-system)
+9. [State Management](#state-management)
+10. [Built-in Components](#built-in-components)
+11. [Testing Architecture](#testing-architecture)
+12. [Security Model](#security-model)
+13. [Examples](#examples)
+14. [Implementation Roadmap](#implementation-roadmap)
 
 ---
 
 **Quick Links:**
 - [TODO.md](../../TODO.md) - Current implementation tasks
-- [TODO-DONE.md](../../TODO-DONE.md) - Completed work tracking
+- [Component Ecosystem Design](./component_ecosystem_design.md) - Detailed component specifications
+- [Script Interface Design](./script_interface_design.md) - Complete scripting API reference
+- [Build vs Buy Decisions](./build_vs_buy_decision_matrix.md) - Technology choices
 
 ## Introduction
 
-Rs-LLMSpell is a **scriptable interface for LLM interactions** that bridges multiple scripting languages (Lua, JavaScript, and potentially others) to powerful Rust-based LLM libraries. It enables developers to write "spells" - scripts that orchestrate AI agents, workflows, and tools without needing to compile Rust code, while benefiting from Rust's performance and safety in the underlying implementation.
+Rs-LLMSpell is a **scriptable LLM interaction framework** that enables developers to orchestrate AI agents, tools, and workflows through expressive scripts in Lua, JavaScript, and other languages. It provides a bridge between high-performance Rust implementations and flexible scripting environments.
+
+### What Makes Rs-LLMSpell Unique
+
+1. **Go-llms Inspired Architecture**: Implements the proven BaseAgent/Agent/Tool/Workflow patterns from go-llms, adapted for Rust
+2. **Multi-Language Scripting**: Write AI orchestration logic in Lua, JavaScript, or other supported languages
+3. **Production-Ready Infrastructure**: Built-in hooks, events, state management, and observability
+4. **Extensible Component Library**: 40+ built-in tools, multiple agent templates, and workflow patterns
+5. **Bridge-First Philosophy**: Leverages existing Rust crates (rig, mlua, etc.) rather than reimplementing
 
 ### What is a Spell?
 
-A spell is a script written in your language of choice (Lua, JavaScript, etc.) that controls LLMs and their associated tools through rs-llmspell's bridge layer. Think of it as magical incantations that bring AI capabilities to life through simple, expressive scripting.
+A spell is a script that orchestrates AI capabilities through rs-llmspell's unified API:
 
 ```lua
--- Example spell: Research Assistant (Lua)
-local researcher = llm.agent({
-    provider = "anthropic",
-    model = "claude-3-opus",
-    tools = {"web_search", "file_write"},
-    system = "You are a helpful research assistant"
+-- Example: Multi-agent research workflow (Lua)
+local workflow = Workflow.sequential({
+    name = "deep_research",
+    steps = {
+        {
+            agent = ResearchAgent.new({ sources = {"academic", "news"} }),
+            action = "research",
+            output = "raw_research"
+        },
+        {
+            agent = AnalysisAgent.new({ tools = {StatisticsTool.new()} }),
+            action = "analyze", 
+            input = "{{raw_research}}",
+            output = "analysis"
+        },
+        {
+            agent = WriterAgent.new({ style = "technical" }),
+            action = "write_report",
+            input = { research = "{{raw_research}}", analysis = "{{analysis}}" },
+            output = "report"
+        }
+    }
 })
 
-local topic = "quantum computing breakthroughs 2025"
-local research = researcher:run("Research " .. topic .. " and summarize findings")
-tools.file_write("research_summary.md", research)
-```
-
-```javascript
-// Example spell: Research Assistant (JavaScript)
-const researcher = await llm.agent({
-    provider: "anthropic",
-    model: "claude-3-opus", 
-    tools: ["web_search", "file_write"],
-    system: "You are a helpful research assistant"
-});
-
-const topic = "quantum computing breakthroughs 2025";
-const research = await researcher.run(`Research ${topic} and summarize findings`);
-await tools.file_write("research_summary.md", research);
+local report = workflow:run({ topic = "AI Safety advances in 2025" })
 ```
 
 ## Why Rs-LLMSpell Exists
 
-### The Problem
+### The Problem Space
 
-1. **Compilation Barrier**: Working with LLMs in Rust requires compilation for every change
-2. **Rapid Prototyping**: AI workflows need constant iteration and experimentation  
-3. **Language Preference**: Different teams prefer different scripting languages
-4. **Hot Reloading**: Production systems need to update AI behaviors without downtime
-5. **Complexity**: Direct Rust LLM library usage requires deep Rust knowledge
+1. **Compilation Barrier**: Rust's compile-edit-test cycle slows AI experimentation
+2. **Complex Orchestration**: Multi-agent workflows require sophisticated coordination
+3. **Language Diversity**: Teams have different scripting language preferences
+4. **Production Requirements**: Real systems need hooks, events, state management
+5. **Tool Integration**: AI agents need access to diverse external capabilities
 
-### The Solution
+### Our Solution
 
-Rs-LLMSpell provides a **bridge-first architecture** that:
-- Exposes Rust LLM library functionality through simple scripting APIs
-- Supports multiple scripting languages with the same interface
-- Enables hot-reloading of AI behaviors
-- Maintains type safety at bridge boundaries
-- Provides security through sandboxed script execution
-- Leverages existing Rust LLM libraries like Rig as the foundation
+Rs-LLMSpell addresses these challenges through:
+
+- **Scriptable Orchestration**: Define complex AI workflows without recompilation
+- **Unified Component Model**: BaseAgent/Agent/Tool/Workflow hierarchy for all AI components
+- **Production Infrastructure**: Built-in hooks, events, state management, and observability
+- **Language Agnostic**: Consistent API across Lua, JavaScript, and future languages
+- **Bridge Architecture**: Leverages best-in-class Rust crates rather than reimplementing
 
 ### Key Benefits
 
-🚀 **Rapid Development**: Test AI workflows instantly without compilation  
-🔄 **Hot Reloading**: Update spells in production without restarts  
-🌐 **Multi-Language**: Choose Lua, JavaScript, or other languages based on your needs  
-🔒 **Secure**: Sandboxed script execution with resource limits  
-⚡ **Rust Performance**: Underlying Rust implementations provide native speed  
-📚 **Reusable**: Build libraries of spells for common tasks  
+🚀 **Rapid Iteration**: Test AI behaviors instantly without compilation  
+🔧 **Production Ready**: Hooks, events, and state management built-in  
+🌐 **Multi-Language**: Use Lua, JavaScript, or extend to other languages  
+🧩 **Composable**: Build complex systems from simple components  
+⚡ **High Performance**: Rust core with efficient script bridges  
+🔒 **Secure**: Sandboxed execution with resource limits  
 
 ## Core Philosophy
 
 ### 1. Bridge, Don't Build
 
-**Fundamental Rule: If it's not in existing Rust LLM libraries, we don't implement it in rs-llmspell.**
+**Fundamental Principle**: We bridge existing Rust crates rather than reimplementing functionality.
 
-We exclusively provide bridging interfaces to expose existing Rust LLM library functionality to scripts. We never reimplement features that exist in libraries like Rig. This strict adherence ensures:
-- Automatic compatibility with upstream library updates
+- LLM Providers: Bridge to `rig` for multi-provider support
+- Scripting: Bridge to `mlua` and JavaScript engines
+- State Storage: Bridge to `sled`/`rocksdb` behind traits
+- Observability: Bridge to `tracing`, `metrics-rs`
+
+This ensures:
+- Leverage battle-tested implementations
+- Automatic compatibility with upstream updates
 - Minimal maintenance burden
-- Consistent behavior with direct Rust library usage
-- No feature drift or divergent implementations
+- Focus on our unique value: scriptable orchestration
 
-**What This Means in Practice:**
-- ✅ Create script bindings for Rust LLM library types and functions
-- ✅ Build type converters between script and Rust types
-- ✅ Implement script engine infrastructure
-- ❌ Never implement LLM logic, agents, tools, or workflows ourselves
-- ❌ Never add features that should belong in underlying Rust libraries
-- ❌ Never maintain custom versions of Rust LLM functionality
+### 2. Go-llms Patterns, Rust Implementation
 
-### 2. Engine-Agnostic Design
+We adopt the proven patterns from go-llms while leveraging Rust's strengths:
 
-All features work identically across Lua, JavaScript, and future script engines. Scripts are portable between engines with minimal changes.
+- **BaseAgent**: Foundation for any tool-handling component
+- **Agent**: LLM-powered extension of BaseAgent
+- **Tool**: Discrete, callable functions for agents
+- **Workflow**: Deterministic orchestration patterns
+- **Tool-Wrapped Agents**: Agents callable as tools
 
-### 3. Script-Friendly APIs
+### 3. Production-First Design
 
-We hide Rust LLM library complexity behind intuitive scripting interfaces. Complex Rust patterns become simple script calls.
+Every component is designed for production use:
 
-### 4. Security First
+- **Hooks**: 20+ lifecycle interception points
+- **Events**: Comprehensive event system for monitoring
+- **State**: Distributed state management with handoff
+- **Observability**: Built-in logging, metrics, tracing
+- **Error Handling**: Graceful degradation and recovery
 
-All script execution happens in sandboxed environments with configurable resource limits and permission controls.
+### 4. Language-Idiomatic APIs
 
-### 5. Upstream-First Development
+Each scripting language gets an API that feels native:
 
-When new features or improvements are needed for core LLM, agent, tools, or workflow functionality, we contribute them upstream to Rust LLM libraries rather than implementing them locally. This ensures:
+```lua
+-- Lua: Table-based, colon syntax
+agent:add_tool(Calculator.new())
+agent:on("tool_called", handler)
+```
 
-- **Community Benefit**: Improvements benefit the entire Rust LLM ecosystem
-- **Maintenance Reduction**: No custom forks or divergent implementations to maintain
-- **Quality Assurance**: Changes go through established library review and testing processes
-- **Long-term Compatibility**: Ensures rs-llmspell stays aligned with library evolution
-
-### 6. Testing-First Architecture
-
-Testing infrastructure is treated as a first-class architectural concern:
-
-- **Reusable Test Components**: Shared fixtures, mocks, and helpers across all crates
-- **Cross-Engine Validation**: Ensure identical behavior across Lua, JavaScript, and future engines
-- **Bridge Contract Testing**: Standardized test suites that all bridge implementations must pass
-- **Integration Testing**: End-to-end validation of script → engine → bridge → library interactions
+```javascript
+// JavaScript: Object-oriented, promises
+agent.addTool(new Calculator());
+agent.on("toolCalled", handler);
+```
 
 ## Architecture Overview
 
-```
-┌─────────────────────────┐
-│   User Scripts          │  ← Your spells (Lua/JS/others)
-├─────────────────────────┤
-│   Script Engines        │  ← Multi-language execution
-├─────────────────────────┤  
-│   Bridge Layer          │  ← Type-safe Rust library access
-├─────────────────────────┤
-│   Rust LLM Libraries    │  ← Rig, other Rust LLM crates
-└─────────────────────────┘
-```
-
-**Key Principle**: We bridge to Rust LLM library functionality rather than reimplementing it.
-
-Rs-LLMSpell consists of several key crates:
+### High-Level Architecture
 
 ```
-rs-llmspell/
-├── rs-llmspell-core/           # Core script engine interfaces and types
-│   ├── src/
-│   │   ├── lib.rs
-│   │   ├── engine/             # Script engine interfaces
-│   │   │   ├── mod.rs
-│   │   │   ├── interface.rs    # ScriptEngine trait
-│   │   │   ├── registry.rs     # Engine registry and discovery
-│   │   │   ├── types.rs        # Script value type system
-│   │   │   └── converter.rs    # Type conversion utilities
-│   │   ├── bridge/             # Bridge interface definitions
-│   │   │   ├── mod.rs
-│   │   │   ├── interface.rs    # Bridge trait
-│   │   │   ├── manager.rs      # Bridge lifecycle management
-│   │   │   └── registry.rs     # Bridge registry
-│   │   ├── types/              # Common types for bridges
-│   │   │   ├── mod.rs
-│   │   │   ├── script_value.rs # Universal script value type
-│   │   │   ├── error.rs        # Error types
-│   │   │   └── metadata.rs     # Metadata types
-│   │   └── security/           # Security and sandboxing
-│   │       ├── mod.rs
-│   │       ├── sandbox.rs      # Script sandbox
-│   │       └── limits.rs       # Resource limits
-│   └── Cargo.toml
-├── rs-llmspell-engines/        # Script engine implementations
-│   ├── src/
-│   │   ├── lib.rs
-│   │   ├── lua/                # Lua engine via mlua
-│   │   │   ├── mod.rs
-│   │   │   ├── engine.rs       # Lua script engine
-│   │   │   ├── converter.rs    # Lua type conversion
-│   │   │   └── sandbox.rs      # Lua sandbox implementation
-│   │   ├── javascript/         # JavaScript engine via boa or v8
-│   │   │   ├── mod.rs
-│   │   │   ├── engine.rs       # JS script engine
-│   │   │   ├── converter.rs    # JS type conversion
-│   │   │   └── sandbox.rs      # JS sandbox implementation
-│   │   └── common/             # Common engine utilities
-│   │       ├── mod.rs
-│   │       ├── timeout.rs      # Execution timeouts
-│   │       └── memory.rs       # Memory management
-│   └── Cargo.toml
-├── rs-llmspell-bridges/        # Bridges to Rust LLM libraries
-│   ├── src/
-│   │   ├── lib.rs
-│   │   ├── rig/                # Rig library bridge
-│   │   │   ├── mod.rs
-│   │   │   ├── llm.rs          # LLM provider bridge
-│   │   │   ├── agent.rs        # Agent bridge
-│   │   │   ├── tools.rs        # Tools bridge
-│   │   │   └── workflows.rs    # Workflow bridge
-│   │   ├── util/               # Utility bridges
-│   │   │   ├── mod.rs
-│   │   │   ├── fs.rs           # File system operations
-│   │   │   ├── http.rs         # HTTP requests
-│   │   │   └── json.rs         # JSON operations
-│   │   └── builtin/            # Built-in script functions
-│   │       ├── mod.rs
-│   │       ├── console.rs      # Console/logging functions
-│   │       └── math.rs         # Math functions
-│   └── Cargo.toml
-├── rs-llmspell-test-common/    # Shared testing infrastructure
-│   ├── src/
-│   │   ├── lib.rs
-│   │   ├── fixtures/           # Test fixtures and data
-│   │   │   ├── mod.rs
-│   │   │   ├── scripts.rs      # Cross-engine test scripts
-│   │   │   ├── responses.rs    # Mock LLM responses
-│   │   │   └── configs.rs      # Test configurations
-│   │   ├── mocks/             # Mock implementations
-│   │   │   ├── mod.rs
-│   │   │   ├── engine.rs       # Mock script engine
-│   │   │   ├── bridge.rs       # Mock bridge
-│   │   │   └── llm_client.rs   # Mock LLM clients
-│   │   ├── traits/            # Test traits and contracts
-│   │   │   ├── mod.rs
-│   │   │   ├── engine_tests.rs # ScriptEngine test suite
-│   │   │   ├── bridge_tests.rs # Bridge test suite
-│   │   │   └── integration.rs  # Integration test suite
-│   │   ├── helpers/           # Test utilities
-│   │   │   ├── mod.rs
-│   │   │   ├── environment.rs  # Test environment setup
-│   │   │   ├── assertions.rs   # Custom assertions
-│   │   │   └── benchmarks.rs   # Performance testing
-│   │   └── builders/          # Test data builders
-│   │       ├── mod.rs
-│   │       ├── script_builder.rs
-│   │       └── response_builder.rs
-│   └── Cargo.toml
-└── rs-llmspell/                # Main binary and convenience crate
-    ├── src/
-    │   ├── main.rs             # CLI tool for running spells
-    │   ├── lib.rs              # Re-exports for library usage
-    │   ├── cli/                # Command-line interface
-    │   │   ├── mod.rs
-    │   │   ├── run.rs          # Run spell command
-    │   │   ├── validate.rs     # Validate spell command
-    │   │   └── info.rs         # Info/help commands
-    │   └── config/             # Configuration management
-    │       ├── mod.rs
-    │       └── spell_config.rs # Spell execution config
-    └── Cargo.toml
+┌─────────────────────────────────────────────────────────────┐
+│                    Script Layer (Lua/JS)                    │
+│        User-written spells and orchestration logic          │
+├─────────────────────────────────────────────────────────────┤
+│                    Bridge Layer (FFI)                       │
+│         Type conversion, async adaptation, safety           │
+├─────────────────────────────────────────────────────────────┤
+│                 Core Components (Rust)                      │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐        │
+│  │   Agents    │  │   Tools     │  │  Workflows  │        │
+│  └─────────────┘  └─────────────┘  └─────────────┘        │
+├─────────────────────────────────────────────────────────────┤
+│                 Infrastructure Layer                        │
+│  ┌────────┐  ┌────────┐  ┌────────┐  ┌────────┐          │
+│  │  LLM   │  │ State  │  │ Events │  │ Hooks  │          │
+│  └────────┘  └────────┘  └────────┘  └────────┘          │
+├─────────────────────────────────────────────────────────────┤
+│                 External Dependencies                       │
+│      rig, mlua, sled/rocksdb, tokio, tracing              │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ### Data Flow
 
 ```
-User Script (Lua/JS)
-    ↓ [Script API Calls]
-Script Engine (rs-llmspell-engines)
-    ↓ [Type Conversion]
-Bridge Layer (rs-llmspell-bridges)
-    ↓ [Rust Function Calls]
-Rust LLM Libraries (Rig, etc.)
-    ↓ [Provider APIs]
-LLM Providers (OpenAI, Anthropic, etc.)
+User Script → Bridge (Type Conversion) → Agent/Workflow → LLM Provider
+     ↑                                          ↓
+     └──────── Bridge (Result Conversion) ← Tool Execution
+                                                ↓
+                                          State/Events/Hooks
 ```
+
+## Component Hierarchy
+
+### Core Trait Hierarchy
+
+```rust
+/// Foundation: Any component that can handle tools
+#[async_trait]
+trait BaseAgent {
+    fn id(&self) -> &str;
+    fn tools(&self) -> &[Box<dyn Tool>];
+    async fn execute(&mut self, input: AgentInput) -> Result<AgentOutput>;
+    fn state(&self) -> &AgentState;
+}
+
+/// LLM-powered agent extending BaseAgent
+#[async_trait] 
+trait Agent: BaseAgent {
+    fn llm_provider(&self) -> &dyn LLMProvider;
+    fn system_prompt(&self) -> &str;
+    async fn chat(&mut self, message: &str) -> Result<String>;
+}
+
+/// Callable tool for agents
+#[async_trait]
+trait Tool {
+    fn name(&self) -> &str;
+    fn description(&self) -> &str;
+    fn parameters_schema(&self) -> Value;
+    async fn execute(&self, params: Value) -> Result<ToolOutput>;
+}
+
+/// Deterministic execution patterns
+#[async_trait]
+trait Workflow: BaseAgent {
+    fn workflow_type(&self) -> WorkflowType;
+    async fn run(&mut self, input: WorkflowInput) -> Result<WorkflowOutput>;
+}
+```
+
+### Composition Patterns
+
+1. **Tool-Wrapped Agent**: Any agent can be wrapped as a tool
+2. **Composite Agent**: Multiple agents working together
+3. **Hierarchical Agent**: Supervisor-worker patterns
+4. **Pipeline Agent**: Sequential processing stages
 
 ## Bridge-First Design
 
-### What We Build vs What We Adapt
+### Bridge Architecture
 
-#### We Build (Our Value-Add)
-1. **Script Engine System** - Multi-language execution environments
-2. **Type Conversion Layer** - Seamless script ↔ Rust type conversions  
-3. **Bridge Interfaces** - Thin wrappers exposing Rust LLM libraries to scripts
-4. **Language Bindings** - Idiomatic APIs for each scripting language
-5. **Script Infrastructure** - Sandboxing, resource limits, hot reload
+We bridge to best-in-class Rust crates:
 
-**Important**: We ONLY create implementations, structs, and interfaces that are necessary to support scripting and bridging. No business logic, no LLM functionality, no duplicating Rust LLM library features.
+| Component | Bridge To | Why |
+|-----------|-----------|-----|
+| LLM Providers | `rig` | Comprehensive multi-provider support |
+| Lua Scripting | `mlua` | Mature, async-capable Lua binding |
+| JS Scripting | `rquickjs` | Lightweight, embeddable JS engine |
+| State Storage | `sled`/`rocksdb` | Embedded persistence options |
+| Observability | `tracing` | Structured, async-aware logging |
 
-#### We Bridge (From Rust LLM Libraries)
-Everything else comes from Rust LLM libraries:
-1. **LLM Providers** - All provider interfaces and implementations (via Rig, etc.)
-2. **Agents** - Complete agent system with tools and orchestration (via Rig, etc.)
-3. **Tools** - All built-in and custom tool functionality (via library ecosystem)
-4. **Workflows** - All workflow types and execution logic (via libraries)
-5. **Vector Operations** - Embeddings, vector search, RAG (via Rig ecosystem)
-6. **Infrastructure** - HTTP clients, JSON parsing, auth (via Rust ecosystem)
+### Type Conversion
 
-#### We Never Implement
-These belong in Rust LLM libraries, not rs-llmspell:
-1. **New LLM Features** - Submit upstream to library authors first
-2. **Custom Agents** - Use existing Rust LLM library agent systems
-3. **New Tools** - Contribute to Rust LLM library tool ecosystems
-4. **Workflow Types** - Extend existing library workflow engines
-5. **Any Core Logic** - All intelligence lives in upstream libraries
-
-### Bridge Implementation Strategy
-
-Each bridge follows these principles:
-
-1. **Thin Wrappers**: Minimal code between scripts and Rust LLM libraries
-2. **Type Safety**: Handle all conversions at bridge boundaries
-3. **Error Mapping**: Convert Rust errors to script-friendly formats
-4. **No Business Logic**: Bridges only translate, never implement features
-5. **Direct Delegation**: All functionality comes from Rust LLM libraries
-
-Example bridge structure:
+Unified value type for cross-language communication:
 
 ```rust
-// Bridge to Rig LLM functionality - ONLY wrapping, no implementation
-pub struct RigLlmBridge {
-    client: rig::Client,  // From Rig library
-}
-
-impl Bridge for RigLlmBridge {
-    fn methods(&self) -> Vec<MethodInfo> {
-        // Define script-accessible methods that map to Rig
-        vec![
-            MethodInfo::new("complete", "Generate text completion"),
-            MethodInfo::new("embed", "Generate embeddings"),
-            // etc - all delegating to Rig
-        ]
-    }
-}
-
-// Example method - just type conversion and delegation
-impl RigLlmBridge {
-    async fn complete(&self, args: Vec<ScriptValue>) -> Result<ScriptValue, BridgeError> {
-        // 1. Convert script types to Rust types
-        let request = self.convert_completion_request(args)?;
-        
-        // 2. Call Rig directly
-        let response = self.client.complete(request).await?;
-        
-        // 3. Convert result back to script types
-        Ok(self.convert_to_script_value(response)?)
-    }
-}
-
-// NEVER implement features like this:
-// ❌ impl RigLlmBridge { fn custom_llm_logic(...) { ... } }
-// ❌ impl RigLlmBridge { fn my_own_agent_feature(...) { ... } }
-```
-
-## Script Engine System
-
-### Core Interfaces
-
-#### ScriptEngine Trait
-
-The foundation of script execution:
-
-```rust
-#[async_trait]
-pub trait ScriptEngine: Send + Sync {
-    /// Engine-specific error type
-    type Error: std::error::Error + Send + Sync + 'static;
-    
-    /// Engine-specific configuration type
-    type Config: Clone + Send + Sync;
-    
-    /// Initialize the engine with configuration
-    async fn initialize(config: Self::Config) -> Result<Self, Self::Error>
-    where
-        Self: Sized;
-    
-    /// Execute a script string with parameters
-    async fn execute(
-        &self, 
-        script: &str, 
-        params: HashMap<String, ScriptValue>
-    ) -> Result<ScriptValue, Self::Error>;
-    
-    /// Execute a script file with parameters
-    async fn execute_file(
-        &self, 
-        path: &Path, 
-        params: HashMap<String, ScriptValue>
-    ) -> Result<ScriptValue, Self::Error>;
-    
-    /// Register a bridge with the engine
-    fn register_bridge(&mut self, name: &str, bridge: Box<dyn Bridge>) -> Result<(), Self::Error>;
-    
-    /// Unregister a bridge
-    fn unregister_bridge(&mut self, name: &str) -> Result<(), Self::Error>;
-    
-    /// Set memory limit for script execution
-    fn set_memory_limit(&mut self, bytes: usize) -> Result<(), Self::Error>;
-    
-    /// Set timeout for script execution
-    fn set_timeout(&mut self, timeout: Duration) -> Result<(), Self::Error>;
-    
-    /// Get engine name/type
-    fn name(&self) -> &'static str;
-    
-    /// Validate script syntax without executing
-    fn validate_syntax(&self, script: &str) -> Result<(), Self::Error>;
+#[derive(Debug, Clone, Serialize, Deserialize)]
+enum ScriptValue {
+    Null,
+    Bool(bool),
+    Number(f64), 
+    String(String),
+    Array(Vec<ScriptValue>),
+    Object(HashMap<String, ScriptValue>),
+    Function(FunctionRef),
+    Promise(PromiseRef),
 }
 ```
-
-#### Agent Trait
-
-High-level agent behavior:
-
-```rust
-#[async_trait]
-pub trait Agent: Send + Sync + Clone {
-    type Error: std::error::Error + Send + Sync + 'static;
-    type Provider: Provider;
-    type Tool: Tool;
-    
-    /// Create a new agent with a provider
-    fn new(provider: Self::Provider) -> Self;
-    
-    /// Configure the agent's behavior
-    fn with_system_prompt(self, prompt: impl Into<String>) -> Self;
-    fn with_tools(self, tools: Vec<Self::Tool>) -> Self;
-    fn with_config(self, config: AgentConfig) -> Self;
-    
-    /// Execute a single request
-    async fn run(&self, input: &str) -> Result<AgentResponse, Self::Error>;
-    
-    /// Execute with conversation context
-    async fn run_with_context(&self, input: &str, context: &ConversationContext) 
-        -> Result<AgentResponse, Self::Error>;
-    
-    /// Stream responses in real-time
-    fn run_stream(&self, input: &str) 
-        -> impl Stream<Item = Result<AgentChunk, Self::Error>> + Send;
-    
-    /// Get available tools
-    fn tools(&self) -> &[Self::Tool];
-    
-    /// Validate agent configuration
-    fn validate(&self) -> Result<(), Self::Error>;
-}
-```
-
-#### Tool Trait
-
-Tool interface for extending agent capabilities:
-
-```rust
-#[async_trait]
-pub trait Tool: Send + Sync + Clone {
-    type Error: std::error::Error + Send + Sync + 'static;
-    type Input: serde::de::DeserializeOwned + Send + Sync;
-    type Output: serde::Serialize + Send + Sync;
-    
-    /// Tool metadata
-    fn name(&self) -> &str;
-    fn description(&self) -> &str;
-    fn parameters_schema(&self) -> serde_json::Value;
-    
-    /// Execute the tool
-    async fn execute(&self, input: Self::Input) -> Result<Self::Output, Self::Error>;
-    
-    /// Validate input without executing
-    fn validate_input(&self, input: &serde_json::Value) -> Result<(), Self::Error>;
-    
-    /// Check if tool is available (e.g., API keys present)
-    async fn health_check(&self) -> Result<(), Self::Error>;
-}
-```
-
-#### Workflow Trait
-
-Orchestration of multiple agents and tools:
-
-```rust
-#[async_trait]
-pub trait Workflow: Send + Sync {
-    type Error: std::error::Error + Send + Sync + 'static;
-    type Step: WorkflowStep;
-    type Context: WorkflowContext;
-    
-    /// Add a step to the workflow
-    fn add_step(self, step: Self::Step) -> Self;
-    
-    /// Execute the entire workflow
-    async fn run(&self, context: Self::Context) -> Result<WorkflowResult, Self::Error>;
-    
-    /// Execute with progress reporting
-    async fn run_with_progress(&self, context: Self::Context) 
-        -> impl Stream<Item = Result<WorkflowProgress, Self::Error>> + Send;
-    
-    /// Validate workflow configuration
-    fn validate(&self) -> Result<(), Self::Error>;
-    
-    /// Get workflow metadata
-    fn metadata(&self) -> WorkflowMetadata;
-}
-```
-
-### Type System Design
-
-#### Core Types
-
-```rust
-// Message types for LLM communication
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Message {
-    pub role: Role,
-    pub content: Content,
-    pub metadata: Option<MessageMetadata>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum Role {
-    System,
-    User,
-    Assistant,
-    Tool,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum Content {
-    Text(String),
-    Multimodal(Vec<ContentPart>),
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum ContentPart {
-    Text(String),
-    Image { 
-        url: Option<String>, 
-        data: Option<Vec<u8>>, 
-        mime_type: String 
-    },
-}
-
-// Request/Response types
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CompletionRequest {
-    pub messages: Vec<Message>,
-    pub model: String,
-    pub temperature: Option<f32>,
-    pub max_tokens: Option<u32>,
-    pub stop_sequences: Option<Vec<String>>,
-    pub tools: Option<Vec<ToolDefinition>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CompletionResponse {
-    pub message: Message,
-    pub usage: TokenUsage,
-    pub model: String,
-    pub finish_reason: FinishReason,
-    pub metadata: ResponseMetadata,
-}
-
-// Error types with rich context
-#[derive(Debug, thiserror::Error)]
-pub enum LlmError {
-    #[error("Provider error: {0}")]
-    Provider(#[from] Box<dyn std::error::Error + Send + Sync>),
-    
-    #[error("Configuration error: {message}")]
-    Configuration { message: String },
-    
-    #[error("Validation error: {field}: {message}")]
-    Validation { field: String, message: String },
-    
-    #[error("Network error: {0}")]
-    Network(#[from] reqwest::Error),
-    
-    #[error("Serialization error: {0}")]
-    Serialization(#[from] serde_json::Error),
-    
-    #[error("Timeout after {duration:?}")]
-    Timeout { duration: std::time::Duration },
-    
-    #[error("Rate limit exceeded: retry after {retry_after:?}")]
-    RateLimit { retry_after: Option<std::time::Duration> },
-}
-```
-
-## Async System Design
 
 ### Async Patterns
 
-#### 1. Provider Operations
+Different languages require different async approaches:
 
-All provider operations are async and cancellable:
+- **Lua**: Coroutines with Promise-like wrappers
+- **JavaScript**: Native promises and async/await
+- **Rust**: Tokio-based async runtime
+
+## Script Interface
+
+### Lua API Highlights
+
+```lua
+-- Agent creation
+local agent = Agent.new({
+    system_prompt = "You are a helpful assistant",
+    provider = "openai",
+    tools = { Calculator.new(), WebSearch.new() }
+})
+
+-- Async operations with coroutines
+coroutine.wrap(function()
+    local response = agent:chat_async("Hello")
+    print(response)
+end)()
+
+-- Event handling
+agent:on("tool_called", function(event)
+    print("Tool used:", event.tool_name)
+end)
+
+-- Workflow definition
+local workflow = Workflow.sequential({
+    steps = { ... }
+})
+```
+
+### JavaScript API Highlights
+
+```javascript
+// Agent creation  
+const agent = new Agent({
+    systemPrompt: "You are a helpful assistant",
+    provider: "anthropic",
+    tools: [new Calculator(), new WebSearch()]
+});
+
+// Native async/await
+const response = await agent.chat("Hello");
+
+// Streaming
+for await (const chunk of agent.streamChat("Tell me a story")) {
+    process.stdout.write(chunk);
+}
+
+// Event handling
+agent.on("toolCalled", (event) => {
+    console.log("Tool used:", event.toolName);
+});
+```
+
+## Hook and Event System
+
+### Hook Points
+
+20+ hook points throughout the lifecycle:
+
+- `beforeInit`, `afterInit`
+- `beforeLLMCall`, `afterLLMCall`
+- `beforeToolCall`, `afterToolCall`
+- `beforeStateChange`, `afterStateChange`
+- `onError`, `onRetry`
+
+### Event System
+
+Comprehensive event emission and handling:
+
+```javascript
+// Global event bus
+eventBus.on("agent:started", (event) => {
+    metrics.increment("agents.active");
+});
+
+// Agent-specific events
+agent.on("tool:*", (event) => {
+    audit.log(event);
+});
+```
+
+### Built-in Hooks
+
+- **LoggingHook**: Structured logging with context
+- **MetricsHook**: Performance and usage metrics
+- **RateLimitHook**: Request throttling
+- **CacheHook**: Response caching
+- **RetryHook**: Automatic retry with backoff
+
+## State Management
+
+### State Hierarchy
+
+1. **Agent State**: Local to each agent instance
+2. **Workflow State**: Managed by workflows, includes child states
+3. **Global State**: Shared via StateRepository with access control
+
+### State Storage
+
+Abstracted behind traits for flexibility:
 
 ```rust
-impl Provider for OpenAiProvider {
-    async fn complete(&self, request: CompletionRequest) -> Result<CompletionResponse, Self::Error> {
-        // Built-in timeout and cancellation
-        let response = tokio::time::timeout(
-            self.config.timeout,
-            self.client.complete(request)
-        ).await??;
-        
-        Ok(response)
-    }
+trait StateStore {
+    async fn get(&self, key: &str) -> Result<Option<Vec<u8>>>;
+    async fn set(&self, key: &str, value: Vec<u8>) -> Result<()>;
+    async fn watch(&self, prefix: &str) -> Result<StateWatcher>;
 }
 ```
 
-#### 2. Concurrent Agent Execution
+- Development: `sled` for fast iteration
+- Production: `rocksdb` for reliability
 
-Agents can be executed concurrently with proper error handling:
+### State Handoff
 
-```rust
-pub async fn run_agents_concurrently(
-    agents: Vec<Agent>,
-    inputs: Vec<String>,
-) -> Result<Vec<AgentResponse>, LlmError> {
-    let tasks: Vec<_> = agents
-        .into_iter()
-        .zip(inputs)
-        .map(|(agent, input)| {
-            tokio::spawn(async move {
-                agent.run(&input).await
-            })
-        })
-        .collect();
-    
-    let results = futures::future::try_join_all(tasks).await?;
-    results.into_iter().collect()
-}
+Agents can transfer state during handoffs:
+
+```lua
+local handoff = StateHandoff.new({
+    from = "researcher",
+    to = "writer", 
+    filter = { include = {"research_notes", "sources"} }
+})
 ```
 
-#### 3. Streaming Responses
+## Built-in Components
 
-Real-time streaming with backpressure:
+### Tools (40+)
 
-```rust
-#[async_trait]
-impl Agent for StreamingAgent {
-    fn run_stream(&self, input: &str) 
-        -> impl Stream<Item = Result<AgentChunk, Self::Error>> + Send {
-        async_stream::try_stream! {
-            let mut stream = self.provider.complete_stream(request).await?;
-            
-            while let Some(chunk) = stream.next().await {
-                let chunk = chunk?;
-                yield AgentChunk::from(chunk);
-            }
-        }
-    }
-}
-```
+Organized by category:
 
-#### 4. Workflow Orchestration
+- **System**: FileSystem, Shell, Environment, Process
+- **Data**: JSON, XML, CSV, SQLite, Regex
+- **Web**: HTTP, WebScraper, RSS, WebSocket
+- **AI**: Embedding, VectorSearch, ImageGen, Transcribe
+- **Communication**: Email, Slack, Discord, SMS
+- **Math**: Calculator, Statistics, LinearAlgebra
+- **Time**: DateTime, Timer, Scheduler
+- **Crypto**: Hash, Encryption, Signature
 
-Complex async orchestration patterns:
+### Agent Templates
 
-```rust
-impl Workflow for SequentialWorkflow {
-    async fn run(&self, mut context: WorkflowContext) -> Result<WorkflowResult, Self::Error> {
-        let mut results = Vec::new();
-        
-        for step in &self.steps {
-            // Each step can access previous results
-            let step_input = self.prepare_step_input(&context, &results)?;
-            
-            // Execute step with timeout and error handling
-            let step_result = tokio::time::timeout(
-                step.timeout(),
-                step.execute(step_input)
-            ).await??;
-            
-            // Update context for next step
-            context.update_with_result(&step_result)?;
-            results.push(step_result);
-        }
-        
-        Ok(WorkflowResult { results, context })
-    }
-}
-```
+Pre-built agents for common use cases:
 
-### Error Handling Patterns
+- **ChatAgent**: Conversational with memory
+- **ResearchAgent**: Search and synthesis
+- **CodeAgent**: Code generation and review
+- **DataAnalyst**: Data processing and visualization
+- **PlannerAgent**: Task decomposition
+- **OrchestratorAgent**: Multi-agent coordination
 
-#### 1. Hierarchical Error Types
+### Workflow Types
 
-```rust
-#[derive(Debug, thiserror::Error)]
-pub enum WorkflowError {
-    #[error("Step {step_name} failed: {source}")]
-    StepFailed {
-        step_name: String,
-        #[source]
-        source: Box<dyn std::error::Error + Send + Sync>,
-    },
-    
-    #[error("Agent error: {0}")]
-    Agent(#[from] AgentError),
-    
-    #[error("Provider error: {0}")]
-    Provider(#[from] LlmError),
-    
-    #[error("Configuration error: {0}")]
-    Configuration(String),
-}
-```
-
-#### 2. Retry Policies
-
-```rust
-pub struct RetryPolicy {
-    pub max_attempts: u32,
-    pub base_delay: Duration,
-    pub max_delay: Duration,
-    pub backoff: BackoffStrategy,
-    pub retryable_errors: fn(&dyn std::error::Error) -> bool,
-}
-
-impl RetryPolicy {
-    pub async fn execute<F, T, E>(&self, operation: F) -> Result<T, E>
-    where
-        F: Fn() -> Pin<Box<dyn Future<Output = Result<T, E>> + Send>>,
-        E: std::error::Error,
-    {
-        let mut attempt = 0;
-        let mut delay = self.base_delay;
-        
-        loop {
-            attempt += 1;
-            
-            match operation().await {
-                Ok(result) => return Ok(result),
-                Err(error) if attempt >= self.max_attempts => return Err(error),
-                Err(error) if !(self.retryable_errors)(&error) => return Err(error),
-                Err(_) => {
-                    tokio::time::sleep(delay).await;
-                    delay = std::cmp::min(delay * 2, self.max_delay);
-                }
-            }
-        }
-    }
-}
-```
-
-## Type Safety & Error Handling
-
-### Compile-Time Guarantees
-
-#### 1. Provider Configuration
-
-```rust
-// Configuration is validated at compile time
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct OpenAiConfig {
-    pub api_key: SecretString,  // Type-safe secret handling
-    pub base_url: Option<url::Url>,  // Validated URL type
-    pub timeout: Duration,
-    pub max_retries: u32,
-}
-
-impl OpenAiConfig {
-    pub fn new(api_key: impl Into<SecretString>) -> Self {
-        Self {
-            api_key: api_key.into(),
-            base_url: None,
-            timeout: Duration::from_secs(30),
-            max_retries: 3,
-        }
-    }
-    
-    // Builder pattern with compile-time validation
-    pub fn with_timeout(mut self, timeout: Duration) -> Self {
-        self.timeout = timeout;
-        self
-    }
-}
-```
-
-#### 2. Tool Parameter Validation
-
-```rust
-// Tools use strong typing for parameters
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WebSearchTool {
-    client: reqwest::Client,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct WebSearchInput {
-    pub query: String,
-    #[serde(default = "default_max_results")]
-    pub max_results: u32,
-    pub filter: Option<SearchFilter>,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct WebSearchOutput {
-    pub results: Vec<SearchResult>,
-    pub query_metadata: QueryMetadata,
-}
-
-#[async_trait]
-impl Tool for WebSearchTool {
-    type Input = WebSearchInput;
-    type Output = WebSearchOutput;
-    type Error = WebSearchError;
-    
-    async fn execute(&self, input: Self::Input) -> Result<Self::Output, Self::Error> {
-        // Input is already validated at compile time
-        self.search_web(input).await
-    }
-}
-```
-
-#### 3. Workflow Type Safety
-
-```rust
-// Workflows enforce type safety between steps
-pub struct TypedWorkflow<Input, Output> {
-    steps: Vec<Box<dyn WorkflowStep<Input, Output>>>,
-    _phantom: PhantomData<(Input, Output)>,
-}
-
-impl<Input, Output> TypedWorkflow<Input, Output> 
-where 
-    Input: Clone + Send + Sync + 'static,
-    Output: Send + Sync + 'static,
-{
-    pub fn new() -> Self {
-        Self {
-            steps: Vec::new(),
-            _phantom: PhantomData,
-        }
-    }
-    
-    // Type-safe step addition
-    pub fn add_step<S>(mut self, step: S) -> Self 
-    where 
-        S: WorkflowStep<Input, Output> + 'static
-    {
-        self.steps.push(Box::new(step));
-        self
-    }
-}
-```
-
-### Runtime Safety
-
-#### 1. Resource Management
-
-```rust
-// Automatic cleanup with RAII
-pub struct ResourceGuard<T> {
-    resource: Option<T>,
-    cleanup: Box<dyn FnOnce(T) + Send>,
-}
-
-impl<T> ResourceGuard<T> {
-    pub fn new(resource: T, cleanup: impl FnOnce(T) + Send + 'static) -> Self {
-        Self {
-            resource: Some(resource),
-            cleanup: Box::new(cleanup),
-        }
-    }
-}
-
-impl<T> Drop for ResourceGuard<T> {
-    fn drop(&mut self) {
-        if let Some(resource) = self.resource.take() {
-            (self.cleanup)(resource);
-        }
-    }
-}
-```
-
-#### 2. Memory Limits
-
-```rust
-// Memory-bounded operations
-pub struct BoundedString {
-    inner: String,
-    max_size: usize,
-}
-
-impl BoundedString {
-    pub fn new(max_size: usize) -> Self {
-        Self {
-            inner: String::new(),
-            max_size,
-        }
-    }
-    
-    pub fn push_str(&mut self, s: &str) -> Result<(), CapacityError> {
-        if self.inner.len() + s.len() > self.max_size {
-            return Err(CapacityError::ExceedsLimit);
-        }
-        self.inner.push_str(s);
-        Ok(())
-    }
-}
-```
-
-## Component Architecture
-
-### Agent System
-
-```rust
-// Basic agent implementation
-pub struct BasicAgent<P: Provider> {
-    provider: P,
-    system_prompt: Option<String>,
-    config: AgentConfig,
-}
-
-impl<P: Provider> BasicAgent<P> {
-    pub fn new(provider: P) -> Self {
-        Self {
-            provider,
-            system_prompt: None,
-            config: AgentConfig::default(),
-        }
-    }
-}
-
-#[async_trait]
-impl<P: Provider> Agent for BasicAgent<P> {
-    type Provider = P;
-    type Error = AgentError;
-    
-    async fn run(&self, input: &str) -> Result<AgentResponse, Self::Error> {
-        let mut messages = Vec::new();
-        
-        if let Some(system) = &self.system_prompt {
-            messages.push(Message::system(system));
-        }
-        
-        messages.push(Message::user(input));
-        
-        let request = CompletionRequest {
-            messages,
-            model: self.config.model.clone(),
-            temperature: self.config.temperature,
-            max_tokens: self.config.max_tokens,
-            stop_sequences: None,
-            tools: None,
-        };
-        
-        let response = self.provider.complete(request).await?;
-        
-        Ok(AgentResponse {
-            content: response.message.content,
-            usage: response.usage,
-            metadata: response.metadata.into(),
-        })
-    }
-}
-```
-
-### Tool System
-
-```rust
-// Tool registry with type safety
-pub struct ToolRegistry {
-    tools: HashMap<String, Box<dyn ErasedTool>>,
-}
-
-// Type-erased tool trait for storage
-trait ErasedTool: Send + Sync {
-    fn name(&self) -> &str;
-    fn description(&self) -> &str;
-    fn parameters_schema(&self) -> serde_json::Value;
-    
-    fn execute_json(&self, input: serde_json::Value) 
-        -> Pin<Box<dyn Future<Output = Result<serde_json::Value, Box<dyn std::error::Error + Send + Sync>>> + Send>>;
-}
-
-impl<T: Tool + 'static> ErasedTool for T {
-    fn name(&self) -> &str {
-        Tool::name(self)
-    }
-    
-    fn description(&self) -> &str {
-        Tool::description(self)
-    }
-    
-    fn parameters_schema(&self) -> serde_json::Value {
-        Tool::parameters_schema(self)
-    }
-    
-    fn execute_json(&self, input: serde_json::Value) 
-        -> Pin<Box<dyn Future<Output = Result<serde_json::Value, Box<dyn std::error::Error + Send + Sync>>> + Send>> {
-        Box::pin(async move {
-            let typed_input: T::Input = serde_json::from_value(input)?;
-            let output = self.execute(typed_input).await?;
-            let json_output = serde_json::to_value(output)?;
-            Ok(json_output)
-        })
-    }
-}
-```
+- **Sequential**: Steps in order
+- **Parallel**: Concurrent execution
+- **Conditional**: Branching logic
+- **Loop**: Iteration patterns
+- **MapReduce**: Distributed processing
+- **Pipeline**: Stream transformation
 
 ## Testing Architecture
 
-### Core Testing Philosophy
+### Testing Strategy
 
-**Fundamental Principle: Testing infrastructure must be as reusable and composable as the production architecture.**
+Multi-layer testing approach:
 
-In a multi-layered system like rs-llmspell, testing components should be shared across:
-- Multiple script engines (Lua, JavaScript, future engines)
-- Multiple bridges (Rig, direct providers, custom bridges)
-- Integration scenarios (end-to-end workflows)
-- Performance and security validation
+1. **Unit Tests**: Mock LLM providers with `mockall`
+2. **Property Tests**: Invariants with `proptest`
+3. **Integration Tests**: Real component interaction
+4. **Performance Tests**: Benchmarks with `criterion`
 
-### Testing Infrastructure Components
-
-#### 1. Test Traits and Contracts
+### Test Infrastructure
 
 ```rust
-// Core testing traits that define behavioral contracts
-pub trait ScriptEngineTestSuite {
-    type Engine: ScriptEngine;
-    
-    /// Standard test suite that any script engine must pass
-    fn run_standard_tests(&self, engine: &Self::Engine) -> TestResult;
-    
-    /// Language-specific tests (syntax, features)
-    fn run_language_tests(&self, engine: &Self::Engine) -> TestResult;
-    
-    /// Performance benchmarks
-    fn run_performance_tests(&self, engine: &Self::Engine) -> BenchmarkResult;
-    
-    /// Security and sandboxing tests
-    fn run_security_tests(&self, engine: &Self::Engine) -> SecurityTestResult;
+// Mock LLM for testing
+#[automock]
+trait LLMProvider {
+    async fn complete(&self, prompt: &str) -> Result<String>;
 }
 
-pub trait BridgeTestSuite {
-    type Bridge: Bridge;
-    
-    /// Standard bridge behavior tests
-    fn run_standard_tests(&self, bridge: &Self::Bridge) -> TestResult;
-    
-    /// Type conversion validation
-    fn run_type_safety_tests(&self, bridge: &Self::Bridge) -> TestResult;
-    
-    /// Error handling verification
-    fn run_error_handling_tests(&self, bridge: &Self::Bridge) -> TestResult;
-    
-    /// Method signature validation
-    fn run_method_tests(&self, bridge: &Self::Bridge) -> TestResult;
-}
-
-pub trait IntegrationTestSuite {
-    /// End-to-end workflow tests
-    fn run_e2e_tests(&self) -> TestResult;
-    
-    /// Cross-engine compatibility tests
-    fn run_cross_engine_tests(&self) -> TestResult;
-    
-    /// Resource limit and timeout tests
-    fn run_resource_tests(&self) -> TestResult;
-}
-```
-
-#### 2. Shared Test Fixtures
-
-```rust
-// Standard test fixtures used across all components
-pub struct TestFixtures {
-    pub scripts: ScriptFixtures,
-    pub mock_responses: MockResponseFixtures,
-    pub test_data: TestDataFixtures,
-    pub configs: ConfigFixtures,
-}
-
-pub struct ScriptFixtures {
-    // Standard test scripts that work across engines
-    pub basic_hello_world: ScriptSet,
-    pub type_conversion_tests: ScriptSet,
-    pub error_handling_tests: ScriptSet,
-    pub async_operation_tests: ScriptSet,
-    pub bridge_interaction_tests: ScriptSet,
-    pub performance_benchmarks: ScriptSet,
-    pub security_violation_tests: ScriptSet,
-}
-
-pub struct ScriptSet {
-    pub lua: &'static str,
-    pub javascript: &'static str,
-    pub description: &'static str,
-    pub expected_output: ExpectedOutput,
-}
-
-// Example fixture
-impl ScriptFixtures {
-    pub fn basic_llm_interaction() -> ScriptSet {
-        ScriptSet {
-            lua: r#"
-                local response = llm.complete({
-                    model = "test-model",
-                    messages = {{role = "user", content = "Hello"}}
-                })
-                return response.content
-            "#,
-            javascript: r#"
-                const response = await llm.complete({
-                    model: "test-model",
-                    messages: [{role: "user", content: "Hello"}]
-                });
-                return response.content;
-            "#,
-            description: "Basic LLM completion request",
-            expected_output: ExpectedOutput::String("Hello from test model".into()),
-        }
+// Property testing
+proptest! {
+    #[test]
+    fn agent_state_serialization(state: AgentState) {
+        let serialized = serde_json::to_string(&state)?;
+        let deserialized: AgentState = serde_json::from_str(&serialized)?;
+        prop_assert_eq!(state, deserialized);
     }
 }
 ```
-
-#### 3. Mock Implementations
-
-```rust
-// Reusable mock implementations for testing
-
-/// Mock script engine for testing bridges
-pub struct MockScriptEngine {
-    pub responses: HashMap<String, ScriptValue>,
-    pub execution_log: Vec<ExecutionEvent>,
-    pub should_fail: bool,
-}
-
-impl ScriptEngine for MockScriptEngine {
-    // Implementation that records calls and returns predefined responses
-}
-
-/// Mock bridge for testing script engines
-pub struct MockBridge {
-    pub method_responses: HashMap<String, ScriptValue>,
-    pub call_log: Vec<BridgeCall>,
-    pub should_fail_method: Option<String>,
-}
-
-impl Bridge for MockBridge {
-    // Implementation that logs calls and returns test data
-}
-
-/// Mock LLM library for testing bridges
-pub struct MockRigClient {
-    pub completion_responses: VecDeque<CompletionResponse>,
-    pub embedding_responses: VecDeque<EmbeddingResponse>,
-    pub call_log: Vec<ApiCall>,
-    pub latency_ms: Option<u64>,
-}
-
-// Mock implementations are configured through builders
-impl MockRigClient {
-    pub fn new() -> MockRigClientBuilder {
-        MockRigClientBuilder::default()
-    }
-}
-
-pub struct MockRigClientBuilder {
-    responses: Vec<CompletionResponse>,
-    latency: Option<u64>,
-    should_fail: bool,
-}
-
-impl MockRigClientBuilder {
-    pub fn with_completion(mut self, response: CompletionResponse) -> Self {
-        self.responses.push(response);
-        self
-    }
-    
-    pub fn with_latency(mut self, ms: u64) -> Self {
-        self.latency = Some(ms);
-        self
-    }
-    
-    pub fn should_fail(mut self) -> Self {
-        self.should_fail = true;
-        self
-    }
-    
-    pub fn build(self) -> MockRigClient {
-        // Build the mock with configured behavior
-    }
-}
-```
-
-#### 4. Test Helpers and Utilities
-
-```rust
-// Reusable test utilities across all components
-
-pub struct TestEnvironment {
-    pub temp_dir: TempDir,
-    pub config: TestConfig,
-    pub cleanup_hooks: Vec<Box<dyn FnOnce()>>,
-}
-
-impl TestEnvironment {
-    pub fn new() -> Self {
-        // Set up isolated test environment
-    }
-    
-    pub fn create_script_file(&self, name: &str, content: &str) -> PathBuf {
-        // Create temporary script file
-    }
-    
-    pub fn create_test_engine(&self, engine_type: EngineType) -> Box<dyn ScriptEngine> {
-        // Create configured test engine
-    }
-    
-    pub fn create_mock_bridge(&self, bridge_name: &str) -> Box<dyn Bridge> {
-        // Create configured mock bridge
-    }
-}
-
-pub struct TestHelpers;
-
-impl TestHelpers {
-    /// Assert that script produces expected output across all engines
-    pub async fn assert_script_output_cross_engine(
-        script_set: &ScriptSet,
-        engines: &[Box<dyn ScriptEngine>],
-    ) -> TestResult {
-        for engine in engines {
-            let script = match engine.name() {
-                "lua" => script_set.lua,
-                "javascript" => script_set.javascript,
-                _ => panic!("Unsupported engine type"),
-            };
-            
-            let result = engine.execute(script, HashMap::new()).await?;
-            assert_eq!(result, script_set.expected_output.to_script_value());
-        }
-        Ok(())
-    }
-    
-    /// Validate bridge type conversion round-trip
-    pub fn assert_type_conversion_round_trip<T>(
-        bridge: &dyn Bridge,
-        original: T,
-    ) -> TestResult 
-    where 
-        T: Serialize + DeserializeOwned + PartialEq + Clone
-    {
-        let script_value = bridge.to_script_value(&original)?;
-        let converted_back: T = bridge.from_script_value(&script_value)?;
-        assert_eq!(original, converted_back);
-        Ok(())
-    }
-    
-    /// Run performance benchmark across engines
-    pub async fn benchmark_script_execution(
-        script_set: &ScriptSet,
-        engines: &[Box<dyn ScriptEngine>],
-        iterations: usize,
-    ) -> BenchmarkResult {
-        // Run performance comparison across engines
-    }
-}
-```
-
-### Component-Specific Testing Strategies
-
-#### Script Engine Testing
-
-```rust
-// Standard test suite for any script engine implementation
-pub struct StandardScriptEngineTests;
-
-impl StandardScriptEngineTests {
-    pub async fn run_all<E: ScriptEngine>(engine: &E) -> TestResult {
-        // Core functionality tests
-        Self::test_basic_execution(engine).await?;
-        Self::test_type_conversions(engine).await?;
-        Self::test_bridge_interactions(engine).await?;
-        Self::test_error_handling(engine).await?;
-        Self::test_async_operations(engine).await?;
-        
-        // Security tests
-        Self::test_memory_limits(engine).await?;
-        Self::test_timeout_enforcement(engine).await?;
-        Self::test_sandbox_isolation(engine).await?;
-        
-        // Performance tests
-        Self::test_execution_performance(engine).await?;
-        Self::test_memory_usage(engine).await?;
-        
-        Ok(())
-    }
-    
-    async fn test_basic_execution<E: ScriptEngine>(engine: &E) -> TestResult {
-        let fixtures = TestFixtures::load();
-        
-        for script_set in &fixtures.scripts.basic_tests {
-            let script = script_set.get_for_engine(engine.name());
-            let result = engine.execute(script, HashMap::new()).await?;
-            
-            assert_eq!(result, script_set.expected_output.to_script_value());
-        }
-        
-        Ok(())
-    }
-    
-    async fn test_bridge_interactions<E: ScriptEngine>(engine: &E) -> TestResult {
-        // Test with mock bridges
-        let mock_bridge = MockBridge::new()
-            .with_method("test_method", ScriptValue::String("test_response".into()))
-            .build();
-            
-        engine.register_bridge("test", Box::new(mock_bridge))?;
-        
-        let script = script_set.get_for_engine(engine.name());
-        let result = engine.execute(script, HashMap::new()).await?;
-        
-        // Verify bridge was called correctly
-        assert!(mock_bridge.was_method_called("test_method"));
-        
-        Ok(())
-    }
-}
-```
-
-#### Bridge Testing
-
-```rust
-// Standard test suite for any bridge implementation
-pub struct StandardBridgeTests;
-
-impl StandardBridgeTests {
-    pub async fn run_all<B: Bridge>(bridge: &B) -> TestResult {
-        // Core bridge functionality
-        Self::test_method_execution(bridge).await?;
-        Self::test_type_conversions(bridge).await?;
-        Self::test_error_handling(bridge).await?;
-        
-        // Integration with mock engines
-        Self::test_engine_integration(bridge).await?;
-        
-        // Performance
-        Self::test_method_performance(bridge).await?;
-        
-        Ok(())
-    }
-    
-    async fn test_method_execution<B: Bridge>(bridge: &B) -> TestResult {
-        for method in bridge.methods() {
-            let test_args = TestFixtures::args_for_method(&method.name);
-            let result = bridge.execute_method(&method.name, test_args).await?;
-            
-            // Validate result type matches method signature
-            Self::validate_result_type(&method, &result)?;
-        }
-        
-        Ok(())
-    }
-    
-    async fn test_engine_integration<B: Bridge>(bridge: &B) -> TestResult {
-        let mock_engine = MockScriptEngine::new();
-        
-        // Register bridge with mock engine
-        mock_engine.register_bridge("test", Box::new(bridge.clone()))?;
-        
-        // Execute test scripts that use the bridge
-        let test_scripts = TestFixtures::load().scripts.bridge_interaction_tests;
-        
-        for script_set in test_scripts {
-            let result = mock_engine.execute(
-                script_set.get_for_engine("mock"), 
-                HashMap::new()
-            ).await?;
-            
-            assert_eq!(result, script_set.expected_output.to_script_value());
-        }
-        
-        Ok(())
-    }
-}
-```
-
-#### Integration Testing
-
-```rust
-// End-to-end integration test framework
-pub struct IntegrationTestFramework {
-    engines: Vec<Box<dyn ScriptEngine>>,
-    bridges: Vec<Box<dyn Bridge>>,
-    mock_clients: HashMap<String, Box<dyn MockClient>>,
-}
-
-impl IntegrationTestFramework {
-    pub fn new() -> Self {
-        Self {
-            engines: vec![
-                Box::new(LuaScriptEngine::new_for_testing()),
-                Box::new(JavaScriptScriptEngine::new_for_testing()),
-            ],
-            bridges: vec![
-                Box::new(MockRigBridge::new()),
-                Box::new(MockUtilBridge::new()),
-            ],
-            mock_clients: HashMap::new(),
-        }
-    }
-    
-    pub async fn run_cross_engine_compatibility_tests(&self) -> TestResult {
-        let test_scenarios = TestFixtures::load().integration_scenarios;
-        
-        for scenario in test_scenarios {
-            for engine in &self.engines {
-                // Register all bridges
-                for bridge in &self.bridges {
-                    engine.register_bridge(&bridge.name(), bridge.clone())?;
-                }
-                
-                // Execute scenario script
-                let script = scenario.get_for_engine(engine.name());
-                let result = engine.execute(script, scenario.params.clone()).await?;
-                
-                // Validate result
-                assert_eq!(result, scenario.expected_output.to_script_value());
-                
-                // Validate side effects (API calls, file operations, etc.)
-                scenario.validate_side_effects(&self.mock_clients)?;
-            }
-        }
-        
-        Ok(())
-    }
-    
-    pub async fn run_performance_comparison(&self) -> BenchmarkResult {
-        let benchmark_scripts = TestFixtures::load().performance_benchmarks;
-        let mut results = BenchmarkResult::new();
-        
-        for script_set in benchmark_scripts {
-            for engine in &self.engines {
-                let start = Instant::now();
-                
-                for _ in 0..1000 {
-                    engine.execute(
-                        script_set.get_for_engine(engine.name()),
-                        HashMap::new()
-                    ).await?;
-                }
-                
-                let duration = start.elapsed();
-                results.add_measurement(engine.name(), &script_set.name, duration);
-            }
-        }
-        
-        Ok(results)
-    }
-}
-```
-
-### Test Organization Structure
-
-```
-rs-llmspell/
-├── rs-llmspell-test-common/    # Shared testing infrastructure
-│   ├── src/
-│   │   ├── lib.rs
-│   │   ├── fixtures/           # Test fixtures and data
-│   │   │   ├── mod.rs
-│   │   │   ├── scripts.rs      # Cross-engine test scripts
-│   │   │   ├── responses.rs    # Mock LLM responses
-│   │   │   └── configs.rs      # Test configurations
-│   │   ├── mocks/             # Mock implementations
-│   │   │   ├── mod.rs
-│   │   │   ├── engine.rs       # Mock script engine
-│   │   │   ├── bridge.rs       # Mock bridge
-│   │   │   └── llm_client.rs   # Mock LLM clients
-│   │   ├── traits/            # Test traits and contracts
-│   │   │   ├── mod.rs
-│   │   │   ├── engine_tests.rs # ScriptEngine test suite
-│   │   │   ├── bridge_tests.rs # Bridge test suite
-│   │   │   └── integration.rs  # Integration test suite
-│   │   ├── helpers/           # Test utilities
-│   │   │   ├── mod.rs
-│   │   │   ├── environment.rs  # Test environment setup
-│   │   │   ├── assertions.rs   # Custom assertions
-│   │   │   └── benchmarks.rs   # Performance testing
-│   │   └── builders/          # Test data builders
-│   │       ├── mod.rs
-│   │       ├── script_builder.rs
-│   │       └── response_builder.rs
-│   └── Cargo.toml
-├── rs-llmspell-engines/
-│   └── tests/                 # Uses rs-llmspell-test-common
-│       ├── lua_engine_tests.rs
-│       ├── js_engine_tests.rs
-│       └── cross_engine_tests.rs
-├── rs-llmspell-bridges/
-│   └── tests/                 # Uses rs-llmspell-test-common
-│       ├── rig_bridge_tests.rs
-│       ├── util_bridge_tests.rs
-│       └── bridge_integration_tests.rs
-└── rs-llmspell/
-    └── tests/                 # Integration tests
-        ├── e2e_tests.rs
-        ├── performance_tests.rs
-        └── security_tests.rs
-```
-
-### Test Data Management
-
-```rust
-// Centralized test data that's versioned and reusable
-
-pub struct TestDataManager {
-    fixtures: TestFixtures,
-    version: semver::Version,
-}
-
-impl TestDataManager {
-    pub fn load_fixtures(version: &str) -> Result<TestFixtures, TestError> {
-        // Load versioned test fixtures
-        // This allows testing against different fixture versions
-        // to ensure backward compatibility
-    }
-    
-    pub fn generate_cross_engine_scripts() -> Vec<ScriptSet> {
-        // Generate equivalent scripts for all supported engines
-        // Ensures feature parity testing
-    }
-    
-    pub fn create_mock_responses() -> MockResponseSet {
-        // Create realistic mock responses for different scenarios
-        // Success cases, error cases, edge cases, performance cases
-    }
-}
-
-// Test fixtures are generated programmatically to ensure consistency
-#[derive(Builder)]
-pub struct ScriptTestCase {
-    pub name: String,
-    pub description: String,
-    pub lua_script: String,
-    pub javascript_script: String,
-    pub input_params: HashMap<String, ScriptValue>,
-    pub expected_output: ScriptValue,
-    pub expected_side_effects: Vec<SideEffect>,
-    pub performance_threshold: Option<Duration>,
-}
-```
-
-This testing architecture ensures that:
-
-1. **All components are thoroughly tested** with standardized test suites
-2. **Tests are reusable** across different implementations (engines, bridges)
-3. **Integration scenarios** are validated across all engine combinations
-4. **Performance** is consistently measured and compared
-5. **Regression testing** is automated through shared test fixtures
-6. **Mock implementations** provide consistent testing environments
 
 ## Security Model
 
-### 1. Memory Safety
+### Script Sandboxing
 
-Rust's ownership system provides automatic memory safety:
-- No buffer overflows
-- No use-after-free
-- No data races in safe code
-- Automatic cleanup of resources
+- Resource limits (CPU, memory, time)
+- Filesystem access restrictions
+- Network access control
+- No access to process/system APIs
 
-### 2. Type Safety
+### Tool Permissions
 
-Strong typing prevents many classes of errors:
-- API parameter validation at compile time
-- Impossible to mix incompatible types
-- Exhaustive pattern matching
-- No null pointer dereferences
-
-### 3. Secure Defaults
-
-```rust
-// Secure configuration by default
-#[derive(Debug, Clone)]
-pub struct SecurityConfig {
-    pub max_request_size: usize,          // 1MB default
-    pub max_response_size: usize,         // 10MB default
-    pub request_timeout: Duration,        // 30s default
-    pub max_concurrent_requests: usize,   // 10 default
-    pub allowed_domains: Option<Vec<String>>, // None = all allowed
-    pub require_tls: bool,                // true default
-}
-
-impl Default for SecurityConfig {
-    fn default() -> Self {
-        Self {
-            max_request_size: 1024 * 1024,      // 1MB
-            max_response_size: 10 * 1024 * 1024, // 10MB
-            request_timeout: Duration::from_secs(30),
-            max_concurrent_requests: 10,
-            allowed_domains: None,
-            require_tls: true,
-        }
-    }
-}
+```lua
+local tool = FileSystemTool.new({
+    allowed_paths = {"/tmp", "./output"},
+    read_only = true,
+    max_file_size = 10 * 1024 * 1024  -- 10MB
+})
 ```
 
-### 4. Secret Management
+### Audit Trail
 
-```rust
-use secrecy::{Secret, SecretString};
+All actions logged with context:
 
-// Secrets are never accidentally logged or printed
-#[derive(Debug, Clone)]
-pub struct ProviderConfig {
-    pub api_key: SecretString,  // Automatically protected
-    pub endpoint: String,
-}
-
-impl ProviderConfig {
-    pub fn new(api_key: impl Into<SecretString>) -> Self {
-        Self {
-            api_key: api_key.into(),
-            endpoint: "https://api.provider.com".to_string(),
-        }
-    }
+```javascript
+{
+    timestamp: "2025-01-20T10:30:00Z",
+    agentId: "agent_123",
+    action: "tool_call",
+    tool: "file_write",
+    params: { path: "./output/report.md" },
+    result: "success",
+    userId: "user_456",
+    sessionId: "session_789"
 }
 ```
 
 ## Examples
 
-### Basic LLM Interaction
+### Simple Chat Agent
 
-**Lua:**
 ```lua
--- basic-llm.lua
-local response = llm.complete({
-    model = "gpt-4",
-    messages = {
-        {role = "user", content = "Explain quantum computing in simple terms"}
-    }
-})
-
-console.log("Response: " .. response.content)
-console.log("Tokens used: " .. response.usage.total_tokens)
+-- Lua
+local agent = Agent.new("You are a helpful assistant")
+local response = agent:chat("What is the weather like?")
+print(response)
 ```
 
-**JavaScript:**
+### Multi-Tool Research Agent
+
 ```javascript
-// basic-llm.js
-const response = await llm.complete({
-    model: "gpt-4",
-    messages: [
-        {role: "user", content: "Explain quantum computing in simple terms"}
+// JavaScript
+const researcher = new Agent({
+    systemPrompt: "You are a research assistant",
+    tools: [
+        new WebSearch({ apiKey: process.env.SEARCH_KEY }),
+        new Calculator(),
+        new FileWriter({ baseDir: "./research" })
     ]
 });
 
-console.log(`Response: ${response.content}`);
-console.log(`Tokens used: ${response.usage.total_tokens}`);
+const report = await researcher.chat(
+    "Research quantum computing and write a summary"
+);
 ```
 
-**Running the spell:**
-```bash
-rs-llmspell run basic-llm.lua
-rs-llmspell run basic-llm.js
-```
+### Complex Workflow
 
-### Agent with Tools
-
-**Lua:**
 ```lua
--- research-agent.lua
-local researcher = llm.agent({
-    model = "claude-3-opus",
-    tools = {"web_search", "file_write"},
-    system = "You are a helpful research assistant"
+-- Multi-agent blog creation
+local workflow = Workflow.sequential({
+    name = "blog_pipeline",
+    steps = {
+        { agent = researcher, action = "research", output = "notes" },
+        { agent = writer, action = "draft", input = "{{notes}}" },
+        { agent = editor, action = "edit", output = "final" }
+    }
 })
 
-local topic = params.topic or "quantum computing breakthroughs 2025"
-local research = researcher:run("Research " .. topic .. " and summarize key findings")
+local blog = workflow:run({ topic = "AI Safety" })
+```
 
--- Save results
-tools.file_write("research/" .. topic:gsub(" ", "_") .. ".md", research)
-console.log("Research completed and saved!")
+## Implementation Roadmap
 
-return {
-    topic = topic,
-    summary = research:sub(1, 200) .. "...",
-    status = "completed"
+### Phase 1: Core Foundation (Weeks 1-2)
+- Basic trait definitions
+- Bridge layer for Lua/JS
+- Simple agent implementation
+- Core tool abstractions
+
+### Phase 2: Infrastructure (Weeks 3-4)
+- Hook system implementation
+- Event bus architecture
+- State management layer
+- LLM provider integration (rig)
+
+### Phase 3: Built-in Components (Weeks 5-6)
+- Essential tools (10-15)
+- Agent templates (3-5)
+- Basic workflows
+- Script APIs
+
+### Phase 4: Production Features (Weeks 7-8)
+- Full tool library
+- Advanced workflows
+- Performance optimization
+- Security hardening
+
+### Phase 5: Polish and Launch (Weeks 9-10)
+- Documentation
+- Examples and tutorials
+- Performance benchmarks
+- Community tooling
+
+## Detailed Component Architecture
+
+### BaseAgent/Agent/Tool/Workflow Hierarchy
+
+#### BaseAgent: The Foundation
+
+BaseAgent is the fundamental trait that defines any component capable of handling tools and maintaining state:
+
+```rust
+#[async_trait]
+pub trait BaseAgent: Send + Sync + Observable + Hookable {
+    /// Unique identifier for this agent
+    fn id(&self) -> &str;
+    
+    /// Human-readable name
+    fn name(&self) -> &str;
+    
+    /// Get available tools
+    fn tools(&self) -> &[Box<dyn Tool>];
+    
+    /// Add a tool to this agent
+    fn add_tool(&mut self, tool: Box<dyn Tool>) -> Result<()>;
+    
+    /// Execute with the given input
+    async fn execute(&mut self, input: AgentInput) -> Result<AgentOutput>;
+    
+    /// Get current state
+    fn state(&self) -> &AgentState;
+    
+    /// Handle state transition
+    async fn transition(&mut self, event: StateEvent) -> Result<()>;
+    
+    /// Get agent metadata
+    fn metadata(&self) -> &AgentMetadata;
 }
 ```
 
-**JavaScript:**
-```javascript
-// research-agent.js
-const researcher = await llm.agent({
-    model: "claude-3-opus",
-    tools: ["web_search", "file_write"],
-    system: "You are a helpful research assistant"
-});
+**Key Characteristics**:
+- Tool management capabilities
+- State tracking and transitions
+- Hook and event integration
+- Async execution model
+- Error handling and recovery
 
-const topic = params.topic || "quantum computing breakthroughs 2025";
-const research = await researcher.run(`Research ${topic} and summarize key findings`);
+#### Agent: LLM-Powered Intelligence
 
-// Save results
-await tools.file_write(`research/${topic.replace(/\s+/g, "_")}.md`, research);
-console.log("Research completed and saved!");
+Agent extends BaseAgent with LLM-specific capabilities:
 
-return {
-    topic: topic,
-    summary: research.substring(0, 200) + "...",
-    status: "completed"
-};
+```rust
+#[async_trait]
+pub trait Agent: BaseAgent {
+    /// Get the LLM provider
+    fn llm_provider(&self) -> &dyn LLMProvider;
+    
+    /// Get system prompt
+    fn system_prompt(&self) -> &str;
+    
+    /// Update system prompt
+    fn set_system_prompt(&mut self, prompt: String);
+    
+    /// Process a conversation turn
+    async fn chat(&mut self, message: &str) -> Result<String>;
+    
+    /// Stream response
+    async fn stream_chat(&mut self, message: &str) -> Result<ResponseStream>;
+    
+    /// Chat with additional context
+    async fn chat_with_context(&mut self, message: &str, context: AgentContext) -> Result<String>;
+    
+    /// Get conversation history
+    fn conversation_history(&self) -> &[ConversationTurn];
+    
+    /// Clear conversation history
+    fn clear_history(&mut self);
+}
 ```
 
-**Running with parameters:**
-```bash
-rs-llmspell run research-agent.lua --param topic="AI safety research"
-rs-llmspell run research-agent.js --param topic="AI safety research"
+**Implementation Example**:
+```rust
+pub struct ChatAgent {
+    id: String,
+    name: String,
+    llm_provider: Box<dyn LLMProvider>,
+    system_prompt: String,
+    tools: Vec<Box<dyn Tool>>,
+    state: AgentState,
+    conversation_history: Vec<ConversationTurn>,
+    hooks: HookManager,
+    events: EventEmitter,
+}
+
+#[async_trait]
+impl Agent for ChatAgent {
+    async fn chat(&mut self, message: &str) -> Result<String> {
+        // Execute pre-chat hooks
+        self.execute_hooks(HookPoint::BeforeLLMCall, &mut HookContext {
+            agent_id: self.id.clone(),
+            message: message.to_string(),
+            ..Default::default()
+        }).await?;
+        
+        // Prepare completion request
+        let request = CompletionRequest {
+            messages: self.build_message_history(message),
+            tools: self.tools.iter().map(|t| t.schema()).collect(),
+            system: Some(self.system_prompt.clone()),
+            ..Default::default()
+        };
+        
+        // Call LLM provider
+        let response = self.llm_provider.complete(request).await?;
+        
+        // Handle tool calls if any
+        if let Some(tool_calls) = response.tool_calls {
+            for tool_call in tool_calls {
+                let result = self.execute_tool(&tool_call).await?;
+                // Continue conversation with tool results...
+            }
+        }
+        
+        // Execute post-chat hooks
+        self.execute_hooks(HookPoint::AfterLLMCall, &mut HookContext {
+            agent_id: self.id.clone(),
+            response: response.content.clone(),
+            token_usage: response.usage,
+            ..Default::default()
+        }).await?;
+        
+        // Update conversation history
+        self.conversation_history.push(ConversationTurn {
+            user_message: message.to_string(),
+            assistant_response: response.content.clone(),
+            tool_calls: response.tool_calls,
+            timestamp: Utc::now(),
+        });
+        
+        Ok(response.content)
+    }
+}
 ```
 
-### Sequential Workflow
+#### Tool: Discrete Capabilities
 
-**Lua:**
+Tools provide specific capabilities that agents can invoke:
+
+```rust
+#[async_trait]
+pub trait Tool: Send + Sync {
+    /// Tool name (must be unique within agent)
+    fn name(&self) -> &str;
+    
+    /// Tool description for LLM
+    fn description(&self) -> &str;
+    
+    /// JSON schema for parameters
+    fn parameters_schema(&self) -> Value;
+    
+    /// Execute the tool
+    async fn execute(&self, params: Value) -> Result<ToolOutput>;
+    
+    /// Validate parameters before execution
+    fn validate_params(&self, params: &Value) -> Result<()> {
+        // Default implementation validates against schema
+        validate_against_schema(params, &self.parameters_schema())
+    }
+    
+    /// Tool metadata (version, author, etc.)
+    fn metadata(&self) -> ToolMetadata {
+        ToolMetadata::default()
+    }
+    
+    /// Resource requirements
+    fn resource_requirements(&self) -> ResourceRequirements {
+        ResourceRequirements::default()
+    }
+}
+```
+
+**Tool Implementation Example**:
+```rust
+pub struct CalculatorTool;
+
+#[async_trait]
+impl Tool for CalculatorTool {
+    fn name(&self) -> &str {
+        "calculator"
+    }
+    
+    fn description(&self) -> &str {
+        "Perform mathematical calculations and return the result"
+    }
+    
+    fn parameters_schema(&self) -> Value {
+        json!({
+            "type": "object",
+            "properties": {
+                "expression": {
+                    "type": "string",
+                    "description": "Mathematical expression to evaluate"
+                }
+            },
+            "required": ["expression"]
+        })
+    }
+    
+    async fn execute(&self, params: Value) -> Result<ToolOutput> {
+        let expression = params.get("expression")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("Missing expression parameter"))?;
+            
+        // Safe mathematical evaluation
+        let result = evaluate_math_expression(expression)?;
+        
+        Ok(ToolOutput {
+            content: json!({"result": result}),
+            metadata: HashMap::from([
+                ("expression".to_string(), Value::String(expression.to_string())),
+                ("result_type".to_string(), Value::String("number".to_string())),
+            ]),
+        })
+    }
+}
+```
+
+#### Workflow: Orchestration Patterns
+
+Workflows provide deterministic orchestration of agents and tools:
+
+```rust
+#[async_trait]
+pub trait Workflow: BaseAgent {
+    /// Workflow type identifier
+    fn workflow_type(&self) -> WorkflowType;
+    
+    /// Get workflow steps
+    fn steps(&self) -> &[WorkflowStep];
+    
+    /// Execute workflow
+    async fn run(&mut self, input: WorkflowInput) -> Result<WorkflowOutput>;
+    
+    /// Pause workflow execution
+    async fn pause(&mut self) -> Result<WorkflowCheckpoint>;
+    
+    /// Resume from checkpoint
+    async fn resume(&mut self, checkpoint: WorkflowCheckpoint) -> Result<()>;
+    
+    /// Get execution progress
+    fn progress(&self) -> WorkflowProgress;
+}
+```
+
+**Sequential Workflow Example**:
+```rust
+pub struct SequentialWorkflow {
+    id: String,
+    name: String,
+    steps: Vec<WorkflowStep>,
+    state: WorkflowState,
+    current_step: usize,
+}
+
+#[async_trait]
+impl Workflow for SequentialWorkflow {
+    async fn run(&mut self, input: WorkflowInput) -> Result<WorkflowOutput> {
+        let mut context = WorkflowContext::new(input);
+        
+        for (index, step) in self.steps.iter().enumerate() {
+            self.current_step = index;
+            
+            // Execute pre-step hooks
+            self.execute_hooks(HookPoint::BeforeWorkflowStep, &mut HookContext {
+                workflow_id: self.id.clone(),
+                step_name: step.name.clone(),
+                step_index: index,
+                ..Default::default()
+            }).await?;
+            
+            // Resolve step input from context
+            let step_input = step.resolve_input(&context)?;
+            
+            // Execute step
+            let step_output = match &step.executor {
+                StepExecutor::Agent(agent) => {
+                    agent.execute(step_input).await?
+                },
+                StepExecutor::Tool(tool) => {
+                    tool.execute(step_input.into()).await?.into()
+                },
+                StepExecutor::Workflow(workflow) => {
+                    workflow.run(step_input.into()).await?.into()
+                },
+            };
+            
+            // Store output in context
+            if let Some(output_key) = &step.output_key {
+                context.set(output_key, step_output.clone());
+            }
+            
+            // Execute post-step hooks
+            self.execute_hooks(HookPoint::AfterWorkflowStep, &mut HookContext {
+                workflow_id: self.id.clone(),
+                step_name: step.name.clone(),
+                step_output: step_output.clone(),
+                ..Default::default()
+            }).await?;
+        }
+        
+        Ok(WorkflowOutput {
+            result: context.get_final_output(),
+            metadata: context.metadata(),
+            steps_executed: self.current_step + 1,
+        })
+    }
+}
+```
+
+### Tool-Wrapped Agents
+
+One of the most powerful patterns is wrapping agents as tools, enabling composition:
+
+```rust
+pub struct AgentAsTool<A: Agent> {
+    agent: A,
+    tool_name: String,
+    tool_description: String,
+}
+
+impl<A: Agent> AgentAsTool<A> {
+    pub fn new(agent: A, name: String, description: String) -> Self {
+        Self {
+            agent,
+            tool_name: name,
+            tool_description: description,
+        }
+    }
+}
+
+#[async_trait]
+impl<A: Agent> Tool for AgentAsTool<A> {
+    fn name(&self) -> &str {
+        &self.tool_name
+    }
+    
+    fn description(&self) -> &str {
+        &self.tool_description
+    }
+    
+    fn parameters_schema(&self) -> Value {
+        json!({
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string",
+                    "description": "Message to send to the agent"
+                },
+                "context": {
+                    "type": "object",
+                    "description": "Additional context for the agent"
+                }
+            },
+            "required": ["message"]
+        })
+    }
+    
+    async fn execute(&self, params: Value) -> Result<ToolOutput> {
+        let message = params.get("message")
+            .and_then(|v| v.as_str())
+            .ok_or_else(|| anyhow!("Missing message parameter"))?;
+            
+        let response = self.agent.chat(message).await?;
+        
+        Ok(ToolOutput {
+            content: json!({"response": response}),
+            metadata: HashMap::from([
+                ("agent_id".to_string(), Value::String(self.agent.id().to_string())),
+                ("agent_type".to_string(), Value::String("wrapped_agent".to_string())),
+            ]),
+        })
+    }
+}
+```
+
+**Usage Example**:
 ```lua
--- research-workflow.lua
-local workflow = workflow.sequential({
-    name = "comprehensive_research"
+-- Lua: Create specialist agents and wrap them as tools
+local code_expert = CodeAgent.new({
+    languages = {"rust", "python"},
+    style = "professional"
 })
 
--- Step 1: Initial research
-workflow:add_step({
-    name = "research",
-    agent = llm.agent({
-        model = "gpt-4",
-        tools = {"web_search"},
-        system = "You are an expert researcher"
-    }),
-    prompt = "Research {{topic}} and gather comprehensive information"
+local research_expert = ResearchAgent.new({
+    sources = {"academic", "documentation"}
 })
 
--- Step 2: Summarize findings
-workflow:add_step({
-    name = "summarize", 
-    agent = llm.agent({
-        model = "claude-3-opus",
-        system = "You are an expert at creating clear, concise summaries"
-    }),
-    prompt = "Summarize these research findings: {{research.output}}"
+-- Create orchestrator with specialist agents as tools
+local orchestrator = Agent.new({
+    system_prompt = "You coordinate specialist agents to solve complex problems",
+    tools = {
+        AgentTool.wrap(code_expert, "code_expert", "Expert in code generation and review"),
+        AgentTool.wrap(research_expert, "research_expert", "Expert in research and analysis")
+    }
 })
 
--- Step 3: Create final report
-workflow:add_step({
-    name = "report",
-    agent = llm.agent({
-        model = "gpt-4",
-        tools = {"file_write"},
-        system = "You are a technical writer"
-    }),
-    prompt = "Create a structured report from this summary: {{summarize.output}}"
-})
+-- The orchestrator can now use specialist agents as tools
+local result = orchestrator:chat([[
+    I need to implement a Rust web server. First research the best frameworks,
+    then generate the code using best practices.
+]])
+```
 
--- Execute workflow
-local result = workflow:run({
-    topic = params.topic or "quantum computing applications"
-})
+### Composition Patterns
 
-console.log("Workflow completed:")
-for step_name, step_result in pairs(result.steps) do
-    console.log("- " .. step_name .. ": " .. step_result.status)
+#### Hierarchical Agents
+```rust
+pub struct HierarchicalAgent {
+    supervisor: Box<dyn Agent>,
+    workers: HashMap<String, Box<dyn Agent>>,
+    delegation_strategy: Box<dyn DelegationStrategy>,
+    coordination_state: CoordinationState,
+}
+
+impl HierarchicalAgent {
+    async fn delegate_task(&mut self, task: Task) -> Result<AgentOutput> {
+        // Supervisor decides which worker should handle the task
+        let worker_id = self.delegation_strategy.select_worker(&task, &self.workers).await?;
+        
+        let worker = self.workers.get_mut(&worker_id)
+            .ok_or_else(|| anyhow!("Worker not found: {}", worker_id))?;
+            
+        // Execute task with selected worker
+        let result = worker.execute(task.into()).await?;
+        
+        // Supervisor reviews and potentially refines the result
+        self.supervisor.chat(&format!(
+            "Review this result from {}: {}",
+            worker_id, result.content
+        )).await
+    }
+}
+```
+
+#### Pipeline Agents
+```rust
+pub struct PipelineAgent {
+    stages: Vec<PipelineStage>,
+    transformers: Vec<Box<dyn Transformer>>,
+}
+
+struct PipelineStage {
+    agent: Box<dyn Agent>,
+    transformer: Option<Box<dyn Transformer>>,
+}
+
+impl PipelineAgent {
+    async fn process(&mut self, input: AgentInput) -> Result<AgentOutput> {
+        let mut current_data = input;
+        
+        for stage in &mut self.stages {
+            // Process with agent
+            let result = stage.agent.execute(current_data).await?;
+            
+            // Transform for next stage
+            current_data = if let Some(transformer) = &stage.transformer {
+                transformer.transform(result).await?
+            } else {
+                result.into()
+            };
+        }
+        
+        Ok(current_data.into())
+    }
+}
+```
+
+## Comprehensive Examples
+
+### BaseAgent Usage in Scripts
+
+#### Custom BaseAgent Implementation (Lua)
+
+```lua
+-- Define a custom workflow agent that handles tools
+local DataProcessingWorkflow = BaseAgent:extend()
+
+function DataProcessingWorkflow:init(config)
+    self.id = config.id or "data_processor"
+    self.name = config.name or "Data Processing Workflow"
+    self.tools = config.tools or {}
+    self.state = {
+        status = "ready",
+        processed_items = 0,
+        errors = {}
+    }
+    self.steps = config.steps or {}
 end
 
-return result
-```
-
-**JavaScript:**
-```javascript
-// research-workflow.js  
-const workflow = workflow.sequential({
-    name: "comprehensive_research"
-});
-
-// Step 1: Initial research
-workflow.addStep({
-    name: "research",
-    agent: await llm.agent({
-        model: "gpt-4", 
-        tools: ["web_search"],
-        system: "You are an expert researcher"
-    }),
-    prompt: "Research {{topic}} and gather comprehensive information"
-});
-
-// Step 2: Summarize findings
-workflow.addStep({
-    name: "summarize",
-    agent: await llm.agent({
-        model: "claude-3-opus",
-        system: "You are an expert at creating clear, concise summaries"  
-    }),
-    prompt: "Summarize these research findings: {{research.output}}"
-});
-
-// Step 3: Create final report
-workflow.addStep({
-    name: "report",
-    agent: await llm.agent({
-        model: "gpt-4",
-        tools: ["file_write"],
-        system: "You are a technical writer"
-    }),
-    prompt: "Create a structured report from this summary: {{summarize.output}}"
-});
-
-// Execute workflow
-const result = await workflow.run({
-    topic: params.topic || "quantum computing applications"
-});
-
-console.log("Workflow completed:");
-for (const [stepName, stepResult] of Object.entries(result.steps)) {
-    console.log(`- ${stepName}: ${stepResult.status}`);
-}
-
-return result;
-```
-
-### Error Handling and Retries
-
-**Lua:**
-```lua
--- robust-agent.lua
-local function robust_llm_call(prompt, max_retries)
-    max_retries = max_retries or 3
-    local attempt = 0
-    
-    while attempt < max_retries do
-        attempt = attempt + 1
+function DataProcessingWorkflow:execute(input)
+    return coroutine.wrap(function()
+        self:set_state("processing")
         
-        local success, result = pcall(function()
-            return llm.complete({
-                model = "gpt-4",
-                messages = {{role = "user", content = prompt}}
-            })
-        end)
-        
-        if success then
-            return result
-        else
-            console.log("Attempt " .. attempt .. " failed: " .. tostring(result))
-            
-            if attempt < max_retries then
-                -- Exponential backoff
-                util.sleep(math.pow(2, attempt) * 1000)
+        for i, step in ipairs(self.steps) do
+            local step_result = self:execute_step(step, input)
+            if step_result.error then
+                table.insert(self.state.errors, step_result.error)
+            else
+                input = step_result.output  -- Chain outputs
+                self.state.processed_items = self.state.processed_items + 1
             end
         end
-    end
-    
-    error("Failed after " .. max_retries .. " attempts")
+        
+        self:set_state("completed")
+        return {
+            processed_items = self.state.processed_items,
+            errors = self.state.errors,
+            final_output = input
+        }
+    end)
 end
 
 -- Usage
-local result = robust_llm_call("Explain machine learning", 3)
-console.log("Success: " .. result.content)
+local processor = DataProcessingWorkflow.new({
+    id = "csv_processor",
+    tools = {
+        CsvReader.new(),
+        DataCleaner.new(),
+        StatisticsCalculator.new(),
+        ChartGenerator.new()
+    },
+    steps = {
+        { tool = "csv_reader", action = "read" },
+        { tool = "data_cleaner", action = "clean" },
+        { tool = "statistics_calculator", action = "analyze" },
+        { tool = "chart_generator", action = "visualize" }
+    }
+})
+
+local result = processor:execute({ file_path = "data.csv" })
 ```
 
-**JavaScript:**
+#### BaseAgent Composition (JavaScript)
+
 ```javascript
-// robust-agent.js
-async function robustLlmCall(prompt, maxRetries = 3) {
-    let attempt = 0;
+// Custom BaseAgent for orchestrating multiple agents
+class MultiAgentOrchestrator extends BaseAgent {
+    constructor(config) {
+        super(config);
+        this.agents = new Map();
+        this.delegationStrategy = config.delegationStrategy || 'round_robin';
+        this.activeJobs = new Map();
+    }
     
-    while (attempt < maxRetries) {
-        attempt++;
+    addAgent(name, agent) {
+        this.agents.set(name, agent);
+        // Wrap agent as a tool for this orchestrator
+        this.addTool(new AgentTool(agent, name));
+    }
+    
+    async execute(input) {
+        // Determine which agents should handle this input
+        const selectedAgents = await this.selectAgents(input);
         
-        try {
-            const result = await llm.complete({
-                model: "gpt-4",
-                messages: [{role: "user", content: prompt}]
-            });
-            return result;
-        } catch (error) {
-            console.log(`Attempt ${attempt} failed: ${error.message}`);
-            
-            if (attempt < maxRetries) {
-                // Exponential backoff
-                await util.sleep(Math.pow(2, attempt) * 1000);
-            }
+        if (selectedAgents.length === 1) {
+            // Single agent execution
+            return await this.executeSingleAgent(selectedAgents[0], input);
+        } else {
+            // Multi-agent coordination
+            return await this.executeMultiAgent(selectedAgents, input);
         }
     }
     
-    throw new Error(`Failed after ${maxRetries} attempts`);
+    async selectAgents(input) {
+        // Custom logic to determine appropriate agents
+        if (input.task_type === 'research') {
+            return ['researcher', 'fact_checker'];
+        } else if (input.task_type === 'development') {
+            return ['code_generator', 'tester', 'reviewer'];
+        }
+        return ['general_assistant'];
+    }
+    
+    async executeMultiAgent(agentNames, input) {
+        const jobs = agentNames.map(async (name) => {
+            const agent = this.agents.get(name);
+            const jobId = this.generateJobId();
+            
+            this.activeJobs.set(jobId, { agent: name, status: 'running' });
+            
+            try {
+                const result = await agent.execute(input);
+                this.activeJobs.set(jobId, { agent: name, status: 'completed' });
+                return { agent: name, result, jobId };
+            } catch (error) {
+                this.activeJobs.set(jobId, { agent: name, status: 'failed', error });
+                throw error;
+            }
+        });
+        
+        const results = await Promise.all(jobs);
+        return this.aggregateResults(results);
+    }
 }
 
 // Usage
-const result = await robustLlmCall("Explain machine learning", 3);
-console.log(`Success: ${result.content}`);
+const orchestrator = new MultiAgentOrchestrator({
+    id: 'main_orchestrator',
+    delegationStrategy: 'skill_based'
+});
+
+orchestrator.addAgent('researcher', new ResearchAgent());
+orchestrator.addAgent('writer', new WriterAgent());
+orchestrator.addAgent('reviewer', new ReviewAgent());
+
+const result = await orchestrator.execute({
+    task_type: 'research',
+    query: 'Latest developments in quantum computing'
+});
 ```
 
-### Configuration and Environment
+### Hook Registration and Usage
 
-**Lua:**
+#### Global Hook Registration (Lua)
+
 ```lua
--- config-example.lua
--- Configuration is passed through environment or params
-local config = {
-    model = env.LLM_MODEL or "gpt-3.5-turbo",
-    temperature = tonumber(env.LLM_TEMPERATURE) or 0.7,
-    max_tokens = tonumber(env.LLM_MAX_TOKENS) or 1000
+-- Global hook for performance monitoring
+Hooks.register("before_llm_call", function(context)
+    context.start_time = os.clock()
+    context.request_id = uuid.generate()
+    
+    print(string.format("[%s] Starting LLM call for agent %s",
+        context.request_id, context.agent_id))
+    
+    -- Add to metrics
+    metrics:increment("llm_calls_started", {
+        agent_type = context.agent_type,
+        provider = context.provider
+    })
+end)
+
+Hooks.register("after_llm_call", function(context)
+    local duration = os.clock() - context.start_time
+    
+    print(string.format("[%s] LLM call completed in %.3fs, tokens: %d",
+        context.request_id, duration, context.token_usage.total))
+    
+    -- Add to metrics
+    metrics:histogram("llm_call_duration", duration, {
+        agent_type = context.agent_type,
+        provider = context.provider
+    })
+    
+    metrics:histogram("llm_tokens_used", context.token_usage.total, {
+        agent_type = context.agent_type,
+        provider = context.provider
+    })
+end)
+
+-- Error handling hook
+Hooks.register("on_error", function(context)
+    -- Log error with full context
+    logger:error({
+        message = "Agent execution failed",
+        agent_id = context.agent_id,
+        error = context.error,
+        stack_trace = context.stack_trace,
+        input = context.input,
+        request_id = context.request_id
+    })
+    
+    -- Implement retry logic
+    if should_retry(context.error) and (context.retry_count or 0) < 3 then
+        context.retry = true
+        context.retry_count = (context.retry_count or 0) + 1
+        context.retry_delay = math.pow(2, context.retry_count) * 1000  -- Exponential backoff
+        
+        print(string.format("Retrying in %dms (attempt %d/3)",
+            context.retry_delay, context.retry_count))
+    end
+end)
+```
+
+#### Agent-Specific Hooks (JavaScript)
+
+```javascript
+// Create agent with comprehensive hooks
+const agent = new ChatAgent({
+    systemPrompt: "You are a helpful assistant",
+    provider: "openai",
+    hooks: {
+        // Input validation and sanitization
+        beforeExecute: async (context) => {
+            // Sanitize input
+            context.input.message = sanitizeInput(context.input.message);
+            
+            // Check rate limits
+            const rateLimitKey = `user:${context.userId}`;
+            if (await rateLimiter.isExceeded(rateLimitKey)) {
+                throw new RateLimitError("Too many requests");
+            }
+            
+            // Add user context
+            context.userProfile = await getUserProfile(context.userId);
+        },
+        
+        // Content filtering
+        beforeLLMCall: async (context) => {
+            // Check for inappropriate content
+            const contentFlags = await contentModerator.check(context.prompt);
+            if (contentFlags.inappropriate) {
+                throw new ContentViolationError("Inappropriate content detected");
+            }
+            
+            // Add safety instructions to prompt
+            context.prompt = addSafetyInstructions(context.prompt);
+        },
+        
+        // Response processing
+        afterLLMCall: async (context) => {
+            // Check response safety
+            const responseFlags = await contentModerator.check(context.response);
+            if (responseFlags.inappropriate) {
+                context.response = "I can't assist with that request.";
+            }
+            
+            // Add citations if needed
+            if (context.toolCalls.some(tc => tc.name === 'web_search')) {
+                context.response = await addCitations(context.response);
+            }
+        },
+        
+        // Audit logging
+        afterExecute: async (context) => {
+            await auditLogger.log({
+                userId: context.userId,
+                agentId: context.agentId,
+                input: context.input,
+                output: context.output,
+                toolsUsed: context.toolCalls.map(tc => tc.name),
+                duration: context.duration,
+                tokensUsed: context.tokenUsage,
+                timestamp: new Date().toISOString()
+            });
+        },
+        
+        // Error handling with user notification
+        onError: async (context) => {
+            // Log error
+            console.error('Agent execution failed:', {
+                agentId: context.agentId,
+                error: context.error.message,
+                userId: context.userId
+            });
+            
+            // Notify user of generic error
+            context.userMessage = "I encountered an error. Please try again.";
+            
+            // Send error to monitoring system
+            await errorReporter.report(context.error, {
+                agentId: context.agentId,
+                userId: context.userId,
+                context: context.sanitizedContext
+            });
+        }
+    }
+});
+```
+
+### Event-Driven Workflow Examples
+
+#### Event-Based Multi-Agent Coordination (Lua)
+
+```lua
+-- Event-driven research workflow
+local research_system = EventSystem.new()
+
+-- Define agents
+local search_agent = ResearchAgent.new({ sources = {"web", "academic"} })
+local analysis_agent = AnalysisAgent.new({ tools = {StatisticsTool.new()} })
+local writing_agent = WriterAgent.new({ style = "academic" })
+local review_agent = ReviewAgent.new({ criteria = {"accuracy", "clarity"} })
+
+-- Event handlers for workflow coordination
+research_system:on("research_requested", function(event)
+    print("Starting research on: " .. event.query)
+    
+    -- Start search
+    search_agent:search_async(event.query, function(results)
+        research_system:emit("search_completed", {
+            query = event.query,
+            results = results,
+            request_id = event.request_id
+        })
+    end)
+end)
+
+research_system:on("search_completed", function(event)
+    print("Search completed, starting analysis...")
+    
+    analysis_agent:analyze_async(event.results, function(analysis)
+        research_system:emit("analysis_completed", {
+            query = event.query,
+            raw_results = event.results,
+            analysis = analysis,
+            request_id = event.request_id
+        })
+    end)
+end)
+
+research_system:on("analysis_completed", function(event)
+    print("Analysis completed, generating report...")
+    
+    writing_agent:write_async({
+        topic = event.query,
+        research = event.raw_results,
+        analysis = event.analysis
+    }, function(draft)
+        research_system:emit("draft_completed", {
+            query = event.query,
+            draft = draft,
+            request_id = event.request_id
+        })
+    end)
+end)
+
+research_system:on("draft_completed", function(event)
+    print("Draft completed, starting review...")
+    
+    review_agent:review_async(event.draft, function(review)
+        if review.approved then
+            research_system:emit("research_completed", {
+                query = event.query,
+                final_report = event.draft,
+                review = review,
+                request_id = event.request_id
+            })
+        else
+            -- Send back for revision
+            research_system:emit("revision_needed", {
+                query = event.query,
+                draft = event.draft,
+                feedback = review.feedback,
+                request_id = event.request_id
+            })
+        end
+    end)
+end)
+
+research_system:on("revision_needed", function(event)
+    print("Revision needed, sending back to writer...")
+    
+    writing_agent:revise_async({
+        draft = event.draft,
+        feedback = event.feedback
+    }, function(revised_draft)
+        research_system:emit("draft_completed", {
+            query = event.query,
+            draft = revised_draft,
+            request_id = event.request_id
+        })
+    end)
+end)
+
+-- Start the research process
+research_system:emit("research_requested", {
+    query = "Impact of AI on software development",
+    request_id = uuid.generate()
+})
+```
+
+#### Real-Time Event Streaming (JavaScript)
+
+```javascript
+// Real-time agent activity monitoring
+class AgentActivityMonitor {
+    constructor() {
+        this.eventStream = new EventEmitter();
+        this.activeAgents = new Map();
+        this.metrics = new MetricsCollector();
+    }
+    
+    // Monitor all agents in the system
+    monitorAgent(agent) {
+        const agentId = agent.id;
+        this.activeAgents.set(agentId, {
+            agent,
+            status: 'idle',
+            lastActivity: Date.now()
+        });
+        
+        // Subscribe to all agent events
+        agent.on('*', (eventType, data) => {
+            this.handleAgentEvent(agentId, eventType, data);
+        });
+    }
+    
+    handleAgentEvent(agentId, eventType, data) {
+        const timestamp = Date.now();
+        
+        // Update agent status
+        const agentInfo = this.activeAgents.get(agentId);
+        agentInfo.lastActivity = timestamp;
+        
+        switch (eventType) {
+            case 'execution_started':
+                agentInfo.status = 'executing';
+                this.metrics.increment('agent_executions_started');
+                break;
+                
+            case 'tool_called':
+                this.metrics.increment('tool_calls', {
+                    tool: data.toolName,
+                    agent: agentId
+                });
+                break;
+                
+            case 'llm_call_started':
+                agentInfo.status = 'waiting_for_llm';
+                this.metrics.increment('llm_calls');
+                break;
+                
+            case 'execution_completed':
+                agentInfo.status = 'idle';
+                this.metrics.histogram('execution_duration', data.duration);
+                break;
+                
+            case 'error':
+                agentInfo.status = 'error';
+                this.metrics.increment('agent_errors', {
+                    agent: agentId,
+                    error_type: data.error.name
+                });
+                break;
+        }
+        
+        // Emit aggregated event
+        this.eventStream.emit('agent_activity', {
+            agentId,
+            eventType,
+            data,
+            timestamp,
+            agentStatus: agentInfo.status
+        });
+    }
+    
+    // Real-time dashboard data
+    getDashboardData() {
+        const agentStats = Array.from(this.activeAgents.entries()).map(([id, info]) => ({
+            id,
+            status: info.status,
+            lastActivity: info.lastActivity,
+            name: info.agent.name
+        }));
+        
+        return {
+            agents: agentStats,
+            metrics: this.metrics.getSnapshot(),
+            timestamp: Date.now()
+        };
+    }
+    
+    // Set up real-time streaming to client
+    streamToClient(websocket) {
+        const handler = (data) => {
+            websocket.send(JSON.stringify({
+                type: 'agent_activity',
+                data
+            }));
+        };
+        
+        this.eventStream.on('agent_activity', handler);
+        
+        // Send periodic dashboard updates
+        const dashboardInterval = setInterval(() => {
+            websocket.send(JSON.stringify({
+                type: 'dashboard_update',
+                data: this.getDashboardData()
+            }));
+        }, 1000);
+        
+        // Cleanup on disconnect
+        websocket.on('close', () => {
+            this.eventStream.off('agent_activity', handler);
+            clearInterval(dashboardInterval);
+        });
+    }
 }
 
-local agent = llm.agent({
-    model = config.model,
-    temperature = config.temperature,
-    max_tokens = config.max_tokens,
-    system = "You are configured with: " .. json.encode(config)
+// Usage
+const monitor = new AgentActivityMonitor();
+
+// Monitor all agents
+monitor.monitorAgent(chatAgent);
+monitor.monitorAgent(researchAgent);
+monitor.monitorAgent(codeAgent);
+
+// Set up real-time monitoring
+monitor.eventStream.on('agent_activity', (activity) => {
+    console.log(`Agent ${activity.agentId}: ${activity.eventType}`);
+    
+    // Trigger alerts for errors
+    if (activity.eventType === 'error') {
+        alertSystem.notify(`Agent ${activity.agentId} encountered an error`);
+    }
+});
+```
+
+### Built-in Tool Usage Examples
+
+#### Tool Composition and Chaining (Lua)
+
+```lua
+-- Advanced tool usage with composition
+local research_assistant = Agent.new({
+    system_prompt = "You are a research assistant with access to various tools",
+    tools = {
+        -- Web and data tools
+        WebSearch.new({ 
+            api_key = config.search_api_key,
+            max_results = 10 
+        }),
+        WebScraper.new({ 
+            rate_limit = { requests = 5, per = "minute" },
+            user_agent = "ResearchBot/1.0"
+        }),
+        
+        -- Data processing tools
+        CsvTool.new(),
+        JsonTool.new(),
+        StatisticsTool.new(),
+        
+        -- File and document tools
+        FileSystemTool.new({ 
+            allowed_paths = {"./research", "./data"},
+            read_only = false 
+        }),
+        MarkdownTool.new(),
+        
+        -- AI-powered tools
+        EmbeddingTool.new({ 
+            model = "text-embedding-ada-002",
+            api_key = config.openai_api_key 
+        }),
+        VectorSearchTool.new({ 
+            index_path = "./vector_index",
+            similarity_threshold = 0.8 
+        }),
+        
+        -- Communication tools
+        EmailTool.new({ 
+            smtp_server = config.smtp_server,
+            from_address = config.email_from 
+        }),
+        SlackTool.new({ 
+            token = config.slack_token,
+            channel = "#research-updates" 
+        })
+    }
 })
 
-local response = agent:run(params.query or "Hello!")
-return {
-    config = config,
-    response = response.content
+-- Complex research workflow using multiple tools
+local function conduct_research(topic)
+    return research_assistant:chat(string.format([[
+        Research the topic "%s" using the following process:
+        
+        1. Use web_search to find recent articles and papers
+        2. Use web_scraper to extract full content from promising sources
+        3. Save raw research data to "./research/%s_raw.json"
+        4. Use statistics_tool to analyze any numerical data found
+        5. Generate embeddings for key findings
+        6. Search for related content in our vector database
+        7. Create a comprehensive markdown report at "./research/%s_report.md"
+        8. Send a summary to the #research-updates Slack channel
+        
+        Be thorough and cite all sources properly.
+    ]], topic, topic:gsub("%s+", "_"), topic:gsub("%s+", "_")))
+end
+
+-- Execute research
+local result = conduct_research("Quantum Computing Applications in Finance")
+print("Research completed:", result)
+```
+
+#### Tool Security and Validation (JavaScript)
+
+```javascript
+// Secure tool usage with validation and sandboxing
+class SecureAgent extends Agent {
+    constructor(config) {
+        super(config);
+        this.setupSecureTools();
+    }
+    
+    setupSecureTools() {
+        // File system tool with strict security
+        this.addTool(new FileSystemTool({
+            allowedPaths: ['/tmp/agent_workspace', './output'],
+            maxFileSize: 10 * 1024 * 1024, // 10MB
+            allowedExtensions: ['.txt', '.json', '.csv', '.md'],
+            readOnly: false,
+            hooks: {
+                beforeExecute: (context) => {
+                    // Additional path validation
+                    const path = context.params.path;
+                    if (path.includes('..') || path.startsWith('/')) {
+                        throw new SecurityError('Invalid path detected');
+                    }
+                    
+                    // Log all file operations
+                    this.auditLogger.log('file_operation', {
+                        operation: context.params.operation,
+                        path: path,
+                        agentId: this.id,
+                        timestamp: new Date().toISOString()
+                    });
+                }
+            }
+        }));
+        
+        // HTTP tool with URL validation
+        this.addTool(new HttpRequestTool({
+            allowedDomains: [
+                'api.openweathermap.org',
+                'jsonplaceholder.typicode.com',
+                'httpbin.org'
+            ],
+            timeout: 30000,
+            maxResponseSize: 5 * 1024 * 1024, // 5MB
+            hooks: {
+                beforeExecute: async (context) => {
+                    const url = context.params.url;
+                    
+                    // Validate URL against allow list
+                    const domain = new URL(url).hostname;
+                    if (!this.isAllowedDomain(domain)) {
+                        throw new SecurityError(`Domain not allowed: ${domain}`);
+                    }
+                    
+                    // Rate limiting
+                    await this.rateLimiter.checkLimit(`http:${domain}`, {
+                        requests: 10,
+                        per: 'minute'
+                    });
+                }
+            }
+        }));
+        
+        // Shell command tool with command whitelist
+        this.addTool(new ShellCommandTool({
+            allowedCommands: [
+                'ls', 'cat', 'head', 'tail', 'wc',
+                'grep', 'awk', 'sed',
+                'python3 ./scripts/*.py',
+                'node ./scripts/*.js'
+            ],
+            timeout: 60000,
+            workingDirectory: '/tmp/agent_workspace',
+            hooks: {
+                beforeExecute: (context) => {
+                    const command = context.params.command;
+                    
+                    if (!this.isCommandAllowed(command)) {
+                        throw new SecurityError(`Command not allowed: ${command}`);
+                    }
+                    
+                    // Log all command executions
+                    this.auditLogger.log('shell_command', {
+                        command: command,
+                        agentId: this.id,
+                        timestamp: new Date().toISOString()
+                    });
+                }
+            }
+        }));
+        
+        // Email tool with template validation
+        this.addTool(new EmailTool({
+            smtpConfig: {
+                host: process.env.SMTP_HOST,
+                port: 587,
+                secure: false,
+                auth: {
+                    user: process.env.SMTP_USER,
+                    pass: process.env.SMTP_PASS
+                }
+            },
+            allowedRecipients: process.env.ALLOWED_EMAIL_DOMAINS?.split(',') || [],
+            templatePath: './email_templates',
+            hooks: {
+                beforeExecute: async (context) => {
+                    // Validate recipient
+                    const recipient = context.params.to;
+                    if (!this.isEmailAllowed(recipient)) {
+                        throw new SecurityError(`Email recipient not allowed: ${recipient}`);
+                    }
+                    
+                    // Content filtering
+                    const subject = context.params.subject;
+                    const body = context.params.body;
+                    
+                    const contentCheck = await this.contentModerator.check(subject + ' ' + body);
+                    if (contentCheck.flagged) {
+                        throw new ContentViolationError('Email content violates policy');
+                    }
+                }
+            }
+        }));
+    }
+    
+    isAllowedDomain(domain) {
+        return this.tools.find(t => t.name === 'http_request')
+            .config.allowedDomains.includes(domain);
+    }
+    
+    isCommandAllowed(command) {
+        const allowedCommands = this.tools.find(t => t.name === 'shell_command')
+            .config.allowedCommands;
+            
+        return allowedCommands.some(pattern => {
+            if (pattern.includes('*')) {
+                // Simple glob pattern matching
+                const regex = new RegExp('^' + pattern.replace(/\*/g, '.*') + '$');
+                return regex.test(command);
+            }
+            return command === pattern;
+        });
+    }
+    
+    isEmailAllowed(email) {
+        const allowedDomains = this.tools.find(t => t.name === 'email')
+            .config.allowedRecipients;
+            
+        const domain = email.split('@')[1];
+        return allowedDomains.includes(domain);
+    }
+}
+
+// Usage with comprehensive security
+const secureAgent = new SecureAgent({
+    systemPrompt: "You are a secure assistant with restricted tool access",
+    auditLogger: new AuditLogger('./logs/agent_audit.log'),
+    rateLimiter: new RateLimiter(),
+    contentModerator: new ContentModerator()
+});
+```
+
+### Async Pattern Examples
+
+#### Cooperative Scheduling (Lua)
+
+```lua
+-- Lua coroutine-based async patterns
+local AsyncScheduler = {}
+AsyncScheduler.__index = AsyncScheduler
+
+function AsyncScheduler.new()
+    return setmetatable({
+        tasks = {},
+        running = false
+    }, AsyncScheduler)
+end
+
+function AsyncScheduler:add_task(name, task_func)
+    local task = coroutine.create(task_func)
+    self.tasks[name] = {
+        coroutine = task,
+        status = "ready"
+    }
+end
+
+function AsyncScheduler:run()
+    self.running = true
+    
+    while self.running and next(self.tasks) do
+        for name, task in pairs(self.tasks) do
+            if task.status == "ready" or task.status == "running" then
+                local success, result = coroutine.resume(task.coroutine)
+                
+                if success then
+                    if coroutine.status(task.coroutine) == "dead" then
+                        task.status = "completed"
+                        task.result = result
+                        print(string.format("Task %s completed: %s", name, tostring(result)))
+                        self.tasks[name] = nil  -- Remove completed task
+                    else
+                        task.status = "running"
+                    end
+                else
+                    task.status = "error"
+                    task.error = result
+                    print(string.format("Task %s error: %s", name, result))
+                    self.tasks[name] = nil  -- Remove failed task
+                end
+            end
+        end
+        
+        -- Yield control briefly
+        coroutine.yield()
+    end
+end
+
+-- Example: Multiple agents running concurrently
+local scheduler = AsyncScheduler.new()
+
+-- Research task
+scheduler:add_task("research", function()
+    local research_agent = ResearchAgent.new()
+    
+    for i = 1, 5 do
+        print("Research step", i)
+        local result = research_agent:search("AI topic " .. i)
+        
+        -- Yield periodically to allow other tasks to run
+        coroutine.yield()
+        
+        -- Process result
+        research_agent:process(result)
+    end
+    
+    return "Research completed"
+end)
+
+-- Analysis task  
+scheduler:add_task("analysis", function()
+    local analysis_agent = AnalysisAgent.new()
+    
+    for i = 1, 3 do
+        print("Analysis step", i)
+        local data = analysis_agent:fetch_data("dataset_" .. i)
+        
+        -- Yield to other tasks
+        coroutine.yield()
+        
+        local insights = analysis_agent:analyze(data)
+        analysis_agent:store_insights(insights)
+    end
+    
+    return "Analysis completed"
+end)
+
+-- Writing task
+scheduler:add_task("writing", function()
+    local writer_agent = WriterAgent.new()
+    
+    local sections = {"intro", "body", "conclusion"}
+    for _, section in ipairs(sections) do
+        print("Writing", section)
+        local content = writer_agent:write_section(section)
+        
+        -- Yield after each section
+        coroutine.yield()
+        
+        writer_agent:save_section(section, content)
+    end
+    
+    return "Writing completed"
+end)
+
+-- Run all tasks cooperatively
+print("Starting cooperative execution...")
+scheduler:run()
+print("All tasks completed!")
+```
+
+#### Promise-Style Async (JavaScript)
+
+```javascript
+// Advanced async patterns with Promise coordination
+class AsyncAgentCoordinator {
+    constructor() {
+        this.agents = new Map();
+        this.taskQueue = [];
+        this.activeJobs = new Map();
+        this.maxConcurrency = 3;
+    }
+    
+    // Register agents for coordination
+    registerAgent(name, agent) {
+        this.agents.set(name, agent);
+    }
+    
+    // Execute multiple agents with different concurrency patterns
+    async executeParallel(tasks) {
+        console.log(`Executing ${tasks.length} tasks in parallel...`);
+        
+        const promises = tasks.map(async (task) => {
+            const agent = this.agents.get(task.agentName);
+            if (!agent) {
+                throw new Error(`Agent not found: ${task.agentName}`);
+            }
+            
+            try {
+                const result = await agent.execute(task.input);
+                return { task: task.name, result, success: true };
+            } catch (error) {
+                return { task: task.name, error, success: false };
+            }
+        });
+        
+        return await Promise.allSettled(promises);
+    }
+    
+    // Execute tasks with controlled concurrency
+    async executeWithConcurrencyLimit(tasks) {
+        console.log(`Executing ${tasks.length} tasks with concurrency limit ${this.maxConcurrency}...`);
+        
+        const results = [];
+        const executing = new Set();
+        
+        for (const task of tasks) {
+            // Wait if we've hit the concurrency limit
+            if (executing.size >= this.maxConcurrency) {
+                await Promise.race(executing);
+            }
+            
+            const promise = this.executeTask(task).finally(() => {
+                executing.delete(promise);
+            });
+            
+            executing.add(promise);
+            results.push(promise);
+        }
+        
+        return await Promise.all(results);
+    }
+    
+    // Execute task with timeout and retry
+    async executeTask(task) {
+        const agent = this.agents.get(task.agentName);
+        let lastError;
+        
+        for (let attempt = 1; attempt <= (task.retries || 1); attempt++) {
+            try {
+                console.log(`Executing ${task.name} (attempt ${attempt})`);
+                
+                const timeoutPromise = new Promise((_, reject) => {
+                    setTimeout(() => reject(new Error('Task timeout')), task.timeout || 30000);
+                });
+                
+                const taskPromise = agent.execute(task.input);
+                
+                const result = await Promise.race([taskPromise, timeoutPromise]);
+                
+                console.log(`Task ${task.name} completed successfully`);
+                return { task: task.name, result, attempt, success: true };
+                
+            } catch (error) {
+                console.warn(`Task ${task.name} failed on attempt ${attempt}:`, error.message);
+                lastError = error;
+                
+                if (attempt < (task.retries || 1)) {
+                    // Exponential backoff
+                    const delay = Math.pow(2, attempt - 1) * 1000;
+                    console.log(`Retrying ${task.name} in ${delay}ms...`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                }
+            }
+        }
+        
+        return { task: task.name, error: lastError, success: false };
+    }
+    
+    // Stream results as they complete
+    async *executeStream(tasks) {
+        const promises = tasks.map(task => this.executeTask(task));
+        
+        // Yield results as they complete
+        while (promises.length > 0) {
+            const { value, index } = await this.raceWithIndex(promises);
+            promises.splice(index, 1);
+            yield value;
+        }
+    }
+    
+    // Helper to get Promise.race result with index
+    async raceWithIndex(promises) {
+        return new Promise((resolve) => {
+            promises.forEach((promise, index) => {
+                promise.then((value) => resolve({ value, index }));
+            });
+        });
+    }
+    
+    // Pipeline execution - output of one task becomes input to next
+    async executePipeline(pipeline) {
+        console.log(`Executing pipeline with ${pipeline.steps.length} steps...`);
+        
+        let currentInput = pipeline.initialInput;
+        const results = [];
+        
+        for (const [index, step] of pipeline.steps.entries()) {
+            console.log(`Pipeline step ${index + 1}: ${step.name}`);
+            
+            const agent = this.agents.get(step.agentName);
+            if (!agent) {
+                throw new Error(`Agent not found: ${step.agentName}`);
+            }
+            
+            try {
+                // Transform input if transformer is provided
+                const stepInput = step.inputTransformer 
+                    ? step.inputTransformer(currentInput)
+                    : currentInput;
+                
+                const result = await agent.execute(stepInput);
+                results.push({ step: step.name, result });
+                
+                // Output becomes input for next step
+                currentInput = step.outputTransformer 
+                    ? step.outputTransformer(result)
+                    : result;
+                    
+            } catch (error) {
+                console.error(`Pipeline failed at step ${step.name}:`, error);
+                
+                if (step.continueOnError) {
+                    results.push({ step: step.name, error, skipped: true });
+                    // Use fallback or previous input
+                    currentInput = step.fallbackOutput || currentInput;
+                } else {
+                    throw error;
+                }
+            }
+        }
+        
+        return {
+            finalOutput: currentInput,
+            stepResults: results
+        };
+    }
+}
+
+// Usage examples
+const coordinator = new AsyncAgentCoordinator();
+
+coordinator.registerAgent('research', new ResearchAgent());
+coordinator.registerAgent('analysis', new AnalysisAgent());
+coordinator.registerAgent('writer', new WriterAgent());
+coordinator.registerAgent('reviewer', new ReviewAgent());
+
+// Parallel execution
+const parallelTasks = [
+    { name: 'search_papers', agentName: 'research', input: { query: 'AI safety' } },
+    { name: 'search_news', agentName: 'research', input: { query: 'AI regulation' } },
+    { name: 'search_blogs', agentName: 'research', input: { query: 'AI ethics' } }
+];
+
+const parallelResults = await coordinator.executeParallel(parallelTasks);
+
+// Streaming execution with real-time updates
+console.log('Streaming results:');
+for await (const result of coordinator.executeStream(parallelTasks)) {
+    console.log(`Completed: ${result.task}`, result.success ? '✓' : '✗');
+    if (result.success) {
+        console.log('Result:', result.result);
+    } else {
+        console.error('Error:', result.error.message);
+    }
+}
+
+// Pipeline execution
+const researchPipeline = {
+    initialInput: { topic: 'Quantum Computing in Finance' },
+    steps: [
+        {
+            name: 'research',
+            agentName: 'research',
+            inputTransformer: (input) => ({ query: input.topic }),
+            outputTransformer: (output) => ({ researchData: output })
+        },
+        {
+            name: 'analyze',
+            agentName: 'analysis',
+            inputTransformer: (input) => input.researchData,
+            outputTransformer: (output) => ({ analysis: output })
+        },
+        {
+            name: 'write',
+            agentName: 'writer',
+            inputTransformer: (input) => ({ 
+                topic: 'Quantum Computing in Finance',
+                analysis: input.analysis 
+            }),
+            outputTransformer: (output) => ({ draft: output })
+        },
+        {
+            name: 'review',
+            agentName: 'reviewer',
+            inputTransformer: (input) => input.draft,
+            continueOnError: true,
+            fallbackOutput: { approved: true, feedback: 'Auto-approved due to review error' }
+        }
+    ]
+};
+
+const pipelineResult = await coordinator.executePipeline(researchPipeline);
+console.log('Pipeline completed:', pipelineResult.finalOutput);
+```
+
+These comprehensive examples demonstrate the full power and flexibility of the rs-llmspell architecture, showing how components can be composed, coordinated, and extended to build sophisticated AI applications.
+
+## Directory Structure and Crate Organization
+
+### Crate Architecture
+
+Rs-LLMSpell follows a modular crate structure that mirrors the component architecture:
+
+```
+rs-llmspell/
+├── Cargo.toml                     # Workspace definition
+├── README.md
+├── TODO.md
+├── docs/
+│   └── technical/                  # Architecture documentation
+│
+├── llmspell-core/                  # Core traits and types
+│   ├── Cargo.toml
+│   └── src/
+│       ├── traits/
+│       │   ├── base_agent.rs       # BaseAgent trait
+│       │   ├── agent.rs            # Agent trait  
+│       │   ├── tool.rs             # Tool trait
+│       │   ├── workflow.rs         # Workflow trait
+│       │   ├── observable.rs       # Observable trait
+│       │   ├── hookable.rs         # Hookable trait
+│       │   └── mod.rs
+│       ├── types/
+│       │   ├── script_value.rs     # ScriptValue enum
+│       │   ├── agent_state.rs      # AgentState types
+│       │   ├── tool_types.rs       # Tool input/output types
+│       │   ├── workflow_types.rs   # Workflow types
+│       │   └── mod.rs
+│       ├── error.rs                # Error types
+│       └── lib.rs
+│
+├── llmspell-bridge/                # Language bindings
+│   ├── Cargo.toml
+│   └── src/
+│       ├── lua/
+│       │   ├── agent_binding.rs    # Lua Agent bindings
+│       │   ├── tool_binding.rs     # Lua Tool bindings
+│       │   ├── workflow_binding.rs # Lua Workflow bindings
+│       │   ├── async_support.rs    # Lua coroutine/Promise
+│       │   ├── event_binding.rs    # Lua event handling
+│       │   └── mod.rs
+│       ├── js/
+│       │   ├── agent_binding.rs    # JS Agent bindings
+│       │   ├── tool_binding.rs     # JS Tool bindings
+│       │   ├── workflow_binding.rs # JS Workflow bindings
+│       │   ├── async_support.rs    # JS Promise integration
+│       │   ├── event_binding.rs    # JS event handling
+│       │   └── mod.rs
+│       ├── convert.rs              # Type conversions
+│       ├── async_bridge.rs         # Async coordination
+│       ├── error_bridge.rs         # Error handling
+│       └── lib.rs
+│
+├── llmspell-infra/                 # Infrastructure layer
+│   ├── Cargo.toml
+│   └── src/
+│       ├── llm/
+│       │   ├── provider.rs         # LLMProvider trait
+│       │   ├── rig_wrapper.rs      # Rig integration
+│       │   ├── local_provider.rs   # Candle integration
+│       │   └── mod.rs
+│       ├── state/
+│       │   ├── store.rs            # StateStore trait
+│       │   ├── sled_store.rs       # Sled implementation
+│       │   ├── rocksdb_store.rs    # RocksDB implementation
+│       │   ├── handoff.rs          # State handoff
+│       │   └── mod.rs
+│       ├── events/
+│       │   ├── bus.rs              # EventBus implementation
+│       │   ├── types.rs            # Event types
+│       │   ├── handler.rs          # EventHandler trait
+│       │   ├── stream.rs           # Event streaming
+│       │   └── mod.rs
+│       ├── hooks/
+│       │   ├── manager.rs          # HookManager
+│       │   ├── context.rs          # HookContext
+│       │   ├── builtin/            # Built-in hooks
+│       │   │   ├── logging.rs      # LoggingHook
+│       │   │   ├── metrics.rs      # MetricsHook
+│       │   │   ├── tracing.rs      # TracingHook
+│       │   │   ├── rate_limit.rs   # RateLimitHook
+│       │   │   ├── cache.rs        # CacheHook
+│       │   │   ├── retry.rs        # RetryHook
+│       │   │   └── mod.rs
+│       │   └── mod.rs
+│       ├── security/
+│       │   ├── sandbox.rs          # Script sandboxing
+│       │   ├── audit.rs            # Audit logging
+│       │   ├── permissions.rs      # Permission system
+│       │   └── mod.rs
+│       └── lib.rs
+│
+├── llmspell-agents/                # Agent implementations
+│   ├── Cargo.toml
+│   └── src/
+│       ├── chat.rs                 # ChatAgent
+│       ├── research.rs             # ResearchAgent
+│       ├── code.rs                 # CodeAgent
+│       ├── data.rs                 # DataAnalyst
+│       ├── planner.rs              # PlannerAgent
+│       ├── orchestrator.rs         # OrchestratorAgent
+│       ├── base_impl.rs            # Common implementations
+│       └── lib.rs
+│
+├── llmspell-tools/                 # Built-in tools
+│   ├── Cargo.toml
+│   └── src/
+│       ├── system/
+│       │   ├── filesystem.rs       # FileSystemTool
+│       │   ├── shell.rs            # ShellCommandTool
+│       │   ├── environment.rs      # EnvironmentTool
+│       │   ├── process.rs          # ProcessTool
+│       │   └── mod.rs
+│       ├── data/
+│       │   ├── json.rs             # JsonTool
+│       │   ├── xml.rs              # XmlTool
+│       │   ├── csv.rs              # CsvTool
+│       │   ├── sqlite.rs           # SqliteTool
+│       │   ├── regex.rs            # RegexTool
+│       │   └── mod.rs
+│       ├── web/
+│       │   ├── http.rs             # HttpRequestTool
+│       │   ├── scraper.rs          # WebScraperTool
+│       │   ├── rss.rs              # RssFeedTool
+│       │   ├── websocket.rs        # WebSocketTool
+│       │   └── mod.rs
+│       ├── ai/
+│       │   ├── embedding.rs        # EmbeddingTool
+│       │   ├── vector_search.rs    # VectorSearchTool
+│       │   ├── image_gen.rs        # ImageGenerationTool
+│       │   ├── transcribe.rs       # AudioTranscribeTool
+│       │   ├── code_interpreter.rs # CodeInterpreterTool
+│       │   └── mod.rs
+│       ├── communication/
+│       │   ├── email.rs            # EmailTool
+│       │   ├── slack.rs            # SlackTool
+│       │   ├── discord.rs          # DiscordTool
+│       │   ├── twilio.rs           # TwilioTool
+│       │   └── mod.rs
+│       ├── math/
+│       │   ├── calculator.rs       # CalculatorTool
+│       │   ├── statistics.rs       # StatisticsTool
+│       │   ├── linear_algebra.rs   # LinearAlgebraTool
+│       │   ├── symbolic.rs         # SymbolicMathTool
+│       │   └── mod.rs
+│       ├── time/
+│       │   ├── datetime.rs         # DateTimeTool
+│       │   ├── timer.rs            # TimerTool
+│       │   ├── scheduler.rs        # SchedulerTool
+│       │   ├── timezone.rs         # TimeZoneTool
+│       │   └── mod.rs
+│       ├── crypto/
+│       │   ├── hash.rs             # HashTool
+│       │   ├── encryption.rs       # EncryptionTool
+│       │   ├── signature.rs        # SignatureTool
+│       │   ├── random.rs           # RandomTool
+│       │   └── mod.rs
+│       ├── integration/
+│       │   ├── github.rs           # GitHubTool
+│       │   ├── jira.rs             # JiraTool
+│       │   ├── aws.rs              # AwsTool
+│       │   ├── kubernetes.rs       # KubernetesTool
+│       │   └── mod.rs
+│       └── lib.rs
+│
+├── llmspell-workflows/             # Workflow implementations
+│   ├── Cargo.toml
+│   └── src/
+│       ├── sequential.rs           # SequentialWorkflow
+│       ├── parallel.rs             # ParallelWorkflow
+│       ├── conditional.rs          # ConditionalWorkflow
+│       ├── loop_flow.rs            # LoopWorkflow
+│       ├── map_reduce.rs           # MapReduceWorkflow
+│       ├── pipeline.rs             # PipelineWorkflow
+│       ├── base_impl.rs            # Common implementations
+│       └── lib.rs
+│
+├── llmspell-mcp/                   # Model Control Protocol support
+│   ├── Cargo.toml
+│   └── src/
+│       ├── client.rs               # MCP client implementation
+│       ├── server.rs               # MCP server implementation
+│       ├── tool_adapter.rs         # Tool → MCP adaptation
+│       ├── agent_adapter.rs        # Agent → MCP adaptation
+│       └── lib.rs
+│
+├── llmspell-a2a/                   # Agent-to-Agent Protocol support
+│   ├── Cargo.toml
+│   └── src/
+│       ├── client.rs               # A2A client implementation
+│       ├── server.rs               # A2A server implementation
+│       ├── protocol.rs             # A2A protocol definition
+│       └── lib.rs
+│
+├── llmspell-testing/               # Testing utilities
+│   ├── Cargo.toml
+│   └── src/
+│       ├── mocks/
+│       │   ├── llm_provider.rs     # Mock LLM providers
+│       │   ├── tools.rs            # Mock tools
+│       │   ├── agents.rs           # Mock agents
+│       │   └── mod.rs
+│       ├── fixtures/
+│       │   ├── agents.rs           # Test agent fixtures
+│       │   ├── workflows.rs        # Test workflow fixtures
+│       │   ├── data.rs             # Test data fixtures
+│       │   └── mod.rs
+│       ├── harness/
+│       │   ├── script_test.rs      # Script testing harness
+│       │   ├── integration.rs      # Integration test helpers
+│       │   ├── performance.rs      # Performance test utilities
+│       │   └── mod.rs
+│       └── lib.rs
+│
+├── llmspell-cli/                   # CLI application
+│   ├── Cargo.toml
+│   └── src/
+│       ├── commands/
+│       │   ├── run.rs              # Run spell command
+│       │   ├── test.rs             # Test spell command
+│       │   ├── init.rs             # Initialize project
+│       │   ├── validate.rs         # Validate spell syntax
+│       │   └── mod.rs
+│       ├── config.rs               # Configuration management
+│       ├── cli.rs                  # CLI interface
+│       └── main.rs
+│
+├── llmspell/                       # Main library crate
+│   ├── Cargo.toml
+│   └── src/
+│       ├── prelude.rs              # Common imports
+│       ├── runtime.rs              # Runtime management
+│       ├── spell.rs                # Spell execution
+│       └── lib.rs
+│
+├── examples/                       # Example spells
+│   ├── lua/
+│   │   ├── simple_chat.lua
+│   │   ├── multi_agent.lua
+│   │   ├── research_workflow.lua
+│   │   └── tool_composition.lua
+│   ├── javascript/
+│   │   ├── simple_chat.js
+│   │   ├── multi_agent.js
+│   │   ├── research_workflow.js
+│   │   └── tool_composition.js
+│   └── README.md
+│
+└── tests/
+    ├── integration/                # Integration tests
+    ├── performance/                # Performance benchmarks
+    └── scripts/                    # Test scripts
+```
+
+### Feature Flags and Conditional Compilation
+
+Each crate includes feature flags for optional dependencies:
+
+```toml
+# llmspell/Cargo.toml
+[features]
+default = ["lua", "javascript", "all-tools", "all-agents"]
+
+# Script engines
+lua = ["llmspell-bridge/lua", "mlua"]
+javascript = ["llmspell-bridge/js", "rquickjs"]
+
+# Tool categories
+tools-system = ["llmspell-tools/system"]
+tools-web = ["llmspell-tools/web"]
+tools-ai = ["llmspell-tools/ai"]
+tools-communication = ["llmspell-tools/communication"]
+tools-math = ["llmspell-tools/math"]
+tools-time = ["llmspell-tools/time"]
+tools-crypto = ["llmspell-tools/crypto"]
+tools-integration = ["llmspell-tools/integration"]
+all-tools = [
+    "tools-system", "tools-web", "tools-ai", "tools-communication",
+    "tools-math", "tools-time", "tools-crypto", "tools-integration"
+]
+
+# Agent types
+agents-chat = ["llmspell-agents/chat"]
+agents-research = ["llmspell-agents/research"]
+agents-code = ["llmspell-agents/code"]
+agents-data = ["llmspell-agents/data"]
+agents-planner = ["llmspell-agents/planner"]
+agents-orchestrator = ["llmspell-agents/orchestrator"]
+all-agents = [
+    "agents-chat", "agents-research", "agents-code",
+    "agents-data", "agents-planner", "agents-orchestrator"
+]
+
+# Workflow types
+workflows-sequential = ["llmspell-workflows/sequential"]
+workflows-parallel = ["llmspell-workflows/parallel"]
+workflows-conditional = ["llmspell-workflows/conditional"]
+workflows-loop = ["llmspell-workflows/loop"]
+workflows-mapreduce = ["llmspell-workflows/mapreduce"]
+workflows-pipeline = ["llmspell-workflows/pipeline"]
+all-workflows = [
+    "workflows-sequential", "workflows-parallel", "workflows-conditional",
+    "workflows-loop", "workflows-mapreduce", "workflows-pipeline"
+]
+
+# Storage backends
+storage-sled = ["llmspell-infra/sled"]
+storage-rocksdb = ["llmspell-infra/rocksdb"]
+
+# LLM providers (via rig)
+providers-openai = ["llmspell-infra/rig-openai"]
+providers-anthropic = ["llmspell-infra/rig-anthropic"]
+providers-local = ["llmspell-infra/candle"]
+
+# Protocols
+mcp = ["llmspell-mcp"]
+a2a = ["llmspell-a2a"]
+
+# Optional infrastructure
+metrics = ["llmspell-infra/metrics"]
+tracing = ["llmspell-infra/tracing"]
+opentelemetry = ["llmspell-infra/opentelemetry"]
+
+# Development/testing
+testing = ["llmspell-testing"]
+mocks = ["llmspell-testing/mocks"]
+```
+
+### Testing Strategy Integration
+
+The modular structure enables comprehensive testing:
+
+#### Unit Testing
+```rust
+// llmspell-tools/src/math/calculator.rs
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use llmspell_testing::mocks::*;
+
+    #[tokio::test]
+    async fn test_calculator_basic_operations() {
+        let calc = CalculatorTool;
+        let result = calc.execute(json!({"expression": "2 + 2"})).await?;
+        assert_eq!(result.content["result"], 4);
+    }
 }
 ```
 
-**Running with environment:**
-```bash
-export LLM_MODEL="claude-3-opus"
-export LLM_TEMPERATURE="0.3"
-rs-llmspell run config-example.lua --param query="What is your configuration?"
+#### Integration Testing
+```rust
+// tests/integration/agent_tool_integration.rs
+use llmspell_testing::{fixtures::*, harness::*};
+
+#[tokio::test]
+async fn test_agent_with_calculator() {
+    let mut agent = test_chat_agent();
+    agent.add_tool(Box::new(CalculatorTool));
+    
+    let response = agent.chat("What is 15% of 2500?").await?;
+    assert!(response.contains("375"));
+}
 ```
 
-## Future Considerations
+#### Script Testing
+```rust
+// llmspell-bridge/src/lua/tests.rs
+#[tokio::test]
+async fn test_lua_agent_creation() {
+    let lua_code = r#"
+        local agent = Agent.new({
+            system_prompt = "Test assistant",
+            tools = { Calculator.new() }
+        })
+        return agent:chat("Calculate 10 + 5")
+    "#;
+    
+    let result = execute_lua_script(lua_code).await?;
+    assert!(result.contains("15"));
+}
+```
 
-### Planned Enhancements
+### Build and Development Workflow
 
-1. **Vector Store Integration**
-   - Bridge abstractions for vector databases
-   - RAG (Retrieval-Augmented Generation) script patterns
-   - Similarity search and semantic caching through bridges
+#### Development Commands
+```bash
+# Run all tests
+cargo test --workspace
 
-2. **Advanced Script Engine Features**
-   - Python script engine (via PyO3)
-   - WebAssembly script engine
-   - Custom domain-specific script languages
+# Test specific component
+cargo test -p llmspell-tools
 
-3. **Enhanced Bridge Ecosystem**
-   - Database operation bridges (SQL, NoSQL)
-   - Cloud service bridges (AWS, GCP, Azure)
-   - Communication bridges (email, Slack, Discord)
+# Test with specific features
+cargo test --features "lua,tools-math"
 
-4. **Observability and Monitoring**
-   - Script execution tracing and metrics
-   - Bridge performance monitoring
-   - Cross-engine compatibility dashboards
+# Benchmark performance
+cargo bench -p llmspell-testing
 
-5. **Testing Infrastructure Evolution**
-   - Automated test generation from script examples
-   - Property-based testing for cross-engine compatibility
-   - Performance regression testing framework
-   - Chaos engineering for bridge reliability
+# Check all feature combinations
+cargo hack check --feature-powerset
 
-6. **Advanced Workflow Patterns**
-   - DAG (Directed Acyclic Graph) workflows
-   - Conditional and loop workflows  
-   - Parallel workflow execution with aggregation
-   - Real-time reactive workflows
+# Build CLI
+cargo build -p llmspell-cli --release
 
-### Extension Points
+# Run examples
+cargo run --example lua/simple_chat.lua
+```
 
-The architecture supports extensions through:
+#### CI/CD Integration
+```yaml
+# .github/workflows/test.yml
+strategy:
+  matrix:
+    features:
+      - "lua,tools-system"
+      - "javascript,tools-web"
+      - "all-tools,all-agents"
+      - "minimal"  # Only core traits
+```
 
-1. **Custom Script Engines** - Implement the `ScriptEngine` trait for new languages
-2. **Custom Bridges** - Implement the `Bridge` trait for new library integrations  
-3. **Custom Security Policies** - Extend sandboxing and resource limit frameworks
-4. **Custom Test Suites** - Add domain-specific testing contracts and fixtures
-
-### Integration with Rust Ecosystem
-
-Rs-LLMSpell bridges to the rich Rust ecosystem:
-
-- **LLM Libraries**: Rig, Candle, Burn for AI/ML functionality
-- **Script Engines**: mlua, boa, quickjs for language support
-- **Web Frameworks**: Axum, Warp, Actix-web for server integration
-- **Async Runtime**: Tokio for high-performance execution
-- **Testing**: rstest, proptest for comprehensive validation
-- **Serialization**: Serde for data interchange
-- **Observability**: Tracing, Metrics for monitoring
+This modular structure provides:
+- **Clear separation of concerns** between different component types
+- **Feature-based compilation** for minimal deployments
+- **Comprehensive testing** at all levels
+- **Easy extension** for new tools, agents, and workflows
+- **Protocol support** for MCP and A2A integration
 
 ## Conclusion
 
-Rs-LLMSpell's bridge-first, script-engine architecture provides a powerful foundation for building scriptable LLM applications. By leveraging existing Rust libraries like Rig as foundation layers and focusing on clean bridge abstractions, we create a system that is:
+Rs-LLMSpell provides a unique combination of:
 
-- **Scriptable**: Write AI workflows in Lua, JavaScript, or other languages without compilation
-- **Performant**: Rust-powered bridges provide native performance with scripting flexibility
-- **Secure**: Sandboxed script execution with configurable resource limits
-- **Testable**: Comprehensive testing infrastructure ensures reliability across engines and bridges
-- **Extensible**: Easy to add new script engines, bridges, and integrations
-- **Maintainable**: Clean separation between scripting layer and Rust implementation
+1. **Proven Patterns**: Go-llms architecture adapted for Rust
+2. **Scriptable Interface**: Multi-language support with idiomatic APIs
+3. **Production Infrastructure**: Hooks, events, state management built-in
+4. **Extensible Components**: 40+ tools, multiple agents, workflow patterns
+5. **Bridge Philosophy**: Leverage best-in-class Rust crates
 
-The architecture strikes a balance between rapid development through scripting and production-grade performance through Rust, making it easy to build both simple AI automations and complex multi-agent systems with the same foundational platform.
+This architecture enables rapid AI development while maintaining production-grade reliability and performance.
