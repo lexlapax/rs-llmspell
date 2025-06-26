@@ -67,20 +67,13 @@ Comprehensive refinement of rs-llmspell architecture based on go-llms and Google
       3.  **State Management**: The existing state management architecture ensures context is preserved during the handoff.
       4.  This pattern is documented in the "LLM-Driven Delegation (Agent Transfer)" section of the main architecture document.
     - [x] Todo: ~~Consider documenting these handoff patterns more explicitly in a dedicated section of the architecture document~~ **Done**. Future work could include adding more complex handoff examples to the `Real-World Examples` section.
-  - [ ] **Task/question 12.3.2** Does the architecture allow for rs-llmspell to be used as a module in lua or in javascript to take advantage of tools, agents, workflows, events?
-    - [ ] Answer: No, not in the current implementation. Module support is comprehensively planned but not yet implemented. Currently:
-      - Rs-llmspell only supports **embedded scripting** where it hosts Lua/JS runtimes internally
-      - Cannot be imported as `require("llmspell")` in external Lua or `import from '@rs/llmspell'` in Node.js
-      - The architecture research includes detailed plans for future module support via:
-        1. Native modules (Lua C API, Node.js N-API)
-        2. C API bridge approach
-        3. WebAssembly modules
-        4. IPC approach
-      - Would require new crates: llmspell-c-api, llmspell-module-core, language bindings
-    - [ ] Todo: 
-      - [ ] Clarify in architecture doc that module support is future work, not current capability
-      - [ ] Consider prioritizing module support in Phase 13 implementation roadmap
-      - [ ] Document that current usage is embedded-only (scripts run inside rs-llmspell)
+  - [x] **Task/question 12.3.2** Does the architecture allow for rs-llmspell to be used as a module in lua or in javascript to take advantage of tools, agents, workflows, events?
+    - [x] Answer: Yes, the architecture is explicitly designed to support this through its **Library Mode**. Key features enabling this are:
+      1.  **Dual Usage Paradigms**: The architecture document now clearly defines both "Embedded Mode" (running scripts within `rs-llmspell`) and "Library Mode" (importing `rs-llmspell` into existing applications).
+      2.  **Stable C API**: The bridge layer is designed to expose a stable C API, which is the foundation for creating native modules.
+      3.  **Native Module Support**: The plan includes creating native modules for Lua (as a LuaRock) and JavaScript (as an NPM package), allowing `require("llmspell")` and `require('@rs/llmspell')` respectively.
+      4.  **Build System**: The build system is designed to produce these native modules for distribution.
+    - [x] Todo: ~~Clarify in architecture doc that module support is future work, not current capability~~ **Done**. The architecture now fully incorporates this capability.
   - [ ] **Task/question 12.3.3** Is the architecture laid out in a modular way such that implementation can occur in verticals or layers across the top to bottom stacks as suggested in the MVP roadmap?
     - [ ] Answer: Yes, the architecture is explicitly designed for modular, layered implementation. Key evidence:
       1. **Four-Layer Architecture**: Script → Bridge → Application → Infrastructure layers with clear boundaries
