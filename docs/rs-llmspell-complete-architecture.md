@@ -743,6 +743,69 @@ Run it:
 llmspell run hello_world.lua
 ```
 
+### Interactive REPL Quick Start
+
+The REPL provides an immediate, interactive way to explore Rs-LLMSpell:
+
+```bash
+# Start the REPL
+$ llmspell repl
+
+Rs-LLMSpell v1.0.0 - Interactive Mode
+Type .help for commands, .exit to quit
+
+# Create an agent interactively
+llmspell> assistant = Agent.new({
+       |   name = "assistant",
+       |   system_prompt = "You are a helpful assistant",
+       |   model = "gpt-3.5-turbo"
+       | })
+<Agent: assistant>
+
+# Chat with the agent
+llmspell> response = assistant:chat("Explain quantum computing in simple terms")
+<AgentOutput: 256 tokens>
+
+llmspell> print(response)
+Quantum computing is like having a super-powered calculator that can try many 
+solutions at once...
+
+# Add tools dynamically
+llmspell> assistant:add_tool(Tools.get("web_search"))
+Tool added: web_search
+
+# Test with tool usage
+llmspell> assistant:chat("What's the latest news about quantum computers?")
+[web_search] Searching for: latest quantum computer news 2025
+<AgentOutput: 3 sources cited>
+
+# Save your work
+llmspell> .save quantum_research.lua
+Session saved to quantum_research.lua
+```
+
+### Unix Pipeline Integration
+
+Rs-LLMSpell seamlessly integrates with Unix pipelines:
+
+```bash
+# Process text from stdin
+echo "Summarize this article about AI safety" | llmspell summarize.lua
+
+# Chain with other tools
+cat large_document.txt | llmspell extract_key_points.js | jq '.points[]'
+
+# Process JSON data
+curl -s https://api.news.com/latest | \
+  llmspell analyze_sentiment.lua | \
+  llmspell generate_report.js > daily_news_analysis.md
+
+# Error handling in pipelines
+llmspell validate_data.lua < input.json && \
+  llmspell process.lua < input.json || \
+  echo "Validation failed" >&2
+```
+
 ### Multi-Agent Workflow
 
 Create a research workflow with multiple specialized agents:
@@ -2611,12 +2674,125 @@ This comprehensive component hierarchy provides:
 
 ## Complete Script Interface
 
-This section details the script-level APIs available to developers. Rs-LLMSpell provides two primary ways to interact with its components:
+This section details the script-level APIs available to developers. Rs-LLMSpell provides three primary ways to interact with its components:
 
 1.  **Embedded Scripting**: Writing scripts (spells) that are executed by the `llmspell` runtime. This is ideal for creating new, standalone AI applications.
-2.  **Native Module Integration**: Importing `rs-llmspell` as a library into existing Lua or JavaScript applications to add agentic capabilities.
+2.  **Interactive REPL Mode**: Live interaction with agents and workflows through an enhanced REPL with state persistence, tab completion, and multi-language support.
+3.  **Native Module Integration**: Importing `rs-llmspell` as a library into existing Lua or JavaScript applications to add agentic capabilities.
 
-Both modes expose the same core functionalities, ensuring a consistent developer experience.
+All modes expose the same core functionalities, ensuring a consistent developer experience across different usage patterns.
+
+### Interactive REPL Mode Architecture
+
+The REPL (Read-Eval-Print-Loop) mode provides a powerful interactive environment for exploring Rs-LLMSpell capabilities, prototyping spells, and debugging complex workflows:
+
+#### REPL Features
+
+- **Multi-Language Support**: Switch between Lua and JavaScript engines on-the-fly
+- **Persistent State**: Agents, tools, and variables persist across commands within a session
+- **Session Management**: Save and restore complete REPL sessions
+- **Tab Completion**: Context-aware completion for agents, tools, methods, and variables
+- **Syntax Highlighting**: Language-specific highlighting for better readability
+- **Multi-line Input**: Support for defining functions and complex structures
+- **Command History**: Navigate through previous commands with arrow keys
+- **Special Commands**: Built-in REPL commands for state inspection and control
+
+#### REPL State Persistence
+
+```lua
+-- REPL maintains state between commands
+llmspell> researcher = Agent.new("researcher", {model = "gpt-4"})
+<Agent: researcher>
+
+llmspell> data = researcher:execute({query = "AI trends 2025"})
+<AgentOutput: 5 sources>
+
+-- State persists for continued interaction
+llmspell> analyst = Agent.new("analyst")
+<Agent: analyst>
+
+llmspell> analysis = analyst:execute({
+       |   data = data,
+       |   focus = "enterprise applications"
+       | })
+<AgentOutput: analysis complete>
+
+-- Save entire session for later
+llmspell> .save research_session.lua
+Session saved with 2 agents, 2 results
+
+-- Later, restore the session
+llmspell> .load research_session.lua
+Session restored: 2 agents, 2 results loaded
+```
+
+#### REPL Global Context
+
+The REPL provides a rich global context with all Rs-LLMSpell components pre-loaded:
+
+```javascript
+// JavaScript REPL example
+llmspell> Object.keys(global).filter(k => k.startsWith('Agent'))
+['Agent', 'AgentBuilder', 'AgentTemplate']
+
+llmspell> typeof Workflow
+'function'
+
+llmspell> Tool.list().length
+42
+
+// Access to utility functions
+llmspell> utils.tokenCount("This is a test string")
+5
+
+// Configuration access
+llmspell> config.get("providers.openai.api_key")
+'sk-...' // Safely masked
+
+// Event subscription in REPL
+llmspell> events.on("agent.completed", (e) => console.log(`Agent ${e.agent} finished`))
+<EventSubscription: agent.completed>
+```
+
+#### REPL-Driven Development Workflow
+
+The REPL supports a natural development workflow:
+
+1. **Explore**: Discover available agents and tools
+2. **Prototype**: Test agent behaviors interactively
+3. **Refine**: Iterate on prompts and parameters
+4. **Save**: Export working code as a spell
+
+```lua
+-- 1. Explore available components
+llmspell> .agents
+Available agents:
+  - researcher: Research and information gathering
+  - analyst: Data analysis and insights
+  - writer: Content creation and editing
+  ...
+
+-- 2. Prototype a workflow
+llmspell> function research_and_write(topic)
+       |   local research = Agent.get("researcher"):execute({query = topic})
+       |   local outline = Agent.get("analyst"):execute({
+       |     data = research,
+       |     task = "create article outline"
+       |   })
+       |   return Agent.get("writer"):execute({
+       |     outline = outline,
+       |     style = "technical blog post"
+       |   })
+       | end
+
+-- 3. Test and refine
+llmspell> result = research_and_write("quantum computing applications")
+<WorkflowResult: 2500 words>
+
+-- 4. Export as spell
+llmspell> .export research_and_write research_writer.lua
+Exported function as spell: research_writer.lua
+```
 
 ## Using Rs-LLMSpell as a Native Module
 
@@ -3373,6 +3549,21 @@ LLMSPELL_SPAN_ID=span-789          # Set span ID
 | Package Manager | 🔧 | ✅ | 🔮 | npm + future support |
 | External Libraries | 🔧 | ✅ | 🔮 | Limited sandboxing |
 | Community Modules | 🔧 | ✅ | 🔮 | Security-screened |
+| **REPL Features** | | | | |
+| Interactive Mode | ✅ | ✅ | 🔮 | Full REPL support |
+| Tab Completion | ✅ | ✅ | 🔮 | Context-aware |
+| Syntax Highlighting | ✅ | ✅ | 🔮 | Language-specific |
+| Multi-line Input | ✅ | ✅ | 🔮 | Smart detection |
+| Session Persistence | ✅ | ✅ | 🔮 | Save/load state |
+| Command History | ✅ | ✅ | 🔮 | Searchable |
+| Special Commands | ✅ | ✅ | 🔮 | .help, .save, etc |
+| Hot Reload | ✅ | ✅ | 🔮 | Module updates |
+| **CLI Integration** | | | | |
+| Pipe Support | ✅ | ✅ | 🔮 | Full Unix pipes |
+| Exit Codes | ✅ | ✅ | 🔮 | Standard codes |
+| Signal Handling | ✅ | ✅ | 🔮 | SIGINT, SIGTERM |
+| JSON I/O | ✅ | ✅ | 🔮 | Structured data |
+| Streaming | ✅ | ✅ | 🔮 | Large data sets |
 
 **Legend**: ✅ Full Support, 🔧 Partial/Emulated, ➖ Not Applicable, 🔮 Planned, ⚡ Optimized
 
@@ -9014,6 +9205,9 @@ pub struct LLMSpellConfig {
     
     // Prompt template configuration
     pub prompts: PromptsConfig,
+    
+    // REPL configuration
+    pub repl: ReplConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -9237,6 +9431,193 @@ impl Default for PromptValidationConfig {
                 "${.*bash.*}".to_string(),
                 "${.*sh.*}".to_string(),
             ],
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReplConfig {
+    // REPL interface configuration
+    pub interface: ReplInterfaceConfig,
+    
+    // Session management
+    pub session: ReplSessionConfig,
+    
+    // History settings
+    pub history: ReplHistoryConfig,
+    
+    // Tab completion configuration
+    pub completion: ReplCompletionConfig,
+    
+    // REPL-specific commands
+    pub commands: ReplCommandsConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReplInterfaceConfig {
+    // Default prompt string
+    pub prompt: String,
+    
+    // Multiline mode prompt
+    pub multiline_prompt: String,
+    
+    // Syntax highlighting theme
+    pub syntax_theme: String,
+    
+    // Enable colored output
+    pub colored_output: bool,
+    
+    // Show execution timing
+    pub show_timing: bool,
+    
+    // Show token usage
+    pub show_token_usage: bool,
+    
+    // Default language engine
+    pub default_engine: String,
+    
+    // Welcome message
+    pub welcome_message: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReplSessionConfig {
+    // Auto-save session on exit
+    pub auto_save: bool,
+    
+    // Session save directory
+    pub save_directory: String,
+    
+    // Maximum session file size
+    pub max_session_size_mb: usize,
+    
+    // Session compression
+    pub compress_sessions: bool,
+    
+    // Auto-restore last session
+    pub auto_restore: bool,
+    
+    // Session expiry days
+    pub session_expiry_days: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReplHistoryConfig {
+    // Maximum history entries
+    pub max_entries: usize,
+    
+    // History file path
+    pub file_path: String,
+    
+    // Save history on exit
+    pub save_on_exit: bool,
+    
+    // Deduplicate entries
+    pub deduplicate: bool,
+    
+    // Ignore patterns (regex)
+    pub ignore_patterns: Vec<String>,
+    
+    // History search mode
+    pub search_mode: String, // "prefix", "substring", "fuzzy"
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReplCompletionConfig {
+    // Enable tab completion
+    pub enabled: bool,
+    
+    // Completion trigger characters
+    pub trigger_chars: u32, // Number of chars before triggering
+    
+    // Show completion hints
+    pub show_hints: bool,
+    
+    // Case sensitive completion
+    pub case_sensitive: bool,
+    
+    // Maximum suggestions
+    pub max_suggestions: usize,
+    
+    // Include documentation
+    pub include_docs: bool,
+    
+    // Custom completion sources
+    pub custom_sources: Vec<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReplCommandsConfig {
+    // Command prefix (e.g., ".")
+    pub prefix: String,
+    
+    // Built-in commands enabled
+    pub builtins_enabled: bool,
+    
+    // Custom command paths
+    pub custom_commands: Vec<String>,
+    
+    // Command aliases
+    pub aliases: HashMap<String, String>,
+    
+    // Command timeout
+    pub timeout_ms: u64,
+}
+
+impl Default for ReplConfig {
+    fn default() -> Self {
+        Self {
+            interface: ReplInterfaceConfig {
+                prompt: "llmspell> ".to_string(),
+                multiline_prompt: "       | ".to_string(),
+                syntax_theme: "monokai".to_string(),
+                colored_output: true,
+                show_timing: false,
+                show_token_usage: false,
+                default_engine: "lua".to_string(),
+                welcome_message: "Rs-LLMSpell Interactive Mode\nType .help for commands, .exit to quit".to_string(),
+            },
+            session: ReplSessionConfig {
+                auto_save: true,
+                save_directory: "${HOME}/.llmspell/sessions".to_string(),
+                max_session_size_mb: 10,
+                compress_sessions: true,
+                auto_restore: false,
+                session_expiry_days: 30,
+            },
+            history: ReplHistoryConfig {
+                max_entries: 10000,
+                file_path: "${HOME}/.llmspell/history".to_string(),
+                save_on_exit: true,
+                deduplicate: true,
+                ignore_patterns: vec![
+                    "^\\s*$".to_string(),      // Empty lines
+                    "^\\.exit".to_string(),     // Exit commands
+                    "^\\.clear".to_string(),    // Clear commands
+                ],
+                search_mode: "prefix".to_string(),
+            },
+            completion: ReplCompletionConfig {
+                enabled: true,
+                trigger_chars: 2,
+                show_hints: true,
+                case_sensitive: false,
+                max_suggestions: 10,
+                include_docs: true,
+                custom_sources: vec![],
+            },
+            commands: ReplCommandsConfig {
+                prefix: ".".to_string(),
+                builtins_enabled: true,
+                custom_commands: vec![],
+                aliases: HashMap::from([
+                    ("q".to_string(), "exit".to_string()),
+                    ("h".to_string(), "help".to_string()),
+                    ("l".to_string(), "load".to_string()),
+                    ("s".to_string(), "save".to_string()),
+                ]),
+                timeout_ms: 30000,
+            },
         }
     }
 }
@@ -12097,7 +12478,124 @@ pub enum ModificationType {
 
 ## Scheduling and Automation
 
-Rs-LLMSpell is designed not just for interactive execution but also for creating long-running, automated services and scheduled tasks. This is achieved through a combination of a dedicated scheduler, trigger-based execution, and specialized listener tools.
+Rs-LLMSpell is designed not just for interactive execution but also for creating long-running, automated services and scheduled tasks. This is achieved through a combination of a dedicated scheduler, trigger-based execution, specialized listener tools, and the serve mode daemon architecture.
+
+### Serve Mode Architecture
+
+The `llmspell serve` command starts Rs-LLMSpell as a background daemon, enabling:
+
+- **Scheduled Task Execution**: Run workflows at specified times or intervals
+- **Event-Driven Automation**: React to external webhooks, file changes, or system events
+- **API Service Hosting**: Expose agents and workflows as REST/GraphQL endpoints
+- **Resource Management**: Persistent connection pooling and optimized resource usage
+- **Hot Reload**: Update configurations and spells without restarting the service
+
+```rust
+pub struct ServeMode {
+    // Core daemon components
+    scheduler: Scheduler,
+    event_listener: EventListener,
+    api_server: ApiServer,
+    spell_loader: SpellLoader,
+    
+    // Resource management
+    connection_pool: ConnectionPool,
+    agent_pool: AgentPool,
+    resource_monitor: ResourceMonitor,
+    
+    // Service configuration
+    config: ServeModeConfig,
+    health_checker: HealthChecker,
+    metrics_collector: MetricsCollector,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServeModeConfig {
+    // Network binding
+    pub bind_address: String,
+    pub port: u16,
+    
+    // Process management
+    pub daemonize: bool,
+    pub pid_file: Option<String>,
+    pub working_directory: String,
+    
+    // Resource limits
+    pub max_concurrent_workflows: usize,
+    pub max_agent_instances: usize,
+    pub memory_limit_mb: usize,
+    
+    // Hot reload settings
+    pub watch_directories: Vec<String>,
+    pub reload_on_change: bool,
+    pub reload_debounce_ms: u64,
+    
+    // Health and monitoring
+    pub health_endpoint: String,
+    pub metrics_endpoint: String,
+    pub enable_prometheus: bool,
+}
+
+impl ServeMode {
+    pub async fn start(config: ServeModeConfig) -> Result<()> {
+        // Initialize daemon components
+        let scheduler = Scheduler::new(&config)?;
+        let event_listener = EventListener::new(&config)?;
+        let api_server = ApiServer::new(&config)?;
+        
+        // Load all spells from configured directories
+        let spell_loader = SpellLoader::new(&config.watch_directories);
+        let spells = spell_loader.load_all().await?;
+        
+        // Register scheduled tasks and event listeners
+        for spell in spells {
+            if let Some(schedule) = spell.schedule {
+                scheduler.register_spell(spell, schedule).await?;
+            }
+            if let Some(triggers) = spell.triggers {
+                event_listener.register_triggers(spell, triggers).await?;
+            }
+            if let Some(api) = spell.api_endpoints {
+                api_server.register_endpoints(spell, api).await?;
+            }
+        }
+        
+        // Start all services
+        tokio::select! {
+            _ = scheduler.run() => {},
+            _ = event_listener.run() => {},
+            _ = api_server.run() => {},
+            _ = spell_loader.watch_for_changes() => {},
+            _ = signal::ctrl_c() => {
+                info!("Received shutdown signal");
+            }
+        }
+        
+        // Graceful shutdown
+        self.shutdown().await
+    }
+    
+    async fn shutdown(&self) -> Result<()> {
+        info!("Starting graceful shutdown");
+        
+        // Stop accepting new work
+        self.api_server.stop_accepting().await?;
+        self.event_listener.stop_accepting().await?;
+        self.scheduler.pause().await?;
+        
+        // Wait for active workflows to complete
+        let timeout = Duration::from_secs(self.config.shutdown_timeout_secs);
+        timeout(timeout, self.wait_for_active_workflows()).await??;
+        
+        // Clean up resources
+        self.connection_pool.close_all().await?;
+        self.agent_pool.shutdown().await?;
+        
+        info!("Shutdown complete");
+        Ok(())
+    }
+}
+```
 
 ### Scheduler Architecture
 
@@ -12160,6 +12658,254 @@ Scheduler.register({
 ```
 
 This spell would be loaded by the `rs-llmspell` runtime in daemon mode, and the scheduler would ensure the workflow is executed at the specified time.
+
+### Serve Mode Examples
+
+#### Basic Service Setup
+
+```bash
+# Start serve mode with default configuration
+llmspell serve
+
+# Start with custom configuration
+llmspell serve --config production.toml
+
+# Start as a daemon
+llmspell serve --daemon --pidfile /var/run/llmspell.pid
+
+# With specific spell directories
+llmspell serve --spell-dir ./automations --spell-dir ./schedules
+```
+
+#### Webhook-Driven Automation
+
+```lua
+-- webhook_handler.lua
+local webhook_tool = Tools.get("webhook_listener")
+
+-- Configure webhook endpoint
+webhook_tool:configure({
+    path = "/api/github/events",
+    port = 8080,
+    auth = {
+        type = "hmac",
+        secret = "${GITHUB_WEBHOOK_SECRET}"
+    }
+})
+
+-- Define handler for GitHub events
+webhook_tool:on_request(function(request)
+    if request.headers["X-GitHub-Event"] == "pull_request" then
+        local pr_data = json.decode(request.body)
+        
+        -- Trigger code review workflow
+        local review_workflow = Workflow.get("automated_pr_review")
+        review_workflow:execute({
+            repo = pr_data.repository.full_name,
+            pr_number = pr_data.pull_request.number,
+            author = pr_data.pull_request.user.login
+        })
+    end
+end)
+
+-- Register with serve mode
+Serve.register({
+    name = "github_webhook_handler",
+    type = "listener",
+    tool = webhook_tool,
+    restart_on_failure = true
+})
+```
+
+#### API Service Hosting
+
+```javascript
+// api_service.js
+const apiBuilder = require('llmspell.api');
+
+// Create REST API for agent interactions
+const api = apiBuilder.create({
+    basePath: '/api/v1',
+    port: 3000,
+    cors: {
+        origins: ['https://app.example.com'],
+        credentials: true
+    }
+});
+
+// Expose research agent as API endpoint
+api.post('/research', async (req, res) => {
+    const { topic, depth, sources } = req.body;
+    
+    const researcher = Agent.get('research_agent');
+    const result = await researcher.execute({
+        query: topic,
+        depth: depth || 'standard',
+        max_sources: sources || 10
+    });
+    
+    res.json({
+        summary: result.summary,
+        sources: result.sources,
+        confidence: result.confidence_score
+    });
+});
+
+// Health check endpoint
+api.get('/health', (req, res) => {
+    res.json({
+        status: 'healthy',
+        uptime: process.uptime(),
+        agents: Agent.list().length,
+        active_workflows: Workflow.active().length
+    });
+});
+
+// Register API with serve mode
+Serve.register({
+    name: 'research_api',
+    type: 'api',
+    api: api,
+    scaling: {
+        min_instances: 2,
+        max_instances: 10,
+        scale_on_cpu: 70
+    }
+});
+```
+
+#### File Watcher Automation
+
+```lua
+-- file_processor.lua
+local file_watcher = Tools.get("file_watcher")
+
+-- Watch for new CSV files
+file_watcher:configure({
+    directory = "/data/incoming",
+    pattern = "*.csv",
+    recursive = false,
+    events = {"create", "modify"}
+})
+
+-- Process new files automatically
+file_watcher:on_change(function(event)
+    if event.type == "create" then
+        local processor = Agent.new("data_processor", {
+            tools = {"csv_parser", "data_validator", "database_writer"}
+        })
+        
+        processor:execute({
+            action = "process_and_import",
+            file_path = event.path,
+            validation_rules = "strict",
+            target_table = "analytics_data"
+        })
+        
+        -- Move processed file
+        Tools.get("file_mover"):execute({
+            source = event.path,
+            destination = "/data/processed/" .. event.filename
+        })
+    end
+end)
+
+-- Register with serve mode
+Serve.register({
+    name = "csv_auto_processor",
+    type = "watcher",
+    tool = file_watcher
+})
+```
+
+#### Scheduled Report with Email
+
+```lua
+-- scheduled_report.lua
+local report_workflow = Workflow.sequential({
+    -- Gather data from multiple sources
+    {
+        name = "data_collection",
+        type = "parallel",
+        agents = {
+            { agent = "sales_analyst", query = "weekly_sales_metrics" },
+            { agent = "marketing_analyst", query = "campaign_performance" },
+            { agent = "support_analyst", query = "customer_satisfaction" }
+        }
+    },
+    
+    -- Generate comprehensive report
+    {
+        name = "report_generation",
+        agent = "report_writer",
+        input = "{{data_collection.results}}",
+        template = "executive_summary"
+    },
+    
+    -- Send via email
+    {
+        name = "email_delivery",
+        tool = "email_sender",
+        config = {
+            to = ["executives@company.com"],
+            subject = "Weekly Business Intelligence Report - {{date}}",
+            body = "{{report_generation.output}}",
+            attachments = ["{{report_generation.pdf_path}}"]
+        }
+    }
+})
+
+-- Schedule for every Monday at 9 AM
+Scheduler.register({
+    name = "weekly_executive_report",
+    trigger = { type = "cron", schedule = "0 9 * * 1" },
+    workflow = report_workflow,
+    error_handling = {
+        retry_count = 3,
+        retry_delay = 300, -- 5 minutes
+        on_failure = "notify_admin"
+    }
+})
+```
+
+### Production Deployment
+
+When running in production, serve mode provides:
+
+```yaml
+# production.toml
+[serve]
+bind_address = "0.0.0.0"
+port = 8080
+daemonize = true
+pid_file = "/var/run/llmspell.pid"
+log_file = "/var/log/llmspell/serve.log"
+
+[serve.resources]
+max_concurrent_workflows = 100
+max_agent_instances = 50
+memory_limit_mb = 4096
+cpu_limit_cores = 8
+
+[serve.monitoring]
+health_endpoint = "/health"
+metrics_endpoint = "/metrics"
+enable_prometheus = true
+metrics_port = 9090
+
+[serve.security]
+tls_cert = "/etc/llmspell/cert.pem"
+tls_key = "/etc/llmspell/key.pem"
+auth_required = true
+auth_provider = "oauth2"
+
+[serve.scaling]
+auto_scale = true
+min_workers = 4
+max_workers = 16
+scale_up_threshold = 0.8
+scale_down_threshold = 0.3
+```
 
 ## Plugin System and Extensions
 
@@ -14267,7 +15013,7 @@ criterion_main!(benches);
 
 #### Core Development Philosophy
 
-Rs-llmspell follows TDD (Test-Driven Development) with a bridge-first approach, emphasizing code quality, security, and maintainable architecture patterns.
+Rs-llmspell follows TDD (Test-Driven Development) with a bridge-first approach, emphasizing code quality, security, and maintainable architecture patterns. The REPL serves as a primary development tool for rapid prototyping and testing.
 
 ```bash
 # Standard development workflow
@@ -14276,6 +15022,199 @@ cargo clippy      # Lint and analyze
 cargo test        # Run all tests
 cargo bench       # Run benchmarks
 cargo audit       # Security audit
+```
+
+#### REPL-Driven Development
+
+The REPL provides an efficient development workflow for creating and testing spells:
+
+##### 1. **Exploratory Development**
+
+```bash
+# Start REPL for exploration
+$ llmspell repl
+
+# Discover available components
+llmspell> Agent.list()
+["chat_agent", "research_agent", "analysis_agent", ...]
+
+llmspell> Tools.describe("web_search")
+{
+  name = "web_search",
+  description = "Search the web using multiple search engines",
+  parameters = {
+    query = { type = "string", required = true },
+    max_results = { type = "number", default = 10 },
+    engines = { type = "array", default = ["google", "bing"] }
+  }
+}
+
+# Test components interactively
+llmspell> searcher = Tools.get("web_search")
+llmspell> results = searcher:execute({query = "rust async programming"})
+llmspell> print(#results.items)
+10
+```
+
+##### 2. **Incremental Spell Development**
+
+```lua
+-- Start with simple functionality
+llmspell> function analyze_text(text)
+       |   local agent = Agent.new("analyzer")
+       |   return agent:execute({text = text, analysis_type = "sentiment"})
+       | end
+
+-- Test immediately
+llmspell> result = analyze_text("This product is amazing!")
+llmspell> print(result.sentiment)
+positive (0.92)
+
+-- Enhance incrementally
+llmspell> function analyze_text_v2(text, options)
+       |   options = options or {}
+       |   local agent = Agent.new("analyzer", {
+       |     model = options.model or "gpt-3.5-turbo",
+       |     temperature = options.temperature or 0.3
+       |   })
+       |   
+       |   local analysis = agent:execute({
+       |     text = text,
+       |     analysis_type = options.type or "comprehensive",
+       |     include_entities = options.entities ~= false
+       |   })
+       |   
+       |   if options.summary then
+       |     local summarizer = Agent.new("summarizer")
+       |     analysis.summary = summarizer:execute({
+       |       text = analysis.full_analysis,
+       |       max_words = 100
+       |     })
+       |   end
+       |   
+       |   return analysis
+       | end
+
+-- Test enhanced version
+llmspell> enhanced = analyze_text_v2("Complex product review text...", {
+       |   type = "comprehensive",
+       |   summary = true,
+       |   model = "gpt-4"
+       | })
+```
+
+##### 3. **Workflow Prototyping**
+
+```javascript
+// JavaScript REPL for workflow development
+llmspell> // Define workflow components
+       | const researchWorkflow = {
+       |   gatherData: async (topic) => {
+       |     const researcher = Agent.get('researcher');
+       |     return await researcher.execute({
+       |       query: topic,
+       |       sources: ['academic', 'news', 'blogs']
+       |     });
+       |   },
+       |   
+       |   analyzeData: async (data) => {
+       |     const analyst = Agent.get('analyst');
+       |     return await analyst.execute({
+       |       data: data,
+       |       metrics: ['trends', 'sentiment', 'key_points']
+       |     });
+       |   },
+       |   
+       |   generateReport: async (analysis) => {
+       |     const writer = Agent.get('writer');
+       |     return await writer.execute({
+       |       input: analysis,
+       |       format: 'executive_summary',
+       |       length: 'concise'
+       |     });
+       |   }
+       | };
+
+// Test workflow step by step
+llmspell> const data = await researchWorkflow.gatherData("AI safety");
+llmspell> console.log(`Found ${data.sources.length} sources`);
+Found 23 sources
+
+llmspell> const analysis = await researchWorkflow.analyzeData(data);
+llmspell> console.log(`Key trends: ${analysis.trends.slice(0, 3).join(', ')}`);
+Key trends: increased regulation, technical alignment, public awareness
+
+// Combine into full workflow
+llmspell> async function fullResearch(topic) {
+       |   console.time('Research workflow');
+       |   const data = await researchWorkflow.gatherData(topic);
+       |   const analysis = await researchWorkflow.analyzeData(data);
+       |   const report = await researchWorkflow.generateReport(analysis);
+       |   console.timeEnd('Research workflow');
+       |   return report;
+       | }
+```
+
+##### 4. **Testing and Debugging**
+
+```lua
+-- Enable debug mode for detailed output
+llmspell> .debug on
+Debug mode enabled
+
+-- Test with verbose output
+llmspell> agent = Agent.new("test_agent", {debug = true})
+[DEBUG] Creating agent: test_agent
+[DEBUG] Provider: openai
+[DEBUG] Model: gpt-3.5-turbo
+[DEBUG] Tools: []
+
+llmspell> result = agent:execute({query = "test"})
+[DEBUG] Executing agent: test_agent
+[DEBUG] Input: {query = "test"}
+[DEBUG] Token count: 15
+[DEBUG] Execution time: 1.23s
+[DEBUG] Output tokens: 127
+
+-- Profile performance
+llmspell> .time on
+Timing enabled
+
+llmspell> heavy_workflow()
+Execution time: 5.67s
+
+-- Memory profiling
+llmspell> .memory
+Current memory usage:
+  Agents: 3 instances (2.1 MB)
+  Tools: 5 loaded (1.3 MB)
+  Cache: 127 entries (5.6 MB)
+  Total: 9.0 MB
+```
+
+##### 5. **Saving and Sharing Work**
+
+```lua
+-- Save successful implementations
+llmspell> .save research_spell.lua
+Saved current session to research_spell.lua
+
+-- Export specific functions
+llmspell> .export analyze_text analyze_module.lua
+Exported function 'analyze_text' to analyze_module.lua
+
+-- Create shareable spell
+llmspell> Spell.create({
+       |   name = "sentiment_analyzer",
+       |   description = "Analyzes sentiment of text with entity extraction",
+       |   version = "1.0.0",
+       |   main = analyze_text_v2,
+       |   dependencies = {
+       |     agents = {"analyzer", "summarizer"},
+       |     tools = {"entity_extractor"}
+       |   }
+       | }):save("sentiment_analyzer_spell.lua")
+Spell saved to sentiment_analyzer_spell.lua
 ```
 
 #### Project Structure and Organization
@@ -14443,6 +15382,215 @@ The primary user-facing tool is the `llmspell-cli`, which provides a powerful co
 - **Automatic Script Engine Detection**: The CLI automatically selects the correct script engine (Lua, JavaScript, etc.) based on the script's file extension (e.g., `.lua`, `.js`, `.mjs`).
 - **Shebang Support**: For more explicit control, scripts can use a shebang line (e.g., `#!/usr/bin/env llmspell-lua`) to specify the exact engine to use, bypassing file extension detection.
 - **Parameter Injection**: Scripts can receive parameters from the command line using `--param <key>=<value>`, which are then available within the script's `params` object.
+- **Unix Pipeline Support**: The CLI fully supports standard Unix pipeline operations with proper stdin/stdout/stderr handling for integration with other tools.
+- **Multiple Execution Modes**: Supports script execution, REPL mode, and daemon/service mode for different use cases.
+
+#### Primary Command Modes
+
+##### Script Execution Mode
+
+The default mode executes a spell script with full Unix pipeline support:
+
+```bash
+# Basic script execution
+llmspell run <script.lua> [options]
+llmspell <script.js>              # run is implicit if file provided
+
+# With parameters
+llmspell research.lua --param query="AI safety" --param max_results=20
+
+# Unix pipeline integration
+echo "Analyze this text" | llmspell analyze.lua > results.json
+cat data.json | llmspell transform.js | jq '.summary'
+
+# Multiple input/output handling
+llmspell process.lua < input.txt > output.txt 2> errors.log
+
+# Chaining with other tools
+curl -s https://api.example.com/data | \
+  llmspell extract.js | \
+  llmspell summarize.lua | \
+  mail -s "Daily Summary" user@example.com
+
+# Exit codes and error handling
+llmspell validate.lua && echo "Validation passed" || echo "Validation failed"
+
+# Background execution
+llmspell long_task.lua &
+pid=$!
+wait $pid
+```
+
+##### REPL (Interactive) Mode
+
+Interactive Read-Eval-Print-Loop for rapid experimentation and development:
+
+```bash
+# Start REPL with specific engine
+llmspell repl [--engine <lua|javascript>]
+llmspell interactive              # alias for repl
+
+# REPL session example
+$ llmspell repl --engine lua
+Rs-LLMSpell v1.0.0 - Lua 5.4 REPL
+Type .help for commands, .exit to quit
+
+llmspell> agent = Agent.new("researcher", {model = "gpt-4"})
+<Agent: researcher>
+
+llmspell> result = agent:execute({query = "Latest AI breakthroughs"})
+<AgentOutput: 3 sources found>
+
+llmspell> print(result.summary)
+Recent AI breakthroughs include...
+
+llmspell> .save session.lua     # Save session state
+Session saved to session.lua
+
+llmspell> .help
+Available commands:
+  .help              Show this help message
+  .exit              Exit the REPL
+  .clear             Clear the screen
+  .reset             Reset the REPL state
+  .save <file>       Save session to file
+  .load <file>       Load and execute file
+  .state             Show current state
+  .agents            List loaded agents
+  .tools             List available tools
+  .workflows         List active workflows
+  .history           Show command history
+  .multiline         Toggle multiline mode
+  .debug on|off      Toggle debug output
+  .time on|off       Toggle execution timing
+
+llmspell> .multiline
+Multiline mode enabled. Use Ctrl+D to execute.
+
+llmspell> function analyze_topic(topic)
+       |   local agents = {
+       |     researcher = Agent.new("researcher"),
+       |     analyst = Agent.new("analyst")
+       |   }
+       |   -- Multi-line function definition
+       |   return Workflow.sequential({
+       |     {agent = agents.researcher, task = "gather_data"},
+       |     {agent = agents.analyst, task = "analyze_findings"}
+       |   }):execute({topic = topic})
+       | end
+       | ^D
+Function defined.
+
+llmspell> result = analyze_topic("quantum computing")
+<WorkflowResult: completed>
+```
+
+##### Serve (Daemon) Mode
+
+Long-running service mode for scheduled tasks and event-driven automations:
+
+```bash
+# Start daemon with default config
+llmspell serve [options]
+
+# With specific configuration
+llmspell serve --config production.toml --log-level info
+
+# Daemon control commands
+llmspell serve --daemon              # Fork to background
+llmspell serve --pidfile rs.pid      # Write PID file
+llmspell serve --bind 127.0.0.1:8080 # Bind to specific address
+
+# Signal handling
+llmspell serve --reload-on-sighup    # Reload config on SIGHUP
+llmspell serve --graceful-shutdown   # Clean shutdown on SIGTERM
+
+# Health checks and monitoring
+llmspell serve --health-port 8081    # Separate health check endpoint
+llmspell serve --metrics-port 9090   # Prometheus metrics endpoint
+
+# Example systemd service
+# /etc/systemd/system/llmspell.service
+[Unit]
+Description=Rs-LLMSpell Automation Service
+After=network.target
+
+[Service]
+Type=notify
+ExecStart=/usr/local/bin/llmspell serve --config /etc/llmspell/config.toml
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+User=llmspell
+Group=llmspell
+
+[Install]
+WantedBy=multi-user.target
+```
+
+#### REPL Architecture
+
+The REPL mode implements a sophisticated interactive environment:
+
+```rust
+// REPL State Management
+pub struct ReplState {
+    // Persistent state across commands
+    agents: HashMap<String, Box<dyn Agent>>,
+    tools: ToolRegistry,
+    workflows: HashMap<String, Box<dyn Workflow>>,
+    variables: HashMap<String, Value>,
+    
+    // Session management
+    history: CommandHistory,
+    current_line: String,
+    multiline_buffer: Vec<String>,
+    
+    // Configuration
+    prompt: String,
+    multiline_prompt: String,
+    debug_mode: bool,
+    timing_enabled: bool,
+}
+
+// REPL Features
+impl Repl {
+    pub fn new(engine: ScriptEngine) -> Self {
+        Self {
+            state: ReplState::new(),
+            engine,
+            completer: TabCompleter::new(),
+            highlighter: SyntaxHighlighter::new(),
+        }
+    }
+    
+    // Tab completion with context awareness
+    fn complete(&self, line: &str, pos: usize) -> Vec<Completion> {
+        self.completer.complete(line, pos, &self.state)
+    }
+    
+    // Syntax highlighting for better readability
+    fn highlight(&self, line: &str) -> String {
+        self.highlighter.highlight(line, self.engine.syntax())
+    }
+    
+    // State persistence between sessions
+    fn save_session(&self, path: &Path) -> Result<()> {
+        let session = Session {
+            state: self.state.serialize()?,
+            history: self.state.history.entries(),
+            timestamp: Utc::now(),
+        };
+        session.save(path)
+    }
+    
+    fn load_session(&mut self, path: &Path) -> Result<()> {
+        let session = Session::load(path)?;
+        self.state = ReplState::deserialize(session.state)?;
+        self.state.history.restore(session.history);
+        Ok(())
+    }
+}
+```
 
 #### Agent and Tool Generation Commands
 

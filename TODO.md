@@ -187,25 +187,42 @@ Comprehensive refinement of rs-llmspell architecture based on go-llms and Google
       - [x] ~~Document how to enable different log levels for framework vs scripts~~ **Done**
       - [x] ~~Add configuration examples showing logging setup in llmspell.toml~~ **Done**
       - [x] ~~Document environment variable options for runtime log level changes~~ **Done** 
-  - [ ] **Task/question 12.3.12** In the **embedded** mode, the vision is to allow to modes for the command line - runner mode that runs scripts, and repl mode to enter an interactive mode. Does the architecture allow for that? what's missing?
-    - [ ] Answer: The architecture partially supports these modes:
-      1. **Runner Mode**: YES - Documented with `llmspell run <script>` command
-      2. **REPL Mode**: NOT DOCUMENTED - No interactive REPL mode found
-      3. **Daemon Mode**: YES - Mentioned for scheduling/automation (loaded in "daemon mode")
-      4. **Serve Mode**: MENTIONED - Task 12.3.5 references `llmspell serve` but not documented
-      5. **Embedded Scripting**: YES - Clear distinction between embedded mode (running scripts) vs library mode
-    - [ ] Todo:
-      - [ ] Document interactive REPL mode architecture (`llmspell repl` or `llmspell interactive`)
-      - [ ] Define REPL features: multi-line input, history, tab completion, state persistence
-      - [ ] Specify how REPL maintains agent/tool state between commands
-      - [ ] Document `llmspell serve` command for daemon/service mode
-      - [ ] Add CLI usage patterns showing: run, repl, serve modes
-      - [ ] Define REPL-specific globals or commands (e.g., .help, .exit, .save, .load) 
-  - [ ] **Task/question 12.3.13** Based on the architecture, can you tell me component by component, what happens when I run a lua script using the command line runner - which component it hits first etc. assume that the script uses all globals Agents, tools, worklfows etc. What's missing in the architectural document for you not to be able to trace that? what components are missing or integration layers between components?
+  - [x] **Task/question 12.3.12** In the **embedded** mode, the vision is to allow to modes for the command line - runner mode that runs scripts, and repl mode to enter an interactive mode. Does the architecture allow for that? what's missing?
+    - [x] Answer: The architecture now FULLY supports all command-line modes:
+      1. **Runner Mode**: YES - `llmspell run <script>` with full Unix pipeline support
+      2. **REPL Mode**: YES - `llmspell repl` with state persistence, tab completion, multi-line input
+      3. **Serve Mode**: YES - `llmspell serve` for daemon/service mode with API endpoints
+      4. **Eval Mode**: YES - `llmspell eval <expr>` for one-shot evaluation
+      5. **Debug Mode**: YES - `llmspell debug <script>` for interactive debugging
+    - [x] Todo: ~~Architecture has been comprehensively enhanced with CLI/REPL support:~~
+      - [x] ~~Document interactive REPL mode architecture (`llmspell repl` or `llmspell interactive`)~~ **Done**
+      - [x] ~~Define REPL features: multi-line input, history, tab completion, state persistence~~ **Done**
+      - [x] ~~Specify how REPL maintains agent/tool state between commands~~ **Done**
+      - [x] ~~Document `llmspell serve` command for daemon/service mode~~ **Done**
+      - [x] ~~Add CLI usage patterns showing: run, repl, serve modes~~ **Done**
+      - [x] ~~Define REPL-specific globals or commands (e.g., .help, .exit, .save, .load)~~ **Done** 
+  - [ ] **Task/question 12.3.13** Does the architecture allow for and say how the `llmspell` command can be run in a unix shell as a pipe component with stdin and stdout and stderr redirection etc just like a regular unix command , with or without args?
     - [ ] Answer:
     - [ ] Todo:
       - [ ] 
       - [ ] 
+  - [ ] **Task/question 12.3.14** Does the architecture have enough thought process given to allow the entire project to be cross-platform, with different os specific components modularly laid out in a nice architecture pattern? the os's i'm concerned with in priority order would be linux, macosx and windows.
+    - [ ] Answer:
+    - [ ] Todo:
+      - [ ] 
+      - [ ] 
+  - [ ] **Task/question 12.3.15** Based on the architecture, can you tell me component by component, what happens when I run a lua script using the command line runner - which component it hits first etc. assume that the script uses all globals Agents, tools, worklfows etc. What's missing in the architectural document for you not to be able to trace that? what components are missing or integration layers between components?
+    - [ ] Answer:
+    - [ ] Todo:
+      - [ ] 
+      - [ ] 
+  - [ ] **Task/question 12.3.16** Based on the architecture, can you tell me component by component, what happens when I load llmspell as a lua module from an external lua runtime  - which component it hits first etc. assume that the script uses all globals Agents, tools, worklfows etc. What's missing in the architectural document for you not to be able to trace that? what components are missing or integration layers between components? what about an alternate scenario where I only want to run Tools ?
+    - [ ] Answer:
+    - [ ] Todo:
+      - [ ] 
+      - [ ] 
+- [ ] **Task 12.4**: Architecture document `docs/rs-llmspell-complete-architecture.md` Consistency Review
+  - [ ] **Task 12.4.1**: 
 
 
 ### Phase 13: Implementation Roadmap 
@@ -252,6 +269,16 @@ Comprehensive refinement of rs-llmspell architecture based on go-llms and Google
     - Per-script log level overrides are enhancement features for flexibility
     - Audit logging and compliance features are enterprise enhancement phase
     - Correlation ID tracking should align with distributed tracing implementation
+  - [ ] **CLI and REPL Implementation Notes**:
+    - Basic `llmspell run <script>` command must be MVP priority
+    - Unix pipeline support (stdin/stdout/stderr) should be MVP for shell integration
+    - Interactive REPL mode is enhancement phase but high priority
+    - REPL state persistence and session management are post-REPL features
+    - Tab completion and syntax highlighting are developer experience enhancements
+    - Serve mode (`llmspell serve`) aligns with scheduler implementation phase
+    - Debug mode (`llmspell debug`) requires debugger integration, post-MVP
+    - REPL-specific commands (.help, .save, .load) are part of REPL implementation
+    - Multi-engine support in REPL should maintain consistency across Lua/JS
 
 ### Phase 14: Final Update (📝 Update)
 - [ ] **Task 14.1**: Complete architecture.md update
