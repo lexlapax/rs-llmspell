@@ -249,13 +249,31 @@ Comprehensive refinement of rs-llmspell architecture based on go-llms and Google
       - Complete execution flow sequence diagram
       - Execution flow testing methodology (Testing Strategy)
     - [x] Todo: **ALL COMPLETED** - Architecture fully documents execution flow from CLI to cleanup 
-  - [ ] **Task/question 12.3.16** Based on the architecture, can you tell me component by component, what happens when I load llmspell as a lua module from an external lua runtime  - which component it hits first etc. assume that the script uses all globals Agents, tools, worklfows etc. What's missing in the architectural document for you not to be able to trace that? what components are missing or integration layers between components? what about an alternate scenario where I only want to run Tools ?
-    - [ ] Answer:
-    - [ ] Todo:
-      - [ ] 
-      - [ ] 
+  - [x] **Task/question 12.3.16** Based on the architecture, can you tell me component by component, what happens when I load llmspell as a lua module from an external lua runtime  - which component it hits first etc. assume that the script uses all globals Agents, tools, worklfows etc. What's missing in the architectural document for you not to be able to trace that? what components are missing or integration layers between components? what about an alternate scenario where I only want to run Tools ?
+    - [x] Answer: **COMPLETED** - Full library mode flow documented through component reuse architecture:
+      1. **External Entry**: `require("llmspell")` → C API (llmspell_init_library) → ScriptRuntime(Library mode)
+      2. **Dual-Mode ScriptRuntime**: RuntimeMode enum extends existing ScriptRuntime for library mode
+      3. **Selective Initialization**: ComponentLifecycleManager with SelectiveInitStrategy (Full/ToolsOnly/AgentsOnly/Custom)
+      4. **External Runtime Integration**: ExternalRuntimeBridge trait extends ScriptEngineBridge
+      5. **C API Layer**: Complete specification for require() support (llmspell_init_library, llmspell_inject_globals, etc.)
+      6. **Tools-Only Mode**: SelectiveInitStrategy::ToolsOnly for partial component loading
+      **Architecture Extended With:**
+      - RuntimeMode in ScriptRuntime (dual embedded/library capability)
+      - SelectiveInitStrategy in ComponentLifecycleManager (tools-only, agents-only patterns)
+      - C API layer with complete FFI specification (Bridge-First Design section)
+      - ExternalRuntimeBridge trait for external Lua/Node.js integration
+      - Library mode build commands (Build System section)
+      - Library mode testing methodology (Testing Strategy section)
+    - [x] Todo: **ALL COMPLETED** - Architecture fully documents library mode integration
+      - [x] Document C API/FFI interface specification for native module creation
+      - [x] Add LibraryModeRuntime component architecture (vs ScriptRuntime)
+      - [x] Detail selective initialization patterns (tools-only, agents-only, etc.)
+      - [x] Document external runtime integration patterns (memory, threading, errors)
+      - [x] Add library mode specific configuration and resource management
+      - [x] Document component lifecycle for library mode vs embedded mode
+
 - [ ] **Task 12.4**: Architecture document `docs/rs-llmspell-complete-architecture.md` Readiness Review
-  - [ ] **Task/question 12.4.1**: Review the document for architecture, component, dependency consistency. Does the document 
+  - [ ] **Task/question 12.4.1**: Review the document for architecture, component, dependency consistency. you may need to read and re-read the document multiple times. Does the document 
     - ensure no feature overlaps
     - ensure no implementation overlaps, ensures reuse of common code etc..
     - ensure no feature or api or naming conflicts
@@ -273,14 +291,17 @@ Comprehensive refinement of rs-llmspell architecture based on go-llms and Google
   - 3. cli support to call agents, workflows and tools 
   - 4. add repl support
   - 5. add javascript engine support
-  - 6. add daemon support
-  - 7. add module support "Library Mode"
-  - 8. add windows support
+  - 6. add mcp tool calling support
+  - 7. add daemon support
+  - 8. add mcp server support for a given set of tools
+  - 9. add A2A support to call other agents from our agents and workflows
+  - 10. add A2A support to expose our agents or workflows to A2A clients
+  - 11. add module support "Library Mode"
+  - 12. add windows support
     - [ ] Answer:
     - [ ] Todo:
       - [ ] 
       - [ ] 
-
 
 ### Phase 13: Implementation Roadmap 
 - [ ] **Task 13.1**: Define a detailed, phased implementation roadmap in the main architecture document.
@@ -356,6 +377,17 @@ Comprehensive refinement of rs-llmspell architecture based on go-llms and Google
     - Component registry pattern should be used consistently across all component types
     - Error propagation from scripts through bridge to CLI must be properly handled
     - Resource cleanup must use RAII pattern with proper Drop implementations
+  - [ ] **Library Mode Implementation Notes**:
+    - RuntimeMode enum in ScriptRuntime enables dual embedded/library mode with code reuse
+    - SelectiveInitStrategy with ComponentLifecycleManager allows tools-only, agents-only partial initialization
+    - C API layer (llmspell_init_library, llmspell_inject_globals) is MVP for require() support
+    - ExternalRuntimeBridge trait extends ScriptEngineBridge for external Lua/Node.js integration
+    - ExternalLuaBridge implementation must handle external lua_State injection properly
+    - Library mode testing requires external runtime mocking alongside existing test infrastructure
+    - Build system must support cargo build --lib --features c-api for shared library compilation
+    - LuaRock and NPM packaging can be post-MVP but C API must be designed from start
+    - Memory management and threading model must be carefully designed for external runtime safety
+    - Configuration loading in library mode should support external context rather than file-based
 
 ### Phase 14: Final Update (📝 Update)
 - [ ] **Task 14.1**: Complete architecture.md update

@@ -1919,6 +1919,7 @@ The **ScriptRuntime** serves as the central orchestrator for all script executio
 
 ```rust
 pub struct ScriptRuntime {
+    mode: RuntimeMode,  // NEW: Dual-mode capability for embedded vs library
     config_manager: Arc<ConfigurationManager>,
     component_registry: ComponentRegistry,
     script_engine_factory: ScriptEngineFactory,
@@ -1928,16 +1929,46 @@ pub struct ScriptRuntime {
     agent_runtime: Arc<AgentRuntime>,
 }
 
+#[derive(Debug, Clone)]
+pub enum RuntimeMode {
+    Embedded {
+        cli_context: CliContext,
+        security_profile: SecurityProfile,
+    },
+    Library {
+        external_context: ExternalRuntimeContext,
+        selective_init: SelectiveInitStrategy,
+        c_api_layer: CApiLayer,
+    }
+}
+
 impl ScriptRuntime {
-    pub async fn new(config_path: Option<&Path>) -> Result<Self> {
-        // Load configuration
+    // Embedded mode constructor (CLI/standalone execution)
+    pub async fn new_embedded(config_path: Option<&Path>) -> Result<Self> {
         let config_manager = Arc::new(ConfigurationManager::new(config_path).await?);
-        
-        // Create component registry
         let component_registry = ComponentRegistry::new();
+        let lifecycle_manager = ComponentLifecycleManager::with_strategy(SelectiveInitStrategy::Full);
         
-        // Initialize lifecycle manager with dependency resolution
-        let lifecycle_manager = ComponentLifecycleManager::new(&config_manager.config);
+        // Full initialization for embedded mode
+        // ... rest of embedded initialization
+    }
+    
+    // Library mode constructor (external runtime integration) 
+    pub async fn new_library(
+        external_context: ExternalRuntimeContext,
+        strategy: SelectiveInitStrategy
+    ) -> Result<Self> {
+        let config_manager = Arc::new(ConfigurationManager::from_external(&external_context).await?);
+        let component_registry = ComponentRegistry::new();
+        let lifecycle_manager = ComponentLifecycleManager::with_strategy(strategy);
+        
+        // Selective initialization based on strategy
+        // ... rest of library initialization
+    }
+    
+    pub async fn new(config_path: Option<&Path>) -> Result<Self> {
+        Self::new_embedded(config_path).await
+    }
         
         // Create provider bridge
         let provider_bridge = Arc::new(LLMProviderBridge::new(&config_manager.config.providers).await?);
@@ -1984,6 +2015,15 @@ pub struct ComponentLifecycleManager {
     shutdown_order: Vec<ComponentId>, // Reverse of init
     component_states: HashMap<ComponentId, ComponentState>,
     dependency_graph: DependencyGraph,
+    selective_strategy: SelectiveInitStrategy, // NEW: Support for selective initialization
+}
+
+#[derive(Debug, Clone)]
+pub enum SelectiveInitStrategy {
+    Full,           // All components (embedded mode default)
+    ToolsOnly,      // Infrastructure + Core + Tools only
+    AgentsOnly,     // Infrastructure + Core + Agents + Tools  
+    Custom(Vec<ComponentType>),  // User-defined component selection
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -1996,12 +2036,22 @@ pub enum InitializationPhase {
 }
 
 impl ComponentLifecycleManager {
+    pub fn with_strategy(strategy: SelectiveInitStrategy) -> Self {
+        Self {
+            initialization_order: Vec::new(),
+            shutdown_order: Vec::new(),
+            component_states: HashMap::new(),
+            dependency_graph: DependencyGraph::new(),
+            selective_strategy: strategy,
+        }
+    }
+    
     pub async fn initialize_phase(
         &mut self,
         phase: InitializationPhase,
         registry: &mut ComponentRegistry,
     ) -> Result<()> {
-        let components = self.get_components_for_phase(phase);
+        let components = self.get_components_for_phase_with_strategy(phase, &self.selective_strategy);
         
         for component_id in components {
             // Check dependencies are initialized
@@ -2022,7 +2072,57 @@ impl ComponentLifecycleManager {
         Ok(())
     }
     
-    fn get_components_for_phase(&self, phase: InitializationPhase) -> Vec<ComponentId> {
+    fn get_components_for_phase_with_strategy(
+        &self, 
+        phase: InitializationPhase, 
+        strategy: &SelectiveInitStrategy
+    ) -> Vec<ComponentId> {
+        let all_components = self.get_all_components_for_phase(phase);
+        
+        match strategy {
+            SelectiveInitStrategy::Full => all_components,
+            SelectiveInitStrategy::ToolsOnly => {
+                // Only include Infrastructure, Core (partial), and Tools
+                match phase {
+                    InitializationPhase::Infrastructure => all_components,
+                    InitializationPhase::Providers => vec![], // Skip providers for tools-only
+                    InitializationPhase::Core => vec![
+                        ComponentId::new("tool_registry"),
+                        ComponentId::new("hook_registry"),
+                        ComponentId::new("event_bus"),
+                    ],
+                    InitializationPhase::ScriptEngine => all_components,
+                    InitializationPhase::Globals => vec![
+                        ComponentId::new("tools_global_api"),
+                    ],
+                }
+            },
+            SelectiveInitStrategy::AgentsOnly => {
+                // Include Infrastructure, Providers, Core, and Agents (but not Workflows)
+                match phase {
+                    InitializationPhase::Core => vec![
+                        ComponentId::new("agent_runtime"),
+                        ComponentId::new("tool_registry"),
+                        ComponentId::new("hook_registry"),
+                        ComponentId::new("event_bus"),
+                    ],
+                    InitializationPhase::Globals => vec![
+                        ComponentId::new("agent_global_api"),
+                        ComponentId::new("tools_global_api"),
+                    ],
+                    _ => all_components,
+                }
+            },
+            SelectiveInitStrategy::Custom(component_types) => {
+                // Filter components based on custom selection
+                all_components.into_iter()
+                    .filter(|id| self.component_matches_types(id, component_types))
+                    .collect()
+            }
+        }
+    }
+    
+    fn get_all_components_for_phase(&self, phase: InitializationPhase) -> Vec<ComponentId> {
         match phase {
             InitializationPhase::Infrastructure => vec![
                 ComponentId::new("storage_backend"),
@@ -3028,7 +3128,7 @@ Rs-LLMSpell follows a **bridge-first philosophy** where we leverage existing, ba
 The bridge layer provides a unified interface between script engines and the Rust application layer:
 
 ```rust
-// Script Engine Bridge trait implemented by all engines
+// Script Engine Bridge trait implemented by all engines (both embedded and external)
 #[async_trait]
 pub trait ScriptEngineBridge: Send + Sync {
     // Lifecycle management
@@ -3050,6 +3150,16 @@ pub trait ScriptEngineBridge: Send + Sync {
     fn translate_error(&self, error: ScriptError) -> LLMSpellError;
 }
 
+// External Runtime Bridge for library mode integration
+#[async_trait]
+pub trait ExternalRuntimeBridge: ScriptEngineBridge {
+    // External runtime specific methods
+    async fn attach_to_external_state(&mut self, external_state: ExternalState) -> Result<()>;
+    async fn inject_globals_external(&mut self, globals: &GlobalAPISet, external_state: &mut ExternalState) -> Result<()>;
+    fn get_external_runtime_info(&self) -> ExternalRuntimeInfo;
+    async fn handle_external_errors(&self, error: ExternalError) -> Result<LLMSpellError>;
+}
+
 // Global APIs available to all script engines
 pub struct GlobalAPISet {
     pub agent_factory: Arc<AgentFactory>,
@@ -3061,6 +3171,109 @@ pub struct GlobalAPISet {
     pub security_context: SecurityContext,
     pub config_accessor: Arc<ConfigAccessor>,
     pub utils: Arc<UtilityFunctions>,
+}
+```
+
+### C API Layer for Library Mode
+
+The C API provides the stable interface for external runtime integration, enabling `require("llmspell")` functionality:
+
+```rust
+// C API exports for library mode
+#[repr(C)]
+pub struct LibraryContext {
+    runtime: *mut ScriptRuntime,
+    error_buffer: [c_char; 1024],
+    last_error: Option<LLMSpellError>,
+}
+
+// Library initialization (called by require())
+#[no_mangle]
+pub extern "C" fn llmspell_init_library(
+    config_source: *const c_char,
+    init_strategy: SelectiveInitStrategy,
+    external_state: *mut c_void
+) -> *mut LibraryContext {
+    // Initialize runtime in library mode
+    // Handle external configuration sources
+    // Setup selective component initialization
+}
+
+#[no_mangle]
+pub extern "C" fn llmspell_inject_globals(
+    ctx: *mut LibraryContext,
+    external_state: *mut c_void,
+    engine_type: EngineType
+) -> c_int {
+    // Inject globals into external runtime state
+    // Handle engine-specific injection patterns
+}
+
+#[no_mangle]
+pub extern "C" fn llmspell_create_tool(
+    ctx: *mut LibraryContext,
+    name: *const c_char,
+    config: *const c_char
+) -> *mut c_void {
+    // Create tools from external runtime
+    // Support tools-only mode
+}
+
+#[no_mangle]
+pub extern "C" fn llmspell_cleanup(ctx: *mut LibraryContext) {
+    // Proper resource cleanup for external runtime
+    // Handle async runtime shutdown
+}
+
+// External Runtime Context
+pub struct ExternalRuntimeContext {
+    pub engine_type: EngineType,
+    pub version_info: RuntimeVersionInfo,
+    pub threading_model: ThreadingModel,
+    pub memory_manager: ExternalMemoryManager,
+    pub error_handler: ExternalErrorHandler,
+}
+
+#[derive(Debug, Clone)]
+pub enum EngineType {
+    ExternalLua { version: String, state: *mut lua_State },
+    ExternalNodeJS { version: String, isolate: *mut v8::Isolate },
+    ExternalPython { version: String, interpreter: *mut pyo3::PyObject },
+}
+```
+
+### External Lua Runtime Bridge
+
+Specialized bridge for integrating with external Lua runtimes:
+
+```rust
+pub struct ExternalLuaBridge {
+    external_state: *mut lua_State,
+    llmspell_table: LuaRegistryKey,
+    async_scheduler: ExternalLuaScheduler,
+    error_translator: LuaErrorTranslator,
+}
+
+impl ExternalRuntimeBridge for ExternalLuaBridge {
+    async fn attach_to_external_state(&mut self, external_state: ExternalState) -> Result<()> {
+        match external_state {
+            ExternalState::Lua(lua_state) => {
+                self.external_state = lua_state;
+                // Create llmspell table in external Lua registry
+                self.setup_llmspell_namespace()?;
+                Ok(())
+            }
+            _ => Err(LLMSpellError::InvalidExternalState("Expected Lua state")),
+        }
+    }
+    
+    async fn inject_globals_external(&mut self, globals: &GlobalAPISet, external_state: &mut ExternalState) -> Result<()> {
+        // Inject globals into external Lua state (not internal mlua context)
+        self.inject_agent_api(globals.agent_factory.clone())?;
+        self.inject_tools_api(globals.tool_registry.clone())?;
+        self.inject_workflow_api(globals.workflow_factory.clone())?;
+        Ok(())
+    }
 }
 ```
 
@@ -15101,6 +15314,28 @@ impl TestResult {
         // Test global API injection
         results.add_test(self.test_global_injection().await?);
         
+        // Test library mode flow
+        results.add_test(self.test_library_mode_flow().await?);
+        
+        Ok(results)
+    }
+    
+    // Test library mode execution flow
+    pub async fn test_library_mode_flow(&self) -> Result<UnitTestResults> {
+        let mut results = UnitTestResults::new("Library Mode Flow Tests");
+        
+        // Test selective initialization strategies
+        results.add_test(self.test_selective_initialization().await?);
+        
+        // Test external runtime integration
+        results.add_test(self.test_external_runtime_integration().await?);
+        
+        // Test C API layer
+        results.add_test(self.test_c_api_layer().await?);
+        
+        // Test tools-only mode
+        results.add_test(self.test_tools_only_mode().await?);
+        
         Ok(results)
     }
     
@@ -17286,6 +17521,13 @@ llmspell validate performance            # Performance baseline check
 llmspell config init                      # Create default llmspell.toml configuration
 llmspell config init --template <env>    # Initialize with environment template (dev, prod, test)
 llmspell config generate --from-env      # Generate config from environment variables
+
+# Library mode build commands (for native module distribution)
+cargo build --lib --features c-api        # Build shared library with C API
+llmspell build-luarock                     # Package as LuaRock for external Lua runtimes
+llmspell build-npm-native                  # Package as NPM native module for Node.js
+llmspell generate-headers                  # Generate C headers for FFI integration
+llmspell build-library --target <platform> # Cross-compile shared library for target platform
 
 # Configuration validation and schema
 llmspell config validate                  # Validate current configuration
