@@ -83,35 +83,18 @@ Comprehensive refinement of rs-llmspell architecture based on go-llms and Google
       5.  **Feature Flags**: The design supports feature flags, enabling the creation of minimal builds (MVPs) that can be expanded over time.
       6.  **Phased Roadmap**: The architecture document's implementation roadmap is structured in phases, directly supporting the layered MVP approach (e.g., Foundation -> Components -> Advanced Features).
     - [x] Todo: ~~The "Implementation Roadmap" section in the main architecture document should be fully detailed...~~ **Done**. These items have been moved to and expanded in **Phase 13: Implementation Roadmap**.
-  - [ ] **Task/question 12.3.4** If we were to create a command line executable with a script argument, would the architecture be able to detect the script type (say lua, javascript) and instantiate the right engine and run the script? If not what changes to the architecture to support that?
-    - [ ] Answer: Yes, the architecture already includes this capability. Evidence:
-      1. **llmspell-cli**: A dedicated CLI crate is part of the architecture
-      2. **Script execution**: `llmspell run hello_world.lua` or `llmspell run script.js` 
-      3. **ScriptEngine enum**: Supports Lua, JavaScript, Python (future)
-      4. **Automatic detection**: Based on file extensions (.lua, .js)
-      5. **Unified execution**: `execute_sandboxed_script` with engine type parameter
-      6. **Type conversion**: TypeConverter handles cross-engine type mapping
-      The architecture includes all necessary components for CLI-based script execution with automatic type detection
-    - [ ] Todo: 
-      - [ ] Ensure CLI implementation includes robust file extension detection (.lua, .js, .mjs, etc.)
-      - [ ] Consider supporting shebang detection for script type (#!/usr/bin/env lua)
-      - [ ] Document CLI usage patterns in the Quick Start section
-  - [ ] **Task/question 12.3.5** Does the architecture allow for constructs to run a script in a cron job perhaps as a long running/always running daemon using perhaps workflow loop agent + mcp server, or a2a server or a tcp listener tool etc?
-    - [ ] Answer: Yes, the architecture supports daemon/long-running service modes through multiple mechanisms:
-      1. **Server Mode**: `rs-llmspell serve` command for running as daemon
-      2. **LoopWorkflow**: Continuous workflow execution component
-      3. **Cooperative Scheduler**: Manages long-running async tasks with configurable tick duration
-      4. **Protocol Servers**: Both MCP and A2A can run as servers
-      5. **Container Deployment**: Dockerfile shows service deployment with exposed ports
-      6. **Event-driven core**: Built for continuous operation with event bus
-      However, explicit cron-like scheduling and built-in TCP server tools are not documented (though infrastructure supports adding them)
-    - [ ] Todo: 
-      - [ ] Consider adding scheduled/timer-based workflow triggers for cron-like functionality
-      - [ ] Document daemon mode usage patterns and examples
-      - [ ] Consider adding TCP/Unix socket server tools to built-in catalog
-      - [ ] Add examples of long-running workflow patterns
-  - [ ] **Task/question 12.3.6** Does the framework allow me to easily create a new tool in a script or an app using rust? Or create a new tool to add to the library of builtin tools into rs-llmspell directly?
-    - [ ] Answer: Yes, the framework provides multiple ways to create custom tools:
+  - [x] **Task/question 12.3.4** If we were to create a command line executable with a script argument, would the architecture be able to detect the script type (say lua, javascript) and instantiate the right engine and run the script? If not what changes to the architecture to support that?
+    - [x] Answer: Yes, the architecture fully supports this. The `llmspell-cli` is designed to automatically detect the script type based on file extension (e.g., `.lua`, `.js`) and can also use shebangs for explicit engine selection. This is now documented in the "Quick Start Guide" and "Build System and Tooling" sections.
+    - [x] Todo: ~~Ensure CLI implementation includes robust file extension detection...~~ **Done**. The architecture document has been updated to reflect these capabilities.
+  - [x] **Task/question 12.3.5** Does the architecture allow for constructs to run a script in a cron job perhaps as a long running/always running daemon using perhaps workflow loop agent + mcp server, or a2a server or a tcp listener tool etc?
+    - [x] Answer: Yes, the architecture has been updated to explicitly support this. It now includes:
+      1.  **Scheduler Component**: A first-class `Scheduler` for managing jobs with `Cron`, `Interval`, and `Event` triggers.
+      2.  **Listener Tools**: `WebhookListenerTool` and `SocketListenerTool` have been added to the built-in tool catalog to enable external triggers.
+      3.  **Daemon/Service Mode**: A `llmspell serve` command is specified for running the framework as a persistent service.
+      4.  These additions are documented in the "Scheduling and Automation", "Built-in Tools Catalog", and "Deployment Strategies" sections.
+    - [x] Todo: ~~Consider adding scheduled/timer-based workflow triggers...~~ **Done**. The architecture now includes a full `Scheduler` component and listener tools.
+  - [x] **Task/question 12.3.6** Does the framework allow me to easily create a new tool in a script or an app using rust? Or create a new tool to add to the library of builtin tools into rs-llmspell directly?
+    - [x] Answer: Yes, the framework provides multiple ways to create custom tools:
       1. **Script-level tools**: Easy creation using `Tools.create()` in Lua/JavaScript with configuration object
       2. **Rust applications**: Implement the `Tool` trait with required methods (name, schema, execute_tool)
       3. **Built-in library**: Add tools directly to rs-llmspell by implementing in `llmspell-tools/src/category/`
@@ -119,11 +102,11 @@ Comprehensive refinement of rs-llmspell architecture based on go-llms and Google
       5. **Tool composition**: Chain tools together with pipelines and sequential execution
       6. **Plugin system**: Dynamic tool loading for advanced extensibility
       The architecture fully supports tool creation at all levels from simple script functions to complex Rust implementations
-    - [ ] Todo: 
-      - [ ] Create tool creation tutorial with examples for each approach
-      - [ ] Document tool trait requirements and best practices
-      - [ ] Add tool template/scaffolding generator
-      - [ ] Consider simplified tool creation API for common patterns
+    - [x] Todo: ~~Architecture has been updated with "Tool Development Architecture" section covering:~~
+      - [x] ~~Tool creation patterns for script-level, native, and plugin approaches~~ **Done**
+      - [x] ~~Tool trait architecture and best practices~~ **Done**
+      - [x] ~~Tool template system and scaffolding architecture~~ **Done**
+      - [x] ~~Simplified patterns via common templates (HTTP API, File Processor, etc.)~~ **Done**
   - [ ] **Task/question 12.3.7** Does the framework allow me to easily create a new agent to add to the library of builtin agents into rs-llmspell directly?
     - [ ] Answer: Yes, the framework provides clear mechanisms for adding built-in agents:
       1. **Location**: Create in `crates/builtin/src/agents/` directory
@@ -201,6 +184,7 @@ Comprehensive refinement of rs-llmspell architecture based on go-llms and Google
   - [ ] Establish a priority order for component implementation.
   - [ ] Outline a strategy for handling breaking changes between phases.
   - [ ] Define key testing milestones for each phase.
+  - [ ] **Note**: Scheduling features (Scheduler component, cron/interval triggers, daemon mode) should be implemented in a later phase after core functionality is stable
 
 ### Phase 14: Final Update (📝 Update)
 - [ ] **Task 14.1**: Complete architecture.md update

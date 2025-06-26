@@ -55,8 +55,9 @@
 29. [Advanced Orchestration Patterns](#advanced-orchestration-patterns)
 30. [LLM-Driven Delegation (Agent Transfer)](#llm-driven-delegation-agent-transfer)
 31. [Protocol Integration (MCP, A2A)](#protocol-integration)
-32. [Plugin System and Extensions](#plugin-system-and-extensions)
-33. [Error Handling and Recovery](#error-handling-and-recovery)
+32. [Scheduling and Automation](#scheduling-and-automation)
+33. [Plugin System and Extensions](#plugin-system-and-extensions)
+34. [Error Handling and Recovery](#error-handling-and-recovery)
 
 ### Part VIII: Testing and Quality Assurance
 33. [Complete Testing Strategy](#complete-testing-strategy)
@@ -738,6 +739,7 @@ assistant:chat("If I invest that amount monthly at 7% annual return, how much wi
 
 Run it:
 ```bash
+# The CLI automatically detects the script type (.lua) and uses the correct engine.
 llmspell run hello_world.lua
 ```
 
@@ -1988,6 +1990,7 @@ pub enum ToolCategory {
     NetworkTools {
         protocols: Vec<NetworkProtocol>, // HTTP, gRPC, WebSocket
         security: NetworkSecurityLevel,
+        listeners: bool, // NEW: For Webhook/Socket listeners
     },
     
     // AI and ML Operations
@@ -5319,6 +5322,173 @@ This comprehensive built-in components library provides:
 - **Performance Optimization**: Caching and monitoring
 - **Extensibility**: Custom tool development patterns
 - **Real-World Examples**: Practical usage scenarios
+
+---
+
+## Tool Development Architecture
+
+Rs-LLMSpell provides a comprehensive architecture for tool development that supports multiple implementation approaches, from simple script-based tools to complex Rust implementations and dynamically loaded plugins.
+
+### Tool Creation Patterns
+
+#### 1. **Script-Level Tool Pattern**
+The simplest approach for rapid prototyping and domain-specific functionality.
+
+**Architecture Elements:**
+- **Dynamic Registration**: Tools created at runtime and registered with the global registry
+- **Schema Validation**: Input/output schemas validated at registration time
+- **Async Execution**: Automatic async wrapper for script functions
+- **Error Boundaries**: Sandboxed execution with error isolation
+
+**Design Considerations:**
+- Ideal for application-specific tools that don't require system access
+- Performance overhead acceptable for I/O-bound operations
+- Automatic type conversion between script and Rust types
+
+#### 2. **Native Tool Pattern**
+High-performance tools implemented directly in Rust.
+
+**Architecture Elements:**
+- **Trait Implementation**: Extends `Tool` trait with full type safety
+- **Direct Integration**: No FFI overhead, direct memory access
+- **Lifecycle Management**: Proper resource initialization and cleanup
+- **Compile-Time Validation**: Schema and type checking at build time
+
+**Design Considerations:**
+- Required for system-level operations (file I/O, network, process management)
+- Enables zero-copy data processing for performance-critical paths
+- Supports complex state management and caching strategies
+
+#### 3. **Plugin Tool Pattern**
+Dynamically loaded tools for extensibility without recompilation.
+
+**Architecture Elements:**
+- **Dynamic Loading**: Runtime discovery and loading of tool libraries
+- **Version Management**: API versioning and compatibility checks
+- **Isolation Boundaries**: Separate memory space with controlled communication
+- **Hot Reload**: Support for updating tools without system restart
+
+**Design Considerations:**
+- Enables third-party tool development and distribution
+- Requires stable ABI and versioning strategy
+- Additional security considerations for untrusted code
+
+### Tool Trait Architecture
+
+The `Tool` trait hierarchy ensures consistent behavior across all tool types:
+
+```rust
+// Architectural trait hierarchy
+BaseAgent (state, hooks)
+    ↓
+Tool (schema, execution, composition)
+    ↓
+SpecializedTool (category-specific behavior)
+```
+
+**Key Architectural Decisions:**
+- Tools inherit from `BaseAgent` to support state management and hooks
+- Schema-first design enables automatic UI generation and validation
+- Composition support built into the trait for tool chaining
+- Category system for organized discovery and capability matching
+
+### Tool Registry Architecture
+
+**Central Registry Design:**
+- **Global Singleton**: Thread-safe access from all components
+- **Category Indexing**: O(1) lookup by category for efficient discovery
+- **Capability Matching**: Graph-based matching for complex requirements
+- **Lazy Loading**: Tools loaded only when first accessed
+
+**Registration Flow:**
+1. Schema validation against JSON Schema spec
+2. Capability extraction and indexing
+3. Security policy attachment
+4. Hook point registration
+5. Availability broadcast via event system
+
+### Tool Composition Architecture
+
+**Pipeline Pattern:**
+- **DAG Execution**: Directed acyclic graph for complex workflows
+- **Type Safety**: Output-to-input type validation at composition time
+- **Error Propagation**: Structured error handling across pipeline stages
+- **Resource Pooling**: Shared resources across pipeline stages
+
+**Chaining Mechanisms:**
+- **Static Chains**: Compile-time validated tool sequences
+- **Dynamic Chains**: Runtime composition based on LLM decisions
+- **Conditional Chains**: Branching logic within tool execution
+- **Parallel Chains**: Concurrent execution with result aggregation
+
+### Tool Development Best Practices
+
+**Schema Design Principles:**
+- **Minimal Required Fields**: Only essential inputs marked as required
+- **Progressive Disclosure**: Optional fields for advanced functionality
+- **Clear Descriptions**: LLM-friendly field descriptions
+- **Example Values**: Concrete examples in schema for better LLM understanding
+
+**Error Handling Architecture:**
+- **Typed Errors**: Enum-based error types for each tool category
+- **Error Recovery**: Built-in retry logic with exponential backoff
+- **Partial Success**: Return partial results when possible
+- **Error Context**: Rich error messages with remediation hints
+
+**Performance Optimization Patterns:**
+- **Result Caching**: LRU cache with TTL for expensive operations
+- **Batch Processing**: Automatic batching for similar requests
+- **Resource Pooling**: Connection and handle reuse
+- **Async by Default**: Non-blocking execution for all I/O operations
+
+### Tool Security Architecture
+
+**Sandboxing Layers:**
+1. **Script Sandbox**: Limited API access for script-based tools
+2. **Process Sandbox**: Separate process for untrusted plugins
+3. **Resource Limits**: CPU, memory, and time quotas
+4. **Capability-Based Security**: Fine-grained permission model
+
+**Security Validation:**
+- **Input Sanitization**: Automatic validation against schema
+- **Output Filtering**: Sensitive data redaction
+- **Audit Logging**: All tool executions logged with context
+- **Rate Limiting**: Per-tool and per-user rate limits
+
+### Tool Testing Architecture
+
+**Test Patterns:**
+- **Unit Tests**: Individual tool logic testing
+- **Integration Tests**: Tool interaction with system resources
+- **Schema Tests**: Input/output validation testing
+- **Performance Tests**: Benchmark suites for critical paths
+
+**Mock Infrastructure:**
+- **Resource Mocks**: File system, network, API mocks
+- **State Verification**: Pre/post condition validation
+- **Error Injection**: Systematic failure testing
+- **Load Testing**: Concurrent execution stress tests
+
+### Tool Template System
+
+**Scaffolding Architecture:**
+- **Template Engine**: Code generation from specifications
+- **Category Templates**: Pre-built patterns for each tool category
+- **Interactive Generation**: CLI wizard for tool creation
+- **Best Practice Enforcement**: Generated code follows all patterns
+
+**Common Templates:**
+- **HTTP API Tool**: REST/GraphQL client template
+- **File Processor Tool**: Streaming file transformation template
+- **Data Analysis Tool**: Statistical computation template
+- **Integration Tool**: Third-party service connector template
+
+This architecture ensures tools are:
+- **Discoverable**: Easy to find and understand capabilities
+- **Composable**: Natural chaining and pipeline creation
+- **Secure**: Sandboxed with principle of least privilege
+- **Performant**: Optimized for common usage patterns
+- **Testable**: Comprehensive testing support at all levels
 
 ---
 
@@ -9970,6 +10140,76 @@ pub enum ModificationType {
 
 ## Protocol Integration (MCP, A2A)
 
+[... existing content ...]
+
+## Scheduling and Automation
+
+Rs-LLMSpell is designed not just for interactive execution but also for creating long-running, automated services and scheduled tasks. This is achieved through a combination of a dedicated scheduler, trigger-based execution, and specialized listener tools.
+
+### Scheduler Architecture
+
+The core of the automation capability is the `Scheduler` component, which manages and executes tasks based on predefined triggers.
+
+```rust
+pub struct Scheduler {
+    jobs: Vec<ScheduledJob>,
+    trigger_evaluator: TriggerEvaluator,
+    runtime: Arc<AgentRuntime>,
+}
+
+pub struct ScheduledJob {
+    id: String,
+    trigger: Trigger,
+    action: Action, // e.g., RunWorkflow, ExecuteAgent
+    config: JobConfig,
+}
+
+pub enum Trigger {
+    Cron(String), // e.g., "0 * * * *"
+    Interval(Duration),
+    OnEvent(EventFilter),
+    External(ExternalTriggerConfig), // e.g., Webhook
+}
+```
+
+### Trigger Types
+
+-   **Cron/Interval Triggers**: For time-based tasks, similar to traditional cron jobs.
+-   **Event Triggers**: Workflows or agents can be executed in response to specific system events from the `EventBus`.
+-   **External Triggers**: The system can listen for external signals via network tools.
+
+### Listener Tools
+
+To enable event-driven automation from external sources, the built-in tool catalog includes listener tools:
+
+-   **`WebhookListenerTool`**: Opens an HTTP endpoint to receive webhook calls, which can then trigger specific workflows or agents.
+-   **`SocketListenerTool`**: Listens on a TCP or Unix socket for incoming data, allowing for custom protocol integrations.
+
+### Example: Daily Report Generation
+
+This example shows a spell that defines a scheduled workflow to generate and email a report every day at 8:00 AM.
+
+```lua
+-- daily_report.lua
+local report_workflow = Workflow.sequential({...})
+
+Scheduler.register({
+    name = "daily_market_report",
+    trigger = { type = "cron", schedule = "0 8 * * *" }, -- 8:00 AM daily
+    action = {
+        type = "workflow",
+        workflow = report_workflow,
+        input = {
+            report_date = "{{now()}}"
+        }
+    }
+})
+```
+
+This spell would be loaded by the `rs-llmspell` runtime in daemon mode, and the scheduler would ensure the workflow is executed at the specified time.
+
+## Plugin System and Extensions
+
 ### Model Control Protocol (MCP) Support
 
 ```rust
@@ -12080,6 +12320,18 @@ refactor: simplify error handling hierarchy
 
 ### Build System and Tooling
 
+The project uses `cargo` as its primary build system, managed through the `Cargo.toml` workspace definition. 
+
+#### `llmspell-cli`
+
+The primary user-facing tool is the `llmspell-cli`, which provides a powerful command-line interface for running spells, managing configurations, and inspecting the system. Key features of the CLI architecture include:
+
+- **Automatic Script Engine Detection**: The CLI automatically selects the correct script engine (Lua, JavaScript, etc.) based on the script's file extension (e.g., `.lua`, `.js`, `.mjs`).
+- **Shebang Support**: For more explicit control, scripts can use a shebang line (e.g., `#!/usr/bin/env llmspell-lua`) to specify the exact engine to use, bypassing file extension detection.
+- **Parameter Injection**: Scripts can receive parameters from the command line using `--param <key>=<value>`, which are then available within the script's `params` object.
+
+### Native Module Builds
+
 #### Cargo Workspace Configuration
 
 ```toml
@@ -12257,6 +12509,16 @@ gpu-acceleration = ["candle-core/cuda", "candle-core/metal"]
 ```
 
 ### Deployment Strategies
+
+[... existing content ...]
+
+#### Daemon / Service Mode
+
+For long-running tasks and automations, `rs-llmspell` can be run as a persistent background service or daemon. In this mode, it loads all specified spells and activates their schedulers and listeners.
+
+-   **Execution**: `llmspell serve --config /path/to/llmspell.toml`
+-   **Use Cases**: Scheduled reports, event-driven automations, webhook responders, and custom API services built with listener tools.
+-   **Process Management**: It is recommended to run the daemon under a process manager like `systemd` or `supervisor` for automatic restarts and logging.
 
 #### Container Deployment
 
