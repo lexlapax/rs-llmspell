@@ -6169,11 +6169,252 @@ local FinanceExpert = TemplateFactory:create_domain_expert(
 )
 ```
 
+#### 4. **Data Analyst Agent Template**
+Specialized for data exploration, statistical analysis, and insight generation.
+
+```lua
+local DataAnalyst = Agent.template("data_analyst", {
+    system_prompt = [[You are a skilled data analyst who helps users understand their data through statistical analysis and visualization recommendations.]],
+    
+    default_tools = {
+        "data_loader",
+        "statistical_analysis", 
+        "chart_generator",
+        "correlation_analyzer"
+    },
+    
+    capabilities = {
+        "data_exploration",
+        "statistical_modeling", 
+        "visualization_design",
+        "insight_extraction"
+    },
+    
+    output_format = "structured_analysis"
+})
+```
+
+#### 5. **Customer Service Agent Template**
+Optimized for customer support, issue resolution, and service excellence.
+
+```javascript
+const CustomerServiceAgent = Agent.template("customer_service", {
+    systemPrompt: "You are a helpful customer service representative focused on resolving issues efficiently while maintaining a friendly, professional tone.",
+    
+    defaultTools: [
+        "knowledge_base_search",
+        "ticket_creation",
+        "escalation_handler",
+        "sentiment_analyzer"
+    ],
+    
+    personality: {
+        tone: "helpful_professional",
+        empathy_level: "high",
+        patience_threshold: "extended"
+    },
+    
+    workflows: ["issue_triage", "resolution_tracking"]
+});
+```
+
+#### 6. **API Integration Agent Template**
+Designed for API testing, integration, and automation tasks.
+
+```lua
+local APIAgent = Agent.template("api_integration", {
+    system_prompt = [[You specialize in API testing, integration, and automation. You can analyze API specifications, generate test cases, and troubleshoot integration issues.]],
+    
+    default_tools = {
+        "http_client",
+        "json_validator", 
+        "api_tester",
+        "schema_analyzer"
+    },
+    
+    specializations = {
+        "rest_apis",
+        "graphql_apis", 
+        "webhook_handling",
+        "auth_flows"
+    }
+})
+```
+
+### Advanced Template Customization
+
+#### **Template Inheritance Architecture**
+
+Templates can be extended and specialized through multiple inheritance patterns:
+
+```lua
+-- Extend base Research template for Market Research
+local MarketResearchAgent = Agent.extend("research_agent", {
+    specialization = "market_analysis",
+    
+    additional_tools = {
+        "market_data_api",
+        "competitor_analyzer",
+        "trend_detector"
+    },
+    
+    enhanced_prompts = {
+        system_addition = "Focus specifically on market trends, competitive landscape, and consumer behavior patterns.",
+        analysis_framework = "SWOT_and_PESTLE"
+    }
+})
+
+-- Multi-level inheritance
+local TechMarketAnalyst = Agent.extend("market_research_agent", {
+    domain = "technology_sector",
+    additional_tools = {"tech_news_scraper", "patent_analyzer"}
+})
+```
+
+#### **Dynamic Template Generation**
+
+```javascript
+// Runtime template creation based on user requirements
+const CustomAgentFactory = {
+    createSpecializedAgent(baseTemplate, requirements) {
+        return Agent.template(`custom_${baseTemplate}`, {
+            ...Agent.getTemplate(baseTemplate).config,
+            
+            // Dynamic tool selection
+            defaultTools: this.selectToolsForRequirements(requirements),
+            
+            // Custom prompt engineering
+            systemPrompt: this.generatePromptFor(baseTemplate, requirements),
+            
+            // Capability mapping
+            capabilities: this.mapCapabilities(requirements)
+        });
+    }
+};
+```
+
+#### **Template Configuration Patterns**
+
+```lua
+-- Configuration-driven template customization
+local template_config = {
+    base_template = "research_agent",
+    
+    customizations = {
+        domain_expertise = "healthcare",
+        data_sources = {"pubmed", "clinical_trials", "medical_journals"},
+        compliance_mode = "HIPAA",
+        
+        tool_overrides = {
+            web_search = {
+                provider = "specialized_medical_search",
+                filters = {"peer_reviewed", "recent_5_years"}
+            }
+        },
+        
+        output_requirements = {
+            citation_style = "AMA",
+            evidence_level = "required",
+            peer_review_check = true
+        }
+    }
+}
+
+local HealthcareResearcher = Agent.create_from_config(template_config)
+```
+
+#### **Built-in Agent Creation Process**
+
+For adding agents to the core `crates/builtin/src/agents/` library:
+
+```rust
+// 1. Implement the Agent trait
+pub struct MarketAnalystAgent {
+    base: BaseAgentImpl,
+    specialized_tools: Vec<Box<dyn Tool>>,
+    market_data_provider: MarketDataAPI,
+}
+
+#[async_trait]
+impl Agent for MarketAnalystAgent {
+    fn agent_type(&self) -> AgentType {
+        AgentType::Specialized("market_analyst".to_string())
+    }
+    
+    fn default_system_prompt(&self) -> &str {
+        "You are a market analyst specializing in business intelligence and market research."
+    }
+    
+    async fn initialize_agent(&mut self, config: &AgentConfig) -> Result<()> {
+        self.register_specialized_tools().await?;
+        self.setup_market_data_connections().await?;
+        Ok(())
+    }
+}
+
+// 2. Register in the built-in agent registry
+pub fn register_builtin_agents(registry: &mut AgentRegistry) -> Result<()> {
+    registry.register_template("market_analyst", || {
+        Box::new(MarketAnalystAgent::new())
+    })?;
+    
+    registry.register_template("customer_service", || {
+        Box::new(CustomerServiceAgent::new())
+    })?;
+    
+    registry.register_template("data_analyst", || {
+        Box::new(DataAnalystAgent::new())
+    })?;
+    
+    Ok(())
+}
+```
+
+#### **Template Testing Framework**
+
+```rust
+// Built-in agent testing patterns
+#[cfg(test)]
+mod agent_template_tests {
+    use super::*;
+    
+    #[tokio::test]
+    async fn test_market_analyst_template() {
+        let agent = Agent.template("market_analyst", default_config()).await?;
+        
+        // Test template capabilities
+        assert!(agent.has_capability("market_analysis"));
+        assert!(agent.has_tool("market_data_api"));
+        
+        // Test specialized behavior
+        let response = agent.process("Analyze the smartphone market").await?;
+        assert!(response.contains_market_metrics());
+        assert!(response.has_competitive_analysis());
+    }
+    
+    #[tokio::test]
+    async fn test_template_inheritance() {
+        let base = Agent.template("research_agent", default_config()).await?;
+        let specialized = Agent.extend("research_agent", market_config()).await?;
+        
+        // Verify inheritance chain
+        assert!(specialized.inherits_from("research_agent"));
+        assert_eq!(specialized.base_capabilities(), base.capabilities());
+        
+        // Verify specialization additions
+        assert!(specialized.capabilities().len() > base.capabilities().len());
+    }
+}
+```
+
 This comprehensive template system provides:
-- **Pre-built Templates**: Common agent patterns ready to use
+- **Pre-built Templates**: 6 common agent patterns ready to use
+- **Specialized Templates**: Domain-specific agents (DataAnalyst, CustomerService, API Integration)
 - **Customization Options**: Flexible configuration for specific needs
-- **Inheritance Patterns**: Extend base templates with specializations
+- **Inheritance Patterns**: Multi-level template extension and specialization
 - **Dynamic Creation**: Runtime template generation for domain experts
+- **Built-in Creation Process**: Clear path for adding agents to core library
+- **Testing Framework**: Comprehensive testing patterns for agent templates
 - **Workflow Integration**: Built-in workflows for complex tasks
 
 ---
@@ -11229,6 +11470,167 @@ impl TestResult {
         }
     }
 }
+
+    // Agent template testing patterns
+    pub async fn test_agent_templates(&self) -> Result<UnitTestResults> {
+        let mut results = UnitTestResults::new("Agent Template Tests");
+        
+        // Test all built-in templates
+        let templates = vec![
+            "chat_agent", "research_agent", "code_assistant", 
+            "data_analyst", "customer_service", "api_integration"
+        ];
+        
+        for template_name in templates {
+            results.add_test(self.test_template_creation(template_name).await?);
+            results.add_test(self.test_template_capabilities(template_name).await?);
+            results.add_test(self.test_template_customization(template_name).await?);
+        }
+        
+        // Test template inheritance
+        results.add_test(self.test_template_inheritance().await?);
+        
+        // Test dynamic template generation
+        results.add_test(self.test_dynamic_template_creation().await?);
+        
+        Ok(results)
+    }
+    
+    async fn test_template_creation(&self, template_name: &str) -> Result<TestResult> {
+        match Agent::template(template_name, &AgentConfig::default()).await {
+            Ok(agent) => {
+                // Verify agent was created with template properties
+                if agent.agent_type().to_string().contains(template_name) {
+                    Ok(TestResult::passed(&format!("Template creation: {}", template_name)))
+                } else {
+                    Ok(TestResult::failed(
+                        &format!("Template creation: {}", template_name),
+                        "Agent type doesn't match template".to_string()
+                    ))
+                }
+            }
+            Err(e) => Ok(TestResult::failed(
+                &format!("Template creation: {}", template_name),
+                e.to_string()
+            ))
+        }
+    }
+    
+    async fn test_template_capabilities(&self, template_name: &str) -> Result<TestResult> {
+        let agent = Agent::template(template_name, &AgentConfig::default()).await?;
+        
+        // Verify template has expected capabilities
+        let capabilities = agent.capabilities();
+        let expected_capability_count = match template_name {
+            "research_agent" => 4, // research, analysis, web_search, summarization
+            "chat_agent" => 3,     // conversation, context_management, personality
+            "code_assistant" => 5, // code_analysis, debugging, refactoring, testing, documentation
+            "data_analyst" => 4,   // data_exploration, statistical_modeling, visualization, insights
+            "customer_service" => 4, // issue_resolution, empathy, escalation, knowledge_base
+            "api_integration" => 4,  // rest_apis, graphql, webhooks, auth_flows
+            _ => 1, // Minimum for unknown templates
+        };
+        
+        if capabilities.len() >= expected_capability_count {
+            Ok(TestResult::passed(&format!("Template capabilities: {}", template_name)))
+        } else {
+            Ok(TestResult::failed(
+                &format!("Template capabilities: {}", template_name),
+                format!("Expected {} capabilities, got {}", expected_capability_count, capabilities.len())
+            ))
+        }
+    }
+    
+    async fn test_template_customization(&self, template_name: &str) -> Result<TestResult> {
+        let custom_config = AgentConfig {
+            system_prompt: "Custom system prompt for testing".to_string(),
+            tools: vec!["custom_tool".to_string()],
+            ..AgentConfig::default()
+        };
+        
+        match Agent::template(template_name, &custom_config).await {
+            Ok(agent) => {
+                // Verify customization was applied
+                if agent.system_prompt().contains("Custom system prompt") {
+                    Ok(TestResult::passed(&format!("Template customization: {}", template_name)))
+                } else {
+                    Ok(TestResult::failed(
+                        &format!("Template customization: {}", template_name),
+                        "Custom system prompt not applied".to_string()
+                    ))
+                }
+            }
+            Err(e) => Ok(TestResult::failed(
+                &format!("Template customization: {}", template_name),
+                e.to_string()
+            ))
+        }
+    }
+    
+    async fn test_template_inheritance(&self) -> Result<TestResult> {
+        // Test extending research agent for market research
+        let base_config = AgentConfig::default();
+        let base_agent = Agent::template("research_agent", &base_config).await?;
+        
+        let specialized_config = AgentConfig {
+            system_prompt: base_agent.system_prompt().to_string() + " Focus on market analysis.",
+            tools: {
+                let mut tools = base_agent.tools().iter().map(|t| t.name()).collect::<Vec<_>>();
+                tools.push("market_data_api".to_string());
+                tools
+            },
+            ..base_config
+        };
+        
+        match Agent::extend("research_agent", &specialized_config).await {
+            Ok(specialized_agent) => {
+                // Verify inheritance
+                let base_capabilities = base_agent.capabilities();
+                let specialized_capabilities = specialized_agent.capabilities();
+                
+                // Specialized agent should have all base capabilities plus more
+                let has_all_base = base_capabilities.iter()
+                    .all(|cap| specialized_capabilities.contains(cap));
+                    
+                if has_all_base && specialized_capabilities.len() > base_capabilities.len() {
+                    Ok(TestResult::passed("Template inheritance"))
+                } else {
+                    Ok(TestResult::failed(
+                        "Template inheritance",
+                        "Inheritance not properly implemented".to_string()
+                    ))
+                }
+            }
+            Err(e) => Ok(TestResult::failed("Template inheritance", e.to_string()))
+        }
+    }
+    
+    async fn test_dynamic_template_creation(&self) -> Result<TestResult> {
+        // Test runtime template generation
+        let requirements = TemplateRequirements {
+            domain: "healthcare".to_string(),
+            capabilities: vec!["medical_research", "hipaa_compliance"],
+            tools: vec!["pubmed_search", "clinical_trials_api"],
+            output_format: "structured_medical_report".to_string(),
+        };
+        
+        match CustomAgentFactory::create_specialized_agent("research_agent", &requirements).await {
+            Ok(agent) => {
+                // Verify dynamic customization
+                if agent.capabilities().contains(&"medical_research".to_string()) &&
+                   agent.tools().iter().any(|t| t.name() == "pubmed_search") {
+                    Ok(TestResult::passed("Dynamic template creation"))
+                } else {
+                    Ok(TestResult::failed(
+                        "Dynamic template creation",
+                        "Dynamic customization not applied correctly".to_string()
+                    ))
+                }
+            }
+            Err(e) => Ok(TestResult::failed("Dynamic template creation", e.to_string()))
+        }
+    }
+}
 ```
 
 ### Integration Testing Framework
@@ -12329,6 +12731,58 @@ The primary user-facing tool is the `llmspell-cli`, which provides a powerful co
 - **Automatic Script Engine Detection**: The CLI automatically selects the correct script engine (Lua, JavaScript, etc.) based on the script's file extension (e.g., `.lua`, `.js`, `.mjs`).
 - **Shebang Support**: For more explicit control, scripts can use a shebang line (e.g., `#!/usr/bin/env llmspell-lua`) to specify the exact engine to use, bypassing file extension detection.
 - **Parameter Injection**: Scripts can receive parameters from the command line using `--param <key>=<value>`, which are then available within the script's `params` object.
+
+#### Agent and Tool Generation Commands
+
+The CLI provides scaffolding commands for rapid development:
+
+```bash
+# Agent scaffolding
+llmspell generate agent <name> [options]
+  --template <template>     # Base template (research, chat, code, data_analyst, etc.)
+  --language <lang>         # Target language (lua, javascript, rust)
+  --tools <tool1,tool2>     # Pre-configure specific tools
+  --output-dir <path>       # Output directory for generated files
+
+# Examples
+llmspell generate agent market_analyzer --template research --language lua --tools web_search,data_analyzer
+llmspell generate agent support_bot --template customer_service --language javascript
+llmspell generate agent code_reviewer --template code --language rust --output-dir ./agents/
+
+# Tool scaffolding  
+llmspell generate tool <name> [options]
+  --category <category>     # Tool category (text, file, web, analysis, etc.)
+  --language <lang>         # Implementation language
+  --template <template>     # Tool template (http_client, file_processor, etc.)
+
+# Examples
+llmspell generate tool api_client --category integration --template http_client --language rust
+llmspell generate tool log_analyzer --category analysis --language lua
+
+# Template management
+llmspell template list                    # List available templates
+llmspell template show <name>             # Show template details
+llmspell template validate <path>         # Validate custom template
+llmspell template install <url>           # Install template from repository
+```
+
+#### Testing and Validation Commands
+
+```bash
+# Agent testing
+llmspell test agent <agent_name>          # Test specific agent
+llmspell test agents --category <cat>     # Test agents by category
+llmspell test template <template_name>    # Test agent template
+
+# Tool testing
+llmspell test tool <tool_name>            # Test specific tool
+llmspell test tools --integration         # Run integration tests
+
+# System validation
+llmspell validate config                  # Validate configuration files
+llmspell validate security               # Check security settings
+llmspell validate performance            # Performance baseline check
+```
 
 ### Native Module Builds
 

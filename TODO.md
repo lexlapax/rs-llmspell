@@ -107,8 +107,8 @@ Comprehensive refinement of rs-llmspell architecture based on go-llms and Google
       - [x] ~~Tool trait architecture and best practices~~ **Done**
       - [x] ~~Tool template system and scaffolding architecture~~ **Done**
       - [x] ~~Simplified patterns via common templates (HTTP API, File Processor, etc.)~~ **Done**
-  - [ ] **Task/question 12.3.7** Does the framework allow me to easily create a new agent to add to the library of builtin agents into rs-llmspell directly?
-    - [ ] Answer: Yes, the framework provides clear mechanisms for adding built-in agents:
+  - [x] **Task/question 12.3.7** Does the framework allow me to easily create a new agent to add to the library of builtin agents into rs-llmspell directly?
+    - [x] Answer: Yes, the framework provides clear mechanisms for adding built-in agents:
       1. **Location**: Create in `crates/builtin/src/agents/` directory
       2. **Templates**: Extend existing templates (Chat, Research, Code, Content Creator)
       3. **From scratch**: Implement BaseAgent and Agent traits directly
@@ -116,11 +116,11 @@ Comprehensive refinement of rs-llmspell architecture based on go-llms and Google
       5. **Factory pattern**: Use AgentTemplateFactory for dynamic creation
       6. **Auto-availability**: Once registered, automatically available in Lua/JS scripts
       Example: Extend ResearchAgent template for MarketResearchAgent with specialized tools and prompts
-    - [ ] Todo: 
-      - [ ] Create agent template scaffolding tool
-      - [ ] Document agent template customization options
-      - [ ] Add more specialized agent templates (e.g., DataAnalyst, CustomerService)
-      - [ ] Create agent testing framework and examples
+    - [x] Todo: ~~Architecture has been enhanced with comprehensive agent development patterns:~~
+      - [x] ~~Agent template scaffolding via CLI commands (llmspell generate agent)~~ **Done**
+      - [x] ~~Advanced template customization options and inheritance patterns~~ **Done**
+      - [x] ~~Added 3 specialized agent templates (DataAnalyst, CustomerService, API Integration)~~ **Done**
+      - [x] ~~Comprehensive agent testing framework with template-specific tests~~ **Done**
   - [ ] **Task/question 12.3.8** Does the architecture security allow for configurable security for a script engine, say lua, where in one script we may want to allow io library access, and in another both io, os and a few other "insecure" libraries? Does it allow for templated security profiles like low, medium, high? If not what are the todos to change the architecture to allow that?
     - [ ] Answer: Yes, the architecture supports configurable security but not pre-defined profiles:
       1. **Per-script security**: Each agent/script can have its own SecurityConfig
@@ -130,14 +130,17 @@ Comprehensive refinement of rs-llmspell architecture based on go-llms and Google
       5. **Resource limits**: Memory, CPU, execution time configurable
       However, pre-defined security profiles (low/medium/high) are NOT currently implemented
     - [ ] Todo: 
-      - [ ] Create pre-defined security profiles (low/medium/high):
+      - [ ] Create pre-defined security profiles (low/medium/high) defaulting to a sane medium:
+        - None: No restrictions every library, even outside libraries allowed.
         - Low: All libraries, minimal restrictions
         - Medium: No os.execute, io.popen, limited filesystem
         - High: Only safe libraries (math, string, table)
+        - Custom: configurable with different library options
       - [ ] Add SecurityProfile enum with preset configurations
       - [ ] Create profile builder/factory for easy security setup
       - [ ] Document security best practices and profile usage
       - [ ] Add per-script security override examples
+      - [ ] Add custom profile support
   - [ ] **Task/question 12.3.9** Does the architecture spell out configuration for prompts, api keys, security profiles etc via configuration files like yaml or environment variables? If not what todos do we have to add to spell that out?
     - [ ] Answer: Yes, the architecture has comprehensive configuration management:
       1. **File formats**: TOML (default), YAML, JSON all supported
@@ -185,6 +188,12 @@ Comprehensive refinement of rs-llmspell architecture based on go-llms and Google
   - [ ] Outline a strategy for handling breaking changes between phases.
   - [ ] Define key testing milestones for each phase.
   - [ ] **Note**: Scheduling features (Scheduler component, cron/interval triggers, daemon mode) should be implemented in a later phase after core functionality is stable
+  - [ ] **Agent Development Priority Notes**:
+    - Core agent templates (Chat, Research, Code) should be MVP priority
+    - Advanced agent templates (DataAnalyst, CustomerService, API Integration) are post-MVP
+    - CLI scaffolding commands (`llmspell generate agent/tool`) are enhancement phase, not MVP
+    - Template inheritance and dynamic generation are advanced features for later phases
+    - Agent testing framework should align with overall testing infrastructure development
 
 ### Phase 14: Final Update (📝 Update)
 - [ ] **Task 14.1**: Complete architecture.md update
