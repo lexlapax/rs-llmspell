@@ -121,26 +121,23 @@ Comprehensive refinement of rs-llmspell architecture based on go-llms and Google
       - [x] ~~Advanced template customization options and inheritance patterns~~ **Done**
       - [x] ~~Added 3 specialized agent templates (DataAnalyst, CustomerService, API Integration)~~ **Done**
       - [x] ~~Comprehensive agent testing framework with template-specific tests~~ **Done**
-  - [ ] **Task/question 12.3.8** Does the architecture security allow for configurable security for a script engine, say lua, where in one script we may want to allow io library access, and in another both io, os and a few other "insecure" libraries? Does it allow for templated security profiles like low, medium, high? If not what are the todos to change the architecture to allow that?
-    - [ ] Answer: Yes, the architecture supports configurable security but not pre-defined profiles:
+  - [x] **Task/question 12.3.8** Does the architecture security allow for configurable security for a script engine, say lua, where in one script we may want to allow io library access, and in another both io, os and a few other "insecure" libraries? Does it allow for templated security profiles like low, medium, high? If not what are the todos to change the architecture to allow that?
+    - [x] Answer: Yes, the architecture now supports both configurable security AND pre-defined profiles:
       1. **Per-script security**: Each agent/script can have its own SecurityConfig
       2. **Library access control**: `stdlib_access` in LuaEngineConfig controls which Lua modules are allowed
       3. **Fine-grained controls**: Filesystem, network, system calls all configurable
       4. **Sandboxing**: Can be enabled/disabled per script via `script_sandbox_mode`
       5. **Resource limits**: Memory, CPU, execution time configurable
-      However, pre-defined security profiles (low/medium/high) are NOT currently implemented
-    - [ ] Todo: 
-      - [ ] Create pre-defined security profiles (low/medium/high) defaulting to a sane medium:
-        - None: No restrictions every library, even outside libraries allowed.
-        - Low: All libraries, minimal restrictions
-        - Medium: No os.execute, io.popen, limited filesystem
-        - High: Only safe libraries (math, string, table)
-        - Custom: configurable with different library options
-      - [ ] Add SecurityProfile enum with preset configurations
-      - [ ] Create profile builder/factory for easy security setup
-      - [ ] Document security best practices and profile usage
-      - [ ] Add per-script security override examples
-      - [ ] Add custom profile support
+      6. **Pre-defined security profiles**: None/Low/Medium/High profiles with preset configurations
+      7. **Custom profiles**: Configurable with specific library and access options
+      8. **Per-script overrides**: Ability to override security profile for specific scripts with audit trail
+    - [x] Todo: ~~Architecture has been comprehensively enhanced with security profile system:~~
+      - [x] ~~Created pre-defined security profiles (None/Low/Medium/High/Custom) with Medium as default~~ **Done**
+      - [x] ~~Added SecurityProfile enum with preset configurations and CustomSecurityProfile support~~ **Done**
+      - [x] ~~Created profile builder/factory pattern with CustomSecurityProfileBuilder~~ **Done**
+      - [x] ~~Added SecurityProfilePresets for common use cases (development, testing, production, data_analysis)~~ **Done**
+      - [x] ~~Added per-script security override examples in configuration with audit trail~~ **Done**
+      - [x] ~~Integrated profile-based library access control in Script Sandbox Security~~ **Done**
   - [ ] **Task/question 12.3.9** Does the architecture spell out configuration for prompts, api keys, security profiles etc via configuration files like yaml or environment variables? If not what todos do we have to add to spell that out?
     - [ ] Answer: Yes, the architecture has comprehensive configuration management:
       1. **File formats**: TOML (default), YAML, JSON all supported
@@ -194,6 +191,11 @@ Comprehensive refinement of rs-llmspell architecture based on go-llms and Google
     - CLI scaffolding commands (`llmspell generate agent/tool`) are enhancement phase, not MVP
     - Template inheritance and dynamic generation are advanced features for later phases
     - Agent testing framework should align with overall testing infrastructure development
+  - [ ] **Security Profile Implementation Notes**:
+    - Basic security profiles (Medium/High) should be MVP priority for production safety
+    - Custom profile builder and presets are enhancement features for later phases
+    - Per-script security overrides are advanced features, implement after core security is stable
+    - SecurityProfile enum and basic factory methods are core infrastructure needed early
 
 ### Phase 14: Final Update (📝 Update)
 - [ ] **Task 14.1**: Complete architecture.md update

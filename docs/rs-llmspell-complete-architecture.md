@@ -1015,10 +1015,48 @@ path = "./llmspell_data"
 max_size = "1GB"
 
 [security]
+# Default security profile for all scripts (none, low, medium, high, custom)
+profile = "medium"
 sandbox_enabled = true
 allowed_domains = ["*.wikipedia.org", "*.github.com", "*.arxiv.org"]
 max_file_size = "10MB"
 allowed_file_types = [".txt", ".md", ".json", ".csv"]
+
+# Security profile definitions
+[security.profiles.development]
+type = "custom"
+allowed_stdlib_modules = ["io", "os", "debug", "math", "string", "table"]
+filesystem_access = "project_directory"
+network_access = "localhost_only"
+external_libraries = true
+
+[security.profiles.testing]
+type = "custom"
+allowed_stdlib_modules = ["math", "string", "table", "io"]
+filesystem_access = "temp_directory"
+network_access = "none"
+external_libraries = false
+
+[security.profiles.production]
+type = "high"
+allowed_stdlib_modules = ["math", "string", "table"]
+filesystem_access = "configured_paths"
+network_access = "configured_hosts"
+external_libraries = false
+execution_limits = { max_memory_mb = 128, max_execution_time_sec = 30 }
+
+[security.profiles.data_analysis]
+type = "custom"
+allowed_stdlib_modules = ["math", "string", "table", "io"]
+filesystem_access = "data_directory"
+network_access = "api_endpoints"
+external_libraries = false
+
+# Per-script security overrides
+[security.script_overrides]
+"admin_tools/system_backup.lua" = { profile = "low", reason = "Requires file system access for backup operations" }
+"data_processing/csv_import.lua" = { profile = "data_analysis", reason = "Needs file access for data import" }
+"monitoring/health_check.lua" = { profile = "production", reason = "Production monitoring script" }
 
 [observability]
 logging_level = "info"
@@ -8538,6 +8576,7 @@ pub struct SecurityManager {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SecurityConfig {
+    pub profile: SecurityProfile,
     pub encryption: EncryptionConfig,
     pub sandbox: SandboxConfig,
     pub audit: AuditConfig,
@@ -8545,6 +8584,34 @@ pub struct SecurityConfig {
     pub threat_detection: ThreatDetectionConfig,
     pub network_restrictions: NetworkRestrictionsConfig,
     pub file_access: FileAccessConfig,
+    pub script_overrides: HashMap<String, SecurityProfileOverride>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum SecurityProfile {
+    None,    // No restrictions, all libraries and external access allowed
+    Low,     // All standard libraries with minimal restrictions
+    Medium,  // Restricted dangerous operations (default)
+    High,    // Only safe libraries (math, string, table)
+    Custom(CustomSecurityProfile),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CustomSecurityProfile {
+    pub name: String,
+    pub allowed_stdlib_modules: Vec<String>,
+    pub allowed_system_calls: Vec<String>,
+    pub filesystem_access: FilesystemAccessLevel,
+    pub network_access: NetworkAccessLevel,
+    pub external_libraries: bool,
+    pub execution_limits: ExecutionLimits,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SecurityProfileOverride {
+    pub profile: SecurityProfile,
+    pub specific_overrides: HashMap<String, serde_json::Value>,
+    pub reason: String, // Audit trail for why override was needed
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -8718,6 +8785,175 @@ impl EncryptionManager {
 }
 ```
 
+### Security Profile Factory
+
+```rust
+impl SecurityProfile {
+    // Factory methods for predefined profiles
+    pub fn none() -> Self {
+        SecurityProfile::None
+    }
+    
+    pub fn low() -> Self {
+        SecurityProfile::Low
+    }
+    
+    pub fn medium() -> Self {
+        SecurityProfile::Medium
+    }
+    
+    pub fn high() -> Self {
+        SecurityProfile::High
+    }
+    
+    pub fn custom(name: &str) -> CustomSecurityProfileBuilder {
+        CustomSecurityProfileBuilder::new(name)
+    }
+    
+    // Get the security configuration for this profile
+    pub fn to_security_config(&self) -> SecurityConfig {
+        match self {
+            SecurityProfile::None => SecurityConfig {
+                profile: self.clone(),
+                encryption: EncryptionConfig::disabled(),
+                sandbox: SandboxConfig::unrestricted(),
+                audit: AuditConfig::minimal(),
+                rate_limiting: SecurityRateLimitConfig::disabled(),
+                threat_detection: ThreatDetectionConfig::disabled(),
+                network_restrictions: NetworkRestrictionsConfig::none(),
+                file_access: FileAccessConfig::unrestricted(),
+                script_overrides: HashMap::new(),
+            },
+            SecurityProfile::Low => SecurityConfig {
+                profile: self.clone(),
+                encryption: EncryptionConfig::basic(),
+                sandbox: SandboxConfig::permissive(),
+                audit: AuditConfig::standard(),
+                rate_limiting: SecurityRateLimitConfig::lenient(),
+                threat_detection: ThreatDetectionConfig::basic(),
+                network_restrictions: NetworkRestrictionsConfig::minimal(),
+                file_access: FileAccessConfig::standard(),
+                script_overrides: HashMap::new(),
+            },
+            SecurityProfile::Medium => SecurityConfig {
+                profile: self.clone(),
+                encryption: EncryptionConfig::standard(),
+                sandbox: SandboxConfig::restricted(),
+                audit: AuditConfig::comprehensive(),
+                rate_limiting: SecurityRateLimitConfig::moderate(),
+                threat_detection: ThreatDetectionConfig::standard(),
+                network_restrictions: NetworkRestrictionsConfig::standard(),
+                file_access: FileAccessConfig::restricted(),
+                script_overrides: HashMap::new(),
+            },
+            SecurityProfile::High => SecurityConfig {
+                profile: self.clone(),
+                encryption: EncryptionConfig::strict(),
+                sandbox: SandboxConfig::maximum_security(),
+                audit: AuditConfig::comprehensive_with_alerts(),
+                rate_limiting: SecurityRateLimitConfig::strict(),
+                threat_detection: ThreatDetectionConfig::advanced(),
+                network_restrictions: NetworkRestrictionsConfig::strict(),
+                file_access: FileAccessConfig::minimal(),
+                script_overrides: HashMap::new(),
+            },
+            SecurityProfile::Custom(profile) => profile.to_security_config(),
+        }
+    }
+}
+
+pub struct CustomSecurityProfileBuilder {
+    profile: CustomSecurityProfile,
+}
+
+impl CustomSecurityProfileBuilder {
+    pub fn new(name: &str) -> Self {
+        Self {
+            profile: CustomSecurityProfile {
+                name: name.to_string(),
+                allowed_stdlib_modules: vec!["math".to_string(), "string".to_string(), "table".to_string()],
+                allowed_system_calls: vec![],
+                filesystem_access: FilesystemAccessLevel::None,
+                network_access: NetworkAccessLevel::None,
+                external_libraries: false,
+                execution_limits: ExecutionLimits::default(),
+            },
+        }
+    }
+    
+    pub fn allow_stdlib_modules(mut self, modules: Vec<&str>) -> Self {
+        self.profile.allowed_stdlib_modules = modules.iter().map(|s| s.to_string()).collect();
+        self
+    }
+    
+    pub fn allow_filesystem_access(mut self, level: FilesystemAccessLevel) -> Self {
+        self.profile.filesystem_access = level;
+        self
+    }
+    
+    pub fn allow_network_access(mut self, level: NetworkAccessLevel) -> Self {
+        self.profile.network_access = level;
+        self
+    }
+    
+    pub fn allow_external_libraries(mut self, allowed: bool) -> Self {
+        self.profile.external_libraries = allowed;
+        self
+    }
+    
+    pub fn with_execution_limits(mut self, limits: ExecutionLimits) -> Self {
+        self.profile.execution_limits = limits;
+        self
+    }
+    
+    pub fn build(self) -> SecurityProfile {
+        SecurityProfile::Custom(self.profile)
+    }
+}
+
+// Security profile presets for common use cases
+pub struct SecurityProfilePresets;
+
+impl SecurityProfilePresets {
+    pub fn development() -> SecurityProfile {
+        SecurityProfile::custom("development")
+            .allow_stdlib_modules(vec!["io", "os", "debug", "math", "string", "table"])
+            .allow_filesystem_access(FilesystemAccessLevel::ProjectDirectory)
+            .allow_network_access(NetworkAccessLevel::LocalhostOnly)
+            .allow_external_libraries(true)
+            .build()
+    }
+    
+    pub fn testing() -> SecurityProfile {
+        SecurityProfile::custom("testing")
+            .allow_stdlib_modules(vec!["math", "string", "table", "io"])
+            .allow_filesystem_access(FilesystemAccessLevel::TempDirectory)
+            .allow_network_access(NetworkAccessLevel::None)
+            .allow_external_libraries(false)
+            .build()
+    }
+    
+    pub fn production() -> SecurityProfile {
+        SecurityProfile::custom("production")
+            .allow_stdlib_modules(vec!["math", "string", "table"])
+            .allow_filesystem_access(FilesystemAccessLevel::ConfiguredPaths)
+            .allow_network_access(NetworkAccessLevel::ConfiguredHosts)
+            .allow_external_libraries(false)
+            .with_execution_limits(ExecutionLimits::strict())
+            .build()
+    }
+    
+    pub fn data_analysis() -> SecurityProfile {
+        SecurityProfile::custom("data_analysis")
+            .allow_stdlib_modules(vec!["math", "string", "table", "io"])
+            .allow_filesystem_access(FilesystemAccessLevel::DataDirectory)
+            .allow_network_access(NetworkAccessLevel::ApiEndpoints)
+            .allow_external_libraries(false)
+            .build()
+    }
+}
+```
+
 ### Script Sandbox Security
 
 ```rust
@@ -8838,6 +9074,47 @@ impl SandboxManager {
         Ok(env)
     }
     
+    // Execute script with per-script security profile override
+    pub async fn execute_with_profile_override(
+        &self,
+        script_content: &str,
+        script_id: &str,
+        base_profile: SecurityProfile,
+        override_config: Option<SecurityProfileOverride>,
+    ) -> Result<SandboxExecutionResult> {
+        // Apply profile override if specified
+        let effective_security_config = if let Some(override_cfg) = override_config {
+            // Audit the override request
+            tracing::warn!(
+                "Security profile override requested for script '{}': {} -> {:?}. Reason: {}",
+                script_id,
+                match base_profile {
+                    SecurityProfile::None => "None",
+                    SecurityProfile::Low => "Low", 
+                    SecurityProfile::Medium => "Medium",
+                    SecurityProfile::High => "High",
+                    SecurityProfile::Custom(_) => "Custom",
+                },
+                override_cfg.profile,
+                override_cfg.reason
+            );
+            
+            override_cfg.profile.to_security_config()
+        } else {
+            base_profile.to_security_config()
+        };
+        
+        // Create sandbox manager with effective security config
+        let override_sandbox = SandboxManager::new(effective_security_config.sandbox);
+        
+        // Execute with override security settings
+        override_sandbox.execute_sandboxed_script(
+            script_content,
+            ScriptEngineType::Lua,
+            SandboxExecutionContext::from_security_config(&effective_security_config),
+        ).await
+    }
+
     async fn execute_lua_script_sandboxed(
         &self,
         script: &str,
@@ -8845,11 +9122,11 @@ impl SandboxManager {
     ) -> Result<ScriptExecutionResult> {
         use mlua::{Lua, StdLib};
         
-        // Create restricted Lua environment
-        let lua = Lua::new_with(
-            StdLib::TABLE | StdLib::STRING | StdLib::MATH | StdLib::UTF8,
-            mlua::LuaOptions::default(),
-        )?;
+        // Determine allowed libraries based on security profile
+        let stdlib_flags = self.get_stdlib_flags_for_profile();
+        
+        // Create Lua environment with profile-based restrictions
+        let lua = Lua::new_with(stdlib_flags, mlua::LuaOptions::default())?;
         
         // Install sandbox restrictions
         self.install_lua_sandbox_restrictions(&lua, &sandbox_env)?;
@@ -8888,6 +9165,51 @@ impl SandboxManager {
         globals.set("network", safe_network)?;
         
         Ok(())
+    }
+    
+    // Get Lua stdlib flags based on security profile
+    fn get_stdlib_flags_for_profile(&self) -> StdLib {
+        // This would be determined by the SecurityProfile in the config
+        // For example purposes, showing profile-based library access:
+        match self.config.profile.as_ref().unwrap_or(&SecurityProfile::Medium) {
+            SecurityProfile::None => {
+                // All libraries allowed including dangerous ones
+                StdLib::ALL
+            }
+            SecurityProfile::Low => {
+                // Most libraries allowed, excluding only the most dangerous
+                StdLib::ALL & !StdLib::DEBUG & !StdLib::OS
+            }
+            SecurityProfile::Medium => {
+                // Standard safe libraries only
+                StdLib::BASE | StdLib::TABLE | StdLib::STRING | StdLib::MATH | 
+                StdLib::UTF8 | StdLib::COROUTINE
+            }
+            SecurityProfile::High => {
+                // Minimal safe libraries only
+                StdLib::TABLE | StdLib::STRING | StdLib::MATH | StdLib::UTF8
+            }
+            SecurityProfile::Custom(profile) => {
+                // Build flags based on allowed modules
+                let mut flags = StdLib::empty();
+                for module in &profile.allowed_stdlib_modules {
+                    match module.as_str() {
+                        "base" => flags |= StdLib::BASE,
+                        "table" => flags |= StdLib::TABLE,
+                        "string" => flags |= StdLib::STRING,
+                        "math" => flags |= StdLib::MATH,
+                        "utf8" => flags |= StdLib::UTF8,
+                        "coroutine" => flags |= StdLib::COROUTINE,
+                        "io" => flags |= StdLib::IO,
+                        "os" => flags |= StdLib::OS,
+                        "debug" => flags |= StdLib::DEBUG,
+                        "package" => flags |= StdLib::PACKAGE,
+                        _ => {} // Unknown modules ignored for security
+                    }
+                }
+                flags
+            }
+        }
     }
 }
 
