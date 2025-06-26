@@ -1052,11 +1052,48 @@ filesystem_access = "data_directory"
 network_access = "api_endpoints"
 external_libraries = false
 
+# Module loading configuration
+[security.module_loading]
+# Default module loading settings (overridden by security profiles)
+allow_require = false                    # Lua require()
+allow_import = false                     # JS import/require()
+sandboxed_require = true                 # Use sandboxed loader when enabled
+module_cache_enabled = true              # Cache loaded modules
+module_verification = "checksum"         # none, checksum, signature, signature_with_audit
+
+# Whitelisted modules (when Low profile or custom allows module loading)
+[security.module_loading.allowed_modules]
+lua = ["lpeg", "socket", "lfs"]         # Lua modules
+javascript = ["lodash", "axios", "moment"] # npm packages
+
+# Custom module search paths
+[security.module_loading.custom_paths]
+lua = ["./lua_modules", "/opt/llmspell/modules/lua"]
+javascript = ["./node_modules", "/opt/llmspell/modules/js"]
+
+# Pre-approved npm packages with integrity checks
+[[security.module_loading.npm_packages]]
+name = "lodash"
+version = "^4.17.21"
+integrity_hash = "sha512-..."
+allowed_imports = ["debounce", "throttle", "merge"]
+
+[[security.module_loading.npm_packages]]
+name = "axios"
+version = "^1.6.0"
+integrity_hash = "sha512-..."
+allowed_imports = ["*"]  # All exports allowed
+
 # Per-script security overrides
 [security.script_overrides]
 "admin_tools/system_backup.lua" = { profile = "low", reason = "Requires file system access for backup operations" }
 "data_processing/csv_import.lua" = { profile = "data_analysis", reason = "Needs file access for data import" }
 "monitoring/health_check.lua" = { profile = "production", reason = "Production monitoring script" }
+"research/arxiv_scraper.js" = { 
+    profile = "custom", 
+    reason = "Needs axios for API calls",
+    module_loading = { allow_import = true, allowed_modules = ["axios"] }
+}
 
 # Prompt template configuration
 [prompts]
@@ -2537,6 +2574,30 @@ Both modes expose the same core functionalities, ensuring a consistent developer
 
 One of the most powerful features of `rs-llmspell` is its ability to be compiled as a native module and integrated into existing applications. This allows you to bring advanced AI agent and workflow capabilities to your current projects without a full rewrite.
 
+### Module Loading in Library Mode
+
+**Important**: When using Rs-LLMSpell as a native module in an external environment, the security sandboxing and module restrictions **do not apply**. The host environment has full control over module loading:
+
+```lua
+-- In library mode, all module loading is controlled by the host
+local llmspell = require("llmspell")        -- Load rs-llmspell module
+local socket = require("socket")             -- Full access to any Lua module
+local mylib = require("mycompany.mylib")     -- Custom modules work normally
+local json = require("json")                 -- Third-party modules allowed
+
+-- Security is managed by the host application, not rs-llmspell
+```
+
+```javascript
+// In Node.js library mode
+const llmspell = require('@rs/llmspell');   // Load rs-llmspell module
+const axios = require('axios');              // Full npm ecosystem access
+const customLib = require('./custom-lib');   // Custom modules work normally
+import { feature } from 'es6-module';       // ES6 imports fully supported
+
+// Node.js security model applies, not rs-llmspell sandboxing
+```
+
 ### Lua Integration
 
 For Lua applications, `rs-llmspell` can be packaged as a LuaRock. Once installed, you can use it like any other native module:
@@ -2606,6 +2667,55 @@ app.listen(3000, () => {
 ## Lua API Reference
 
 Rs-LLMSpell provides a **unified scripting interface** that delivers identical functionality across Lua, JavaScript, and planned Python support. This interface abstracts away the complexity of the underlying Rust architecture while providing full access to all capabilities.
+
+### Global API Injection Model
+
+Rs-LLMSpell uses a **global object injection** approach rather than traditional module loading:
+
+#### Pre-Injected Global Objects
+
+All Rs-LLMSpell functionality is available through pre-injected global objects, eliminating the need for `require()` statements:
+
+```lua
+-- These globals are automatically available in every script:
+-- No require() needed!
+
+Agent        -- Agent creation and management
+Tool         -- Tool creation and execution  
+Tools        -- Tool registry and discovery
+Workflow     -- Workflow definition and execution
+Hook         -- Hook registration and management
+Event        -- Event emission and subscription
+State        -- Shared state management
+Logger       -- Structured logging
+Config       -- Configuration access
+Security     -- Security context information
+Utils        -- Utility functions
+```
+
+#### Module Loading Behavior by Security Profile
+
+Module loading capabilities depend on the active security profile:
+
+| Security Profile | Lua `require()` | JS `import`/`require()` | External Modules | Rs-LLMSpell APIs |
+|-----------------|-----------------|-------------------------|------------------|-------------------|
+| None | ✅ Allowed | ✅ Allowed | ✅ All modules | ✅ Global objects |
+| Low | ✅ Allowed | ✅ Allowed | 🔒 Whitelist only | ✅ Global objects |
+| Medium | ❌ Disabled | ❌ Disabled | ❌ None | ✅ Global objects |
+| High | ❌ Disabled | ❌ Disabled | ❌ None | ✅ Global objects |
+
+#### Library Mode Exception
+
+When using Rs-LLMSpell as a native module (see [Using Rs-LLMSpell as a Native Module](#using-rs-llmspell-as-a-native-module)), module restrictions do not apply:
+
+```lua
+-- In library mode (external Lua/Node.js environment)
+local llmspell = require("llmspell")  -- Load rs-llmspell as a module
+local axios = require("axios")         -- Full require() access
+local custom = require("./mymodule")   -- Custom modules allowed
+
+-- All module loading controlled by host environment
+```
 
 ### Design Principles
 
@@ -3814,6 +3924,302 @@ end)
 -- Run all tests
 LuaTest.run_all()
 ```
+
+---
+
+## Code Organization Patterns Without Modules
+
+Since Rs-LLMSpell restricts module loading in most security profiles, here are architectural patterns for organizing code without traditional `require()` or `import` statements:
+
+### 1. **Namespace Pattern**
+
+Use tables (Lua) or objects (JavaScript) to create logical namespaces:
+
+```lua
+-- Lua: Namespace using tables
+local MyApp = {
+    Utils = {},
+    Agents = {},
+    Workflows = {},
+    Config = {}
+}
+
+-- Define utilities
+MyApp.Utils.formatResponse = function(data)
+    return {
+        status = "success",
+        data = data,
+        timestamp = os.time()
+    }
+end
+
+-- Define agent factories
+MyApp.Agents.createResearcher = function(config)
+    return Agent.create({
+        name = config.name or "researcher",
+        system_prompt = config.prompt or MyApp.Config.DEFAULT_RESEARCH_PROMPT,
+        tools = {"web_search", "summarizer"}
+    })
+end
+
+-- Use throughout your script
+local researcher = MyApp.Agents.createResearcher({name = "market_analyst"})
+local result = MyApp.Utils.formatResponse(researcher:process(query))
+```
+
+```javascript
+// JavaScript: Namespace using objects
+const MyApp = {
+    Utils: {},
+    Agents: {},
+    Workflows: {},
+    Config: {}
+};
+
+// Define utilities
+MyApp.Utils.formatResponse = (data) => ({
+    status: "success",
+    data,
+    timestamp: Date.now()
+});
+
+// Define agent factories
+MyApp.Agents.createResearcher = (config) => {
+    return Agent.create({
+        name: config.name || "researcher",
+        systemPrompt: config.prompt || MyApp.Config.DEFAULT_RESEARCH_PROMPT,
+        tools: ["web_search", "summarizer"]
+    });
+};
+```
+
+### 2. **Closure Pattern for Private State**
+
+Encapsulate private state without modules:
+
+```lua
+-- Lua: Closure for encapsulation
+local function createStatefulAgent()
+    -- Private state
+    local conversationHistory = {}
+    local totalTokens = 0
+    
+    -- Private helper
+    local function addToHistory(role, content)
+        table.insert(conversationHistory, {
+            role = role,
+            content = content,
+            timestamp = os.time()
+        })
+    end
+    
+    -- Public interface
+    return {
+        chat = function(self, message)
+            addToHistory("user", message)
+            local response = Agent.chat(self.agent, message)
+            addToHistory("assistant", response)
+            totalTokens = totalTokens + response.token_count
+            return response
+        end,
+        
+        getHistory = function(self)
+            return table.copy(conversationHistory) -- Return copy for safety
+        end,
+        
+        getTokenUsage = function(self)
+            return totalTokens
+        end
+    }
+end
+
+-- Usage
+local agent = createStatefulAgent()
+agent:chat("Hello")
+print("Tokens used:", agent:getTokenUsage())
+```
+
+### 3. **Configuration-Driven Architecture**
+
+Centralize configuration in structured objects:
+
+```javascript
+// JavaScript: Configuration-driven patterns
+const AppConfig = {
+    agents: {
+        researcher: {
+            template: "research_agent",
+            tools: ["web_search", "arxiv_search", "summarizer"],
+            prompts: {
+                system: Config.get("prompts.research_agent"),
+                analysis: "Analyze the following data: {{data}}"
+            }
+        },
+        coder: {
+            template: "code_assistant",
+            languages: ["python", "javascript", "rust"],
+            style: {
+                naming: "camelCase",
+                documentation: "jsdoc"
+            }
+        }
+    },
+    
+    workflows: {
+        research_pipeline: {
+            type: "sequential",
+            steps: ["gather", "analyze", "summarize"],
+            error_handling: "continue_on_error"
+        }
+    }
+};
+
+// Factory functions use configuration
+const createAgent = (agentType) => {
+    const config = AppConfig.agents[agentType];
+    if (!config) throw new Error(`Unknown agent type: ${agentType}`);
+    
+    return Agent.template(config.template, {
+        tools: config.tools,
+        systemPrompt: config.prompts.system
+    });
+};
+```
+
+### 4. **Event-Driven Communication**
+
+Use the Event system for loose coupling between components:
+
+```lua
+-- Lua: Event-driven architecture
+local DataProcessor = {
+    init = function(self)
+        -- Subscribe to data events
+        Event.on("data:received", function(data)
+            self:processData(data)
+        end)
+        
+        Event.on("processing:complete", function(result)
+            self:handleResult(result)
+        end)
+    end,
+    
+    processData = function(self, data)
+        -- Process data
+        local result = self:analyze(data)
+        
+        -- Emit completion event
+        Event.emit("data:processed", result)
+    end
+}
+
+-- Different components communicate via events
+local Coordinator = {
+    start = function(self)
+        -- Emit data received event
+        Event.emit("data:received", self.inputData)
+    end
+}
+```
+
+### 5. **Shared State Pattern**
+
+Use the State global for inter-component communication:
+
+```javascript
+// JavaScript: Shared state for component communication
+const SharedState = {
+    // Initialize shared state structure
+    init() {
+        State.set("app.status", "initializing");
+        State.set("app.components", {});
+        State.set("app.results", []);
+    },
+    
+    // Register component
+    registerComponent(name, component) {
+        State.set(`app.components.${name}`, {
+            status: "ready",
+            instance: component
+        });
+    },
+    
+    // Share results between components
+    shareResult(componentName, result) {
+        const results = State.get("app.results") || [];
+        results.push({
+            component: componentName,
+            result,
+            timestamp: Date.now()
+        });
+        State.set("app.results", results);
+    }
+};
+
+// Components use shared state
+const Analyzer = {
+    async analyze(data) {
+        const result = await this.performAnalysis(data);
+        SharedState.shareResult("analyzer", result);
+        return result;
+    }
+};
+```
+
+### 6. **Function Composition Pattern**
+
+Build complex functionality through composition:
+
+```lua
+-- Lua: Function composition
+local Compose = {
+    -- Pipe functions together
+    pipe = function(...)
+        local functions = {...}
+        return function(input)
+            local result = input
+            for _, fn in ipairs(functions) do
+                result = fn(result)
+            end
+            return result
+        end
+    end,
+    
+    -- Conditional composition
+    when = function(predicate, fn)
+        return function(input)
+            if predicate(input) then
+                return fn(input)
+            else
+                return input
+            end
+        end
+    end
+}
+
+-- Build complex processing pipelines
+local processText = Compose.pipe(
+    Compose.when(
+        function(text) return #text > 100 end,
+        Tools.get("summarizer").execute
+    ),
+    Tools.get("sentiment_analyzer").execute,
+    Tools.get("entity_extractor").execute
+)
+
+local result = processText(longText)
+```
+
+### Best Practices for Module-less Development
+
+1. **Clear Naming Conventions**: Use descriptive namespaces to avoid collisions
+2. **Documentation**: Comment extensively since code organization isn't obvious
+3. **Initialization Order**: Define clear initialization sequences
+4. **Error Boundaries**: Wrap components in error handlers
+5. **Type Checking**: Use runtime validation since static analysis is limited
+6. **Testing Strategy**: Create test harnesses that don't rely on module isolation
+
+These patterns enable clean, maintainable code architecture even without traditional module systems, leveraging Rs-LLMSpell's global objects and built-in state management capabilities.
 
 ---
 
@@ -8815,6 +9221,36 @@ pub struct CustomSecurityProfile {
     pub network_access: NetworkAccessLevel,
     pub external_libraries: bool,
     pub execution_limits: ExecutionLimits,
+    pub module_loading: ModuleLoadingConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ModuleLoadingConfig {
+    // Module loading strategy
+    pub allow_require: bool,                    // Allow require() in Lua
+    pub allow_import: bool,                     // Allow import in JavaScript
+    pub allowed_modules: Vec<String>,           // Whitelist of external modules
+    pub custom_module_paths: Vec<String>,       // Additional search paths
+    pub sandboxed_require: bool,                // Use sandboxed module loader
+    pub npm_packages: Vec<AllowedNpmPackage>,  // Pre-approved npm packages
+    pub module_cache_enabled: bool,             // Cache loaded modules
+    pub module_verification: ModuleVerification, // Security verification
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AllowedNpmPackage {
+    pub name: String,
+    pub version: String,           // Exact version or range
+    pub integrity_hash: String,    // SRI hash for verification
+    pub allowed_imports: Vec<String>, // Specific imports allowed
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ModuleVerification {
+    None,                          // No verification (SecurityProfile::None only)
+    Checksum,                      // Verify module checksums
+    Signature,                     // Cryptographic signatures required
+    SignatureWithAudit,           // Signatures + audit log
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -9087,6 +9523,7 @@ impl CustomSecurityProfileBuilder {
                 network_access: NetworkAccessLevel::None,
                 external_libraries: false,
                 execution_limits: ExecutionLimits::default(),
+                module_loading: ModuleLoadingConfig::default(),
             },
         }
     }
@@ -9113,6 +9550,27 @@ impl CustomSecurityProfileBuilder {
     
     pub fn with_execution_limits(mut self, limits: ExecutionLimits) -> Self {
         self.profile.execution_limits = limits;
+        self
+    }
+    
+    pub fn with_module_loading(mut self, config: ModuleLoadingConfig) -> Self {
+        self.profile.module_loading = config;
+        self
+    }
+    
+    pub fn allow_module_loading(mut self, allow_require: bool, allow_import: bool) -> Self {
+        self.profile.module_loading.allow_require = allow_require;
+        self.profile.module_loading.allow_import = allow_import;
+        self
+    }
+    
+    pub fn with_allowed_modules(mut self, modules: Vec<&str>) -> Self {
+        self.profile.module_loading.allowed_modules = modules.iter().map(|s| s.to_string()).collect();
+        self
+    }
+    
+    pub fn with_custom_module_paths(mut self, paths: Vec<&str>) -> Self {
+        self.profile.module_loading.custom_module_paths = paths.iter().map(|s| s.to_string()).collect();
         self
     }
     
@@ -9160,6 +9618,82 @@ impl SecurityProfilePresets {
             .allow_network_access(NetworkAccessLevel::ApiEndpoints)
             .allow_external_libraries(false)
             .build()
+    }
+}
+
+impl Default for ModuleLoadingConfig {
+    fn default() -> Self {
+        Self {
+            allow_require: false,
+            allow_import: false,
+            allowed_modules: vec![],
+            custom_module_paths: vec![],
+            sandboxed_require: true,
+            npm_packages: vec![],
+            module_cache_enabled: true,
+            module_verification: ModuleVerification::Checksum,
+        }
+    }
+}
+
+// Module loading configurations for each security profile
+impl ModuleLoadingConfig {
+    pub fn none() -> Self {
+        Self {
+            allow_require: true,
+            allow_import: true,
+            allowed_modules: vec!["*".to_string()], // All modules allowed
+            custom_module_paths: vec![],
+            sandboxed_require: false, // No sandboxing
+            npm_packages: vec![],
+            module_cache_enabled: true,
+            module_verification: ModuleVerification::None,
+        }
+    }
+    
+    pub fn low() -> Self {
+        Self {
+            allow_require: true,
+            allow_import: true,
+            allowed_modules: vec![
+                // Common safe modules
+                "lodash".to_string(),
+                "axios".to_string(),
+                "moment".to_string(),
+                "uuid".to_string(),
+            ],
+            custom_module_paths: vec![],
+            sandboxed_require: true,
+            npm_packages: vec![],
+            module_cache_enabled: true,
+            module_verification: ModuleVerification::Checksum,
+        }
+    }
+    
+    pub fn medium() -> Self {
+        Self {
+            allow_require: false,
+            allow_import: false,
+            allowed_modules: vec![], // No external modules
+            custom_module_paths: vec![],
+            sandboxed_require: true,
+            npm_packages: vec![],
+            module_cache_enabled: false,
+            module_verification: ModuleVerification::Signature,
+        }
+    }
+    
+    pub fn high() -> Self {
+        Self {
+            allow_require: false,
+            allow_import: false,
+            allowed_modules: vec![],
+            custom_module_paths: vec![],
+            sandboxed_require: true,
+            npm_packages: vec![],
+            module_cache_enabled: false,
+            module_verification: ModuleVerification::SignatureWithAudit,
+        }
     }
 }
 ```
@@ -9357,14 +9891,37 @@ impl SandboxManager {
     fn install_lua_sandbox_restrictions(&self, lua: &Lua, sandbox_env: &SandboxEnvironment) -> Result<()> {
         let globals = lua.globals();
         
-        // Remove dangerous globals
-        globals.set("os", mlua::Nil)?;
-        globals.set("io", mlua::Nil)?;
-        globals.set("require", mlua::Nil)?;
+        // Handle module loading based on security profile
+        if let Some(module_config) = &self.config.module_loading {
+            if module_config.allow_require {
+                // Install sandboxed require with whitelist
+                self.install_sandboxed_require(lua, module_config)?;
+            } else {
+                // Remove module loading capabilities
+                globals.set("require", mlua::Nil)?;
+                globals.set("package", mlua::Nil)?;
+            }
+        } else {
+            // Default: no module loading
+            globals.set("require", mlua::Nil)?;
+        }
+        
+        // Remove other dangerous globals
         globals.set("dofile", mlua::Nil)?;
         globals.set("loadfile", mlua::Nil)?;
         globals.set("load", mlua::Nil)?;
-        globals.set("debug", mlua::Nil)?;
+        
+        // Conditionally remove based on allowed stdlib modules
+        let allowed_modules = &self.config.allowed_stdlib_modules;
+        if !allowed_modules.contains(&"os".to_string()) {
+            globals.set("os", mlua::Nil)?;
+        }
+        if !allowed_modules.contains(&"io".to_string()) {
+            globals.set("io", mlua::Nil)?;
+        }
+        if !allowed_modules.contains(&"debug".to_string()) {
+            globals.set("debug", mlua::Nil)?;
+        }
         
         // Install safe filesystem access
         let safe_fs = self.create_safe_filesystem_api(sandbox_env)?;
@@ -9373,6 +9930,81 @@ impl SandboxManager {
         // Install safe network access
         let safe_network = self.create_safe_network_api(sandbox_env)?;
         globals.set("network", safe_network)?;
+        
+        // Install rs-llmspell globals
+        self.install_llmspell_globals(lua)?;
+        
+        Ok(())
+    }
+    
+    fn install_sandboxed_require(&self, lua: &Lua, module_config: &ModuleLoadingConfig) -> Result<()> {
+        let allowed_modules = module_config.allowed_modules.clone();
+        let custom_paths = module_config.custom_module_paths.clone();
+        let verification = module_config.module_verification.clone();
+        
+        // Create sandboxed require function
+        let sandboxed_require = lua.create_function(move |lua, module_name: String| {
+            // Check if module is in whitelist
+            if !allowed_modules.contains(&module_name) && !allowed_modules.contains(&"*".to_string()) {
+                return Err(mlua::Error::RuntimeError(
+                    format!("Module '{}' is not in the allowed module list", module_name)
+                ));
+            }
+            
+            // Verify module integrity if required
+            match &verification {
+                ModuleVerification::Checksum => {
+                    // Verify module checksum
+                    if !verify_module_checksum(&module_name)? {
+                        return Err(mlua::Error::RuntimeError(
+                            format!("Module '{}' failed checksum verification", module_name)
+                        ));
+                    }
+                }
+                ModuleVerification::Signature => {
+                    // Verify cryptographic signature
+                    if !verify_module_signature(&module_name)? {
+                        return Err(mlua::Error::RuntimeError(
+                            format!("Module '{}' failed signature verification", module_name)
+                        ));
+                    }
+                }
+                ModuleVerification::SignatureWithAudit => {
+                    // Verify and log
+                    if !verify_module_signature(&module_name)? {
+                        return Err(mlua::Error::RuntimeError(
+                            format!("Module '{}' failed signature verification", module_name)
+                        ));
+                    }
+                    audit_module_load(&module_name);
+                }
+                ModuleVerification::None => {}
+            }
+            
+            // Load module with custom paths
+            let module = load_module_with_paths(&module_name, &custom_paths)?;
+            Ok(module)
+        })?;
+        
+        lua.globals().set("require", sandboxed_require)?;
+        Ok(())
+    }
+    
+    fn install_llmspell_globals(&self, lua: &Lua) -> Result<()> {
+        let globals = lua.globals();
+        
+        // Install all rs-llmspell global objects
+        globals.set("Agent", self.create_agent_global(lua)?)?;
+        globals.set("Tool", self.create_tool_global(lua)?)?;
+        globals.set("Tools", self.create_tools_global(lua)?)?;
+        globals.set("Workflow", self.create_workflow_global(lua)?)?;
+        globals.set("Hook", self.create_hook_global(lua)?)?;
+        globals.set("Event", self.create_event_global(lua)?)?;
+        globals.set("State", self.create_state_global(lua)?)?;
+        globals.set("Logger", self.create_logger_global(lua)?)?;
+        globals.set("Config", self.create_config_global(lua)?)?;
+        globals.set("Security", self.create_security_global(lua)?)?;
+        globals.set("Utils", self.create_utils_global(lua)?)?;
         
         Ok(())
     }

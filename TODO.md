@@ -156,22 +156,37 @@ Comprehensive refinement of rs-llmspell architecture based on go-llms and Google
       - [x] ~~Added comprehensive security profile configuration examples~~ **Done** (completed in 12.3.8)
       - [x] ~~Created extensive config generator/validator CLI toolset with migration support~~ **Done**
       - [x] ~~Added configuration migration tools with backup/restore and version management~~ **Done**
-  - [ ] **Task/question 12.3.10** Does the framework or architecture spell out standard library for methods in rs-llmspell for respective script engine to load e.g. for lua promise.lua, llm.lua or provider.lua, agent.lua etc, or are they all assumed to be available? Can the scripts load other lua modules? Same goes for javascript. If not what todos do we need to add to have the architecture spell that out?
-    - [ ] Answer: No standard library modules exist. The architecture uses global object injection:
+  - [x] **Task/question 12.3.10** Does the framework or architecture spell out standard library for methods in rs-llmspell for respective script engine to load e.g. for lua promise.lua, llm.lua or provider.lua, agent.lua etc, or are they all assumed to be available? Can the scripts load other lua modules? Same goes for javascript. If not what todos do we need to add to have the architecture spell that out?
+    - [x] Answer: The architecture now fully documents module loading behavior:
       1. **Global APIs**: Agent, Tool, Tools, Workflow, etc. are pre-injected as globals
       2. **No module loading**: Cannot use `require()` or `import` for rs-llmspell APIs
-      3. **External modules restricted**: Sandboxing prevents loading arbitrary modules
-      4. **Limited npm support**: JavaScript can import pre-approved packages only
-      5. **No promise.lua**: Lua uses native coroutines, not a promise library
-      6. **Security-first design**: Module loading is intentionally restricted for security
-    - [ ] Todo: 
-      - [ ] Document the global API injection model explicitly
-      - [ ] Create a "Script API Reference" section listing all global objects
-      - [ ] Consider adding controlled module loading with whitelist
-      - [ ] Add custom module path configuration for trusted environments
-      - [ ] Document how to package reusable script code without modules
-      - [ ] Consider implementing require() with sandboxed module loader
-      - [ ] Add examples of code organization patterns without modules
+      3. **Module loading by security profile**: None=All, Low=Whitelist, Medium/High=None
+      4. **Sandboxed require/import**: Controlled module loading with verification when allowed
+      5. **Library mode exception**: Full module access when used as native module
+      6. **Code organization patterns**: Documented patterns for module-less development
+    - [x] Todo: ~~Architecture has been comprehensively enhanced with module loading support:~~
+      - [x] ~~Documented global API injection model with complete list of globals~~ **Done**
+      - [x] ~~Added module loading behavior table by security profile~~ **Done**
+      - [x] ~~Implemented controlled module loading with whitelist and verification~~ **Done**
+      - [x] ~~Added custom module path configuration in ModuleLoadingConfig~~ **Done**
+      - [x] ~~Created "Code Organization Patterns Without Modules" section~~ **Done**
+      - [x] ~~Implemented sandboxed require() with security verification~~ **Done**
+      - [x] ~~Added 6 code organization patterns with examples~~ **Done**
+  - [ ] **Task/question 12.3.11** Does the architecture spell out how to enable logging of different levels or debugging of framework/library itself, or logging debuging of scripts? does Log/Logging need to be a global level entity like Agent, Tools or workflows? how about Debug? are they the same thing or different things?
+    - [ ] Answer:
+    - [ ] Todo:
+      - [ ] 
+      - [ ] 
+  - [ ] **Task/question 12.3.12** In the **embedded** mode, the vision is to allow to modes for the command line - runner mode that runs scripts, and repl mode to enter an interactive mode. Does the architecture allow for that? what's missing?
+    - [ ] Answer:
+    - [ ] Todo:
+      - [ ] 
+      - [ ] 
+  - [ ] **Task/question 12.3.13** Based on the architecture, can you tell me component by component, what happens when I run a lua script using the command line runner - which component it hits first etc. assume that the script uses all globals Agents, tools, worklfows etc. What's missing in the architectural document for you not to trace that?
+    - [ ] Answer:
+    - [ ] Todo:
+      - [ ] 
+      - [ ] 
 
 
 ### Phase 13: Implementation Roadmap 
@@ -202,6 +217,13 @@ Comprehensive refinement of rs-llmspell architecture based on go-llms and Google
     - Advanced template interpolation (Handlebars/Jinja2) can be later enhancement phase
     - Configuration migration tools are operational features for post-MVP deployment
     - CLI config management commands are developer experience enhancements for later phases
+  - [ ] **Module Loading Implementation Notes**:
+    - Global API injection (Agent, Tool, Tools, Workflow, etc.) must be MVP priority
+    - Basic module security (no external modules by default) should be MVP for safety
+    - Sandboxed require/import implementation can be enhancement phase
+    - Module whitelist/verification features are advanced security features for later phases
+    - Library mode module support (full access) should be considered with native module distribution
+    - Custom module paths and npm package support are enhancement features post-MVP
 
 ### Phase 14: Final Update (📝 Update)
 - [ ] **Task 14.1**: Complete architecture.md update
