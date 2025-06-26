@@ -259,6 +259,7 @@ mod tests {
             if input.prompt.is_empty() {
                 return Err(crate::LLMSpellError::Validation {
                     message: "Prompt cannot be empty".to_string(),
+                    field: Some("prompt".to_string()),
                 });
             }
             Ok(())
@@ -298,7 +299,7 @@ mod tests {
         let validation_result = agent.validate_input(&invalid_input).await;
         assert!(validation_result.is_err());
         
-        if let Err(crate::LLMSpellError::Validation { message }) = validation_result {
+        if let Err(crate::LLMSpellError::Validation { message, .. }) = validation_result {
             assert_eq!(message, "Prompt cannot be empty");
         } else {
             panic!("Expected validation error");
@@ -311,6 +312,7 @@ mod tests {
         
         let error = crate::LLMSpellError::Component {
             message: "Test error".to_string(),
+            source: None,
         };
         
         let result = agent.handle_error(error).await.unwrap();

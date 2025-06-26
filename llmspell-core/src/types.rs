@@ -6,7 +6,7 @@ use std::fmt;
 use uuid::Uuid;
 
 /// Unique identifier for components
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ComponentId(Uuid);
 
 impl ComponentId {

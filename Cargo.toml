@@ -48,7 +48,7 @@ thiserror = "1.0"
 
 # Logging and tracing
 tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
+tracing-subscriber = { version = "0.3", features = ["json", "env-filter", "fmt", "time"] }
 tracing-futures = "0.2"
 
 # Configuration management
