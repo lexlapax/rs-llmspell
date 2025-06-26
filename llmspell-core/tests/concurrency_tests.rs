@@ -1,16 +1,19 @@
 //! Concurrency and thread-safety tests for llmspell-core
-//! 
+//!
 //! These tests verify that components work correctly under concurrent access
 
-use llmspell_core::{
-    ComponentId, ComponentMetadata, Result,
-    traits::{
-        base_agent::{BaseAgent, AgentInput, AgentOutput, ExecutionContext},
-        agent::{Agent, AgentConfig, ConversationMessage},
-    },
-};
 use async_trait::async_trait;
-use std::sync::{Arc, Mutex, atomic::{AtomicUsize, Ordering}};
+use llmspell_core::{
+    traits::{
+        agent::{Agent, AgentConfig, ConversationMessage},
+        base_agent::{AgentInput, AgentOutput, BaseAgent, ExecutionContext},
+    },
+    ComponentId, ComponentMetadata, Result,
+};
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc, Mutex,
+};
 use tokio::sync::RwLock;
 
 /// Thread-safe agent implementation
@@ -33,7 +36,7 @@ impl ConcurrentAgent {
             execution_count: Arc::new(AtomicUsize::new(0)),
         }
     }
-    
+
     fn get_execution_count(&self) -> usize {
         self.execution_count.load(Ordering::SeqCst)
     }
@@ -44,24 +47,27 @@ impl BaseAgent for ConcurrentAgent {
     fn metadata(&self) -> &ComponentMetadata {
         &self.metadata
     }
-    
+
     async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
         // Increment execution count atomically
         let count = self.execution_count.fetch_add(1, Ordering::SeqCst) + 1;
-        
+
         // Add to conversation with write lock
         {
             let mut conv = self.conversation.write().await;
             conv.push(ConversationMessage::user(input.prompt.clone()));
-            conv.push(ConversationMessage::assistant(format!("Response #{}", count)));
+            conv.push(ConversationMessage::assistant(format!(
+                "Response #{}",
+                count
+            )));
         }
-        
+
         // Simulate some work
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
-        
+
         Ok(AgentOutput::new(format!("Execution #{}", count)))
     }
-    
+
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
         if input.prompt.is_empty() {
             return Err(llmspell_core::LLMSpellError::Validation {
@@ -71,7 +77,7 @@ impl BaseAgent for ConcurrentAgent {
         }
         Ok(())
     }
-    
+
     async fn handle_error(&self, error: llmspell_core::LLMSpellError) -> Result<AgentOutput> {
         Ok(AgentOutput::new(format!("Error: {}", error)))
     }
@@ -82,18 +88,18 @@ impl Agent for ConcurrentAgent {
     fn config(&self) -> &AgentConfig {
         &self.config
     }
-    
+
     async fn get_conversation(&self) -> Result<Vec<ConversationMessage>> {
         let conv = self.conversation.read().await;
         Ok(conv.clone())
     }
-    
+
     async fn add_message(&mut self, message: ConversationMessage) -> Result<()> {
         let mut conv = self.conversation.write().await;
         conv.push(message);
         Ok(())
     }
-    
+
     async fn clear_conversation(&mut self) -> Result<()> {
         let mut conv = self.conversation.write().await;
         conv.clear();
@@ -105,7 +111,7 @@ impl Agent for ConcurrentAgent {
 async fn test_concurrent_agent_execution() {
     let agent = Arc::new(ConcurrentAgent::new("concurrent-test"));
     let num_tasks = 100;
-    
+
     // Spawn multiple concurrent tasks
     let mut handles = Vec::new();
     for i in 0..num_tasks {
@@ -117,23 +123,23 @@ async fn test_concurrent_agent_execution() {
         });
         handles.push(handle);
     }
-    
+
     // Wait for all tasks to complete
     let mut results = Vec::new();
     for handle in handles {
         let result = handle.await.unwrap();
         results.push(result);
     }
-    
+
     // Verify all executions completed
     assert_eq!(results.len(), num_tasks);
     for result in &results {
         assert!(result.is_ok());
     }
-    
+
     // Verify execution count
     assert_eq!(agent.get_execution_count(), num_tasks);
-    
+
     // Verify conversation has correct number of messages
     let conv = agent.get_conversation().await.unwrap();
     assert_eq!(conv.len(), num_tasks * 2); // User + Assistant messages
@@ -143,7 +149,7 @@ async fn test_concurrent_agent_execution() {
 async fn test_component_id_thread_safety() {
     let num_threads = 50;
     let names = Arc::new(Mutex::new(Vec::new()));
-    
+
     // Generate unique names in parallel
     let mut handles = Vec::new();
     for i in 0..num_threads {
@@ -155,12 +161,12 @@ async fn test_component_id_thread_safety() {
         });
         handles.push(handle);
     }
-    
+
     // Wait for all threads
     for handle in handles {
         handle.join().unwrap();
     }
-    
+
     // Verify deterministic ID generation
     let names_vec = names.lock().unwrap();
     for (name, id) in names_vec.iter() {
@@ -172,7 +178,7 @@ async fn test_component_id_thread_safety() {
 #[tokio::test]
 async fn test_concurrent_conversation_modifications() {
     let agent = Arc::new(RwLock::new(ConcurrentAgent::new("conversation-test")));
-    
+
     // Concurrent readers
     let mut read_handles = Vec::new();
     for i in 0..10 {
@@ -184,23 +190,26 @@ async fn test_concurrent_conversation_modifications() {
         });
         read_handles.push(handle);
     }
-    
+
     // Concurrent writer
     let agent_clone = Arc::clone(&agent);
     let write_handle = tokio::spawn(async move {
         for i in 0..20 {
             tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
             let mut agent = agent_clone.write().await;
-            agent.add_message(ConversationMessage::user(format!("Message {}", i))).await.unwrap();
+            agent
+                .add_message(ConversationMessage::user(format!("Message {}", i)))
+                .await
+                .unwrap();
         }
     });
-    
+
     // Wait for all operations
     for handle in read_handles {
         let _ = handle.await.unwrap();
     }
     write_handle.await.unwrap();
-    
+
     // Verify final state
     let agent = agent.read().await;
     let conv = agent.get_conversation().await.unwrap();
@@ -214,7 +223,7 @@ async fn test_metadata_immutability() {
         "shared-component".to_string(),
         "A shared component".to_string(),
     ));
-    
+
     let mut handles = Vec::new();
     for _ in 0..10 {
         let metadata_clone = Arc::clone(&metadata);
@@ -227,7 +236,7 @@ async fn test_metadata_immutability() {
         });
         handles.push(handle);
     }
-    
+
     for handle in handles {
         handle.await.unwrap();
     }
@@ -239,9 +248,9 @@ async fn test_execution_context_concurrent_access() {
         ExecutionContext::new("shared-session".to_string())
             .with_user_id("user-123".to_string())
             .with_env("KEY1".to_string(), "value1".to_string())
-            .with_env("KEY2".to_string(), "value2".to_string())
+            .with_env("KEY2".to_string(), "value2".to_string()),
     );
-    
+
     let mut handles = Vec::new();
     for i in 0..20 {
         let context_clone = Arc::clone(&context);
@@ -249,7 +258,7 @@ async fn test_execution_context_concurrent_access() {
             // Concurrent reads
             assert_eq!(context_clone.session_id, "shared-session");
             assert_eq!(context_clone.user_id, Some("user-123".to_string()));
-            
+
             // Access environment variables
             if i % 2 == 0 {
                 assert_eq!(context_clone.get_env("KEY1"), Some(&"value1".to_string()));
@@ -259,7 +268,7 @@ async fn test_execution_context_concurrent_access() {
         });
         handles.push(handle);
     }
-    
+
     for handle in handles {
         handle.await.unwrap();
     }
@@ -268,25 +277,31 @@ async fn test_execution_context_concurrent_access() {
 #[test]
 fn test_error_thread_safety() {
     use std::thread;
-    
+
     // Errors should be Send + Sync
     let error = Arc::new(llmspell_core::LLMSpellError::Component {
         message: "Shared error".to_string(),
         source: None,
     });
-    
+
     let mut handles = Vec::new();
     for _ in 0..10 {
         let error_clone = Arc::clone(&error);
         let handle = thread::spawn(move || {
             // Access error from multiple threads
             assert!(error_clone.to_string().contains("Shared error"));
-            assert_eq!(error_clone.severity(), llmspell_core::error::ErrorSeverity::Error);
-            assert_eq!(error_clone.category(), llmspell_core::error::ErrorCategory::Logic);
+            assert_eq!(
+                error_clone.severity(),
+                llmspell_core::error::ErrorSeverity::Error
+            );
+            assert_eq!(
+                error_clone.category(),
+                llmspell_core::error::ErrorCategory::Logic
+            );
         });
         handles.push(handle);
     }
-    
+
     for handle in handles {
         handle.join().unwrap();
     }

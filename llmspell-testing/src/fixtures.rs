@@ -2,38 +2,41 @@
 //! ABOUTME: Provides pre-configured test objects and sample data
 
 //! Test fixtures and common test data.
-//! 
+//!
 //! This module provides pre-configured test objects and sample data
 //! that can be used across different test suites for consistency.
-//! 
+//!
 //! # Examples
-//! 
+//!
 //! ```rust
 //! use llmspell_testing::fixtures::{
 //!     sample_component_metadata,
 //!     sample_agent_input,
 //!     sample_workflow_steps,
 //! };
-//! 
+//!
 //! // Use pre-configured test data
 //! let metadata = sample_component_metadata();
 //! assert_eq!(metadata.name, "test-component");
-//! 
+//!
 //! let input = sample_agent_input();
 //! assert_eq!(input.prompt, "Test prompt");
 //! ```
 
 use llmspell_core::{
-    ComponentId, Version, ComponentMetadata,
     traits::{
+        agent::{AgentConfig, ConversationMessage},
         base_agent::{AgentInput, ExecutionContext},
-        agent::{ConversationMessage, MessageRole, AgentConfig},
         tool::ToolSchema,
-        workflow::{WorkflowStep, RetryPolicy, WorkflowConfig},
+        workflow::{RetryPolicy, WorkflowConfig, WorkflowStep},
     },
+    ComponentId, ComponentMetadata, Version,
 };
-use std::time::Duration;
+
+#[cfg(test)]
+use llmspell_core::traits::agent::MessageRole;
 use serde_json::json;
+use std::time::Duration;
 
 /// Sample ComponentMetadata for testing
 pub fn sample_component_metadata() -> ComponentMetadata {
@@ -41,7 +44,11 @@ pub fn sample_component_metadata() -> ComponentMetadata {
         "test-component".to_string(),
         "A test component for unit testing".to_string(),
     );
-    metadata.version = Version { major: 1, minor: 0, patch: 0 };
+    metadata.version = Version {
+        major: 1,
+        minor: 0,
+        patch: 0,
+    };
     metadata
 }
 
@@ -61,7 +68,11 @@ pub fn component_metadata_variants() -> Vec<ComponentMetadata> {
                 "v2-component".to_string(),
                 "Version 2 test component".to_string(),
             );
-            metadata.version = Version { major: 2, minor: 0, patch: 0 };
+            metadata.version = Version {
+                major: 2,
+                minor: 0,
+                patch: 0,
+            };
             metadata
         },
     ]
@@ -103,7 +114,9 @@ pub fn sample_conversation() -> Vec<ConversationMessage> {
     vec![
         ConversationMessage::system("You are a helpful assistant for testing.".to_string()),
         ConversationMessage::user("Hello, how are you?".to_string()),
-        ConversationMessage::assistant("I'm doing well, thank you! How can I help you today?".to_string()),
+        ConversationMessage::assistant(
+            "I'm doing well, thank you! How can I help you today?".to_string(),
+        ),
         ConversationMessage::user("Can you help me test something?".to_string()),
         ConversationMessage::assistant("Of course! I'd be happy to help you test.".to_string()),
     ]
@@ -122,10 +135,10 @@ pub fn sample_agent_config() -> AgentConfig {
 /// Sample ToolSchema for testing
 pub fn sample_tool_schema() -> ToolSchema {
     use llmspell_core::traits::tool::{ParameterDef, ParameterType};
-    
+
     ToolSchema::new(
         "process_data".to_string(),
-        "Process data with various options".to_string()
+        "Process data with various options".to_string(),
     )
     .with_parameter(ParameterDef {
         name: "input".to_string(),
@@ -156,7 +169,7 @@ pub fn sample_workflow_steps() -> Vec<WorkflowStep> {
     let step1_id = ComponentId::from_name("step-1");
     let step2_id = ComponentId::from_name("step-2");
     let step3_id = ComponentId::from_name("step-3");
-    
+
     vec![
         WorkflowStep {
             id: step1_id,
@@ -201,7 +214,7 @@ pub fn sample_workflow_config() -> WorkflowConfig {
 /// Create test error scenarios
 pub fn error_scenarios() -> Vec<llmspell_core::LLMSpellError> {
     use llmspell_core::LLMSpellError;
-    
+
     vec![
         // Component error
         LLMSpellError::Component {
@@ -239,38 +252,38 @@ pub fn setup_test_environment() -> std::collections::HashMap<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_sample_fixtures() {
         // Test metadata fixture
         let metadata = sample_component_metadata();
         assert_eq!(metadata.name, "test-component");
         assert_eq!(metadata.version.major, 1);
-        
+
         // Test input fixture
         let input = sample_agent_input();
         assert_eq!(input.prompt, "Test prompt");
         assert!(!input.context.is_empty());
-        
+
         // Test conversation fixture
         let conversation = sample_conversation();
         assert_eq!(conversation.len(), 5);
         assert_eq!(conversation[0].role, MessageRole::System);
-        
+
         // Test workflow steps
         let steps = sample_workflow_steps();
         assert_eq!(steps.len(), 3);
         assert_eq!(steps[1].dependencies.len(), 1);
     }
-    
+
     #[test]
     fn test_fixture_variants() {
         let metadata_variants = component_metadata_variants();
         assert_eq!(metadata_variants.len(), 3);
-        
+
         let input_variants = agent_input_variants();
         assert_eq!(input_variants.len(), 3);
-        
+
         let errors = error_scenarios();
         assert!(errors.len() >= 4);
     }

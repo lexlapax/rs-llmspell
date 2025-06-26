@@ -7,15 +7,15 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
 /// Role in a conversation.
-/// 
+///
 /// Defines the role of a message in a conversation history.
 /// Used for maintaining context in LLM interactions.
-/// 
+///
 /// # Examples
-/// 
+///
 /// ```
 /// use llmspell_core::traits::agent::MessageRole;
-/// 
+///
 /// assert_eq!(MessageRole::System.to_string(), "system");
 /// assert_eq!(MessageRole::User.to_string(), "user");
 /// assert_eq!(MessageRole::Assistant.to_string(), "assistant");
@@ -38,20 +38,20 @@ impl std::fmt::Display for MessageRole {
 }
 
 /// Conversation message in an agent's history.
-/// 
+///
 /// Represents a single message in a conversation, including the role,
 /// content, and timestamp. Used to maintain conversation context for agents.
-/// 
+///
 /// # Examples
-/// 
+///
 /// ```
 /// use llmspell_core::traits::agent::{ConversationMessage, MessageRole};
-/// 
+///
 /// // Create messages using convenience methods
 /// let system_msg = ConversationMessage::system("You are a helpful assistant".to_string());
 /// let user_msg = ConversationMessage::user("Hello!".to_string());
 /// let assistant_msg = ConversationMessage::assistant("Hi! How can I help?".to_string());
-/// 
+///
 /// assert_eq!(system_msg.role, MessageRole::System);
 /// assert_eq!(user_msg.role, MessageRole::User);
 /// assert_eq!(assistant_msg.role, MessageRole::Assistant);
@@ -72,17 +72,17 @@ impl ConversationMessage {
             timestamp: chrono::Utc::now(),
         }
     }
-    
+
     /// Create a system message
     pub fn system(content: String) -> Self {
         Self::new(MessageRole::System, content)
     }
-    
+
     /// Create a user message
     pub fn user(content: String) -> Self {
         Self::new(MessageRole::User, content)
     }
-    
+
     /// Create an assistant message
     pub fn assistant(content: String) -> Self {
         Self::new(MessageRole::Assistant, content)
@@ -90,22 +90,22 @@ impl ConversationMessage {
 }
 
 /// Configuration for LLM-powered agents.
-/// 
+///
 /// Controls agent behavior including conversation management, generation parameters,
 /// and system prompts. All fields are optional to allow partial configuration.
-/// 
+///
 /// # Examples
-/// 
+///
 /// ```
 /// use llmspell_core::traits::agent::AgentConfig;
-/// 
+///
 /// let config = AgentConfig {
 ///     max_conversation_length: Some(50),
 ///     system_prompt: Some("You are a research assistant".to_string()),
 ///     temperature: Some(0.7),
 ///     max_tokens: Some(1000),
 /// };
-/// 
+///
 /// // Or use default configuration
 /// let default_config = AgentConfig::default();
 /// assert_eq!(default_config.max_conversation_length, Some(100));
@@ -135,20 +135,20 @@ impl Default for AgentConfig {
 }
 
 /// Agent trait for LLM-powered components.
-/// 
+///
 /// Extends `BaseAgent` with conversation management and LLM-specific functionality.
 /// Agents maintain conversation history, handle message trimming, and provide
 /// configuration for LLM generation parameters.
-/// 
+///
 /// # Implementation Requirements
-/// 
+///
 /// - Must maintain conversation history thread-safely
 /// - Should implement conversation trimming to respect max length
 /// - Configuration should be accessible but may be immutable
 /// - All conversation operations should be atomic
-/// 
+///
 /// # Examples
-/// 
+///
 /// ```ignore
 /// use llmspell_core::{
 ///     ComponentMetadata, Result,
@@ -158,13 +158,13 @@ impl Default for AgentConfig {
 ///     }
 /// };
 /// use async_trait::async_trait;
-/// 
+///
 /// struct MyLLMAgent {
 ///     metadata: ComponentMetadata,
 ///     config: AgentConfig,
 ///     conversation: Vec<ConversationMessage>,
 /// }
-/// 
+///
 /// #[async_trait]
 /// impl Agent for MyLLMAgent {
 ///     fn config(&self) -> &AgentConfig {
@@ -187,7 +187,7 @@ impl Default for AgentConfig {
 ///         Ok(())
 ///     }
 /// }
-/// 
+///
 /// # impl BaseAgent for MyLLMAgent {
 /// #     fn metadata(&self) -> &ComponentMetadata { &self.metadata }
 /// #     async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput> {
@@ -203,21 +203,21 @@ impl Default for AgentConfig {
 pub trait Agent: BaseAgent {
     /// Get agent configuration
     fn config(&self) -> &AgentConfig;
-    
+
     /// Get conversation history
     async fn get_conversation(&self) -> Result<Vec<ConversationMessage>>;
-    
+
     /// Add message to conversation
     async fn add_message(&mut self, message: ConversationMessage) -> Result<()>;
-    
+
     /// Clear conversation history
     async fn clear_conversation(&mut self) -> Result<()>;
-    
+
     /// Get the current conversation length
     async fn conversation_length(&self) -> Result<usize> {
         Ok(self.get_conversation().await?.len())
     }
-    
+
     /// Trim conversation to configured max length
     async fn trim_conversation(&mut self) -> Result<()> {
         if let Some(max_len) = self.config().max_conversation_length {
@@ -230,21 +230,23 @@ pub trait Agent: BaseAgent {
                     .filter(|msg| matches!(msg.role, MessageRole::System))
                     .cloned()
                     .collect();
-                
+
                 let other_messages: Vec<_> = conversation
                     .into_iter()
                     .filter(|msg| !matches!(msg.role, MessageRole::System))
                     .collect();
-                
-                let skip_count = other_messages.len().saturating_sub(max_len - system_messages.len());
-                
+
+                let skip_count = other_messages
+                    .len()
+                    .saturating_sub(max_len - system_messages.len());
+
                 self.clear_conversation().await?;
-                
+
                 // Re-add system messages
                 for msg in system_messages {
                     self.add_message(msg).await?;
                 }
-                
+
                 // Add trimmed other messages
                 for msg in other_messages.into_iter().skip(skip_count) {
                     self.add_message(msg).await?;
@@ -257,83 +259,83 @@ pub trait Agent: BaseAgent {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::base_agent::{AgentInput, AgentOutput, ExecutionContext};
+    use super::*;
     use crate::ComponentMetadata;
     use std::collections::VecDeque;
-    
+
     #[test]
     fn test_message_role_display() {
         assert_eq!(MessageRole::System.to_string(), "system");
         assert_eq!(MessageRole::User.to_string(), "user");
         assert_eq!(MessageRole::Assistant.to_string(), "assistant");
     }
-    
+
     #[test]
     fn test_conversation_message_creation() {
         let content = "Test message".to_string();
         let msg = ConversationMessage::new(MessageRole::User, content.clone());
-        
+
         assert_eq!(msg.role, MessageRole::User);
         assert_eq!(msg.content, content);
-        
+
         // Test helper methods
         let system_msg = ConversationMessage::system("System prompt".to_string());
         assert_eq!(system_msg.role, MessageRole::System);
-        
+
         let user_msg = ConversationMessage::user("User input".to_string());
         assert_eq!(user_msg.role, MessageRole::User);
-        
+
         let assistant_msg = ConversationMessage::assistant("Assistant response".to_string());
         assert_eq!(assistant_msg.role, MessageRole::Assistant);
     }
-    
+
     #[test]
     fn test_conversation_message_serialization() {
         let msg = ConversationMessage::user("Test".to_string());
-        
+
         let json = serde_json::to_string(&msg).unwrap();
         let deserialized: ConversationMessage = serde_json::from_str(&json).unwrap();
-        
+
         assert_eq!(msg.role, deserialized.role);
         assert_eq!(msg.content, deserialized.content);
     }
-    
+
     #[test]
     fn test_agent_config_default() {
         let config = AgentConfig::default();
-        
+
         assert_eq!(config.max_conversation_length, Some(100));
         assert_eq!(config.system_prompt, None);
         assert_eq!(config.temperature, Some(0.7));
         assert_eq!(config.max_tokens, Some(2000));
     }
-    
+
     #[test]
     fn test_agent_config_serialization() {
         let mut config = AgentConfig::default();
         config.system_prompt = Some("You are a helpful assistant".to_string());
         config.temperature = Some(0.9);
-        
+
         let json = serde_json::to_string(&config).unwrap();
         let deserialized: AgentConfig = serde_json::from_str(&json).unwrap();
-        
+
         assert_eq!(config.system_prompt, deserialized.system_prompt);
         assert_eq!(config.temperature, deserialized.temperature);
     }
-    
+
     // Mock implementation for testing
     struct MockLLMAgent {
         metadata: ComponentMetadata,
         config: AgentConfig,
         conversation: VecDeque<ConversationMessage>,
     }
-    
+
     impl MockLLMAgent {
         fn new() -> Self {
             let mut config = AgentConfig::default();
             config.system_prompt = Some("You are a test assistant".to_string());
-            
+
             Self {
                 metadata: ComponentMetadata::new(
                     "mock-llm-agent".to_string(),
@@ -344,18 +346,22 @@ mod tests {
             }
         }
     }
-    
+
     #[async_trait]
     impl BaseAgent for MockLLMAgent {
         fn metadata(&self) -> &ComponentMetadata {
             &self.metadata
         }
-        
-        async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+
+        async fn execute(
+            &self,
+            input: AgentInput,
+            _context: ExecutionContext,
+        ) -> Result<AgentOutput> {
             // Simple echo response
             Ok(AgentOutput::new(format!("Response to: {}", input.prompt)))
         }
-        
+
         async fn validate_input(&self, input: &AgentInput) -> Result<()> {
             if input.prompt.is_empty() {
                 return Err(crate::LLMSpellError::Validation {
@@ -365,94 +371,115 @@ mod tests {
             }
             Ok(())
         }
-        
+
         async fn handle_error(&self, error: crate::LLMSpellError) -> Result<AgentOutput> {
             Ok(AgentOutput::new(format!("Error: {}", error)))
         }
     }
-    
+
     #[async_trait]
     impl Agent for MockLLMAgent {
         fn config(&self) -> &AgentConfig {
             &self.config
         }
-        
+
         async fn get_conversation(&self) -> Result<Vec<ConversationMessage>> {
             Ok(self.conversation.iter().cloned().collect())
         }
-        
+
         async fn add_message(&mut self, message: ConversationMessage) -> Result<()> {
             self.conversation.push_back(message);
             Ok(())
         }
-        
+
         async fn clear_conversation(&mut self) -> Result<()> {
             self.conversation.clear();
             Ok(())
         }
     }
-    
+
     #[tokio::test]
     async fn test_agent_conversation_management() {
         let mut agent = MockLLMAgent::new();
-        
+
         // Test empty conversation
         assert_eq!(agent.conversation_length().await.unwrap(), 0);
-        
+
         // Add messages
-        agent.add_message(ConversationMessage::system("System prompt".to_string())).await.unwrap();
-        agent.add_message(ConversationMessage::user("Hello".to_string())).await.unwrap();
-        agent.add_message(ConversationMessage::assistant("Hi there!".to_string())).await.unwrap();
-        
+        agent
+            .add_message(ConversationMessage::system("System prompt".to_string()))
+            .await
+            .unwrap();
+        agent
+            .add_message(ConversationMessage::user("Hello".to_string()))
+            .await
+            .unwrap();
+        agent
+            .add_message(ConversationMessage::assistant("Hi there!".to_string()))
+            .await
+            .unwrap();
+
         assert_eq!(agent.conversation_length().await.unwrap(), 3);
-        
+
         // Get conversation
         let conversation = agent.get_conversation().await.unwrap();
         assert_eq!(conversation.len(), 3);
         assert_eq!(conversation[0].role, MessageRole::System);
         assert_eq!(conversation[1].role, MessageRole::User);
         assert_eq!(conversation[2].role, MessageRole::Assistant);
-        
+
         // Clear conversation
         agent.clear_conversation().await.unwrap();
         assert_eq!(agent.conversation_length().await.unwrap(), 0);
     }
-    
+
     #[tokio::test]
     async fn test_agent_conversation_trimming() {
         let mut agent = MockLLMAgent::new();
         agent.config.max_conversation_length = Some(5);
-        
+
         // Add system message
-        agent.add_message(ConversationMessage::system("System prompt".to_string())).await.unwrap();
-        
+        agent
+            .add_message(ConversationMessage::system("System prompt".to_string()))
+            .await
+            .unwrap();
+
         // Add more messages than max length
         for i in 0..6 {
-            agent.add_message(ConversationMessage::user(format!("Message {}", i))).await.unwrap();
-            agent.add_message(ConversationMessage::assistant(format!("Response {}", i))).await.unwrap();
+            agent
+                .add_message(ConversationMessage::user(format!("Message {}", i)))
+                .await
+                .unwrap();
+            agent
+                .add_message(ConversationMessage::assistant(format!("Response {}", i)))
+                .await
+                .unwrap();
         }
-        
+
         // Should have 13 messages (1 system + 12 others)
         assert_eq!(agent.conversation_length().await.unwrap(), 13);
-        
+
         // Trim conversation
         agent.trim_conversation().await.unwrap();
-        
+
         // Should keep system message and latest 4 messages
         assert_eq!(agent.conversation_length().await.unwrap(), 5);
-        
+
         let conversation = agent.get_conversation().await.unwrap();
         assert_eq!(conversation[0].role, MessageRole::System);
         assert!(conversation[1].content.contains("Message 4")); // Should keep latest messages
     }
-    
+
     #[tokio::test]
     async fn test_agent_config_usage() {
         let agent = MockLLMAgent::new();
-        
+
         // Test config access
         let config = agent.config();
-        assert_eq!(config.system_prompt, Some("You are a test assistant".to_string()));
+        assert_eq!(
+            config.system_prompt,
+            Some("You are a test assistant".to_string())
+        );
         assert_eq!(config.temperature, Some(0.7));
         assert_eq!(config.max_tokens, Some(2000));
     }

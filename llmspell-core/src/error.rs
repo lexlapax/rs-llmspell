@@ -4,15 +4,15 @@
 use thiserror::Error;
 
 /// Error severity levels.
-/// 
+///
 /// Defines the severity of errors in the system, from informational to fatal.
 /// Used for error prioritization, alerting, and recovery strategies.
-/// 
+///
 /// # Examples
-/// 
+///
 /// ```
 /// use llmspell_core::error::ErrorSeverity;
-/// 
+///
 /// assert!(ErrorSeverity::Info < ErrorSeverity::Warning);
 /// assert!(ErrorSeverity::Error < ErrorSeverity::Critical);
 /// assert!(ErrorSeverity::Critical < ErrorSeverity::Fatal);
@@ -32,16 +32,16 @@ pub enum ErrorSeverity {
 }
 
 /// Error category for classification.
-/// 
+///
 /// Groups errors by their source or type for better error handling
 /// and monitoring. Categories help determine retry strategies and
 /// escalation paths.
-/// 
+///
 /// # Examples
-/// 
+///
 /// ```
 /// use llmspell_core::error::ErrorCategory;
-/// 
+///
 /// let category = ErrorCategory::Network;
 /// match category {
 ///     ErrorCategory::Network => println!("Network issue - may be transient"),
@@ -69,30 +69,30 @@ pub enum ErrorCategory {
 }
 
 /// Comprehensive error enum for all LLMSpell operations.
-/// 
+///
 /// Central error type that encompasses all possible errors in the system.
 /// Each variant includes relevant context and may chain underlying errors.
 /// Provides methods for categorization, severity assessment, and retry logic.
-/// 
+///
 /// # Error Handling Strategy
-/// 
+///
 /// - **Retryable errors**: Network, timeout, and some storage errors
 /// - **Non-retryable errors**: Validation, security, and configuration errors
 /// - **Error chaining**: Use `with_source()` to preserve error context
 /// - **Structured logging**: All errors integrate with the logging system
-/// 
+///
 /// # Examples
-/// 
+///
 /// ```
 /// use llmspell_core::{LLMSpellError, Result};
 /// use std::io;
-/// 
+///
 /// // Create errors with context
 /// let validation_err = LLMSpellError::Validation {
 ///     message: "Invalid email format".to_string(),
 ///     field: Some("email".to_string()),
 /// };
-/// 
+///
 /// // Chain errors
 /// let io_error = io::Error::new(io::ErrorKind::NotFound, "File not found");
 /// let storage_err = LLMSpellError::Storage {
@@ -100,86 +100,86 @@ pub enum ErrorCategory {
 ///     operation: Some("read".to_string()),
 ///     source: None,
 /// }.with_source(io_error);
-/// 
+///
 /// // Check error properties
 /// assert!(!validation_err.is_retryable());
 /// assert!(storage_err.is_retryable());
-/// 
+///
 /// // Use convenience macros
 /// use llmspell_core::{component_error, validation_error};
-/// 
+///
 /// let comp_err = component_error!("Component initialization failed");
 /// let val_err = validation_error!("Missing required field", "username");
 /// ```
 #[derive(Debug, Error)]
 pub enum LLMSpellError {
     #[error("Component error: {message}")]
-    Component { 
+    Component {
         message: String,
         #[source]
         source: Option<Box<dyn std::error::Error + Send + Sync>>,
     },
-    
+
     #[error("Configuration error: {message}")]
-    Configuration { 
+    Configuration {
         message: String,
-        #[source] 
+        #[source]
         source: Option<Box<dyn std::error::Error + Send + Sync>>,
     },
-    
+
     #[error("LLM provider error: {message}")]
-    Provider { 
+    Provider {
         message: String,
         provider: Option<String>,
         #[source]
         source: Option<Box<dyn std::error::Error + Send + Sync>>,
     },
-    
+
     #[error("Script execution error: {message}")]
-    Script { 
+    Script {
         message: String,
         language: Option<String>,
         line: Option<usize>,
         #[source]
         source: Option<Box<dyn std::error::Error + Send + Sync>>,
     },
-    
+
     #[error("Tool execution error: {message}")]
-    Tool { 
+    Tool {
         message: String,
         tool_name: Option<String>,
         #[source]
         source: Option<Box<dyn std::error::Error + Send + Sync>>,
     },
-    
+
     #[error("Workflow execution error: {message}")]
-    Workflow { 
+    Workflow {
         message: String,
         step: Option<String>,
         #[source]
         source: Option<Box<dyn std::error::Error + Send + Sync>>,
     },
-    
+
     #[error("Storage error: {message}")]
-    Storage { 
+    Storage {
         message: String,
         operation: Option<String>,
         #[source]
         source: Option<Box<dyn std::error::Error + Send + Sync>>,
     },
-    
+
     #[error("Security violation: {message}")]
-    Security { 
+    Security {
         message: String,
         violation_type: Option<String>,
     },
-    
+
     #[error("Validation error: {message}")]
-    Validation { 
+    Validation {
         message: String,
         field: Option<String>,
     },
-    
+
     #[error("Resource error: {message}")]
     Resource {
         message: String,
@@ -187,22 +187,22 @@ pub enum LLMSpellError {
         #[source]
         source: Option<Box<dyn std::error::Error + Send + Sync>>,
     },
-    
+
     #[error("Timeout error: {message}")]
     Timeout {
         message: String,
         duration_ms: Option<u64>,
     },
-    
+
     #[error("Network error: {message}")]
     Network {
         message: String,
         #[source]
         source: Option<Box<dyn std::error::Error + Send + Sync>>,
     },
-    
+
     #[error("Internal error: {message}")]
-    Internal { 
+    Internal {
         message: String,
         #[source]
         source: Option<Box<dyn std::error::Error + Send + Sync>>,
@@ -218,11 +218,13 @@ impl LLMSpellError {
             Self::Resource { .. } | Self::Timeout { .. } => ErrorCategory::Resource,
             Self::Security { .. } => ErrorCategory::Security,
             Self::Validation { .. } | Self::Component { .. } => ErrorCategory::Logic,
-            Self::Tool { .. } | Self::Script { .. } | Self::Workflow { .. } => ErrorCategory::External,
+            Self::Tool { .. } | Self::Script { .. } | Self::Workflow { .. } => {
+                ErrorCategory::External
+            }
             Self::Storage { .. } | Self::Internal { .. } => ErrorCategory::Internal,
         }
     }
-    
+
     /// Get the error severity
     pub fn severity(&self) -> ErrorSeverity {
         match self {
@@ -234,7 +236,7 @@ impl LLMSpellError {
             _ => ErrorSeverity::Error,
         }
     }
-    
+
     /// Check if the error is retryable
     pub fn is_retryable(&self) -> bool {
         match self {
@@ -242,22 +244,22 @@ impl LLMSpellError {
             Self::Resource { .. } => true,
             Self::Storage { operation, .. } => {
                 // Some storage operations are retryable
-                operation.as_ref().map_or(false, |op| {
-                    op == "read" || op == "write" || op == "lock"
-                })
+                operation
+                    .as_ref()
+                    .is_some_and(|op| op == "read" || op == "write" || op == "lock")
             }
             Self::Security { .. } | Self::Configuration { .. } | Self::Validation { .. } => false,
             Self::Internal { .. } => false,
             _ => false,
         }
     }
-    
+
     /// Get suggested retry delay in milliseconds
     pub fn retry_delay_ms(&self) -> Option<u64> {
         if !self.is_retryable() {
             return None;
         }
-        
+
         match self {
             Self::Network { .. } => Some(1000), // 1 second
             Self::Timeout { duration_ms, .. } => {
@@ -265,28 +267,28 @@ impl LLMSpellError {
                 duration_ms.map(|d| d * 2).or(Some(5000))
             }
             Self::Provider { .. } => Some(2000), // 2 seconds
-            Self::Resource { .. } => Some(500), // 500ms
-            Self::Storage { .. } => Some(100), // 100ms
-            _ => Some(1000), // Default 1 second
+            Self::Resource { .. } => Some(500),  // 500ms
+            Self::Storage { .. } => Some(100),   // 100ms
+            _ => Some(1000),                     // Default 1 second
         }
     }
-    
+
     /// Chain with another error as the source
-    pub fn with_source<E>(mut self, source: E) -> Self 
-    where 
-        E: std::error::Error + Send + Sync + 'static 
+    pub fn with_source<E>(mut self, source: E) -> Self
+    where
+        E: std::error::Error + Send + Sync + 'static,
     {
         match &mut self {
-            Self::Component { source: src, .. } |
-            Self::Configuration { source: src, .. } |
-            Self::Provider { source: src, .. } |
-            Self::Script { source: src, .. } |
-            Self::Tool { source: src, .. } |
-            Self::Workflow { source: src, .. } |
-            Self::Storage { source: src, .. } |
-            Self::Resource { source: src, .. } |
-            Self::Network { source: src, .. } |
-            Self::Internal { source: src, .. } => {
+            Self::Component { source: src, .. }
+            | Self::Configuration { source: src, .. }
+            | Self::Provider { source: src, .. }
+            | Self::Script { source: src, .. }
+            | Self::Tool { source: src, .. }
+            | Self::Workflow { source: src, .. }
+            | Self::Storage { source: src, .. }
+            | Self::Resource { source: src, .. }
+            | Self::Network { source: src, .. }
+            | Self::Internal { source: src, .. } => {
                 *src = Some(Box::new(source));
             }
             _ => {}
@@ -409,7 +411,7 @@ macro_rules! log_error {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_error_severity_ordering() {
         assert!(ErrorSeverity::Info < ErrorSeverity::Warning);
@@ -417,7 +419,7 @@ mod tests {
         assert!(ErrorSeverity::Error < ErrorSeverity::Critical);
         assert!(ErrorSeverity::Critical < ErrorSeverity::Fatal);
     }
-    
+
     #[test]
     fn test_error_categorization() {
         let config_err = LLMSpellError::Configuration {
@@ -425,20 +427,20 @@ mod tests {
             source: None,
         };
         assert_eq!(config_err.category(), ErrorCategory::Configuration);
-        
+
         let network_err = LLMSpellError::Network {
             message: "Connection failed".to_string(),
             source: None,
         };
         assert_eq!(network_err.category(), ErrorCategory::Network);
-        
+
         let security_err = LLMSpellError::Security {
             message: "Unauthorized".to_string(),
             violation_type: Some("auth".to_string()),
         };
         assert_eq!(security_err.category(), ErrorCategory::Security);
     }
-    
+
     #[test]
     fn test_error_severity_mapping() {
         let validation_err = LLMSpellError::Validation {
@@ -446,20 +448,20 @@ mod tests {
             field: Some("name".to_string()),
         };
         assert_eq!(validation_err.severity(), ErrorSeverity::Warning);
-        
+
         let security_err = LLMSpellError::Security {
             message: "Access denied".to_string(),
             violation_type: None,
         };
         assert_eq!(security_err.severity(), ErrorSeverity::Critical);
-        
+
         let internal_err = LLMSpellError::Internal {
             message: "System failure".to_string(),
             source: None,
         };
         assert_eq!(internal_err.severity(), ErrorSeverity::Fatal);
     }
-    
+
     #[test]
     fn test_error_retryability() {
         // Retryable errors
@@ -469,14 +471,14 @@ mod tests {
         };
         assert!(network_err.is_retryable());
         assert_eq!(network_err.retry_delay_ms(), Some(1000));
-        
+
         let timeout_err = LLMSpellError::Timeout {
             message: "Operation timed out".to_string(),
             duration_ms: Some(5000),
         };
         assert!(timeout_err.is_retryable());
         assert_eq!(timeout_err.retry_delay_ms(), Some(10000)); // Double the timeout
-        
+
         // Non-retryable errors
         let validation_err = LLMSpellError::Validation {
             message: "Invalid format".to_string(),
@@ -484,7 +486,7 @@ mod tests {
         };
         assert!(!validation_err.is_retryable());
         assert_eq!(validation_err.retry_delay_ms(), None);
-        
+
         let security_err = LLMSpellError::Security {
             message: "Forbidden".to_string(),
             violation_type: None,
@@ -492,7 +494,7 @@ mod tests {
         assert!(!security_err.is_retryable());
         assert_eq!(security_err.retry_delay_ms(), None);
     }
-    
+
     #[test]
     fn test_storage_error_retryability() {
         let read_err = LLMSpellError::Storage {
@@ -501,7 +503,7 @@ mod tests {
             source: None,
         };
         assert!(read_err.is_retryable());
-        
+
         let delete_err = LLMSpellError::Storage {
             message: "Delete failed".to_string(),
             operation: Some("delete".to_string()),
@@ -509,18 +511,19 @@ mod tests {
         };
         assert!(!delete_err.is_retryable());
     }
-    
+
     #[test]
     fn test_error_chaining() {
         use std::io;
-        
+
         let io_error = io::Error::new(io::ErrorKind::NotFound, "File not found");
         let storage_err = LLMSpellError::Storage {
             message: "Failed to read file".to_string(),
             operation: Some("read".to_string()),
             source: None,
-        }.with_source(io_error);
-        
+        }
+        .with_source(io_error);
+
         // Check that source is set
         match storage_err {
             LLMSpellError::Storage { source, .. } => {
@@ -529,7 +532,7 @@ mod tests {
             _ => panic!("Expected Storage error"),
         }
     }
-    
+
     #[test]
     fn test_error_display() {
         let provider_err = LLMSpellError::Provider {
@@ -541,7 +544,7 @@ mod tests {
         assert!(display.contains("LLM provider error"));
         assert!(display.contains("API rate limit exceeded"));
     }
-    
+
     #[test]
     fn test_error_macros() {
         let comp_err = component_error!("Component failed");
@@ -552,7 +555,7 @@ mod tests {
             }
             _ => panic!("Expected Component error"),
         }
-        
+
         let val_err = validation_error!("Invalid value", "username");
         match val_err {
             LLMSpellError::Validation { message, field } => {
@@ -561,17 +564,19 @@ mod tests {
             }
             _ => panic!("Expected Validation error"),
         }
-        
+
         let tool_err = tool_error!("Execution failed", "FileReader");
         match tool_err {
-            LLMSpellError::Tool { message, tool_name, .. } => {
+            LLMSpellError::Tool {
+                message, tool_name, ..
+            } => {
                 assert_eq!(message, "Execution failed");
                 assert_eq!(tool_name, Some("FileReader".to_string()));
             }
             _ => panic!("Expected Tool error"),
         }
     }
-    
+
     #[test]
     fn test_script_error_with_details() {
         let script_err = LLMSpellError::Script {
@@ -580,7 +585,7 @@ mod tests {
             line: Some(42),
             source: None,
         };
-        
+
         match script_err {
             LLMSpellError::Script { language, line, .. } => {
                 assert_eq!(language, Some("lua".to_string()));
@@ -589,7 +594,7 @@ mod tests {
             _ => panic!("Expected Script error"),
         }
     }
-    
+
     #[test]
     fn test_workflow_error_with_step() {
         let workflow_err = LLMSpellError::Workflow {
@@ -597,7 +602,7 @@ mod tests {
             step: Some("data_processing".to_string()),
             source: None,
         };
-        
+
         match workflow_err {
             LLMSpellError::Workflow { step, .. } => {
                 assert_eq!(step, Some("data_processing".to_string()));
@@ -605,17 +610,30 @@ mod tests {
             _ => panic!("Expected Workflow error"),
         }
     }
-    
+
     #[test]
     fn test_error_serialization() {
         // Test that errors can be converted to strings and back
         let errors: Vec<LLMSpellError> = vec![
-            LLMSpellError::Component { message: "Test".to_string(), source: None },
-            LLMSpellError::Configuration { message: "Test".to_string(), source: None },
-            LLMSpellError::Provider { message: "Test".to_string(), provider: None, source: None },
-            LLMSpellError::Security { message: "Test".to_string(), violation_type: None },
+            LLMSpellError::Component {
+                message: "Test".to_string(),
+                source: None,
+            },
+            LLMSpellError::Configuration {
+                message: "Test".to_string(),
+                source: None,
+            },
+            LLMSpellError::Provider {
+                message: "Test".to_string(),
+                provider: None,
+                source: None,
+            },
+            LLMSpellError::Security {
+                message: "Test".to_string(),
+                violation_type: None,
+            },
         ];
-        
+
         for err in errors {
             let err_string = err.to_string();
             assert!(!err_string.is_empty());

@@ -142,6 +142,7 @@ self.hooks.execute(HookPoint::AfterExecution, &result).await?;
 ## Key Development Reminders
 
 - **Complete Tasks Fully**: No lazy implementations or deferrals
+- **Do not jump ahead** Stick to task hierarchy in TODO.md, re-read it after tasks again to make sure you didn't miss steps.
 - **Maintain Bridge Philosophy**: Use existing crates, don't reinvent
 - **State Over Messages**: Agent handoff via shared state
 - **Tool Composition**: Agents as composable tools

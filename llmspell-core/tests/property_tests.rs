@@ -1,17 +1,17 @@
 //! Property-based tests for llmspell-core
-//! 
+//!
 //! These tests use proptest to verify invariants and properties
 //! that should hold for all possible inputs
 
-use proptest::prelude::*;
 use llmspell_core::{
-    ComponentId, Version, ComponentMetadata,
     traits::{
+        agent::{AgentConfig, ConversationMessage, MessageRole},
         base_agent::{AgentInput, AgentOutput, ExecutionContext},
-        agent::{ConversationMessage, MessageRole, AgentConfig},
-        workflow::{WorkflowStep, RetryPolicy},
+        workflow::{RetryPolicy, WorkflowStep},
     },
+    ComponentId, ComponentMetadata, Version,
 };
+use proptest::prelude::*;
 
 // Strategy for generating ComponentIds
 prop_compose! {
@@ -99,7 +99,7 @@ proptest! {
         let id2 = ComponentId::from_name(&name);
         prop_assert_eq!(id1, id2);
     }
-    
+
     #[test]
     fn test_component_id_different_names(
         name1 in arb_component_name(),
@@ -111,7 +111,7 @@ proptest! {
         let id2 = ComponentId::from_name(&name2);
         prop_assert_ne!(id1, id2);
     }
-    
+
     #[test]
     fn test_component_id_serialization_roundtrip(name in arb_component_name()) {
         // Property: ComponentId survives serialization/deserialization
@@ -120,7 +120,7 @@ proptest! {
         let deserialized: ComponentId = serde_json::from_str(&json).unwrap();
         prop_assert_eq!(id, deserialized);
     }
-    
+
     #[test]
     fn test_version_ordering_properties(v1 in arb_version(), v2 in arb_version()) {
         // Property: Version ordering is transitive
@@ -132,21 +132,21 @@ proptest! {
             prop_assert!(v2.is_compatible_with(&v1));
         }
     }
-    
+
     #[test]
     fn test_version_compatibility_properties(v in arb_version()) {
         // Property: A version is always compatible with itself
         prop_assert!(v.is_compatible_with(&v));
-        
+
         // Property: Versions with same major are compatible
         let v2 = Version::new(v.major, v.minor + 1, v.patch);
         prop_assert!(v.is_compatible_with(&v2));
-        
+
         // Property: Versions with different major are not compatible
         let v3 = Version::new(v.major + 1, v.minor, v.patch);
         prop_assert!(!v.is_compatible_with(&v3));
     }
-    
+
     #[test]
     fn test_version_serialization_roundtrip(v in arb_version()) {
         // Property: Version survives serialization/deserialization
@@ -157,18 +157,18 @@ proptest! {
         prop_assert_eq!(v.patch, deserialized.patch);
         prop_assert_eq!(v.to_string(), deserialized.to_string());
     }
-    
+
     #[test]
     fn test_agent_input_context_preservation(input in arb_agent_input()) {
         // Property: Context values are preserved
         for (key, value) in &input.context {
             prop_assert_eq!(input.get_context(key), Some(value));
         }
-        
+
         // Property: Non-existent keys return None
         prop_assert_eq!(input.get_context("non_existent_key_xyz"), None);
     }
-    
+
     #[test]
     fn test_agent_input_serialization_roundtrip(input in arb_agent_input()) {
         // Property: AgentInput survives serialization/deserialization
@@ -177,7 +177,7 @@ proptest! {
         prop_assert_eq!(input.prompt, deserialized.prompt);
         prop_assert_eq!(input.context, deserialized.context);
     }
-    
+
     #[test]
     fn test_agent_output_metadata_preservation(
         content in prop::string::string_regex("[a-zA-Z0-9 ]{1,100}").unwrap(),
@@ -202,21 +202,21 @@ proptest! {
             prop_assert_eq!(output.get_metadata(&key), Some(&value));
         }
     }
-    
+
     #[test]
     fn test_conversation_message_properties(msg in arb_conversation_message()) {
         // Property: Message fields are preserved
         let cloned = msg.clone();
         prop_assert_eq!(msg.role, cloned.role);
         prop_assert_eq!(msg.content, cloned.content);
-        
+
         // Property: Timestamp is set and reasonable
         let now = chrono::Utc::now();
         let diff = now - msg.timestamp;
         prop_assert!(diff.num_seconds() >= 0);
         prop_assert!(diff.num_seconds() < 60); // Should be created within last minute
     }
-    
+
     #[test]
     fn test_execution_context_environment_properties(
         session_id in prop::string::string_regex("[a-zA-Z0-9-]{1,50}").unwrap(),
@@ -232,20 +232,20 @@ proptest! {
     ) {
         // Property: Context preserves all fields
         let mut context = ExecutionContext::new(session_id.clone());
-        
+
         if let Some(uid) = user_id.clone() {
             context = context.with_user_id(uid);
         }
-        
+
         for (key, value) in env_keys.into_iter().zip(env_values.into_iter()) {
             context = context.with_env(key.clone(), value.clone());
             prop_assert_eq!(context.get_env(&key), Some(&value));
         }
-        
+
         prop_assert_eq!(context.session_id, session_id);
         prop_assert_eq!(context.user_id, user_id);
     }
-    
+
     #[test]
     fn test_retry_policy_properties(policy in arb_retry_policy()) {
         // Property: All fields are preserved
@@ -253,13 +253,13 @@ proptest! {
         prop_assert_eq!(policy.max_attempts, cloned.max_attempts);
         prop_assert_eq!(policy.backoff_seconds, cloned.backoff_seconds);
         prop_assert_eq!(policy.exponential_backoff, cloned.exponential_backoff);
-        
+
         // Property: Serialization roundtrip
         let json = serde_json::to_string(&policy).unwrap();
         let deserialized: RetryPolicy = serde_json::from_str(&json).unwrap();
         prop_assert_eq!(policy.max_attempts, deserialized.max_attempts);
     }
-    
+
     #[test]
     fn test_component_metadata_timestamp_ordering(
         name in arb_component_name(),
@@ -268,14 +268,14 @@ proptest! {
         // Property: created_at <= updated_at
         let metadata = ComponentMetadata::new(name, description);
         prop_assert!(metadata.created_at <= metadata.updated_at);
-        
+
         // Property: After version update, updated_at changes
         let mut metadata_mut = metadata.clone();
         std::thread::sleep(std::time::Duration::from_millis(10));
         metadata_mut.update_version(Version::new(1, 0, 0));
         prop_assert!(metadata_mut.updated_at > metadata.updated_at);
     }
-    
+
     #[test]
     fn test_agent_config_optional_fields(
         max_conversation_length in prop::option::of(1usize..1000),
@@ -290,11 +290,11 @@ proptest! {
             temperature,
             max_tokens,
         };
-        
+
         // Serialization roundtrip
         let json = serde_json::to_string(&config).unwrap();
         let deserialized: AgentConfig = serde_json::from_str(&json).unwrap();
-        
+
         prop_assert_eq!(config.max_conversation_length, deserialized.max_conversation_length);
         prop_assert_eq!(config.system_prompt, deserialized.system_prompt);
         prop_assert_eq!(config.temperature, deserialized.temperature);
@@ -314,20 +314,20 @@ proptest! {
         let deps: Vec<ComponentId> = (0..dep_count)
             .map(|i| ComponentId::from_name(&format!("dep-{}", i)))
             .collect();
-        
+
         // Build workflow step
         let mut step = WorkflowStep::new(name, component_id);
         for dep in &deps {
             step = step.with_dependency(*dep);
         }
-        
+
         // Property: All dependencies are preserved
         prop_assert_eq!(step.dependencies.len(), deps.len());
         for dep in deps {
             prop_assert!(step.dependencies.contains(&dep));
         }
     }
-    
+
     #[test]
     fn test_error_severity_ordering_transitivity(
         errors in prop::collection::vec(
@@ -346,7 +346,7 @@ proptest! {
         if a < b && b < c {
             prop_assert!(a < c);
         }
-        
+
         // Property: Exactly one of a < b, a == b, or a > b is true
         let less = a < b;
         let equal = a == b;
@@ -358,7 +358,7 @@ proptest! {
 #[cfg(test)]
 mod regression_tests {
     use super::*;
-    
+
     #[test]
     fn test_empty_string_component_id() {
         // Regression test: empty strings should produce valid IDs
@@ -366,7 +366,7 @@ mod regression_tests {
         let id2 = ComponentId::from_name("");
         assert_eq!(id1, id2);
     }
-    
+
     #[test]
     fn test_unicode_component_names() {
         // Regression test: unicode should work in component names
@@ -377,14 +377,14 @@ mod regression_tests {
             "🚀-rocket",
             "café-component",
         ];
-        
+
         for name in names {
             let id1 = ComponentId::from_name(name);
             let id2 = ComponentId::from_name(name);
             assert_eq!(id1, id2);
         }
     }
-    
+
     #[test]
     fn test_very_large_version_numbers() {
         // Regression test: large version numbers
