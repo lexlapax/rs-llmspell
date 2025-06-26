@@ -393,6 +393,7 @@ Rs-LLMSpell is built on seven foundational principles that guide every architect
 - **Script Engines**: Use battle-tested `mlua`, `boa`/`v8`, `pyo3` rather than custom parsers
 - **Storage**: Use proven `sled` and `rocksdb` behind trait abstractions
 - **Async Runtime**: Build on `tokio`'s mature ecosystem
+- **Platform Abstraction**: Use cross-platform crates (`std::path::PathBuf`, `directories-rs`, `which`) for OS-specific behavior
 
 **Benefits**:
 - Faster development and time-to-market
@@ -414,6 +415,44 @@ impl LLMProvider for LLMProviderBridge {
         Ok(response.text)
     }
 }
+```
+
+**Platform Bridge Philosophy**: Cross-platform support is achieved through carefully selected abstraction layers rather than conditional compilation:
+
+```rust
+// Platform-agnostic path handling
+use std::path::{Path, PathBuf};
+use directories::ProjectDirs;
+
+pub struct PlatformConfig {
+    // Cross-platform directory resolution
+    pub fn config_dir() -> Result<PathBuf> {
+        ProjectDirs::from("com", "rs-llmspell", "LLMSpell")
+            .map(|dirs| dirs.config_dir().to_path_buf())
+            .ok_or_else(|| anyhow!("Unable to determine config directory"))
+    }
+    
+    // Platform-aware executable resolution
+    pub fn find_executable(name: &str) -> Result<PathBuf> {
+        which::which(name)
+            .map_err(|e| anyhow!("Executable {} not found: {}", name, e))
+    }
+}
+
+// Platform abstraction traits
+pub trait PlatformServices {
+    fn spawn_daemon(&self) -> Result<()>;
+    fn install_service(&self) -> Result<()>;
+    fn handle_signals(&self) -> Result<()>;
+}
+
+// Implementations selected at compile time
+#[cfg(target_os = "linux")]
+mod linux;
+#[cfg(target_os = "macos")]
+mod macos;
+#[cfg(target_os = "windows")]
+mod windows;
 ```
 
 ### 2. **Production-First Infrastructure**
@@ -1282,6 +1321,40 @@ max_concurrent_agents = 10
 agent_timeout = 300
 tool_timeout = 60
 memory_limit = "2GB"
+
+# Platform-specific configuration
+[system.platform]
+# Auto-detected values can be overridden
+# target_os = "linux"    # linux, macos, windows
+# target_arch = "x86_64" # x86_64, aarch64
+
+# Platform-specific directory overrides (uses platform defaults if not specified)
+# config_dir_override = "/etc/llmspell"      # Linux: /etc, macOS: ~/Library/Preferences, Windows: %APPDATA%
+# cache_dir_override = "/var/cache/llmspell" # Linux: ~/.cache, macOS: ~/Library/Caches, Windows: %LOCALAPPDATA%
+# data_dir_override = "/var/lib/llmspell"    # Linux: ~/.local/share, macOS: ~/Library/Application Support, Windows: %APPDATA%
+
+# Service configuration
+service_type = "auto"  # auto, systemd, launchd, windows_service
+service_name = "llmspell-daemon"
+
+# Platform behavior
+line_endings = "native"  # lf, crlf, native (auto-detect)
+# path_separator = ":"     # Auto-detected (":" on Unix, ";" on Windows)
+# shell_command = "bash"   # Auto-detected (sh/bash on Unix, cmd/powershell on Windows)
+
+# Platform-specific service configurations
+[system.platform.linux]
+systemd_unit_path = "/etc/systemd/system"
+log_to_journal = true
+
+[system.platform.macos]
+launchd_plist_path = "~/Library/LaunchAgents"
+use_notification_center = true
+
+[system.platform.windows]
+service_display_name = "Rs-LLMSpell Service"
+service_description = "Scriptable LLM interaction service"
+event_log_source = "LLMSpell"
 ```
 
 ### Next Steps
@@ -8113,6 +8186,200 @@ impl StorageManager {
 }
 ```
 
+### Platform-Aware File Handling
+
+Rs-LLMSpell provides cross-platform file path resolution and handling for storage operations:
+
+```rust
+use std::path::{Path, PathBuf};
+use directories::{ProjectDirs, UserDirs};
+
+pub struct PlatformPaths {
+    project_dirs: ProjectDirs,
+    user_dirs: UserDirs,
+}
+
+impl PlatformPaths {
+    pub fn new() -> Result<Self> {
+        let project_dirs = ProjectDirs::from("com", "rs-llmspell", "LLMSpell")
+            .ok_or_else(|| anyhow!("Could not determine project directories"))?;
+        
+        let user_dirs = UserDirs::new()
+            .ok_or_else(|| anyhow!("Could not determine user directories"))?;
+            
+        Ok(Self { project_dirs, user_dirs })
+    }
+    
+    // Platform-specific data directory
+    pub fn data_dir(&self) -> PathBuf {
+        #[cfg(target_os = "linux")]
+        {
+            // Linux: ~/.local/share/llmspell or /var/lib/llmspell
+            if running_as_service() {
+                PathBuf::from("/var/lib/llmspell")
+            } else {
+                self.project_dirs.data_dir().to_path_buf()
+            }
+        }
+        
+        #[cfg(target_os = "macos")]
+        {
+            // macOS: ~/Library/Application Support/LLMSpell
+            self.project_dirs.data_dir().to_path_buf()
+        }
+        
+        #[cfg(target_os = "windows")]
+        {
+            // Windows: %APPDATA%\LLMSpell\data
+            self.project_dirs.data_dir().to_path_buf()
+        }
+    }
+    
+    // Platform-specific config directory
+    pub fn config_dir(&self) -> PathBuf {
+        #[cfg(target_os = "linux")]
+        {
+            // Linux: ~/.config/llmspell or /etc/llmspell
+            if running_as_service() {
+                PathBuf::from("/etc/llmspell")
+            } else {
+                self.project_dirs.config_dir().to_path_buf()
+            }
+        }
+        
+        #[cfg(target_os = "macos")]
+        {
+            // macOS: ~/Library/Preferences/LLMSpell
+            self.project_dirs.preference_dir().to_path_buf()
+        }
+        
+        #[cfg(target_os = "windows")]
+        {
+            // Windows: %APPDATA%\LLMSpell\config
+            self.project_dirs.config_dir().to_path_buf()
+        }
+    }
+    
+    // Platform-specific cache directory
+    pub fn cache_dir(&self) -> PathBuf {
+        #[cfg(target_os = "linux")]
+        {
+            // Linux: ~/.cache/llmspell or /var/cache/llmspell
+            if running_as_service() {
+                PathBuf::from("/var/cache/llmspell")
+            } else {
+                self.project_dirs.cache_dir().to_path_buf()
+            }
+        }
+        
+        #[cfg(target_os = "macos")]
+        {
+            // macOS: ~/Library/Caches/LLMSpell
+            self.project_dirs.cache_dir().to_path_buf()
+        }
+        
+        #[cfg(target_os = "windows")]
+        {
+            // Windows: %LOCALAPPDATA%\LLMSpell\cache
+            self.project_dirs.cache_dir().to_path_buf()
+        }
+    }
+    
+    // Resolve path with platform considerations
+    pub fn resolve_path(&self, path: &str) -> PathBuf {
+        let path = Path::new(path);
+        
+        // Handle home directory expansion
+        if path.starts_with("~") {
+            if let Some(home) = self.user_dirs.home_dir() {
+                return home.join(path.strip_prefix("~").unwrap());
+            }
+        }
+        
+        // Handle environment variables
+        if path.to_string_lossy().contains("$") {
+            return self.expand_env_vars(path);
+        }
+        
+        // Return absolute path
+        if path.is_absolute() {
+            path.to_path_buf()
+        } else {
+            std::env::current_dir()
+                .unwrap_or_default()
+                .join(path)
+        }
+    }
+    
+    // Platform-specific path validation
+    pub fn validate_path(&self, path: &Path) -> Result<()> {
+        #[cfg(target_os = "windows")]
+        {
+            // Windows path validation
+            let path_str = path.to_string_lossy();
+            if path_str.contains(['<', '>', '|', '?', '*'].as_ref()) {
+                return Err(anyhow!("Invalid characters in Windows path"));
+            }
+            
+            // Check for reserved names
+            let reserved = ["CON", "PRN", "AUX", "NUL", "COM1", "LPT1"];
+            if let Some(stem) = path.file_stem() {
+                if reserved.contains(&stem.to_string_lossy().to_uppercase().as_str()) {
+                    return Err(anyhow!("Reserved Windows filename"));
+                }
+            }
+        }
+        
+        #[cfg(not(target_os = "windows"))]
+        {
+            // Unix path validation
+            if path.to_string_lossy().contains('\0') {
+                return Err(anyhow!("Null character in path"));
+            }
+        }
+        
+        Ok(())
+    }
+}
+
+// Storage backend path configuration
+impl StorageConfig {
+    pub fn resolve_storage_path(&self) -> Result<PathBuf> {
+        let platform_paths = PlatformPaths::new()?;
+        
+        let base_path = match &self.path {
+            Some(p) => platform_paths.resolve_path(p),
+            None => platform_paths.data_dir().join("storage"),
+        };
+        
+        // Ensure directory exists with proper permissions
+        self.ensure_directory_with_permissions(&base_path)?;
+        
+        Ok(base_path)
+    }
+    
+    #[cfg(unix)]
+    fn ensure_directory_with_permissions(&self, path: &Path) -> Result<()> {
+        use std::os::unix::fs::PermissionsExt;
+        
+        std::fs::create_dir_all(path)?;
+        
+        // Set appropriate permissions (750)
+        let mut perms = std::fs::metadata(path)?.permissions();
+        perms.set_mode(0o750);
+        std::fs::set_permissions(path, perms)?;
+        
+        Ok(())
+    }
+    
+    #[cfg(not(unix))]
+    fn ensure_directory_with_permissions(&self, path: &Path) -> Result<()> {
+        std::fs::create_dir_all(path)?;
+        Ok(())
+    }
+}
+```
+
 ## Async Patterns and Concurrency
 
 ### Cross-Engine Async Coordination
@@ -9220,6 +9487,30 @@ pub struct SystemConfig {
     pub max_concurrent_operations: usize,
     pub shutdown_timeout_seconds: u64,
     pub feature_flags: HashMap<String, bool>,
+    
+    // Platform-specific configuration
+    pub platform: PlatformConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlatformConfig {
+    // Platform detection and overrides
+    pub target_os: Option<String>,  // Auto-detected if not specified
+    pub target_arch: Option<String>, // Auto-detected if not specified
+    
+    // Platform-specific paths
+    pub config_dir_override: Option<String>,
+    pub cache_dir_override: Option<String>,
+    pub data_dir_override: Option<String>,
+    
+    // Service configuration
+    pub service_type: ServiceType,  // SystemD, LaunchD, WindowsService
+    pub service_name: String,
+    
+    // Platform behavior
+    pub line_endings: LineEnding,   // LF, CRLF, Native
+    pub path_separator: Option<String>, // Auto-detected if not specified
+    pub shell_command: Option<String>,  // sh, bash, cmd, powershell
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -12623,6 +12914,151 @@ pub enum Trigger {
 }
 ```
 
+### Platform-Specific Service Integration
+
+Rs-LLMSpell's serve mode adapts to the host platform's service management system:
+
+```rust
+// Platform service abstraction
+pub trait PlatformService {
+    fn install(&self, config: &ServeModeConfig) -> Result<()>;
+    fn uninstall(&self) -> Result<()>;
+    fn start(&self) -> Result<()>;
+    fn stop(&self) -> Result<()>;
+    fn status(&self) -> Result<ServiceStatus>;
+}
+
+// Linux systemd integration
+#[cfg(target_os = "linux")]
+pub struct SystemdService {
+    service_name: String,
+    unit_file_path: PathBuf,
+}
+
+#[cfg(target_os = "linux")]
+impl SystemdService {
+    pub fn generate_unit_file(&self, config: &ServeModeConfig) -> String {
+        format!(r#"
+[Unit]
+Description=Rs-LLMSpell Automation Service
+After=network.target
+
+[Service]
+Type=notify
+ExecStart=/usr/bin/llmspell serve --config {}
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+WorkingDirectory={}
+User=llmspell
+Group=llmspell
+
+# Security hardening
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths={}
+
+[Install]
+WantedBy=multi-user.target
+"#, config.config_path, config.working_directory, config.data_directory)
+    }
+}
+
+// macOS launchd integration
+#[cfg(target_os = "macos")]
+pub struct LaunchdService {
+    label: String,
+    plist_path: PathBuf,
+}
+
+#[cfg(target_os = "macos")]
+impl LaunchdService {
+    pub fn generate_plist(&self, config: &ServeModeConfig) -> String {
+        format!(r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.rs-llmspell.daemon</string>
+    <key>ProgramArguments</key>
+    <array>
+        <string>{}</string>
+        <string>serve</string>
+        <string>--config</string>
+        <string>{}</string>
+    </array>
+    <key>WorkingDirectory</key>
+    <string>{}</string>
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+    <key>StandardOutPath</key>
+    <string>{}/llmspell.log</string>
+    <key>StandardErrorPath</key>
+    <string>{}/llmspell.error.log</string>
+</dict>
+</plist>"#, 
+            config.executable_path,
+            config.config_path,
+            config.working_directory,
+            config.log_directory,
+            config.log_directory
+        )
+    }
+}
+
+// Windows Service integration
+#[cfg(target_os = "windows")]
+pub struct WindowsService {
+    service_name: String,
+    display_name: String,
+}
+
+#[cfg(target_os = "windows")]
+impl WindowsService {
+    pub fn install(&self, config: &ServeModeConfig) -> Result<()> {
+        use windows::Win32::System::Services::*;
+        
+        let service_config = ServiceConfig {
+            service_type: SERVICE_WIN32_OWN_PROCESS,
+            start_type: SERVICE_AUTO_START,
+            binary_path: format!("{} serve --config {}", 
+                config.executable_path.display(),
+                config.config_path.display()
+            ),
+            display_name: self.display_name.clone(),
+            description: "Rs-LLMSpell Automation Service".to_string(),
+        };
+        
+        // Windows service installation logic
+        self.create_service(service_config)
+    }
+}
+
+// Platform detection and service factory
+pub fn create_platform_service(config: &ServeModeConfig) -> Box<dyn PlatformService> {
+    #[cfg(target_os = "linux")]
+    {
+        Box::new(SystemdService::new(config))
+    }
+    
+    #[cfg(target_os = "macos")]
+    {
+        Box::new(LaunchdService::new(config))
+    }
+    
+    #[cfg(target_os = "windows")]
+    {
+        Box::new(WindowsService::new(config))
+    }
+}
+```
+
 ### Trigger Types
 
 -   **Cron/Interval Triggers**: For time-based tasks, similar to traditional cron jobs.
@@ -14642,6 +15078,204 @@ struct MathTestResult {
 }
 ```
 
+### Platform Testing Matrix
+
+Rs-LLMSpell implements comprehensive cross-platform testing to ensure consistent behavior across Linux, macOS, and Windows:
+
+```rust
+pub struct PlatformTestRunner {
+    test_config: TestConfiguration,
+    platform_detector: PlatformDetector,
+    test_environments: HashMap<Platform, TestEnvironment>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum Platform {
+    LinuxX86_64,
+    LinuxAarch64,
+    MacOSX86_64,
+    MacOSAarch64,
+    WindowsX86_64,
+    WindowsAarch64,
+}
+
+impl PlatformTestRunner {
+    pub async fn run_platform_tests(&self) -> Result<PlatformTestResults> {
+        let mut results = PlatformTestResults::new();
+        
+        // Test 1: File path handling
+        results.add_test(self.test_path_handling().await?);
+        
+        // Test 2: Process spawning and IPC
+        results.add_test(self.test_process_spawning().await?);
+        
+        // Test 3: Service installation/management
+        results.add_test(self.test_service_management().await?);
+        
+        // Test 4: Signal handling
+        results.add_test(self.test_signal_handling().await?);
+        
+        // Test 5: Storage path resolution
+        results.add_test(self.test_storage_paths().await?);
+        
+        Ok(results)
+    }
+    
+    async fn test_path_handling(&self) -> Result<PlatformTestResult> {
+        let platform_paths = PlatformPaths::new()?;
+        let test_cases = vec![
+            ("~/test/file.txt", "Home directory expansion"),
+            ("$HOME/config", "Environment variable expansion"),
+            ("../relative/path", "Relative path resolution"),
+            ("C:\\Windows\\System32", "Windows absolute path"),
+            ("/usr/local/bin", "Unix absolute path"),
+        ];
+        
+        for (path, description) in test_cases {
+            let resolved = platform_paths.resolve_path(path);
+            
+            // Platform-specific assertions
+            match self.platform_detector.current_platform() {
+                Platform::WindowsX86_64 | Platform::WindowsAarch64 => {
+                    // Windows-specific path tests
+                    if path.starts_with("C:\\") {
+                        assert!(resolved.is_absolute());
+                        assert!(resolved.to_string_lossy().contains('\\'));
+                    }
+                }
+                _ => {
+                    // Unix-like path tests
+                    if path.starts_with('/') {
+                        assert!(resolved.is_absolute());
+                        assert!(!resolved.to_string_lossy().contains('\\'));
+                    }
+                }
+            }
+        }
+        
+        Ok(PlatformTestResult::passed("Path handling"))
+    }
+    
+    async fn test_service_management(&self) -> Result<PlatformTestResult> {
+        let serve_config = ServeModeConfig::default();
+        let platform_service = create_platform_service(&serve_config);
+        
+        // Test service file generation
+        match self.platform_detector.current_platform() {
+            Platform::LinuxX86_64 | Platform::LinuxAarch64 => {
+                // Test systemd unit file generation
+                let systemd_service = platform_service.as_any()
+                    .downcast_ref::<SystemdService>()
+                    .expect("Should be SystemdService on Linux");
+                
+                let unit_file = systemd_service.generate_unit_file(&serve_config);
+                assert!(unit_file.contains("[Unit]"));
+                assert!(unit_file.contains("[Service]"));
+                assert!(unit_file.contains("Type=notify"));
+            }
+            Platform::MacOSX86_64 | Platform::MacOSAarch64 => {
+                // Test launchd plist generation
+                let launchd_service = platform_service.as_any()
+                    .downcast_ref::<LaunchdService>()
+                    .expect("Should be LaunchdService on macOS");
+                
+                let plist = launchd_service.generate_plist(&serve_config);
+                assert!(plist.contains("<?xml version=\"1.0\""));
+                assert!(plist.contains("<key>Label</key>"));
+                assert!(plist.contains("com.rs-llmspell.daemon"));
+            }
+            Platform::WindowsX86_64 | Platform::WindowsAarch64 => {
+                // Test Windows service configuration
+                let windows_service = platform_service.as_any()
+                    .downcast_ref::<WindowsService>()
+                    .expect("Should be WindowsService on Windows");
+                
+                // Verify service can be configured
+                assert_eq!(windows_service.service_name, "llmspell-daemon");
+            }
+        }
+        
+        Ok(PlatformTestResult::passed("Service management"))
+    }
+}
+
+// CI/CD Platform Matrix Configuration
+pub struct CIPlatformMatrix {
+    pub platforms: Vec<PlatformTarget>,
+    pub test_categories: Vec<TestCategory>,
+}
+
+#[derive(Debug, Clone)]
+pub struct PlatformTarget {
+    pub os: String,
+    pub arch: String,
+    pub rust_target: String,
+    pub test_runner: String,
+    pub environment_setup: Vec<String>,
+}
+
+impl CIPlatformMatrix {
+    pub fn default() -> Self {
+        Self {
+            platforms: vec![
+                PlatformTarget {
+                    os: "ubuntu-latest".to_string(),
+                    arch: "x86_64".to_string(),
+                    rust_target: "x86_64-unknown-linux-gnu".to_string(),
+                    test_runner: "cargo test".to_string(),
+                    environment_setup: vec![
+                        "sudo apt-get update".to_string(),
+                        "sudo apt-get install -y libssl-dev".to_string(),
+                    ],
+                },
+                PlatformTarget {
+                    os: "macos-latest".to_string(),
+                    arch: "x86_64".to_string(),
+                    rust_target: "x86_64-apple-darwin".to_string(),
+                    test_runner: "cargo test".to_string(),
+                    environment_setup: vec![],
+                },
+                PlatformTarget {
+                    os: "macos-latest".to_string(),
+                    arch: "aarch64".to_string(),
+                    rust_target: "aarch64-apple-darwin".to_string(),
+                    test_runner: "cargo test".to_string(),
+                    environment_setup: vec![],
+                },
+                PlatformTarget {
+                    os: "windows-latest".to_string(),
+                    arch: "x86_64".to_string(),
+                    rust_target: "x86_64-pc-windows-msvc".to_string(),
+                    test_runner: "cargo test".to_string(),
+                    environment_setup: vec![],
+                },
+            ],
+            test_categories: vec![
+                TestCategory::Unit,
+                TestCategory::Integration,
+                TestCategory::Platform,
+                TestCategory::Performance,
+            ],
+        }
+    }
+    
+    pub fn generate_github_actions_matrix(&self) -> String {
+        // Generate GitHub Actions matrix configuration
+        let matrix_yaml = format!(r#"
+strategy:
+  matrix:
+    include:
+{}
+"#, self.platforms.iter().map(|p| format!(r#"      - os: {}
+        arch: {}
+        rust-target: {}
+        test-runner: {}"#, 
+            p.os, p.arch, p.rust_target, p.test_runner
+        )).collect::<Vec<_>>().join("\n"))
+    }
+}
+```
+
 ## Performance Benchmarks
 
 ### Comprehensive Performance Testing
@@ -15371,6 +16005,180 @@ perf: optimize tool execution pipeline
 refactor: simplify error handling hierarchy
 ```
 
+#### Cross-Platform Development Guidelines
+
+Rs-LLMSpell development requires careful attention to platform differences. Follow these guidelines to ensure consistent behavior across Linux, macOS, and Windows:
+
+**1. Path Handling Best Practices:**
+```rust
+// DON'T: Use hardcoded path separators
+let config_path = format!("config/{}\\settings.toml", user); // Wrong!
+
+// DO: Use PathBuf and platform-agnostic methods
+use std::path::PathBuf;
+let config_path = PathBuf::from("config")
+    .join(user)
+    .join("settings.toml");
+
+// DON'T: Assume Unix-style paths
+let log_file = "/tmp/llmspell.log"; // Won't work on Windows!
+
+// DO: Use platform-aware temporary directories
+use tempfile::TempDir;
+let temp_dir = TempDir::new()?;
+let log_file = temp_dir.path().join("llmspell.log");
+```
+
+**2. Process and Signal Handling:**
+```rust
+// Platform-specific signal handling
+#[cfg(unix)]
+use tokio::signal::unix::{signal, SignalKind};
+
+#[cfg(unix)]
+async fn setup_signal_handlers() -> Result<()> {
+    let mut sigterm = signal(SignalKind::terminate())?;
+    let mut sigint = signal(SignalKind::interrupt())?;
+    
+    tokio::select! {
+        _ = sigterm.recv() => info!("Received SIGTERM"),
+        _ = sigint.recv() => info!("Received SIGINT"),
+    }
+    Ok(())
+}
+
+#[cfg(windows)]
+async fn setup_signal_handlers() -> Result<()> {
+    tokio::signal::ctrl_c().await?;
+    info!("Received Ctrl+C");
+    Ok(())
+}
+```
+
+**3. File Permissions and Attributes:**
+```rust
+// Platform-aware file permissions
+#[cfg(unix)]
+fn set_executable_permission(path: &Path) -> Result<()> {
+    use std::os::unix::fs::PermissionsExt;
+    let mut perms = std::fs::metadata(path)?.permissions();
+    perms.set_mode(0o755);
+    std::fs::set_permissions(path, perms)?;
+    Ok(())
+}
+
+#[cfg(windows)]
+fn set_executable_permission(path: &Path) -> Result<()> {
+    // Windows determines executability by file extension
+    Ok(())
+}
+```
+
+**4. Environment Variable Handling:**
+```rust
+// Use cross-platform environment variable resolution
+use std::env;
+
+// Platform-aware home directory
+fn get_home_dir() -> Option<PathBuf> {
+    #[cfg(unix)]
+    {
+        env::var("HOME").ok().map(PathBuf::from)
+    }
+    
+    #[cfg(windows)]
+    {
+        env::var("USERPROFILE").ok().map(PathBuf::from)
+    }
+}
+
+// Better: Use directories crate
+use directories::UserDirs;
+fn get_home_dir_portable() -> Option<PathBuf> {
+    UserDirs::new().map(|dirs| dirs.home_dir().to_path_buf())
+}
+```
+
+**5. Testing Across Platforms:**
+```rust
+// Platform-specific test cases
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    #[test]
+    #[cfg(unix)]
+    fn test_unix_path_expansion() {
+        let path = expand_path("~/config");
+        assert!(path.starts_with("/"));
+    }
+    
+    #[test]
+    #[cfg(windows)]
+    fn test_windows_path_expansion() {
+        let path = expand_path("%APPDATA%\\config");
+        assert!(path.to_string_lossy().contains("\\"));
+    }
+    
+    #[test]
+    fn test_cross_platform_path_join() {
+        let base = PathBuf::from("base");
+        let full = base.join("sub").join("file.txt");
+        
+        #[cfg(unix)]
+        assert_eq!(full.to_string_lossy(), "base/sub/file.txt");
+        
+        #[cfg(windows)]
+        assert_eq!(full.to_string_lossy(), "base\\sub\\file.txt");
+    }
+}
+```
+
+**6. Development Environment Setup by Platform:**
+```bash
+# Platform detection in setup scripts
+if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    echo "Setting up Linux development environment..."
+    sudo apt-get update
+    sudo apt-get install -y build-essential libssl-dev
+elif [[ "$OSTYPE" == "darwin"* ]]; then
+    echo "Setting up macOS development environment..."
+    brew install openssl
+elif [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
+    echo "Setting up Windows development environment..."
+    # Windows-specific setup
+fi
+```
+
+**7. CI/CD Platform Matrix:**
+```yaml
+# .github/workflows/cross-platform.yml
+name: Cross-Platform CI
+
+on: [push, pull_request]
+
+jobs:
+  test:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        rust: [stable, beta]
+    
+    runs-on: ${{ matrix.os }}
+    
+    steps:
+    - uses: actions/checkout@v3
+    - uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: ${{ matrix.rust }}
+    
+    - name: Run tests
+      run: cargo test --all-features
+    
+    - name: Platform-specific tests
+      run: cargo test --features platform-tests
+```
+
 ### Build System and Tooling
 
 The project uses `cargo` as its primary build system, managed through the `Cargo.toml` workspace definition. 
@@ -15831,6 +16639,174 @@ if [[ "${RUN_COVERAGE:-false}" == "true" ]]; then
 fi
 
 echo "All tests completed successfully!"
+```
+
+#### Platform-Specific Build Configurations
+
+Rs-LLMSpell supports cross-platform builds with platform-specific optimizations and configurations:
+
+**Cross-Platform Build Script:**
+```bash
+#!/bin/bash
+# scripts/build_cross_platform.sh
+set -euo pipefail
+
+TARGET=${1:-"native"}
+MODE=${2:-"release"}
+
+echo "Building rs-llmspell for target: $TARGET"
+
+case $TARGET in
+    "native")
+        cargo build --release
+        ;;
+    "linux-x86_64")
+        cargo build --release --target x86_64-unknown-linux-gnu
+        ;;
+    "linux-aarch64")
+        cargo build --release --target aarch64-unknown-linux-gnu
+        ;;
+    "macos-x86_64")
+        cargo build --release --target x86_64-apple-darwin
+        ;;
+    "macos-aarch64")
+        cargo build --release --target aarch64-apple-darwin
+        ;;
+    "windows-x86_64")
+        cargo build --release --target x86_64-pc-windows-msvc
+        ;;
+    "windows-aarch64")
+        cargo build --release --target aarch64-pc-windows-msvc
+        ;;
+    "all")
+        # Build for all supported platforms
+        for platform in linux-x86_64 linux-aarch64 macos-x86_64 macos-aarch64 windows-x86_64; do
+            ./scripts/build_cross_platform.sh $platform $MODE
+        done
+        ;;
+    *)
+        echo "Unknown target: $TARGET"
+        exit 1
+        ;;
+esac
+
+# Platform-specific post-build steps
+case $TARGET in
+    linux-*)
+        # Create AppImage for portable Linux distribution
+        if command -v appimagetool &> /dev/null; then
+            ./scripts/create_appimage.sh
+        fi
+        ;;
+    macos-*)
+        # Create macOS app bundle
+        ./scripts/create_macos_bundle.sh
+        # Sign the binary if certificates are available
+        if [ -n "${APPLE_DEVELOPER_ID:-}" ]; then
+            codesign --sign "$APPLE_DEVELOPER_ID" target/*/release/llmspell
+        fi
+        ;;
+    windows-*)
+        # Create Windows installer
+        if command -v makensis &> /dev/null; then
+            makensis scripts/windows_installer.nsi
+        fi
+        ;;
+esac
+
+echo "Build complete for $TARGET!"
+```
+
+**Platform-Specific Cargo Configuration:**
+```toml
+# .cargo/config.toml
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
+
+[target.x86_64-apple-darwin]
+rustflags = ["-C", "link-arg=-framework", "-C", "link-arg=Security"]
+
+[target.aarch64-apple-darwin]
+rustflags = ["-C", "link-arg=-framework", "-C", "link-arg=Security"]
+
+# Platform-specific dependencies
+[target.'cfg(windows)'.dependencies]
+windows = { version = "0.52", features = ["Win32_System_Services", "Win32_Foundation"] }
+winreg = "0.52"
+
+[target.'cfg(target_os = "macos")'.dependencies]
+cocoa = "0.25"
+core-foundation = "0.9"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# Linux-specific dependencies for system integration
+dbus = "0.9"
+```
+
+**Platform Feature Detection Build Script:**
+```rust
+// build.rs
+use std::env;
+
+fn main() {
+    // Detect and set platform-specific features
+    let target_os = env::var("CARGO_CFG_TARGET_OS").unwrap();
+    let target_arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap();
+    
+    println!("cargo:rustc-env=TARGET_OS={}", target_os);
+    println!("cargo:rustc-env=TARGET_ARCH={}", target_arch);
+    
+    // Platform-specific compilation flags
+    match target_os.as_str() {
+        "linux" => {
+            println!("cargo:rustc-cfg=platform_linux");
+            // Check for systemd presence
+            if check_systemd() {
+                println!("cargo:rustc-cfg=has_systemd");
+            }
+        }
+        "macos" => {
+            println!("cargo:rustc-cfg=platform_macos");
+            println!("cargo:rustc-link-lib=framework=CoreFoundation");
+            println!("cargo:rustc-link-lib=framework=Security");
+        }
+        "windows" => {
+            println!("cargo:rustc-cfg=platform_windows");
+            // Link Windows-specific libraries
+            println!("cargo:rustc-link-lib=userenv");
+            println!("cargo:rustc-link-lib=shell32");
+        }
+        _ => {}
+    }
+    
+    // Architecture-specific optimizations
+    match target_arch.as_str() {
+        "x86_64" => {
+            // Enable AVX2 if available for better performance
+            if check_cpu_feature("avx2") {
+                println!("cargo:rustc-cfg=has_avx2");
+            }
+        }
+        "aarch64" => {
+            // ARM-specific optimizations
+            println!("cargo:rustc-cfg=has_neon");
+        }
+        _ => {}
+    }
+}
+
+fn check_systemd() -> bool {
+    std::process::Command::new("systemctl")
+        .arg("--version")
+        .output()
+        .is_ok()
+}
+
+fn check_cpu_feature(feature: &str) -> bool {
+    // Platform-specific CPU feature detection
+    // Implementation varies by platform
+    false // Simplified for example
+}
 ```
 
 #### Feature Flag Management
