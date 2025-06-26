@@ -1,18 +1,128 @@
-[package]
-name = "rs-llmspell"
+[workspace]
+resolver = "2"
+
+members = [
+    "llmspell-cli",
+    "llmspell-core", 
+    "llmspell-agents",
+    "llmspell-tools",
+    "llmspell-workflows",
+    "llmspell-bridge",
+    "llmspell-providers",
+    "llmspell-storage",
+    "llmspell-config",
+    "llmspell-security",
+    "llmspell-hooks",
+    "llmspell-testing"
+]
+
+[workspace.package]
 version = "0.1.0"
 edition = "2021"
 authors = ["Lex Lapax<lexlapax@gmail.com>"]
-description = "Cast scripting spells to animate LLM golems - A Rust library for scriptable LLM interactions"
 repository = "https://github.com/lexlapax/rs-llmspell"
 license = "MIT OR Apache-2.0"
 keywords = ["llm", "ai", "agents", "scripting", "automation"]
 categories = ["text-processing", "api-bindings", "automation"]
 
-[dependencies]
+[workspace.dependencies]
+# Async runtime and utilities
+tokio = { version = "1.40", features = ["full"] }
+tokio-stream = "0.1"
+futures = "0.3"
+async-trait = "0.1"
 
-[dev-dependencies]
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+toml = "0.8"
 
-[lib]
-name = "rs_llmspell"
-path = "src/lib.rs"
+# UUID and time handling
+uuid = { version = "1.10", features = ["v4", "v5", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Logging and tracing
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["json", "env-filter"] }
+tracing-futures = "0.2"
+
+# Configuration management
+config = "0.14"
+
+# Testing framework
+mockall = "0.13"
+proptest = "1.4"
+criterion = { version = "0.5", features = ["html_reports"] }
+
+# Storage backends
+sled = "0.34"
+rocksdb = "0.22"
+
+# Scripting engines
+mlua = { version = "0.9", features = ["lua54", "async", "serialize"] }
+boa_engine = "0.18"
+quickjs_runtime = "0.12"
+
+# LLM providers and AI
+rig-core = "0.4"
+candle-core = "0.7"
+candle-nn = "0.7"
+candle-transformers = "0.7"
+tokenizers = "0.20"
+
+# HTTP client for API calls
+reqwest = { version = "0.12", features = ["json", "stream"] }
+
+# JSON schema validation
+jsonschema = "0.18"
+
+# Cross-platform filesystem operations
+path-clean = "1.0"
+walkdir = "2.5"
+
+# Concurrency primitives
+crossbeam = "0.8"
+parking_lot = "0.12"
+
+# CLI framework
+clap = { version = "4.5", features = ["derive", "env"] }
+
+# Environment and process management
+which = "6.0"
+
+[profile.dev]
+opt-level = 0
+debug = true
+strip = false
+debug-assertions = true
+overflow-checks = true
+lto = false
+panic = 'unwind'
+incremental = true
+codegen-units = 256
+
+[profile.release]
+opt-level = 3
+debug = false
+strip = true
+debug-assertions = false
+overflow-checks = false
+lto = true
+panic = 'abort'
+incremental = false
+codegen-units = 1
+
+[profile.test]
+opt-level = 1
+debug = true
+strip = false
+debug-assertions = true
+overflow-checks = true
+incremental = true
+codegen-units = 256
+

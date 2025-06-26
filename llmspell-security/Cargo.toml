@@ -1,0 +1,15 @@
+[package]
+name = "llmspell-security"
+description = "Security and sandboxing for rs-llmspell"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+llmspell-core = { path = "../llmspell-core" }
+tokio.workspace = true
+serde.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
