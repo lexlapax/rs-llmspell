@@ -843,7 +843,7 @@
 
 ---
 
-## Handoff to Phase 1
+## Handoff to Phase 1 (`/docs/in-progress/PHASE01_HANDOFF_PACKAGE.md`)
 
 ### Deliverables Package
 - [ ] Complete foundation crate compilation
@@ -855,7 +855,7 @@
 - [ ] Testing approach and coverage requirements
 - [ ] Performance characteristics documentation
 
-### Knowledge Transfer Session
+### Knowledge Transfer Session (`/docs/in-progress/PHASE01_KNOWLEDGE_TRANSFER.md`)
 - [ ] Architecture walkthrough with Phase 1 team
 - [ ] Code patterns and conventions review
 - [ ] Testing strategy explanation
