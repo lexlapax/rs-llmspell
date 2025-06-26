@@ -172,17 +172,36 @@ Comprehensive refinement of rs-llmspell architecture based on go-llms and Google
       - [x] ~~Created "Code Organization Patterns Without Modules" section~~ **Done**
       - [x] ~~Implemented sandboxed require() with security verification~~ **Done**
       - [x] ~~Added 6 code organization patterns with examples~~ **Done**
-  - [ ] **Task/question 12.3.11** Does the architecture spell out how to enable logging of different levels or debugging of framework/library itself, or logging debuging of scripts? does Log/Logging need to be a global level entity like Agent, Tools or workflows? how about Debug? are they the same thing or different things?
-    - [ ] Answer:
-    - [ ] Todo:
-      - [ ] 
-      - [ ] 
+  - [x] **Task/question 12.3.11** Does the architecture spell out how to enable logging of different levels or debugging of framework/library itself, or logging debuging of scripts? does Log/Logging need to be a global level entity like Agent, Tools or workflows? how about Debug? are they the same thing or different things?
+    - [x] Answer: The architecture now FULLY addresses logging and debugging:
+      1. **Framework Logging**: SystemConfig has a `log_level` field accepting "trace", "debug", "info", "warn", "error"
+      2. **Script Logging**: `Logger` IS a pre-injected global entity like Agent, Tools, Workflow
+      3. **Configuration**: Log levels configured via TOML config file or LLMSPELL_SYSTEM__LOG_LEVEL env var
+      4. **Debug Mode**: Separate concept - LuaEngineConfig and JavaScriptEngineConfig have `debug_mode` boolean
+      5. **Observability**: Comprehensive ObservabilityManager with TracingManager for distributed tracing
+      6. **Logging vs Debug**: Different concerns - logging for observability, debug for script development
+    - [x] Todo: ~~Architecture has been comprehensively enhanced with logging support:~~
+      - [x] ~~Document Logger global API methods (Logger.info(), Logger.debug(), Logger.error(), etc.)~~ **Done**
+      - [x] ~~Clarify what `debug_mode` enables in script engines (debugger attachment, breakpoints, etc.)~~ **Done**
+      - [x] ~~Add per-script log level configuration capability~~ **Done**
+      - [x] ~~Document how to enable different log levels for framework vs scripts~~ **Done**
+      - [x] ~~Add configuration examples showing logging setup in llmspell.toml~~ **Done**
+      - [x] ~~Document environment variable options for runtime log level changes~~ **Done** 
   - [ ] **Task/question 12.3.12** In the **embedded** mode, the vision is to allow to modes for the command line - runner mode that runs scripts, and repl mode to enter an interactive mode. Does the architecture allow for that? what's missing?
-    - [ ] Answer:
+    - [ ] Answer: The architecture partially supports these modes:
+      1. **Runner Mode**: YES - Documented with `llmspell run <script>` command
+      2. **REPL Mode**: NOT DOCUMENTED - No interactive REPL mode found
+      3. **Daemon Mode**: YES - Mentioned for scheduling/automation (loaded in "daemon mode")
+      4. **Serve Mode**: MENTIONED - Task 12.3.5 references `llmspell serve` but not documented
+      5. **Embedded Scripting**: YES - Clear distinction between embedded mode (running scripts) vs library mode
     - [ ] Todo:
-      - [ ] 
-      - [ ] 
-  - [ ] **Task/question 12.3.13** Based on the architecture, can you tell me component by component, what happens when I run a lua script using the command line runner - which component it hits first etc. assume that the script uses all globals Agents, tools, worklfows etc. What's missing in the architectural document for you not to trace that?
+      - [ ] Document interactive REPL mode architecture (`llmspell repl` or `llmspell interactive`)
+      - [ ] Define REPL features: multi-line input, history, tab completion, state persistence
+      - [ ] Specify how REPL maintains agent/tool state between commands
+      - [ ] Document `llmspell serve` command for daemon/service mode
+      - [ ] Add CLI usage patterns showing: run, repl, serve modes
+      - [ ] Define REPL-specific globals or commands (e.g., .help, .exit, .save, .load) 
+  - [ ] **Task/question 12.3.13** Based on the architecture, can you tell me component by component, what happens when I run a lua script using the command line runner - which component it hits first etc. assume that the script uses all globals Agents, tools, worklfows etc. What's missing in the architectural document for you not to be able to trace that? what components are missing or integration layers between components?
     - [ ] Answer:
     - [ ] Todo:
       - [ ] 
@@ -224,6 +243,15 @@ Comprehensive refinement of rs-llmspell architecture based on go-llms and Google
     - Module whitelist/verification features are advanced security features for later phases
     - Library mode module support (full access) should be considered with native module distribution
     - Custom module paths and npm package support are enhancement features post-MVP
+  - [ ] **Logging and Debugging Implementation Notes**:
+    - Logger global API must be MVP priority (basic logging levels and structured output)
+    - Framework/script logging separation should be MVP for proper observability
+    - Basic configuration via TOML and environment variables is MVP requirement
+    - Advanced features (batching, async logging, performance logger) can be enhancement phase
+    - Debug mode with stack traces is MVP, full debugger attachment is post-MVP
+    - Per-script log level overrides are enhancement features for flexibility
+    - Audit logging and compliance features are enterprise enhancement phase
+    - Correlation ID tracking should align with distributed tracing implementation
 
 ### Phase 14: Final Update (📝 Update)
 - [ ] **Task 14.1**: Complete architecture.md update

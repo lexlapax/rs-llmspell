@@ -809,19 +809,37 @@ const researchWorkflow = Workflow.sequential([
     }
 ]);
 
-// Execute the workflow
+// Set up logging
+const logger = new Logger({
+    name: "research_workflow",
+    level: "info",
+    format: "pretty"
+});
+
+// Execute the workflow with logging
 async function runResearch() {
+    // Set correlation ID for the entire workflow
+    Logger.setCorrelationId(`research-${Date.now()}`);
+    
+    // Performance timer
+    const timer = logger.timer("research_workflow_execution");
+    
     try {
+        logger.info("Starting research workflow", {
+            topic: "Impact of large language models on software development productivity"
+        });
+        
         const result = await researchWorkflow.execute({
             topic: "Impact of large language models on software development productivity",
             output_format: "executive_summary",
             max_sources: 20
         });
         
-        console.log("Research Complete!");
-        console.log(`Sources analyzed: ${result.research_data.sources.length}`);
-        console.log(`Key insights: ${result.analysis_results.insights.length}`);
-        console.log(`Report length: ${result.final_report.word_count} words`);
+        logger.info("Research complete", {
+            sources_analyzed: result.research_data.sources.length,
+            insights_found: result.analysis_results.insights.length,
+            report_word_count: result.final_report.word_count
+        });
         
         // Save the report
         await Tools.get("file_writer").execute({
@@ -830,12 +848,20 @@ async function runResearch() {
         });
         
     } catch (error) {
-        console.error("Research failed:", error.message);
+        logger.error("Research workflow failed", {
+            error: error.message,
+            stack: error.stack,
+            recoverable: error.recoverable,
+            recovery_suggestion: error.recovery_suggestion
+        });
         
-        // Access detailed error information
-        if (error.recoverable) {
-            console.log("Suggested recovery:", error.recovery_suggestion);
+        // Log error context for debugging
+        if (error.context) {
+            logger.debug("Error context", error.context);
         }
+    } finally {
+        // Stop timer (automatically logs duration)
+        timer.stop();
     }
 }
 
@@ -854,17 +880,39 @@ local Events = require("llmspell.events")
 local ErrorHandler = require("llmspell.errors")
 
 -- Set up comprehensive logging
-local logger = Hooks.create_logger({
-    level = "info",
-    format = "json",
-    output = "stdout"
+local logger = Logger.new({
+    name = "advanced_demo",
+    level = "debug",
+    format = "json"
+})
+
+-- Use structured logging
+logger:info("Demo started", { 
+    version = "1.0", 
+    environment = "development" 
+})
+
+-- Create context-aware logger
+local agent_logger = logger:with_context({
+    component = "agent",
+    session_id = "demo-123"
 })
 
 -- Register hooks for observability
-Hooks.register("before_agent_execution", logger)
-Hooks.register("after_agent_execution", logger)
-Hooks.register("tool_execution_start", logger)
-Hooks.register("tool_execution_complete", logger)
+Hooks.register("before_agent_execution", function(context)
+    agent_logger:debug("Agent execution starting", {
+        agent_id = context.agent.id,
+        input_type = type(context.input)
+    })
+end)
+
+Hooks.register("after_agent_execution", function(context)
+    agent_logger:info("Agent execution complete", {
+        agent_id = context.agent.id,
+        duration_ms = context.timing.duration,
+        success = context.success
+    })
+end)
 
 -- Set up metrics collection
 local metrics = Hooks.create_metrics_collector({
@@ -3209,8 +3257,9 @@ declare global {
     const Storage: typeof StorageModule;
     const ErrorHandler: typeof ErrorHandlerModule;
     const Async: typeof AsyncModule;
+    const Logger: typeof LoggerModule;
     
-    // Utility functions
+    // Utility functions (convenience wrappers for Logger)
     function print(...args: any[]): void;
     function log(level: string, message: string, metadata?: any): void;
     function trace(message: string): void;
@@ -3233,6 +3282,7 @@ interface ScriptEnvironment {
     CONFIG_PATH: string;
     DATA_PATH: string;
     CACHE_PATH: string;
+    LOG_PATH: string;
     
     // Security context
     SECURITY_LEVEL: "low" | "medium" | "high";
@@ -3246,7 +3296,52 @@ interface ScriptEnvironment {
     // Provider information
     AVAILABLE_PROVIDERS: string[];
     DEFAULT_PROVIDER: string;
+    
+    // Logging configuration
+    LOG_LEVEL: "trace" | "debug" | "info" | "warn" | "error";
+    LOG_FORMAT: "json" | "text" | "pretty" | "compact";
+    DEBUG_MODE: boolean;
+    CORRELATION_ID?: string;
 }
+```
+
+##### Logging-Specific Environment Variables
+
+Rs-LLMSpell recognizes the following environment variables for logging configuration:
+
+```bash
+# Core logging settings
+LLMSPELL_LOG_LEVEL=debug           # Override config file log level
+LLMSPELL_LOG_FORMAT=json           # Override log format
+LLMSPELL_LOG_OUTPUT=both           # stdout, stderr, file, or both
+LLMSPELL_LOG_FILE=/custom/path.log # Override log file path
+
+# Performance and debugging
+LLMSPELL_LOG_ASYNC=true            # Enable async logging
+LLMSPELL_LOG_BUFFER_SIZE=16384     # Buffer size in bytes
+LLMSPELL_LOG_INCLUDE_CALLER=true   # Include file:line info
+LLMSPELL_LOG_PERF_METRICS=true     # Log performance metrics
+
+# Filtering and targeting
+LLMSPELL_LOG_FILTER="llmspell::agent=debug,llmspell::tool=trace"
+LLMSPELL_LOG_MODULES=agent,workflow # Only log specific modules
+LLMSPELL_LOG_EXCLUDE_MODULES=http  # Exclude specific modules
+
+# Security and compliance
+LLMSPELL_LOG_REDACT_KEYS="password,api_key,token,ssn"
+LLMSPELL_LOG_AUDIT_ENABLED=true    # Enable audit logging
+LLMSPELL_LOG_AUDIT_FILE=/secure/audit.log
+
+# Development and testing
+LLMSPELL_DEBUG=true                # Enable all debug features
+LLMSPELL_LOG_SQL_QUERIES=true      # Log database queries
+LLMSPELL_LOG_HTTP_REQUESTS=true    # Log HTTP requests/responses
+LLMSPELL_LOG_SCRIPT_EXECUTION=true # Log script execution details
+
+# Correlation and tracing
+LLMSPELL_CORRELATION_ID=req-123    # Set correlation ID
+LLMSPELL_TRACE_ID=trace-456        # Set trace ID
+LLMSPELL_SPAN_ID=span-789          # Set span ID
 ```
 
 ### Cross-Engine Feature Matrix
@@ -3923,6 +4018,117 @@ end)
 
 -- Run all tests
 LuaTest.run_all()
+```
+
+#### 7. **Lua Logger API**
+
+The Logger global provides comprehensive structured logging capabilities:
+
+```lua
+-- Basic logging functions (convenience wrappers)
+trace("Detailed trace message")
+debug("Debug information")
+info("Information message")
+warn("Warning message")
+error("Error message")
+
+-- Structured logging with metadata
+log("info", "User action", {
+    user_id = "12345",
+    action = "login",
+    ip_address = "192.168.1.1",
+    timestamp = os.time()
+})
+
+-- Logger object for advanced usage
+local logger = Logger.new({
+    name = "my_component",
+    level = "debug",  -- "trace", "debug", "info", "warn", "error"
+    format = "json"   -- "json" or "text"
+})
+
+-- Logger instance methods
+logger:trace("Component initialized")
+logger:debug("Processing request", { request_id = "abc123" })
+logger:info("Request completed", {
+    duration = 1234,
+    status = "success"
+})
+logger:warn("High memory usage", {
+    memory_used = "1.2GB",
+    threshold = "1GB"
+})
+logger:error("Database connection failed", {
+    error_code = 2001,
+    retry_count = 3
+})
+
+-- Context-aware logging
+local context_logger = logger:with_context({
+    session_id = "xyz789",
+    user_id = "12345"
+})
+-- All logs from context_logger will include session_id and user_id
+context_logger:info("Action performed", { action = "save" })
+
+-- Performance logging
+local timer = logger:timer("operation_duration")
+-- ... perform operation ...
+timer:stop() -- Automatically logs duration
+
+-- Structured error logging with stack traces
+local success, err = pcall(function()
+    -- risky operation
+end)
+if not success then
+    logger:error("Operation failed", {
+        error = tostring(err),
+        stack_trace = debug.traceback()
+    })
+end
+
+-- Log filtering and conditional logging
+if logger:is_enabled_for("debug") then
+    -- Only execute expensive operations if debug logging is enabled
+    local debug_data = generate_expensive_debug_info()
+    logger:debug("Debug data", debug_data)
+end
+
+-- Correlation ID tracking
+Logger.set_correlation_id("req-123456")
+-- All subsequent logs will include correlation_id: "req-123456"
+
+-- Custom log formatting
+local custom_logger = Logger.new({
+    name = "custom",
+    formatter = function(level, message, metadata)
+        return string.format("[%s] %s - %s: %s",
+            os.date("%Y-%m-%d %H:%M:%S"),
+            level:upper(),
+            metadata.component or "unknown",
+            message
+        )
+    end
+})
+
+-- Batch logging for performance
+local batch_logger = logger:batch()
+batch_logger:info("Message 1")
+batch_logger:info("Message 2")
+batch_logger:info("Message 3")
+batch_logger:flush() -- Send all messages at once
+
+-- Integration with hooks and events
+Hooks.register("before_agent_execution", function(context)
+    logger:debug("Agent starting", {
+        agent_id = context.agent.id,
+        input_size = #tostring(context.input)
+    })
+end)
+
+-- Automatic error context capture
+ErrorHandler.set_logger(logger)
+-- All errors will be automatically logged with full context
 ```
 
 ---
@@ -5047,6 +5253,141 @@ try {
 } catch (error) {
     console.error("Research failed after all recovery attempts:", error.message);
 }
+```
+
+#### 6. **JavaScript Logger API**
+
+The Logger global provides comprehensive structured logging capabilities:
+
+```javascript
+// Basic logging functions (convenience wrappers)
+trace("Detailed trace message");
+debug("Debug information");
+info("Information message");
+warn("Warning message");
+error("Error message");
+
+// Structured logging with metadata
+log("info", "User action", {
+    userId: "12345",
+    action: "login",
+    ipAddress: "192.168.1.1",
+    timestamp: Date.now()
+});
+
+// Logger object for advanced usage
+const logger = new Logger({
+    name: "my_component",
+    level: "debug",  // "trace", "debug", "info", "warn", "error"
+    format: "json"   // "json" or "text"
+});
+
+// Logger instance methods
+logger.trace("Component initialized");
+logger.debug("Processing request", { requestId: "abc123" });
+logger.info("Request completed", {
+    duration: 1234,
+    status: "success"
+});
+logger.warn("High memory usage", {
+    memoryUsed: "1.2GB",
+    threshold: "1GB"
+});
+logger.error("Database connection failed", {
+    errorCode: 2001,
+    retryCount: 3
+});
+
+// Context-aware logging
+const contextLogger = logger.withContext({
+    sessionId: "xyz789",
+    userId: "12345"
+});
+// All logs from contextLogger will include sessionId and userId
+contextLogger.info("Action performed", { action: "save" });
+
+// Performance logging
+const timer = logger.timer("operation_duration");
+// ... perform operation ...
+timer.stop(); // Automatically logs duration
+
+// Structured error logging with stack traces
+try {
+    // risky operation
+} catch (err) {
+    logger.error("Operation failed", {
+        error: err.message,
+        stack: err.stack,
+        code: err.code
+    });
+}
+
+// Log filtering and conditional logging
+if (logger.isEnabledFor("debug")) {
+    // Only execute expensive operations if debug logging is enabled
+    const debugData = generateExpensiveDebugInfo();
+    logger.debug("Debug data", debugData);
+}
+
+// Correlation ID tracking
+Logger.setCorrelationId("req-123456");
+// All subsequent logs will include correlationId: "req-123456"
+
+// Custom log formatting
+const customLogger = new Logger({
+    name: "custom",
+    formatter: (level, message, metadata) => {
+        return `[${new Date().toISOString()}] ${level.toUpperCase()} - ${metadata.component || "unknown"}: ${message}`;
+    }
+});
+
+// Batch logging for performance
+const batchLogger = logger.batch();
+batchLogger.info("Message 1");
+batchLogger.info("Message 2");
+batchLogger.info("Message 3");
+batchLogger.flush(); // Send all messages at once
+
+// Integration with hooks and events
+Hooks.register("beforeAgentExecution", (context) => {
+    logger.debug("Agent starting", {
+        agentId: context.agent.id,
+        inputSize: JSON.stringify(context.input).length
+    });
+});
+
+// Automatic error context capture
+ErrorHandler.setLogger(logger);
+// All errors will be automatically logged with full context
+
+// Async logging with backpressure
+const asyncLogger = logger.async({
+    bufferSize: 1000,
+    flushInterval: 5000 // milliseconds
+});
+
+// Log aggregation for metrics
+const metricsLogger = logger.metrics();
+metricsLogger.increment("api.requests", { endpoint: "/users" });
+metricsLogger.gauge("memory.usage", process.memoryUsage().heapUsed);
+metricsLogger.histogram("response.time", responseTime, { status: 200 });
+
+// Child loggers for component isolation
+const dbLogger = logger.child({ component: "database" });
+const apiLogger = logger.child({ component: "api" });
+
+// Log redaction for sensitive data
+const secureLogger = new Logger({
+    name: "secure",
+    redact: ["password", "apiKey", "ssn"],
+    redactPattern: /\b(?:\d{4}[\s-]?){3}\d{4}\b/g // Credit card pattern
+});
+
+secureLogger.info("User login", {
+    username: "john.doe",
+    password: "secret123", // Will be redacted
+    apiKey: "key-123456"   // Will be redacted
+});
 ```
 
 # Part IV: Built-in Components Library
@@ -8729,7 +9070,7 @@ pub struct LuaEngineConfig {
     pub max_coroutines: usize,
     pub stdlib_access: Vec<String>, // Allowed standard library modules
     pub custom_modules: Vec<String>,
-    pub debug_mode: bool,
+    pub debug_mode: bool,            // Enables trace logging, stack traces, and performance profiling
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -8741,7 +9082,7 @@ pub struct JavaScriptEngineConfig {
     pub strict_mode: bool,
     pub ecmascript_version: String,
     pub custom_modules: Vec<String>,
-    pub debug_mode: bool,
+    pub debug_mode: bool,            // Enables trace logging, stack traces, and performance profiling
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -10381,6 +10722,7 @@ use tracing::{event, Level, span, Instrument};
 use opentelemetry::trace::{TraceError, Tracer};
 
 pub struct ObservabilityManager {
+    logging_subsystem: LoggingSubsystem,
     metrics_collector: MetricsCollector,
     tracing_manager: TracingManager,
     alerting_system: AlertingSystem,
@@ -10389,6 +10731,9 @@ pub struct ObservabilityManager {
 
 impl ObservabilityManager {
     pub async fn new(config: &ObservabilityConfig) -> Result<Self> {
+        // Initialize unified logging subsystem
+        let logging_subsystem = LoggingSubsystem::new(&config.logging).await?;
+        
         // Initialize metrics collection
         let metrics_collector = MetricsCollector::new(&config.metrics).await?;
         
@@ -10402,6 +10747,7 @@ impl ObservabilityManager {
         let dashboard_exporter = DashboardExporter::new(&config.dashboard).await?;
         
         Ok(Self {
+            logging_subsystem,
             metrics_collector,
             tracing_manager,
             alerting_system,
@@ -10422,6 +10768,208 @@ impl ObservabilityManager {
         
         // Start dashboard data export
         self.dashboard_exporter.start_export_loop().await?;
+        
+        Ok(())
+    }
+}
+
+/// Unified Logging Subsystem Architecture
+pub struct LoggingSubsystem {
+    core_logger: CoreLogger,
+    script_logger_bridge: ScriptLoggerBridge,
+    audit_logger: AuditLogger,
+    performance_logger: PerformanceLogger,
+    log_aggregator: LogAggregator,
+    correlation_tracker: CorrelationTracker,
+}
+
+impl LoggingSubsystem {
+    pub async fn new(config: &LoggingConfig) -> Result<Self> {
+        // Initialize core logger with tracing
+        let core_logger = CoreLogger::new(
+            config.level.clone(),
+            config.format.clone(),
+            config.output.clone(),
+        )?;
+        
+        // Initialize script logger bridge for Lua/JS integration
+        let script_logger_bridge = ScriptLoggerBridge::new(&core_logger)?;
+        
+        // Initialize specialized loggers
+        let audit_logger = if config.audit_logging_enabled {
+            Some(AuditLogger::new(&config.audit_log_path)?)
+        } else {
+            None
+        };
+        
+        let performance_logger = if config.perf_logging_enabled {
+            Some(PerformanceLogger::new(&core_logger)?)
+        } else {
+            None
+        };
+        
+        // Initialize log aggregation
+        let log_aggregator = LogAggregator::new(
+            config.buffer_size,
+            config.flush_interval_ms,
+        )?;
+        
+        // Initialize correlation tracking
+        let correlation_tracker = CorrelationTracker::new();
+        
+        Ok(Self {
+            core_logger,
+            script_logger_bridge,
+            audit_logger,
+            performance_logger,
+            log_aggregator,
+            correlation_tracker,
+        })
+    }
+    
+    /// Create logger instance for script environments
+    pub fn create_script_logger(&self, engine: ScriptEngine, context: LogContext) -> ScriptLogger {
+        self.script_logger_bridge.create_logger(engine, context)
+    }
+    
+    /// Log with automatic correlation ID injection
+    pub fn log(&self, level: Level, message: &str, metadata: Option<Value>) {
+        let correlation_id = self.correlation_tracker.current_id();
+        let mut enriched_metadata = metadata.unwrap_or_else(|| json!({}));
+        
+        if let Some(id) = correlation_id {
+            enriched_metadata["correlation_id"] = json!(id);
+        }
+        
+        self.core_logger.log(level, message, Some(enriched_metadata));
+    }
+}
+
+/// Script Logger Bridge - Provides unified logging API across Lua/JS/Python
+pub struct ScriptLoggerBridge {
+    core_logger: Arc<CoreLogger>,
+    script_adapters: HashMap<ScriptEngine, Box<dyn ScriptLogAdapter>>,
+}
+
+impl ScriptLoggerBridge {
+    pub fn create_logger(&self, engine: ScriptEngine, context: LogContext) -> ScriptLogger {
+        ScriptLogger {
+            engine,
+            context,
+            bridge: self.clone(),
+        }
+    }
+    
+    pub fn log_from_script(
+        &self,
+        engine: ScriptEngine,
+        level: &str,
+        message: &str,
+        metadata: ScriptValue,
+    ) -> Result<()> {
+        // Convert script value to JSON
+        let adapter = self.script_adapters.get(&engine)
+            .ok_or_else(|| LLMSpellError::Script("Unsupported script engine".into()))?;
+        
+        let json_metadata = adapter.script_value_to_json(metadata)?;
+        
+        // Parse level
+        let level = match level {
+            "trace" => Level::TRACE,
+            "debug" => Level::DEBUG,
+            "info" => Level::INFO,
+            "warn" => Level::WARN,
+            "error" => Level::ERROR,
+            _ => Level::INFO,
+        };
+        
+        // Log through core logger
+        self.core_logger.log(level, message, Some(json_metadata));
+        
+        Ok(())
+    }
+}
+
+/// Performance Logger for automatic timing and metrics
+pub struct PerformanceLogger {
+    core_logger: Arc<CoreLogger>,
+    active_timers: Arc<DashMap<String, Instant>>,
+}
+
+impl PerformanceLogger {
+    pub fn start_timer(&self, operation: &str) -> PerformanceTimer {
+        let timer_id = Uuid::new_v4().to_string();
+        self.active_timers.insert(timer_id.clone(), Instant::now());
+        
+        PerformanceTimer {
+            id: timer_id,
+            operation: operation.to_string(),
+            logger: self.clone(),
+        }
+    }
+}
+
+pub struct PerformanceTimer {
+    id: String,
+    operation: String,
+    logger: Arc<PerformanceLogger>,
+}
+
+impl Drop for PerformanceTimer {
+    fn drop(&mut self) {
+        if let Some((_, start_time)) = self.logger.active_timers.remove(&self.id) {
+            let duration = start_time.elapsed();
+            
+            self.logger.core_logger.log(
+                Level::DEBUG,
+                &format!("Operation '{}' completed", self.operation),
+                Some(json!({
+                    "operation": self.operation,
+                    "duration_ms": duration.as_millis(),
+                    "duration_us": duration.as_micros(),
+                })),
+            );
+            
+            // Also record as metric
+            histogram!("operation.duration_seconds", duration.as_secs_f64(), 
+                "operation" => self.operation.clone());
+        }
+    }
+}
+
+/// Audit Logger for security and compliance
+pub struct AuditLogger {
+    audit_file: Arc<Mutex<File>>,
+    encryption_key: Option<Vec<u8>>,
+}
+
+impl AuditLogger {
+    pub async fn log_security_event(&self, event: SecurityEvent) -> Result<()> {
+        let log_entry = AuditLogEntry {
+            timestamp: Utc::now(),
+            event_type: event.event_type,
+            user_id: event.user_id,
+            resource: event.resource,
+            action: event.action,
+            result: event.result,
+            ip_address: event.ip_address,
+            metadata: event.metadata,
+        };
+        
+        let serialized = serde_json::to_string(&log_entry)?;
+        
+        // Optionally encrypt
+        let data = if let Some(key) = &self.encryption_key {
+            encrypt_data(&serialized, key)?
+        } else {
+            serialized.into_bytes()
+        };
+        
+        // Write to audit file
+        let mut file = self.audit_file.lock().await;
+        file.write_all(&data).await?;
+        file.write_all(b"\n").await?;
+        file.flush().await?;
         
         Ok(())
     }
@@ -16350,6 +16898,47 @@ local conditional_workflow = Workflow.conditional({
 })
 ```
 
+**Logger Usage:**
+```lua
+-- Create logger
+local logger = Logger.new({
+    name = "my_component",
+    level = "debug",
+    format = "json"
+})
+
+-- Basic logging
+logger:trace("Trace message")
+logger:debug("Debug message", { details = "extra info" })
+logger:info("Info message")
+logger:warn("Warning message")
+logger:error("Error message", { error_code = 500 })
+
+-- Context logger
+local ctx_logger = logger:with_context({
+    user_id = "12345",
+    session = "abc-123"
+})
+ctx_logger:info("User action", { action = "login" })
+
+-- Performance timing
+local timer = logger:timer("operation_name")
+-- ... do work ...
+timer:stop() -- Logs duration automatically
+
+-- Conditional logging
+if logger:is_enabled_for("debug") then
+    local expensive_data = calculate_debug_info()
+    logger:debug("Debug data", expensive_data)
+end
+
+-- Batch logging
+local batch = logger:batch()
+batch:info("Message 1")
+batch:info("Message 2")
+batch:flush()
+```
+
 **Event Handling:**
 ```lua
 -- Event registration
@@ -16499,6 +17088,55 @@ Hooks.register('beforeLlmCall', {
         return context;
     }
 });
+```
+
+**Logger Usage:**
+```javascript
+// Create logger
+const logger = new Logger({
+    name: 'my_component',
+    level: 'debug',
+    format: 'json'
+});
+
+// Basic logging
+logger.trace('Trace message');
+logger.debug('Debug message', { details: 'extra info' });
+logger.info('Info message');
+logger.warn('Warning message');
+logger.error('Error message', { errorCode: 500 });
+
+// Context logger
+const ctxLogger = logger.withContext({
+    userId: '12345',
+    session: 'abc-123'
+});
+ctxLogger.info('User action', { action: 'login' });
+
+// Performance timing
+const timer = logger.timer('operation_name');
+// ... do work ...
+timer.stop(); // Logs duration automatically
+
+// Conditional logging
+if (logger.isEnabledFor('debug')) {
+    const expensiveData = calculateDebugInfo();
+    logger.debug('Debug data', expensiveData);
+}
+
+// Batch logging
+const batch = logger.batch();
+batch.info('Message 1');
+batch.info('Message 2');
+batch.flush();
+
+// Async logging
+const asyncLogger = logger.async({ bufferSize: 1000 });
+asyncLogger.info('Buffered message');
+
+// Child loggers
+const dbLogger = logger.child({ component: 'database' });
+dbLogger.info('Query executed');
 ```
 
 ### Error Code Reference
@@ -16827,12 +17465,25 @@ health_check_interval = 30         # Health check interval in seconds
 
 [observability.logging]
 level = "info"                     # Log level: "trace", "debug", "info", "warn", "error"
-format = "json"                    # Log format: "json", "text"
-output = "stdout"                  # Log output: "stdout", "stderr", "file"
+format = "json"                    # Log format: "json", "text", "pretty", "compact"
+output = "stdout"                  # Log output: "stdout", "stderr", "file", "both"
 file_path = "/var/log/rs-llmspell.log" # Log file path
 rotation_enabled = true            # Enable log rotation
 max_file_size = 104857600          # Max log file size in bytes (100MB)
 max_files = 10                     # Maximum number of log files
+buffer_size = 8192                 # Log buffer size in bytes
+async_logging = true               # Enable async logging for performance
+include_caller = true              # Include file:line in logs
+include_thread_id = true           # Include thread ID in logs
+timestamp_format = "rfc3339"       # Timestamp format: "rfc3339", "unix", "unix_ms"
+filter_targets = []                # Filter specific modules: ["llmspell::agent=debug"]
+redact_keys = ["password", "api_key", "token"] # Keys to redact in structured logs
+correlation_id_header = "X-Correlation-ID" # HTTP header for correlation ID
+sampling_config = {                # Log sampling configuration
+    enabled = false,
+    rate = 0.1,                    # Sample 10% of trace logs
+    always_log_errors = true       # Always log errors regardless of sampling
+}
 
 [observability.metrics]
 prometheus_enabled = true          # Enable Prometheus metrics
