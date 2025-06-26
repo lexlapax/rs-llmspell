@@ -24,8 +24,14 @@ mockall = { workspace = true, optional = true }
 [dev-dependencies]
 mockall.workspace = true
 proptest.workspace = true
+criterion.workspace = true
 tokio-test = "0.4"
+llmspell-testing = { path = "../llmspell-testing" }
 
 [features]
 default = []
 testing = ["mockall"]
+
+[[bench]]
+name = "core_benchmarks"
+harness = false

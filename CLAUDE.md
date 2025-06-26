@@ -34,6 +34,7 @@ cargo doc --workspace --no-deps  # Generate documentation
 cargo clippy -- -D warnings      # Zero warnings policy
 cargo fmt --check               # Formatting validation
 cargo fmt                       # Apply formatting
+cargo test --workspace          # Run all tests
 
 # Phase 0 Specific Tasks
 cargo metadata                   # Verify workspace structure
@@ -212,4 +213,5 @@ cargo test --lib                    # Unit tests only
 cargo test --test '*'               # Integration tests
 cargo test --all-features           # All features enabled
 cargo test --workspace              # Entire workspace
+cargo clippy -- -D warnings         # Zero warnings policy 
 ```
