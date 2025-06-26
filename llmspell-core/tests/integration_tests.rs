@@ -6,9 +6,10 @@ use async_trait::async_trait;
 use llmspell_core::{
     traits::{
         agent::{Agent, AgentConfig, ConversationMessage, MessageRole},
-        base_agent::{AgentInput, AgentOutput, BaseAgent, ExecutionContext},
+        base_agent::BaseAgent,
         tool::{ParameterDef, ParameterType, SecurityLevel, Tool, ToolCategory, ToolSchema},
     },
+    types::{AgentInput, AgentOutput, ExecutionContext},
     ComponentMetadata, LLMSpellError, Result, Version,
 };
 use std::sync::{Arc, Mutex};
@@ -46,19 +47,18 @@ impl BaseAgent for TestAgent {
 
         // Add to conversation
         let mut conv = self.conversation.lock().unwrap();
-        conv.push(ConversationMessage::user(input.prompt.clone()));
+        conv.push(ConversationMessage::user(input.text.clone()));
 
-        let response = format!("Processed: {}", input.prompt);
+        let response = format!("Processed: {}", input.text);
         conv.push(ConversationMessage::assistant(response.clone()));
 
-        Ok(AgentOutput::new(response).with_metadata(
-            "execution_count".to_string(),
-            serde_json::json!(*self.execution_count.lock().unwrap()),
-        ))
+        let mut metadata = llmspell_core::types::OutputMetadata::default();
+        metadata.extra.insert("execution_count".to_string(), serde_json::json!(*self.execution_count.lock().unwrap()));
+        Ok(AgentOutput::text(response).with_metadata(metadata))
     }
 
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
-        if input.prompt.is_empty() {
+        if input.text.is_empty() {
             return Err(LLMSpellError::Validation {
                 message: "Prompt cannot be empty".to_string(),
                 field: Some("prompt".to_string()),
@@ -68,7 +68,7 @@ impl BaseAgent for TestAgent {
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
-        Ok(AgentOutput::new(format!("Error handled: {}", error)))
+        Ok(AgentOutput::text(format!("Error handled: {}", error)))
     }
 }
 
@@ -117,11 +117,10 @@ impl BaseAgent for TestTool {
     async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
         *self.invocation_count.lock().unwrap() += 1;
 
-        // Parse parameters
-        let params = input
-            .get_context("params")
+        // Parse parameters from input parameters
+        let params = input.parameters.get("params")
             .ok_or_else(|| LLMSpellError::Validation {
-                message: "Missing params in context".to_string(),
+                message: "Missing params in parameters".to_string(),
                 field: Some("params".to_string()),
             })?;
 
@@ -144,7 +143,7 @@ impl BaseAgent for TestTool {
             _ => text.to_string(),
         };
 
-        Ok(AgentOutput::new(result))
+        Ok(AgentOutput::text(result))
     }
 
     async fn validate_input(&self, _input: &AgentInput) -> Result<()> {
@@ -152,7 +151,7 @@ impl BaseAgent for TestTool {
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
-        Ok(AgentOutput::new(format!("Tool error: {}", error)))
+        Ok(AgentOutput::text(format!("Tool error: {}", error)))
     }
 }
 
@@ -215,11 +214,11 @@ async fn test_agent_conversation_flow() {
     assert_eq!(conv.len(), 0);
 
     // Execute with input
-    let input = AgentInput::new("Hello, agent!".to_string());
-    let context = ExecutionContext::new("test-session".to_string());
+    let input = AgentInput::text("Hello, agent!".to_string());
+    let context = ExecutionContext::with_conversation("test-session".to_string());
 
     let output = agent.execute(input, context).await.unwrap();
-    assert_eq!(output.content, "Processed: Hello, agent!");
+    assert_eq!(output.text, "Processed: Hello, agent!");
 
     // Check conversation was updated
     let conv = agent.get_conversation().await.unwrap();
@@ -230,8 +229,8 @@ async fn test_agent_conversation_flow() {
     assert_eq!(conv[1].content, "Processed: Hello, agent!");
 
     // Check execution count in metadata
-    let count = output.get_metadata("execution_count").unwrap();
-    assert_eq!(count, 1);
+    let count = output.metadata.extra.get("execution_count").unwrap();
+    assert_eq!(count, &serde_json::json!(1));
 
     // Add system message
     agent
@@ -273,36 +272,38 @@ async fn test_tool_execution_and_validation() {
     assert!(err.to_string().contains("Missing required parameter"));
 
     // Test execution
-    let input =
-        AgentInput::new("transform".to_string()).with_context("params".to_string(), valid_params);
-    let context = ExecutionContext::new("test-session".to_string());
+    let input = AgentInput::text("transform".to_string())
+        .with_parameter("params".to_string(), valid_params);
+    let context = ExecutionContext::with_conversation("test-session".to_string());
 
     let output = tool.execute(input, context).await.unwrap();
-    assert_eq!(output.content, "HELLO WORLD");
+    assert_eq!(output.text, "HELLO WORLD");
 
     // Test different operations
     let params = serde_json::json!({
         "text": "HELLO",
         "operation": "lowercase"
     });
-    let input = AgentInput::new("transform".to_string()).with_context("params".to_string(), params);
+    let input = AgentInput::text("transform".to_string())
+        .with_parameter("params".to_string(), params);
     let output = tool
-        .execute(input, ExecutionContext::new("test".to_string()))
+        .execute(input, ExecutionContext::with_conversation("test".to_string()))
         .await
         .unwrap();
-    assert_eq!(output.content, "hello");
+    assert_eq!(output.text, "hello");
 
     // Test reverse
     let params = serde_json::json!({
         "text": "hello",
         "operation": "reverse"
     });
-    let input = AgentInput::new("transform".to_string()).with_context("params".to_string(), params);
+    let input = AgentInput::text("transform".to_string())
+        .with_parameter("params".to_string(), params);
     let output = tool
-        .execute(input, ExecutionContext::new("test".to_string()))
+        .execute(input, ExecutionContext::with_conversation("test".to_string()))
         .await
         .unwrap();
-    assert_eq!(output.content, "olleh");
+    assert_eq!(output.text, "olleh");
 }
 
 #[tokio::test]
@@ -310,8 +311,8 @@ async fn test_error_handling_flow() {
     let agent = TestAgent::new("error-test-agent");
 
     // Test validation error
-    let input = AgentInput::new("".to_string());
-    let context = ExecutionContext::new("test".to_string());
+    let input = AgentInput::text("".to_string());
+    let context = ExecutionContext::with_conversation("test".to_string());
 
     let result = agent.execute(input, context).await;
     assert!(result.is_err());
@@ -326,7 +327,7 @@ async fn test_error_handling_flow() {
 
     // Test error handling
     let handled = agent.handle_error(err).await.unwrap();
-    assert!(handled.content.contains("Error handled"));
+    assert!(handled.text.contains("Error handled"));
 }
 
 #[tokio::test]
@@ -353,24 +354,25 @@ async fn test_component_metadata_updates() {
 
 #[tokio::test]
 async fn test_execution_context_environment() {
-    let context = ExecutionContext::new("test-session".to_string())
-        .with_user_id("user-123".to_string())
-        .with_env("LOG_LEVEL".to_string(), "debug".to_string())
-        .with_env("ENV".to_string(), "test".to_string());
+    let mut context = ExecutionContext::with_conversation("test-session".to_string());
+    context.user_id = Some("user-123".to_string());
+    let context = context
+        .with_data("LOG_LEVEL".to_string(), serde_json::json!("debug"))
+        .with_data("ENV".to_string(), serde_json::json!("test"));
 
-    assert_eq!(context.session_id, "test-session");
+    assert_eq!(context.conversation_id, Some("test-session".to_string()));
     assert_eq!(context.user_id, Some("user-123".to_string()));
-    assert_eq!(context.get_env("LOG_LEVEL"), Some(&"debug".to_string()));
-    assert_eq!(context.get_env("ENV"), Some(&"test".to_string()));
-    assert_eq!(context.get_env("MISSING"), None);
+    assert_eq!(context.data.get("LOG_LEVEL"), Some(&serde_json::json!("debug")));
+    assert_eq!(context.data.get("ENV"), Some(&serde_json::json!("test")));
+    assert_eq!(context.data.get("MISSING"), None);
 }
 
 #[tokio::test]
 async fn test_agent_input_context_manipulation() {
-    let input = AgentInput::new("test prompt".to_string())
-        .with_context("key1".to_string(), serde_json::json!("value1"))
-        .with_context("key2".to_string(), serde_json::json!(42))
-        .with_context(
+    let input = AgentInput::text("test prompt".to_string())
+        .with_parameter("key1".to_string(), serde_json::json!("value1"))
+        .with_parameter("key2".to_string(), serde_json::json!(42))
+        .with_parameter(
             "nested".to_string(),
             serde_json::json!({
                 "inner": "value",
@@ -378,34 +380,29 @@ async fn test_agent_input_context_manipulation() {
             }),
         );
 
-    assert_eq!(input.prompt, "test prompt");
+    assert_eq!(input.text, "test prompt");
     assert_eq!(
-        input.get_context("key1"),
+        input.parameters.get("key1"),
         Some(&serde_json::json!("value1"))
     );
-    assert_eq!(input.get_context("key2"), Some(&serde_json::json!(42)));
+    assert_eq!(input.parameters.get("key2"), Some(&serde_json::json!(42)));
 
-    let nested = input.get_context("nested").unwrap();
+    let nested = input.parameters.get("nested").unwrap();
     assert_eq!(nested.get("inner"), Some(&serde_json::json!("value")));
     assert_eq!(nested.get("count"), Some(&serde_json::json!(10)));
 }
 
 #[tokio::test]
 async fn test_agent_output_metadata() {
-    let output = AgentOutput::new("result".to_string())
-        .with_metadata("confidence".to_string(), serde_json::json!(0.95))
-        .with_metadata("tokens".to_string(), serde_json::json!(100))
-        .with_metadata("model".to_string(), serde_json::json!("gpt-4"));
+    let mut metadata = llmspell_core::types::OutputMetadata::default();
+    metadata.confidence = Some(0.95);
+    metadata.token_count = Some(100);
+    metadata.model = Some("gpt-4".to_string());
+    let output = AgentOutput::text("result".to_string()).with_metadata(metadata);
 
-    assert_eq!(output.content, "result");
-    assert_eq!(
-        output.get_metadata("confidence"),
-        Some(&serde_json::json!(0.95))
-    );
-    assert_eq!(output.get_metadata("tokens"), Some(&serde_json::json!(100)));
-    assert_eq!(
-        output.get_metadata("model"),
-        Some(&serde_json::json!("gpt-4"))
-    );
-    assert_eq!(output.get_metadata("missing"), None);
+    assert_eq!(output.text, "result");
+    assert_eq!(output.metadata.confidence, Some(0.95));
+    assert_eq!(output.metadata.token_count, Some(100));
+    assert_eq!(output.metadata.model, Some("gpt-4".to_string()));
+    assert_eq!(output.metadata.extra.get("missing"), None);
 }

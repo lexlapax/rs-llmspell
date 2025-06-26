@@ -2,6 +2,7 @@
 //! ABOUTME: Extends BaseAgent with step management and execution planning
 
 use super::base_agent::BaseAgent;
+use crate::types::{AgentInput, AgentOutput, ExecutionContext};
 use crate::{ComponentId, Result};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -117,7 +118,7 @@ impl Default for RetryPolicy {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StepResult {
     pub step_id: ComponentId,
-    pub output: super::base_agent::AgentOutput,
+    pub output: AgentOutput,
     pub duration: Duration,
     pub success: bool,
     pub error: Option<String>,
@@ -128,7 +129,7 @@ impl StepResult {
     /// Create a successful result
     pub fn success(
         step_id: ComponentId,
-        output: super::base_agent::AgentOutput,
+        output: AgentOutput,
         duration: Duration,
     ) -> Self {
         Self {
@@ -150,7 +151,7 @@ impl StepResult {
     ) -> Self {
         Self {
             step_id,
-            output: super::base_agent::AgentOutput::new(String::new()),
+            output: AgentOutput::text(String::new()),
             duration,
             success: false,
             error: Some(error),
@@ -227,8 +228,9 @@ pub struct WorkflowConfig {
 /// ```ignore
 /// use llmspell_core::{
 ///     ComponentId, ComponentMetadata, Result,
+///     types::{AgentInput, AgentOutput, ExecutionContext},
 ///     traits::{
-///         base_agent::{BaseAgent, AgentInput, AgentOutput, ExecutionContext},
+///         base_agent::BaseAgent,
 ///         workflow::{Workflow, WorkflowConfig, WorkflowStep, WorkflowStatus, StepResult}
 ///     }
 /// };
@@ -276,11 +278,11 @@ pub struct WorkflowConfig {
 /// # impl BaseAgent for DataPipeline {
 /// #     fn metadata(&self) -> &ComponentMetadata { &self.metadata }
 /// #     async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput> {
-/// #         Ok(AgentOutput::new("Workflow complete".to_string()))
+/// #         Ok(AgentOutput::text("Workflow complete"))
 /// #     }
 /// #     async fn validate_input(&self, input: &AgentInput) -> Result<()> { Ok(()) }
 /// #     async fn handle_error(&self, error: llmspell_core::LLMSpellError) -> Result<AgentOutput> {
-/// #         Ok(AgentOutput::new("Error".to_string()))
+/// #         Ok(AgentOutput::text("Error"))
 /// #     }
 /// # }
 /// ```
@@ -393,7 +395,6 @@ pub trait Workflow: BaseAgent {
 
 #[cfg(test)]
 mod tests {
-    use super::super::base_agent::{AgentInput, AgentOutput, ExecutionContext};
     use super::*;
     use crate::ComponentMetadata;
     use std::sync::Arc;
@@ -428,7 +429,7 @@ mod tests {
     #[test]
     fn test_step_result_creation() {
         let step_id = ComponentId::new();
-        let output = AgentOutput::new("Success".to_string());
+        let output = AgentOutput::text("Success");
         let duration = Duration::from_secs(1);
 
         // Test success result
@@ -495,21 +496,21 @@ mod tests {
             for step in steps {
                 let result = StepResult::success(
                     step.id,
-                    AgentOutput::new(format!("Executed {}", step.name)),
+                    AgentOutput::text(format!("Executed {}", step.name)),
                     Duration::from_secs(1),
                 );
                 self.results.lock().await.push(result);
             }
 
             *self.status.lock().await = WorkflowStatus::Completed;
-            Ok(AgentOutput::new("Workflow completed".to_string()))
+            Ok(AgentOutput::text("Workflow completed"))
         }
 
         async fn validate_input(&self, input: &AgentInput) -> Result<()> {
-            if input.prompt.is_empty() {
+            if input.text.is_empty() {
                 return Err(crate::LLMSpellError::Validation {
-                    message: "Input prompt cannot be empty".to_string(),
-                    field: Some("prompt".to_string()),
+                    message: "Input text cannot be empty".to_string(),
+                    field: Some("text".to_string()),
                 });
             }
             Ok(())
@@ -517,7 +518,7 @@ mod tests {
 
         async fn handle_error(&self, error: crate::LLMSpellError) -> Result<AgentOutput> {
             *self.status.lock().await = WorkflowStatus::Failed;
-            Ok(AgentOutput::new(format!("Workflow error: {}", error)))
+            Ok(AgentOutput::text(format!("Workflow error: {}", error)))
         }
     }
 
@@ -660,11 +661,11 @@ mod tests {
         let workflow = workflow_mut;
 
         // Execute workflow
-        let input = AgentInput::new("Execute workflow".to_string());
-        let context = ExecutionContext::new("session".to_string());
+        let input = AgentInput::text("Execute workflow");
+        let context = ExecutionContext::with_conversation("session".to_string());
 
         let output = workflow.execute(input, context).await.unwrap();
-        assert_eq!(output.content, "Workflow completed");
+        assert_eq!(output.text, "Workflow completed");
 
         // Check status and results
         assert_eq!(workflow.status().await.unwrap(), WorkflowStatus::Completed);

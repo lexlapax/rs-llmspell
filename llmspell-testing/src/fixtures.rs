@@ -20,16 +20,16 @@
 //! assert_eq!(metadata.name, "test-component");
 //!
 //! let input = sample_agent_input();
-//! assert_eq!(input.prompt, "Test prompt");
+//! assert_eq!(input.text, "Test prompt");
 //! ```
 
 use llmspell_core::{
     traits::{
         agent::{AgentConfig, ConversationMessage},
-        base_agent::{AgentInput, ExecutionContext},
         tool::ToolSchema,
         workflow::{RetryPolicy, WorkflowConfig, WorkflowStep},
     },
+    types::{AgentInput, ExecutionContext},
     ComponentId, ComponentMetadata, Version,
 };
 
@@ -80,33 +80,33 @@ pub fn component_metadata_variants() -> Vec<ComponentMetadata> {
 
 /// Sample AgentInput for testing
 pub fn sample_agent_input() -> AgentInput {
-    AgentInput::new("Test prompt".to_string())
-        .with_context("user_id".to_string(), json!("test-user"))
-        .with_context("session".to_string(), json!("test-session"))
+    AgentInput::text("Test prompt")
+        .with_parameter("user_id", json!("test-user"))
+        .with_parameter("session", json!("test-session"))
 }
 
 /// Sample AgentInput variants
 pub fn agent_input_variants() -> Vec<AgentInput> {
     vec![
         // Simple input
-        AgentInput::new("Simple prompt".to_string()),
+        AgentInput::text("Simple prompt"),
         // Input with context
         sample_agent_input(),
         // Complex input
-        AgentInput::new("Complex prompt with lots of detail".to_string())
-            .with_context("history".to_string(), json!(["previous", "messages"]))
-            .with_context("temperature".to_string(), json!(0.7))
-            .with_context("max_tokens".to_string(), json!(100))
-            .with_context("priority".to_string(), json!("high"))
-            .with_context("timestamp".to_string(), json!(1234567890)),
+        AgentInput::text("Complex prompt with lots of detail")
+            .with_parameter("history", json!(["previous", "messages"]))
+            .with_parameter("temperature", json!(0.7))
+            .with_parameter("max_tokens", json!(100))
+            .with_parameter("priority", json!("high"))
+            .with_parameter("timestamp", json!(1234567890)),
     ]
 }
 
 /// Sample ExecutionContext for testing
 pub fn sample_execution_context() -> ExecutionContext {
-    ExecutionContext::new("test-session-123".to_string())
-        .with_user_id("test-user".to_string())
-        .with_env("LLMSPELL_ENV".to_string(), "test".to_string())
+    ExecutionContext::with_conversation("test-session-123".to_string())
+        .with_data("user_id".to_string(), json!("test-user"))
+        .with_data("LLMSPELL_ENV".to_string(), json!("test"))
 }
 
 /// Sample conversation for Agent testing
@@ -262,8 +262,8 @@ mod tests {
 
         // Test input fixture
         let input = sample_agent_input();
-        assert_eq!(input.prompt, "Test prompt");
-        assert!(!input.context.is_empty());
+        assert_eq!(input.text, "Test prompt");
+        assert!(!input.parameters.is_empty());
 
         // Test conversation fixture
         let conversation = sample_conversation();

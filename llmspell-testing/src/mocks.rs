@@ -11,20 +11,23 @@
 //!
 //! ```rust,no_run
 //! use llmspell_testing::mocks::MockBaseAgent;
-//! use llmspell_core::traits::base_agent::{AgentInput, AgentOutput, ExecutionContext, BaseAgent};
+//! use llmspell_core::{
+//!     traits::base_agent::BaseAgent,
+//!     types::{AgentInput, AgentOutput, ExecutionContext}
+//! };
 //!
 //! # async fn test_example() {
 //! let mut mock = MockBaseAgent::new();
 //! mock.expect_execute()
 //!     .times(1)
 //!     .returning(|input, _| {
-//!         Ok(AgentOutput::new(format!("Processed: {}", input.prompt)))
+//!         Ok(AgentOutput::text(format!("Processed: {}", input.text)))
 //!     });
 //!
-//! let input = AgentInput::new("test".to_string());
-//! let context = ExecutionContext::new("session".to_string());
+//! let input = AgentInput::text("test");
+//! let context = ExecutionContext::new();
 //! let result = mock.execute(input, context).await.unwrap();
-//! assert_eq!(result.content, "Processed: test");
+//! assert_eq!(result.text, "Processed: test");
 //! # }
 //! ```
 
@@ -32,10 +35,11 @@ use async_trait::async_trait;
 use llmspell_core::{
     traits::{
         agent::{Agent, AgentConfig, ConversationMessage},
-        base_agent::{AgentInput, AgentOutput, BaseAgent, ExecutionContext},
+        base_agent::BaseAgent,
         tool::{SecurityLevel, Tool, ToolCategory, ToolSchema},
         workflow::{StepResult, Workflow, WorkflowConfig, WorkflowStatus, WorkflowStep},
     },
+    types::{AgentInput, AgentOutput, AgentStream, ExecutionContext, MediaType},
     ComponentId, ComponentMetadata, LLMSpellError, Result,
 };
 use mockall::*;
@@ -50,6 +54,10 @@ mock! {
         async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput>;
         async fn validate_input(&self, input: &AgentInput) -> Result<()>;
         async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput>;
+        async fn stream_execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentStream>;
+        fn supports_streaming(&self) -> bool;
+        fn supports_multimodal(&self) -> bool;
+        fn supported_media_types(&self) -> Vec<MediaType>;
     }
 }
 
@@ -63,6 +71,10 @@ mock! {
         async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput>;
         async fn validate_input(&self, input: &AgentInput) -> Result<()>;
         async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput>;
+        async fn stream_execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentStream>;
+        fn supports_streaming(&self) -> bool;
+        fn supports_multimodal(&self) -> bool;
+        fn supported_media_types(&self) -> Vec<MediaType>;
     }
 
     #[async_trait]
@@ -86,6 +98,10 @@ mock! {
         async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput>;
         async fn validate_input(&self, input: &AgentInput) -> Result<()>;
         async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput>;
+        async fn stream_execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentStream>;
+        fn supports_streaming(&self) -> bool;
+        fn supports_multimodal(&self) -> bool;
+        fn supported_media_types(&self) -> Vec<MediaType>;
     }
 
     #[async_trait]
@@ -107,6 +123,10 @@ mock! {
         async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput>;
         async fn validate_input(&self, input: &AgentInput) -> Result<()>;
         async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput>;
+        async fn stream_execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentStream>;
+        fn supports_streaming(&self) -> bool;
+        fn supports_multimodal(&self) -> bool;
+        fn supported_media_types(&self) -> Vec<MediaType>;
     }
 
     #[async_trait]
@@ -144,13 +164,13 @@ mod tests {
 
         mock.expect_execute()
             .times(1)
-            .returning(|input, _| Ok(AgentOutput::new(format!("Echo: {}", input.prompt))));
+            .returning(|input, _| Ok(AgentOutput::text(format!("Echo: {}", input.text))));
 
-        let input = AgentInput::new("Hello".to_string());
-        let context = ExecutionContext::new("test-session".to_string());
+        let input = AgentInput::text("Hello");
+        let context = ExecutionContext::with_conversation("test-session".to_string());
 
         let result = mock.execute(input, context).await.unwrap();
-        assert_eq!(result.content, "Echo: Hello");
+        assert_eq!(result.text, "Echo: Hello");
     }
 
     #[tokio::test]
@@ -158,7 +178,7 @@ mod tests {
         let mock = create_simple_mock_agent();
 
         // Validate input should succeed
-        let input = AgentInput::new("test".to_string());
+        let input = AgentInput::text("test");
         assert!(mock.validate_input(&input).await.is_ok());
     }
 }

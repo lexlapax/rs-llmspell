@@ -1,5 +1,21 @@
 //! ABOUTME: Core types and foundational data structures
-//! ABOUTME: Provides ComponentId, Version, and ComponentMetadata types
+//! ABOUTME: Provides ComponentId, Version, ComponentMetadata and streaming types
+
+mod agent_io;
+mod media;
+mod streaming;
+
+pub use agent_io::{
+    AgentInput, AgentInputBuilder, AgentOutput, AgentOutputBuilder, ExecutionContext,
+    OutputMetadata, ToolCall, ToolOutput,
+};
+pub use media::{
+    AudioFormat, AudioMetadata, ColorSpace, ImageFormat, ImageMetadata, MediaContent, MediaType,
+    VideoFormat, VideoMetadata, MAX_AUDIO_SIZE, MAX_BINARY_SIZE, MAX_IMAGE_SIZE, MAX_VIDEO_SIZE,
+};
+pub use streaming::{
+    AgentChunk, AgentStream, ChunkContent, ChunkMetadata, ControlMessage, ReasoningStep,
+};
 
 use serde::{Deserialize, Serialize};
 use std::fmt;

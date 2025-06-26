@@ -5,9 +5,9 @@
 use llmspell_core::{
     traits::{
         agent::{ConversationMessage, MessageRole},
-        base_agent::{AgentInput, AgentOutput},
         tool::{ParameterType, SecurityLevel, ToolCategory},
     },
+    types::{AgentInput, AgentOutput},
     ComponentId, LLMSpellError, Version,
 };
 
@@ -131,35 +131,35 @@ fn test_error_edge_cases() {
 #[test]
 fn test_agent_input_edge_cases() {
     // Empty prompt
-    let input = AgentInput::new("".to_string());
-    assert_eq!(input.prompt, "");
-    assert!(input.context.is_empty());
+    let input = AgentInput::text("".to_string());
+    assert_eq!(input.text, "");
+    assert!(input.parameters.is_empty());
 
     // Very large context
-    let mut input = AgentInput::new("test".to_string());
+    let mut input = AgentInput::text("test".to_string());
     for i in 0..1000 {
-        input = input.with_context(format!("key{}", i), serde_json::json!(i));
+        input = input.with_parameter(format!("key{}", i), serde_json::json!(i));
     }
-    assert_eq!(input.context.len(), 1000);
+    assert_eq!(input.parameters.len(), 1000);
 
-    // Overwriting context values
-    let input = AgentInput::new("test".to_string())
-        .with_context("key".to_string(), serde_json::json!("value1"))
-        .with_context("key".to_string(), serde_json::json!("value2"));
-    assert_eq!(input.get_context("key"), Some(&serde_json::json!("value2")));
+    // Overwriting parameter values
+    let input = AgentInput::text("test".to_string())
+        .with_parameter("key".to_string(), serde_json::json!("value1"))
+        .with_parameter("key".to_string(), serde_json::json!("value2"));
+    assert_eq!(input.parameters.get("key"), Some(&serde_json::json!("value2")));
 
-    // Null and complex values in context
-    let input = AgentInput::new("test".to_string())
-        .with_context("null".to_string(), serde_json::json!(null))
-        .with_context("array".to_string(), serde_json::json!([1, 2, 3]))
-        .with_context(
+    // Null and complex values in parameters
+    let input = AgentInput::text("test".to_string())
+        .with_parameter("null".to_string(), serde_json::json!(null))
+        .with_parameter("array".to_string(), serde_json::json!([1, 2, 3]))
+        .with_parameter(
             "object".to_string(),
             serde_json::json!({"nested": {"deep": "value"}}),
         );
 
-    assert_eq!(input.get_context("null"), Some(&serde_json::json!(null)));
+    assert_eq!(input.parameters.get("null"), Some(&serde_json::json!(null)));
     assert_eq!(
-        input.get_context("array"),
+        input.parameters.get("array"),
         Some(&serde_json::json!([1, 2, 3]))
     );
 }
@@ -167,26 +167,32 @@ fn test_agent_input_edge_cases() {
 #[test]
 fn test_agent_output_edge_cases() {
     // Empty content
-    let output = AgentOutput::new("".to_string());
-    assert_eq!(output.content, "");
-    assert!(output.metadata.is_empty());
+    let output = AgentOutput::text("".to_string());
+    assert_eq!(output.text, "");
+    assert!(output.metadata.extra.is_empty());
 
     // Unicode content
-    let output = AgentOutput::new("Hello 世界 🌍".to_string());
-    assert_eq!(output.content, "Hello 世界 🌍");
+    let output = AgentOutput::text("Hello 世界 🌍".to_string());
+    assert_eq!(output.text, "Hello 世界 🌍");
 
     // Very large metadata
-    let mut output = AgentOutput::new("result".to_string());
+    let mut output = AgentOutput::text("result".to_string());
+    let mut metadata = llmspell_core::types::OutputMetadata::default();
     for i in 0..1000 {
-        output = output.with_metadata(format!("key{}", i), serde_json::json!(i));
+        metadata.extra.insert(format!("key{}", i), serde_json::json!(i));
     }
-    assert_eq!(output.metadata.len(), 1000);
+    output = output.with_metadata(metadata);
+    assert_eq!(output.metadata.extra.len(), 1000);
 
     // Overwriting metadata
-    let output = AgentOutput::new("test".to_string())
-        .with_metadata("key".to_string(), serde_json::json!(1))
-        .with_metadata("key".to_string(), serde_json::json!(2));
-    assert_eq!(output.get_metadata("key"), Some(&serde_json::json!(2)));
+    let mut metadata1 = llmspell_core::types::OutputMetadata::default();
+    metadata1.extra.insert("key".to_string(), serde_json::json!(1));
+    let mut metadata2 = llmspell_core::types::OutputMetadata::default();
+    metadata2.extra.insert("key".to_string(), serde_json::json!(2));
+    let output = AgentOutput::text("test".to_string())
+        .with_metadata(metadata1)
+        .with_metadata(metadata2);
+    assert_eq!(output.metadata.extra.get("key"), Some(&serde_json::json!(2)));
 }
 
 #[test]
@@ -251,7 +257,7 @@ fn test_security_level_edge_cases() {
 #[test]
 fn test_parameter_type_equality() {
     // Ensure all parameter types are distinct
-    let types = vec![
+    let types = [
         ParameterType::String,
         ParameterType::Number,
         ParameterType::Boolean,

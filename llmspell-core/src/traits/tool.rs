@@ -239,9 +239,10 @@ impl ToolSchema {
 /// use llmspell_core::{
 ///     ComponentMetadata, Result, LLMSpellError,
 ///     traits::{
-///         base_agent::{BaseAgent, AgentInput, AgentOutput, ExecutionContext},
+///         base_agent::BaseAgent,
 ///         tool::{Tool, ToolCategory, SecurityLevel, ToolSchema, ParameterDef, ParameterType}
-///     }
+///     },
+///     types::{AgentInput, AgentOutput, ExecutionContext}
 /// };
 /// use async_trait::async_trait;
 /// use serde_json::json;
@@ -288,7 +289,7 @@ impl ToolSchema {
 ///         context: ExecutionContext,
 ///     ) -> Result<AgentOutput> {
 ///         // Get parameters from input context
-///         let params = input.get_context("parameters")
+///         let params = input.parameters.get("parameters")
 ///             .ok_or_else(|| LLMSpellError::Validation {
 ///                 message: "Missing parameters".to_string(),
 ///                 field: Some("parameters".to_string()),
@@ -301,7 +302,7 @@ impl ToolSchema {
 ///         let pattern = params["pattern"].as_str().unwrap();
 ///         let results = json!(["file1.txt", "file2.txt"]);
 ///         
-///         Ok(AgentOutput::new(results.to_string()))
+///         Ok(AgentOutput::text(results.to_string()))
 ///     }
 ///     
 ///     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
@@ -309,7 +310,7 @@ impl ToolSchema {
 ///     }
 ///     
 ///     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
-///         Ok(AgentOutput::new(format!("Tool error: {}", error)))
+///         Ok(AgentOutput::text(format!("Tool error: {}", error)))
 ///     }
 /// }
 /// ```
@@ -377,7 +378,7 @@ pub trait Tool: BaseAgent {
 
 #[cfg(test)]
 mod tests {
-    use super::super::base_agent::{AgentInput, AgentOutput, ExecutionContext};
+    use crate::types::{AgentInput, AgentOutput, ExecutionContext};
     use super::*;
     use crate::ComponentMetadata;
 
@@ -507,9 +508,9 @@ mod tests {
             _context: ExecutionContext,
         ) -> Result<AgentOutput> {
             // Parse parameters from input context
-            let params = input.get_context("parameters").ok_or_else(|| {
+            let params = input.parameters.get("parameters").ok_or_else(|| {
                 crate::LLMSpellError::Validation {
-                    message: "Missing parameters in context".to_string(),
+                    message: "Missing parameters in input".to_string(),
                     field: Some("parameters".to_string()),
                 }
             })?;
@@ -530,11 +531,11 @@ mod tests {
                 text.to_string()
             };
 
-            Ok(AgentOutput::new(result))
+            Ok(AgentOutput::text(result))
         }
 
         async fn validate_input(&self, input: &AgentInput) -> Result<()> {
-            if input.prompt.is_empty() {
+            if input.text.is_empty() {
                 return Err(crate::LLMSpellError::Validation {
                     message: "Input prompt cannot be empty".to_string(),
                     field: Some("prompt".to_string()),
@@ -544,7 +545,7 @@ mod tests {
         }
 
         async fn handle_error(&self, error: crate::LLMSpellError) -> Result<AgentOutput> {
-            Ok(AgentOutput::new(format!("Tool error: {}", error)))
+            Ok(AgentOutput::text(format!("Tool error: {}", error)))
         }
     }
 
@@ -609,30 +610,30 @@ mod tests {
         let tool = MockTool::new();
 
         // Test with uppercase = false
-        let input = AgentInput::new("process text".to_string()).with_context(
+        let input = AgentInput::text("process text".to_string()).with_parameter(
             "parameters".to_string(),
             serde_json::json!({
                 "text": "hello world",
                 "uppercase": false
             }),
         );
-        let context = ExecutionContext::new("session".to_string());
+        let context = ExecutionContext::with_conversation("session".to_string());
 
         let result = tool.execute(input, context).await.unwrap();
-        assert_eq!(result.content, "hello world");
+        assert_eq!(result.text, "hello world");
 
         // Test with uppercase = true
-        let input = AgentInput::new("process text".to_string()).with_context(
+        let input = AgentInput::text("process text".to_string()).with_parameter(
             "parameters".to_string(),
             serde_json::json!({
                 "text": "hello world",
                 "uppercase": true
             }),
         );
-        let context = ExecutionContext::new("session".to_string());
+        let context = ExecutionContext::with_conversation("session".to_string());
 
         let result = tool.execute(input, context).await.unwrap();
-        assert_eq!(result.content, "HELLO WORLD");
+        assert_eq!(result.text, "HELLO WORLD");
     }
 
     #[test]

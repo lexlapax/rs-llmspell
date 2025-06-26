@@ -6,9 +6,9 @@
 use llmspell_core::{
     traits::{
         agent::{AgentConfig, ConversationMessage, MessageRole},
-        base_agent::{AgentInput, AgentOutput, ExecutionContext},
         workflow::{RetryPolicy, WorkflowStep},
     },
+    types::{AgentInput, AgentOutput, ExecutionContext},
     ComponentId, ComponentMetadata, Version,
 };
 use proptest::prelude::*;
@@ -49,9 +49,9 @@ prop_compose! {
             0..5
         )
     ) -> AgentInput {
-        let mut input = AgentInput::new(prompt);
+        let mut input = AgentInput::text(prompt);
         for (key, value) in context_keys.into_iter().zip(context_values.into_iter()) {
-            input = input.with_context(key, value);
+            input = input.with_parameter(key, value);
         }
         input
     }
@@ -160,13 +160,13 @@ proptest! {
 
     #[test]
     fn test_agent_input_context_preservation(input in arb_agent_input()) {
-        // Property: Context values are preserved
-        for (key, value) in &input.context {
-            prop_assert_eq!(input.get_context(key), Some(value));
+        // Property: Parameter values are preserved
+        for (key, value) in &input.parameters {
+            prop_assert_eq!(input.parameters.get(key), Some(value));
         }
 
         // Property: Non-existent keys return None
-        prop_assert_eq!(input.get_context("non_existent_key_xyz"), None);
+        prop_assert_eq!(input.parameters.get("non_existent_key_xyz"), None);
     }
 
     #[test]
@@ -174,8 +174,8 @@ proptest! {
         // Property: AgentInput survives serialization/deserialization
         let json = serde_json::to_string(&input).unwrap();
         let deserialized: AgentInput = serde_json::from_str(&json).unwrap();
-        prop_assert_eq!(input.prompt, deserialized.prompt);
-        prop_assert_eq!(input.context, deserialized.context);
+        prop_assert_eq!(input.text, deserialized.text);
+        prop_assert_eq!(input.parameters, deserialized.parameters);
     }
 
     #[test]
@@ -196,10 +196,13 @@ proptest! {
         )
     ) {
         // Property: Metadata values are preserved
-        let mut output = AgentOutput::new(content);
+        let mut metadata = llmspell_core::types::OutputMetadata::default();
+        for (key, value) in metadata_keys.iter().zip(metadata_values.iter()) {
+            metadata.extra.insert(key.clone(), value.clone());
+        }
+        let output = AgentOutput::text(content).with_metadata(metadata);
         for (key, value) in metadata_keys.into_iter().zip(metadata_values.into_iter()) {
-            output = output.with_metadata(key.clone(), value.clone());
-            prop_assert_eq!(output.get_metadata(&key), Some(&value));
+            prop_assert_eq!(output.metadata.extra.get(&key), Some(&value));
         }
     }
 
@@ -231,18 +234,19 @@ proptest! {
         )
     ) {
         // Property: Context preserves all fields
-        let mut context = ExecutionContext::new(session_id.clone());
+        let mut context = ExecutionContext::with_conversation(session_id.clone());
 
         if let Some(uid) = user_id.clone() {
-            context = context.with_user_id(uid);
+            context.user_id = Some(uid);
         }
 
         for (key, value) in env_keys.into_iter().zip(env_values.into_iter()) {
-            context = context.with_env(key.clone(), value.clone());
-            prop_assert_eq!(context.get_env(&key), Some(&value));
+            let json_value = serde_json::json!(value.clone());
+            context = context.with_data(key.clone(), json_value.clone());
+            prop_assert_eq!(context.data.get(&key), Some(&json_value));
         }
 
-        prop_assert_eq!(context.session_id, session_id);
+        prop_assert_eq!(context.conversation_id, Some(session_id));
         prop_assert_eq!(context.user_id, user_id);
     }
 

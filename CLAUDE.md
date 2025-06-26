@@ -170,7 +170,7 @@ self.hooks.execute(HookPoint::AfterExecution, &result).await?;
 - **Maintain Bridge Philosophy**: Use existing crates, don't reinvent
 - **State Over Messages**: Agent handoff via shared state
 - **Tool Composition**: Agents as composable tools
-- **No Backward Compatibility**: Breaking changes allowed until v1.0.0
+- **No Backward Compatibility**: Breaking changes encouraged until v1.0.0
 - **Update Documentation**: Keep TODO.md current with timestamps as tasks progress
 
 ## Primary Documentation

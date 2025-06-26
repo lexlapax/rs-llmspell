@@ -6,8 +6,9 @@ use async_trait::async_trait;
 use llmspell_core::{
     traits::{
         agent::{Agent, AgentConfig, ConversationMessage},
-        base_agent::{AgentInput, AgentOutput, BaseAgent, ExecutionContext},
+        base_agent::BaseAgent,
     },
+    types::{AgentInput, AgentOutput, ExecutionContext},
     ComponentId, ComponentMetadata, Result,
 };
 use std::sync::{
@@ -55,7 +56,7 @@ impl BaseAgent for ConcurrentAgent {
         // Add to conversation with write lock
         {
             let mut conv = self.conversation.write().await;
-            conv.push(ConversationMessage::user(input.prompt.clone()));
+            conv.push(ConversationMessage::user(input.text.clone()));
             conv.push(ConversationMessage::assistant(format!(
                 "Response #{}",
                 count
@@ -65,11 +66,11 @@ impl BaseAgent for ConcurrentAgent {
         // Simulate some work
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
 
-        Ok(AgentOutput::new(format!("Execution #{}", count)))
+        Ok(AgentOutput::text(format!("Execution #{}", count)))
     }
 
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
-        if input.prompt.is_empty() {
+        if input.text.is_empty() {
             return Err(llmspell_core::LLMSpellError::Validation {
                 message: "Empty prompt".to_string(),
                 field: Some("prompt".to_string()),
@@ -79,7 +80,7 @@ impl BaseAgent for ConcurrentAgent {
     }
 
     async fn handle_error(&self, error: llmspell_core::LLMSpellError) -> Result<AgentOutput> {
-        Ok(AgentOutput::new(format!("Error: {}", error)))
+        Ok(AgentOutput::text(format!("Error: {}", error)))
     }
 }
 
@@ -117,8 +118,8 @@ async fn test_concurrent_agent_execution() {
     for i in 0..num_tasks {
         let agent_clone = Arc::clone(&agent);
         let handle = tokio::spawn(async move {
-            let input = AgentInput::new(format!("Request {}", i));
-            let context = ExecutionContext::new(format!("session-{}", i));
+            let input = AgentInput::text(format!("Request {}", i));
+            let context = ExecutionContext::with_conversation(format!("session-{}", i));
             agent_clone.execute(input, context).await
         });
         handles.push(handle);
@@ -245,10 +246,13 @@ async fn test_metadata_immutability() {
 #[tokio::test]
 async fn test_execution_context_concurrent_access() {
     let context = Arc::new(
-        ExecutionContext::new("shared-session".to_string())
-            .with_user_id("user-123".to_string())
-            .with_env("KEY1".to_string(), "value1".to_string())
-            .with_env("KEY2".to_string(), "value2".to_string()),
+        {
+            let mut context = ExecutionContext::with_conversation("shared-session".to_string());
+            context.user_id = Some("user-123".to_string());
+            context
+                .with_data("KEY1".to_string(), serde_json::json!("value1"))
+                .with_data("KEY2".to_string(), serde_json::json!("value2"))
+        },
     );
 
     let mut handles = Vec::new();
@@ -256,14 +260,14 @@ async fn test_execution_context_concurrent_access() {
         let context_clone = Arc::clone(&context);
         let handle = tokio::spawn(async move {
             // Concurrent reads
-            assert_eq!(context_clone.session_id, "shared-session");
+            assert_eq!(context_clone.conversation_id, Some("shared-session".to_string()));
             assert_eq!(context_clone.user_id, Some("user-123".to_string()));
 
-            // Access environment variables
+            // Access data variables
             if i % 2 == 0 {
-                assert_eq!(context_clone.get_env("KEY1"), Some(&"value1".to_string()));
+                assert_eq!(context_clone.data.get("KEY1"), Some(&serde_json::json!("value1")));
             } else {
-                assert_eq!(context_clone.get_env("KEY2"), Some(&"value2".to_string()));
+                assert_eq!(context_clone.data.get("KEY2"), Some(&serde_json::json!("value2")));
             }
         });
         handles.push(handle);

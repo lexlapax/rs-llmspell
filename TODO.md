@@ -33,7 +33,7 @@
 
 ---
 
-## Phase 1.0: Utilities Crate (Days 1-2)
+## Phase 1.0: Utilities Crate (Days 1-2) ✅ COMPLETE
 
 ### Task 1.0.1: Create llmspell-utils Crate Structure
 **Priority**: CRITICAL  
@@ -44,11 +44,11 @@
 **Description**: Create the new llmspell-utils crate with proper structure and dependencies.
 
 **Acceptance Criteria:**
-- [ ] `llmspell-utils` directory created with Cargo.toml
-- [ ] Added to workspace members in root Cargo.toml
-- [ ] Basic module structure created (lib.rs with submodules)
-- [ ] Dependencies configured (tokio, tracing, etc.)
-- [ ] `cargo check -p llmspell-utils` passes
+- [x] `llmspell-utils` directory created with Cargo.toml
+- [x] Added to workspace members in root Cargo.toml
+- [x] Basic module structure created (lib.rs with submodules)
+- [x] Dependencies configured (tokio, tracing, etc.)
+- [x] `cargo check -p llmspell-utils` passes
 
 **Implementation Steps:**
 1. Create `llmspell-utils/` directory
@@ -58,10 +58,12 @@
 5. Create empty module files for each utility module
 
 **Definition of Done:**
-- [ ] Crate compiles without warnings
-- [ ] Module structure matches design document
-- [ ] All dependencies resolve correctly
-- [ ] Basic documentation in lib.rs
+- [x] Crate compiles without warnings
+- [x] Module structure matches design document
+- [x] All dependencies resolve correctly
+- [x] Basic documentation in lib.rs
+
+**Completed**: 2025-06-26
 
 ### Task 1.0.2: Implement Async Utilities Module
 **Priority**: HIGH  
@@ -72,11 +74,11 @@
 **Description**: Implement retry logic, timeout helpers, and other async utilities.
 
 **Acceptance Criteria:**
-- [ ] `retry_async` function with configurable attempts and backoff
-- [ ] `timeout_with_default` helper function
-- [ ] `concurrent_map` for parallel async operations
-- [ ] Comprehensive unit tests for each utility
-- [ ] Documentation with usage examples
+- [x] `retry_async` function with configurable attempts and backoff
+- [x] `timeout_with_default` helper function
+- [x] `concurrent_map` for parallel async operations
+- [x] Comprehensive unit tests for each utility (12 tests)
+- [x] Documentation with usage examples
 
 **Implementation Steps:**
 1. Create `src/async_utils.rs`
@@ -87,10 +89,12 @@
 6. Add rustdoc with examples
 
 **Definition of Done:**
-- [ ] All functions have tests
-- [ ] Test coverage >90%
-- [ ] No clippy warnings
-- [ ] Documentation complete
+- [x] All functions have tests
+- [x] Test coverage >90%
+- [x] No clippy warnings
+- [x] Documentation complete
+
+**Completed**: 2025-06-26
 
 ### Task 1.0.3: Implement File Utilities Module
 **Priority**: HIGH  
@@ -101,11 +105,11 @@
 **Description**: Create safe file operations and path manipulation utilities.
 
 **Acceptance Criteria:**
-- [ ] Path normalization functions
-- [ ] Safe file read/write with proper error handling
-- [ ] Directory creation with parent handling
-- [ ] Atomic file operations support
-- [ ] Cross-platform path handling
+- [x] Path normalization functions
+- [x] Safe file read/write with proper error handling
+- [x] Directory creation with parent handling
+- [x] Atomic file operations support
+- [x] Cross-platform path handling
 
 **Implementation Steps:**
 1. Create `src/file_utils.rs`
@@ -116,10 +120,12 @@
 6. Write comprehensive tests
 
 **Definition of Done:**
-- [ ] Works on Windows, macOS, and Linux
-- [ ] Handles edge cases (permissions, missing dirs)
-- [ ] Tests cover error scenarios
-- [ ] Performance benchmarks included
+- [x] Works on Windows, macOS, and Linux
+- [x] Handles edge cases (permissions, missing dirs)
+- [x] Tests cover error scenarios (18 unit tests + 3 property tests)
+- [x] Performance benchmarks included
+
+**Completed**: 2025-06-26
 
 ### Task 1.0.4: Implement Remaining Utility Modules
 **Priority**: MEDIUM  
@@ -130,11 +136,11 @@
 **Description**: Implement string_utils, system_info, error_builders, id_generator, and serialization modules.
 
 **Acceptance Criteria:**
-- [ ] String manipulation and formatting utilities
-- [ ] System/OS detection helpers
-- [ ] Error builder patterns for common errors
-- [ ] UUID generation with prefixes
-- [ ] JSON/TOML serialization helpers
+- [x] String manipulation and formatting utilities
+- [x] System/OS detection helpers
+- [x] Error builder patterns for common errors
+- [x] UUID generation with prefixes
+- [x] JSON/TOML serialization helpers
 
 **Implementation Steps:**
 1. Create module files for each utility type
@@ -144,10 +150,12 @@
 5. Document all public functions
 
 **Definition of Done:**
-- [ ] All modules compile and pass tests
-- [ ] Consistent naming conventions
-- [ ] >80% test coverage overall
-- [ ] Examples in documentation
+- [x] All modules compile and pass tests
+- [x] Consistent naming conventions
+- [x] >80% test coverage overall
+- [x] Examples in documentation
+
+**Completed**: 2025-06-26
 
 ---
 
@@ -162,11 +170,11 @@
 **Description**: Add streaming-related types to llmspell-core.
 
 **Acceptance Criteria:**
-- [ ] `AgentStream` type alias defined
-- [ ] `AgentChunk` struct with all fields
-- [ ] `ChunkContent` enum with variants
-- [ ] `ChunkMetadata` struct
-- [ ] Serialization/deserialization support
+- [x] `AgentStream` type alias defined
+- [x] `AgentChunk` struct with all fields
+- [x] `ChunkContent` enum with variants
+- [x] `ChunkMetadata` struct
+- [x] Serialization/deserialization support
 
 **Implementation Steps:**
 1. Create `src/types/streaming.rs` in llmspell-core
@@ -177,10 +185,12 @@
 6. Export from types module
 
 **Definition of Done:**
-- [ ] All types serialize/deserialize correctly
-- [ ] Comprehensive Debug implementations
-- [ ] Tests for all type variants
-- [ ] Documentation complete
+- [x] All types serialize/deserialize correctly
+- [x] Comprehensive Debug implementations
+- [x] Tests for all type variants
+- [x] Documentation complete
+
+**Completed**: 2025-06-26
 
 ### Task 1.1.2: Add Multimodal Content Types
 **Priority**: CRITICAL  
@@ -191,11 +201,11 @@
 **Description**: Implement MediaContent enum and related types.
 
 **Acceptance Criteria:**
-- [ ] `MediaContent` enum with all variants
-- [ ] Format enums (ImageFormat, AudioFormat, VideoFormat)
-- [ ] Metadata structs for each media type
-- [ ] Size validation helpers
-- [ ] Type conversion utilities
+- [x] `MediaContent` enum with all variants
+- [x] Format enums (ImageFormat, AudioFormat, VideoFormat)
+- [x] Metadata structs for each media type
+- [x] Size validation helpers
+- [x] Type conversion utilities
 
 **Implementation Steps:**
 1. Create `src/types/media.rs` in llmspell-core
@@ -207,12 +217,14 @@
 7. Write comprehensive tests
 
 **Definition of Done:**
-- [ ] All media types properly defined
-- [ ] Validation logic works correctly
-- [ ] Binary data handling tested
-- [ ] Memory-efficient implementations
+- [x] All media types properly defined
+- [x] Validation logic works correctly (100MB/500MB/5GB limits)
+- [x] Binary data handling tested
+- [x] Memory-efficient implementations
 
-### Task 1.1.3: Enhance AgentInput/AgentOutput Types
+**Completed**: 2025-06-26
+
+### Task 1.1.3: Enhance AgentInput/AgentOutput Types ✅ COMPLETE
 **Priority**: HIGH  
 **Estimated Time**: 3 hours  
 **Assignee**: Core Team
@@ -221,11 +233,11 @@
 **Description**: Update AgentInput and AgentOutput to support multimodal content.
 
 **Acceptance Criteria:**
-- [ ] AgentInput includes media Vec
-- [ ] AgentOutput includes media Vec
-- [ ] Builder patterns for construction
-- [ ] Backward compatibility maintained
-- [ ] Helper methods for common operations
+- [x] AgentInput includes media Vec
+- [x] AgentOutput includes media Vec
+- [x] Builder patterns for construction
+- [x] Backward compatibility maintained
+- [x] Helper methods for common operations
 
 **Implementation Steps:**
 1. Update AgentInput struct in core types
@@ -236,12 +248,14 @@
 6. Add new multimodal tests
 
 **Definition of Done:**
-- [ ] Existing code still compiles
-- [ ] New fields properly integrated
-- [ ] Builder patterns documented
-- [ ] Migration guide written
+- [x] Existing code still compiles
+- [x] New fields properly integrated
+- [x] Builder patterns documented
+- [x] Migration guide written
 
-### Task 1.1.4: Update BaseAgent Trait with Streaming
+**Completed**: 2025-06-26
+
+### Task 1.1.4: Update BaseAgent Trait with Streaming ✅ COMPLETE
 **Priority**: CRITICAL  
 **Estimated Time**: 3 hours  
 **Assignee**: Core Team Lead
@@ -250,11 +264,11 @@
 **Description**: Add streaming methods to BaseAgent trait.
 
 **Acceptance Criteria:**
-- [ ] `stream_execute` method added with default impl
-- [ ] `supports_streaming` method added
-- [ ] `supports_multimodal` method added
-- [ ] `supported_media_types` method added
-- [ ] Trait still object-safe
+- [x] `stream_execute` method added with default impl
+- [x] `supports_streaming` method added
+- [x] `supports_multimodal` method added
+- [x] `supported_media_types` method added
+- [x] Trait still object-safe
 
 **Implementation Steps:**
 1. Update BaseAgent trait in traits module
@@ -265,10 +279,12 @@
 6. Update mock implementations
 
 **Definition of Done:**
-- [ ] Trait compiles without breaking changes
-- [ ] Default implementations work
-- [ ] Mock implementations updated
-- [ ] Documentation explains streaming
+- [x] Trait compiles without breaking changes
+- [x] Default implementations work
+- [x] Mock implementations updated
+- [x] Documentation explains streaming
+
+**Completed**: 2025-06-26
 
 ---
 

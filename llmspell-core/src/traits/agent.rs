@@ -191,11 +191,11 @@ impl Default for AgentConfig {
 /// # impl BaseAgent for MyLLMAgent {
 /// #     fn metadata(&self) -> &ComponentMetadata { &self.metadata }
 /// #     async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput> {
-/// #         Ok(AgentOutput::new("Response".to_string()))
+/// #         Ok(AgentOutput::text("Response".to_string()))
 /// #     }
 /// #     async fn validate_input(&self, input: &AgentInput) -> Result<()> { Ok(()) }
 /// #     async fn handle_error(&self, error: llmspell_core::LLMSpellError) -> Result<AgentOutput> {
-/// #         Ok(AgentOutput::new("Error".to_string()))
+/// #         Ok(AgentOutput::text("Error".to_string()))
 /// #     }
 /// # }
 /// ```
@@ -259,7 +259,7 @@ pub trait Agent: BaseAgent {
 
 #[cfg(test)]
 mod tests {
-    use super::super::base_agent::{AgentInput, AgentOutput, ExecutionContext};
+    use crate::types::{AgentInput, AgentOutput, ExecutionContext};
     use super::*;
     use crate::ComponentMetadata;
     use std::collections::VecDeque;
@@ -359,11 +359,11 @@ mod tests {
             _context: ExecutionContext,
         ) -> Result<AgentOutput> {
             // Simple echo response
-            Ok(AgentOutput::new(format!("Response to: {}", input.prompt)))
+            Ok(AgentOutput::text(format!("Response to: {}", input.text)))
         }
 
         async fn validate_input(&self, input: &AgentInput) -> Result<()> {
-            if input.prompt.is_empty() {
+            if input.text.is_empty() {
                 return Err(crate::LLMSpellError::Validation {
                     message: "Prompt cannot be empty".to_string(),
                     field: Some("prompt".to_string()),
@@ -373,7 +373,7 @@ mod tests {
         }
 
         async fn handle_error(&self, error: crate::LLMSpellError) -> Result<AgentOutput> {
-            Ok(AgentOutput::new(format!("Error: {}", error)))
+            Ok(AgentOutput::text(format!("Error: {}", error)))
         }
     }
 

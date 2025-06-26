@@ -5,10 +5,11 @@
 use llmspell_core::{
     traits::{
         agent::{Agent, AgentConfig, ConversationMessage, MessageRole},
-        base_agent::{AgentInput, AgentOutput, BaseAgent, ExecutionContext},
+        base_agent::BaseAgent,
         tool::{ParameterDef, ParameterType, SecurityLevel, Tool, ToolCategory, ToolSchema},
         workflow::{RetryPolicy, Workflow, WorkflowStatus, WorkflowStep},
     },
+    types::{AgentInput, AgentOutput, ExecutionContext},
     ComponentId, LLMSpellError,
 };
 use llmspell_testing::mocks::*;
@@ -29,15 +30,15 @@ async fn test_base_agent_mock_behavior() {
     mock.expect_execute()
         .with(always(), always())
         .times(1)
-        .returning(|input, _| Ok(AgentOutput::new(format!("Mocked: {}", input.prompt))));
+        .returning(|input, _| Ok(AgentOutput::text(format!("Mocked: {}", input.text))));
 
     // Test the mock
-    let input = AgentInput::new("test input".to_string());
-    let context = ExecutionContext::new("test-session".to_string());
+    let input = AgentInput::text("test input");
+    let context = ExecutionContext::with_conversation("test-session".to_string());
 
     assert!(mock.validate_input(&input).await.is_ok());
     let result = mock.execute(input, context).await.unwrap();
-    assert_eq!(result.content, "Mocked: test input");
+    assert_eq!(result.text, "Mocked: test input");
 }
 
 #[tokio::test]
@@ -260,16 +261,17 @@ fn test_retry_policy_configuration() {
 
 #[test]
 fn test_execution_context_builder() {
-    let context = ExecutionContext::new("test-session".to_string())
-        .with_user_id("user-123".to_string())
-        .with_env("KEY1".to_string(), "value1".to_string())
-        .with_env("KEY2".to_string(), "value2".to_string());
+    let mut context = ExecutionContext::with_conversation("test-session".to_string());
+    context.user_id = Some("user-123".to_string());
+    let context = context
+        .with_data("KEY1".to_string(), serde_json::json!("value1"))
+        .with_data("KEY2".to_string(), serde_json::json!("value2"));
 
-    assert_eq!(context.session_id, "test-session");
+    assert_eq!(context.conversation_id, Some("test-session".to_string()));
     assert_eq!(context.user_id, Some("user-123".to_string()));
-    assert_eq!(context.get_env("KEY1"), Some(&"value1".to_string()));
-    assert_eq!(context.get_env("KEY2"), Some(&"value2".to_string()));
-    assert_eq!(context.get_env("KEY3"), None);
+    assert_eq!(context.data.get("KEY1"), Some(&serde_json::json!("value1")));
+    assert_eq!(context.data.get("KEY2"), Some(&serde_json::json!("value2")));
+    assert_eq!(context.data.get("KEY3"), None);
 }
 
 #[test]

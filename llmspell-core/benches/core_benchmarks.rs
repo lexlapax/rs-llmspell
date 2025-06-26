@@ -25,7 +25,7 @@ fn bench_component_id_generation(c: &mut Criterion) {
     }
 
     // Benchmark new() vs from_name()
-    group.bench_function("new", |b| b.iter(|| ComponentId::new()));
+    group.bench_function("new", |b| b.iter(ComponentId::new));
 
     group.finish();
 }

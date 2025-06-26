@@ -30,9 +30,10 @@
 //! use llmspell_core::{
 //!     ComponentMetadata, Result,
 //!     traits::{
-//!         base_agent::{BaseAgent, AgentInput, AgentOutput, ExecutionContext},
+//!         base_agent::BaseAgent,
 //!         agent::{Agent, AgentConfig, ConversationMessage}
-//!     }
+//!     },
+//!     types::{AgentInput, AgentOutput, ExecutionContext}
 //! };
 //! use async_trait::async_trait;
 //!
@@ -62,7 +63,7 @@
 //!         context: ExecutionContext,
 //!     ) -> Result<AgentOutput> {
 //!         // Your agent logic here
-//!         Ok(AgentOutput::new(format!("Processed: {}", input.prompt)))
+//!         Ok(AgentOutput::text(format!("Processed: {}", input.text)))
 //!     }
 //!     
 //!     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
@@ -70,7 +71,7 @@
 //!     }
 //!     
 //!     async fn handle_error(&self, error: llmspell_core::LLMSpellError) -> Result<AgentOutput> {
-//!         Ok(AgentOutput::new(format!("Error: {}", error)))
+//!         Ok(AgentOutput::text(format!("Error: {}", error)))
 //!     }
 //! }
 //! ```

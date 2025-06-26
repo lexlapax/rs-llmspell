@@ -22,7 +22,7 @@
 //! ```
 
 use criterion::{black_box, BenchmarkId, Criterion};
-use llmspell_core::{traits::base_agent::AgentInput, ComponentId, ComponentMetadata, Version};
+use llmspell_core::{types::AgentInput, ComponentId, ComponentMetadata, Version};
 use std::time::Duration;
 
 /// Benchmark trait method dispatch overhead
@@ -91,7 +91,7 @@ pub fn bench_serialization(c: &mut Criterion) {
 
     // AgentInput serialization with varying sizes
     for size in [10, 100, 1000].iter() {
-        let input = AgentInput::new("x".repeat(*size));
+        let input = AgentInput::text("x".repeat(*size));
 
         group.bench_with_input(
             BenchmarkId::new("agent_input_to_json", size),

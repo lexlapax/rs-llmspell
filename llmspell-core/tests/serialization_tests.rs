@@ -5,13 +5,12 @@
 use llmspell_core::{
     traits::{
         agent::{AgentConfig, ConversationMessage, MessageRole},
-        base_agent::{AgentInput, AgentOutput, ExecutionContext},
         tool::{ParameterDef, ParameterType, SecurityLevel, ToolCategory, ToolSchema},
         workflow::{RetryPolicy, StepResult, WorkflowStatus, WorkflowStep},
     },
+    types::{AgentInput, AgentOutput, ExecutionContext},
     ComponentId, ComponentMetadata, Version,
 };
-use serde_json;
 
 #[test]
 fn test_component_id_json_roundtrip() {
@@ -54,10 +53,10 @@ fn test_component_metadata_json_roundtrip() {
 
 #[test]
 fn test_agent_input_json_roundtrip() {
-    let input = AgentInput::new("test prompt".to_string())
-        .with_context("key1".to_string(), serde_json::json!("value1"))
-        .with_context("key2".to_string(), serde_json::json!(42))
-        .with_context(
+    let input = AgentInput::text("test prompt".to_string())
+        .with_parameter("key1".to_string(), serde_json::json!("value1"))
+        .with_parameter("key2".to_string(), serde_json::json!(42))
+        .with_parameter(
             "nested".to_string(),
             serde_json::json!({
                 "inner": "value",
@@ -68,36 +67,39 @@ fn test_agent_input_json_roundtrip() {
     let json = serde_json::to_string(&input).unwrap();
     let deserialized: AgentInput = serde_json::from_str(&json).unwrap();
 
-    assert_eq!(input.prompt, deserialized.prompt);
-    assert_eq!(input.context, deserialized.context);
+    assert_eq!(input.text, deserialized.text);
+    assert_eq!(input.parameters, deserialized.parameters);
 }
 
 #[test]
 fn test_agent_output_json_roundtrip() {
-    let output = AgentOutput::new("result content".to_string())
-        .with_metadata("confidence".to_string(), serde_json::json!(0.95))
-        .with_metadata("tokens".to_string(), serde_json::json!(150))
-        .with_metadata("model".to_string(), serde_json::json!("gpt-4"));
+    let mut metadata = llmspell_core::types::OutputMetadata::default();
+    metadata.confidence = Some(0.95);
+    metadata.token_count = Some(150);
+    metadata.model = Some("gpt-4".to_string());
+    let output = AgentOutput::text("result content".to_string()).with_metadata(metadata);
 
     let json = serde_json::to_string(&output).unwrap();
     let deserialized: AgentOutput = serde_json::from_str(&json).unwrap();
 
-    assert_eq!(output.content, deserialized.content);
-    assert_eq!(output.metadata, deserialized.metadata);
+    assert_eq!(output.text, deserialized.text);
+    assert_eq!(output.metadata.confidence, deserialized.metadata.confidence);
+    assert_eq!(output.metadata.token_count, deserialized.metadata.token_count);
+    assert_eq!(output.metadata.model, deserialized.metadata.model);
 }
 
 #[test]
 fn test_execution_context_json_roundtrip() {
-    let context = ExecutionContext::new("session-123".to_string())
-        .with_user_id("user-456".to_string())
-        .with_env("ENV_VAR".to_string(), "value".to_string());
+    let mut context = ExecutionContext::with_conversation("session-123".to_string());
+    context.user_id = Some("user-456".to_string());
+    let context = context.with_data("ENV_VAR".to_string(), serde_json::json!("value"));
 
     let json = serde_json::to_string(&context).unwrap();
     let deserialized: ExecutionContext = serde_json::from_str(&json).unwrap();
 
-    assert_eq!(context.session_id, deserialized.session_id);
+    assert_eq!(context.conversation_id, deserialized.conversation_id);
     assert_eq!(context.user_id, deserialized.user_id);
-    assert_eq!(context.environment, deserialized.environment);
+    assert_eq!(context.data, deserialized.data);
 }
 
 #[test]
@@ -255,8 +257,9 @@ fn test_workflow_step_json_roundtrip() {
 #[test]
 fn test_step_result_json_roundtrip() {
     let step_id = ComponentId::from_name("test-step");
-    let output = AgentOutput::new("Completed successfully".to_string())
-        .with_metadata("records".to_string(), serde_json::json!(100));
+    let mut metadata = llmspell_core::types::OutputMetadata::default();
+    metadata.extra.insert("records".to_string(), serde_json::json!(100));
+    let output = AgentOutput::text("Completed successfully".to_string()).with_metadata(metadata);
 
     let success_result = StepResult::success(step_id, output, std::time::Duration::from_secs(1));
 
@@ -328,7 +331,7 @@ fn test_retry_policy_json_roundtrip() {
 #[test]
 fn test_complex_nested_serialization() {
     // Test deeply nested structures
-    let input = AgentInput::new("complex test".to_string()).with_context(
+    let input = AgentInput::text("complex test".to_string()).with_parameter(
         "nested".to_string(),
         serde_json::json!({
             "level1": {
@@ -346,7 +349,7 @@ fn test_complex_nested_serialization() {
     let json = serde_json::to_string(&input).unwrap();
     let deserialized: AgentInput = serde_json::from_str(&json).unwrap();
 
-    let nested = deserialized.get_context("nested").unwrap();
+    let nested = deserialized.parameters.get("nested").unwrap();
     let level3 = &nested["level1"]["level2"]["level3"];
     assert_eq!(level3["data"], serde_json::json!([1, 2, 3]));
     assert_eq!(level3["flag"], serde_json::json!(true));

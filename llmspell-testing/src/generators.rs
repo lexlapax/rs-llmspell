@@ -27,10 +27,10 @@
 use llmspell_core::{
     traits::{
         agent::{AgentConfig, ConversationMessage, MessageRole},
-        base_agent::{AgentInput, AgentOutput, ExecutionContext},
         tool::{SecurityLevel, ToolCategory, ToolSchema},
         workflow::{RetryPolicy, WorkflowConfig, WorkflowStatus, WorkflowStep},
     },
+    types::{AgentInput, AgentOutput, ExecutionContext},
     ComponentId, ComponentMetadata, Version,
 };
 use proptest::prelude::*;
@@ -85,9 +85,9 @@ pub fn agent_input_strategy() -> impl Strategy<Value = AgentInput> {
         ".*",
         prop::collection::hash_map("[a-zA-Z0-9_]+", json_value_strategy(), 0..5),
     )
-        .prop_map(|(prompt, context)| {
-            let mut input = AgentInput::new(prompt);
-            input.context = context;
+        .prop_map(|(text, parameters)| {
+            let mut input = AgentInput::text(text);
+            input.parameters = parameters;
             input
         })
 }
@@ -96,12 +96,10 @@ pub fn agent_input_strategy() -> impl Strategy<Value = AgentInput> {
 pub fn agent_output_strategy() -> impl Strategy<Value = AgentOutput> {
     (
         ".*",
-        prop::collection::hash_map("[a-zA-Z0-9_]+", json_value_strategy(), 0..5),
+        prop::collection::vec(any::<u8>(), 0..100),
     )
-        .prop_map(|(content, metadata)| {
-            let mut output = AgentOutput::new(content);
-            output.metadata = metadata;
-            output
+        .prop_map(|(text, _)| {
+            AgentOutput::text(text)
         })
 }
 
@@ -110,12 +108,14 @@ pub fn execution_context_strategy() -> impl Strategy<Value = ExecutionContext> {
     (
         "[a-zA-Z0-9-]{8,36}",
         prop::option::of("[a-zA-Z0-9_]+"),
-        prop::collection::hash_map("[a-zA-Z_][a-zA-Z0-9_]*", "[a-zA-Z0-9_-]+", 0..5),
+        prop::collection::hash_map("[a-zA-Z_][a-zA-Z0-9_]*", json_value_strategy(), 0..5),
     )
-        .prop_map(|(session_id, user_id, environment)| {
-            let mut context = ExecutionContext::new(session_id);
-            context.user_id = user_id;
-            context.environment = environment;
+        .prop_map(|(conversation_id, user_id, data)| {
+            let mut context = ExecutionContext::with_conversation(conversation_id);
+            if let Some(uid) = user_id {
+                context.user_id = Some(uid);
+            }
+            context.data = data;
             context
         })
 }
@@ -271,7 +271,7 @@ mod tests {
         #[test]
         fn test_agent_input_generation(input in agent_input_strategy()) {
             // Should have a non-empty prompt
-            assert!(!input.prompt.is_empty() || input.prompt.is_empty()); // tautology but tests generation
+            assert!(!input.text.is_empty() || input.text.is_empty()); // tautology but tests generation
         }
 
         #[test]
