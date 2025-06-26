@@ -26,10 +26,11 @@
 
 ### Part III: Scripting and API Reference
 11. [Complete Script Interface](#complete-script-interface)
-12. [Lua API Reference](#lua-api-reference)
-13. [JavaScript API Reference](#javascript-api-reference)
-14. [Python API Reference (Future)](#python-api-reference)
-15. [Cross-Engine Compatibility Matrix](#cross-engine-compatibility-matrix)
+12. [Using Rs-LLMSpell as a Native Module](#using-rs-llmspell-as-a-native-module)
+13. [Lua API Reference](#lua-api-reference)
+14. [JavaScript API Reference](#javascript-api-reference)
+15. [Python API Reference (Future)](#python-api-reference)
+16. [Cross-Engine Compatibility Matrix](#cross-engine-compatibility-matrix)
 
 ### Part IV: Built-in Components Library
 16. [Complete Built-in Tools Catalog](#complete-built-in-tools-catalog)
@@ -52,9 +53,10 @@
 
 ### Part VII: Advanced Features
 29. [Advanced Orchestration Patterns](#advanced-orchestration-patterns)
-30. [Protocol Integration (MCP, A2A)](#protocol-integration)
-31. [Plugin System and Extensions](#plugin-system-and-extensions)
-32. [Error Handling and Recovery](#error-handling-and-recovery)
+30. [LLM-Driven Delegation (Agent Transfer)](#llm-driven-delegation-agent-transfer)
+31. [Protocol Integration (MCP, A2A)](#protocol-integration)
+32. [Plugin System and Extensions](#plugin-system-and-extensions)
+33. [Error Handling and Recovery](#error-handling-and-recovery)
 
 ### Part VIII: Testing and Quality Assurance
 33. [Complete Testing Strategy](#complete-testing-strategy)
@@ -99,6 +101,8 @@ Rs-LLMSpell is a **production-ready scriptable LLM interaction framework** that 
 **🔌 Bridge-First Philosophy**: Leverages the best existing Rust crates (rig for LLM providers, mlua for Lua, sled/rocksdb for storage) rather than reimplementing. Standing on the shoulders of giants.
 
 **🚀 Zero-Compilation Development**: Test complex AI behaviors instantly without recompilation cycles. Perfect for rapid experimentation and production deployments alike.
+
+**📦 Embeddable & Extendable**: Use rs-llmspell as a standalone framework or import it as a native library into existing Lua and JavaScript applications to enhance them with powerful agentic capabilities.
 
 ### What is a "Spell"?
 
@@ -206,6 +210,8 @@ Rs-LLMSpell represents a paradigm shift in AI application development, solving t
 
 **Integration Fragmentation**: Each AI provider, tool, and workflow requires custom integration code, creating maintenance nightmares.
 
+**Integration Rigidity**: Existing applications cannot easily incorporate advanced agentic capabilities without significant rewrites or being absorbed into a monolithic framework.
+
 ### Our Solution Architecture
 
 Rs-LLMSpell solves these problems through five key architectural innovations:
@@ -260,7 +266,9 @@ Built-in production capabilities that scale from development to enterprise deplo
 🛡️ **Enterprise Security**: Comprehensive threat model and mitigations  
 📈 **Scalable Architecture**: From prototype to enterprise deployment  
 🔌 **Extensible Design**: Plugin system for custom providers, tools, workflows  
-🎯 **Real-world Proven**: Based on battle-tested go-llms patterns  
+🎯 **Real-world Proven**: Based on battle-tested go-llms patterns
+
+🔄 **Flexible Integration**: Use as a standalone framework or import as a native library into existing applications.  
 
 ---
 
@@ -365,6 +373,7 @@ This architecture delivers:
 - **Script Flexibility** for rapid iteration and experimentation  
 - **Production Reliability** through comprehensive infrastructure
 - **Team Productivity** by supporting multiple language preferences
+- **Integration Flexibility** by allowing rs-llmspell to be used as a native library.
 
 ---
 
@@ -376,7 +385,7 @@ Rs-LLMSpell is built on seven foundational principles that guide every architect
 
 > *"Stand on the shoulders of giants, don't build your own mountain."*
 
-**Principle**: Leverage the best existing solutions through well-designed bridges rather than reimplementing functionality.
+**Principle**: Leverage the best existing solutions through well-designed bridges rather than reimplementing functionality. This applies to both internal components and external integration. The bridge layer is also designed to expose a stable C API, which is the foundation for creating native modules for languages like Lua and JavaScript. This enables the **Library Mode** usage paradigm, allowing `rs-llmspell` to be integrated into existing applications.
 
 **Implementation**:
 - **LLM Providers**: Use `rig` crate that already supports OpenAI, Anthropic, Ollama, and more
@@ -1046,7 +1055,41 @@ Now that you have rs-llmspell running:
 
 ## Architecture Overview
 
-Rs-LLMSpell implements a **hierarchical, event-driven architecture** built on four foundational layers that work together to provide seamless AI orchestration capabilities.
+Rs-LLMSpell implements a **hierarchical, event-driven architecture** built on four foundational layers that work together to provide seamless AI orchestration capabilities. It supports two primary usage paradigms: **Embedded Mode** and **Library Mode**.
+
+### Dual Usage Paradigms
+
+#### 1. Embedded Mode
+
+In this mode, `rs-llmspell` acts as a standalone runtime that executes scripts (spells). This is the primary mode for building new applications from scratch, where `rs-llmspell` provides the complete execution environment.
+
+```
+┌─────────────────────────────────────┐
+│         Rs-LLMSpell Runtime         │
+│  ┌─────────────┐  ┌─────────────┐   │
+│  │ Lua Script  │  │  JS Script  │   │
+│  └─────────────┘  └─────────────┘   │
+└─────────────────────────────────────┘
+```
+
+#### 2. Library Mode
+
+In this mode, `rs-llmspell` is compiled as a native shared library (e.g., `.so`, `.dll`, `.dylib`) and imported into an existing application's scripting environment (like a standard Lua 5.4 or Node.js runtime). This allows developers to add powerful agentic capabilities to their existing applications without a complete rewrite.
+
+```
+┌─────────────────────────────────────┐
+│      External Application (Lua/JS)  │
+│  ┌─────────────────────────────────┐ │
+│  │    local llmspell = require()   │ │
+│  │ const llmspell = require()      │ │
+│  └─────────────────────────────────┘ │
+│                  │                  │
+│                  ▼                  │
+│  ┌─────────────────────────────────┐ │
+│  │   Rs-LLMSpell Native Module     │ │
+│  └─────────────────────────────────┘ │
+└─────────────────────────────────────┘
+```
 
 ### Four-Layer Architecture
 
@@ -2384,6 +2427,85 @@ This comprehensive component hierarchy provides:
 # Part III: Scripting and API Reference
 
 ## Complete Script Interface
+
+This section details the script-level APIs available to developers. Rs-LLMSpell provides two primary ways to interact with its components:
+
+1.  **Embedded Scripting**: Writing scripts (spells) that are executed by the `llmspell` runtime. This is ideal for creating new, standalone AI applications.
+2.  **Native Module Integration**: Importing `rs-llmspell` as a library into existing Lua or JavaScript applications to add agentic capabilities.
+
+Both modes expose the same core functionalities, ensuring a consistent developer experience.
+
+## Using Rs-LLMSpell as a Native Module
+
+One of the most powerful features of `rs-llmspell` is its ability to be compiled as a native module and integrated into existing applications. This allows you to bring advanced AI agent and workflow capabilities to your current projects without a full rewrite.
+
+### Lua Integration
+
+For Lua applications, `rs-llmspell` can be packaged as a LuaRock. Once installed, you can use it like any other native module:
+
+```lua
+-- main.lua (in an existing Lua application)
+local llmspell = require("llmspell")
+
+-- Create an agent on the fly
+local assistant = llmspell.agent.new({
+    system_prompt = "You are a helpful assistant integrated into a larger application.",
+    provider = "ollama",
+    model = "llama3"
+})
+
+-- Use the agent to process application data
+local function process_user_data(data)
+    local analysis_prompt = string.format("Analyze the following user data and provide insights: %s", data)
+    local insights = assistant:chat(analysis_prompt)
+    return insights
+end
+
+-- Example usage
+local user_data = "... some data from the application ..."
+local analysis_result = process_user_data(user_data)
+print("AI Analysis:", analysis_result)
+```
+
+### JavaScript (Node.js) Integration
+
+For Node.js applications, `rs-llmspell` can be distributed as an NPM package with native bindings.
+
+```javascript
+// server.js (in an existing Node.js application)
+const { Agent } = require('@rs/llmspell');
+const express = require('express');
+
+const app = express();
+app.use(express.json());
+
+// Create a single, long-lived agent for the application
+const supportAgent = new Agent({
+    systemPrompt: "You are a customer support agent for our application.",
+    tools: [/* ... application-specific tools ... */]
+});
+
+app.post('/api/support', async (req, res) => {
+    const { userId, message } = req.body;
+    
+    try {
+        const response = await supportAgent.chat(message, {
+            metadata: { userId }
+        });
+        res.json({ reply: response });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.listen(3000, () => {
+    console.log('Server with integrated AI support running on port 3000');
+});
+```
+
+---
+
+## Lua API Reference
 
 Rs-LLMSpell provides a **unified scripting interface** that delivers identical functionality across Lua, JavaScript, and planned Python support. This interface abstracts away the complexity of the underlying Rust architecture while providing full access to all capabilities.
 
@@ -9091,6 +9213,99 @@ pub fn create_default_alert_rules() -> Vec<AlertRule> {
 # Part VII: Advanced Features
 
 ## Advanced Orchestration Patterns
+
+While workflows provide structured, deterministic orchestration, `rs-llmspell` also supports more dynamic, LLM-driven orchestration patterns. These allow for greater flexibility and adaptability in complex scenarios.
+
+### 1. LLM-Driven Delegation (Agent Transfer)
+
+This pattern allows an agent to dynamically decide to hand off control to another specialized agent without a predefined workflow. This is a powerful mechanism for creating flexible, multi-agent systems that can adapt to unforeseen tasks.
+
+#### Architectural Support
+
+To enable this, the architecture includes:
+
+*   **Explicit Handoff in `AgentOutput`**: The `AgentOutput` struct contains an optional `handoff_request` field. When an agent's logic determines that another agent is better suited for the task, it can populate this field.
+
+    ```rust
+    pub struct AgentOutput {
+        pub content: String,
+        pub tool_calls: Vec<ToolCall>,
+        pub handoff_request: Option<HandoffRequest>, // Explicit handoff action
+        pub metadata: OutputMetadata,
+        pub state_updates: HashMap<String, ScriptValue>,
+    }
+
+    pub struct HandoffRequest {
+        pub target_agent_id: String,
+        pub input: AgentInput, // The input for the next agent
+        pub reason: String, // Justification for the handoff
+        pub state_filter: Option<StateFilter>, // Control which state gets passed
+    }
+    ```
+
+*   **Agent Runtime Engine**: A dedicated `AgentRuntime` is responsible for the core execution loop. It inspects the `AgentOutput` of each execution. If a `handoff_request` is present, the runtime manages the transfer of control and state to the target agent.
+
+    ```rust
+    // Simplified runtime logic
+    pub struct AgentRuntime {
+        agent_registry: AgentRegistry,
+        state_manager: StateManager,
+    }
+
+    impl AgentRuntime {
+        pub async fn run_conversation(&self, initial_agent_id: String, initial_input: AgentInput) -> Result<AgentOutput> {
+            let mut current_agent_id = initial_agent_id;
+            let mut current_input = initial_input;
+            let mut final_output;
+
+            loop {
+                let mut agent = self.agent_registry.get(&current_agent_id)?;
+                let output = agent.execute(current_input).await?;
+
+                if let Some(handoff) = output.handoff_request {
+                    // Transfer control to the next agent
+                    current_agent_id = handoff.target_agent_id;
+                    current_input = handoff.input;
+                } else {
+                    final_output = output;
+                    break;
+                }
+            }
+            Ok(final_output)
+        }
+    }
+    ```
+
+*   **Agent-Aware Prompts**: For an LLM to make a delegation decision, it must be aware of available peer agents. The system prompt for orchestrator agents is dynamically enriched with a list of available specialists, enabling the LLM to generate a `HandoffRequest` when appropriate.
+
+#### Scripting Example
+
+```lua
+-- An orchestrator agent that can delegate tasks
+local orchestrator = Agent.new({
+    name = "orchestrator",
+    system_prompt = [[
+        You are a master orchestrator. Based on the user request, you can either answer directly
+        or delegate to a specialist. Available specialists:
+        - 'code_reviewer': For analyzing code quality.
+        - 'database_expert': For database queries and analysis.
+
+        To delegate, return a 'handoff' action.
+    ]],
+    tools = { AgentFinderTool.new() } -- A tool to find available agents
+})
+
+-- Execution that triggers a handoff
+local result = orchestrator:chat("Please review the code in 'src/main.rs'")
+
+-- The 'result' object would contain the final output from the 'code_reviewer' agent
+-- after the handoff was completed by the AgentRuntime.
+```
+
+This pattern provides a powerful alternative to rigid workflows, enabling more autonomous and intelligent multi-agent systems.
+
+### 2. Swarm Intelligence Pattern
+
 
 Rs-LLMSpell provides sophisticated orchestration capabilities for complex multi-agent workflows, dynamic execution patterns, and intelligent coordination strategies.
 

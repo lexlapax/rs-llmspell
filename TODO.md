@@ -60,13 +60,13 @@ Comprehensive refinement of rs-llmspell architecture based on go-llms and Google
 - [ ] **Task 12.3**: Manual Review of Final documentation 
   - [ ] Manual human review and correction lists - my prompt for this
     **now I'm going to ask you a series of questions about the architecture documented in @docs/rs-llmspell-complete-architecture.md . for each question, document the question in Section 12.3 of Phase 2. for each question, document the question under the Task/question 12.3.1 heading. for that question review the architecture document and find the answer and document the answer under - [ ] Answer: . if you do not find the answer, document it as such. if you figure out what needs to be done, document in - [ ] Todo: subtask. Once that's done, prompt me for another answer. To understand this read the TODO.md document and make sure you understand the section **Task 12.3** and what I'm saying here. think hard and reason. do what I'm asking in this prompt and come back and tell me that you understand.** 
-  - [ ] **Task/question 12.3.1** Does the architecture allow for agent handoff from one agent to another without resorting to workflows or resorting to the A2A protocol?
-    - [ ] Answer: Yes, the architecture supports agent handoff through multiple mechanisms:
-      1. **AgentWrappedTool pattern**: Any agent can be wrapped as a tool that other agents can invoke
-      2. **Direct invocation**: Agents can directly call other agents via Agent.execute() in scripts
-      3. **State-based handoff**: Agents can save/restore state and share context through the Storage module
-      4. **Tool composition**: Since agents can use tools, and agents can be wrapped as tools, this enables agent-to-agent communication
-    - [ ] Todo: Consider documenting these handoff patterns more explicitly in a dedicated section of the architecture document
+  - [x] **Task/question 12.3.1** Does the architecture allow for agent handoff from one agent to another without resorting to workflows or resorting to the A2A protocol?
+    - [x] Answer: Yes, the architecture now explicitly supports LLM-Driven Delegation (Agent Transfer). This is a first-class feature enabling dynamic, intelligent handoffs.
+      1.  **`HandoffRequest`**: The `AgentOutput` struct contains an optional `handoff_request` field. An agent can return this to signal its intent to transfer control.
+      2.  **`AgentRuntime`**: A dedicated runtime engine inspects agent outputs. If a `HandoffRequest` is found, the runtime manages the seamless transfer of control and state to the specified target agent.
+      3.  **State Management**: The existing state management architecture ensures context is preserved during the handoff.
+      4.  This pattern is documented in the "LLM-Driven Delegation (Agent Transfer)" section of the main architecture document.
+    - [x] Todo: ~~Consider documenting these handoff patterns more explicitly in a dedicated section of the architecture document~~ **Done**. Future work could include adding more complex handoff examples to the `Real-World Examples` section.
   - [ ] **Task/question 12.3.2** Does the architecture allow for rs-llmspell to be used as a module in lua or in javascript to take advantage of tools, agents, workflows, events?
     - [ ] Answer: No, not in the current implementation. Module support is comprehensively planned but not yet implemented. Currently:
       - Rs-llmspell only supports **embedded scripting** where it hosts Lua/JS runtimes internally
