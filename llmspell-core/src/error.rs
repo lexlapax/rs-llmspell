@@ -3,7 +3,20 @@
 
 use thiserror::Error;
 
-/// Error severity levels
+/// Error severity levels.
+/// 
+/// Defines the severity of errors in the system, from informational to fatal.
+/// Used for error prioritization, alerting, and recovery strategies.
+/// 
+/// # Examples
+/// 
+/// ```
+/// use llmspell_core::error::ErrorSeverity;
+/// 
+/// assert!(ErrorSeverity::Info < ErrorSeverity::Warning);
+/// assert!(ErrorSeverity::Error < ErrorSeverity::Critical);
+/// assert!(ErrorSeverity::Critical < ErrorSeverity::Fatal);
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub enum ErrorSeverity {
     /// Informational - can be ignored
@@ -18,7 +31,25 @@ pub enum ErrorSeverity {
     Fatal,
 }
 
-/// Error category for classification
+/// Error category for classification.
+/// 
+/// Groups errors by their source or type for better error handling
+/// and monitoring. Categories help determine retry strategies and
+/// escalation paths.
+/// 
+/// # Examples
+/// 
+/// ```
+/// use llmspell_core::error::ErrorCategory;
+/// 
+/// let category = ErrorCategory::Network;
+/// match category {
+///     ErrorCategory::Network => println!("Network issue - may be transient"),
+///     ErrorCategory::Configuration => println!("Config error - needs fixing"),
+///     ErrorCategory::Security => println!("Security issue - escalate immediately"),
+///     _ => println!("Other error type"),
+/// }
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ErrorCategory {
     /// Configuration-related errors
@@ -37,7 +68,49 @@ pub enum ErrorCategory {
     Internal,
 }
 
-/// Comprehensive error enum for all LLMSpell operations
+/// Comprehensive error enum for all LLMSpell operations.
+/// 
+/// Central error type that encompasses all possible errors in the system.
+/// Each variant includes relevant context and may chain underlying errors.
+/// Provides methods for categorization, severity assessment, and retry logic.
+/// 
+/// # Error Handling Strategy
+/// 
+/// - **Retryable errors**: Network, timeout, and some storage errors
+/// - **Non-retryable errors**: Validation, security, and configuration errors
+/// - **Error chaining**: Use `with_source()` to preserve error context
+/// - **Structured logging**: All errors integrate with the logging system
+/// 
+/// # Examples
+/// 
+/// ```
+/// use llmspell_core::{LLMSpellError, Result};
+/// use std::io;
+/// 
+/// // Create errors with context
+/// let validation_err = LLMSpellError::Validation {
+///     message: "Invalid email format".to_string(),
+///     field: Some("email".to_string()),
+/// };
+/// 
+/// // Chain errors
+/// let io_error = io::Error::new(io::ErrorKind::NotFound, "File not found");
+/// let storage_err = LLMSpellError::Storage {
+///     message: "Failed to read configuration".to_string(),
+///     operation: Some("read".to_string()),
+///     source: None,
+/// }.with_source(io_error);
+/// 
+/// // Check error properties
+/// assert!(!validation_err.is_retryable());
+/// assert!(storage_err.is_retryable());
+/// 
+/// // Use convenience macros
+/// use llmspell_core::{component_error, validation_error};
+/// 
+/// let comp_err = component_error!("Component initialization failed");
+/// let val_err = validation_error!("Missing required field", "username");
+/// ```
 #[derive(Debug, Error)]
 pub enum LLMSpellError {
     #[error("Component error: {message}")]

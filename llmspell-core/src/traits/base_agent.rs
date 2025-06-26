@@ -6,7 +6,24 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
-/// Input for agent execution
+/// Input for agent execution.
+/// 
+/// Contains the prompt and optional context data for agent execution.
+/// The context is a flexible key-value store that can hold any JSON-serializable data.
+/// 
+/// # Examples
+/// 
+/// ```
+/// use llmspell_core::traits::base_agent::AgentInput;
+/// use serde_json::json;
+/// 
+/// let input = AgentInput::new("Analyze this text".to_string())
+///     .with_context("language".to_string(), json!("en"))
+///     .with_context("max_length".to_string(), json!(1000));
+/// 
+/// assert_eq!(input.prompt, "Analyze this text");
+/// assert_eq!(input.get_context("language"), Some(&json!("en")));
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentInput {
     pub prompt: String,
@@ -34,7 +51,24 @@ impl AgentInput {
     }
 }
 
-/// Output from agent execution  
+/// Output from agent execution.
+/// 
+/// Contains the result content and optional metadata about the execution.
+/// Metadata can include confidence scores, sources, timing information, etc.
+/// 
+/// # Examples
+/// 
+/// ```
+/// use llmspell_core::traits::base_agent::AgentOutput;
+/// use serde_json::json;
+/// 
+/// let output = AgentOutput::new("Analysis complete".to_string())
+///     .with_metadata("confidence".to_string(), json!(0.95))
+///     .with_metadata("tokens_used".to_string(), json!(150));
+/// 
+/// assert_eq!(output.content, "Analysis complete");
+/// assert_eq!(output.get_metadata("confidence"), Some(&json!(0.95)));
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentOutput {
     pub content: String,
@@ -62,7 +96,25 @@ impl AgentOutput {
     }
 }
 
-/// Execution context for components
+/// Execution context for components.
+/// 
+/// Provides session information, user context, and environment variables
+/// for component execution. Used to maintain state and configuration
+/// across component invocations.
+/// 
+/// # Examples
+/// 
+/// ```
+/// use llmspell_core::traits::base_agent::ExecutionContext;
+/// 
+/// let context = ExecutionContext::new("session-123".to_string())
+///     .with_user_id("user-456".to_string())
+///     .with_env("LOG_LEVEL".to_string(), "debug".to_string());
+/// 
+/// assert_eq!(context.session_id, "session-123");
+/// assert_eq!(context.user_id, Some("user-456".to_string()));
+/// assert_eq!(context.get_env("LOG_LEVEL"), Some(&"debug".to_string()));
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExecutionContext {
     pub session_id: String,
@@ -98,19 +150,121 @@ impl ExecutionContext {
     }
 }
 
-/// Base trait for all components in the system
+/// Base trait for all components in the LLMSpell system.
+/// 
+/// This is the foundational trait that all agents, tools, and workflows must implement.
+/// It provides the core interface for component execution, validation, and error handling.
+/// 
+/// # Implementation Requirements
+/// 
+/// - Components must be `Send + Sync` for async execution
+/// - All methods should handle errors gracefully
+/// - Input validation should be thorough but not overly restrictive
+/// - Error handling should provide meaningful recovery options
+/// 
+/// # Examples
+/// 
+/// ```
+/// use llmspell_core::{
+///     ComponentMetadata, Result, LLMSpellError,
+///     traits::base_agent::{BaseAgent, AgentInput, AgentOutput, ExecutionContext}
+/// };
+/// use async_trait::async_trait;
+/// 
+/// struct MyAgent {
+///     metadata: ComponentMetadata,
+/// }
+/// 
+/// #[async_trait]
+/// impl BaseAgent for MyAgent {
+///     fn metadata(&self) -> &ComponentMetadata {
+///         &self.metadata
+///     }
+///     
+///     async fn execute(
+///         &self,
+///         input: AgentInput,
+///         context: ExecutionContext,
+///     ) -> Result<AgentOutput> {
+///         // Validate input first
+///         self.validate_input(&input).await?;
+///         
+///         // Process the input
+///         let result = format!("Processed: {}", input.prompt);
+///         
+///         Ok(AgentOutput::new(result))
+///     }
+///     
+///     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
+///         if input.prompt.is_empty() {
+///             return Err(LLMSpellError::Validation {
+///                 message: "Prompt cannot be empty".to_string(),
+///                 field: Some("prompt".to_string()),
+///             });
+///         }
+///         Ok(())
+///     }
+///     
+///     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
+///         Ok(AgentOutput::new(format!("Error handled: {}", error)))
+///     }
+/// }
+/// ```
 #[async_trait]
 pub trait BaseAgent: Send + Sync {
-    /// Get component metadata
+    /// Get component metadata.
+    /// 
+    /// Returns a reference to the component's metadata including its ID,
+    /// name, version, and description. This metadata is immutable and
+    /// identifies the component throughout its lifecycle.
     fn metadata(&self) -> &ComponentMetadata;
     
-    /// Execute the component with given input
+    /// Execute the component with given input.
+    /// 
+    /// This is the main execution method for all components. It processes
+    /// the input according to the component's logic and returns the result.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `input` - The input containing prompt and optional context data
+    /// * `context` - Execution context with session info and environment
+    /// 
+    /// # Returns
+    /// 
+    /// Returns `Ok(AgentOutput)` on success, or an error if execution fails.
+    /// The output contains the result content and optional metadata.
     async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput>;
     
-    /// Validate input before execution
+    /// Validate input before execution.
+    /// 
+    /// Called before `execute()` to validate the input parameters.
+    /// Implementations should check for required fields, validate formats,
+    /// and ensure the input meets the component's requirements.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `input` - The input to validate
+    /// 
+    /// # Returns
+    /// 
+    /// Returns `Ok(())` if validation passes, or a `Validation` error
+    /// with details about what failed.
     async fn validate_input(&self, input: &AgentInput) -> Result<()>;
     
-    /// Handle execution errors
+    /// Handle execution errors.
+    /// 
+    /// Provides a way for components to handle errors gracefully and
+    /// potentially recover or provide fallback responses. This method
+    /// is called when an error occurs during execution.
+    /// 
+    /// # Arguments
+    /// 
+    /// * `error` - The error that occurred
+    /// 
+    /// # Returns
+    /// 
+    /// Returns an `AgentOutput` with error information or a fallback response,
+    /// or propagates the error if it cannot be handled.
     async fn handle_error(&self, error: crate::LLMSpellError) -> Result<AgentOutput>;
 }
 

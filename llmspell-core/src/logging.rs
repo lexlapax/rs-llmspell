@@ -9,7 +9,37 @@ use tracing_subscriber::{
     EnvFilter, Layer,
 };
 
-/// Logging configuration
+/// Logging configuration for the LLMSpell system.
+/// 
+/// Controls various aspects of log output including format, level,
+/// and metadata inclusion. Supports both human-readable and JSON formats.
+/// 
+/// # Examples
+/// 
+/// ```
+/// use llmspell_core::logging::{LoggingConfig, init_logging};
+/// use tracing::Level;
+/// 
+/// // Development configuration with pretty printing
+/// let dev_config = LoggingConfig::development();
+/// assert_eq!(dev_config.default_level, Level::DEBUG);
+/// assert!(!dev_config.json_format);
+/// 
+/// // Production configuration with JSON output
+/// let prod_config = LoggingConfig::production();
+/// assert!(prod_config.json_format);
+/// 
+/// // Custom configuration
+/// let custom_config = LoggingConfig {
+///     default_level: Level::WARN,
+///     json_format: true,
+///     with_timestamps: true,
+///     with_thread_names: false,
+///     with_thread_ids: false,
+///     with_file_lines: true,
+///     with_span_events: false,
+/// };
+/// ```
 #[derive(Debug, Clone)]
 pub struct LoggingConfig {
     /// Default log level
@@ -62,7 +92,28 @@ impl LoggingConfig {
     }
 }
 
-/// Initialize logging with the given configuration
+/// Initialize logging with the given configuration.
+/// 
+/// Sets up the global tracing subscriber with the specified configuration.
+/// This function should be called once at application startup.
+/// 
+/// # Environment Variables
+/// 
+/// - `RUST_LOG`: Controls log filtering (e.g., "debug", "llmspell=trace")
+/// - `LLMSPELL_ENV`: Set to "production" for production config
+/// 
+/// # Examples
+/// 
+/// ```no_run
+/// use llmspell_core::logging::{LoggingConfig, init_logging};
+/// 
+/// // Initialize with default configuration
+/// init_logging(LoggingConfig::default()).expect("Failed to init logging");
+/// 
+/// // Or initialize from environment
+/// use llmspell_core::logging::init_from_env;
+/// init_from_env().expect("Failed to init logging");
+/// ```
 pub fn init_logging(config: LoggingConfig) -> Result<(), Box<dyn std::error::Error>> {
     // Create env filter with default level
     let env_filter = EnvFilter::try_from_default_env()
@@ -130,6 +181,9 @@ pub fn update_log_filter(filter: &str) -> Result<(), Box<dyn std::error::Error>>
 pub use tracing::{debug, error, info, instrument, span, trace, warn, Level as LogLevel};
 
 // Logging macros for components
+/// 
+/// These macros provide structured logging for component lifecycle events.
+/// They automatically capture component metadata and format it consistently.
 #[macro_export]
 macro_rules! log_component_event {
     ($component:expr, $event:expr) => {{

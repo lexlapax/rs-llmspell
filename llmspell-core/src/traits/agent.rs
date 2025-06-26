@@ -6,7 +6,20 @@ use crate::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
-/// Role in a conversation
+/// Role in a conversation.
+/// 
+/// Defines the role of a message in a conversation history.
+/// Used for maintaining context in LLM interactions.
+/// 
+/// # Examples
+/// 
+/// ```
+/// use llmspell_core::traits::agent::MessageRole;
+/// 
+/// assert_eq!(MessageRole::System.to_string(), "system");
+/// assert_eq!(MessageRole::User.to_string(), "user");
+/// assert_eq!(MessageRole::Assistant.to_string(), "assistant");
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum MessageRole {
     System,
@@ -24,7 +37,25 @@ impl std::fmt::Display for MessageRole {
     }
 }
 
-/// Conversation message
+/// Conversation message in an agent's history.
+/// 
+/// Represents a single message in a conversation, including the role,
+/// content, and timestamp. Used to maintain conversation context for agents.
+/// 
+/// # Examples
+/// 
+/// ```
+/// use llmspell_core::traits::agent::{ConversationMessage, MessageRole};
+/// 
+/// // Create messages using convenience methods
+/// let system_msg = ConversationMessage::system("You are a helpful assistant".to_string());
+/// let user_msg = ConversationMessage::user("Hello!".to_string());
+/// let assistant_msg = ConversationMessage::assistant("Hi! How can I help?".to_string());
+/// 
+/// assert_eq!(system_msg.role, MessageRole::System);
+/// assert_eq!(user_msg.role, MessageRole::User);
+/// assert_eq!(assistant_msg.role, MessageRole::Assistant);
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConversationMessage {
     pub role: MessageRole,
@@ -58,7 +89,28 @@ impl ConversationMessage {
     }
 }
 
-/// Configuration for agents
+/// Configuration for LLM-powered agents.
+/// 
+/// Controls agent behavior including conversation management, generation parameters,
+/// and system prompts. All fields are optional to allow partial configuration.
+/// 
+/// # Examples
+/// 
+/// ```
+/// use llmspell_core::traits::agent::AgentConfig;
+/// 
+/// let config = AgentConfig {
+///     max_conversation_length: Some(50),
+///     system_prompt: Some("You are a research assistant".to_string()),
+///     temperature: Some(0.7),
+///     max_tokens: Some(1000),
+/// };
+/// 
+/// // Or use default configuration
+/// let default_config = AgentConfig::default();
+/// assert_eq!(default_config.max_conversation_length, Some(100));
+/// assert_eq!(default_config.temperature, Some(0.7));
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentConfig {
     /// Maximum number of messages to retain in conversation history
@@ -82,7 +134,71 @@ impl Default for AgentConfig {
     }
 }
 
-/// Agent trait for LLM-powered components
+/// Agent trait for LLM-powered components.
+/// 
+/// Extends `BaseAgent` with conversation management and LLM-specific functionality.
+/// Agents maintain conversation history, handle message trimming, and provide
+/// configuration for LLM generation parameters.
+/// 
+/// # Implementation Requirements
+/// 
+/// - Must maintain conversation history thread-safely
+/// - Should implement conversation trimming to respect max length
+/// - Configuration should be accessible but may be immutable
+/// - All conversation operations should be atomic
+/// 
+/// # Examples
+/// 
+/// ```ignore
+/// use llmspell_core::{
+///     ComponentMetadata, Result,
+///     traits::{
+///         base_agent::{BaseAgent, AgentInput, AgentOutput, ExecutionContext},
+///         agent::{Agent, AgentConfig, ConversationMessage, MessageRole}
+///     }
+/// };
+/// use async_trait::async_trait;
+/// 
+/// struct MyLLMAgent {
+///     metadata: ComponentMetadata,
+///     config: AgentConfig,
+///     conversation: Vec<ConversationMessage>,
+/// }
+/// 
+/// #[async_trait]
+/// impl Agent for MyLLMAgent {
+///     fn config(&self) -> &AgentConfig {
+///         &self.config
+///     }
+///     
+///     async fn get_conversation(&self) -> Result<Vec<ConversationMessage>> {
+///         Ok(self.conversation.clone())
+///     }
+///     
+///     async fn add_message(&mut self, message: ConversationMessage) -> Result<()> {
+///         self.conversation.push(message);
+///         // Trim if needed
+///         self.trim_conversation().await?;
+///         Ok(())
+///     }
+///     
+///     async fn clear_conversation(&mut self) -> Result<()> {
+///         self.conversation.clear();
+///         Ok(())
+///     }
+/// }
+/// 
+/// # impl BaseAgent for MyLLMAgent {
+/// #     fn metadata(&self) -> &ComponentMetadata { &self.metadata }
+/// #     async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput> {
+/// #         Ok(AgentOutput::new("Response".to_string()))
+/// #     }
+/// #     async fn validate_input(&self, input: &AgentInput) -> Result<()> { Ok(()) }
+/// #     async fn handle_error(&self, error: llmspell_core::LLMSpellError) -> Result<AgentOutput> {
+/// #         Ok(AgentOutput::new("Error".to_string()))
+/// #     }
+/// # }
+/// ```
 #[async_trait]
 pub trait Agent: BaseAgent {
     /// Get agent configuration

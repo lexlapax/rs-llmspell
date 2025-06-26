@@ -6,7 +6,23 @@ use crate::Result;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
-/// Tool category for organization
+/// Tool category for organization and discovery.
+/// 
+/// Categorizes tools by their primary function to help with tool selection
+/// and organization. Custom categories can be created for specialized tools.
+/// 
+/// # Examples
+/// 
+/// ```
+/// use llmspell_core::traits::tool::ToolCategory;
+/// 
+/// let category = ToolCategory::Filesystem;
+/// assert_eq!(category.to_string(), "filesystem");
+/// 
+/// // Custom category
+/// let custom = ToolCategory::Custom("ai-tools".to_string());
+/// assert_eq!(custom.to_string(), "ai-tools");
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ToolCategory {
     Filesystem,
@@ -32,7 +48,25 @@ impl std::fmt::Display for ToolCategory {
     }
 }
 
-/// Security level for tools
+/// Security level for tools.
+/// 
+/// Defines the security requirements and permissions needed to execute a tool.
+/// Higher levels include permissions of lower levels (Privileged > Restricted > Safe).
+/// 
+/// # Examples
+/// 
+/// ```
+/// use llmspell_core::traits::tool::SecurityLevel;
+/// 
+/// let user_level = SecurityLevel::Restricted;
+/// let tool_level = SecurityLevel::Safe;
+/// 
+/// // User with Restricted can run Safe tools
+/// assert!(user_level.allows(&tool_level));
+/// 
+/// // But Safe user cannot run Restricted tools
+/// assert!(!SecurityLevel::Safe.allows(&SecurityLevel::Restricted));
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
 pub enum SecurityLevel {
     Safe,
@@ -68,7 +102,44 @@ pub struct ParameterDef {
     pub default: Option<serde_json::Value>,
 }
 
-/// Tool schema for parameter validation
+/// Tool schema for parameter validation.
+/// 
+/// Defines the structure and validation rules for tool parameters.
+/// Can be converted to JSON Schema format for integration with LLMs.
+/// 
+/// # Examples
+/// 
+/// ```
+/// use llmspell_core::traits::tool::{ToolSchema, ParameterDef, ParameterType};
+/// use serde_json::json;
+/// 
+/// let schema = ToolSchema::new(
+///     "search_files".to_string(),
+///     "Search for files by pattern".to_string()
+/// )
+/// .with_parameter(ParameterDef {
+///     name: "pattern".to_string(),
+///     param_type: ParameterType::String,
+///     description: "File pattern to search".to_string(),
+///     required: true,
+///     default: None,
+/// })
+/// .with_parameter(ParameterDef {
+///     name: "recursive".to_string(),
+///     param_type: ParameterType::Boolean,
+///     description: "Search recursively".to_string(),
+///     required: false,
+///     default: Some(json!(true)),
+/// })
+/// .with_returns(ParameterType::Array);
+/// 
+/// // Get required parameters
+/// assert_eq!(schema.required_parameters(), vec!["pattern"]);
+/// 
+/// // Convert to JSON Schema
+/// let json_schema = schema.to_json_schema();
+/// assert_eq!(json_schema["type"], "object");
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolSchema {
     pub name: String,
@@ -142,7 +213,99 @@ impl ToolSchema {
     }
 }
 
-/// Tool trait for functional components
+/// Tool trait for functional components.
+/// 
+/// Extends `BaseAgent` to create tools - specialized components that perform
+/// specific functions with validated parameters. Tools have categories, security
+/// levels, and schemas that define their interfaces.
+/// 
+/// # Implementation Requirements
+/// 
+/// - Must provide accurate parameter schema
+/// - Should validate all parameters before execution
+/// - Security level should reflect actual requirements
+/// - Category should accurately describe tool function
+/// 
+/// # Examples
+/// 
+/// ```
+/// use llmspell_core::{
+///     ComponentMetadata, Result, LLMSpellError,
+///     traits::{
+///         base_agent::{BaseAgent, AgentInput, AgentOutput, ExecutionContext},
+///         tool::{Tool, ToolCategory, SecurityLevel, ToolSchema, ParameterDef, ParameterType}
+///     }
+/// };
+/// use async_trait::async_trait;
+/// use serde_json::json;
+/// 
+/// struct FileSearchTool {
+///     metadata: ComponentMetadata,
+/// }
+/// 
+/// #[async_trait]
+/// impl Tool for FileSearchTool {
+///     fn category(&self) -> ToolCategory {
+///         ToolCategory::Filesystem
+///     }
+///     
+///     fn security_level(&self) -> SecurityLevel {
+///         SecurityLevel::Safe
+///     }
+///     
+///     fn schema(&self) -> ToolSchema {
+///         ToolSchema::new(
+///             "file_search".to_string(),
+///             "Search for files".to_string()
+///         )
+///         .with_parameter(ParameterDef {
+///             name: "pattern".to_string(),
+///             param_type: ParameterType::String,
+///             description: "Search pattern".to_string(),
+///             required: true,
+///             default: None,
+///         })
+///         .with_returns(ParameterType::Array)
+///     }
+/// }
+/// 
+/// #[async_trait]
+/// impl BaseAgent for FileSearchTool {
+///     fn metadata(&self) -> &ComponentMetadata {
+///         &self.metadata
+///     }
+///     
+///     async fn execute(
+///         &self,
+///         input: AgentInput,
+///         context: ExecutionContext,
+///     ) -> Result<AgentOutput> {
+///         // Get parameters from input context
+///         let params = input.get_context("parameters")
+///             .ok_or_else(|| LLMSpellError::Validation {
+///                 message: "Missing parameters".to_string(),
+///                 field: Some("parameters".to_string()),
+///             })?;
+///         
+///         // Validate parameters
+///         self.validate_parameters(params).await?;
+///         
+///         // Execute tool logic
+///         let pattern = params["pattern"].as_str().unwrap();
+///         let results = json!(["file1.txt", "file2.txt"]);
+///         
+///         Ok(AgentOutput::new(results.to_string()))
+///     }
+///     
+///     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
+///         Ok(())
+///     }
+///     
+///     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
+///         Ok(AgentOutput::new(format!("Tool error: {}", error)))
+///     }
+/// }
+/// ```
 #[async_trait]
 pub trait Tool: BaseAgent {
     /// Get tool category

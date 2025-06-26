@@ -5,7 +5,27 @@ use serde::{Deserialize, Serialize};
 use std::fmt;
 use uuid::Uuid;
 
-/// Unique identifier for components
+/// Unique identifier for components in the LLMSpell system.
+/// 
+/// `ComponentId` uses UUID v4 for random generation and UUID v5 for deterministic
+/// generation from names. This allows both unique random IDs and reproducible IDs
+/// for named components.
+/// 
+/// # Examples
+/// 
+/// ```
+/// use llmspell_core::ComponentId;
+/// 
+/// // Create a random ID
+/// let id1 = ComponentId::new();
+/// let id2 = ComponentId::new();
+/// assert_ne!(id1, id2);
+/// 
+/// // Create deterministic ID from name
+/// let id3 = ComponentId::from_name("my-agent");
+/// let id4 = ComponentId::from_name("my-agent");
+/// assert_eq!(id3, id4);
+/// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ComponentId(Uuid);
 
@@ -39,7 +59,28 @@ impl Default for ComponentId {
     }
 }
 
-/// Semantic version information
+/// Semantic version information for components.
+/// 
+/// Follows semantic versioning specification (major.minor.patch).
+/// Used to track component versions and check compatibility.
+/// 
+/// # Examples
+/// 
+/// ```
+/// use llmspell_core::Version;
+/// 
+/// let v1 = Version::new(1, 0, 0);
+/// let v2 = Version::new(1, 1, 0);
+/// 
+/// // Check compatibility (same major version)
+/// assert!(v1.is_compatible_with(&v2));
+/// 
+/// // Check if newer
+/// assert!(v2.is_newer_than(&v1));
+/// 
+/// // Display version
+/// assert_eq!(v1.to_string(), "1.0.0");
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
 pub struct Version {
     pub major: u32,
@@ -69,7 +110,28 @@ impl fmt::Display for Version {
     }
 }
 
-/// Metadata for components
+/// Metadata for components in the LLMSpell system.
+/// 
+/// Contains essential information about a component including its ID, name,
+/// version, description, and timestamps. This metadata is used throughout
+/// the system for component identification and management.
+/// 
+/// # Examples
+/// 
+/// ```
+/// use llmspell_core::{ComponentMetadata, Version};
+/// 
+/// let mut metadata = ComponentMetadata::new(
+///     "research-agent".to_string(),
+///     "An agent for conducting research".to_string(),
+/// );
+/// 
+/// // Update version
+/// metadata.update_version(Version::new(1, 1, 0));
+/// 
+/// assert_eq!(metadata.name, "research-agent");
+/// assert_eq!(metadata.version, Version::new(1, 1, 0));
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ComponentMetadata {
     pub id: ComponentId,

@@ -8,7 +8,31 @@ use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::time::Duration;
 
-/// Workflow step definition
+/// Workflow step definition.
+/// 
+/// Represents a single step in a workflow, including its dependencies,
+/// retry policies, and timeout configuration. Steps are executed in
+/// topological order based on their dependencies.
+/// 
+/// # Examples
+/// 
+/// ```
+/// use llmspell_core::{ComponentId, traits::workflow::{WorkflowStep, RetryPolicy}};
+/// use std::time::Duration;
+/// 
+/// let step1_id = ComponentId::new();
+/// let step2_id = ComponentId::new();
+/// let agent_id = ComponentId::new();
+/// 
+/// let step = WorkflowStep::new("analyze_data".to_string(), agent_id)
+///     .with_dependency(step1_id)
+///     .with_dependency(step2_id)
+///     .with_retry(RetryPolicy::default())
+///     .with_timeout(Duration::from_secs(300));
+/// 
+/// assert_eq!(step.name, "analyze_data");
+/// assert_eq!(step.dependencies.len(), 2);
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkflowStep {
     pub id: ComponentId,
@@ -51,7 +75,27 @@ impl WorkflowStep {
     }
 }
 
-/// Retry policy for steps
+/// Retry policy for workflow steps.
+/// 
+/// Defines how failed steps should be retried, including the number of attempts,
+/// backoff strategy, and delay between retries.
+/// 
+/// # Examples
+/// 
+/// ```
+/// use llmspell_core::traits::workflow::RetryPolicy;
+/// 
+/// let policy = RetryPolicy {
+///     max_attempts: 5,
+///     backoff_seconds: 2,
+///     exponential_backoff: true,
+/// };
+/// 
+/// // Default policy
+/// let default = RetryPolicy::default();
+/// assert_eq!(default.max_attempts, 3);
+/// assert!(default.exponential_backoff);
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RetryPolicy {
     pub max_attempts: u32,
@@ -116,7 +160,28 @@ pub enum WorkflowStatus {
     Cancelled,
 }
 
-/// Workflow configuration
+/// Workflow configuration.
+/// 
+/// Controls workflow execution behavior including parallelism limits,
+/// error handling strategy, and global timeouts.
+/// 
+/// # Examples
+/// 
+/// ```
+/// use llmspell_core::traits::workflow::WorkflowConfig;
+/// use std::time::Duration;
+/// 
+/// let config = WorkflowConfig {
+///     max_parallel: Some(4),
+///     continue_on_error: true,
+///     timeout: Some(Duration::from_secs(3600)),
+/// };
+/// 
+/// // Default configuration
+/// let default = WorkflowConfig::default();
+/// assert_eq!(default.max_parallel, None); // No limit
+/// assert!(!default.continue_on_error); // Stop on error
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkflowConfig {
     /// Maximum parallel executions
@@ -137,7 +202,89 @@ impl Default for WorkflowConfig {
     }
 }
 
-/// Workflow trait for orchestration components
+/// Workflow trait for orchestration components.
+/// 
+/// Extends `BaseAgent` to create workflows that orchestrate multiple components.
+/// Workflows manage step execution order, handle dependencies, and coordinate
+/// parallel execution while respecting configuration limits.
+/// 
+/// # Key Features
+/// 
+/// - **Dependency Management**: Steps execute in topological order
+/// - **Parallel Execution**: Multiple independent steps can run concurrently
+/// - **Error Handling**: Configurable continue-on-error behavior
+/// - **Retry Logic**: Per-step retry policies with backoff
+/// - **Circular Dependency Detection**: Validates workflow before execution
+/// 
+/// # Implementation Requirements
+/// 
+/// - Must detect circular dependencies during validation
+/// - Should respect max_parallel configuration
+/// - Must maintain step execution results
+/// - Should handle step failures according to configuration
+/// 
+/// # Examples
+/// 
+/// ```ignore
+/// use llmspell_core::{
+///     ComponentId, ComponentMetadata, Result,
+///     traits::{
+///         base_agent::{BaseAgent, AgentInput, AgentOutput, ExecutionContext},
+///         workflow::{Workflow, WorkflowConfig, WorkflowStep, WorkflowStatus, StepResult}
+///     }
+/// };
+/// use async_trait::async_trait;
+/// 
+/// struct DataPipeline {
+///     metadata: ComponentMetadata,
+///     config: WorkflowConfig,
+///     steps: Vec<WorkflowStep>,
+///     status: WorkflowStatus,
+///     results: Vec<StepResult>,
+/// }
+/// 
+/// #[async_trait]
+/// impl Workflow for DataPipeline {
+///     fn config(&self) -> &WorkflowConfig {
+///         &self.config
+///     }
+///     
+///     async fn add_step(&mut self, step: WorkflowStep) -> Result<()> {
+///         // Validate no circular dependencies
+///         self.steps.push(step);
+///         self.validate().await?;
+///         Ok(())
+///     }
+///     
+///     async fn remove_step(&mut self, step_id: ComponentId) -> Result<()> {
+///         self.steps.retain(|s| s.id != step_id);
+///         Ok(())
+///     }
+///     
+///     async fn get_steps(&self) -> Result<Vec<WorkflowStep>> {
+///         Ok(self.steps.clone())
+///     }
+///     
+///     async fn status(&self) -> Result<WorkflowStatus> {
+///         Ok(self.status.clone())
+///     }
+///     
+///     async fn get_results(&self) -> Result<Vec<StepResult>> {
+///         Ok(self.results.clone())
+///     }
+/// }
+/// 
+/// # impl BaseAgent for DataPipeline {
+/// #     fn metadata(&self) -> &ComponentMetadata { &self.metadata }
+/// #     async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput> {
+/// #         Ok(AgentOutput::new("Workflow complete".to_string()))
+/// #     }
+/// #     async fn validate_input(&self, input: &AgentInput) -> Result<()> { Ok(()) }
+/// #     async fn handle_error(&self, error: llmspell_core::LLMSpellError) -> Result<AgentOutput> {
+/// #         Ok(AgentOutput::new("Error".to_string()))
+/// #     }
+/// # }
+/// ```
 #[async_trait]
 pub trait Workflow: BaseAgent {
     /// Get workflow configuration
