@@ -2053,6 +2053,11 @@ llmspell-core:
   - BaseAgent trait, ScriptRuntime, ComponentRegistry
   - Core abstractions and lifecycle management
     ↓
+llmspell-utils:
+  - Shared utilities for all crates
+  - File helpers, async patterns, string utils
+  - System info, error builders, path normalization
+    ↓
 llmspell-bridge: 
   - ScriptEngineBridge, ExternalRuntimeBridge, C API
   - Abstraction layer for all external integrations
@@ -2399,6 +2404,478 @@ impl AgentRuntime {
 }
 ```
 
+## Multimodal Content Architecture
+
+Rs-LLMSpell provides comprehensive support for multimodal content, enabling agents to process and generate images, audio, video, and binary data alongside text.
+
+### Core Multimodal Types
+
+```rust
+use std::fmt;
+
+/// Represents different types of media content
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum MediaContent {
+    /// Plain text content
+    Text(String),
+    
+    /// Image content with format
+    Image {
+        data: Vec<u8>,
+        format: ImageFormat,
+        metadata: ImageMetadata,
+    },
+    
+    /// Audio content with format
+    Audio {
+        data: Vec<u8>,
+        format: AudioFormat,
+        metadata: AudioMetadata,
+    },
+    
+    /// Video content with format
+    Video {
+        data: Vec<u8>,
+        format: VideoFormat,
+        metadata: VideoMetadata,
+    },
+    
+    /// Generic binary content
+    Binary {
+        data: Vec<u8>,
+        mime_type: String,
+        filename: Option<String>,
+    },
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum ImageFormat {
+    Png,
+    Jpeg,
+    Webp,
+    Gif,
+    Svg,
+    Tiff,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImageMetadata {
+    pub width: u32,
+    pub height: u32,
+    pub color_space: ColorSpace,
+    pub has_transparency: bool,
+    pub dpi: Option<(u32, u32)>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum AudioFormat {
+    Mp3,
+    Wav,
+    Flac,
+    Ogg,
+    M4a,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AudioMetadata {
+    pub duration_ms: u64,
+    pub sample_rate: u32,
+    pub channels: u8,
+    pub bitrate: Option<u32>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum VideoFormat {
+    Mp4,
+    Webm,
+    Avi,
+    Mov,
+    Mkv,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VideoMetadata {
+    pub duration_ms: u64,
+    pub width: u32,
+    pub height: u32,
+    pub fps: f32,
+    pub codec: String,
+}
+```
+
+### Extended Agent Input/Output
+
+```rust
+/// Enhanced agent input with multimodal support
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentInput {
+    /// Text prompt or instruction
+    pub text: String,
+    
+    /// Optional media content
+    pub media: Vec<MediaContent>,
+    
+    /// Context from previous interactions
+    pub context: Option<ExecutionContext>,
+    
+    /// Parameters for execution
+    pub parameters: HashMap<String, Value>,
+    
+    /// Preferred output modalities
+    pub output_modalities: Vec<MediaType>,
+}
+
+/// Enhanced agent output with multimodal support
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentOutput {
+    /// Primary text response
+    pub text: String,
+    
+    /// Generated or processed media
+    pub media: Vec<MediaContent>,
+    
+    /// Tool calls made during execution
+    pub tool_calls: Vec<ToolCall>,
+    
+    /// Metadata about the execution
+    pub metadata: OutputMetadata,
+    
+    /// Next agent to transfer to (if any)
+    pub transfer_to: Option<ComponentId>,
+}
+
+impl AgentInput {
+    /// Create a text-only input
+    pub fn text(text: impl Into<String>) -> Self {
+        Self {
+            text: text.into(),
+            media: vec![],
+            context: None,
+            parameters: HashMap::new(),
+            output_modalities: vec![MediaType::Text],
+        }
+    }
+    
+    /// Add media content to the input
+    pub fn with_media(mut self, media: MediaContent) -> Self {
+        self.media.push(media);
+        self
+    }
+    
+    /// Add multiple media items
+    pub fn with_media_vec(mut self, media: Vec<MediaContent>) -> Self {
+        self.media.extend(media);
+        self
+    }
+}
+```
+
+### Multimodal Provider Abstraction
+
+```rust
+/// Provider capability detection
+pub trait ProviderCapabilities {
+    /// Check if provider supports specific media type
+    fn supports_media_type(&self, media_type: &MediaType) -> bool;
+    
+    /// Get maximum size for media type
+    fn max_media_size(&self, media_type: &MediaType) -> Option<usize>;
+    
+    /// Check if provider supports streaming
+    fn supports_streaming(&self) -> bool;
+    
+    /// Get supported input modalities
+    fn input_modalities(&self) -> Vec<MediaType>;
+    
+    /// Get supported output modalities  
+    fn output_modalities(&self) -> Vec<MediaType>;
+}
+
+/// Enhanced provider instance with multimodal support
+#[async_trait]
+pub trait ProviderInstance: Send + Sync {
+    // ... existing methods ...
+    
+    /// Complete with multimodal input
+    async fn complete_multimodal(
+        &self,
+        messages: Vec<MultimodalMessage>,
+        options: CompletionOptions,
+    ) -> Result<MultimodalResponse>;
+    
+    /// Get provider capabilities
+    fn capabilities(&self) -> &dyn ProviderCapabilities;
+}
+
+/// Message with multimodal content
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MultimodalMessage {
+    pub role: MessageRole,
+    pub content: Vec<MessageContent>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum MessageContent {
+    Text(String),
+    Image { 
+        data: Vec<u8>, 
+        format: ImageFormat,
+        detail: ImageDetail,
+    },
+    Audio {
+        data: Vec<u8>,
+        format: AudioFormat,
+    },
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum ImageDetail {
+    Auto,
+    High,
+    Low,
+}
+```
+
+### Multimodal Tool Examples
+
+```rust
+/// Image processing tool
+pub struct ImageProcessor {
+    supported_formats: HashSet<ImageFormat>,
+}
+
+#[async_trait]
+impl Tool for ImageProcessor {
+    fn input_media_types(&self) -> Vec<MediaType> {
+        vec![MediaType::Image]
+    }
+    
+    fn output_media_types(&self) -> Vec<MediaType> {
+        vec![MediaType::Image, MediaType::Text]
+    }
+    
+    async fn execute_tool(&self, input: ToolInput) -> Result<ToolOutput> {
+        let operation = input.get_string("operation")?;
+        let image = input.get_media("image")?;
+        
+        match operation.as_str() {
+            "resize" => {
+                let width = input.get_u32("width")?;
+                let height = input.get_u32("height")?;
+                let resized = self.resize_image(image, width, height).await?;
+                Ok(ToolOutput::with_media(resized))
+            }
+            "extract_text" => {
+                let text = self.ocr(image).await?;
+                Ok(ToolOutput::text(text))
+            }
+            "analyze" => {
+                let analysis = self.analyze_image(image).await?;
+                Ok(ToolOutput::json(analysis))
+            }
+            _ => Err(LLMSpellError::InvalidInput("Unknown operation".into()))
+        }
+    }
+}
+
+/// Video processing tool
+pub struct VideoProcessor {
+    ffmpeg: FfmpegWrapper,
+}
+
+#[async_trait]
+impl Tool for VideoProcessor {
+    fn input_media_types(&self) -> Vec<MediaType> {
+        vec![MediaType::Video]
+    }
+    
+    fn output_media_types(&self) -> Vec<MediaType> {
+        vec![MediaType::Video, MediaType::Image, MediaType::Audio]
+    }
+    
+    async fn execute_tool(&self, input: ToolInput) -> Result<ToolOutput> {
+        let operation = input.get_string("operation")?;
+        let video = input.get_media("video")?;
+        
+        match operation.as_str() {
+            "extract_frames" => {
+                let count = input.get_u32("count").unwrap_or(10);
+                let frames = self.extract_frames(video, count).await?;
+                Ok(ToolOutput::with_media_vec(frames))
+            }
+            "extract_audio" => {
+                let audio = self.extract_audio(video).await?;
+                Ok(ToolOutput::with_media(audio))
+            }
+            "generate_thumbnail" => {
+                let time = input.get_f32("time").unwrap_or(0.0);
+                let thumbnail = self.generate_thumbnail(video, time).await?;
+                Ok(ToolOutput::with_media(thumbnail))
+            }
+            _ => Err(LLMSpellError::InvalidInput("Unknown operation".into()))
+        }
+    }
+}
+```
+
+### Script Bridge Media Marshalling
+
+#### Lua Media Handling
+
+```lua
+-- Lua example with media content
+local function process_image_with_agent(agent, image_path)
+    -- Load image file
+    local image_data = Files.read_binary(image_path)
+    
+    -- Create multimodal input
+    local input = {
+        text = "Analyze this image and describe what you see",
+        media = {
+            {
+                type = "image",
+                format = "png",
+                data = image_data,  -- Binary data as string
+                metadata = {
+                    width = 1920,
+                    height = 1080
+                }
+            }
+        }
+    }
+    
+    -- Execute agent
+    local result = agent:execute(input)
+    
+    -- Handle multimodal output
+    if result.media and #result.media > 0 then
+        for i, media in ipairs(result.media) do
+            if media.type == "image" then
+                -- Save processed image
+                Files.write_binary("output_" .. i .. ".png", media.data)
+            end
+        end
+    end
+    
+    return result.text
+end
+```
+
+#### JavaScript Media Handling
+
+```javascript
+// JavaScript example with media content
+async function analyzeImageWithAgent(agent, imageBuffer) {
+    // Create multimodal input
+    const input = {
+        text: "Extract text from this image using OCR",
+        media: [{
+            type: 'image',
+            format: 'jpeg',
+            data: imageBuffer,  // Uint8Array or Buffer
+            metadata: {
+                width: 1920,
+                height: 1080,
+                colorSpace: 'sRGB'
+            }
+        }]
+    };
+    
+    // Execute agent
+    const result = await agent.execute(input);
+    
+    // Handle mixed media output
+    result.media.forEach((media, index) => {
+        switch(media.type) {
+            case 'image':
+                // Process image data
+                saveImage(`processed_${index}.png`, media.data);
+                break;
+            case 'audio':
+                // Handle audio data
+                playAudio(media.data, media.format);
+                break;
+        }
+    });
+    
+    return result.text;
+}
+
+// Type conversion utilities
+const MediaUtils = {
+    // Convert base64 to Uint8Array
+    base64ToBytes(base64) {
+        const binary = atob(base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
+        }
+        return bytes;
+    },
+    
+    // Convert Uint8Array to base64
+    bytesToBase64(bytes) {
+        return btoa(String.fromCharCode(...bytes));
+    }
+};
+```
+
+### Multimodal Workflow Example
+
+```rust
+// Example: Document processing workflow with OCR and analysis
+pub struct DocumentAnalysisWorkflow {
+    ocr_tool: Arc<OcrTool>,
+    image_analyzer: Arc<ImageAnalyzer>,
+    text_analyzer: Arc<Agent>,
+    summarizer: Arc<Agent>,
+}
+
+impl DocumentAnalysisWorkflow {
+    pub async fn analyze_document(&self, document: MediaContent) -> Result<AnalysisResult> {
+        // Step 1: Extract text from document/image
+        let ocr_result = match document {
+            MediaContent::Image { data, format, .. } => {
+                self.ocr_tool.execute_tool(ToolInput::new()
+                    .with_media("image", document)
+                    .with_param("enhance", true)).await?
+            },
+            MediaContent::Binary { data, mime_type, .. } if mime_type.starts_with("application/pdf") => {
+                // Handle PDF documents
+                self.pdf_extractor.execute_tool(ToolInput::new()
+                    .with_media("document", document)).await?
+            },
+            _ => return Err(LLMSpellError::UnsupportedMediaType)
+        };
+        
+        // Step 2: Analyze visual elements
+        let visual_analysis = self.image_analyzer.execute(AgentInput {
+            text: "Analyze visual elements, layout, and design",
+            media: vec![document.clone()],
+            ..Default::default()
+        }).await?;
+        
+        // Step 3: Analyze extracted text
+        let text_analysis = self.text_analyzer.execute(AgentInput::text(
+            format!("Analyze this text:\n{}", ocr_result.get_string("text")?)
+        )).await?;
+        
+        // Step 4: Generate comprehensive summary
+        let summary = self.summarizer.execute(AgentInput::text(
+            format!("Summarize these analyses:\nVisual: {}\nText: {}", 
+                visual_analysis.text, text_analysis.text)
+        )).await?;
+        
+        Ok(AnalysisResult {
+            extracted_text: ocr_result.get_string("text")?,
+            visual_elements: visual_analysis,
+            text_analysis,
+            summary: summary.text,
+        })
+    }
+}
+```
+
 ---
 
 ## Component Hierarchy
@@ -2492,6 +2969,17 @@ pub trait BaseAgent: Send + Sync + Observable + SecureComponent + Clone {
     async fn execute(&mut self, input: AgentInput) -> Result<AgentOutput>;
     async fn validate_input(&self, input: &AgentInput) -> Result<ValidationResult>;
     async fn prepare_execution(&mut self, input: &AgentInput) -> Result<ExecutionContext>;
+    
+    // Streaming Execution Interface
+    async fn stream_execute(&mut self, input: AgentInput) -> Result<AgentStream> {
+        // Default implementation returns NotImplemented error
+        Err(LLMSpellError::NotImplemented("Streaming not supported by this agent".into()))
+    }
+    
+    // Multimodal Support
+    fn supports_streaming(&self) -> bool { false }
+    fn supports_multimodal(&self) -> bool { false }
+    fn supported_media_types(&self) -> Vec<MediaType> { vec![MediaType::Text] }
     
     // Capability and Dependency Management
     fn capabilities(&self) -> &ComponentCapabilities;
@@ -2833,6 +3321,16 @@ pub trait Tool: BaseAgent {
     
     // Execution interface (simpler than full BaseAgent)
     async fn execute_tool(&self, input: ToolInput) -> Result<ToolOutput>;
+    
+    // Streaming interface for tools
+    async fn stream_call(&self, input: ToolInput) -> Result<ToolStream> {
+        // Default implementation
+        Err(LLMSpellError::NotImplemented("Tool streaming not supported".into()))
+    }
+    
+    // Media type support
+    fn input_media_types(&self) -> Vec<MediaType> { vec![MediaType::Text] }
+    fn output_media_types(&self) -> Vec<MediaType> { vec![MediaType::Text] }
     
     // Tool composition
     fn can_chain_with(&self, other: &dyn Tool) -> bool;
@@ -6655,16 +7153,16 @@ Rs-LLMSpell provides a comprehensive library of **40+ production-ready tools** o
 #### 1. **File System Operations** (8 tools)
 Tools for secure file and directory operations with comprehensive sandboxing.
 
-| Tool Name | Description | Key Features | Security Level |
-|-----------|-------------|--------------|----------------|
-| `file_reader` | Read files with format detection | UTF-8, binary, encoding detection | High |
-| `file_writer` | Write files with atomic operations | Atomic writes, backup creation | High |
-| `directory_lister` | List directory contents | Recursive, filtering, metadata | Medium |
-| `file_metadata` | Extract file information | Size, dates, permissions, checksums | Low |
-| `file_search` | Search files by content/name | Regex, glob patterns, indexing | Medium |
-| `file_archiver` | Create/extract archives | ZIP, TAR, compression levels | High |
-| `file_watcher` | Monitor file changes | Real-time events, batch processing | Medium |
-| `file_converter` | Convert between formats | Text encodings, line endings | Low |
+| Tool Name | Description | Key Features | Security Level | Streaming |
+|-----------|-------------|--------------|----------------|-----------|
+| `file_reader` | Read files with format detection | UTF-8, binary, encoding detection | High | Yes |
+| `file_writer` | Write files with atomic operations | Atomic writes, backup creation | High | Yes |
+| `directory_lister` | List directory contents | Recursive, filtering, metadata | Medium | No |
+| `file_metadata` | Extract file information | Size, dates, permissions, checksums | Low | No |
+| `file_search` | Search files by content/name | Regex, glob patterns, indexing | Medium | Yes |
+| `file_archiver` | Create/extract archives | ZIP, TAR, compression levels | High | Yes |
+| `file_watcher` | Monitor file changes | Real-time events, batch processing | Medium | Yes |
+| `file_converter` | Convert between formats | Text encodings, line endings | Low | No |
 
 ```lua
 -- File operations examples
@@ -6692,10 +7190,10 @@ local files = Tools.get("directory_lister"):execute({
 #### 2. **Web and Network Operations** (7 tools)
 Comprehensive web access with rate limiting, caching, and security controls.
 
-| Tool Name | Description | Key Features | Rate Limits |
-|-----------|-------------|--------------|-------------|
-| `web_search` | Multi-provider search | Google, Bing, DuckDuckGo fallback | 30/min |
-| `web_scraper` | Extract web content | CSS selectors, JavaScript rendering | 20/min |
+| Tool Name | Description | Key Features | Rate Limits | Streaming |
+|-----------|-------------|--------------|-------------|-----------|
+| `web_search` | Multi-provider search | Google, Bing, DuckDuckGo fallback | 30/min | No |
+| `web_scraper` | Extract web content | CSS selectors, JavaScript rendering | 20/min | Yes |
 | `http_client` | HTTP/HTTPS requests | REST APIs, custom headers, auth | 60/min |
 | `url_analyzer` | Analyze URL structure | Domain info, security scoring | 100/min |
 | `webpage_monitor` | Monitor page changes | Content diffs, scheduling | 10/min |
@@ -7018,6 +7516,87 @@ const academicPapers = await Tools.get("academic_searcher").execute({
     include_abstracts: true,
     sort_by: "relevance" // relevance, date, citations
 });
+```
+
+#### 9. **Multimodal Processing Tools** (8 tools)
+Advanced tools for processing images, audio, video, and mixed media content.
+
+| Tool Name | Description | Input Types | Output Types | Streaming |
+|-----------|-------------|-------------|--------------|-----------|
+| `image_analyzer` | Computer vision analysis | Image | Text, JSON | No |
+| `ocr_extractor` | Optical character recognition | Image, PDF | Text | Yes |
+| `video_processor` | Video manipulation | Video | Video, Images, Audio | Yes |
+| `audio_transcriber` | Speech to text | Audio | Text | Yes |
+| `image_generator` | AI image generation | Text | Image | Yes |
+| `media_converter` | Format conversion | Any media | Any media | Yes |
+| `face_detector` | Face detection/recognition | Image, Video | JSON, Image | No |
+| `scene_analyzer` | Scene understanding | Image, Video | Text, JSON | No |
+
+```lua
+-- Multimodal tools examples
+local ocr_result = Tools.get("ocr_extractor"):execute({
+    image = image_data,  -- binary image data
+    languages = {"en", "es"},
+    enhance_quality = true,
+    output_format = "structured",  -- text, structured, json
+    confidence_threshold = 0.8
+})
+
+local video_frames = Tools.get("video_processor"):execute({
+    operation = "extract_frames",
+    video = video_data,
+    interval = 1.0,  -- extract frame every 1 second
+    format = "png",
+    resize = { width = 1280, height = 720 }
+})
+
+-- Streaming example
+local transcription_stream = Tools.get("audio_transcriber"):stream_call({
+    audio = audio_stream,
+    language = "auto",  -- auto-detect
+    real_time = true,
+    include_timestamps = true,
+    speaker_diarization = true
+})
+
+for chunk in transcription_stream do
+    print("Speaker " .. chunk.speaker .. ": " .. chunk.text)
+end
+```
+
+```javascript
+// Advanced multimodal processing
+const sceneAnalysis = await Tools.get("scene_analyzer").execute({
+    image: imageBuffer,
+    analysis_types: ["objects", "text", "faces", "emotions"],
+    return_annotated_image: true,
+    confidence_threshold: 0.7
+});
+
+// Process video with multiple outputs
+const videoOutputs = await Tools.get("video_processor").execute({
+    operation: "multi_extract",
+    video: videoFile,
+    outputs: {
+        thumbnail: { time: 5.0, format: "jpeg" },
+        preview: { duration: 10, format: "gif" },
+        audio: { format: "mp3", bitrate: 128 },
+        subtitles: { format: "srt", language: "en" }
+    }
+});
+
+// Stream processing for real-time applications
+const imageStream = await Tools.get("image_generator").streamCall({
+    prompt: "A beautiful sunset over mountains",
+    style: "photorealistic",
+    resolution: { width: 1920, height: 1080 },
+    steps: 50,
+    stream_interval: 10  // Send update every 10 steps
+});
+
+for await (const progressImage of imageStream) {
+    updatePreview(progressImage);
+}
 ```
 
 ### Tool Discovery and Management
@@ -9970,6 +10549,373 @@ impl JavaScriptAsyncManager {
 pub struct JsPromiseCallback {
     pub promise_id: String,
     pub script: String,
+}
+```
+
+## Streaming Execution Model
+
+Rs-LLMSpell provides comprehensive streaming support across all layers of the architecture, enabling real-time processing of LLM outputs and efficient handling of large data streams.
+
+### Core Streaming Types
+
+```rust
+use tokio::stream::Stream;
+use tokio::sync::mpsc;
+use std::pin::Pin;
+
+/// Represents a chunk of streaming agent output
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentChunk {
+    /// Unique identifier for this stream
+    pub stream_id: String,
+    
+    /// Sequential chunk number
+    pub chunk_index: u64,
+    
+    /// The actual content chunk
+    pub content: ChunkContent,
+    
+    /// Metadata about this chunk
+    pub metadata: ChunkMetadata,
+    
+    /// Timestamp when chunk was generated
+    pub timestamp: Instant,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ChunkContent {
+    /// Text content chunk
+    Text(String),
+    
+    /// Partial tool call being constructed
+    ToolCallProgress {
+        tool_id: String,
+        partial_args: serde_json::Value,
+    },
+    
+    /// Completed tool call result
+    ToolCallComplete {
+        tool_id: String,
+        result: ToolOutput,
+    },
+    
+    /// Media content chunk (for multimodal streaming)
+    Media {
+        media_type: MediaType,
+        data: Vec<u8>,
+        is_final: bool,
+    },
+    
+    /// Control message (e.g., thinking, planning)
+    Control(ControlMessage),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChunkMetadata {
+    /// Indicates if this is the final chunk
+    pub is_final: bool,
+    
+    /// Token count in this chunk (if applicable)
+    pub token_count: Option<u32>,
+    
+    /// Model being used (for multi-model workflows)
+    pub model: Option<String>,
+    
+    /// Current reasoning step (for CoT)
+    pub reasoning_step: Option<String>,
+}
+
+/// Streaming output type for agents
+pub type AgentStream = Pin<Box<dyn Stream<Item = Result<AgentChunk, LLMSpellError>> + Send>>;
+```
+
+### Streaming BaseAgent Extension
+
+The BaseAgent trait is extended with streaming capabilities:
+
+```rust
+pub trait BaseAgent: Send + Sync + Observable + Hookable {
+    // ... existing methods ...
+    
+    /// Execute the agent with streaming output
+    async fn stream_execute(&mut self, input: AgentInput) -> Result<AgentStream> {
+        // Default implementation returns NotImplemented error
+        Err(LLMSpellError::NotImplemented("Streaming not supported".into()))
+    }
+    
+    /// Check if this agent supports streaming
+    fn supports_streaming(&self) -> bool {
+        false // Default to false, override in implementations
+    }
+    
+    /// Get streaming configuration for this agent
+    fn streaming_config(&self) -> StreamingConfig {
+        StreamingConfig::default()
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StreamingConfig {
+    /// Maximum chunk size in tokens
+    pub chunk_size: usize,
+    
+    /// Buffer size for backpressure handling
+    pub buffer_size: usize,
+    
+    /// Timeout for individual chunks
+    pub chunk_timeout: Duration,
+    
+    /// Whether to emit partial tool calls
+    pub emit_partial_tool_calls: bool,
+    
+    /// Compression for large media chunks
+    pub compress_media_chunks: bool,
+}
+```
+
+### Streaming Workflow Orchestration
+
+```rust
+pub struct StreamingWorkflow {
+    agents: Vec<Box<dyn BaseAgent>>,
+    flow_control: FlowController,
+    aggregator: StreamAggregator,
+}
+
+impl StreamingWorkflow {
+    /// Execute workflow with streaming output
+    pub async fn stream_execute(
+        &mut self,
+        input: WorkflowInput,
+    ) -> Result<WorkflowStream> {
+        let (tx, rx) = mpsc::channel(self.flow_control.buffer_size());
+        
+        // Spawn orchestration task
+        let agents = self.agents.clone();
+        let flow_control = self.flow_control.clone();
+        let aggregator = self.aggregator.clone();
+        
+        tokio::spawn(async move {
+            for agent in agents {
+                if !agent.supports_streaming() {
+                    // Fall back to regular execution
+                    let output = agent.execute(input.clone()).await?;
+                    tx.send(Ok(AgentChunk::from_output(output))).await?;
+                } else {
+                    // Stream from agent
+                    let mut stream = agent.stream_execute(input.clone()).await?;
+                    
+                    while let Some(chunk) = stream.next().await {
+                        // Apply flow control
+                        flow_control.check_backpressure().await?;
+                        
+                        // Process chunk through aggregator
+                        let processed = aggregator.process(chunk?).await?;
+                        
+                        // Forward to output stream
+                        tx.send(Ok(processed)).await?;
+                    }
+                }
+            }
+            Ok::<(), LLMSpellError>(())
+        });
+        
+        Ok(Box::pin(ReceiverStream::new(rx)))
+    }
+}
+```
+
+### Backpressure and Flow Control
+
+```rust
+pub struct FlowController {
+    /// Maximum in-flight chunks
+    max_in_flight: usize,
+    
+    /// Current in-flight counter
+    in_flight: Arc<AtomicUsize>,
+    
+    /// Pause threshold
+    pause_threshold: f64,
+    
+    /// Resume threshold  
+    resume_threshold: f64,
+    
+    /// Backpressure strategy
+    strategy: BackpressureStrategy,
+}
+
+#[derive(Debug, Clone)]
+pub enum BackpressureStrategy {
+    /// Drop oldest chunks when buffer full
+    DropOldest,
+    
+    /// Drop newest chunks when buffer full
+    DropNewest,
+    
+    /// Pause upstream when buffer full
+    PauseUpstream,
+    
+    /// Buffer to disk when memory full
+    SpillToDisk { path: PathBuf },
+}
+
+impl FlowController {
+    pub async fn check_backpressure(&self) -> Result<()> {
+        let current = self.in_flight.load(Ordering::Relaxed);
+        let threshold = (self.max_in_flight as f64 * self.pause_threshold) as usize;
+        
+        if current > threshold {
+            match &self.strategy {
+                BackpressureStrategy::PauseUpstream => {
+                    // Wait until below resume threshold
+                    while self.in_flight.load(Ordering::Relaxed) > 
+                          (self.max_in_flight as f64 * self.resume_threshold) as usize {
+                        tokio::time::sleep(Duration::from_millis(10)).await;
+                    }
+                }
+                BackpressureStrategy::DropOldest => {
+                    // Handled by bounded channel
+                }
+                BackpressureStrategy::DropNewest => {
+                    return Err(LLMSpellError::BackpressureExceeded);
+                }
+                BackpressureStrategy::SpillToDisk { path } => {
+                    // Implement disk spilling
+                    todo!("Implement disk spilling")
+                }
+            }
+        }
+        
+        Ok(())
+    }
+}
+```
+
+### Script Bridge Streaming Support
+
+#### Lua Streaming with Coroutines
+
+```lua
+-- Lua streaming example using coroutines
+local function stream_agent_execution(agent, input)
+    return coroutine.create(function()
+        local stream = agent:stream_execute(input)
+        
+        while true do
+            local chunk = stream:next()
+            if not chunk then break end
+            
+            -- Yield each chunk to caller
+            coroutine.yield(chunk)
+            
+            -- Process chunk
+            if chunk.content.type == "text" then
+                print(chunk.content.text)
+            elseif chunk.content.type == "tool_call_progress" then
+                print("Tool call in progress:", chunk.content.tool_id)
+            end
+        end
+    end)
+end
+
+-- Usage
+local stream_co = stream_agent_execution(agent, { query = "Analyze this data" })
+while coroutine.status(stream_co) ~= "dead" do
+    local ok, chunk = coroutine.resume(stream_co)
+    if ok and chunk then
+        -- Handle chunk
+        process_chunk(chunk)
+    end
+end
+```
+
+#### JavaScript Streaming with Async Generators
+
+```javascript
+// JavaScript streaming using async generators
+async function* streamAgentExecution(agent, input) {
+    const stream = await agent.streamExecute(input);
+    
+    for await (const chunk of stream) {
+        // Process and yield chunk
+        if (chunk.content.type === 'text') {
+            yield { type: 'text', data: chunk.content.text };
+        } else if (chunk.content.type === 'tool_call_progress') {
+            yield { type: 'progress', tool: chunk.content.toolId };
+        }
+        
+        // Check for control messages
+        if (chunk.metadata.isFinal) {
+            yield { type: 'complete', summary: chunk };
+        }
+    }
+}
+
+// Usage with async iteration
+for await (const processed of streamAgentExecution(agent, input)) {
+    console.log('Received:', processed);
+    updateUI(processed);
+}
+```
+
+### Streaming Tool Interface
+
+Tools can also support streaming for long-running operations:
+
+```rust
+pub trait Tool: BaseAgent {
+    // ... existing methods ...
+    
+    /// Execute tool with streaming output
+    async fn stream_call(&self, input: ToolInput) -> Result<ToolStream> {
+        // Default implementation
+        Err(LLMSpellError::NotImplemented("Tool streaming not supported".into()))
+    }
+    
+    /// Check if tool supports streaming
+    fn supports_streaming(&self) -> bool {
+        false
+    }
+}
+
+/// Example: Streaming file reader tool
+pub struct StreamingFileReader {
+    chunk_size: usize,
+}
+
+#[async_trait]
+impl Tool for StreamingFileReader {
+    async fn stream_call(&self, input: ToolInput) -> Result<ToolStream> {
+        let path = input.get_string("path")?;
+        let file = tokio::fs::File::open(path).await?;
+        let reader = BufReader::new(file);
+        
+        let stream = ReaderStream::new(reader)
+            .map(|result| {
+                result.map(|bytes| {
+                    AgentChunk {
+                        stream_id: Uuid::new_v4().to_string(),
+                        chunk_index: 0, // Would be incremented
+                        content: ChunkContent::Text(String::from_utf8_lossy(&bytes).into()),
+                        metadata: ChunkMetadata {
+                            is_final: false,
+                            token_count: None,
+                            model: None,
+                            reasoning_step: None,
+                        },
+                        timestamp: Instant::now(),
+                    }
+                })
+                .map_err(|e| LLMSpellError::from(e))
+            });
+            
+        Ok(Box::pin(stream))
+    }
+    
+    fn supports_streaming(&self) -> bool {
+        true
+    }
 }
 ```
 

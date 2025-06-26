@@ -6,35 +6,33 @@ rs-llmspell: **Scriptable LLM interactions** via Lua, JavaScript - Cast scriptin
 
 ## Current Status
 
-🎉 **Phase 0 - Foundation Infrastructure**: COMPLETE AND VALIDATED ✅
+🚀 **Phase 1 - Core Execution Runtime**: IN PROGRESS (Started 2025-06-26)
 - **Completed**: All architectural research phases (1-13) ✅
-- **Completed**: Phase 0 implementation - All 25 tasks completed ✅
-- **Delivered**: Complete architecture, implementation roadmap, and production-ready foundation ✅
-- **Current**: Ready for Phase 1 - Core Agent Implementation 
-- **Next**: Begin Phase 1 implementation with established foundation
+- **Completed**: Phase 0 implementation - All 37 tasks ✅
+- **Completed**: Architecture updates for streaming/multimodal ✅
+- **Current**: Phase 1 implementation - Core runtime with Lua 🔄
+- **Next**: Working Lua scripts calling LLM agents
 
-### Architecture Readiness
-- ✅ **15,034+ line complete architecture document**
-- ✅ **16-phase implementation roadmap** with clear success criteria
-- ✅ **Technology stack selection** and integration strategy
-- ✅ **Phase 0 detailed design** with 37 specific implementation tasks
-- ✅ **Complete built-in library specification** (40+ tools, agent templates, workflows)
-
-### Phase 0 Implementation Complete
+### Phase 0 Achievements
 - ✅ **12-crate workspace** with zero compiler warnings
 - ✅ **165 comprehensive tests** (unit, integration, property, doc tests)
 - ✅ **Complete CI/CD pipeline** with 7 jobs and quality gates
 - ✅ **Professional documentation** (>95% coverage, GitHub Pages ready)
-- ✅ **Local quality tools** (`./scripts/quality-check.sh` matching CI)
-- ✅ **Performance benchmarking** framework with baselines established
-- ✅ **Clean build time**: 21 seconds (target was <60s)
+- ✅ **Architecture enhanced** with streaming and multimodal support
 
-## Phase 0 Development Commands
+### Phase 1 Implementation Focus
+- 🔄 **13th crate**: `llmspell-utils` for shared utilities
+- 🔄 **Streaming support**: BaseAgent and Tool traits extended
+- 🔄 **Multimodal types**: MediaContent (Image, Audio, Video, Binary)
+- 🔄 **Lua runtime**: Basic script execution with agent APIs
+- 🔄 **CLI enhancement**: Streaming output with progress indicators
 
-**Current Focus**: Foundation Infrastructure Implementation
+## Phase 1 Development Commands
+
+**Current Focus**: Core Execution Runtime (10 working days)
 
 ```bash
-# Phase 0 Workspace Setup
+# Phase 1 Development Commands
 cargo check --workspace          # Verify workspace compilation
 cargo build --workspace          # Build all foundation crates
 cargo test --workspace           # Run foundation tests
@@ -194,37 +192,37 @@ self.hooks.execute(HookPoint::AfterExecution, &result).await?;
 - Deep dives into specific technical decisions
 - Historical context for architectural choices
 
-## Phase 0 Specific Tasks
+## Phase 1 Specific Tasks
 
-### Task 0.1: Workspace Setup
-1. Create root `Cargo.toml` with 12-crate workspace
-2. Generate individual crate structures and manifests
-3. Verify workspace compilation: `cargo check --workspace`
-4. **Acceptance**: Zero compilation errors, clean dependency graph
+### Task 1.0: Create llmspell-utils Crate
+1. Create new crate directory with Cargo.toml
+2. Add to workspace members in root Cargo.toml
+3. Implement utility modules (async_utils, file_utils, etc.)
+4. **Acceptance**: All utilities tested with >90% coverage
 
-### Task 0.2: Core Traits Definition
-1. Implement `ComponentId`, `Version`, `ComponentMetadata` in `llmspell-core`
-2. Define `BaseAgent` trait with full method signatures
-3. Implement `Agent`, `Tool`, `Workflow` traits extending `BaseAgent`
-4. **Acceptance**: All traits compile with comprehensive documentation
+### Task 1.1: Enhanced Core Types
+1. Add streaming types (AgentStream, AgentChunk, ChunkContent)
+2. Add multimodal types (MediaContent, ImageFormat, etc.)
+3. Update AgentInput/AgentOutput with media support
+4. **Acceptance**: All types serialize/deserialize correctly
 
-### Task 0.3: Error Handling System
-1. Create `LLMSpellError` enum with all error variants
-2. Implement error categorization and retryability detection
-3. Add error convenience macros for consistent usage
-4. **Acceptance**: Comprehensive error handling with 100% test coverage
+### Task 1.2: Script Runtime Foundation
+1. Create ScriptRuntime struct with Lua integration
+2. Inject Agent API into Lua environment
+3. Implement coroutine-based streaming support
+4. **Acceptance**: Can execute Lua scripts with agents
 
-### Task 0.4: Testing Infrastructure
-1. Configure `mockall` for trait mocking
-2. Set up `proptest` for property-based testing
-3. Configure `criterion` for performance benchmarks
-4. **Acceptance**: All testing frameworks operational with examples
+### Task 1.3: Provider Integration
+1. Create provider abstraction layer
+2. Implement rig provider wrapper
+3. Add capability detection for streaming/multimodal
+4. **Acceptance**: LLM calls work from scripts
 
-### Task 0.5: CI/CD Pipeline
-1. Create `.github/workflows/ci.yml`
-2. Configure quality gates (tests, clippy, formatting, docs)
-3. Set up GitHub Pages documentation deployment
-4. **Acceptance**: Pipeline passes on clean codebase, <10min runtime
+### Task 1.4: CLI Implementation
+1. Create basic CLI structure with clap
+2. Add streaming output support with progress
+3. Implement configuration loading
+4. **Acceptance**: CLI executes scripts with streaming output
 
 ## Testing Strategy
 

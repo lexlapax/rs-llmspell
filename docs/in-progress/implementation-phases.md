@@ -60,19 +60,27 @@ Rs-LLMSpell follows a carefully structured 16-phase implementation approach that
 - `ScriptRuntime` with embedded mode only
 - `ComponentLifecycleManager` with basic 5-phase initialization
 - `mlua` integration with basic API injection
+- Lua coroutine-based streaming support
 - Simple LLM provider integration using `rig`
+- Provider capability detection for multimodal support
+- Provider abstraction layer for future multimodal providers (mistral.rs, etc.)
 - In-memory state management
 
 **Essential Components**:
-- `BaseAgent` trait implementation
-- `Agent` trait with basic LLM calling
-- `Tool` trait with schema validation
-- Basic CLI entry point (`llmspell run script.lua`)
+- `llmspell-utils` crate with shared utilities
+- `BaseAgent` trait implementation with streaming support
+- `Agent` trait with basic LLM calling and multimodal types
+- `Tool` trait with schema validation and streaming interface
+- Basic CLI entry point (`llmspell run script.lua`) with streaming output support
+- Multimodal content types (`MediaContent`, enhanced `AgentInput`/`AgentOutput`)
 
 **Success Criteria**:
+- [ ] `llmspell-utils` crate provides common utilities to all crates
 - [ ] Can execute simple Lua scripts with Agent/Tool APIs
 - [ ] LLM providers can be called from scripts
 - [ ] Basic tool execution works
+- [ ] Streaming methods defined (implementation can be stub)
+- [ ] Multimodal types compile and are accessible from scripts
 - [ ] Error propagation from scripts to CLI
 - [ ] Memory usage stays under 50MB for simple scripts
 
@@ -91,19 +99,23 @@ Rs-LLMSpell follows a carefully structured 16-phase implementation approach that
 **Priority**: CRITICAL (MVP Essential)
 
 **MVP Scope** (Core Tools Only):
-- **File System**: `FileReadTool`, `FileWriteTool`, `DirectoryListTool`
-- **HTTP**: `HttpRequestTool`, `WebScrapeTool`
+- **File System**: `FileReadTool` (streaming), `FileWriteTool` (streaming), `DirectoryListTool`
+- **HTTP**: `HttpRequestTool`, `WebScrapeTool` (streaming)
 - **Utilities**: `CalculatorTool`, `JsonTool`, `TextTool`
 - **System**: `CommandTool` (sandboxed), `EnvironmentTool`
+- **Multimodal**: `ImageProcessor` (stub), `OcrExtractor` (stub)
 
 **Essential Components**:
 - Tool registry and discovery system
-- Tool schema validation
+- Tool schema validation with media type support
+- Streaming tool interface implementation
 - Security sandboxing for tools
 - Tool error handling and timeout management
 
 **Success Criteria**:
 - [ ] 12+ core built-in tools functional
+- [ ] Streaming tools can return data progressively
+- [ ] Multimodal tool stubs compile and register properly
 - [ ] All tools have comprehensive schemas
 - [ ] Tool security sandbox prevents unauthorized access
 - [ ] Tool execution timeout enforcement works
@@ -127,18 +139,23 @@ Rs-LLMSpell follows a carefully structured 16-phase implementation approach that
 - `SequentialWorkflow` for step-by-step execution
 - `ConditionalWorkflow` for branching logic
 - `LoopWorkflow` for iterative processes
+- `StreamingWorkflow` for real-time data processing
 - Basic workflow state management
+- Multimodal workflow examples
 
 **Essential Components**:
 - `Workflow` trait implementation
-- Workflow execution engine
+- Workflow execution engine with streaming support
 - State passing between workflow steps
+- Backpressure handling for streaming workflows
 - Error handling and recovery in workflows
 
 **Success Criteria**:
 - [ ] Sequential workflows execute correctly
 - [ ] Conditional workflows handle branching logic
 - [ ] Loop workflows with proper termination conditions
+- [ ] Streaming workflows handle backpressure properly
+- [ ] Multimodal data flows through workflows correctly
 - [ ] Workflow state is preserved between steps
 - [ ] Workflow errors don't crash the runtime
 
@@ -190,11 +207,15 @@ Rs-LLMSpell follows a carefully structured 16-phase implementation approach that
 - `ScriptEngineBridge` trait implementation
 - Cross-engine API compatibility layer
 - JavaScript Promise-based async patterns
+- Streaming support via async generators
+- Media type marshalling (base64/typed arrays)
 
 **Success Criteria**:
 - [ ] JavaScript scripts can execute with same API as Lua
 - [ ] Cross-engine compatibility maintained
 - [ ] JavaScript async/await patterns work
+- [ ] Streaming via async generators functional
+- [ ] Media types properly marshalled to/from JavaScript
 - [ ] Performance comparable to Lua execution
 - [ ] Error handling consistent across engines
 
@@ -207,7 +228,37 @@ Rs-LLMSpell follows a carefully structured 16-phase implementation approach that
 
 ---
 
-### **Phase 6: REPL Interactive Mode (Weeks 13-14)**
+### **Phase 5.5: Multimodal Tools Implementation (Weeks 12-13)**
+
+**Goal**: Implement comprehensive multimodal processing tools  
+**Priority**: MEDIUM (Feature Enhancement)
+
+**Components**:
+- Image processing tools (resize, crop, format conversion)
+- OCR tool with multiple language support
+- Video processing tools (frame extraction, thumbnail generation)
+- Audio transcription tool (stub with interface)
+- Media format conversion utilities
+- Integration with multimodal workflows
+
+**Success Criteria**:
+- [ ] Image processing tools handle common formats (PNG, JPEG, WebP)
+- [ ] OCR tool extracts text from images accurately
+- [ ] Video tools can extract frames and generate thumbnails
+- [ ] Audio transcription interface defined (implementation can be stub)
+- [ ] Tools integrate smoothly with streaming workflows
+- [ ] Media type validation works correctly
+
+**Testing Requirements**:
+- Individual tool functionality tests
+- Media format compatibility tests
+- Integration tests with workflows
+- Performance benchmarks for media processing
+- Error handling for invalid media
+
+---
+
+### **Phase 6: REPL Interactive Mode (Weeks 14-15)**
 
 **Goal**: Implement interactive REPL for development and debugging  
 **Priority**: MEDIUM (Developer Experience)
@@ -218,6 +269,9 @@ Rs-LLMSpell follows a carefully structured 16-phase implementation approach that
 - Multi-line input handling
 - Tab completion and history
 - REPL-specific commands (`.help`, `.save`, `.load`)
+- Streaming output display with progress indicators
+- Media file input/output support
+- Multimodal content preview capabilities
 
 **Success Criteria**:
 - [ ] REPL starts and accepts commands
@@ -225,6 +279,9 @@ Rs-LLMSpell follows a carefully structured 16-phase implementation approach that
 - [ ] Multi-line scripts can be entered
 - [ ] Tab completion works for APIs
 - [ ] Command history is saved and restored
+- [ ] Streaming outputs display progressively
+- [ ] Can load and display media files
+- [ ] Multimodal outputs preview correctly
 
 **Testing Requirements**:
 - REPL command execution tests

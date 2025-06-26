@@ -1,34 +1,160 @@
 ## TODOS Handoff to Phase 1 
 **checks for architecture consistency, implementation consistency, gaps between phases and late breaking requirements**
-
-**Instructions** now I'm going to ask you a series of questions about the architecture documented in `/docs/rs-llmspell-complete-architecture.md` . for each question, document the question in Section 12.3 of Phase 2. for each question, document the question under the Task/question Section 1 heading. for that question review the architecture document and find the answer and document the answer under - [ ] Answer: . if you do not find the answer, document it as such. if you figure out what needs to be done, document in - [ ] Todo: subtask.Once that's done, prompt me for another answer. To understand this read this TODO.md document and make sure you understand the section **Task 1** and what I'm saying here.  think hard and reason. do what I'm asking in this prompt and come back and tell me that you understand.
+Each Section of this document comes with it's own **Instructions** read that for a section at a time. Ask me after you're read the entirety of this document.
 
 ### Section 1: Check Architecture for and late breaking requirement
+**Instructions** clear all your internal todos first. we're ready to transition to `Phase 1`
+now I'm going to ask you a series of questions about the architecture documented in `/docs/technical/rs-llmspell-complete-architecture.md` . for each question, document the question in Section 1 of this document. for each question, document the question under the Task/question Section 1 heading. for that question review the architecture document and find the answer and document the answer under - [ ] Answer: . if you do not find the answer, document it as such. if you figure out what needs to be done, document in - [ ] Todo: subtask.Once that's done, prompt me for another answer. To understand this read this TODO.md document and make sure you understand the section **Task 1** and what I'm saying here.  think hard and reason. do what I'm asking in this prompt and come back and tell me that you understand.
 - [ ] **Task/question 1.1** Streaming requirements for llms 
     - Does the architecture allow llms to accomodate streaming requirements for clients?
-    - Do the subsequent layers above? core, agent, tools, workflow, and above that engine, ccli, repl allow for streaming?
+    - Do the subsequent layers above? core, agent, tools, workflow, and above that engine, cli, repl allow for streaming?
     - do you need to do external research/web research for this question?
-    - How does the `/docs/rs-llmspell-complete-architecture.md` need to change? 
+    - How does the `/docs/technical/rs-llmspell-complete-architecture.md` need to change? 
     - does the change require changes to what was accomplished in `/doc/in-progress/PHASE00-DONE.md`, what and how so?
     - does the change require changes to subsequent phases as documented in `/doc/in-progress/implementation-phases.md`, what and how so?
-    - [ ] Answer: 
+    - [x] Answer: **PARTIAL SUPPORT** - The architecture has foundational support for streaming but needs enhancement:
+        - **LLM Provider Layer**: ✅ The `rig` crate supports streaming (has a `streaming` module). The architecture defines `stream_complete()` methods in the `ProviderInstance` trait.
+        - **Core/Agent Layer**: ⚠️ `BaseAgent` trait currently only has `execute()` method returning `AgentOutput`. No streaming execution methods defined.
+        - **Tool Layer**: ❌ Tools have synchronous `call()` interface, no streaming support.
+        - **Workflow Layer**: ❌ Workflows process complete agent outputs, no streaming orchestration.
+        - **Script Layer**: ⚠️ JavaScript mentions async generators for streaming, but no formal streaming API defined.
+        - **CLI/REPL Layer**: ✅ Table shows "Streaming" support planned for CLI integration.
     - [ ] Todo: 
-        - [ ]
-        - [ ]
-- [ ] **Task/question 1.3** Multimodal requirements for llms 
+        - [ ] Add `stream_execute()` method to `BaseAgent` trait that returns an async stream of partial outputs
+        - [ ] Define `StreamingAgentOutput` type with incremental content chunks
+        - [ ] Add `stream_call()` method to `Tool` trait for tools that support streaming
+        - [ ] Create `StreamingWorkflow` types that can orchestrate streaming agents
+        - [ ] Define streaming bridges for Lua (coroutines) and JavaScript (async generators)
+        - [ ] Update CLI/REPL to handle streaming responses with proper display
+- [ ] **Task/question 1.2** Multimodal requirements for llms 
     - Does the architecture allow llms to accomodate multimodal content both-ways (as in images, binaries, videos) requirements for clients?
-    - Do the subsequent layers above? core, agent, tools, workflow, and above that engine, ccli, repl allow for multimodal content?
+    - Do the subsequent layers above? core, agent, tools, workflow, and above that engine, cli, repl allow for multimodal content?
     - do you need to do external research/web research for this question?
-    - How does the `docs/rs-llmspell-complete-architecture.md` need to change? 
-    - does the change require changes to what was accomplished in `doc/in-progress/PHASE00-DONE.md`, what and how so?
-    - does the change require changes to subsequent phases as documented in `doc/in-progress/implementation-phases.md`, what and how so?
-    - [ ] Answer: 
+    - How does the `/docs/technical/rs-llmspell-complete-architecture.md` need to change? 
+    - does the change require changes to what was accomplished in `/doc/in-progress/PHASE00-DONE.md`, what and how so?
+    - does the change require changes to subsequent phases as documented in `/doc/in-progress/implementation-phases.md`, what and how so?
+    - [x] Answer: **MINIMAL/NO SUPPORT** - The architecture lacks comprehensive multimodal support:
+        - **LLM Provider Layer**: ❌ The `rig` crate focuses on text-only interactions. No native multimodal support found.
+        - **Data Types**: ⚠️ `AgentInput`/`AgentOutput` are not explicitly defined in architecture. `ScriptValue` exists but unclear if it supports binary/media.
+        - **Core/Agent Layer**: ❌ No multimodal content handling defined. Architecture mentions "Multi-Modal Integration" as a need but doesn't implement it.
+        - **Tool Layer**: ⚠️ Some file system tools exist but no image/video processing tools defined.
+        - **Script Bridge**: ❌ Type conversion focuses on JSON-serializable data, no binary/media bridges.
+        - **Alternative Solutions**: Other Rust crates (mistral.rs, lm.rs) offer multimodal support but would require different provider integration.
     - [ ] Todo: 
-        - [ ]
-        - [ ]
-### Section 2: Transition to next phase
-- [ ] **Task/question 2.1** Based on the `/docs/rs-llmspell-complete-architecture.md`, and the `/doc/in-progress/implemenation-phases.md`, are you ready to create a detailed design doc for phase 01 `/doc/in-progress/phase-01-design-doc.md` and a todo list `/doc/in-progress/PHASE01-TODO.md` in the style of `/doc/in-progress/phase-00-design-doc.md` and `/doc/in-progress/PHASE00-TODO.md`? if not what needs to be done? you can also look at output of previous phase `/doc/in-progress/PHASE00-TODO-DONE.md`, `/docs/in-progress/PHASE01_HANDOFF_PACKAGE.md` and `/docs/in-progress/PHASE01_KNOWLEDGE_TRANSFER.md` to inform your answers and todos.
-    - [ ] Answer: 
-    - [ ] Todo: 
-        - [ ]
-        - [ ]
+        - [ ] Define `MediaContent` enum type supporting text, images, audio, video, binary data
+        - [ ] Extend `AgentInput`/`AgentOutput` to include `Vec<MediaContent>` for multimodal data
+        - [ ] Create provider abstraction layer that supports both text-only (rig) and multimodal providers
+        - [ ] Add media type conversion in script bridges (base64 for Lua/JS, bytes for Python)
+        - [ ] Define built-in tools for image/video processing (resize, extract frames, OCR, etc.)
+        - [ ] Update CLI/REPL to handle media file inputs and outputs
+        - [ ] Consider switching from rig to mistral.rs or creating multi-provider abstraction
+- [ ] **Task/question 1.3** System for file utilities for rs-llmspell 
+    - Does the architecture need local utilities that is available to other crates in this library as a baseline, or as a building block for the tools package - for e.g. file manipulation tools, system tools (read services, start stop services, date and time, localization, etc), web fetch/download tools, etc
+    - Can the the current architecture allow such a local utility package/crate or in existing package crate in this upcoming phase, or phases there after?
+    - do you need to do external research/web research for this question?
+    - How does the `/docs/technical/rs-llmspell-complete-architecture.md` need to change? 
+    - does the change require changes to what was accomplished in `/doc/in-progress/PHASE00-DONE.md`, what and how so?
+    - does the change require changes to subsequent phases as documented in `/doc/in-progress/implementation-phases.md`, what and how so?
+    - [x] Answer: **PARTIAL SUPPORT** - The architecture has tools but lacks internal utilities:
+        - **Tool-Based Utilities**: ✅ 40+ built-in tools including 8 utility tools (file system, date/time, text manipulation, etc.)
+        - **Runtime Access**: ✅ Utilities are available as LLM-callable tools that agents can execute
+        - **Internal Library**: ❌ No dedicated `llmspell-utils` crate for shared internal functionality
+        - **Code Reuse**: ❌ Each crate must implement its own helper functions (file operations, error formatting, etc.)
+        - **Common Patterns**: ❌ No shared implementations for logging helpers, path utilities, config parsing, etc.
+        - **Architecture Allows**: ✅ The 12-crate workspace can easily accommodate a new utils crate
+        - **Phase Timing**: Adding a utils crate would be beneficial early (Phase 1-2) before too much duplication occurs
+    - [ ] Todo:
+        - [ ] Create `llmspell-utils` crate with common internal utilities (file helpers, string utils, system info)
+        - [ ] Move shared functionality from `llmspell-core` that doesn't belong in core traits
+        - [ ] Implement builder patterns for common constructs (error building, config parsing)
+        - [ ] Add system information utilities (OS detection, environment helpers)
+        - [ ] Create file system helpers with proper error handling and path normalization
+        - [ ] Add async utilities for common patterns (retry logic, timeout helpers)
+        - [ ] Update workspace Cargo.toml to include the new utils crate
+        - [ ] Have other crates depend on utils for shared functionality
+
+### Section 2: Changes to architecture document and implementation plan
+**Instructions** Read Section 1 questions, answers and todos and propose a detailed change to the the documents in the task sections outlined below: for each question below, first answer the first task `Changes to document`, then pause and ask if you should do the second part `Applied changes to document`, one at a time.
+- [x] **Task/question 2.1** changes to overall architecture in `/docs/technical/rs-llmspell-final-architecture.md` keeping in mind we've already accomplished last phase changes as documented in `/docs/in-progress/PHASE00-DONE.md`. Ensure the entire document makes holistic architecture sense, do not just add new sections, the updates may need to be interspersed across sections.
+    - [x] **Task 2.1.1** Changes to document
+        - **Add Streaming Support Section** (after "Async Execution Model"):
+            - Define `StreamingExecutionModel` with `stream_execute()` returning `Stream<Item = AgentChunk>`
+            - Add `StreamingAgentOutput` type with incremental chunks and metadata
+            - Document streaming orchestration patterns for workflows
+            - Specify backpressure handling and flow control mechanisms
+        - **Add Multimodal Content Section** (after "Data Flow Architecture"):
+            - Define `MediaContent` enum: `Text(String)`, `Image(Vec<u8>, ImageFormat)`, `Audio(Vec<u8>, AudioFormat)`, `Video(Vec<u8>, VideoFormat)`, `Binary(Vec<u8>, MimeType)`
+            - Extend `AgentInput`/`AgentOutput` to include `media: Vec<MediaContent>`
+            - Add provider capability detection for multimodal support
+            - Document media type conversion for script bridges
+        - **Add Internal Utilities Crate** (in "Crate Structure"):
+            - Add 13th crate: `llmspell-utils` - Internal shared utilities
+            - List utilities: file helpers, async patterns, system info, string utils, error builders
+            - Show dependency: all other crates depend on utils (except llmspell-core)
+        - **Update BaseAgent Trait** (in "Core Traits"):
+            - Add `stream_execute()` method returning `Pin<Box<dyn Stream<Item = Result<AgentChunk>>>>`
+            - Add `supports_streaming()` capability detection method
+            - Add `supports_multimodal()` capability detection method
+        - **Update Tool Trait** (in "Core Traits"):
+            - Add `stream_call()` method for streaming tool execution
+            - Add `input_media_types()` and `output_media_types()` for capability declaration
+        - **Update Built-in Tools Section**:
+            - Add multimodal tools category: image resize, OCR, video frame extraction, audio transcription
+            - Note which tools support streaming (web scrapers, file readers, etc.)
+        - **Update Script Bridge Section**:
+            - Document Lua coroutine-based streaming with yielding chunks
+            - Document JavaScript async generator streaming patterns
+            - Add media type marshalling (base64 for images in JSON, typed arrays for binary)
+    - [x] **Task 2.1.2** Applied changes to document 2025-06-26
+- [x] **Task/question 2.2** changes to implementation plan in `/docs/in-progress/implementation-phases.md` keeping in mind we've already accomplished last phase changes as documented in `/docs/in-progress/PHASE00-DONE.md`. Ensure the entire document makes sense from a dependency, scoping complexity perspective for each subsequent/yet to be done phase. Take into account the changes above in Task/question 2.1. do not just add new sections, the updates may need to be interspersed across sections for each phase.
+    - [x] **Task 2.2.1** Changes to document
+        - **Phase 1 Modifications** (Core Agent Implementation):
+            - Add Task 1.0: Create `llmspell-utils` crate with basic utilities
+            - Modify Task 1.1: Extend BaseAgent with streaming methods
+            - Add Task 1.6: Implement streaming execution support
+            - Add Task 1.7: Add multimodal content types to AgentInput/Output
+            - Update success criteria: Include streaming test, multimodal type validation
+        - **Phase 2 Modifications** (Tool System):
+            - Add Task 2.5: Implement streaming tool interface
+            - Add Task 2.6: Create multimodal tool examples (image processor, etc.)
+            - Update Tool trait implementation to include media type capabilities
+        - **Phase 3 Modifications** (Provider Integration):
+            - Add provider capability matrix (text-only vs multimodal)
+            - Add abstraction layer for multimodal providers (mistral.rs integration)
+            - Include streaming provider setup and testing
+        - **Phase 4 Modifications** (Script Language Bridges):
+            - Add streaming bridge implementation tasks for Lua/JavaScript
+            - Add media type marshalling implementation
+            - Include performance tests for streaming data transfer
+        - **Phase 5 Modifications** (Workflow System):
+            - Add StreamingWorkflow implementation
+            - Add multimodal workflow examples
+            - Include backpressure handling tests
+        - **New Phase 5.5** (Multimodal Tools - insert after Phase 5):
+            - Image processing tools (resize, crop, OCR)
+            - Video tools (frame extraction, thumbnail generation)
+            - Audio tools (transcription stubs, format conversion)
+            - Integration tests with multimodal workflows
+        - **Phase 9 Modifications** (CLI/REPL):
+            - Add streaming output display with progress indicators
+            - Add file input/output for media content
+            - Include multimodal content preview capabilities
+    - [x] **Task 2.2.2** Applied changes to document 2025-06-26
+
+
+### Section 3: Transition to next phase
+**Instructions** Read Section 1 and section 2 above and complete the following tasks/questions: 
+- [ ] **Task/question 3.1** Based on the `/docs/technical/rs-llmspell-final-architecture.md`, and the `/docs/in-progress/implemenation-phases.md`, are you ready to create a detailed design doc for phase 01 `/docs/in-progress/phase-01-design-doc.md` in the style of `/docs/in-progress/phase-00-design-doc.md` and a todo list `/docss/in-progress/PHASE01-TODO.md` in the style of `/docs/in-progress/PHASE00-TODO.md`? if not what needs to be done? you can also look at output of previous phase `/docs/in-progress/PHASE00-TODO-DONE.md`, `/docs/in-progress/PHASE01_HANDOFF_PACKAGE.md` and `/docs/in-progress/PHASE01_KNOWLEDGE_TRANSFER.md` to inform your answers and todos.
+    - [x] Answer: **YES, READY FOR PHASE 1** with the following assessment:
+        - **Foundation Complete**: Phase 0 delivered all foundation infrastructure with 165 tests, zero warnings, and complete documentation
+        - **Architecture Updated**: Streaming and multimodal support has been integrated throughout the architecture document
+        - **Implementation Plan Updated**: Phase 1 now includes utils crate, streaming, and multimodal tasks
+        - **Clear Scope**: Phase 1 (Core Execution Runtime) has well-defined components and success criteria
+        - **Knowledge Transfer Ready**: Handoff package and knowledge transfer materials from Phase 0 provide solid foundation
+        - **Design Pattern Established**: Phase 0 design doc provides clear template for Phase 1 documentation
+    - [x] Todo: 
+        - [x] Review updated Phase 1 scope in implementation-phases.md
+        - [x] Understand new requirements (utils crate, streaming, multimodal)
+        - [x] Note that Phase 1 now has 13 crates (including llmspell-utils)
+        - [x] Create `/docs/in-progress/phase-01-design-doc.md` - COMPLETED 2025-06-26
+        - [x] Create `/docs/in-progress/PHASE01-TODO.md` - COMPLETED 2025-06-26
