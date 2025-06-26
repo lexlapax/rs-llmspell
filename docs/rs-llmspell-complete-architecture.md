@@ -1058,6 +1058,63 @@ external_libraries = false
 "data_processing/csv_import.lua" = { profile = "data_analysis", reason = "Needs file access for data import" }
 "monitoring/health_check.lua" = { profile = "production", reason = "Production monitoring script" }
 
+# Prompt template configuration
+[prompts]
+# System-level prompt templates with variable interpolation
+[prompts.system]
+default = """
+You are an AI assistant powered by Rs-LLMSpell. 
+Current environment: {{environment}}
+Available tools: {{tools.count}} tools across {{tools.categories}} categories
+Security profile: {{security.profile}}
+"""
+
+research_agent = """
+You are a research specialist focused on thorough investigation and analysis.
+Your tools include: {{tools.research_category}}
+Always cite sources and provide evidence-based conclusions.
+Research scope: {{agent.config.research_scope | default: "general"}}
+"""
+
+code_assistant = """
+You are a coding assistant specializing in {{language | default: "multiple languages"}}.
+Available development tools: {{tools.code_category}}
+Code style: {{agent.config.code_style | default: "idiomatic"}}
+Testing approach: {{agent.config.testing | default: "comprehensive"}}
+"""
+
+# Agent-specific prompt customizations
+[prompts.agents]
+"data_analyst" = """
+{{prompts.system.research_agent}}
+
+Additional focus: Statistical analysis and data visualization.
+Data sources: {{agent.config.data_sources}}
+Output format: {{agent.config.output_format | default: "structured_report"}}
+"""
+
+"customer_service" = """
+{{prompts.system.default}}
+
+You are a customer service representative with the following traits:
+- Empathy level: {{agent.config.empathy_level | default: "high"}}
+- Escalation threshold: {{agent.config.escalation_threshold | default: "moderate"}}
+- Response tone: {{agent.config.tone | default: "helpful_professional"}}
+"""
+
+# Dynamic prompt variables and defaults
+[prompts.variables]
+environment = "${LLMSPELL_ENV:development}"
+language = "${PREFERRED_LANGUAGE:English}"
+timezone = "${TZ:UTC}"
+
+# Variable interpolation settings
+[prompts.interpolation]
+syntax = "handlebars"  # or "jinja2", "mustache"
+escape_html = false
+strict_variables = true  # Fail if variable not found
+default_filters = ["default", "upper", "lower", "capitalize"]
+
 [observability]
 logging_level = "info"
 metrics_enabled = true
@@ -6212,7 +6269,15 @@ Specialized for data exploration, statistical analysis, and insight generation.
 
 ```lua
 local DataAnalyst = Agent.template("data_analyst", {
-    system_prompt = [[You are a skilled data analyst who helps users understand their data through statistical analysis and visualization recommendations.]],
+    -- Use configured prompt template with variable interpolation
+    system_prompt_template = "{{prompts.agents.data_analyst}}",
+    
+    -- Override specific configuration for this instance
+    config_overrides = {
+        data_sources = {"csv", "json", "api"},
+        output_format = "structured_analysis",
+        analysis_depth = "comprehensive"
+    },
     
     default_tools = {
         "data_loader",
@@ -6228,7 +6293,22 @@ local DataAnalyst = Agent.template("data_analyst", {
         "insight_extraction"
     },
     
-    output_format = "structured_analysis"
+    -- Template variables available for prompt interpolation
+    template_context = {
+        analysis_type = "statistical",
+        visualization_preference = "interactive_charts",
+        reporting_format = "executive_summary"
+    }
+})
+
+-- Example: Create specialized analyst with custom prompt variables
+local MarketDataAnalyst = Agent.extend("data_analyst", {
+    template_context = {
+        domain = "financial_markets",
+        data_sources = {"bloomberg_api", "yahoo_finance", "sec_filings"},
+        analysis_framework = "quantitative_finance",
+        risk_assessment = "enabled"
+    }
 })
 ```
 
@@ -8184,6 +8264,9 @@ pub struct LLMSpellConfig {
     
     // Performance tuning
     pub performance: PerformanceConfig,
+    
+    // Prompt template configuration
+    pub prompts: PromptsConfig,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -8282,6 +8365,133 @@ pub struct PerformanceConfig {
     pub cache_settings: CacheConfig,
     pub memory_management: MemoryConfig,
     pub gc_settings: GCConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PromptsConfig {
+    // System-level prompt templates
+    pub system: HashMap<String, String>,
+    
+    // Agent-specific prompt customizations
+    pub agents: HashMap<String, String>,
+    
+    // Dynamic prompt variables and environment integration
+    pub variables: HashMap<String, String>,
+    
+    // Template interpolation engine configuration
+    pub interpolation: TemplateInterpolationConfig,
+    
+    // Prompt validation and constraints
+    pub validation: PromptValidationConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TemplateInterpolationConfig {
+    // Template engine syntax (handlebars, jinja2, mustache)
+    pub syntax: String,
+    
+    // HTML escaping for security
+    pub escape_html: bool,
+    
+    // Fail on undefined variables vs. use defaults
+    pub strict_variables: bool,
+    
+    // Available template filters
+    pub default_filters: Vec<String>,
+    
+    // Custom filter functions (for advanced use)
+    pub custom_filters: HashMap<String, String>,
+    
+    // Maximum template nesting depth for security
+    pub max_nesting_depth: u32,
+    
+    // Template processing timeout
+    pub processing_timeout_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PromptValidationConfig {
+    // Maximum prompt length in characters
+    pub max_prompt_length: usize,
+    
+    // Minimum prompt length for meaningful interaction
+    pub min_prompt_length: usize,
+    
+    // Validate prompt variables exist
+    pub validate_variables: bool,
+    
+    // Check for potentially harmful content
+    pub content_filtering: bool,
+    
+    // Allowed template variables (security constraint)
+    pub allowed_variables: Vec<String>,
+    
+    // Forbidden patterns in prompts
+    pub forbidden_patterns: Vec<String>,
+}
+
+impl Default for PromptsConfig {
+    fn default() -> Self {
+        Self {
+            system: HashMap::from([
+                ("default".to_string(), "You are a helpful AI assistant.".to_string()),
+                ("research_agent".to_string(), "You are a research specialist focused on thorough investigation and analysis.".to_string()),
+                ("code_assistant".to_string(), "You are a coding assistant specializing in software development.".to_string()),
+            ]),
+            agents: HashMap::new(),
+            variables: HashMap::from([
+                ("environment".to_string(), "${LLMSPELL_ENV:development}".to_string()),
+                ("language".to_string(), "${PREFERRED_LANGUAGE:English}".to_string()),
+            ]),
+            interpolation: TemplateInterpolationConfig::default(),
+            validation: PromptValidationConfig::default(),
+        }
+    }
+}
+
+impl Default for TemplateInterpolationConfig {
+    fn default() -> Self {
+        Self {
+            syntax: "handlebars".to_string(),
+            escape_html: false,
+            strict_variables: true,
+            default_filters: vec![
+                "default".to_string(),
+                "upper".to_string(),
+                "lower".to_string(),
+                "capitalize".to_string(),
+                "trim".to_string(),
+            ],
+            custom_filters: HashMap::new(),
+            max_nesting_depth: 10,
+            processing_timeout_ms: 5000,
+        }
+    }
+}
+
+impl Default for PromptValidationConfig {
+    fn default() -> Self {
+        Self {
+            max_prompt_length: 32768, // 32KB
+            min_prompt_length: 10,
+            validate_variables: true,
+            content_filtering: true,
+            allowed_variables: vec![
+                "agent".to_string(),
+                "tools".to_string(),
+                "environment".to_string(),
+                "security".to_string(),
+                "user".to_string(),
+                "context".to_string(),
+            ],
+            forbidden_patterns: vec![
+                "{{#.*exec.*}}".to_string(),
+                "{{#.*eval.*}}".to_string(),
+                "${.*bash.*}".to_string(),
+                "${.*sh.*}".to_string(),
+            ],
+        }
+    }
 }
 ```
 
@@ -13104,6 +13314,54 @@ llmspell test tools --integration         # Run integration tests
 llmspell validate config                  # Validate configuration files
 llmspell validate security               # Check security settings
 llmspell validate performance            # Performance baseline check
+```
+
+#### Configuration Management Commands
+
+```bash
+# Configuration generation and initialization
+llmspell config init                      # Create default llmspell.toml configuration
+llmspell config init --template <env>    # Initialize with environment template (dev, prod, test)
+llmspell config generate --from-env      # Generate config from environment variables
+
+# Configuration validation and schema
+llmspell config validate                  # Validate current configuration
+llmspell config validate --file <path>   # Validate specific config file
+llmspell config schema                    # Show complete configuration schema
+llmspell config schema --format json     # Export schema as JSON/YAML
+
+# Prompt template management
+llmspell prompts list                     # List all configured prompt templates
+llmspell prompts validate                 # Validate prompt templates and variables
+llmspell prompts test <template>          # Test prompt template with sample data
+llmspell prompts export --format yaml    # Export prompt templates
+
+# Configuration migration and upgrades
+llmspell config migrate                   # Migrate config to latest schema version
+llmspell config migrate --from <version> # Migrate from specific version
+llmspell config backup                    # Create config backup before changes
+llmspell config restore <backup_file>    # Restore from config backup
+
+# Environment and variable management
+llmspell config env list                  # List environment variables used
+llmspell config env check                 # Verify environment variable availability
+llmspell config interpolate               # Test variable interpolation
+llmspell config diff --env <env1> <env2> # Compare configs between environments
+
+# Security profile management
+llmspell security profiles list          # List available security profiles
+llmspell security profile validate <name> # Validate specific security profile
+llmspell security analyze                 # Analyze current security configuration
+
+# Configuration hot-reload testing
+llmspell config watch                     # Start config file watcher for testing
+llmspell config reload                    # Trigger manual configuration reload
+
+# Examples
+llmspell config init --template production --output ./configs/prod.toml
+llmspell prompts validate --check-variables --strict
+llmspell config migrate --backup --dry-run
+llmspell security profile validate development --show-permissions
 ```
 
 ### Native Module Builds

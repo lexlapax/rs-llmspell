@@ -138,8 +138,8 @@ Comprehensive refinement of rs-llmspell architecture based on go-llms and Google
       - [x] ~~Added SecurityProfilePresets for common use cases (development, testing, production, data_analysis)~~ **Done**
       - [x] ~~Added per-script security override examples in configuration with audit trail~~ **Done**
       - [x] ~~Integrated profile-based library access control in Script Sandbox Security~~ **Done**
-  - [ ] **Task/question 12.3.9** Does the architecture spell out configuration for prompts, api keys, security profiles etc via configuration files like yaml or environment variables? If not what todos do we have to add to spell that out?
-    - [ ] Answer: Yes, the architecture has comprehensive configuration management:
+  - [x] **Task/question 12.3.9** Does the architecture spell out configuration for prompts, api keys, security profiles etc via configuration files like yaml or environment variables? If not what todos do we have to add to spell that out?
+    - [x] Answer: Yes, the architecture has comprehensive configuration management:
       1. **File formats**: TOML (default), YAML, JSON all supported
       2. **Main config file**: `llmspell.toml` with complete schema documented
       3. **Environment variables**: `LLMSPELL_` prefix with `__` for nesting
@@ -148,13 +148,14 @@ Comprehensive refinement of rs-llmspell architecture based on go-llms and Google
       6. **Hot reload**: Configuration changes without restart
       7. **Security profiles**: Configurable via `[security]` and `[security.sandbox]` sections
       8. **Validation**: All configs validated with helpful error messages
-      However, prompt templates configuration is not explicitly shown in config files
-    - [ ] Todo: 
-      - [ ] Add `[prompts]` section to config for system/agent prompt templates
-      - [ ] Document prompt template variables and interpolation
-      - [ ] Add examples of security profile configurations in config file
-      - [ ] Create config generator/validator CLI tool
-      - [ ] Add configuration migration tool for version upgrades
+      9. **Prompt templates**: Full `[prompts]` section with system/agent templates and variable interpolation
+      10. **Template variables**: Environment variable integration and dynamic substitution
+    - [x] Todo: ~~Architecture has been comprehensively enhanced with configuration management:~~
+      - [x] ~~Added `[prompts]` section to config with system/agent prompt templates and variable interpolation~~ **Done**
+      - [x] ~~Documented prompt template variables, filters, and Handlebars/Jinja2 syntax support~~ **Done**
+      - [x] ~~Added comprehensive security profile configuration examples~~ **Done** (completed in 12.3.8)
+      - [x] ~~Created extensive config generator/validator CLI toolset with migration support~~ **Done**
+      - [x] ~~Added configuration migration tools with backup/restore and version management~~ **Done**
   - [ ] **Task/question 12.3.10** Does the framework or architecture spell out standard library for methods in rs-llmspell for respective script engine to load e.g. for lua promise.lua, llm.lua or provider.lua, agent.lua etc, or are they all assumed to be available? Can the scripts load other lua modules? Same goes for javascript. If not what todos do we need to add to have the architecture spell that out?
     - [ ] Answer: No standard library modules exist. The architecture uses global object injection:
       1. **Global APIs**: Agent, Tool, Tools, Workflow, etc. are pre-injected as globals
@@ -196,6 +197,11 @@ Comprehensive refinement of rs-llmspell architecture based on go-llms and Google
     - Custom profile builder and presets are enhancement features for later phases
     - Per-script security overrides are advanced features, implement after core security is stable
     - SecurityProfile enum and basic factory methods are core infrastructure needed early
+  - [ ] **Configuration Management Implementation Notes**:
+    - Basic prompt template support should be MVP priority for agent customization
+    - Advanced template interpolation (Handlebars/Jinja2) can be later enhancement phase
+    - Configuration migration tools are operational features for post-MVP deployment
+    - CLI config management commands are developer experience enhancements for later phases
 
 ### Phase 14: Final Update (📝 Update)
 - [ ] **Task 14.1**: Complete architecture.md update
