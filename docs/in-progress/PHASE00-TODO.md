@@ -6,7 +6,6 @@
 **Phase**: 0 (Foundation Infrastructure)  
 **Timeline**: Weeks 1-2 (10 working days)  
 **Priority**: CRITICAL (MVP Prerequisite)
-**Design-Dcoument**: docs/in-progress/phase-00-design-doc.md
 
 > **📋 Actionable Task List**: This document breaks down Phase 0 implementation into specific, measurable tasks with clear acceptance criteria.
 
