@@ -284,7 +284,7 @@ Comprehensive refinement of rs-llmspell architecture based on go-llms and Google
     - [ ] Todo:
       - [ ] 
       - [ ] 
-  - [ ] **Task/question 12.4.2**: Review the document for implementation plan readiness. Does the document have enough content to give us a phased plan, each phase complete in itself to be built, tested, compiled and run? do you have enough information to phase components etc for different releases such as (they don't have to be in this order or number of phases but they give a sense of priority)
+  - [ ] **Task/question 12.4.2**: Review the document for implementation plan readiness. Does the document have enough content to give us a phased plan, each phase complete in itself to be built, tested, compiled and run? I'm not asking for an in-depth readiness plan, just enough architectural content and readiness to derive a plan for it. do you have enough information to phase components etc for different releases such as (they don't have to be in this order or number of phases but they give a sense of priority).
   - 0. build infrastructure including project structures, crate structures, changelog management, git, identified rust crates dependencies
   - 1. rudimentary CLI with lua engine support to call llms (simple calls) on linux and macosx "Embedded Mode"
   - 2. rudimentary CLI with lua debug support to call tools directly (not via llms) with metrics, logging etc
