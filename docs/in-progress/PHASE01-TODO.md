@@ -2,7 +2,8 @@
 
 **Version**: 1.0  
 **Date**: June 2025  
-**Status**: Implementation Ready  
+**Status**: IN PROGRESS 🚀  
+**Started**: 2025-06-26 (Evening)  
 **Phase**: 1 (Core Execution Runtime)  
 **Timeline**: Weeks 3-4 (10 working days)  
 **Priority**: CRITICAL (MVP Core)
@@ -10,22 +11,32 @@
 **All-Phases-Document**: docs/in-progress/implementation-phases.md
 **Design-Document**: docs/in-progress/phase-01-design-doc.md
 
+> **📢 UPDATE**: Phase 0 complete! Phase 1 implementation started. Architecture enhanced with streaming and multimodal support.
+
 > **📋 Actionable Task List**: This document breaks down Phase 1 implementation into specific, measurable tasks with clear acceptance criteria.
 
 ---
 
 ## Overview
 
-**Goal**: Implement core execution engine with basic Lua scripting, streaming support, and multimodal content types.
+**Goal**: Implement core execution engine with ScriptEngineBridge abstraction and Lua as first concrete implementation.
+
+**🚨 CRITICAL ARCHITECTURE UPDATE**: Phase 1.2 implements ScriptEngineBridge foundation (NOT direct Lua coupling)
 
 **Success Criteria Summary:**
-- [ ] `llmspell-utils` crate provides common utilities to all crates
-- [ ] Can execute simple Lua scripts with Agent/Tool APIs
+- [ ] `llmspell-utils` crate provides common utilities to all crates 
+- [ ] ScriptEngineBridge abstraction works (not just Lua integration)
+- [ ] Engine factory pattern functional
+- [ ] Directory structure supports multi-language from day one
+- [ ] API injection is language-agnostic (ready for Phase 5)
+- [ ] Can execute simple Lua scripts through ScriptEngineBridge abstraction
 - [ ] LLM providers can be called from scripts
 - [ ] Basic tool execution works
 - [ ] Streaming methods defined and functional (stub implementation acceptable)
 - [ ] Multimodal types compile and are accessible from scripts
 - [ ] Error propagation from scripts to CLI
+- [ ] Runtime can switch between engines (even with only Lua implemented)
+- [ ] Third-party engine plugin interface defined
 - [ ] Memory usage stays under 50MB for simple scripts
 
 ---
@@ -269,123 +280,127 @@
 
 ---
 
-## Phase 1.2: Script Runtime Foundation (Days 3-5)
+## Phase 1.2: Script Engine Bridge Foundation (Days 3-5) 🚨 ARCHITECTURE UPDATE
 
-### Task 1.2.1: Create Basic ScriptRuntime Structure
+### Task 1.2.1: Create ScriptEngineBridge Foundation
 **Priority**: CRITICAL  
 **Estimated Time**: 4 hours  
 **Assignee**: Bridge Team Lead
 **Dependencies**: Enhanced core types
 
-**Description**: Implement the core ScriptRuntime struct with Lua integration.
+**Description**: Implement language-agnostic script engine abstraction before any Lua-specific code.
 
 **Acceptance Criteria:**
-- [ ] ScriptRuntime struct with all fields
-- [ ] Lua initialization with restricted stdlib
-- [ ] Component registry integration
-- [ ] Provider manager integration
-- [ ] Basic execute_script method
+- [ ] ScriptEngineBridge trait defined with all required methods
+- [ ] Engine factory pattern implemented
+- [ ] ScriptRuntime uses Box<dyn ScriptEngineBridge> (NOT direct Lua)
+- [ ] Directory structure follows multi-engine design
+- [ ] Foundation ready for multiple language implementations
 
 **Implementation Steps:**
-1. Create runtime module in llmspell-bridge
-2. Define ScriptRuntime struct
-3. Implement new() with Lua setup
-4. Add component registry field
-5. Add provider manager field
-6. Implement basic script execution
+1. Create llmspell-bridge/src/engine/bridge.rs
+2. Define ScriptEngineBridge trait with execute_script, inject_apis methods
+3. Create llmspell-bridge/src/engine/factory.rs for engine creation
+4. Design ScriptRuntime to be language-agnostic
+5. Set up proper directory structure for multi-engine support
+6. Create plugin interface for third-party engines
 
 **Definition of Done:**
-- [ ] Runtime initializes without errors
-- [ ] Can execute simple Lua scripts
-- [ ] Proper error handling
-- [ ] Thread-safe implementation
+- [ ] ScriptEngineBridge trait compiles and is well-documented
+- [ ] Factory pattern supports engine creation by name
+- [ ] Directory structure ready for lua/, javascript/, python/ modules
+- [ ] Plugin interface defined for third-party engines
+- [ ] No direct Lua coupling anywhere in core runtime
 
-### Task 1.2.2: Inject Agent API into Lua
+### Task 1.2.2: Implement LuaEngine (First Concrete Implementation)
 **Priority**: CRITICAL  
-**Estimated Time**: 4 hours  
+**Estimated Time**: 5 hours  
 **Assignee**: Bridge Team
 **Dependencies**: Task 1.2.1
 
-**Description**: Create Lua bindings for Agent creation and execution.
+**Description**: Create LuaEngine as first implementation of ScriptEngineBridge.
 
 **Acceptance Criteria:**
-- [ ] Agent.create() function in Lua
-- [ ] agent:execute() method works
-- [ ] agent:get_config() method
-- [ ] Error handling from Lua to Rust
-- [ ] Type conversions work correctly
+- [ ] LuaEngine struct implements ScriptEngineBridge trait
+- [ ] Lua-specific API injection in llmspell-bridge/src/lua/api/ modules
+- [ ] ScriptRuntime::new_with_lua() factory method
+- [ ] Agent.create() function accessible in Lua through bridge
+- [ ] Type conversions isolated to Lua-specific modules
 
 **Implementation Steps:**
-1. Create lua/agent_api.rs module
-2. Implement Agent userdata type
-3. Add create function to globals
-4. Implement execute method
-5. Add configuration access
-6. Write Lua integration tests
+1. Create llmspell-bridge/src/lua/engine.rs
+2. Implement ScriptEngineBridge for LuaEngine
+3. Create llmspell-bridge/src/lua/api/agent.rs for Agent API injection
+4. Add factory method: ScriptRuntime::new_with_lua()
+5. Test bridge pattern with Lua implementation
+6. Ensure API injection is language-agnostic at the bridge level
 
 **Definition of Done:**
-- [ ] Can create agents from Lua
-- [ ] Execute method returns results
-- [ ] Errors propagate correctly
-- [ ] Tests pass with mock agents
+- [ ] LuaEngine implements ScriptEngineBridge trait completely
+- [ ] Can create agents from Lua through bridge abstraction
+- [ ] Factory method creates runtime with LuaEngine
+- [ ] Type conversions contained in lua/ module
+- [ ] Bridge pattern validated with tests
 
-### Task 1.2.3: Implement Lua Streaming Support
+### Task 1.2.3: Implement Language-Agnostic ScriptRuntime
+**Priority**: CRITICAL  
+**Estimated Time**: 4 hours  
+**Assignee**: Bridge Team Lead
+**Dependencies**: Task 1.2.2
+
+**Description**: Create ScriptRuntime that uses ScriptEngineBridge abstraction.
+
+**Acceptance Criteria:**
+- [ ] ScriptRuntime uses Box<dyn ScriptEngineBridge> field
+- [ ] Factory methods for different engines (new_with_lua, future new_with_javascript)
+- [ ] Language-agnostic execute_script method
+- [ ] Engine capability detection (supports_streaming, etc.)
+- [ ] Configuration system supports multiple engines
+
+**Implementation Steps:**
+1. Create llmspell-bridge/src/runtime.rs with bridge-based design
+2. Implement ScriptRuntime::new_with_engine() core method
+3. Add ScriptRuntime::new_with_lua() factory method
+4. Create multi-engine configuration structure
+5. Add engine capability detection methods
+6. Test runtime can switch between engines
+
+**Definition of Done:**
+- [ ] ScriptRuntime completely language-agnostic
+- [ ] Factory pattern enables engine selection
+- [ ] Configuration supports engine-specific settings
+- [ ] Runtime exposes engine capabilities
+- [ ] Ready for Phase 5 JavaScript engine addition
+
+### Task 1.2.4: Implement Lua Streaming and Complete API Suite
 **Priority**: HIGH  
 **Estimated Time**: 5 hours  
 **Assignee**: Bridge Team
-**Dependencies**: Task 1.2.2
+**Dependencies**: Task 1.2.3
 
-**Description**: Add coroutine-based streaming to Lua API.
-
-**Acceptance Criteria:**
-- [ ] stream_execute returns Lua coroutine
-- [ ] Coroutines yield chunks properly
-- [ ] Error handling in coroutines
-- [ ] Memory management correct
-- [ ] Examples demonstrate usage
-
-**Implementation Steps:**
-1. Create lua/streaming.rs module
-2. Implement coroutine creation helpers
-3. Add stream iteration support
-4. Handle chunk conversion to Lua
-5. Test with mock streaming agent
-6. Create usage examples
-
-**Definition of Done:**
-- [ ] Streaming works end-to-end
-- [ ] No memory leaks
-- [ ] Performance acceptable
-- [ ] Documentation complete
-
-### Task 1.2.4: Add Tool and Basic Workflow APIs
-**Priority**: HIGH  
-**Estimated Time**: 4 hours  
-**Assignee**: Bridge Team
-**Dependencies**: Task 1.2.2
-
-**Description**: Create Lua bindings for Tool usage and basic workflows.
+**Description**: Add streaming support and complete API suite to LuaEngine.
 
 **Acceptance Criteria:**
-- [ ] Tool.get() function in Lua
-- [ ] tool:execute() method works
-- [ ] Basic workflow creation
-- [ ] State passing between tools
-- [ ] Error propagation works
+- [ ] Streaming support via async generators functional through bridge
+- [ ] Tool.get() function in Lua through bridge abstraction
+- [ ] agent:execute() and tool:execute() methods work
+- [ ] Coroutine-based streaming with proper chunk handling
+- [ ] Language-agnostic API injection framework ready for Phase 5
 
 **Implementation Steps:**
-1. Create lua/tool_api.rs module
-2. Implement Tool userdata type
-3. Add tool registry access
-4. Create workflow stubs
-5. Test tool execution
-6. Document API usage
+1. Create llmspell-bridge/src/lua/api/streaming.rs module
+2. Implement streaming through ScriptEngineBridge interface
+3. Create llmspell-bridge/src/lua/api/tool.rs module
+4. Add Tool API through bridge pattern
+5. Test API injection through ScriptEngineBridge
+6. Ensure APIs work through abstraction layer
 
 **Definition of Done:**
-- [ ] Tools callable from Lua
-- [ ] Results properly converted
-- [ ] Workflow stubs compile
-- [ ] Integration tests pass
+- [ ] Streaming works through bridge abstraction
+- [ ] Tools callable from Lua through bridge
+- [ ] API injection is language-agnostic
+- [ ] Ready for Phase 5 JavaScript API compatibility
+- [ ] Integration tests validate bridge pattern
 
 ---
 
@@ -449,67 +464,67 @@
 - [ ] Configuration flexible
 - [ ] Ready for streaming later
 
-### Task 1.3.3: Integrate Providers with ScriptRuntime
+### Task 1.3.3: Integrate Providers with Bridge-Based ScriptRuntime
 **Priority**: HIGH  
 **Estimated Time**: 3 hours  
 **Assignee**: Bridge Team
-**Dependencies**: Task 1.3.2, Task 1.2.1
+**Dependencies**: Task 1.3.2, Task 1.2.3
 
-**Description**: Connect provider system to script runtime.
+**Description**: Connect provider system to language-agnostic script runtime.
 
 **Acceptance Criteria:**
-- [ ] Providers accessible from scripts
-- [ ] Default provider configuration
-- [ ] Provider switching support
-- [ ] Error messages helpful
-- [ ] Performance acceptable
+- [ ] Providers accessible from scripts through bridge abstraction
+- [ ] Multi-engine configuration for providers
+- [ ] Provider switching support across engines
+- [ ] Engine-agnostic error handling
+- [ ] Performance acceptable with bridge overhead
 
 **Implementation Steps:**
-1. Add provider manager to runtime
-2. Configure default provider
-3. Add provider access from Lua
-4. Test provider calls
-5. Add error context
-6. Benchmark performance
+1. Add provider manager to bridge-based runtime
+2. Configure providers in multi-engine config
+3. Add provider access through ScriptEngineBridge
+4. Test provider calls through bridge abstraction
+5. Add engine-agnostic error context
+6. Benchmark bridge overhead
 
 **Definition of Done:**
-- [ ] LLM calls work from scripts
-- [ ] Configuration documented
-- [ ] Errors are clear
-- [ ] Performance <100ms overhead
+- [ ] LLM calls work from scripts through bridge
+- [ ] Configuration supports multiple engines
+- [ ] Errors are engine-agnostic and clear
+- [ ] Bridge overhead <5ms additional latency
 
 ---
 
 ## Phase 1.4: CLI Implementation (Days 7-8)
 
-### Task 1.4.1: Create Basic CLI Structure
+### Task 1.4.1: Create Multi-Engine CLI Structure
 **Priority**: HIGH  
-**Estimated Time**: 3 hours  
+**Estimated Time**: 4 hours  
 **Assignee**: CLI Team Lead
-**Dependencies**: Script runtime complete
+**Dependencies**: Bridge-based script runtime complete
 
-**Description**: Implement CLI entry point with run command.
+**Description**: Implement CLI with engine selection support.
 
 **Acceptance Criteria:**
-- [ ] CLI parsing with clap
-- [ ] Run subcommand works
-- [ ] Help text comprehensive
-- [ ] Error messages friendly
+- [ ] CLI parsing with clap and --engine flag
+- [ ] Run subcommand supports engine selection (--engine lua)
+- [ ] Engine validation and helpful error messages
+- [ ] Multi-engine configuration loading
 - [ ] Version information correct
 
 **Implementation Steps:**
-1. Set up clap in llmspell-cli
-2. Define CLI structure
-3. Implement run command
-4. Add help documentation
-5. Handle errors gracefully
+1. Set up clap in llmspell-cli with engine selection
+2. Define CLI structure with --engine flag
+3. Implement run command with engine switching
+4. Add engine validation and help documentation
+5. Handle engine-specific errors gracefully
 6. Add version from cargo
 
 **Definition of Done:**
-- [ ] CLI compiles and runs
-- [ ] Help text is clear
-- [ ] Errors show context
-- [ ] Version matches cargo
+- [ ] CLI supports --engine lua flag
+- [ ] Engine validation provides clear errors
+- [ ] Help text explains engine options
+- [ ] Ready for --engine javascript in Phase 5
 
 ### Task 1.4.2: Add Streaming Output Support
 **Priority**: HIGH  
@@ -573,63 +588,72 @@
 
 ## Phase 1.5: Testing and Integration (Days 8-9)
 
-### Task 1.5.1: Unit Test Suite
+### Task 1.5.1: Bridge Abstraction and Unit Test Suite
 **Priority**: HIGH  
-**Estimated Time**: 4 hours  
+**Estimated Time**: 5 hours  
 **Assignee**: Full Team
 **Dependencies**: All implementation tasks
 
-**Description**: Ensure comprehensive unit test coverage.
+**Description**: Comprehensive testing of ScriptEngineBridge abstraction and all components.
 
 **Acceptance Criteria:**
-- [ ] Utils crate >90% coverage
-- [ ] Core types fully tested
-- [ ] Bridge components tested
+- [x] Utils crate >90% coverage ✅
+- [x] Core types fully tested ✅
+- [ ] ScriptEngineBridge trait behavior tests
+- [ ] Engine factory pattern validation
+- [ ] Cross-engine API consistency framework (ready for Phase 5)
+- [ ] Bridge abstraction unit tests
+- [ ] Engine implementation compliance tests
 - [ ] Provider abstractions tested
-- [ ] CLI parsing tested
+- [ ] CLI engine selection tested
 
 **Implementation Steps:**
-1. Review test coverage reports
-2. Add missing unit tests
-3. Test error conditions
-4. Test edge cases
-5. Verify test quality
-6. Document test patterns
+1. Create bridge abstraction test suite
+2. Add engine compliance tests
+3. Test factory pattern thoroughly
+4. Create cross-engine compatibility test framework
+5. Test error conditions and edge cases
+6. Validate bridge performance overhead
 
 **Definition of Done:**
-- [ ] Coverage targets met
-- [ ] All tests pass
-- [ ] Tests are maintainable
-- [ ] CI runs all tests
+- [ ] Bridge pattern thoroughly tested
+- [ ] Engine compliance validated
+- [ ] Cross-engine test framework ready for Phase 5
+- [ ] Performance overhead <5% validated
+- [ ] All tests pass in CI
 
-### Task 1.5.2: Integration Test Suite
+### Task 1.5.2: Bridge-Based Integration Test Suite
 **Priority**: CRITICAL  
-**Estimated Time**: 5 hours  
+**Estimated Time**: 6 hours  
 **Assignee**: Full Team
 **Dependencies**: Task 1.5.1
 
-**Description**: Create end-to-end integration tests.
+**Description**: Create end-to-end integration tests validating bridge abstraction.
 
 **Acceptance Criteria:**
-- [ ] Script execution tests
-- [ ] Streaming tests work
-- [ ] Provider integration tested
-- [ ] CLI commands tested
-- [ ] Error scenarios covered
+- [ ] Script execution tests through bridge abstraction
+- [ ] Engine switching integration tests
+- [ ] Streaming tests work through bridge
+- [ ] Provider integration tested with bridge
+- [ ] CLI engine selection tested
+- [ ] Error scenarios covered across engines
+- [ ] Performance benchmarks with bridge overhead
 
 **Implementation Steps:**
 1. Create tests/integration directory
-2. Write script execution tests
-3. Add streaming tests
-4. Test provider calls
-5. Test CLI commands
-6. Add performance tests
+2. Write script execution tests using ScriptEngineBridge
+3. Add engine switching tests (validates factory pattern)
+4. Test streaming through bridge abstraction
+5. Test provider calls through bridge
+6. Test CLI with --engine flag
+7. Add bridge performance benchmarks
 
 **Definition of Done:**
-- [ ] Integration tests comprehensive
-- [ ] Tests run in CI
-- [ ] Performance benchmarks included
-- [ ] Flaky tests eliminated
+- [ ] Integration tests validate bridge pattern
+- [ ] Engine switching works seamlessly
+- [ ] Bridge overhead measured and acceptable
+- [ ] Ready for Phase 5 JavaScript engine addition
+- [ ] All tests run in CI
 
 ### Task 1.5.3: Memory and Performance Validation
 **Priority**: HIGH  
@@ -755,32 +779,41 @@
 
 ## Summary Dashboard
 
-### Critical Path
-1. **Days 1-2**: Utils crate (foundation for everything)
-2. **Days 2-3**: Core types (streaming, multimodal)
-3. **Days 3-5**: Script runtime (Lua integration)
-4. **Days 5-6**: Provider integration
-5. **Days 7-8**: CLI implementation
-6. **Days 8-10**: Testing, documentation, handoff
+### Critical Path (UPDATED for Bridge Architecture)
+1. **Days 1-2**: Utils crate (foundation for everything) ✅
+2. **Days 2-3**: Core types (streaming, multimodal) ✅
+3. **Days 3-5**: ScriptEngineBridge foundation + LuaEngine implementation
+4. **Days 5-6**: Provider integration with bridge abstraction
+5. **Days 7-8**: CLI implementation with engine selection
+6. **Days 8-10**: Bridge testing, documentation, handoff
 
-### Resource Allocation
-- **Core Team**: Utils, core types, trait updates
-- **Bridge Team**: Script runtime, Lua APIs
-- **Provider Team**: Provider abstraction and integration
-- **CLI Team**: Command-line interface
-- **All**: Testing and documentation
+### Resource Allocation (UPDATED)
+- **Core Team**: Utils ✅, core types ✅, trait updates ✅
+- **Bridge Team**: ScriptEngineBridge design, LuaEngine implementation, bridge APIs
+- **Provider Team**: Provider abstraction and bridge integration
+- **CLI Team**: Command-line interface with engine selection
+- **All**: Bridge abstraction testing and documentation
 
-### Risk Areas
-1. **Lua Streaming Complexity**: Have fallback plan
-2. **Memory Constraints**: Monitor early and often
-3. **Provider Abstraction**: Keep simple initially
-4. **Schedule**: 10 days is aggressive, prioritize MVP
+### Risk Areas (UPDATED)
+1. **Bridge Abstraction Complexity**: Start simple, ensure it works with Lua first
+2. **API Injection Complexity**: Design language-agnostic APIs carefully
+3. **Performance Risk**: Bridge abstraction must not add significant overhead
+4. **Memory Constraints**: Monitor early and often
+5. **Schedule**: 10 days is aggressive, prioritize bridge MVP
+6. **Architecture Risk**: CRITICAL - implement bridge pattern correctly or face major refactoring in Phase 5
 
-### Success Metrics
+### Success Metrics (UPDATED)
 - ✅ All crates compile without warnings
-- ✅ Can execute Lua scripts with agents
-- ✅ Streaming methods defined (stub OK)
-- ✅ Multimodal types accessible
-- ✅ Memory usage <50MB
-- ✅ >80% test coverage
-- ✅ Documentation complete
+- ✅ Utils crate provides common utilities
+- ✅ Streaming and multimodal types accessible
+- [ ] ScriptEngineBridge abstraction works (not just Lua integration)
+- [ ] Engine factory pattern functional
+- [ ] Directory structure supports multi-language from day one
+- [ ] API injection is language-agnostic (ready for Phase 5)
+- [ ] Can execute Lua scripts through ScriptEngineBridge abstraction
+- [ ] Runtime can switch between engines (even with only Lua implemented)
+- [ ] Third-party engine plugin interface defined
+- [ ] Memory usage <50MB (including bridge overhead)
+- [ ] Bridge performance overhead <5%
+- [ ] >90% test coverage including bridge abstraction
+- [ ] Documentation covers bridge architecture
