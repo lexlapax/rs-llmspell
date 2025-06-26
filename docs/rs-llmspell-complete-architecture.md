@@ -13813,7 +13813,626 @@ pub enum ModificationType {
 
 ## Protocol Integration (MCP, A2A)
 
-[... existing content ...]
+Rs-LLMSpell provides comprehensive support for Model Control Protocol (MCP) and Agent-to-Agent (A2A) protocols, enabling seamless integration with external tools and agent networks. This dual-protocol approach allows rs-llmspell to both consume external services and expose its capabilities to other systems while supporting both tool-level (MCP) and agent-level (A2A) interactions.
+
+### Protocol Overview
+
+**MCP (Model Control Protocol)**: Standardized protocol for tool discovery, invocation, and resource access across AI systems. Enables rs-llmspell agents to seamlessly integrate external tools as if they were built-in components.
+
+**A2A (Agent-to-Agent Protocol)**: Advanced protocol for agent discovery, capability negotiation, task delegation, and collaborative workflows. Enables sophisticated multi-agent orchestration across distributed networks.
+
+Both protocols support multiple transport methods (HTTP, WebSocket, stdio), comprehensive authentication (API keys, OAuth2, mutual TLS), and production-ready features (rate limiting, circuit breakers, health monitoring).
+
+### MCP (Model Control Protocol) Integration
+
+MCP enables standardized access to external tools and resources across different AI systems. Rs-LLMSpell implements both client and server capabilities for comprehensive MCP integration.
+
+#### MCP Client Architecture
+
+The MCP client allows rs-llmspell agents to discover and use external MCP tools seamlessly:
+
+```rust
+// Core MCP client traits and types
+pub trait MCPClient: Send + Sync {
+    async fn connect(&mut self, server_uri: &str) -> Result<MCPConnection>;
+    async fn discover_capabilities(&self, connection: &MCPConnection) -> Result<MCPCapabilities>;
+    async fn list_tools(&self, connection: &MCPConnection) -> Result<Vec<MCPToolDescription>>;
+    async fn invoke_tool(&self, connection: &MCPConnection, request: MCPToolRequest) -> Result<MCPToolResponse>;
+    async fn disconnect(&mut self, connection: MCPConnection) -> Result<()>;
+}
+
+pub struct MCPConnection {
+    session_id: String,
+    transport: Box<dyn MCPTransport>,
+    capabilities: MCPCapabilities,
+    auth_context: Option<AuthContext>,
+}
+
+pub struct MCPCapabilities {
+    supported_transports: Vec<TransportType>,
+    supported_auth_methods: Vec<AuthMethod>,
+    tool_discovery: bool,
+    streaming_support: bool,
+    batch_operations: bool,
+    resource_subscriptions: bool,
+}
+
+// Bridge MCP tools into rs-llmspell tool system
+pub struct MCPToolAdapter {
+    mcp_client: Box<dyn MCPClient>,
+    connection: MCPConnection,
+    tool_description: MCPToolDescription,
+    performance_monitor: ToolPerformanceMonitor,
+}
+
+#[async_trait]
+impl Tool for MCPToolAdapter {
+    fn name(&self) -> &str {
+        &self.tool_description.name
+    }
+    
+    fn description(&self) -> &str {
+        &self.tool_description.description
+    }
+    
+    fn parameters_schema(&self) -> serde_json::Value {
+        self.tool_description.input_schema.clone()
+    }
+    
+    async fn execute(&self, params: serde_json::Value) -> Result<ToolOutput> {
+        // Convert rs-llmspell tool params to MCP format
+        let mcp_request = MCPToolRequest {
+            tool_name: self.tool_description.name.clone(),
+            parameters: params,
+            context: MCPExecutionContext {
+                session_id: self.connection.session_id.clone(),
+                request_id: Uuid::new_v4().to_string(),
+                timestamp: Utc::now(),
+            },
+        };
+        
+        // Execute via MCP client
+        let start_time = Instant::now();
+        let mcp_response = self.mcp_client.invoke_tool(&self.connection, mcp_request).await?;
+        let duration = start_time.elapsed();
+        
+        // Record performance metrics
+        self.performance_monitor.record_execution(&self.tool_description.name, duration, &mcp_response);
+        
+        // Convert MCP response to rs-llmspell format
+        Ok(ToolOutput {
+            content: mcp_response.result,
+            metadata: HashMap::from([
+                ("mcp_session_id".to_string(), Value::String(self.connection.session_id.clone())),
+                ("mcp_server_uri".to_string(), Value::String(mcp_response.server_info.uri)),
+                ("execution_time_ms".to_string(), Value::Number(duration.as_millis().into())),
+                ("mcp_version".to_string(), Value::String(mcp_response.protocol_version)),
+            ]),
+        })
+    }
+}
+
+// MCP client manager for handling multiple connections
+pub struct MCPClientManager {
+    clients: HashMap<String, Box<dyn MCPClient>>,
+    connections: HashMap<String, MCPConnection>,
+    discovery_cache: Arc<RwLock<HashMap<String, Vec<MCPToolDescription>>>>,
+    connection_pool: MCPConnectionPool,
+    security_manager: MCPSecurityManager,
+}
+
+impl MCPClientManager {
+    pub async fn register_mcp_server(&mut self, server_config: MCPServerConfig) -> Result<String> {
+        let server_id = format!("mcp_server_{}", Uuid::new_v4());
+        
+        // Create client for this server
+        let mut client = match server_config.transport {
+            TransportType::HTTP => Box::new(HTTPMCPClient::new(server_config.clone())),
+            TransportType::WebSocket => Box::new(WebSocketMCPClient::new(server_config.clone())),
+            TransportType::Stdio => Box::new(StdioMCPClient::new(server_config.clone())),
+        };
+        
+        // Establish connection
+        let connection = client.connect(&server_config.uri).await?;
+        
+        // Discover available tools
+        let tools = client.list_tools(&connection).await?;
+        
+        // Cache discovered tools
+        {
+            let mut cache = self.discovery_cache.write().await;
+            cache.insert(server_id.clone(), tools.clone());
+        }
+        
+        // Store client and connection
+        self.clients.insert(server_id.clone(), client);
+        self.connections.insert(server_id.clone(), connection);
+        
+        info!("Registered MCP server {} with {} tools", server_id, tools.len());
+        Ok(server_id)
+    }
+    
+    pub async fn create_tool_adapters(&self, server_id: &str) -> Result<Vec<Box<dyn Tool>>> {
+        let tools = {
+            let cache = self.discovery_cache.read().await;
+            cache.get(server_id)
+                .ok_or_else(|| anyhow!("Server not found: {}", server_id))?
+                .clone()
+        };
+        
+        let client = self.clients.get(server_id)
+            .ok_or_else(|| anyhow!("Client not found: {}", server_id))?;
+            
+        let connection = self.connections.get(server_id)
+            .ok_or_else(|| anyhow!("Connection not found: {}", server_id))?;
+        
+        let mut adapters: Vec<Box<dyn Tool>> = Vec::new();
+        
+        for tool_desc in tools {
+            let adapter = MCPToolAdapter {
+                mcp_client: dyn_clone::clone_box(&**client),
+                connection: connection.clone(),
+                tool_description: tool_desc,
+                performance_monitor: ToolPerformanceMonitor::new(),
+            };
+            
+            adapters.push(Box::new(adapter));
+        }
+        
+        Ok(adapters)
+    }
+}
+```
+
+#### MCP Server Architecture
+
+Rs-LLMSpell can expose its tools and agents via MCP for consumption by external systems:
+
+```rust
+// MCP server implementation
+pub struct MCPServer {
+    tool_registry: Arc<RwLock<ToolRegistry>>,
+    agent_registry: Arc<RwLock<AgentRegistry>>,
+    server_config: MCPServerConfig,
+    connection_manager: ConnectionManager,
+    security_manager: SecurityManager,
+    performance_monitor: ServerPerformanceMonitor,
+}
+
+pub struct MCPServerConfig {
+    bind_address: String,
+    port: u16,
+    transport_types: Vec<TransportType>,
+    auth_methods: Vec<AuthMethod>,
+    rate_limits: RateLimitConfig,
+    cors_settings: CorsConfig,
+    tls_config: Option<TlsConfig>,
+}
+
+impl MCPServer {
+    pub async fn start(&mut self) -> Result<()> {
+        // Start HTTP server for MCP over HTTP
+        if self.server_config.transport_types.contains(&TransportType::HTTP) {
+            self.start_http_server().await?;
+        }
+        
+        // Start WebSocket server for MCP over WebSocket
+        if self.server_config.transport_types.contains(&TransportType::WebSocket) {
+            self.start_websocket_server().await?;
+        }
+        
+        // Start stdio server for MCP over stdio
+        if self.server_config.transport_types.contains(&TransportType::Stdio) {
+            self.start_stdio_server().await?;
+        }
+        
+        info!("MCP server started on {}:{}", self.server_config.bind_address, self.server_config.port);
+        Ok(())
+    }
+    
+    async fn handle_tool_invocation(&self, request: MCPToolInvocationRequest) -> Result<MCPToolInvocationResponse> {
+        // Verify session and permissions
+        let session = self.connection_manager.get_session(&request.session_id).await?;
+        self.security_manager.authorize_tool_access(&session, &request.tool_name).await?;
+        
+        // Get tool instance
+        let tool = {
+            let registry = self.tool_registry.read().await;
+            registry.get_tool(&request.tool_name)
+                .ok_or_else(|| anyhow!("Tool not found: {}", request.tool_name))?
+                .clone()
+        };
+        
+        // Rate limiting check
+        self.security_manager.check_rate_limit(&session, &request.tool_name).await?;
+        
+        // Execute tool
+        let start_time = Instant::now();
+        let execution_result = tool.execute(request.parameters).await;
+        let duration = start_time.elapsed();
+        
+        // Record metrics
+        self.performance_monitor.record_tool_execution(&request.tool_name, duration, &execution_result);
+        
+        match execution_result {
+            Ok(output) => Ok(MCPToolInvocationResponse {
+                success: true,
+                result: output.content,
+                metadata: Some(MCPExecutionMetadata {
+                    execution_time_ms: duration.as_millis() as u64,
+                    tool_version: output.metadata.get("version")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("unknown")
+                        .to_string(),
+                    session_id: request.session_id,
+                }),
+                error: None,
+            }),
+            Err(error) => Ok(MCPToolInvocationResponse {
+                success: false,
+                result: serde_json::Value::Null,
+                metadata: None,
+                error: Some(MCPError {
+                    code: "TOOL_EXECUTION_FAILED".to_string(),
+                    message: error.to_string(),
+                    details: None,
+                }),
+            })
+        }
+    }
+}
+```
+
+### A2A (Agent-to-Agent) Protocol Integration
+
+A2A enables distributed agent networks where rs-llmspell agents can discover, communicate with, and delegate tasks to other agents across different systems.
+
+#### A2A Client Architecture
+
+The A2A client enables rs-llmspell agents to discover and collaborate with external agents:
+
+```rust
+// Core A2A client traits and types
+pub trait A2AClient: Send + Sync {
+    async fn discover_agents(&self, discovery_config: DiscoveryConfig) -> Result<Vec<AgentDescriptor>>;
+    async fn establish_connection(&mut self, agent_id: &str) -> Result<A2AConnection>;
+    async fn negotiate_capabilities(&self, connection: &A2AConnection) -> Result<CapabilityNegotiation>;
+    async fn delegate_task(&self, connection: &A2AConnection, task: TaskDelegation) -> Result<TaskResult>;
+    async fn start_conversation(&self, connection: &A2AConnection, conversation: ConversationRequest) -> Result<ConversationSession>;
+    async fn monitor_agent_health(&self, agent_id: &str) -> Result<AgentHealth>;
+}
+
+pub struct A2AConnection {
+    session_id: String,
+    agent_id: String,
+    transport: Box<dyn A2ATransport>,
+    capabilities: NegotiatedCapabilities,
+    auth_context: AuthContext,
+    heartbeat_interval: Duration,
+    last_activity: Instant,
+}
+
+pub struct AgentDescriptor {
+    id: String,
+    name: String,
+    description: String,
+    version: String,
+    endpoint: String,
+    capabilities: AgentCapabilities,
+    specializations: Vec<String>,
+    availability: AgentAvailability,
+    reputation: AgentReputation,
+    cost_model: Option<CostModel>,
+}
+
+// A2A agent registry and discovery
+pub struct A2AAgentRegistry {
+    discovery_services: Vec<Box<dyn DiscoveryService>>,
+    agent_cache: Arc<RwLock<HashMap<String, CachedAgentInfo>>>,
+    connection_pool: A2AConnectionPool,
+    reputation_system: ReputationSystem,
+    load_balancer: Box<dyn AgentLoadBalancer>,
+}
+
+impl A2AAgentRegistry {
+    pub async fn discover_agents_by_capability(&self, capability: &str) -> Result<Vec<AgentDescriptor>> {
+        let mut all_agents = Vec::new();
+        
+        // Query all discovery services
+        for discovery_service in &self.discovery_services {
+            let query = DiscoveryQuery {
+                capability_filter: Some(capability.to_string()),
+                availability_filter: Some(AgentAvailability::Available),
+                reputation_threshold: Some(0.7),
+                max_results: Some(50),
+            };
+            
+            match discovery_service.discover_agents(query).await {
+                Ok(agents) => all_agents.extend(agents),
+                Err(e) => warn!("Discovery service failed: {}", e),
+            }
+        }
+        
+        // Deduplicate and rank agents
+        let unique_agents = self.deduplicate_agents(all_agents);
+        let ranked_agents = self.rank_agents_by_suitability(unique_agents, capability).await?;
+        
+        Ok(ranked_agents)
+    }
+}
+
+// A2A agent wrapper for external agents
+pub struct A2AAgentProxy {
+    agent_descriptor: AgentDescriptor,
+    connection: Option<A2AConnection>,
+    client: Box<dyn A2AClient>,
+    performance_monitor: AgentPerformanceMonitor,
+    fallback_strategy: FallbackStrategy,
+}
+
+#[async_trait]
+impl Agent for A2AAgentProxy {
+    fn id(&self) -> &str {
+        &self.agent_descriptor.id
+    }
+    
+    fn name(&self) -> &str {
+        &self.agent_descriptor.name
+    }
+    
+    async fn execute(&mut self, input: AgentInput) -> Result<AgentOutput> {
+        // Ensure connection is established
+        if self.connection.is_none() {
+            let connection = self.client.establish_connection(&self.agent_descriptor.id).await?;
+            self.connection = Some(connection);
+        }
+        
+        let connection = self.connection.as_ref().unwrap();
+        
+        // Create task delegation
+        let task = TaskDelegation {
+            task_id: Uuid::new_v4().to_string(),
+            task_type: TaskType::General,
+            input_data: serde_json::to_value(&input)?,
+            requirements: TaskRequirements {
+                max_execution_time: Duration::from_secs(120),
+                required_quality_score: 0.8,
+                preferred_agent_specializations: vec![],
+                input_format: "json".to_string(),
+                output_format: "json".to_string(),
+            },
+            constraints: TaskConstraints {
+                max_cost: Some(1.0),
+                geographic_restrictions: vec![],
+                data_residency_requirements: vec![],
+                security_clearance_level: None,
+            },
+            callback_config: None,
+        };
+        
+        // Execute task delegation
+        let start_time = Instant::now();
+        let result = match self.client.delegate_task(connection, task).await {
+            Ok(task_result) => {
+                let duration = start_time.elapsed();
+                self.performance_monitor.record_success(&self.agent_descriptor.id, duration);
+                
+                AgentOutput {
+                    content: task_result.output,
+                    metadata: HashMap::from([
+                        ("external_agent_id".to_string(), Value::String(self.agent_descriptor.id.clone())),
+                        ("execution_time_ms".to_string(), Value::Number(duration.as_millis().into())),
+                        ("task_id".to_string(), Value::String(task_result.task_id)),
+                        ("agent_version".to_string(), Value::String(self.agent_descriptor.version.clone())),
+                    ]),
+                }
+            },
+            Err(error) => {
+                self.performance_monitor.record_failure(&self.agent_descriptor.id, &error);
+                
+                // Apply fallback strategy
+                match &self.fallback_strategy {
+                    FallbackStrategy::RetryWithBackoff { max_retries, base_delay } => {
+                        return self.retry_with_backoff(input, *max_retries, *base_delay).await;
+                    },
+                    FallbackStrategy::UseAlternativeAgent { alternative_agents } => {
+                        return self.try_alternative_agents(input, alternative_agents).await;
+                    },
+                    FallbackStrategy::Fail => {
+                        return Err(error);
+                    }
+                }
+            }
+        };
+        
+        Ok(result)
+    }
+}
+```
+
+#### A2A Server Architecture
+
+Rs-LLMSpell can expose its agents and workflows via A2A for consumption by external agent networks:
+
+```rust
+// A2A server implementation
+pub struct A2AServer {
+    agent_registry: Arc<RwLock<LocalAgentRegistry>>,
+    workflow_registry: Arc<RwLock<WorkflowRegistry>>,
+    server_config: A2AServerConfig,
+    connection_manager: A2AConnectionManager,
+    discovery_beacon: DiscoveryBeacon,
+    reputation_tracker: ReputationTracker,
+}
+
+pub struct A2AServerConfig {
+    bind_address: SocketAddr,
+    supported_transports: Vec<TransportType>,
+    discovery_config: DiscoveryConfig,
+    auth_config: AuthConfig,
+    rate_limits: RateLimitConfig,
+    security_policy: SecurityPolicy,
+}
+
+impl A2AServer {
+    pub async fn register_agent(&mut self, agent: Box<dyn Agent>, config: AgentRegistrationConfig) -> Result<String> {
+        let agent_id = agent.id().to_string();
+        
+        // Create agent descriptor
+        let descriptor = AgentDescriptor {
+            id: agent_id.clone(),
+            name: config.name.unwrap_or_else(|| agent.name().to_string()),
+            description: config.description,
+            version: config.version.unwrap_or_else(|| "1.0.0".to_string()),
+            endpoint: format!("{}/agents/{}", self.server_config.public_endpoint, agent_id),
+            capabilities: self.extract_agent_capabilities(&*agent).await?,
+            specializations: config.specializations,
+            availability: AgentAvailability::Available,
+            reputation: AgentReputation::new(),
+            cost_model: config.cost_model,
+        };
+        
+        // Create registered agent
+        let registered_agent = RegisteredAgent {
+            agent,
+            descriptor: descriptor.clone(),
+            access_policy: config.access_policy.unwrap_or_default(),
+            usage_stats: AgentUsageStats::new(),
+            health_monitor: AgentHealthMonitor::new(),
+        };
+        
+        // Add to registry
+        {
+            let mut registry = self.agent_registry.write().await;
+            registry.agents.insert(agent_id.clone(), registered_agent);
+            registry.capabilities_index.index_agent(&descriptor).await?;
+        }
+        
+        // Update discovery beacon
+        self.discovery_beacon.update_agent_list().await?;
+        
+        info!("Registered agent {} for A2A access", agent_id);
+        Ok(agent_id)
+    }
+    
+    async fn handle_task_delegation(&self, request: TaskDelegationRequest) -> Result<TaskDelegationResponse> {
+        // Validate request
+        self.validate_delegation_request(&request).await?;
+        
+        // Get target agent
+        let agent = {
+            let registry = self.agent_registry.read().await;
+            registry.agents.get(&request.target_agent_id)
+                .ok_or_else(|| anyhow!("Agent not found: {}", request.target_agent_id))?
+                .agent.clone() // This would need proper cloning/sharing
+        };
+        
+        // Check access permissions
+        self.check_delegation_permissions(&request).await?;
+        
+        // Apply rate limiting
+        self.check_rate_limits(&request.requester_id, &request.target_agent_id).await?;
+        
+        // Execute task
+        let start_time = Instant::now();
+        let execution_result = self.execute_delegated_task(agent, &request).await;
+        let duration = start_time.elapsed();
+        
+        // Record usage statistics
+        self.record_delegation_usage(&request, &execution_result, duration).await?;
+        
+        match execution_result {
+            Ok(result) => Ok(TaskDelegationResponse {
+                task_id: request.task_id,
+                success: true,
+                output: result.content,
+                metadata: TaskExecutionMetadata {
+                    execution_time_ms: duration.as_millis() as u64,
+                    agent_id: request.target_agent_id,
+                    cost: self.calculate_execution_cost(&request, duration),
+                },
+                error: None,
+            }),
+            Err(error) => Ok(TaskDelegationResponse {
+                task_id: request.task_id,
+                success: false,
+                output: serde_json::Value::Null,
+                metadata: TaskExecutionMetadata {
+                    execution_time_ms: duration.as_millis() as u64,
+                    agent_id: request.target_agent_id,
+                    cost: 0.0,
+                },
+                error: Some(A2AError {
+                    code: "EXECUTION_FAILED".to_string(),
+                    message: error.to_string(),
+                    details: None,
+                }),
+            })
+        }
+    }
+}
+```
+
+### Script Interface Examples
+
+#### Lua MCP Integration
+```lua
+-- Configure MCP client manager
+local mcp_manager = MCPClientManager.new({
+    connection_timeout = 30,
+    request_timeout = 60,
+    max_connections_per_server = 5,
+    security_policy = "strict"
+})
+
+-- Register external MCP servers
+local weather_server = mcp_manager:register_mcp_server({
+    name = "weather_service",
+    uri = "https://weather-mcp.example.com",
+    transport = "http",
+    auth = {
+        type = "api_key",
+        key = config.weather_api_key
+    }
+})
+
+-- Create agent with MCP tools
+local research_agent = Agent.new({
+    system_prompt = "You are a research assistant with access to external tools",
+    tools = {
+        WebSearch.new(),
+        FileProcessor.new(),
+        table.unpack(mcp_manager:create_tool_adapters(weather_server))
+    }
+})
+```
+
+#### JavaScript A2A Integration
+```javascript
+// Configure A2A integration
+const a2aClient = new A2AClient({
+    discoveryServices: [
+        new ConsulDiscovery({
+            consulEndpoint: 'http://consul.company.com:8500',
+            serviceName: 'ai-agents'
+        })
+    ],
+    connectionPool: {
+        maxConnectionsPerAgent: 3,
+        connectionTimeout: 30000
+    }
+});
+
+// Create orchestrator agent with A2A capabilities
+const projectManager = new Agent({
+    systemPrompt: "You coordinate work across teams",
+    a2aClient,
+    tools: [
+        new TaskPlannerTool(),
+        new ResourceAllocatorTool()
+    ]
+});
+```
 
 ## Scheduling and Automation
 
@@ -15193,6 +15812,405 @@ impl TestingFramework {
 }
 ```
 
+### Phase-Specific Testing Framework
+
+Rs-LLMSpell implements a comprehensive phase-specific testing strategy that aligns with the 13 implementation phases, ensuring each phase can be built, tested, and deployed independently:
+
+```rust
+// Phase-specific testing architecture
+pub struct PhaseTestingFramework {
+    phase_validators: HashMap<u8, PhaseValidator>,
+    integration_test_suite: IntegrationTestSuite,
+    cross_platform_matrix: CrossPlatformTestMatrix,
+    component_integration_tests: ComponentIntegrationTests,
+    phase_dependency_tracker: PhaseDependencyTracker,
+}
+
+impl PhaseTestingFramework {
+    pub async fn new(config: TestConfiguration) -> Result<Self> {
+        let mut phase_validators = HashMap::new();
+        
+        // Initialize validators for each implementation phase
+        phase_validators.insert(0, PhaseValidator::new_infrastructure_validator());
+        phase_validators.insert(1, PhaseValidator::new_cli_lua_validator());
+        phase_validators.insert(2, PhaseValidator::new_debug_support_validator());
+        phase_validators.insert(3, PhaseValidator::new_agent_workflow_validator());
+        phase_validators.insert(4, PhaseValidator::new_repl_validator());
+        phase_validators.insert(5, PhaseValidator::new_javascript_validator());
+        phase_validators.insert(6, PhaseValidator::new_mcp_client_validator());
+        phase_validators.insert(7, PhaseValidator::new_daemon_validator());
+        phase_validators.insert(8, PhaseValidator::new_mcp_server_validator());
+        phase_validators.insert(9, PhaseValidator::new_a2a_client_validator());
+        phase_validators.insert(10, PhaseValidator::new_a2a_server_validator());
+        phase_validators.insert(11, PhaseValidator::new_library_mode_validator());
+        phase_validators.insert(12, PhaseValidator::new_windows_support_validator());
+        
+        Ok(Self {
+            phase_validators,
+            integration_test_suite: IntegrationTestSuite::new(&config).await?,
+            cross_platform_matrix: CrossPlatformTestMatrix::new(&config),
+            component_integration_tests: ComponentIntegrationTests::new(&config).await?,
+            phase_dependency_tracker: PhaseDependencyTracker::new(),
+        })
+    }
+    
+    // Test specific phase implementation
+    pub async fn test_phase(&self, phase_id: u8) -> Result<PhaseTestResult> {
+        let validator = self.phase_validators.get(&phase_id)
+            .ok_or_else(|| anyhow!("No validator found for phase {}", phase_id))?;
+        
+        // Check dependencies are satisfied
+        let dependencies_satisfied = self.phase_dependency_tracker.check_dependencies(phase_id).await?;
+        if !dependencies_satisfied {
+            return Ok(PhaseTestResult::skipped(phase_id, "Dependencies not satisfied"));
+        }
+        
+        // Run phase-specific tests
+        let mut phase_result = PhaseTestResult::new(phase_id);
+        
+        // 1. Component Tests
+        let component_tests = validator.test_components().await?;
+        phase_result.add_component_results(component_tests);
+        
+        // 2. Integration Tests
+        let integration_tests = validator.test_integration().await?;
+        phase_result.add_integration_results(integration_tests);
+        
+        // 3. Cross-Platform Tests (if applicable)
+        if validator.requires_cross_platform_testing() {
+            let platform_tests = self.cross_platform_matrix.test_phase(phase_id).await?;
+            phase_result.add_platform_results(platform_tests);
+        }
+        
+        // 4. Phase-Specific Functionality Tests
+        let functionality_tests = validator.test_functionality().await?;
+        phase_result.add_functionality_results(functionality_tests);
+        
+        // 5. Performance Validation
+        let performance_tests = validator.test_performance().await?;
+        phase_result.add_performance_results(performance_tests);
+        
+        Ok(phase_result)
+    }
+    
+    // Test component integration between phases
+    pub async fn test_component_integration(&self, from_phase: u8, to_phase: u8) -> Result<IntegrationTestResult> {
+        let integration_tests = self.component_integration_tests.test_phase_transition(from_phase, to_phase).await?;
+        Ok(integration_tests)
+    }
+}
+
+// Phase validator trait for implementing phase-specific testing
+pub trait PhaseValidator: Send + Sync {
+    async fn test_components(&self) -> Result<ComponentTestResults>;
+    async fn test_integration(&self) -> Result<IntegrationTestResults>;
+    async fn test_functionality(&self) -> Result<FunctionalityTestResults>;
+    async fn test_performance(&self) -> Result<PerformanceTestResults>;
+    fn requires_cross_platform_testing(&self) -> bool;
+    fn get_phase_id(&self) -> u8;
+    fn get_dependencies(&self) -> Vec<u8>;
+}
+
+// Comprehensive component integration testing
+pub struct ComponentIntegrationTests {
+    hook_system_tests: HookSystemTestHarness,
+    event_system_tests: EventBusTestHarness,
+    tool_wrapped_agent_tests: ToolWrappedAgentTestHarness,
+    async_pattern_tests: AsyncPatternTestHarness,
+    protocol_integration_tests: ProtocolIntegrationTestHarness,
+    debug_system_tests: DebugSystemTestHarness,
+}
+
+impl ComponentIntegrationTests {
+    pub async fn new(config: &TestConfiguration) -> Result<Self> {
+        Ok(Self {
+            hook_system_tests: HookSystemTestHarness::new(),
+            event_system_tests: EventBusTestHarness::new().await,
+            tool_wrapped_agent_tests: ToolWrappedAgentTestHarness::new(),
+            async_pattern_tests: AsyncPatternTestHarness::new(),
+            protocol_integration_tests: ProtocolIntegrationTestHarness::new().await?,
+            debug_system_tests: DebugSystemTestHarness::new().await?,
+        })
+    }
+    
+    pub async fn test_phase_transition(&self, from_phase: u8, to_phase: u8) -> Result<IntegrationTestResult> {
+        let mut results = IntegrationTestResult::new(from_phase, to_phase);
+        
+        // Test component compatibility
+        let compatibility_tests = self.test_component_compatibility(from_phase, to_phase).await?;
+        results.add_compatibility_results(compatibility_tests);
+        
+        // Test state preservation
+        let state_preservation_tests = self.test_state_preservation(from_phase, to_phase).await?;
+        results.add_state_preservation_results(state_preservation_tests);
+        
+        // Test configuration migration
+        let config_migration_tests = self.test_configuration_migration(from_phase, to_phase).await?;
+        results.add_config_migration_results(config_migration_tests);
+        
+        // Test API compatibility
+        let api_compatibility_tests = self.test_api_compatibility(from_phase, to_phase).await?;
+        results.add_api_compatibility_results(api_compatibility_tests);
+        
+        Ok(results)
+    }
+    
+    // Hook system integration testing
+    pub async fn test_hook_system_integration(&self) -> Result<HookIntegrationTestResult> {
+        // Test hook registration and execution
+        let registration_tests = self.hook_system_tests.test_hook_registration().await?;
+        
+        // Test hook execution order
+        let execution_order_tests = self.hook_system_tests.test_execution_order().await?;
+        
+        // Test hook failure isolation
+        let failure_isolation_tests = self.hook_system_tests.test_failure_isolation().await?;
+        
+        // Test parallel hook execution
+        let parallel_execution_tests = self.hook_system_tests.test_parallel_execution().await?;
+        
+        // Test hook context isolation
+        let context_isolation_tests = self.hook_system_tests.test_context_isolation().await?;
+        
+        Ok(HookIntegrationTestResult {
+            registration_tests,
+            execution_order_tests,
+            failure_isolation_tests,
+            parallel_execution_tests,
+            context_isolation_tests,
+        })
+    }
+    
+    // Event system integration testing
+    pub async fn test_event_system_integration(&self) -> Result<EventIntegrationTestResult> {
+        // Test event delivery
+        let delivery_tests = self.event_system_tests.test_event_delivery().await?;
+        
+        // Test event bus throughput
+        let throughput_tests = self.event_system_tests.test_throughput().await?;
+        
+        // Test circuit breaker behavior
+        let circuit_breaker_tests = self.event_system_tests.test_circuit_breaker().await?;
+        
+        // Test event ordering
+        let ordering_tests = self.event_system_tests.test_event_ordering().await?;
+        
+        Ok(EventIntegrationTestResult {
+            delivery_tests,
+            throughput_tests,
+            circuit_breaker_tests,
+            ordering_tests,
+        })
+    }
+    
+    // Tool-wrapped agent integration testing
+    pub async fn test_tool_wrapped_agent_integration(&self) -> Result<ToolWrappedAgentTestResult> {
+        // Test basic functionality
+        let basic_functionality_tests = self.tool_wrapped_agent_tests.test_basic_functionality().await?;
+        
+        // Test error handling
+        let error_handling_tests = self.tool_wrapped_agent_tests.test_error_handling().await?;
+        
+        // Test parameter validation
+        let parameter_validation_tests = self.tool_wrapped_agent_tests.test_parameter_validation().await?;
+        
+        // Test composition
+        let composition_tests = self.tool_wrapped_agent_tests.test_composition().await?;
+        
+        // Test recursive prevention
+        let recursion_prevention_tests = self.tool_wrapped_agent_tests.test_recursion_prevention().await?;
+        
+        Ok(ToolWrappedAgentTestResult {
+            basic_functionality_tests,
+            error_handling_tests,
+            parameter_validation_tests,
+            composition_tests,
+            recursion_prevention_tests,
+        })
+    }
+}
+
+// Cross-platform testing matrix
+pub struct CrossPlatformTestMatrix {
+    platforms: Vec<Platform>,
+    test_configurations: HashMap<Platform, PlatformTestConfig>,
+}
+
+#[derive(Debug, Clone, Hash, Eq, PartialEq)]
+pub enum Platform {
+    Linux,
+    MacOS,
+    Windows,
+}
+
+impl CrossPlatformTestMatrix {
+    pub fn new(config: &TestConfiguration) -> Self {
+        let platforms = vec![Platform::Linux, Platform::MacOS, Platform::Windows];
+        let mut test_configurations = HashMap::new();
+        
+        // Linux configuration
+        test_configurations.insert(Platform::Linux, PlatformTestConfig {
+            service_integration: ServiceIntegrationType::SystemD,
+            path_separator: "/",
+            executable_extension: "",
+            ipc_mechanism: IPCMechanism::UnixSocket,
+            build_script: "scripts/build-linux.sh",
+            test_runner: "cargo test --target x86_64-unknown-linux-gnu",
+        });
+        
+        // macOS configuration  
+        test_configurations.insert(Platform::MacOS, PlatformTestConfig {
+            service_integration: ServiceIntegrationType::LaunchD,
+            path_separator: "/",
+            executable_extension: "",
+            ipc_mechanism: IPCMechanism::UnixSocket,
+            build_script: "scripts/build-macos.sh",
+            test_runner: "cargo test --target x86_64-apple-darwin",
+        });
+        
+        // Windows configuration
+        test_configurations.insert(Platform::Windows, PlatformTestConfig {
+            service_integration: ServiceIntegrationType::WindowsService,
+            path_separator: "\\",
+            executable_extension: ".exe",
+            ipc_mechanism: IPCMechanism::NamedPipe,
+            build_script: "scripts/build-windows.ps1",
+            test_runner: "cargo test --target x86_64-pc-windows-msvc",
+        });
+        
+        Self {
+            platforms,
+            test_configurations,
+        }
+    }
+    
+    pub async fn test_phase(&self, phase_id: u8) -> Result<PlatformTestResults> {
+        let mut results = PlatformTestResults::new(phase_id);
+        
+        for platform in &self.platforms {
+            let platform_config = self.test_configurations.get(platform).unwrap();
+            
+            // Run platform-specific tests
+            let platform_result = self.test_platform_phase(phase_id, platform, platform_config).await?;
+            results.add_platform_result(platform.clone(), platform_result);
+        }
+        
+        Ok(results)
+    }
+    
+    async fn test_platform_phase(
+        &self,
+        phase_id: u8,
+        platform: &Platform,
+        config: &PlatformTestConfig,
+    ) -> Result<PlatformTestResult> {
+        let mut result = PlatformTestResult::new(platform.clone());
+        
+        // Test build process
+        let build_test = self.test_platform_build(platform, config).await?;
+        result.add_build_result(build_test);
+        
+        // Test platform-specific features
+        let feature_tests = self.test_platform_features(phase_id, platform, config).await?;
+        result.add_feature_results(feature_tests);
+        
+        // Test service integration (if applicable)
+        if Self::phase_requires_service_integration(phase_id) {
+            let service_tests = self.test_service_integration(platform, config).await?;
+            result.add_service_results(service_tests);
+        }
+        
+        Ok(result)
+    }
+    
+    fn phase_requires_service_integration(phase_id: u8) -> bool {
+        matches!(phase_id, 7 | 8 | 9 | 10 | 12) // Daemon, MCP server, A2A, Windows support
+    }
+}
+```
+
+#### Phase Testing Matrix
+
+Each implementation phase has specific testing requirements and validation criteria:
+
+**Phase 0: Infrastructure Testing**
+- Crate structure validation
+- Dependency resolution testing  
+- Build system verification
+- Workspace configuration validation
+
+**Phase 1: CLI + Lua Engine Testing**
+- Basic script execution tests
+- Error handling validation
+- CLI argument parsing tests
+- Lua bridge functionality tests
+
+**Phase 2: Debug Support Testing**
+- Breakpoint system validation
+- Variable inspection tests
+- DAP integration tests
+- Debug protocol compliance tests
+
+**Phase 3: Agent/Tool/Workflow Testing**
+- Component interaction tests
+- State management validation
+- Hook system integration tests
+- Tool composition tests
+
+**Phase 4: REPL Support Testing**
+- Interactive mode validation
+- Session persistence tests
+- Multi-line input handling tests
+- State continuity tests
+
+**Phase 5: JavaScript Engine Testing**
+- Cross-engine compatibility tests
+- Async pattern validation
+- Promise-based execution tests
+- JavaScript bridge tests
+
+**Phase 6: MCP Tool Calling Testing**
+- External tool integration tests
+- MCP protocol compliance tests
+- Error handling validation
+- Connection management tests
+
+**Phase 7: Daemon Support Testing**
+- Service mode validation
+- Long-running process tests
+- Resource management tests
+- Signal handling tests
+
+**Phase 8: MCP Server Testing**
+- Tool exposure validation
+- Agent-as-tool pattern tests
+- Protocol compliance tests
+- Multi-client handling tests
+
+**Phase 9: A2A Client Testing**
+- Agent discovery tests
+- Task delegation validation
+- Network communication tests
+- Failover mechanism tests
+
+**Phase 10: A2A Server Testing**
+- Agent exposure validation
+- Multi-agent coordination tests
+- Network topology tests
+- Load balancing tests
+
+**Phase 11: Library Mode Testing**
+- Native module creation tests
+- External runtime integration tests
+- C API validation tests
+- Memory management tests
+
+**Phase 12: Windows Support Testing**
+- Platform-specific functionality tests
+- Windows service integration tests
+- Path handling validation tests
+- Build system compatibility tests
+
 ### Unit Testing Framework
 
 ```rust
@@ -16472,6 +17490,435 @@ strategy:
 }
 ```
 
+### Phase-Specific Testing Framework
+
+Rs-LLMSpell implements a specialized testing framework that aligns with the 13-phase implementation roadmap, ensuring each phase can be independently built, tested, and validated:
+
+```rust
+pub struct PhaseTestingFramework {
+    phase_validators: HashMap<u8, PhaseValidator>,
+    integration_test_suite: IntegrationTestSuite,
+    cross_platform_matrix: CrossPlatformTestMatrix,
+    component_integration_tests: ComponentIntegrationTests,
+    performance_gate_tests: PerformanceGateTests,
+}
+
+pub struct PhaseValidator {
+    phase_id: u8,
+    phase_name: String,
+    prerequisites: Vec<u8>,
+    component_tests: Vec<ComponentTest>,
+    integration_tests: Vec<IntegrationTest>,
+    acceptance_criteria: Vec<AcceptanceCriterion>,
+    performance_requirements: PerformanceRequirements,
+    security_requirements: SecurityRequirements,
+}
+
+impl PhaseTestingFramework {
+    pub fn new() -> Self {
+        let mut framework = Self {
+            phase_validators: HashMap::new(),
+            integration_test_suite: IntegrationTestSuite::new(),
+            cross_platform_matrix: CrossPlatformTestMatrix::new(),
+            component_integration_tests: ComponentIntegrationTests::new(),
+            performance_gate_tests: PerformanceGateTests::new(),
+        };
+        
+        // Phase 0: Build Infrastructure
+        framework.add_phase_validator(PhaseValidator {
+            phase_id: 0,
+            phase_name: "Build Infrastructure".to_string(),
+            prerequisites: vec![],
+            component_tests: vec![
+                ComponentTest::new("workspace_structure", "Validate Cargo workspace configuration"),
+                ComponentTest::new("crate_dependencies", "Verify all dependency versions and features"),
+                ComponentTest::new("build_scripts", "Test cross-platform build scripts"),
+                ComponentTest::new("ci_pipeline", "Validate CI/CD pipeline configuration"),
+            ],
+            integration_tests: vec![
+                IntegrationTest::new("clean_build", "Full clean build on all platforms"),
+                IntegrationTest::new("dependency_resolution", "Cargo dependency resolution"),
+                IntegrationTest::new("feature_flag_matrix", "All feature flag combinations build"),
+            ],
+            acceptance_criteria: vec![
+                AcceptanceCriterion::new("builds_clean", "All crates build without warnings"),
+                AcceptanceCriterion::new("tests_pass", "All unit tests pass"),
+                AcceptanceCriterion::new("lints_clean", "Clippy and rustfmt pass"),
+                AcceptanceCriterion::new("docs_generate", "Documentation generates without errors"),
+            ],
+            performance_requirements: PerformanceRequirements {
+                build_time_max: Duration::from_secs(300),
+                test_time_max: Duration::from_secs(60),
+                memory_usage_max: 2_000_000_000, // 2GB
+            },
+            security_requirements: SecurityRequirements {
+                dependency_audit: true,
+                supply_chain_verification: true,
+                vulnerability_scan: true,
+            },
+        });
+        
+        // Phase 1: CLI with Lua Engine (Linux/macOS)
+        framework.add_phase_validator(PhaseValidator {
+            phase_id: 1,
+            phase_name: "Rudimentary CLI with Lua Engine".to_string(),
+            prerequisites: vec![0],
+            component_tests: vec![
+                ComponentTest::new("cli_argument_parsing", "Validate clap CLI argument parsing"),
+                ComponentTest::new("lua_engine_initialization", "Test mlua engine setup"),
+                ComponentTest::new("script_type_detection", "File extension and shebang detection"),
+                ComponentTest::new("llm_provider_connection", "Basic LLM provider integration"),
+                ComponentTest::new("script_execution_flow", "End-to-end script execution"),
+            ],
+            integration_tests: vec![
+                IntegrationTest::new("lua_script_execution", "Execute Lua scripts with LLM calls"),
+                IntegrationTest::new("error_handling", "Script error propagation and reporting"),
+                IntegrationTest::new("cli_help_system", "CLI help and usage information"),
+                IntegrationTest::new("configuration_loading", "Config file parsing and validation"),
+            ],
+            acceptance_criteria: vec![
+                AcceptanceCriterion::new("executes_lua_scripts", "Can execute .lua files"),
+                AcceptanceCriterion::new("makes_llm_calls", "Can call LLM providers from Lua"),
+                AcceptanceCriterion::new("handles_errors_gracefully", "Error messages are user-friendly"),
+                AcceptanceCriterion::new("unix_integration", "Works with stdin/stdout/stderr"),
+            ],
+            performance_requirements: PerformanceRequirements {
+                startup_time_max: Duration::from_millis(500),
+                script_execution_overhead: Duration::from_millis(50),
+                memory_baseline: 50_000_000, // 50MB
+            },
+            security_requirements: SecurityRequirements {
+                script_sandboxing: true,
+                api_key_protection: true,
+                file_access_restrictions: true,
+            },
+        });
+        
+        // Phase 2: Debug Support and Tool Calling
+        framework.add_phase_validator(PhaseValidator {
+            phase_id: 2,
+            phase_name: "Debug Support and Direct Tool Calling".to_string(),
+            prerequisites: vec![1],
+            component_tests: vec![
+                ComponentTest::new("debug_adapter_protocol", "DAP server functionality"),
+                ComponentTest::new("breakpoint_management", "Set/remove breakpoints"),
+                ComponentTest::new("variable_inspection", "Debug variable examination"),
+                ComponentTest::new("step_execution", "Step over/into/out debugging"),
+                ComponentTest::new("tool_registry", "Tool discovery and registration"),
+                ComponentTest::new("tool_execution", "Direct tool invocation"),
+                ComponentTest::new("metrics_collection", "Performance and usage metrics"),
+                ComponentTest::new("logging_system", "Structured logging output"),
+            ],
+            integration_tests: vec![
+                IntegrationTest::new("debug_session_lifecycle", "Full debug session from start to finish"),
+                IntegrationTest::new("ide_integration", "VS Code debug adapter integration"),
+                IntegrationTest::new("tool_chain_execution", "Multiple tools in sequence"),
+                IntegrationTest::new("metrics_aggregation", "Metrics collection and export"),
+            ],
+            acceptance_criteria: vec![
+                AcceptanceCriterion::new("debug_lua_scripts", "Can debug Lua scripts step-by-step"),
+                AcceptanceCriterion::new("inspect_variables", "Debug variable values visible"),
+                AcceptanceCriterion::new("call_tools_directly", "Tools executable without LLM"),
+                AcceptanceCriterion::new("metrics_accurate", "Performance metrics are accurate"),
+            ],
+            performance_requirements: PerformanceRequirements {
+                debug_overhead_max: Duration::from_millis(100),
+                tool_execution_overhead: Duration::from_millis(20),
+                metrics_collection_overhead: Duration::from_millis(5),
+            },
+            security_requirements: SecurityRequirements {
+                debug_session_isolation: true,
+                tool_permission_system: true,
+                audit_logging: true,
+            },
+        });
+        
+        // Phase 3: Agents and Workflows
+        framework.add_phase_validator(PhaseValidator {
+            phase_id: 3,
+            phase_name: "Agents, Workflows, and Tools Integration".to_string(),
+            prerequisites: vec![2],
+            component_tests: vec![
+                ComponentTest::new("base_agent_trait", "BaseAgent trait implementation"),
+                ComponentTest::new("agent_factory", "Agent creation and configuration"),
+                ComponentTest::new("tool_integration", "Agent-tool interaction"),
+                ComponentTest::new("workflow_engine", "Workflow execution patterns"),
+                ComponentTest::new("state_management", "Agent state persistence"),
+                ComponentTest::new("hook_system", "Hook registration and execution"),
+                ComponentTest::new("event_system", "Event emission and subscription"),
+            ],
+            integration_tests: vec![
+                IntegrationTest::new("agent_tool_workflow", "Complete agent→tool→workflow chain"),
+                IntegrationTest::new("agent_handoff", "Agent-to-agent handoff patterns"),
+                IntegrationTest::new("workflow_orchestration", "Complex workflow execution"),
+                IntegrationTest::new("state_persistence", "Agent state across executions"),
+            ],
+            acceptance_criteria: vec![
+                AcceptanceCriterion::new("creates_agents", "Can create and configure agents"),
+                AcceptanceCriterion::new("executes_workflows", "Workflows execute successfully"),
+                AcceptanceCriterion::new("agent_handoff_works", "Agent handoff preserves context"),
+                AcceptanceCriterion::new("hooks_events_work", "Hooks and events function correctly"),
+            ],
+            performance_requirements: PerformanceRequirements {
+                agent_creation_time: Duration::from_millis(100),
+                workflow_execution_overhead: Duration::from_millis(50),
+                state_persistence_time: Duration::from_millis(20),
+            },
+            security_requirements: SecurityRequirements {
+                agent_isolation: true,
+                workflow_sandboxing: true,
+                state_encryption: true,
+            },
+        });
+        
+        // Additional phases 4-12 would be defined similarly...
+        // Phase 4: REPL Support
+        // Phase 5: JavaScript Engine Support  
+        // Phase 6: MCP Tool Calling Support
+        // Phase 7: Daemon Support
+        // Phase 8: MCP Server Support
+        // Phase 9: A2A Client Support
+        // Phase 10: A2A Server Support
+        // Phase 11: Library Mode Support
+        // Phase 12: Windows Support
+        
+        framework
+    }
+    
+    pub async fn validate_phase(&self, phase_id: u8) -> Result<PhaseValidationResult> {
+        let validator = self.phase_validators.get(&phase_id)
+            .ok_or_else(|| anyhow!("Phase {} not found", phase_id))?;
+            
+        info!("Validating Phase {}: {}", phase_id, validator.phase_name);
+        
+        // Check prerequisites
+        for prereq_phase in &validator.prerequisites {
+            if !self.is_phase_validated(*prereq_phase).await? {
+                return Err(anyhow!("Prerequisite phase {} not validated", prereq_phase));
+            }
+        }
+        
+        let mut results = PhaseValidationResult::new(phase_id);
+        
+        // Run component tests
+        for component_test in &validator.component_tests {
+            let result = self.run_component_test(component_test).await?;
+            results.component_results.push(result);
+        }
+        
+        // Run integration tests
+        for integration_test in &validator.integration_tests {
+            let result = self.run_integration_test(integration_test).await?;
+            results.integration_results.push(result);
+        }
+        
+        // Validate acceptance criteria
+        for criterion in &validator.acceptance_criteria {
+            let result = self.validate_acceptance_criterion(criterion).await?;
+            results.acceptance_results.push(result);
+        }
+        
+        // Validate performance requirements
+        let performance_result = self.validate_performance_requirements(&validator.performance_requirements).await?;
+        results.performance_result = Some(performance_result);
+        
+        // Validate security requirements
+        let security_result = self.validate_security_requirements(&validator.security_requirements).await?;
+        results.security_result = Some(security_result);
+        
+        // Overall phase validation
+        results.overall_success = results.all_tests_passed();
+        
+        if results.overall_success {
+            info!("✅ Phase {} validation PASSED", phase_id);
+        } else {
+            error!("❌ Phase {} validation FAILED", phase_id);
+        }
+        
+        Ok(results)
+    }
+    
+    pub async fn validate_phase_sequence(&self, phases: Vec<u8>) -> Result<SequenceValidationResult> {
+        let mut sequence_result = SequenceValidationResult::new();
+        
+        for phase_id in phases {
+            let phase_result = self.validate_phase(phase_id).await?;
+            sequence_result.phase_results.push(phase_result);
+            
+            if !sequence_result.phase_results.last().unwrap().overall_success {
+                sequence_result.failed_at_phase = Some(phase_id);
+                break;
+            }
+        }
+        
+        sequence_result.overall_success = sequence_result.failed_at_phase.is_none();
+        Ok(sequence_result)
+    }
+}
+
+pub struct CrossPlatformTestMatrix {
+    platforms: Vec<TestPlatform>,
+    test_combinations: Vec<TestCombination>,
+}
+
+#[derive(Debug, Clone)]
+pub struct TestPlatform {
+    os: String,
+    architecture: String,
+    rust_target: String,
+    docker_image: Option<String>,
+    special_requirements: Vec<String>,
+}
+
+impl CrossPlatformTestMatrix {
+    pub fn new() -> Self {
+        Self {
+            platforms: vec![
+                TestPlatform {
+                    os: "ubuntu-latest".to_string(),
+                    architecture: "x86_64".to_string(),
+                    rust_target: "x86_64-unknown-linux-gnu".to_string(),
+                    docker_image: Some("ubuntu:22.04".to_string()),
+                    special_requirements: vec!["systemd".to_string()],
+                },
+                TestPlatform {
+                    os: "macos-latest".to_string(),
+                    architecture: "x86_64".to_string(),
+                    rust_target: "x86_64-apple-darwin".to_string(),
+                    docker_image: None,
+                    special_requirements: vec!["launchd".to_string()],
+                },
+                TestPlatform {
+                    os: "macos-latest".to_string(),
+                    architecture: "aarch64".to_string(),
+                    rust_target: "aarch64-apple-darwin".to_string(),
+                    docker_image: None,
+                    special_requirements: vec!["apple_silicon".to_string()],
+                },
+                TestPlatform {
+                    os: "windows-latest".to_string(),
+                    architecture: "x86_64".to_string(),
+                    rust_target: "x86_64-pc-windows-msvc".to_string(),
+                    docker_image: Some("mcr.microsoft.com/windows/servercore:ltsc2022".to_string()),
+                    special_requirements: vec!["windows_service".to_string()],
+                },
+            ],
+            test_combinations: vec![],
+        }
+    }
+    
+    pub async fn run_cross_platform_tests(&self, phase_id: u8) -> Result<CrossPlatformTestResult> {
+        let mut results = CrossPlatformTestResult::new(phase_id);
+        
+        for platform in &self.platforms {
+            info!("Running Phase {} tests on {}-{}", phase_id, platform.os, platform.architecture);
+            
+            let platform_result = self.run_platform_test(phase_id, platform).await?;
+            results.platform_results.insert(platform.rust_target.clone(), platform_result);
+        }
+        
+        results.overall_success = results.platform_results.values().all(|r| r.success);
+        Ok(results)
+    }
+    
+    async fn run_platform_test(&self, phase_id: u8, platform: &TestPlatform) -> Result<PlatformTestResult> {
+        // Platform-specific test execution logic
+        let mut result = PlatformTestResult::new(platform.rust_target.clone());
+        
+        // Build tests
+        result.build_success = self.run_build_test(platform).await?;
+        
+        // Unit tests
+        result.unit_test_success = self.run_unit_tests(platform).await?;
+        
+        // Integration tests
+        result.integration_test_success = self.run_integration_tests(phase_id, platform).await?;
+        
+        // Platform-specific tests
+        result.platform_specific_success = self.run_platform_specific_tests(platform).await?;
+        
+        result.success = result.build_success && 
+                        result.unit_test_success && 
+                        result.integration_test_success && 
+                        result.platform_specific_success;
+        
+        Ok(result)
+    }
+}
+
+#[derive(Debug)]
+pub struct PhaseValidationResult {
+    phase_id: u8,
+    component_results: Vec<ComponentTestResult>,
+    integration_results: Vec<IntegrationTestResult>,
+    acceptance_results: Vec<AcceptanceCriterionResult>,
+    performance_result: Option<PerformanceTestResult>,
+    security_result: Option<SecurityTestResult>,
+    overall_success: bool,
+    validation_time: Duration,
+}
+
+impl PhaseValidationResult {
+    fn new(phase_id: u8) -> Self {
+        Self {
+            phase_id,
+            component_results: Vec::new(),
+            integration_results: Vec::new(),
+            acceptance_results: Vec::new(),
+            performance_result: None,
+            security_result: None,
+            overall_success: false,
+            validation_time: Duration::ZERO,
+        }
+    }
+    
+    fn all_tests_passed(&self) -> bool {
+        self.component_results.iter().all(|r| r.success) &&
+        self.integration_results.iter().all(|r| r.success) &&
+        self.acceptance_results.iter().all(|r| r.success) &&
+        self.performance_result.as_ref().map_or(true, |r| r.success) &&
+        self.security_result.as_ref().map_or(true, |r| r.success)
+    }
+}
+
+// Usage in CI/CD pipeline
+#[cfg(test)]
+mod phase_testing_tests {
+    use super::*;
+    
+    #[tokio::test]
+    async fn test_phase_0_validation() {
+        let framework = PhaseTestingFramework::new();
+        let result = framework.validate_phase(0).await.unwrap();
+        assert!(result.overall_success, "Phase 0 validation should pass");
+    }
+    
+    #[tokio::test]
+    async fn test_sequential_phase_validation() {
+        let framework = PhaseTestingFramework::new();
+        let result = framework.validate_phase_sequence(vec![0, 1, 2, 3]).await.unwrap();
+        assert!(result.overall_success, "Sequential phase validation should pass");
+    }
+    
+    #[tokio::test]
+    async fn test_cross_platform_matrix() {
+        let framework = PhaseTestingFramework::new();
+        let result = framework.cross_platform_matrix.run_cross_platform_tests(1).await.unwrap();
+        assert!(result.overall_success, "Cross-platform tests should pass");
+    }
+}
+```
+
+This Phase-Specific Testing Framework provides:
+
+1. **Phase Validation**: Each of the 13 implementation phases has specific test requirements and validation criteria
+2. **Prerequisites Checking**: Ensures phases are implemented in the correct order
+3. **Component Integration**: Tests that components work together correctly between phases
+4. **Cross-Platform Matrix**: Validates each phase works across Linux, macOS, and Windows
+5. **Performance Gates**: Each phase must meet performance requirements before proceeding
+6. **Security Validation**: Security requirements are enforced at each phase
+7. **Acceptance Criteria**: Clear success/failure criteria for each phase
+
 ## Performance Benchmarks
 
 ### Comprehensive Performance Testing
@@ -17526,6 +18973,836 @@ async fn execute_script(args: RunArgs, config_path: Option<PathBuf>) -> Result<(
     }
     
     // 8. Cleanup handled by Drop implementations
+    Ok(())
+}
+```
+
+#### Debug Command Architecture
+
+Rs-LLMSpell provides comprehensive debugging capabilities through the `llmspell debug` command, supporting step-through debugging, breakpoints, variable inspection, and IDE integration via the Debug Adapter Protocol (DAP):
+
+```rust
+// Debug Adapter Protocol (DAP) implementation for rs-llmspell
+use serde::{Deserialize, Serialize};
+use tokio::sync::{mpsc, RwLock};
+use std::collections::HashMap;
+
+// Main debug adapter following DAP specification
+pub struct LLMSpellDebugAdapter {
+    dap_server: DAPServer,
+    script_runtime: Arc<ScriptRuntime>,
+    breakpoint_manager: BreakpointManager,
+    variable_inspector: VariableInspector,
+    execution_controller: ExecutionController,
+    debug_session: Option<DebugSession>,
+}
+
+// DAP server for IDE integration (VS Code, etc.)
+pub struct DAPServer {
+    client_connection: Option<DAPConnection>,
+    message_handler: DAPMessageHandler,
+    capabilities: DAPCapabilities,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DAPCapabilities {
+    supports_configuration_done_request: bool,
+    supports_function_breakpoints: bool,
+    supports_conditional_breakpoints: bool,
+    supports_hit_conditional_breakpoints: bool,
+    supports_evaluate_for_hovers: bool,
+    supports_step_back: bool,
+    supports_set_variable: bool,
+    supports_restart_frame: bool,
+    supports_goto_targets_request: bool,
+    supports_step_in_targets_request: bool,
+    supports_completions_request: bool,
+    supports_modules_request: bool,
+    supports_restart_request: bool,
+    supports_exception_options: bool,
+    supports_value_formatting_options: bool,
+    supports_exception_info_request: bool,
+    supports_terminate_debuggee: bool,
+    supports_delayed_stack_trace_loading: bool,
+    supports_loaded_sources_request: bool,
+    supports_log_points: bool,
+    supports_terminate_threads_request: bool,
+    supports_set_expression: bool,
+    supports_terminate_request: bool,
+    supports_data_breakpoints: bool,
+    supports_read_memory_request: bool,
+    supports_write_memory_request: bool,
+    supports_disassemble_request: bool,
+}
+
+// Debug session management
+#[derive(Debug)]
+pub struct DebugSession {
+    id: String,
+    script_path: PathBuf,
+    script_engine: ScriptEngine,
+    execution_state: ExecutionState,
+    breakpoints: HashMap<String, Vec<Breakpoint>>,
+    variables: VariableScope,
+    call_stack: Vec<StackFrame>,
+    thread_id: i64,
+}
+
+#[derive(Debug, Clone)]
+pub enum ExecutionState {
+    Running,
+    Paused(PauseReason),
+    Terminated,
+    Disconnected,
+}
+
+#[derive(Debug, Clone)]
+pub enum PauseReason {
+    Breakpoint(String),
+    Step,
+    Exception(String),
+    Pause,
+    Entry,
+}
+
+// Breakpoint management
+pub struct BreakpointManager {
+    breakpoints: RwLock<HashMap<String, Vec<Breakpoint>>>,
+    conditional_breakpoints: RwLock<HashMap<String, ConditionalBreakpoint>>,
+    logpoints: RwLock<HashMap<String, LogPoint>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Breakpoint {
+    id: i64,
+    verified: bool,
+    line: i64,
+    column: Option<i64>,
+    source: Source,
+    condition: Option<String>,
+    hit_condition: Option<String>,
+    log_message: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConditionalBreakpoint {
+    breakpoint: Breakpoint,
+    condition_expression: String,
+    hit_count: u32,
+    hit_condition_type: HitConditionType,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum HitConditionType {
+    Equal,
+    NotEqual,
+    GreaterThan,
+    GreaterThanOrEqual,
+    LessThan,
+    LessThanOrEqual,
+    MultipleOf,
+}
+
+// Variable inspection
+pub struct VariableInspector {
+    scopes: RwLock<HashMap<String, VariableScope>>,
+    evaluation_context: RwLock<EvaluationContext>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VariableScope {
+    name: String,
+    variables: HashMap<String, Variable>,
+    expensive: bool,
+    named_variables: Option<i64>,
+    indexed_variables: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Variable {
+    name: String,
+    value: String,
+    type_: Option<String>,
+    presentation_hint: Option<VariablePresentationHint>,
+    evaluate_name: Option<String>,
+    variables_reference: i64,
+    named_variables: Option<i64>,
+    indexed_variables: Option<i64>,
+    memory_reference: Option<String>,
+}
+
+// Execution control
+pub struct ExecutionController {
+    execution_thread: Option<tokio::task::JoinHandle<()>>,
+    control_channel: mpsc::UnboundedSender<ExecutionCommand>,
+    state_receiver: mpsc::UnboundedReceiver<ExecutionState>,
+    step_mode: StepMode,
+}
+
+#[derive(Debug, Clone)]
+pub enum ExecutionCommand {
+    Continue,
+    StepOver,
+    StepInto,
+    StepOut,
+    Pause,
+    Terminate,
+    Restart,
+    SetBreakpoint(Breakpoint),
+    RemoveBreakpoint(i64),
+    Evaluate(String),
+}
+
+#[derive(Debug, Clone)]
+pub enum StepMode {
+    Over,
+    Into,
+    Out,
+    Back,
+}
+
+// DAP message handling
+pub struct DAPMessageHandler {
+    sequence_number: AtomicI64,
+    pending_requests: RwLock<HashMap<i64, PendingRequest>>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct DAPMessage {
+    seq: i64,
+    type_: String,
+    command: Option<String>,
+    event: Option<String>,
+    body: Option<serde_json::Value>,
+}
+
+// Debug command integration
+impl LLMSpellDebugAdapter {
+    pub async fn start_debug_session(&mut self, script: PathBuf, config: DebugConfig) -> Result<String> {
+        // Initialize debug session
+        let session_id = Uuid::new_v4().to_string();
+        let script_engine = self.script_runtime.create_engine_for_file(&script).await?;
+        
+        let debug_session = DebugSession {
+            id: session_id.clone(),
+            script_path: script.clone(),
+            script_engine,
+            execution_state: ExecutionState::Paused(PauseReason::Entry),
+            breakpoints: HashMap::new(),
+            variables: VariableScope {
+                name: "Globals".to_string(),
+                variables: HashMap::new(),
+                expensive: false,
+                named_variables: None,
+                indexed_variables: None,
+            },
+            call_stack: Vec::new(),
+            thread_id: 1,
+        };
+        
+        // Set initial breakpoints
+        for bp_spec in &config.initial_breakpoints {
+            self.set_breakpoint(&session_id, bp_spec.clone()).await?;
+        }
+        
+        // Start DAP server if requested
+        if config.enable_dap_server {
+            self.start_dap_server(config.dap_port).await?;
+        }
+        
+        self.debug_session = Some(debug_session);
+        
+        info!("Debug session started for {}", script.display());
+        Ok(session_id)
+    }
+    
+    pub async fn set_breakpoint(&mut self, session_id: &str, spec: BreakpointSpec) -> Result<Breakpoint> {
+        let breakpoint = Breakpoint {
+            id: self.generate_breakpoint_id(),
+            verified: true,
+            line: spec.line,
+            column: spec.column,
+            source: Source {
+                name: Some(spec.file.file_name().unwrap().to_string_lossy().to_string()),
+                path: Some(spec.file.to_string_lossy().to_string()),
+                source_reference: None,
+                presentation_hint: None,
+                origin: None,
+                sources: None,
+                adapter_data: None,
+                checksums: None,
+            },
+            condition: spec.condition,
+            hit_condition: spec.hit_condition,
+            log_message: spec.log_message,
+        };
+        
+        self.breakpoint_manager.add_breakpoint(spec.file.to_string_lossy().to_string(), breakpoint.clone()).await?;
+        
+        // Notify DAP client if connected
+        if let Some(ref dap_server) = self.dap_server.client_connection {
+            dap_server.send_event("breakpoint", json!({
+                "reason": "new",
+                "breakpoint": breakpoint
+            })).await?;
+        }
+        
+        Ok(breakpoint)
+    }
+    
+    pub async fn step_execution(&mut self, session_id: &str, step_mode: StepMode) -> Result<ExecutionState> {
+        let command = match step_mode {
+            StepMode::Over => ExecutionCommand::StepOver,
+            StepMode::Into => ExecutionCommand::StepInto,
+            StepMode::Out => ExecutionCommand::StepOut,
+            StepMode::Back => return Err(anyhow!("Step back not implemented")),
+        };
+        
+        self.execution_controller.send_command(command).await?;
+        
+        // Wait for execution to pause
+        let new_state = self.execution_controller.wait_for_pause().await?;
+        
+        // Update debug session state
+        if let Some(ref mut session) = self.debug_session {
+            session.execution_state = new_state.clone();
+            
+            // Refresh variable scopes
+            session.variables = self.variable_inspector.capture_current_scope().await?;
+            
+            // Update call stack
+            session.call_stack = self.capture_call_stack().await?;
+        }
+        
+        // Notify DAP client
+        if let Some(ref dap_server) = self.dap_server.client_connection {
+            dap_server.send_event("stopped", json!({
+                "reason": match &new_state {
+                    ExecutionState::Paused(reason) => match reason {
+                        PauseReason::Step => "step",
+                        PauseReason::Breakpoint(_) => "breakpoint",
+                        PauseReason::Exception(_) => "exception",
+                        PauseReason::Pause => "pause",
+                        PauseReason::Entry => "entry",
+                    },
+                    _ => "unknown"
+                },
+                "threadId": 1,
+                "allThreadsStopped": true
+            })).await?;
+        }
+        
+        Ok(new_state)
+    }
+    
+    pub async fn evaluate_expression(&self, session_id: &str, expression: &str, context: &str) -> Result<EvaluationResult> {
+        let session = self.debug_session.as_ref()
+            .ok_or_else(|| anyhow!("No active debug session"))?;
+            
+        // Evaluate expression in current script context
+        let result = session.script_engine.evaluate_in_debug_context(expression).await?;
+        
+        Ok(EvaluationResult {
+            result: result.to_string(),
+            type_: Some(result.get_type_name().to_string()),
+            presentation_hint: None,
+            variables_reference: 0,
+            named_variables: None,
+            indexed_variables: None,
+            memory_reference: None,
+        })
+    }
+    
+    async fn start_dap_server(&mut self, port: u16) -> Result<()> {
+        let dap_server = DAPServer::new(port, self.get_dap_capabilities()).await?;
+        self.dap_server = dap_server;
+        
+        info!("DAP server started on port {}", port);
+        Ok(())
+    }
+    
+    fn get_dap_capabilities(&self) -> DAPCapabilities {
+        DAPCapabilities {
+            supports_configuration_done_request: true,
+            supports_function_breakpoints: true,
+            supports_conditional_breakpoints: true,
+            supports_hit_conditional_breakpoints: true,
+            supports_evaluate_for_hovers: true,
+            supports_step_back: false,
+            supports_set_variable: true,
+            supports_restart_frame: false,
+            supports_goto_targets_request: false,
+            supports_step_in_targets_request: false,
+            supports_completions_request: true,
+            supports_modules_request: false,
+            supports_restart_request: true,
+            supports_exception_options: true,
+            supports_value_formatting_options: true,
+            supports_exception_info_request: true,
+            supports_terminate_debuggee: true,
+            supports_delayed_stack_trace_loading: false,
+            supports_loaded_sources_request: false,
+            supports_log_points: true,
+            supports_terminate_threads_request: false,
+            supports_set_expression: true,
+            supports_terminate_request: true,
+            supports_data_breakpoints: false,
+            supports_read_memory_request: false,
+            supports_write_memory_request: false,
+            supports_disassemble_request: false,
+        }
+    }
+}
+
+// Debug command arguments and configuration
+#[derive(Debug, Clone, Parser)]
+pub struct DebugArgs {
+    /// Script file to debug
+    script: PathBuf,
+    
+    /// Set breakpoints at file:line locations
+    #[arg(short, long)]
+    breakpoints: Vec<String>,
+    
+    /// Step execution mode (over, into, out)
+    #[arg(long, default_value = "over")]
+    step_mode: StepMode,
+    
+    /// Watch variable values during execution
+    #[arg(short, long)]
+    watch: Vec<String>,
+    
+    /// Debug Adapter Protocol server port
+    #[arg(long)]
+    debug_port: Option<u16>,
+    
+    /// Attach to running process instead of starting new one
+    #[arg(long)]
+    attach: bool,
+    
+    /// Start in interactive debugging mode
+    #[arg(short, long)]
+    interactive: bool,
+    
+    /// Enable verbose debug output
+    #[arg(short, long)]
+    verbose: bool,
+}
+
+#[derive(Debug, Clone)]
+pub enum StepMode {
+    Over,    // Step over function calls
+    Into,    // Step into function calls
+    Out,     // Step out of current function
+}
+
+// Core debug system architecture
+pub struct LLMSpellDebugAdapter {
+    dap_server: DAPServer,
+    script_runtime: Arc<ScriptRuntime>,
+    breakpoint_manager: BreakpointManager,
+    variable_inspector: VariableInspector,
+    execution_controller: ExecutionController,
+    debug_session: Option<DebugSession>,
+}
+
+impl LLMSpellDebugAdapter {
+    pub async fn new(config: DebugConfig) -> Result<Self> {
+        let dap_server = DAPServer::new(config.port).await?;
+        
+        Ok(Self {
+            dap_server,
+            script_runtime: Arc::new(ScriptRuntime::new_debug_mode().await?),
+            breakpoint_manager: BreakpointManager::new(),
+            variable_inspector: VariableInspector::new(),
+            execution_controller: ExecutionController::new(),
+            debug_session: None,
+        })
+    }
+    
+    pub async fn start_debug_session(&mut self, script_path: &Path, args: DebugArgs) -> Result<DebugSession> {
+        // 1. Initialize debug session
+        let session_id = Uuid::new_v4().to_string();
+        let session = DebugSession {
+            id: session_id.clone(),
+            script_path: script_path.to_path_buf(),
+            state: DebugState::Initializing,
+            breakpoints: Vec::new(),
+            watch_expressions: args.watch.clone(),
+            step_mode: args.step_mode,
+            stack_frames: Vec::new(),
+            variables: HashMap::new(),
+        };
+        
+        // 2. Set up breakpoints
+        for bp_spec in &args.breakpoints {
+            let breakpoint = self.parse_breakpoint_spec(bp_spec)?;
+            self.breakpoint_manager.add_breakpoint(breakpoint).await?;
+        }
+        
+        // 3. Initialize script runtime in debug mode
+        let debug_engine = self.script_runtime.create_debug_engine(script_path).await?;
+        debug_engine.set_breakpoint_callback(Box::new(move |bp| {
+            self.handle_breakpoint_hit(bp)
+        })).await?;
+        
+        // 4. Start DAP server if port specified
+        if let Some(port) = args.debug_port {
+            self.dap_server.start(port).await?;
+            println!("Debug Adapter Protocol server started on port {}", port);
+        }
+        
+        self.debug_session = Some(session);
+        Ok(self.debug_session.as_ref().unwrap().clone())
+    }
+    
+    async fn handle_breakpoint_hit(&mut self, breakpoint: BreakpointHit) -> Result<DebugAction> {
+        // Update session state
+        if let Some(session) = &mut self.debug_session {
+            session.state = DebugState::Paused;
+            session.current_line = Some(breakpoint.line);
+            session.current_file = Some(breakpoint.file.clone());
+            
+            // Capture stack frames and variables
+            session.stack_frames = self.execution_controller.capture_stack_frames().await?;
+            session.variables = self.variable_inspector.capture_variables(&session.stack_frames).await?;
+        }
+        
+        // Notify DAP clients
+        self.dap_server.send_stopped_event(breakpoint.clone()).await?;
+        
+        // Interactive mode handling
+        if self.is_interactive_mode() {
+            self.start_interactive_debugger().await?;
+        }
+        
+        // Wait for next action
+        let action = self.execution_controller.wait_for_debug_action().await?;
+        Ok(action)
+    }
+}
+
+// Breakpoint management
+pub struct BreakpointManager {
+    lua_breakpoints: HashMap<String, Vec<LuaBreakpoint>>,
+    js_breakpoints: HashMap<String, Vec<JSBreakpoint>>,
+    conditional_breakpoints: Vec<ConditionalBreakpoint>,
+}
+
+impl BreakpointManager {
+    pub async fn add_breakpoint(&mut self, breakpoint: Breakpoint) -> Result<BreakpointId> {
+        let id = BreakpointId::new();
+        
+        match breakpoint {
+            Breakpoint::Line { file, line } => {
+                let engine_type = self.detect_engine_type(&file)?;
+                match engine_type {
+                    EngineType::Lua => {
+                        let lua_bp = LuaBreakpoint { id: id.clone(), file: file.clone(), line };
+                        self.lua_breakpoints.entry(file).or_insert_with(Vec::new).push(lua_bp);
+                    }
+                    EngineType::JavaScript => {
+                        let js_bp = JSBreakpoint { id: id.clone(), file: file.clone(), line };
+                        self.js_breakpoints.entry(file).or_insert_with(Vec::new).push(js_bp);
+                    }
+                }
+            }
+            Breakpoint::Conditional { file, line, condition } => {
+                let cond_bp = ConditionalBreakpoint {
+                    id: id.clone(),
+                    file,
+                    line,
+                    condition,
+                    hit_count: 0,
+                };
+                self.conditional_breakpoints.push(cond_bp);
+            }
+        }
+        
+        Ok(id)
+    }
+    
+    pub async fn remove_breakpoint(&mut self, id: BreakpointId) -> Result<()> {
+        // Remove from Lua breakpoints
+        for breakpoints in self.lua_breakpoints.values_mut() {
+            breakpoints.retain(|bp| bp.id != id);
+        }
+        
+        // Remove from JavaScript breakpoints
+        for breakpoints in self.js_breakpoints.values_mut() {
+            breakpoints.retain(|bp| bp.id != id);
+        }
+        
+        // Remove from conditional breakpoints
+        self.conditional_breakpoints.retain(|bp| bp.id != id);
+        
+        Ok(())
+    }
+}
+
+// Interactive debugging interface
+pub trait DebugInterface {
+    async fn set_breakpoint(&mut self, file: &str, line: u32) -> Result<BreakpointId>;
+    async fn remove_breakpoint(&mut self, id: BreakpointId) -> Result<()>;
+    async fn step_over(&mut self) -> Result<DebugState>;
+    async fn step_into(&mut self) -> Result<DebugState>;
+    async fn step_out(&mut self) -> Result<DebugState>;
+    async fn continue_execution(&mut self) -> Result<DebugState>;
+    async fn pause_execution(&mut self) -> Result<DebugState>;
+    async fn inspect_variable(&self, name: &str) -> Result<VariableValue>;
+    async fn evaluate_expression(&mut self, expr: &str) -> Result<Value>;
+    async fn get_stack_trace(&self) -> Result<Vec<StackFrame>>;
+    async fn get_source_code(&self, file: &str, start_line: u32, end_line: u32) -> Result<String>;
+}
+
+// Variable inspection
+pub struct VariableInspector {
+    variable_cache: HashMap<String, VariableValue>,
+    watch_expressions: Vec<WatchExpression>,
+}
+
+impl VariableInspector {
+    pub async fn capture_variables(&mut self, stack_frames: &[StackFrame]) -> Result<HashMap<String, VariableValue>> {
+        let mut variables = HashMap::new();
+        
+        for frame in stack_frames {
+            // Capture local variables
+            let locals = self.capture_frame_locals(frame).await?;
+            for (name, value) in locals {
+                variables.insert(format!("{}#{}", frame.id, name), value);
+            }
+            
+            // Capture global variables in top frame
+            if frame.id == 0 {
+                let globals = self.capture_global_variables(frame).await?;
+                for (name, value) in globals {
+                    variables.insert(name, value);
+                }
+            }
+        }
+        
+        // Evaluate watch expressions
+        for watch_expr in &self.watch_expressions {
+            match self.evaluate_watch_expression(watch_expr, stack_frames).await {
+                Ok(value) => {
+                    variables.insert(format!("watch:{}", watch_expr.expression), value);
+                }
+                Err(e) => {
+                    variables.insert(
+                        format!("watch:{}", watch_expr.expression), 
+                        VariableValue::Error(e.to_string())
+                    );
+                }
+            }
+        }
+        
+        self.variable_cache = variables.clone();
+        Ok(variables)
+    }
+    
+    async fn capture_frame_locals(&self, frame: &StackFrame) -> Result<HashMap<String, VariableValue>> {
+        // Implementation depends on script engine
+        match frame.engine_type {
+            EngineType::Lua => self.capture_lua_locals(frame).await,
+            EngineType::JavaScript => self.capture_js_locals(frame).await,
+        }
+    }
+    
+    async fn capture_lua_locals(&self, frame: &StackFrame) -> Result<HashMap<String, VariableValue>> {
+        // Use Lua debug API to inspect local variables
+        let mut locals = HashMap::new();
+        
+        // This would integrate with mlua debug hooks
+        // lua.context(|ctx| {
+        //     let debug = ctx.debug();
+        //     for i in 1.. {
+        //         match debug.local_name(frame.level, i) {
+        //             Some(name) => {
+        //                 let value = debug.local_value(frame.level, i)?;
+        //                 locals.insert(name, self.lua_value_to_variable_value(value)?);
+        //             }
+        //             None => break,
+        //         }
+        //     }
+        // })?;
+        
+        Ok(locals)
+    }
+    
+    async fn capture_js_locals(&self, frame: &StackFrame) -> Result<HashMap<String, VariableValue>> {
+        // Use JavaScript debug API to inspect local variables
+        let mut locals = HashMap::new();
+        
+        // This would integrate with boa or quickjs debugging capabilities
+        // Implementation would depend on chosen JS engine
+        
+        Ok(locals)
+    }
+}
+
+// Debug Adapter Protocol (DAP) server
+pub struct DAPServer {
+    port: Option<u16>,
+    connections: Vec<DAPConnection>,
+    message_handler: DAPMessageHandler,
+}
+
+impl DAPServer {
+    pub async fn new(port: Option<u16>) -> Result<Self> {
+        Ok(Self {
+            port,
+            connections: Vec::new(),
+            message_handler: DAPMessageHandler::new(),
+        })
+    }
+    
+    pub async fn start(&mut self, port: u16) -> Result<()> {
+        let listener = TcpListener::bind(format!("127.0.0.1:{}", port)).await?;
+        println!("DAP server listening on port {}", port);
+        
+        while let Ok((stream, addr)) = listener.accept().await {
+            println!("DAP client connected from {}", addr);
+            
+            let connection = DAPConnection::new(stream).await?;
+            self.connections.push(connection);
+            
+            // Handle DAP protocol messages
+            let handler = self.message_handler.clone();
+            tokio::spawn(async move {
+                if let Err(e) = handler.handle_connection(connection).await {
+                    eprintln!("DAP connection error: {}", e);
+                }
+            });
+        }
+        
+        Ok(())
+    }
+    
+    pub async fn send_stopped_event(&self, breakpoint: BreakpointHit) -> Result<()> {
+        let stopped_event = DAPEvent::Stopped {
+            reason: "breakpoint".to_string(),
+            thread_id: Some(1),
+            hit_breakpoint_ids: Some(vec![breakpoint.breakpoint_id.to_string()]),
+            all_threads_stopped: Some(true),
+        };
+        
+        for connection in &self.connections {
+            connection.send_event(stopped_event.clone()).await?;
+        }
+        
+        Ok(())
+    }
+}
+
+// IDE integration support
+pub enum IDEIntegration {
+    VSCode { 
+        extension_path: PathBuf,
+        launch_config: VSCodeLaunchConfig,
+    },
+    IntelliJ { 
+        plugin_config: IntelliJConfig,
+        debug_config: IntelliJDebugConfig,
+    },
+    Vim { 
+        dap_config: VimDAPConfig,
+        nvim_dap_setup: String,
+    },
+    Emacs { 
+        dap_mode_config: EmacsDAPConfig,
+        lsp_config: EmacsLSPConfig,
+    },
+}
+
+impl IDEIntegration {
+    pub fn generate_vscode_launch_config(&self) -> Result<String> {
+        let config = json!({
+            "version": "0.2.0",
+            "configurations": [
+                {
+                    "name": "Debug LLMSpell Script",
+                    "type": "llmspell",
+                    "request": "launch",
+                    "program": "${workspaceFolder}/${file}",
+                    "args": [],
+                    "stopOnEntry": false,
+                    "cwd": "${workspaceFolder}",
+                    "environment": [],
+                    "externalConsole": false,
+                    "preLaunchTask": "llmspell-build"
+                }
+            ]
+        });
+        
+        Ok(serde_json::to_string_pretty(&config)?)
+    }
+    
+    pub fn generate_nvim_dap_config(&self) -> Result<String> {
+        Ok(r#"
+local dap = require('dap')
+
+dap.adapters.llmspell = {
+  type = 'server',
+  host = '127.0.0.1',
+  port = 5678
+}
+
+dap.configurations.lua = {
+  {
+    type = 'llmspell',
+    request = 'launch',
+    name = 'Debug LLMSpell Lua Script',
+    program = '${file}',
+    cwd = '${workspaceFolder}',
+  }
+}
+
+dap.configurations.javascript = {
+  {
+    type = 'llmspell',
+    request = 'launch',
+    name = 'Debug LLMSpell JavaScript Script',
+    program = '${file}',
+    cwd = '${workspaceFolder}',
+  }
+}
+"#.to_string())
+    }
+}
+
+// Debug command execution
+async fn debug_script(args: DebugArgs, config_path: Option<PathBuf>) -> Result<()> {
+    // 1. Initialize debug adapter
+    let debug_config = DebugConfig {
+        port: args.debug_port,
+        interactive: args.interactive,
+        verbose: args.verbose,
+        step_mode: args.step_mode.clone(),
+    };
+    
+    let mut debug_adapter = LLMSpellDebugAdapter::new(debug_config).await?;
+    
+    // 2. Start debug session
+    let session = debug_adapter.start_debug_session(&args.script, args).await?;
+    println!("Debug session started: {}", session.id);
+    
+    // 3. Execute script in debug mode
+    let result = debug_adapter.execute_script_with_debugging(&args.script).await?;
+    
+    // 4. Handle debug session completion
+    match result {
+        DebugResult::Completed => {
+            println!("Script execution completed successfully");
+        }
+        DebugResult::Terminated => {
+            println!("Script execution terminated by debugger");
+        }
+        DebugResult::Error(err) => {
+            eprintln!("Script execution failed: {}", err);
+            std::process::exit(1);
+        }
+    }
+    
     Ok(())
 }
 ```
