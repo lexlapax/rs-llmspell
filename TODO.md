@@ -74,18 +74,15 @@ Comprehensive refinement of rs-llmspell architecture based on go-llms and Google
       3.  **Native Module Support**: The plan includes creating native modules for Lua (as a LuaRock) and JavaScript (as an NPM package), allowing `require("llmspell")` and `require('@rs/llmspell')` respectively.
       4.  **Build System**: The build system is designed to produce these native modules for distribution.
     - [x] Todo: ~~Clarify in architecture doc that module support is future work, not current capability~~ **Done**. The architecture now fully incorporates this capability.
-  - [ ] **Task/question 12.3.3** Is the architecture laid out in a modular way such that implementation can occur in verticals or layers across the top to bottom stacks as suggested in the MVP roadmap?
-    - [ ] Answer: Yes, the architecture is explicitly designed for modular, layered implementation. Key evidence:
-      1. **Four-Layer Architecture**: Script → Bridge → Application → Infrastructure layers with clear boundaries
-      2. **Trait-based design**: Composable traits enable incremental implementation
-      3. **Bridge-first philosophy**: Build on existing crates, allowing gradual capability addition
-      4. **Explicit phased roadmap**: 4-phase implementation plan (Foundation → Scripting/Tools → Advanced → Production)
-      5. **Component hierarchy**: BaseAgent/Agent/Tool/Workflow supports independent development
-      6. **Production infrastructure at each layer**: Hooks, events, logging built-in from start
-      The architecture fully supports the suggested MVP approach: providers+bridge+scripting → add tools → add built-ins → add agents/workflows
-    - [ ] Todo: 
-      - [ ] Ensure Phase 13 implementation roadmap aligns with the 4-phase plan in the architecture doc
-      - [ ] Consider documenting which traits/interfaces are minimal for MVP vs later phases
+  - [x] **Task/question 12.3.3** Is the architecture laid out in a modular way such that implementation can occur in verticals or layers across the top to bottom stacks as suggested in the MVP roadmap?
+    - [x] Answer: Yes, the architecture is explicitly designed for modular, layered implementation. This is evident through several key design decisions:
+      1.  **Four-Layer Architecture**: The document defines clear boundaries between the Script, Bridge, Application, and Infrastructure layers.
+      2.  **Modular Crate Structure**: The system is broken into independent crates (e.g., `llmspell-core`, `llmspell-agents`, `llmspell-tools`), allowing features to be built and tested in isolation.
+      3.  **Trait-Based Design**: Core functionality is defined by traits (`BaseAgent`, `Tool`, `Workflow`), allowing for different components to be implemented and added incrementally.
+      4.  **Component Hierarchy**: The `BaseAgent` -> `Agent` -> `Tool` hierarchy allows for building foundational capabilities first and layering more complex components on top.
+      5.  **Feature Flags**: The design supports feature flags, enabling the creation of minimal builds (MVPs) that can be expanded over time.
+      6.  **Phased Roadmap**: The architecture document's implementation roadmap is structured in phases, directly supporting the layered MVP approach (e.g., Foundation -> Components -> Advanced Features).
+    - [x] Todo: ~~The "Implementation Roadmap" section in the main architecture document should be fully detailed...~~ **Done**. These items have been moved to and expanded in **Phase 13: Implementation Roadmap**.
   - [ ] **Task/question 12.3.4** If we were to create a command line executable with a script argument, would the architecture be able to detect the script type (say lua, javascript) and instantiate the right engine and run the script? If not what changes to the architecture to support that?
     - [ ] Answer: Yes, the architecture already includes this capability. Evidence:
       1. **llmspell-cli**: A dedicated CLI crate is part of the architecture
@@ -194,16 +191,16 @@ Comprehensive refinement of rs-llmspell architecture based on go-llms and Google
 
 
 ### Phase 13: Implementation Roadmap 
-- [ ] **Task 13.1**: Layered implementation roadmap (suggested layers below - need to )
-  - [ ] MVP - should be just providers, bridging for providers, scripting engine and one scripting engine that can call providers (mlua)
-    - [ ] MVP should have events, logging, metrics hooks
-  - [ ] MVP2 - then add tools - and propagate throughout stack upwards
-  - [ ] MVP3 - then add builtin-tools - and propagate 
-  - [ ] MVP3 - add agents and workflows - and propagate
-- [ ]  **Task 13.2** Based on Layered architecture - the actual plan below
-  - [ ] Priority order for implementation
-  - [ ] Breaking change migration strategy
-  - [ ] Testing milestones
+- [ ] **Task 13.1**: Define a detailed, phased implementation roadmap in the main architecture document.
+  - [ ] The roadmap should be structured in layers/phases (e.g., Phase 1: Core Foundation, Phase 2: Built-in Components, etc.).
+  - [ ] **CRITICAL**: Explicitly define the scope for a Minimal Viable Product (MVP).
+    - [ ] Detail the specific traits required for the MVP (e.g., `BaseAgent`, `Tool`).
+    - [ ] List the essential components for the MVP (e.g., `AgentRuntime`, `mlua` script engine).
+    - [ ] Specify a small, core set of built-in tools for the initial release.
+- [ ] **Task 13.2**: Align the implementation plan with the architectural design.
+  - [ ] Establish a priority order for component implementation.
+  - [ ] Outline a strategy for handling breaking changes between phases.
+  - [ ] Define key testing milestones for each phase.
 
 ### Phase 14: Final Update (📝 Update)
 - [ ] **Task 14.1**: Complete architecture.md update
