@@ -33,55 +33,55 @@
 16. [Cross-Engine Compatibility Matrix](#cross-engine-compatibility-matrix)
 
 ### Part IV: Built-in Components Library
-16. [Complete Built-in Tools Catalog](#complete-built-in-tools-catalog)
-17. [Agent Templates and Patterns](#agent-templates-and-patterns)
-18. [Workflow Libraries](#workflow-libraries)
-19. [Hook and Event System](#hook-and-event-system)
+17. [Complete Built-in Tools Catalog](#complete-built-in-tools-catalog)
+18. [Agent Templates and Patterns](#agent-templates-and-patterns)
+19. [Workflow Libraries](#workflow-libraries)
+20. [Hook and Event System](#hook-and-event-system)
 
 ### Part V: Technology Stack and Implementation
-20. [Complete Technology Decision Matrix](#complete-technology-decision-matrix)
-21. [LLM Provider Integration](#llm-provider-integration)
-22. [Storage and Persistence](#storage-and-persistence)
-23. [Async Patterns and Concurrency](#async-patterns-and-concurrency)
-24. [Performance Optimization](#performance-optimization)
+21. [Complete Technology Decision Matrix](#complete-technology-decision-matrix)
+22. [LLM Provider Integration](#llm-provider-integration)
+23. [Storage and Persistence](#storage-and-persistence)
+24. [Async Patterns and Concurrency](#async-patterns-and-concurrency)
+25. [Performance Optimization](#performance-optimization)
 
 ### Part VI: Configuration and Security
-25. [Configuration Architecture](#configuration-architecture)
-26. [Security Model and Threat Analysis](#security-model-and-threat-analysis)
-27. [Resource Management](#resource-management)
-28. [Observability and Monitoring](#observability-and-monitoring)
+26. [Configuration Architecture](#configuration-architecture)
+27. [Security Model and Threat Analysis](#security-model-and-threat-analysis)
+28. [Resource Management](#resource-management)
+29. [Observability and Monitoring](#observability-and-monitoring)
 
 ### Part VII: Advanced Features
-29. [Advanced Orchestration Patterns](#advanced-orchestration-patterns)
-30. [LLM-Driven Delegation (Agent Transfer)](#llm-driven-delegation-agent-transfer)
-31. [Protocol Integration (MCP, A2A)](#protocol-integration)
-32. [Scheduling and Automation](#scheduling-and-automation)
-33. [Plugin System and Extensions](#plugin-system-and-extensions)
-34. [Error Handling and Recovery](#error-handling-and-recovery)
+30. [Advanced Orchestration Patterns](#advanced-orchestration-patterns)
+31. [LLM-Driven Delegation (Agent Transfer)](#llm-driven-delegation-agent-transfer)
+32. [Protocol Integration (MCP, A2A)](#protocol-integration)
+33. [Scheduling and Automation](#scheduling-and-automation)
+34. [Plugin System and Extensions](#plugin-system-and-extensions)
+35. [Error Handling and Recovery](#error-handling-and-recovery)
 
 ### Part VIII: Testing and Quality Assurance
-33. [Complete Testing Strategy](#complete-testing-strategy)
-34. [Performance Benchmarks](#performance-benchmarks)
-35. [Security Testing](#security-testing)
-36. [Integration Testing Framework](#integration-testing-framework)
+36. [Complete Testing Strategy](#complete-testing-strategy)
+37. [Performance Benchmarks](#performance-benchmarks)
+38. [Security Testing](#security-testing)
+39. [Integration Testing Framework](#integration-testing-framework)
 
 ### Part IX: Development and Operations
-37. [Development Workflow](#development-workflow)
-38. [Build System and Tooling](#build-system-and-tooling)
-39. [Deployment Strategies](#deployment-strategies)
-40. [Migration and Backward Compatibility](#migration-and-backward-compatibility)
+40. [Development Workflow](#development-workflow)
+41. [Build System and Tooling](#build-system-and-tooling)
+42. [Deployment Strategies](#deployment-strategies)
+43. [Migration and Backward Compatibility](#migration-and-backward-compatibility)
 
 ### Part X: Practical Implementation
-41. [Implementation Roadmap](#implementation-roadmap)
-42. [Real-World Examples](#real-world-examples)
-43. [Troubleshooting Guide](#troubleshooting-guide)
-44. [Performance Tuning](#performance-tuning)
+44. [Implementation Roadmap](#implementation-roadmap)
+45. [Real-World Examples](#real-world-examples)
+46. [Troubleshooting Guide](#troubleshooting-guide)
+47. [Performance Tuning](#performance-tuning)
 
 ### Part XI: Reference and Appendices
-45. [Complete API Quick Reference](#complete-api-quick-reference)
-46. [Error Code Reference](#error-code-reference)
-47. [Configuration Schema Reference](#configuration-schema-reference)
-48. [Future Evolution Strategy](#future-evolution-strategy)
+48. [Complete API Quick Reference](#complete-api-quick-reference)
+49. [Error Code Reference](#error-code-reference)
+50. [Configuration Schema Reference](#configuration-schema-reference)
+51. [Future Evolution Strategy](#future-evolution-strategy)
 
 ---
 
@@ -1500,16 +1500,43 @@ User Script Request
 
 ### Core Architectural Patterns
 
-#### 1. **Component Registry Pattern**
+#### 1. **Component Registry with Dependency Injection**
 
-All major components (agents, tools, workflows) are registered in centralized registries with metadata and lifecycle management:
+Component registries use dependency injection to eliminate circular dependencies:
 
 ```rust
-pub struct ComponentRegistry<T> {
-    components: HashMap<String, Arc<T>>,
+// Dependency Injection Container (eliminates circular dependencies)
+pub struct ComponentContainer {
+    storage: Arc<dyn StorageBackend>,
+    event_system: Arc<EventDrivenHookSystem>,
+    config: Arc<ConfigurationManager>,
+    // Core dependencies injected into registries
+}
+
+impl ComponentContainer {
+    pub fn new(
+        storage: Arc<dyn StorageBackend>,
+        event_system: Arc<EventDrivenHookSystem>,
+        config: Arc<ConfigurationManager>,
+    ) -> Self {
+        Self { storage, event_system, config }
+    }
+}
+
+// AgentRegistry with injected dependencies (no circular references)
+pub struct AgentRegistry {
+    agents: HashMap<String, Arc<Agent>>,
+    container: Arc<ComponentContainer>,  // Injected dependencies
     metadata: HashMap<String, ComponentMetadata>,
-    lifecycle_hooks: Vec<Box<dyn LifecycleHook<T>>>,
-    discovery_service: DiscoveryService,
+    // Does NOT own ToolRegistry - accesses via container
+}
+
+// ToolRegistry with injected dependencies (can contain AgentWrappedTool safely)
+pub struct ToolRegistry {
+    tools: HashMap<String, Arc<dyn Tool>>,
+    container: Arc<ComponentContainer>,  // Injected dependencies
+    metadata: HashMap<String, ComponentMetadata>,
+    // Can contain AgentWrappedTool without circular dependency
 }
 
 impl<T> ComponentRegistry<T> 
@@ -1611,22 +1638,43 @@ impl EventBus {
 }
 ```
 
-#### 3. **Hook-Based Extensibility Pattern**
+#### 3. **Unified Event-Driven Hook System**
 
-Every major operation provides hook points for customization, monitoring, and integration:
+The architecture unifies hooks and events into a single event-driven system, eliminating overlap:
 
 ```rust
-pub struct HookRegistry {
-    hooks: HashMap<HookPoint, Vec<Box<dyn Hook>>>,
-    execution_strategy: HookExecutionStrategy,
-    metrics: HookMetrics,
+// Unified Event-Driven System (eliminates hook/event overlap)
+pub struct EventDrivenHookSystem {
+    event_bus: Arc<EventBus>,
+    hook_registry: HookRegistry,
+    component_accessor: ComponentAccessor,  // Prevents circular dependencies
 }
 
+// Hooks are specialized event handlers
 #[async_trait]
 pub trait Hook: Send + Sync {
     fn name(&self) -> &str;
     fn priority(&self) -> HookPriority;
-    async fn execute(&self, context: &mut HookContext) -> Result<HookResult>;
+    async fn handle_event(&self, event: &Event, context: &ExecutionContext) -> Result<HookResult>;
+}
+
+// Events drive all system notifications
+#[derive(Debug, Clone)]
+pub struct Event {
+    pub id: EventId,
+    pub event_type: EventType,
+    pub source: ComponentId,
+    pub data: EventData,
+    pub timestamp: SystemTime,
+    pub metadata: EventMetadata,
+}
+
+// ExecutionContext provides controlled access (prevents circular dependencies)
+pub struct ExecutionContext {
+    component_access: ComponentAccessor,  // Controlled access, not direct registry access
+    state: ExecutionState,
+    metadata: EventMetadata,
+    // Safe access patterns, no direct component references
 }
 
 #[derive(Debug, Clone)]
@@ -1969,15 +2017,59 @@ impl ScriptRuntime {
     pub async fn new(config_path: Option<&Path>) -> Result<Self> {
         Self::new_embedded(config_path).await
     }
-        
-        // Create provider bridge
-        let provider_bridge = Arc::new(LLMProviderBridge::new(&config_manager.config.providers).await?);
-        
-        // Create agent runtime
-        let agent_runtime = Arc::new(AgentRuntime::new(
-            provider_bridge.clone(),
-            component_registry.clone(),
-        ));
+}
+
+### Component Ownership Hierarchy
+
+The architecture eliminates orchestration overlap through clear ownership and dependency relationships:
+
+```rust
+// Clear Ownership Hierarchy (eliminates ScriptRuntime/AgentRuntime overlap)
+pub struct ScriptRuntime {
+    mode: RuntimeMode,
+    config_manager: Arc<ConfigurationManager>,
+    agent_runtime: Arc<AgentRuntime>,      // ScriptRuntime OWNS AgentRuntime
+    component_registry: ComponentRegistry,
+    lifecycle_manager: ComponentLifecycleManager,
+    // ... other fields
+}
+
+// AgentRuntime is specialized component orchestrator (not competing orchestrator)
+pub struct AgentRuntime {
+    provider_bridge: Arc<LLMProviderBridge>,
+    execution_context: ExecutionContext,
+    state_manager: Arc<StateManager>,
+    // Focuses solely on agent execution coordination
+}
+```
+
+### Crate Organization and Dependencies
+
+```rust
+/*
+Crate Dependency Graph (eliminates boundary ambiguity):
+
+llmspell-core: 
+  - BaseAgent trait, ScriptRuntime, ComponentRegistry
+  - Core abstractions and lifecycle management
+    ↓
+llmspell-bridge: 
+  - ScriptEngineBridge, ExternalRuntimeBridge, C API
+  - Abstraction layer for all external integrations
+    ↓
+llmspell-agents: AgentRuntime, Agent implementations
+llmspell-tools: ToolRegistry, Tool implementations  
+llmspell-workflows: WorkflowEngine, Workflow implementations
+    ↓
+llmspell-cli: CLI entry point, command handling
+llmspell-repl: REPL implementation, interactive mode
+
+Dependencies:
+- Each crate depends only on layers above it
+- No circular dependencies between crates
+- Bridge crate isolates external dependencies
+*/
+```
         
         Ok(Self {
             config_manager,
@@ -2044,6 +2136,26 @@ impl ComponentLifecycleManager {
             dependency_graph: DependencyGraph::new(),
             selective_strategy: strategy,
         }
+    }
+    
+    // Dependency injection initialization (eliminates circular dependencies)
+    pub async fn initialize_with_injection(&mut self) -> Result<()> {
+        // 1. Create container with core dependencies (no cycles)
+        let storage = Arc::new(self.create_storage_backend().await?);
+        let event_system = Arc::new(EventDrivenHookSystem::new());
+        let config = Arc::new(ConfigurationManager::new(None).await?);
+        
+        let container = Arc::new(ComponentContainer::new(storage, event_system, config));
+        
+        // 2. Create registries with injected dependencies (no cycles)
+        let tool_registry = ToolRegistry::new(container.clone());
+        let agent_registry = AgentRegistry::new(container.clone());
+        let workflow_registry = WorkflowRegistry::new(container.clone());
+        
+        // 3. Clear dependency order, no circular references
+        self.register_core_components(tool_registry, agent_registry, workflow_registry).await?;
+        
+        Ok(())
     }
     
     pub async fn initialize_phase(
@@ -2327,14 +2439,54 @@ BaseAgent (Foundation Trait)
 **BaseAgent** is the foundational trait that defines capabilities common to ALL components in the system - whether they're LLM-powered agents, simple tools, or complex workflows.
 
 ```rust
+// Composition Pattern Implementation (eliminates BaseAgent duplication)
+pub struct BaseAgentImpl {
+    id: ComponentId,
+    name: String,
+    description: String,
+    version: Version,
+    metadata: ComponentMetadata,
+    state_manager: Arc<StateManager>,
+    hook_executor: Arc<HookExecutor>,
+    tools: Vec<Box<dyn Tool>>,
+    // Common implementation shared across all component types
+}
+
+impl BaseAgentImpl {
+    pub fn new(id: ComponentId, name: String, description: String) -> Self {
+        Self {
+            id,
+            name,
+            description,
+            version: Version::new(1, 0, 0),
+            metadata: ComponentMetadata::default(),
+            state_manager: Arc::new(StateManager::new()),
+            hook_executor: Arc::new(HookExecutor::new()),
+            tools: Vec::new(),
+        }
+    }
+    
+    // Common implementations for all BaseAgent methods
+    pub async fn execute_common(&mut self, input: AgentInput) -> Result<AgentOutput> {
+        // Common pre-execution hooks, validation, etc.
+        self.hook_executor.execute_pre_hooks(&input).await?;
+        // Delegate to component-specific implementation
+        Ok(AgentOutput::default())
+    }
+}
+
 #[async_trait]
 pub trait BaseAgent: Send + Sync + Observable + SecureComponent + Clone {
-    // Identity and Metadata
-    fn id(&self) -> &ComponentId;
-    fn name(&self) -> &str;
-    fn description(&self) -> &str;
-    fn version(&self) -> &Version;
-    fn component_type(&self) -> ComponentType;
+    // Composition: access to shared implementation
+    fn base(&self) -> &BaseAgentImpl;
+    fn base_mut(&mut self) -> &mut BaseAgentImpl;
+    
+    // Default implementations delegate to BaseAgentImpl (no duplication)
+    fn id(&self) -> &ComponentId { &self.base().id }
+    fn name(&self) -> &str { &self.base().name }
+    fn description(&self) -> &str { &self.base().description }
+    fn version(&self) -> &Version { &self.base().version }
+    fn get_tools(&self) -> &[Box<dyn Tool>] { &self.base().tools }
     
     // Core Execution Interface
     async fn execute(&mut self, input: AgentInput) -> Result<AgentOutput>;
@@ -2390,9 +2542,52 @@ pub trait BaseAgent: Send + Sync + Observable + SecureComponent + Clone {
 
 #### BaseAgent Implementation Pattern
 
-All components implement BaseAgent through a common base implementation:
+All components implement BaseAgent through composition, eliminating implementation duplication:
 
 ```rust
+// Agent Implementation using Composition
+pub struct Agent {
+    base: BaseAgentImpl,  // Composition, not inheritance
+    llm_client: Arc<LLMClient>,
+    agent_config: AgentConfig,
+    // Agent-specific fields only
+}
+
+impl BaseAgent for Agent {
+    fn base(&self) -> &BaseAgentImpl { &self.base }
+    fn base_mut(&mut self) -> &mut BaseAgentImpl { &mut self.base }
+    
+    async fn execute(&mut self, input: AgentInput) -> Result<AgentOutput> {
+        // Agent-specific implementation
+        let result = self.llm_client.execute(&input).await?;
+        self.base.execute_common(input).await  // Delegates common logic
+    }
+}
+
+// Tool Implementation using Composition
+pub struct FileTool {
+    base: BaseAgentImpl,  // Same composition pattern
+    file_config: FileToolConfig,
+    // Tool-specific fields only
+}
+
+impl BaseAgent for FileTool {
+    fn base(&self) -> &BaseAgentImpl { &self.base }
+    fn base_mut(&mut self) -> &mut BaseAgentImpl { &mut self.base }
+    
+    async fn execute(&mut self, input: AgentInput) -> Result<AgentOutput> {
+        // Tool-specific implementation
+        let file_result = self.process_file(&input).await?;
+        self.base.execute_common(input).await  // Delegates common logic
+    }
+}
+
+// Workflow Implementation using Composition
+pub struct SequentialWorkflow {
+    base: BaseAgentImpl,  // Same composition pattern
+    steps: Vec<WorkflowStep>,
+    // Workflow-specific fields only
+}
 pub struct BaseAgentImpl {
     // Core identity
     pub id: ComponentId,
@@ -4049,21 +4244,43 @@ interface WorkflowStep {
 }
 ```
 
-#### 4. **Tools Registry Module**
+#### 4. **Standardized API Patterns Module**
 ```typescript
-interface ToolsRegistry {
-    // Built-in tools access
-    get(name: string): Tool;
+// Standardized API Patterns (eliminates naming conflicts)
+interface ApiFactory<T> {
+    create(name: string, config: Config): Promise<T>;     // Creates new instances
+    get(name: string): Option<Arc<T>>;                   // Retrieves existing instances  
+    register(instance: T): Promise<void>;                // Adds instances to registry
+}
+
+interface ToolsRegistry extends ApiFactory<Tool> {
+    // Built-in tools access (consistent naming)
+    get(name: string): Option<Arc<Tool>>;               // Get existing instances
     list(category?: ToolCategory): Tool[];
     search(query: string): Tool[];
+    getByCategory(category: ToolCategory): Tool[];
     
-    // Custom tool registration
-    register(tool: Tool): Promise<void>;
+    // Custom tool creation and registration (clear patterns)
+    create(name: string, config: ToolConfig): Promise<Tool>;  // Factory pattern
+    register(tool: Tool): Promise<void>;                      // Registry pattern
     unregister(toolId: string): Promise<void>;
     
-    // Discovery
+    // Discovery patterns
     discover(capabilities: Capability[]): Tool[];
-    getByCategory(category: ToolCategory): Tool[];
+}
+
+// Agent API follows same patterns
+interface AgentAPI extends ApiFactory<Agent> {
+    create(config: AgentConfig): Promise<Agent>;     // Factory pattern
+    get(name: string): Option<Arc<Agent>>;          // Registry lookup
+    // No register() - agents aren't pre-registered like tools
+}
+
+// Workflow API follows same patterns  
+interface WorkflowAPI extends ApiFactory<Workflow> {
+    create(type: WorkflowType, config: WorkflowConfig): Promise<Workflow>;
+    get(name: string): Option<Arc<Workflow>>;
+    register(workflow: Workflow): Promise<void>;  // Workflows can be registered
 }
 
 // Global Tools object available in scripts
@@ -8624,13 +8841,14 @@ impl ProviderInstance for LocalModelProvider {
 
 ## Storage and Persistence
 
-### Unified Storage Architecture
+### Unified Storage Architecture (Eliminates Backend Duplication)
 
-Rs-LLMSpell provides a unified storage interface that can switch between storage backends based on deployment requirements.
+Rs-LLMSpell provides a single storage interface with multiple backend implementations, eliminating code duplication:
 
-#### Storage Trait Abstraction
+#### Single Storage Abstraction
 
 ```rust
+// Single Storage Abstraction (eliminates backend duplication)
 #[async_trait]
 pub trait StorageBackend: Send + Sync {
     // Core Key-Value Operations
@@ -8643,6 +8861,63 @@ pub trait StorageBackend: Send + Sync {
     async fn get_batch(&self, keys: &[String]) -> Result<Vec<Option<Vec<u8>>>>;
     async fn set_batch(&self, items: &[(String, Vec<u8>)]) -> Result<()>;
     async fn delete_batch(&self, keys: &[String]) -> Result<()>;
+    
+    // Metadata and Performance
+    fn backend_type(&self) -> StorageBackendType;
+    fn characteristics(&self) -> StorageCharacteristics;
+}
+
+// Backends implement same interface with different characteristics (no duplication)
+pub struct SledBackend {
+    db: sled::Db,
+    // Characteristics: Simple, embedded, good for development
+}
+
+pub struct RocksDbBackend {
+    db: rocksdb::DB,
+    // Characteristics: High-performance, production, tunable
+}
+
+#[derive(Debug, Clone)]
+pub struct StorageCharacteristics {
+    pub use_case: StorageUseCase,           // Development, Production, Testing
+    pub persistence: PersistenceLevel,      // InMemory, Durable, Replicated
+    pub performance: PerformanceProfile,    // Latency, Throughput, Balanced
+    pub features: StorageFeatures,          // Transactions, Compression, etc.
+}
+
+// No duplication - same interface, different implementations
+impl StorageBackend for SledBackend {
+    async fn get(&self, key: &str) -> Result<Option<Vec<u8>>> {
+        // Sled-specific implementation
+        Ok(self.db.get(key)?.map(|v| v.to_vec()))
+    }
+    
+    fn characteristics(&self) -> StorageCharacteristics {
+        StorageCharacteristics {
+            use_case: StorageUseCase::Development,
+            persistence: PersistenceLevel::Durable,
+            performance: PerformanceProfile::Balanced,
+            features: StorageFeatures::basic(),
+        }
+    }
+}
+
+impl StorageBackend for RocksDbBackend {
+    async fn get(&self, key: &str) -> Result<Option<Vec<u8>>> {
+        // RocksDB-specific implementation
+        Ok(self.db.get(key.as_bytes())?)
+    }
+    
+    fn characteristics(&self) -> StorageCharacteristics {
+        StorageCharacteristics {
+            use_case: StorageUseCase::Production,
+            persistence: PersistenceLevel::Durable,
+            performance: PerformanceProfile::Throughput,
+            features: StorageFeatures::advanced(),
+        }
+    }
+}
     
     // Iteration and Scanning
     async fn scan_prefix(&self, prefix: &str) -> Result<Vec<(String, Vec<u8>)>>;
