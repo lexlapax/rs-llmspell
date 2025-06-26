@@ -1913,6 +1913,280 @@ This architecture provides:
 - **Event-driven coordination** for loose coupling
 - **Hook-based extensibility** for customization
 
+### ScriptRuntime: Central Orchestrator
+
+The **ScriptRuntime** serves as the central orchestrator for all script execution, managing the lifecycle of components and coordinating between the different architectural layers:
+
+```rust
+pub struct ScriptRuntime {
+    config_manager: Arc<ConfigurationManager>,
+    component_registry: ComponentRegistry,
+    script_engine_factory: ScriptEngineFactory,
+    provider_bridge: Arc<LLMProviderBridge>,
+    lifecycle_manager: ComponentLifecycleManager,
+    execution_context: ExecutionContext,
+    agent_runtime: Arc<AgentRuntime>,
+}
+
+impl ScriptRuntime {
+    pub async fn new(config_path: Option<&Path>) -> Result<Self> {
+        // Load configuration
+        let config_manager = Arc::new(ConfigurationManager::new(config_path).await?);
+        
+        // Create component registry
+        let component_registry = ComponentRegistry::new();
+        
+        // Initialize lifecycle manager with dependency resolution
+        let lifecycle_manager = ComponentLifecycleManager::new(&config_manager.config);
+        
+        // Create provider bridge
+        let provider_bridge = Arc::new(LLMProviderBridge::new(&config_manager.config.providers).await?);
+        
+        // Create agent runtime
+        let agent_runtime = Arc::new(AgentRuntime::new(
+            provider_bridge.clone(),
+            component_registry.clone(),
+        ));
+        
+        Ok(Self {
+            config_manager,
+            component_registry,
+            script_engine_factory: ScriptEngineFactory::new(),
+            provider_bridge,
+            lifecycle_manager,
+            execution_context: ExecutionContext::new(),
+            agent_runtime,
+        })
+    }
+    
+    pub async fn initialize_phase(&mut self, phase: InitializationPhase) -> Result<()> {
+        self.lifecycle_manager.initialize_phase(phase, &mut self.component_registry).await
+    }
+    
+    pub async fn create_engine_for_script(&self, script_path: &Path) -> Result<Box<dyn ScriptEngineBridge>> {
+        let engine_type = self.script_engine_factory.detect_engine_type(script_path)?;
+        self.script_engine_factory.create_engine(
+            engine_type,
+            &self.config_manager.config,
+            self.agent_runtime.clone(),
+        ).await
+    }
+}
+```
+
+### Component Lifecycle Management
+
+The lifecycle manager ensures components are initialized and shutdown in the correct order, respecting dependencies:
+
+```rust
+pub struct ComponentLifecycleManager {
+    initialization_order: Vec<ComponentId>,
+    shutdown_order: Vec<ComponentId>, // Reverse of init
+    component_states: HashMap<ComponentId, ComponentState>,
+    dependency_graph: DependencyGraph,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum InitializationPhase {
+    Infrastructure,  // Storage, networking, resource managers
+    Providers,      // LLM providers, external services  
+    Core,          // AgentRuntime, registries, event bus
+    ScriptEngine,  // Lua/JS engines with security
+    Globals,       // API injection into script environments
+}
+
+impl ComponentLifecycleManager {
+    pub async fn initialize_phase(
+        &mut self,
+        phase: InitializationPhase,
+        registry: &mut ComponentRegistry,
+    ) -> Result<()> {
+        let components = self.get_components_for_phase(phase);
+        
+        for component_id in components {
+            // Check dependencies are initialized
+            self.verify_dependencies_initialized(&component_id)?;
+            
+            // Initialize component
+            let component = registry.get_mut(&component_id)
+                .ok_or_else(|| LLMSpellError::Component(format!("Component not found: {}", component_id)))?;
+            
+            component.initialize().await?;
+            
+            // Update state
+            self.component_states.insert(component_id.clone(), ComponentState::Initialized);
+            
+            tracing::info!("Initialized component: {} in phase {:?}", component_id, phase);
+        }
+        
+        Ok(())
+    }
+    
+    fn get_components_for_phase(&self, phase: InitializationPhase) -> Vec<ComponentId> {
+        match phase {
+            InitializationPhase::Infrastructure => vec![
+                ComponentId::new("storage_backend"),
+                ComponentId::new("resource_manager"),
+                ComponentId::new("security_manager"),
+            ],
+            InitializationPhase::Providers => vec![
+                ComponentId::new("llm_provider_bridge"),
+                ComponentId::new("external_services"),
+            ],
+            InitializationPhase::Core => vec![
+                ComponentId::new("agent_runtime"),
+                ComponentId::new("tool_registry"),
+                ComponentId::new("workflow_engine"),
+                ComponentId::new("hook_registry"),
+                ComponentId::new("event_bus"),
+            ],
+            InitializationPhase::ScriptEngine => vec![
+                ComponentId::new("script_engine"),
+                ComponentId::new("sandbox_manager"),
+            ],
+            InitializationPhase::Globals => vec![
+                ComponentId::new("global_api_injector"),
+            ],
+        }
+    }
+}
+```
+
+### Execution Flow Sequence
+
+When running a Lua script from the command line, the following sequence occurs:
+
+```
+1. CLI Entry (llmspell-cli/src/main.rs)
+   ├─> Parse arguments with clap
+   ├─> Detect command mode (run/repl/serve)
+   └─> Create tokio runtime
+
+2. ScriptRuntime Creation
+   ├─> Load configuration (llmspell.toml + env vars)
+   ├─> Select security profile based on config
+   ├─> Initialize component registry
+   └─> Create execution context
+
+3. Phased Initialization
+   ├─> Phase 1: Infrastructure
+   │   ├─> Storage backend (sled/rocksdb)
+   │   ├─> Network configuration
+   │   ├─> Resource limits setup
+   │   └─> Security manager
+   ├─> Phase 2: Providers
+   │   ├─> LLM provider connections (rig integration)
+   │   ├─> Provider health checks
+   │   └─> External service clients
+   ├─> Phase 3: Core Components
+   │   ├─> AgentRuntime initialization
+   │   ├─> ToolRegistry with built-in tools
+   │   ├─> WorkflowEngine setup
+   │   ├─> HookRegistry with default hooks
+   │   └─> EventBus creation
+   └─> Phase 4: Script Engine
+       ├─> Detect script type (.lua/.js)
+       ├─> Create appropriate engine
+       ├─> Apply security sandbox
+       └─> Inject global APIs
+
+4. Global API Injection
+   ├─> Agent factory methods
+   ├─> Tool registry access
+   ├─> Workflow builders
+   ├─> Logger instance
+   ├─> State management
+   ├─> Event emitters
+   └─> Security context
+
+5. Script Execution
+   ├─> Load and parse script file
+   ├─> Validate against security policy
+   ├─> Execute with monitoring
+   ├─> Handle async operations
+   └─> Capture results/errors
+
+6. Cleanup and Shutdown
+   ├─> Flush pending operations
+   ├─> Save state if configured
+   ├─> Close provider connections
+   └─> Shutdown components (reverse order)
+```
+
+### AgentRuntime: Core Execution Coordinator
+
+The **AgentRuntime** coordinates all agent operations and serves as the bridge between script engines and the application layer:
+
+```rust
+pub struct AgentRuntime {
+    agent_factory: AgentFactory,
+    tool_registry: Arc<ToolRegistry>,
+    workflow_engine: WorkflowEngine,
+    state_manager: StateManager,
+    execution_monitor: ExecutionMonitor,
+    provider_bridge: Arc<LLMProviderBridge>,
+}
+
+impl AgentRuntime {
+    // Central method for all agent operations from scripts
+    pub async fn execute_agent_operation(
+        &self,
+        agent_id: &AgentId,
+        operation: AgentOperation,
+        context: ExecutionContext,
+    ) -> Result<OperationResult> {
+        // Get or create agent instance
+        let mut agent = self.agent_factory.get_or_create(agent_id).await?;
+        
+        // Apply security context
+        agent.set_security_context(context.security_context.clone());
+        
+        // Execute with full monitoring and state management
+        self.execution_monitor.track(async {
+            // Pre-execution hooks
+            agent.execute_hooks(HookPoint::BeforeAgentExecution, &mut context.hook_context).await?;
+            
+            // Execute operation
+            let result = match operation {
+                AgentOperation::Chat(message) => {
+                    agent.chat(&message).await.map(OperationResult::Text)
+                }
+                AgentOperation::ExecuteWithTools(prompt) => {
+                    agent.generate_with_tools(&prompt, &context.available_tools).await
+                        .map(OperationResult::Complex)
+                }
+                AgentOperation::Custom(custom_op) => {
+                    agent.execute_custom(custom_op).await
+                }
+            };
+            
+            // Post-execution hooks
+            agent.execute_hooks(HookPoint::AfterAgentExecution, &mut context.hook_context).await?;
+            
+            // Update state
+            self.state_manager.update_agent_state(&agent_id, agent.state()).await?;
+            
+            result
+        }).await
+    }
+    
+    // Tool execution for agents
+    pub async fn execute_tool_for_agent(
+        &self,
+        agent_id: &AgentId,
+        tool_id: &ToolId,
+        input: ToolInput,
+    ) -> Result<ToolOutput> {
+        let tool = self.tool_registry.get(tool_id)
+            .ok_or_else(|| LLMSpellError::Tool(format!("Tool not found: {}", tool_id)))?;
+        
+        // Execute tool with agent's context
+        let agent_context = self.get_agent_context(agent_id).await?;
+        tool.execute_with_context(input, agent_context).await
+    }
+}
+```
+
 ---
 
 ## Component Hierarchy
@@ -2742,6 +3016,292 @@ This comprehensive component hierarchy provides:
 - **Type Safety**: Rust's type system enforces correct component usage
 - **Performance**: Zero-cost abstractions compile to efficient code
 - **Extensibility**: Easy to add new component types and capabilities
+
+---
+
+## Bridge-First Design
+
+Rs-LLMSpell follows a **bridge-first philosophy** where we leverage existing, battle-tested crates rather than reimplementing functionality. This approach ensures reliability, reduces maintenance burden, and allows us to focus on the unique value proposition of scriptable LLM orchestration.
+
+### Script Engine Bridge Architecture
+
+The bridge layer provides a unified interface between script engines and the Rust application layer:
+
+```rust
+// Script Engine Bridge trait implemented by all engines
+#[async_trait]
+pub trait ScriptEngineBridge: Send + Sync {
+    // Lifecycle management
+    async fn initialize(&mut self, runtime: &ScriptRuntime) -> Result<()>;
+    async fn shutdown(&mut self) -> Result<()>;
+    
+    // Global API injection
+    async fn inject_globals(&mut self, globals: &GlobalAPISet) -> Result<()>;
+    
+    // Script execution
+    async fn execute_script(&mut self, script: &str) -> Result<ScriptResult>;
+    async fn execute_file(&mut self, path: &Path) -> Result<ScriptResult>;
+    
+    // Type conversion
+    fn convert_to_script_value(&self, rust_value: Value) -> Result<ScriptValue>;
+    fn convert_from_script_value(&self, script_value: ScriptValue) -> Result<Value>;
+    
+    // Error handling
+    fn translate_error(&self, error: ScriptError) -> LLMSpellError;
+}
+
+// Global APIs available to all script engines
+pub struct GlobalAPISet {
+    pub agent_factory: Arc<AgentFactory>,
+    pub tool_registry: Arc<ToolRegistry>,
+    pub workflow_factory: Arc<WorkflowFactory>,
+    pub logger: Arc<Logger>,
+    pub state_manager: Arc<StateManager>,
+    pub event_bus: Arc<EventBus>,
+    pub security_context: SecurityContext,
+    pub config_accessor: Arc<ConfigAccessor>,
+    pub utils: Arc<UtilityFunctions>,
+}
+```
+
+### Lua Bridge Implementation
+
+The Lua bridge leverages `mlua` for safe, ergonomic Lua integration:
+
+```rust
+pub struct LuaEngineBridge {
+    lua: Arc<Mutex<mlua::Lua>>,
+    async_manager: LuaAsyncManager,
+    global_injector: LuaGlobalInjector,
+    type_converter: LuaTypeConverter,
+}
+
+impl LuaEngineBridge {
+    pub async fn new(config: &LuaEngineConfig, runtime: &ScriptRuntime) -> Result<Self> {
+        // Create Lua instance with security-appropriate libraries
+        let lua = Self::create_lua_instance(config)?;
+        
+        // Set up async support
+        let async_manager = LuaAsyncManager::new(lua.clone());
+        
+        // Create global injector
+        let global_injector = LuaGlobalInjector::new(runtime.agent_runtime.clone());
+        
+        Ok(Self {
+            lua: Arc::new(Mutex::new(lua)),
+            async_manager,
+            global_injector,
+            type_converter: LuaTypeConverter::new(),
+        })
+    }
+    
+    async fn inject_globals(&mut self, globals: &GlobalAPISet) -> Result<()> {
+        let lua = self.lua.lock().await;
+        let globals_table = lua.globals();
+        
+        // Inject Agent API
+        self.global_injector.inject_agent_api(&lua, &globals_table, &globals.agent_factory)?;
+        
+        // Inject Tools API
+        self.global_injector.inject_tools_api(&lua, &globals_table, &globals.tool_registry)?;
+        
+        // Inject Workflow API
+        self.global_injector.inject_workflow_api(&lua, &globals_table, &globals.workflow_factory)?;
+        
+        // Inject Logger as a global
+        self.global_injector.inject_logger(&lua, &globals_table, &globals.logger)?;
+        
+        // Inject other globals
+        self.global_injector.inject_state_api(&lua, &globals_table, &globals.state_manager)?;
+        self.global_injector.inject_event_api(&lua, &globals_table, &globals.event_bus)?;
+        self.global_injector.inject_security_api(&lua, &globals_table, &globals.security_context)?;
+        self.global_injector.inject_config_api(&lua, &globals_table, &globals.config_accessor)?;
+        self.global_injector.inject_utils(&lua, &globals_table, &globals.utils)?;
+        
+        Ok(())
+    }
+}
+
+// Lua-specific global injection
+pub struct LuaGlobalInjector {
+    agent_runtime: Arc<AgentRuntime>,
+}
+
+impl LuaGlobalInjector {
+    pub fn inject_agent_api(
+        &self,
+        lua: &Lua,
+        globals: &Table,
+        agent_factory: &Arc<AgentFactory>,
+    ) -> Result<()> {
+        let agent_table = lua.create_table()?;
+        let factory = agent_factory.clone();
+        let runtime = self.agent_runtime.clone();
+        
+        // Agent.new(config) -> Agent
+        let new_fn = lua.create_async_function(move |lua, config: Table| {
+            let factory = factory.clone();
+            let runtime = runtime.clone();
+            async move {
+                let agent_config = lua_table_to_agent_config(config)?;
+                let agent = factory.create_agent(agent_config).await?;
+                
+                // Wrap agent for Lua with runtime binding
+                Ok(LuaAgent::new(agent, runtime))
+            }
+        })?;
+        agent_table.set("new", new_fn)?;
+        
+        // Agent.template(name, config) -> Agent
+        let template_fn = lua.create_async_function(move |lua, (name, config): (String, Table)| {
+            let factory = factory.clone();
+            let runtime = runtime.clone();
+            async move {
+                let agent_config = lua_table_to_agent_config(config)?;
+                let agent = factory.create_from_template(&name, agent_config).await?;
+                Ok(LuaAgent::new(agent, runtime))
+            }
+        })?;
+        agent_table.set("template", template_fn)?;
+        
+        globals.set("Agent", agent_table)?;
+        Ok(())
+    }
+}
+```
+
+### JavaScript Bridge Implementation
+
+The JavaScript bridge can use either `boa` (pure Rust) or `v8` (for performance):
+
+```rust
+pub struct JavaScriptEngineBridge {
+    engine: JSEngine,
+    async_manager: JSAsyncManager,
+    global_injector: JSGlobalInjector,
+    type_converter: JSTypeConverter,
+}
+
+enum JSEngine {
+    Boa(boa_engine::Context),
+    V8(v8::Isolate),
+}
+
+impl JavaScriptEngineBridge {
+    pub async fn new(config: &JavaScriptEngineConfig, runtime: &ScriptRuntime) -> Result<Self> {
+        let engine = match config.engine_type {
+            JSEngineType::Boa => JSEngine::Boa(Self::create_boa_context(config)?),
+            JSEngineType::V8 => JSEngine::V8(Self::create_v8_isolate(config)?),
+        };
+        
+        let async_manager = JSAsyncManager::new(&engine);
+        let global_injector = JSGlobalInjector::new(runtime.agent_runtime.clone());
+        
+        Ok(Self {
+            engine,
+            async_manager,
+            global_injector,
+            type_converter: JSTypeConverter::new(),
+        })
+    }
+    
+    async fn inject_globals(&mut self, globals: &GlobalAPISet) -> Result<()> {
+        match &mut self.engine {
+            JSEngine::Boa(context) => {
+                self.inject_globals_boa(context, globals).await
+            }
+            JSEngine::V8(isolate) => {
+                self.inject_globals_v8(isolate, globals).await
+            }
+        }
+    }
+    
+    async fn inject_globals_boa(&self, context: &mut boa_engine::Context, globals: &GlobalAPISet) -> Result<()> {
+        // Create Agent constructor
+        let agent_constructor = FunctionObjectBuilder::new(context, |this, args, context| {
+            // Agent constructor implementation
+            let config = args.get(0).ok_or("Missing config")?;
+            let agent_config = js_value_to_agent_config(config, context)?;
+            
+            // Create promise for async agent creation
+            let promise = JsPromise::new(...);
+            Ok(promise.into())
+        })
+        .name("Agent")
+        .length(1)
+        .constructor(true)
+        .build();
+        
+        context.register_global_property("Agent", agent_constructor, Attribute::all());
+        
+        // Inject other globals similarly...
+        Ok(())
+    }
+}
+```
+
+### Bridge Technology Choices
+
+| Component | Bridge Crate | Why This Choice |
+|-----------|-------------|------------------|
+| **LLM Providers** | `rig` | Multi-provider support, streaming, function calling |
+| **Lua Engine** | `mlua` | Safe bindings, async support, sandboxing |
+| **JavaScript** | `boa`/`v8` | Pure Rust option + high-performance option |
+| **Python** | `pyo3` | De facto standard, excellent API |
+| **Storage** | `sled`/`rocksdb` | Development simplicity + production scale |
+| **Async Runtime** | `tokio` | Ecosystem standard, comprehensive features |
+| **Serialization** | `serde` | Universal Rust serialization |
+| **HTTP Client** | `reqwest` | Async support, feature-rich |
+| **WebSockets** | `tokio-tungstenite` | Tokio integration |
+| **CLI** | `clap` | Declarative, powerful, standard |
+| **Logging** | `tracing` | Structured, async-aware |
+| **Metrics** | `metrics` | Flexible backend support |
+
+### Platform Bridge Pattern
+
+For cross-platform support, we use a bridge pattern for platform-specific functionality:
+
+```rust
+// Platform services trait - bridged to OS-specific implementations
+#[async_trait]
+pub trait PlatformServices: Send + Sync {
+    // Path handling
+    fn config_dir() -> Result<PathBuf>;
+    fn data_dir() -> Result<PathBuf>;
+    fn cache_dir() -> Result<PathBuf>;
+    
+    // Process management
+    async fn daemonize(&self) -> Result<()>;
+    async fn install_service(&self, config: &ServiceConfig) -> Result<()>;
+    
+    // System integration
+    fn set_process_priority(&self, priority: Priority) -> Result<()>;
+    fn get_system_info(&self) -> SystemInfo;
+}
+
+// Platform-specific implementations
+#[cfg(target_os = "linux")]
+pub struct LinuxPlatformServices {
+    systemd_bridge: SystemdBridge,
+}
+
+#[cfg(target_os = "macos")]
+pub struct MacOSPlatformServices {
+    launchd_bridge: LaunchdBridge,
+}
+
+#[cfg(target_os = "windows")]
+pub struct WindowsPlatformServices {
+    service_bridge: WindowsServiceBridge,
+}
+```
+
+This bridge-first approach provides:
+- **Reliability**: Battle-tested implementations
+- **Maintainability**: Updates come from upstream
+- **Focus**: We build unique value, not infrastructure
+- **Flexibility**: Easy to swap implementations
+- **Performance**: Optimized native code
 
 # Part III: Scripting and API Reference
 
@@ -14524,6 +15084,132 @@ impl TestResult {
             Err(e) => Ok(TestResult::failed("Dynamic template creation", e.to_string()))
         }
     }
+    
+    // Test execution flow initialization
+    pub async fn test_execution_flow(&self) -> Result<UnitTestResults> {
+        let mut results = UnitTestResults::new("Execution Flow Tests");
+        
+        // Test initialization phases
+        results.add_test(self.test_initialization_phases().await?);
+        
+        // Test component lifecycle
+        results.add_test(self.test_component_lifecycle().await?);
+        
+        // Test script runtime creation
+        results.add_test(self.test_script_runtime_creation().await?);
+        
+        // Test global API injection
+        results.add_test(self.test_global_injection().await?);
+        
+        Ok(results)
+    }
+    
+    async fn test_initialization_phases(&self) -> Result<TestResult> {
+        let config_path = self.test_config.test_config_path();
+        let mut runtime = ScriptRuntime::new(Some(&config_path)).await?;
+        
+        // Test each phase initializes correctly
+        for phase in [
+            InitializationPhase::Infrastructure,
+            InitializationPhase::Providers,
+            InitializationPhase::Core,
+            InitializationPhase::ScriptEngine,
+            InitializationPhase::Globals,
+        ] {
+            let result = runtime.initialize_phase(phase.clone()).await;
+            if result.is_err() {
+                return Ok(TestResult::failed(
+                    "Initialization phases",
+                    format!("Phase {:?} failed: {:?}", phase, result.err())
+                ));
+            }
+        }
+        
+        Ok(TestResult::passed("Initialization phases"))
+    }
+    
+    async fn test_component_lifecycle(&self) -> Result<TestResult> {
+        let lifecycle_manager = ComponentLifecycleManager::new(&TestConfig::default());
+        
+        // Verify components initialize in correct order
+        let infra_components = lifecycle_manager.get_components_for_phase(InitializationPhase::Infrastructure);
+        let core_components = lifecycle_manager.get_components_for_phase(InitializationPhase::Core);
+        
+        // Infrastructure should not depend on core
+        for infra in &infra_components {
+            let deps = lifecycle_manager.get_dependencies(infra);
+            for dep in deps {
+                if core_components.contains(&dep) {
+                    return Ok(TestResult::failed(
+                        "Component lifecycle",
+                        format!("Infrastructure component {} depends on core component {}", infra, dep)
+                    ));
+                }
+            }
+        }
+        
+        Ok(TestResult::passed("Component lifecycle"))
+    }
+    
+    async fn test_script_runtime_creation(&self) -> Result<TestResult> {
+        // Test runtime can be created with various configs
+        let configs = vec![
+            None, // Default config
+            Some(PathBuf::from("test-config.toml")),
+            Some(PathBuf::from("custom-config.yaml")),
+        ];
+        
+        for config in configs {
+            match ScriptRuntime::new(config.as_deref()).await {
+                Ok(_) => continue,
+                Err(e) => {
+                    if config.is_some() && !config.as_ref().unwrap().exists() {
+                        // Expected failure for non-existent config
+                        continue;
+                    }
+                    return Ok(TestResult::failed(
+                        "Script runtime creation",
+                        format!("Failed to create runtime with config {:?}: {}", config, e)
+                    ));
+                }
+            }
+        }
+        
+        Ok(TestResult::passed("Script runtime creation"))
+    }
+    
+    async fn test_global_injection(&self) -> Result<TestResult> {
+        let runtime = ScriptRuntime::new(None).await?;
+        let lua_engine = runtime.create_engine_for_script(&PathBuf::from("test.lua")).await?;
+        
+        // Test that all expected globals are injected
+        let expected_globals = vec![
+            "Agent", "Tool", "Tools", "Workflow", "Hook", "Event", 
+            "State", "Logger", "Config", "Security", "Utils"
+        ];
+        
+        for global in expected_globals {
+            let check_script = format!("return type({})", global);
+            match lua_engine.execute_script(&check_script).await {
+                Ok(result) => {
+                    if result.as_text().unwrap_or("") == "nil" {
+                        return Ok(TestResult::failed(
+                            "Global injection",
+                            format!("Global '{}' not injected", global)
+                        ));
+                    }
+                }
+                Err(e) => {
+                    return Ok(TestResult::failed(
+                        "Global injection",
+                        format!("Failed to check global '{}': {}", global, e)
+                    ));
+                }
+            }
+        }
+        
+        Ok(TestResult::passed("Global injection"))
+    }
 }
 ```
 
@@ -16192,6 +16878,147 @@ The primary user-facing tool is the `llmspell-cli`, which provides a powerful co
 - **Parameter Injection**: Scripts can receive parameters from the command line using `--param <key>=<value>`, which are then available within the script's `params` object.
 - **Unix Pipeline Support**: The CLI fully supports standard Unix pipeline operations with proper stdin/stdout/stderr handling for integration with other tools.
 - **Multiple Execution Modes**: Supports script execution, REPL mode, and daemon/service mode for different use cases.
+
+#### CLI Entry Point and Command Processing
+
+The CLI uses `clap` for declarative command-line parsing and follows a clear execution flow:
+
+```rust
+// llmspell-cli/src/main.rs
+use clap::{Parser, Subcommand};
+use llmspell_core::ScriptRuntime;
+
+#[derive(Parser)]
+#[command(name = "llmspell")]
+#[command(about = "Scriptable LLM interaction framework")]
+struct Cli {
+    #[command(subcommand)]
+    command: Option<Commands>,
+    
+    /// Script file to execute (implicit run command)
+    script: Option<PathBuf>,
+    
+    /// Configuration file path
+    #[arg(short, long, global = true)]
+    config: Option<PathBuf>,
+    
+    /// Log level
+    #[arg(short, long, global = true, default_value = "info")]
+    log_level: String,
+}
+
+#[derive(Subcommand)]
+enum Commands {
+    /// Run a spell script
+    Run(RunArgs),
+    
+    /// Start interactive REPL
+    Repl(ReplArgs),
+    
+    /// Run as daemon/service
+    Serve(ServeArgs),
+    
+    /// Evaluate inline expression
+    Eval(EvalArgs),
+    
+    /// Debug a script with step-through execution
+    Debug(DebugArgs),
+    
+    /// Configuration management
+    Config(ConfigArgs),
+    
+    /// Generate shell completions
+    Completions(CompletionArgs),
+}
+
+pub fn main() -> Result<()> {
+    // Parse command line arguments
+    let cli = Cli::parse();
+    
+    // Initialize logging early
+    init_logging(&cli.log_level)?;
+    
+    // Create tokio runtime for async execution
+    let runtime = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .build()?;
+    
+    // Execute in async context
+    runtime.block_on(async {
+        match cli.command {
+            Some(Commands::Run(args)) => execute_script(args, cli.config).await,
+            Some(Commands::Repl(args)) => start_repl(args, cli.config).await,
+            Some(Commands::Serve(args)) => start_daemon(args, cli.config).await,
+            Some(Commands::Eval(args)) => evaluate_expression(args, cli.config).await,
+            Some(Commands::Debug(args)) => debug_script(args, cli.config).await,
+            Some(Commands::Config(args)) => manage_config(args).await,
+            Some(Commands::Completions(args)) => generate_completions(args),
+            None => {
+                // Implicit run command if script provided
+                if let Some(script) = cli.script {
+                    let args = RunArgs { script, params: vec![] };
+                    execute_script(args, cli.config).await
+                } else {
+                    // No command or script, show help
+                    print_help()
+                }
+            }
+        }
+    })
+}
+
+async fn execute_script(args: RunArgs, config_path: Option<PathBuf>) -> Result<()> {
+    // 1. Create ScriptRuntime with configuration
+    let mut runtime = ScriptRuntime::new(config_path.as_deref()).await?;
+    
+    // 2. Initialize components in phases
+    runtime.initialize_phase(InitializationPhase::Infrastructure).await?;
+    runtime.initialize_phase(InitializationPhase::Providers).await?;
+    runtime.initialize_phase(InitializationPhase::Core).await?;
+    
+    // 3. Create script engine based on file extension or shebang
+    let engine = runtime.create_engine_for_script(&args.script).await?;
+    
+    // 4. Inject command-line parameters
+    let params = parse_params(&args.params)?;
+    engine.inject_params(params).await?;
+    
+    // 5. Handle stdin if piped
+    let stdin_data = if !atty::is(atty::Stream::Stdin) {
+        let mut buffer = String::new();
+        std::io::stdin().read_to_string(&mut buffer)?;
+        Some(buffer)
+    } else {
+        None
+    };
+    
+    if let Some(data) = stdin_data {
+        engine.inject_stdin(data).await?;
+    }
+    
+    // 6. Execute script
+    let result = engine.execute_file(&args.script).await?;
+    
+    // 7. Handle output
+    match result {
+        ScriptResult::Success(output) => {
+            if let Some(text) = output.as_text() {
+                println!("{}", text);
+            } else if let Some(json) = output.as_json() {
+                println!("{}", serde_json::to_string_pretty(&json)?);
+            }
+            std::process::exit(0);
+        }
+        ScriptResult::Error(err) => {
+            eprintln!("Error: {}", err);
+            std::process::exit(1);
+        }
+    }
+    
+    // 8. Cleanup handled by Drop implementations
+    Ok(())
+}
+```
 
 #### Primary Command Modes
 

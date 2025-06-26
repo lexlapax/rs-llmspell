@@ -231,11 +231,24 @@ Comprehensive refinement of rs-llmspell architecture based on go-llms and Google
       - [x] ~~Add platform-specific configuration defaults (data directories, config paths)~~ **Done** - In PlatformConfig
       - [x] ~~Document IPC mechanism differences (Unix sockets vs Named Pipes)~~ **Done** - Implicit in service architecture
       - [x] ~~Add platform testing matrix to ensure Linux/macOS/Windows compatibility~~ **Done** - CIPlatformMatrix added 
-  - [ ] **Task/question 12.3.15** Based on the architecture, can you tell me component by component, what happens when I run a lua script using the command line runner - which component it hits first etc. assume that the script uses all globals Agents, tools, worklfows etc. What's missing in the architectural document for you not to be able to trace that? what components are missing or integration layers between components?
-    - [ ] Answer:
-    - [ ] Todo:
-      - [ ] 
-      - [ ] 
+  - [x] **Task/question 12.3.15** Based on the architecture, can you tell me component by component, what happens when I run a lua script using the command line runner - which component it hits first etc. assume that the script uses all globals Agents, tools, worklfows etc. What's missing in the architectural document for you not to be able to trace that? what components are missing or integration layers between components?
+    - [x] Answer: **COMPLETED** - Full execution flow now documented in architecture. Complete component-by-component trace:
+      1. **CLI Entry** (`main()`) → Command parsing via clap → Script type detection by extension
+      2. **ScriptRuntime** creation → ComponentLifecycleManager initialization in phases:
+         - Infrastructure (storage, config)
+         - Providers (LLM connections)  
+         - Core (registries, factories)
+         - ScriptEngine (Lua/JS context)
+         - Globals (API injection)
+      3. **Bridge Layer** (ScriptEngineBridge trait) → Script execution → Result handling → Cleanup
+      **Architecture Updated With:**
+      - ScriptRuntime as central orchestrator (Architecture Overview section)
+      - ComponentLifecycleManager with 5-phase initialization
+      - CLI entry point implementation (Build System section)
+      - ScriptEngineBridge trait for unified script interface (Bridge-First Design)
+      - Complete execution flow sequence diagram
+      - Execution flow testing methodology (Testing Strategy)
+    - [x] Todo: **ALL COMPLETED** - Architecture fully documents execution flow from CLI to cleanup 
   - [ ] **Task/question 12.3.16** Based on the architecture, can you tell me component by component, what happens when I load llmspell as a lua module from an external lua runtime  - which component it hits first etc. assume that the script uses all globals Agents, tools, worklfows etc. What's missing in the architectural document for you not to be able to trace that? what components are missing or integration layers between components? what about an alternate scenario where I only want to run Tools ?
     - [ ] Answer:
     - [ ] Todo:
@@ -244,15 +257,18 @@ Comprehensive refinement of rs-llmspell architecture based on go-llms and Google
 - [ ] **Task 12.4**: Architecture document `docs/rs-llmspell-complete-architecture.md` Readiness Review
   - [ ] **Task/question 12.4.1**: Review the document for architecture, component, dependency consistency. Does the document 
     - ensure no feature overlaps
+    - ensure no implementation overlaps, ensures reuse of common code etc..
     - ensure no feature or api or naming conflicts
     - ensure clean integration between namespaces, modules, crates etc
+    - ensure no circular dependencies
+    - ensures clear unambiguous start for detailed designs to come later
     - [ ] Answer:
     - [ ] Todo:
       - [ ] 
       - [ ] 
-  - [ ] **Task/question**: Review the document for implementation plan readiness. Does the document have enough content to give us a phased plan, each phase complete in itself to be built, tested, compiled and run? do you have enough information to phase components etc for different releases such as (they don't have to be in this order but they give a sense of priority)
-  - 0. build infrastructure including project structures, crate structures, changelog management, git 
-  - 1. rudimentary CLI with lua support to call llms (simple calls) on linux and macosx "Embedded Mode"
+  - [ ] **Task/question 12.4.2**: Review the document for implementation plan readiness. Does the document have enough content to give us a phased plan, each phase complete in itself to be built, tested, compiled and run? do you have enough information to phase components etc for different releases such as (they don't have to be in this order or number of phases but they give a sense of priority)
+  - 0. build infrastructure including project structures, crate structures, changelog management, git, identified rust crates dependencies
+  - 1. rudimentary CLI with lua engine support to call llms (simple calls) on linux and macosx "Embedded Mode"
   - 2. rudimentary CLI with lua debug support to call tools directly (not via llms) with metrics, logging etc
   - 3. cli support to call agents, workflows and tools 
   - 4. add repl support
@@ -329,6 +345,17 @@ Comprehensive refinement of rs-llmspell architecture based on go-llms and Google
     - Platform testing matrix should run on Linux/macOS from start, add Windows later
     - IPC mechanisms can start with Unix sockets, add Named Pipes for Windows later
     - Package distribution (.deb, .rpm, .pkg, .msi) is post-MVP release engineering
+  - [ ] **Execution Flow Implementation Notes**:
+    - ScriptRuntime must be implemented as the central orchestrator for MVP
+    - ComponentLifecycleManager with phased initialization is critical for correct startup
+    - CLI entry point (main.rs) should use clap with clear command structure from start
+    - AgentRuntime needs to be core component coordinating all agent operations
+    - Bridge layer implementation (ScriptEngineBridge trait) must be established early
+    - Global API injection mechanism must be implemented before any script execution
+    - Initialization phases must be clearly defined and enforced (Infrastructure → Providers → Core → ScriptEngine → Globals)
+    - Component registry pattern should be used consistently across all component types
+    - Error propagation from scripts through bridge to CLI must be properly handled
+    - Resource cleanup must use RAII pattern with proper Drop implementations
 
 ### Phase 14: Final Update (📝 Update)
 - [ ] **Task 14.1**: Complete architecture.md update
