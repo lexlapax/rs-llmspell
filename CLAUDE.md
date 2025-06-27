@@ -6,12 +6,12 @@ rs-llmspell: **Scriptable LLM interactions** via Lua, JavaScript - Cast scriptin
 
 ## Current Status
 
-🚀 **Phase 1 - Core Execution Runtime**: IN PROGRESS (Started 2025-06-26)
+🚀 **Phase 2 - Built-in Tools Library**: IN PROGRESS (Started 2025-06-27)
 - **Completed**: All architectural research phases (1-13) ✅
 - **Completed**: Phase 0 implementation - All 37 tasks ✅
-- **Completed**: Architecture updates for streaming/multimodal ✅
-- **Current**: Phase 1 implementation - Core runtime with Lua 🔄
-- **Next**: Working Lua scripts calling LLM agents
+- **Completed**: Phase 1 implementation - All 21 tasks ✅
+- **Current**: Phase 2 implementation - Built-in tools library 🔄
+- **Next**: 12+ core tools with provider enhancements
 
 ### Phase 0 Achievements
 - ✅ **12-crate workspace** with zero compiler warnings
@@ -20,22 +20,31 @@ rs-llmspell: **Scriptable LLM interactions** via Lua, JavaScript - Cast scriptin
 - ✅ **Professional documentation** (>95% coverage, GitHub Pages ready)
 - ✅ **Architecture enhanced** with streaming and multimodal support
 
-### Phase 1 Implementation Focus
-- 🔄 **13th crate**: `llmspell-utils` for shared utilities
-- 🔄 **Streaming support**: BaseAgent and Tool traits extended
-- 🔄 **Multimodal types**: MediaContent (Image, Audio, Video, Binary)
-- 🔄 **Lua runtime**: Basic script execution with agent APIs
-- 🔄 **CLI enhancement**: Streaming output with progress indicators
+### Phase 1 Achievements
+- ✅ **13th crate**: `llmspell-utils` for shared utilities
+- ✅ **Streaming support**: BaseAgent and Tool traits extended
+- ✅ **Multimodal types**: MediaContent (Image, Audio, Video, Binary)
+- ✅ **Lua runtime**: Basic script execution with agent APIs through ScriptEngineBridge
+- ✅ **CLI enhancement**: Streaming output with progress indicators
+- ✅ **Provider integration**: Rig provider wrapper with capability detection
+- ✅ **Performance**: All targets exceeded (startup <100μs, streaming <50μs)
 
-## Phase 1 Development Commands
+### Phase 2 Implementation Focus
+- 🔄 **ModelSpecifier**: Parse `provider/model` syntax (e.g., "openai/gpt-4")
+- 🔄 **Base URL overrides**: Agent-level configuration for custom endpoints
+- 🔄 **12+ Built-in Tools**: Web search, JSON processing, HTTP requests, etc.
+- 🔄 **Tool Registry**: Discovery by capability with validation
+- 🔄 **Security Sandbox**: Prevent unauthorized file/network access
 
-**Current Focus**: Core Execution Runtime (10 working days)
+## Phase 2 Development Commands
+
+**Current Focus**: Built-in Tools Library (10 working days)
 
 ```bash
-# Phase 1 Development Commands
+# Phase 2 Development Commands
 cargo check --workspace          # Verify workspace compilation
-cargo build --workspace          # Build all foundation crates
-cargo test --workspace           # Run foundation tests
+cargo build --workspace          # Build all crates including tools
+cargo test --workspace           # Run all tests including tools
 cargo doc --workspace --no-deps  # Generate documentation
 
 # Quality Assurance (MANDATORY before commits)
@@ -53,15 +62,17 @@ npm install -g markdown-link-check # Install markdown link validator (npm packag
 cargo deadlinks --dir target/doc # Check internal documentation links
 markdown-link-check README.md    # Validate README links
 
-# Phase 0 Specific Tasks
-cargo metadata                   # Verify workspace structure
-cargo tree                      # Check dependency graph
+# Phase 2 Specific Tasks
+cargo test -p llmspell-tools     # Test tools crate
+cargo test -p llmspell-providers # Test provider enhancements
+cargo bench -p llmspell-tools    # Benchmark tool performance
 
-# CI/CD Pipeline (IMPLEMENTED - Phase 0 Complete)
+# CI/CD Pipeline (IMPLEMENTED)
 .github/workflows/ci.yml         # Automated quality checks
 .github/QUALITY_GATES.md         # Branch protection and quality standards
 .github/CI_VALIDATION_REPORT.md  # CI/CD pipeline validation results
 .github/PHASE0_COMPLETION_REPORT.md # Phase 0 completion validation
+.github/PHASE1_COMPLETION_REPORT.md # Phase 1 completion validation
 .markdown-link-check.json        # Link validation configuration
 
 # Clean workspace
@@ -182,48 +193,45 @@ self.hooks.execute(HookPoint::AfterExecution, &result).await?;
 - Production-ready specifications with examples
 - No external references required
 
-**Phase 0 Implementation Documents**:
-- `/docs/in-progress/phase-00-design-doc.md` - Detailed Phase 0 specifications
-- `/docs/in-progress/PHASE00-TODO.md` - 37 specific implementation tasks
-- `/docs/in-progress/implementation-phases.md` - Complete 16-phase roadmap
-- `/TODO.md` - Current Phase 0 task tracking
+**Phase Implementation Documents**:
+- `/docs/in-progress/phase-02-design-doc.md` - Detailed Phase 2 specifications
+- `/docs/in-progress/PHASE02-TODO.md` - 22 specific implementation tasks
+- `/docs/in-progress/implementation-phases.md` - Complete 16-phase roadmap (updated)
+- `/TODO.md` - Current Phase 2 task tracking
 
 **Research Archive**: `/docs/technical/`
 - 30+ research documents from architectural phases
 - Deep dives into specific technical decisions
 - Historical context for architectural choices
 
-## Phase 1 Specific Tasks
+## Phase 2 Specific Tasks
 
-### Task 1.0: Create llmspell-utils Crate
-1. Create new crate directory with Cargo.toml
-2. Add to workspace members in root Cargo.toml
-3. Implement utility modules (async_utils, file_utils, etc.)
-4. **Acceptance**: All utilities tested with >90% coverage
+### Task 2.1: Provider Enhancement (ModelSpecifier)
+1. Implement ModelSpecifier to parse "provider/model" syntax
+2. Update ProviderManager with create_agent_from_spec()
+3. Update script APIs to support new syntax
+4. **Acceptance**: Scripts can use "openai/gpt-4" syntax
 
-### Task 1.1: Enhanced Core Types
-1. Add streaming types (AgentStream, AgentChunk, ChunkContent)
-2. Add multimodal types (MediaContent, ImageFormat, etc.)
-3. Update AgentInput/AgentOutput with media support
-4. **Acceptance**: All types serialize/deserialize correctly
+### Task 2.2: Core Tool Infrastructure
+1. Enhance Tool trait with streaming and security methods
+2. Implement Tool Registry with discovery and validation
+3. Create Security Sandbox for safe execution
+4. **Acceptance**: Tools can be registered and discovered
 
-### Task 1.2: Script Runtime Foundation
-1. Create ScriptRuntime struct with Lua integration
-2. Inject Agent API into Lua environment
-3. Implement coroutine-based streaming support
-4. **Acceptance**: Can execute Lua scripts with agents
+### Task 2.3-2.5: Built-in Tools Implementation
+1. Search Tools: WebSearch, SemanticSearch, CodeSearch
+2. Data Tools: JsonProcessor, CsvAnalyzer, XmlTransformer
+3. API Tools: HttpRequest, GraphQLQuery
+4. File Tools: FileOperations, ArchiveHandler
+5. Utility Tools: TemplateEngine, DataValidation
+6. **Acceptance**: All 12+ tools functional with tests
 
-### Task 1.3: Provider Integration
-1. Create provider abstraction layer
-2. Implement rig provider wrapper
-3. Add capability detection for streaming/multimodal
-4. **Acceptance**: LLM calls work from scripts
-
-### Task 1.4: CLI Implementation
-1. Create basic CLI structure with clap
-2. Add streaming output support with progress
-3. Implement configuration loading
-4. **Acceptance**: CLI executes scripts with streaming output
+### Task 2.6: Integration and Documentation
+1. Script integration tests for all tools
+2. Security validation and penetration testing
+3. Performance optimization (<10ms init)
+4. Comprehensive documentation and examples
+5. **Acceptance**: Ready for Phase 3 handoff
 
 ## Testing Strategy
 
