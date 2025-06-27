@@ -80,7 +80,7 @@ tokenizers = "0.20"
 reqwest = { version = "0.12", features = ["json", "stream"] }
 
 # JSON schema validation
-jsonschema = "0.18"
+jsonschema = "0.30"
 
 # Cross-platform filesystem operations
 path-clean = "1.0"
