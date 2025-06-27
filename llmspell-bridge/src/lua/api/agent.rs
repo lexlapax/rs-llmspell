@@ -1,15 +1,21 @@
 //! ABOUTME: Lua Agent API implementation providing Agent.create() and agent methods
 //! ABOUTME: Bridges between Lua scripts and Rust Agent implementations
 
-use mlua::{Lua, Result as LuaResult, Table, UserData, UserDataMethods};
+use mlua::{Lua, Table, UserData, UserDataMethods};
 use std::sync::Arc;
 use llmspell_core::{
-    traits::agent::Agent,
-    types::{AgentInput, ExecutionContext},
+    traits::{
+        agent::{Agent, AgentConfig, ConversationMessage},
+        base_agent::BaseAgent,
+    },
+    types::{AgentInput, AgentOutput, ExecutionContext},
+    ComponentMetadata, Result,
 };
 use llmspell_core::error::LLMSpellError;
+use llmspell_providers::ProviderInstance;
 use crate::engine::types::AgentApiDefinition;
 use crate::{ComponentRegistry, ProviderManager};
+use async_trait::async_trait;
 
 /// Inject the Agent API into the Lua environment
 pub fn inject_agent_api(
@@ -17,7 +23,7 @@ pub fn inject_agent_api(
     api_def: &AgentApiDefinition,
     registry: Arc<ComponentRegistry>,
     providers: Arc<ProviderManager>,
-) -> Result<(), LLMSpellError> {
+) -> Result<()> {
     // Create the Agent global table
     let agent_table = lua.create_table().map_err(|e| LLMSpellError::Component {
         message: format!("Failed to create Agent table: {}", e),
@@ -25,20 +31,57 @@ pub fn inject_agent_api(
     })?;
     
     // Clone Arc for the closure
-    let _registry_clone = registry.clone();
-    let _providers_clone = providers.clone();
+    let registry_clone = registry.clone();
+    let providers_clone = providers.clone();
     
     // Create the Agent.create() function
-    let create_fn = lua.create_function(move |_lua, args: Table| -> LuaResult<()> {
-        // Extract configuration from Lua table
-        let _system_prompt: Option<String> = args.get("system_prompt").ok();
-        let _temperature: Option<f32> = args.get("temperature").ok();
-        let _max_tokens: Option<usize> = args.get("max_tokens").ok();
-        let _max_conversation_length: Option<usize> = args.get("max_conversation_length").ok();
+    let create_fn = lua.create_async_function(move |_lua, args: Table| {
+        let registry = registry_clone.clone();
+        let providers = providers_clone.clone();
         
-        // TODO: Actually create agent from provider
-        // For now, return error as we need provider integration
-        Err(mlua::Error::RuntimeError("Agent creation not yet implemented - needs provider integration".to_string()))
+        async move {
+            // Extract configuration from Lua table
+            let system_prompt: Option<String> = args.get("system_prompt").ok();
+            let temperature: Option<f32> = args.get("temperature").ok();
+            let max_tokens: Option<usize> = args.get("max_tokens").ok();
+            let provider_name: Option<String> = args.get("provider").ok();
+            let model: Option<String> = args.get("model").ok();
+            
+            // Create a basic agent configuration
+            let agent_config = AgentConfig {
+                system_prompt,
+                temperature,
+                max_tokens,
+                max_conversation_length: args.get("max_conversation_length").ok(),
+            };
+            
+            // Get the provider
+            let provider = if let Some(name) = provider_name {
+                providers.get_provider(Some(&name)).await.map_err(|e| {
+                    mlua::Error::RuntimeError(format!("Failed to get provider '{}': {}", name, e))
+                })?
+            } else {
+                providers.get_default_provider().await.map_err(|e| {
+                    mlua::Error::RuntimeError(format!("Failed to get default provider: {}", e))
+                })?
+            };
+            
+            // Create a simple agent wrapper
+            let agent: Box<dyn Agent> = Box::new(SimpleProviderAgent::new(
+                agent_config,
+                provider,
+                model.unwrap_or_else(|| "default".to_string()),
+            ));
+            
+            // Create the Lua wrapper
+            let wrapper = LuaAgentWrapper {
+                agent: Arc::new(agent),
+                _registry: registry,
+                _providers: providers,
+            };
+            
+            Ok(wrapper)
+        }
     }).map_err(|e| LLMSpellError::Component {
         message: format!("Failed to create Agent.create function: {}", e),
         source: None,
@@ -119,5 +162,83 @@ impl UserData for LuaAgentWrapper {
             // TODO: Implement state setting on agent
             Ok(())
         });
+    }
+}
+
+/// Simple agent implementation that uses a provider directly
+struct SimpleProviderAgent {
+    metadata: ComponentMetadata,
+    config: AgentConfig,
+    provider: Arc<Box<dyn ProviderInstance>>,
+    _model: String,
+    conversation: tokio::sync::Mutex<Vec<ConversationMessage>>,
+}
+
+impl SimpleProviderAgent {
+    fn new(config: AgentConfig, provider: Arc<Box<dyn ProviderInstance>>, model: String) -> Self {
+        let metadata = ComponentMetadata::new(
+            "SimpleProviderAgent".to_string(),
+            "A basic agent that uses a provider directly".to_string(),
+        );
+        
+        Self {
+            metadata,
+            config,
+            provider,
+            _model: model,
+            conversation: tokio::sync::Mutex::new(Vec::new()),
+        }
+    }
+}
+
+#[async_trait]
+impl BaseAgent for SimpleProviderAgent {
+    fn metadata(&self) -> &ComponentMetadata {
+        &self.metadata
+    }
+    
+    async fn execute(&self, mut input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+        // Add system prompt to the input if configured
+        if let Some(ref system_prompt) = self.config.system_prompt {
+            // Prepend system prompt to the input text
+            input.text = format!("{}\n\n{}", system_prompt, input.text);
+        }
+        
+        // Use the provider to complete the request
+        let output = self.provider.complete(&input).await?;
+        Ok(output)
+    }
+    
+    async fn validate_input(&self, _input: &AgentInput) -> Result<()> {
+        // Basic validation - ensure text is not empty
+        Ok(())
+    }
+    
+    async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
+        Ok(AgentOutput::text(format!("Error: {}", error)))
+    }
+}
+
+#[async_trait]
+impl Agent for SimpleProviderAgent {
+    fn config(&self) -> &AgentConfig {
+        &self.config
+    }
+    
+    async fn get_conversation(&self) -> Result<Vec<ConversationMessage>> {
+        let conv = self.conversation.lock().await;
+        Ok(conv.clone())
+    }
+    
+    async fn add_message(&mut self, message: ConversationMessage) -> Result<()> {
+        let mut conv = self.conversation.lock().await;
+        conv.push(message);
+        Ok(())
+    }
+    
+    async fn clear_conversation(&mut self) -> Result<()> {
+        let mut conv = self.conversation.lock().await;
+        conv.clear();
+        Ok(())
     }
 }

@@ -30,7 +30,7 @@ mod tests {
         // Create mock registry and provider manager
         let registry = Arc::new(ComponentRegistry::new());
         let provider_config = ProviderManagerConfig::default();
-        let providers = Arc::new(ProviderManager::new(provider_config).unwrap());
+        let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
         
         // Inject APIs
         let result = engine.inject_apis(&registry, &providers);
@@ -56,7 +56,7 @@ mod tests {
         // Create mock registry and provider manager
         let registry = Arc::new(ComponentRegistry::new());
         let provider_config = ProviderManagerConfig::default();
-        let providers = Arc::new(ProviderManager::new(provider_config).unwrap());
+        let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
         
         // Inject APIs
         engine.inject_apis(&registry, &providers).unwrap();
@@ -81,7 +81,7 @@ mod tests {
         // Create mock registry and provider manager
         let registry = Arc::new(ComponentRegistry::new());
         let provider_config = ProviderManagerConfig::default();
-        let providers = Arc::new(ProviderManager::new(provider_config).unwrap());
+        let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
         
         // Inject APIs
         engine.inject_apis(&registry, &providers).unwrap();
@@ -101,7 +101,7 @@ mod tests {
                 let obj = result.output.as_object().expect("Expected object result");
                 assert_eq!(obj.get("ok").and_then(|v| v.as_bool()), Some(false));
                 let error = obj.get("error").and_then(|v| v.as_str()).unwrap_or("");
-                assert!(error.contains("not yet implemented"), "Expected placeholder error");
+                assert!(error.contains("Failed to get default provider"), "Expected provider error");
             }
             Err(e) => panic!("Script execution failed: {:?}", e),
         }

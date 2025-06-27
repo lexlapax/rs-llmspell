@@ -56,7 +56,7 @@ impl ScriptRuntime {
         
         // Create provider manager
         let provider_config = config.providers.clone();
-        let provider_manager = Arc::new(ProviderManager::new(provider_config)?);
+        let provider_manager = Arc::new(ProviderManager::new(provider_config).await?);
         
         // Inject APIs into the engine
         engine.inject_apis(&registry, &provider_manager)?;

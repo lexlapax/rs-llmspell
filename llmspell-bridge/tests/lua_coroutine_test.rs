@@ -19,7 +19,7 @@ mod tests {
         // Create mock registry and provider manager
         let registry = Arc::new(ComponentRegistry::new());
         let provider_config = ProviderManagerConfig::default();
-        let providers = Arc::new(ProviderManager::new(provider_config).unwrap());
+        let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
         
         // Inject APIs
         engine.inject_apis(&registry, &providers).unwrap();
@@ -78,7 +78,7 @@ mod tests {
         // Create mock registry and provider manager
         let registry = Arc::new(ComponentRegistry::new());
         let provider_config = ProviderManagerConfig::default();
-        let providers = Arc::new(ProviderManager::new(provider_config).unwrap());
+        let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
         
         // Inject APIs
         engine.inject_apis(&registry, &providers).unwrap();
@@ -122,7 +122,7 @@ mod tests {
         // Create mock registry and provider manager
         let registry = Arc::new(ComponentRegistry::new());
         let provider_config = ProviderManagerConfig::default();
-        let providers = Arc::new(ProviderManager::new(provider_config).unwrap());
+        let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
         
         // Inject APIs
         engine.inject_apis(&registry, &providers).unwrap();
@@ -180,7 +180,7 @@ mod tests {
         // Create mock registry and provider manager
         let registry = Arc::new(ComponentRegistry::new());
         let provider_config = ProviderManagerConfig::default();
-        let providers = Arc::new(ProviderManager::new(provider_config).unwrap());
+        let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
         
         // Inject APIs
         engine.inject_apis(&registry, &providers).unwrap();

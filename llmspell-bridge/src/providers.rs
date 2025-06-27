@@ -2,52 +2,53 @@
 //! ABOUTME: Manages provider configuration, capability detection, and access control
 
 use llmspell_core::error::LLMSpellError;
+use llmspell_providers::{
+    ProviderCapabilities, ProviderConfig as ProviderInstanceConfig, 
+    ProviderInstance, ProviderManager as CoreProviderManager,
+};
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::Arc;
 use serde::{Deserialize, Serialize};
-use async_trait::async_trait;
-
-// Placeholder traits until llmspell-providers is implemented
-#[async_trait]
-pub trait Provider: Send + Sync {
-    fn capabilities(&self) -> ProviderCapabilities;
-    async fn complete(&self, prompt: &str) -> Result<String, LLMSpellError>;
-}
-
-#[derive(Debug, Clone)]
-pub struct ProviderCapabilities {
-    pub streaming: bool,
-    pub multimodal: bool,
-    pub tool_calling: bool,
-    pub embeddings: bool,
-}
 
 /// Manages LLM providers for script access
 pub struct ProviderManager {
-    providers: Arc<RwLock<HashMap<String, Arc<dyn Provider>>>>,
-    default_provider: Arc<RwLock<Option<String>>>,
+    core_manager: CoreProviderManager,
     config: ProviderManagerConfig,
 }
 
 impl ProviderManager {
     /// Create a new provider manager with configuration
-    pub fn new(config: ProviderManagerConfig) -> Result<Self, LLMSpellError> {
+    pub async fn new(config: ProviderManagerConfig) -> Result<Self, LLMSpellError> {
+        let core_manager = CoreProviderManager::new();
         let manager = Self {
-            providers: Arc::new(RwLock::new(HashMap::new())),
-            default_provider: Arc::new(RwLock::new(config.default_provider.clone())),
-            config,
+            core_manager,
+            config: config.clone(),
         };
         
+        // Register the rig provider factory
+        manager.register_rig_provider().await?;
+        
         // Initialize configured providers
-        manager.initialize_providers()?;
+        manager.initialize_providers().await?;
         
         Ok(manager)
     }
     
+    /// Register the rig provider factory
+    async fn register_rig_provider(&self) -> Result<(), LLMSpellError> {
+        self.core_manager.register_provider("rig", llmspell_providers::create_rig_provider).await;
+        Ok(())
+    }
+    
     /// Initialize providers from configuration
-    fn initialize_providers(&self) -> Result<(), LLMSpellError> {
-        // This will be implemented when we have actual provider implementations
-        // For now, just validate configuration
+    async fn initialize_providers(&self) -> Result<(), LLMSpellError> {
+        // Initialize each configured provider
+        for (name, config) in &self.config.providers {
+            let provider_config = self.create_provider_config(name, config)?;
+            self.core_manager.init_provider(provider_config).await?;
+        }
+        
+        // Set default provider if specified
         if let Some(ref default) = self.config.default_provider {
             if !self.config.providers.contains_key(default) {
                 return Err(LLMSpellError::Validation {
@@ -55,81 +56,95 @@ impl ProviderManager {
                     message: format!("Default provider '{}' not found in configuration", default),
                 });
             }
+            // The default will be set based on the provider:model format
+            let model = self.config.providers[default].model.as_ref()
+                .ok_or_else(|| LLMSpellError::Validation {
+                    field: Some("model".to_string()),
+                    message: format!("Model not specified for provider '{}'", default),
+                })?;
+            self.core_manager.set_default_provider(format!("{}:{}", default, model)).await?;
         }
+        
         Ok(())
     }
     
-    /// Register a provider
-    pub fn register_provider(&self, name: String, provider: Arc<dyn Provider>) -> Result<(), LLMSpellError> {
-        let mut providers = self.providers.write().unwrap();
-        if providers.contains_key(&name) {
-            return Err(LLMSpellError::Validation {
-                field: Some("provider_name".to_string()),
-                message: format!("Provider '{}' already registered", name),
-            });
-        }
-        providers.insert(name.clone(), provider);
+    /// Create a provider config from our configuration
+    fn create_provider_config(&self, name: &str, config: &ProviderConfig) -> Result<ProviderInstanceConfig, LLMSpellError> {
+        // Map provider_type to the actual provider name
+        let provider_name = match config.provider_type.as_str() {
+            "openai" | "anthropic" | "cohere" => "rig",
+            other => other,
+        };
         
-        // If no default provider set, use the first one registered
-        let mut default = self.default_provider.write().unwrap();
-        if default.is_none() {
-            *default = Some(name);
+        let model = config.model.as_ref()
+            .ok_or_else(|| LLMSpellError::Validation {
+                field: Some("model".to_string()),
+                message: format!("Model not specified for provider '{}'", name),
+            })?;
+        
+        let mut provider_config = ProviderInstanceConfig::new(provider_name, model);
+        
+        // Set API key from environment if specified
+        if let Some(ref api_key_env) = config.api_key_env {
+            let api_key = std::env::var(api_key_env)
+                .map_err(|_| LLMSpellError::Configuration {
+                    message: format!("Environment variable '{}' not found for provider '{}'", api_key_env, name),
+                    source: None,
+                })?;
+            provider_config.api_key = Some(api_key);
         }
         
-        Ok(())
+        // Set other configuration
+        if let Some(ref base_url) = config.base_url {
+            provider_config.endpoint = Some(base_url.clone());
+        }
+        
+        // Add extra configuration
+        for (key, value) in &config.extra {
+            provider_config.custom_config.insert(key.clone(), value.clone());
+        }
+        
+        Ok(provider_config)
     }
     
     /// Get a provider by name
-    pub fn get_provider(&self, name: &str) -> Option<Arc<dyn Provider>> {
-        let providers = self.providers.read().unwrap();
-        providers.get(name).cloned()
+    pub async fn get_provider(&self, name: Option<&str>) -> Result<Arc<Box<dyn ProviderInstance>>, LLMSpellError> {
+        self.core_manager.get_provider(name).await
     }
     
     /// Get the default provider
-    pub fn get_default_provider(&self) -> Option<Arc<dyn Provider>> {
-        let default = self.default_provider.read().unwrap();
-        if let Some(ref name) = *default {
-            self.get_provider(name)
-        } else {
-            None
-        }
+    pub async fn get_default_provider(&self) -> Result<Arc<Box<dyn ProviderInstance>>, LLMSpellError> {
+        self.core_manager.get_provider(None).await
     }
     
     /// Set the default provider
-    pub fn set_default_provider(&self, name: String) -> Result<(), LLMSpellError> {
-        let providers = self.providers.read().unwrap();
-        if !providers.contains_key(&name) {
-            return Err(LLMSpellError::Validation {
-                field: Some("provider_name".to_string()),
-                message: format!("Provider '{}' not found", name),
-            });
-        }
-        
-        let mut default = self.default_provider.write().unwrap();
-        *default = Some(name);
-        Ok(())
+    pub async fn set_default_provider(&self, name: String) -> Result<(), LLMSpellError> {
+        self.core_manager.set_default_provider(name).await
     }
     
     /// List all registered providers
-    pub fn list_providers(&self) -> Vec<ProviderInfo> {
-        let providers = self.providers.read().unwrap();
-        providers.iter().map(|(name, provider)| {
-            ProviderInfo {
-                name: name.clone(),
-                capabilities: provider.capabilities(),
+    pub async fn list_providers(&self) -> Vec<ProviderInfo> {
+        let providers = self.core_manager.list_providers().await;
+        let mut infos = Vec::new();
+        
+        for provider_name in providers {
+            if let Ok(capabilities) = self.core_manager.query_capabilities(Some(&provider_name)).await {
+                infos.push(ProviderInfo {
+                    name: provider_name,
+                    capabilities,
+                });
             }
-        }).collect()
+        }
+        
+        infos
     }
     
     /// Check if a provider supports a specific capability
-    pub fn provider_supports(&self, provider_name: &str, capability: &str) -> bool {
-        if let Some(provider) = self.get_provider(provider_name) {
-            let caps = provider.capabilities();
+    pub async fn provider_supports(&self, provider_name: &str, capability: &str) -> bool {
+        if let Ok(caps) = self.core_manager.query_capabilities(Some(provider_name)).await {
             match capability {
-                "streaming" => caps.streaming,
-                "multimodal" => caps.multimodal,
-                "tool_calling" => caps.tool_calling,
-                "embeddings" => caps.embeddings,
+                "streaming" => caps.supports_streaming,
+                "multimodal" => caps.supports_multimodal,
                 _ => false,
             }
         } else {
@@ -185,19 +200,19 @@ pub struct ProviderConfig {
 mod tests {
     use super::*;
     
-    #[test]
-    fn test_provider_manager_creation() {
+    #[tokio::test]
+    async fn test_provider_manager_creation() {
         let config = ProviderManagerConfig::default();
-        let manager = ProviderManager::new(config).unwrap();
-        assert!(manager.get_default_provider().is_none());
+        let manager = ProviderManager::new(config).await.unwrap();
+        assert!(manager.get_default_provider().await.is_err());
     }
     
-    #[test]
-    fn test_provider_config_validation() {
+    #[tokio::test]
+    async fn test_provider_config_validation() {
         let mut config = ProviderManagerConfig::default();
         config.default_provider = Some("nonexistent".to_string());
         
-        let result = ProviderManager::new(config);
+        let result = ProviderManager::new(config).await;
         assert!(result.is_err());
     }
 }

@@ -1,4 +1,17 @@
 //! ABOUTME: llmspell-providers implementation crate
-//! ABOUTME: Foundation stub for future implementation
+//! ABOUTME: Provider abstraction layer and LLM provider implementations
 
-// Module stub - to be implemented in later phases
+pub mod abstraction;
+pub mod rig;
+
+// Re-export main types
+pub use abstraction::{
+    ProviderCapabilities,
+    ProviderConfig,
+    ProviderInstance,
+    ProviderRegistry,
+    ProviderManager,
+};
+
+// Re-export provider factories
+pub use rig::create_rig_provider;
