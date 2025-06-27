@@ -2,8 +2,8 @@
 //! ABOUTME: Shows available providers and their capabilities
 
 use crate::cli::OutputFormat;
-use llmspell_bridge::RuntimeConfig;
 use anyhow::Result;
+use llmspell_bridge::RuntimeConfig;
 use serde_json::json;
 
 /// List available providers
@@ -13,16 +13,14 @@ pub async fn list_providers(
     output_format: OutputFormat,
 ) -> Result<()> {
     // TODO: Query actual providers from runtime
-    let providers = vec![
-        json!({
-            "name": "rig",
-            "models": ["openai/gpt-4", "anthropic/claude-3", "cohere/command"],
-            "capabilities": {
-                "streaming": false,
-                "multimodal": true,
-            }
-        }),
-    ];
+    let providers = vec![json!({
+        "name": "rig",
+        "models": ["openai/gpt-4", "anthropic/claude-3", "cohere/command"],
+        "capabilities": {
+            "streaming": false,
+            "multimodal": true,
+        }
+    })];
 
     match output_format {
         OutputFormat::Json => {

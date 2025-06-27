@@ -146,7 +146,10 @@ fn test_agent_input_edge_cases() {
     let input = AgentInput::text("test".to_string())
         .with_parameter("key".to_string(), serde_json::json!("value1"))
         .with_parameter("key".to_string(), serde_json::json!("value2"));
-    assert_eq!(input.parameters.get("key"), Some(&serde_json::json!("value2")));
+    assert_eq!(
+        input.parameters.get("key"),
+        Some(&serde_json::json!("value2"))
+    );
 
     // Null and complex values in parameters
     let input = AgentInput::text("test".to_string())
@@ -179,20 +182,29 @@ fn test_agent_output_edge_cases() {
     let mut output = AgentOutput::text("result".to_string());
     let mut metadata = llmspell_core::types::OutputMetadata::default();
     for i in 0..1000 {
-        metadata.extra.insert(format!("key{}", i), serde_json::json!(i));
+        metadata
+            .extra
+            .insert(format!("key{}", i), serde_json::json!(i));
     }
     output = output.with_metadata(metadata);
     assert_eq!(output.metadata.extra.len(), 1000);
 
     // Overwriting metadata
     let mut metadata1 = llmspell_core::types::OutputMetadata::default();
-    metadata1.extra.insert("key".to_string(), serde_json::json!(1));
+    metadata1
+        .extra
+        .insert("key".to_string(), serde_json::json!(1));
     let mut metadata2 = llmspell_core::types::OutputMetadata::default();
-    metadata2.extra.insert("key".to_string(), serde_json::json!(2));
+    metadata2
+        .extra
+        .insert("key".to_string(), serde_json::json!(2));
     let output = AgentOutput::text("test".to_string())
         .with_metadata(metadata1)
         .with_metadata(metadata2);
-    assert_eq!(output.metadata.extra.get("key"), Some(&serde_json::json!(2)));
+    assert_eq!(
+        output.metadata.extra.get("key"),
+        Some(&serde_json::json!(2))
+    );
 }
 
 #[test]

@@ -14,10 +14,10 @@ pub async fn init_config(output: PathBuf, force: bool) -> Result<()> {
             output.display()
         );
     }
-    
+
     // Create the configuration file
     config::create_default_config(&output).await?;
-    
+
     println!("✓ Created configuration file: {}", output.display());
     println!();
     println!("Next steps:");
@@ -28,6 +28,6 @@ pub async fn init_config(output: PathBuf, force: bool) -> Result<()> {
     println!("     - COHERE_API_KEY for Cohere provider");
     println!("  3. Run 'llmspell validate' to check your configuration");
     println!("  4. Run 'llmspell run <script>' to execute scripts");
-    
+
     Ok(())
 }

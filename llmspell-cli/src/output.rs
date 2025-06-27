@@ -2,21 +2,19 @@
 //! ABOUTME: Handles text, JSON, and pretty-printed output formats
 
 use crate::cli::OutputFormat;
-use llmspell_bridge::engine::{ScriptOutput, ScriptStream};
 use anyhow::Result;
 use futures::StreamExt;
 use indicatif::{ProgressBar, ProgressStyle};
+use llmspell_bridge::engine::{ScriptOutput, ScriptStream};
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::signal;
-use std::sync::Arc;
 use tokio::sync::Mutex;
 
 /// Format script output according to the specified format
 pub fn format_output(output: &ScriptOutput, format: OutputFormat) -> Result<String> {
     match format {
-        OutputFormat::Json => {
-            Ok(serde_json::to_string_pretty(&output.output)?)
-        }
+        OutputFormat::Json => Ok(serde_json::to_string_pretty(&output.output)?),
         OutputFormat::Text => {
             // Simple text representation
             match output.output {
@@ -27,77 +25,70 @@ pub fn format_output(output: &ScriptOutput, format: OutputFormat) -> Result<Stri
         OutputFormat::Pretty => {
             // Pretty-printed output with metadata
             let mut result = String::new();
-            
+
             // Add console output if any
             if !output.console_output.is_empty() {
                 result.push_str("Console Output:\n");
                 for line in &output.console_output {
                     result.push_str(&format!("  {}\n", line));
                 }
-                result.push_str("\n");
+                result.push('\n');
             }
-            
-            result.push_str(&format!("Output: {}\n", 
-                serde_json::to_string_pretty(&output.output)?));
-            
+
+            result.push_str(&format!(
+                "Output: {}\n",
+                serde_json::to_string_pretty(&output.output)?
+            ));
+
             // Add metadata
             result.push_str(&format!("Engine: {}\n", output.metadata.engine));
-            result.push_str(&format!("Execution time: {}ms\n", output.metadata.execution_time_ms));
-            
+            result.push_str(&format!(
+                "Execution time: {}ms\n",
+                output.metadata.execution_time_ms
+            ));
+
             if !output.metadata.warnings.is_empty() {
                 result.push_str("\nWarnings:\n");
                 for warning in &output.metadata.warnings {
                     result.push_str(&format!("  ⚠ {}\n", warning));
                 }
             }
-            
+
             Ok(result)
         }
     }
 }
 
 /// Print streaming output with the specified format
-pub async fn print_stream(
-    stream: &mut ScriptStream,
-    format: OutputFormat,
-) -> Result<()> {
+pub async fn print_stream(stream: &mut ScriptStream, format: OutputFormat) -> Result<()> {
     // Set up signal handler for graceful shutdown
     let interrupted = Arc::new(Mutex::new(false));
     let interrupted_clone = interrupted.clone();
-    
+
     tokio::spawn(async move {
         signal::ctrl_c().await.expect("Failed to listen for Ctrl+C");
         *interrupted_clone.lock().await = true;
     });
 
     match format {
-        OutputFormat::Json => {
-            print_stream_json(stream, interrupted).await
-        }
-        OutputFormat::Text => {
-            print_stream_text(stream, false, interrupted).await
-        }
-        OutputFormat::Pretty => {
-            print_stream_text(stream, true, interrupted).await
-        }
+        OutputFormat::Json => print_stream_json(stream, interrupted).await,
+        OutputFormat::Text => print_stream_text(stream, false, interrupted).await,
+        OutputFormat::Pretty => print_stream_text(stream, true, interrupted).await,
     }
 }
 
 /// Print streaming output as JSON
-async fn print_stream_json(
-    stream: &mut ScriptStream, 
-    interrupted: Arc<Mutex<bool>>
-) -> Result<()> {
+async fn print_stream_json(stream: &mut ScriptStream, interrupted: Arc<Mutex<bool>>) -> Result<()> {
     // Show progress while collecting chunks
     let spinner = ProgressBar::new_spinner();
     spinner.set_style(
         ProgressStyle::default_spinner()
             .template("{spinner:.cyan} {msg}")
-            .unwrap()
+            .unwrap(),
     );
     spinner.set_message("Collecting stream data...");
     spinner.enable_steady_tick(Duration::from_millis(100));
-    
+
     let mut chunks = Vec::new();
     while let Some(chunk) = stream.stream.next().await {
         // Check if interrupted
@@ -106,11 +97,11 @@ async fn print_stream_json(
             eprintln!("\n⚠️ Stream interrupted by Ctrl+C");
             break;
         }
-        
+
         chunks.push(chunk?);
         spinner.set_message(format!("Collected {} chunks", chunks.len()));
     }
-    
+
     spinner.finish_and_clear();
     println!("{}", serde_json::to_string_pretty(&chunks)?);
     Ok(())
@@ -118,18 +109,18 @@ async fn print_stream_json(
 
 /// Print streaming output as text with optional progress indicators
 async fn print_stream_text(
-    stream: &mut ScriptStream, 
+    stream: &mut ScriptStream,
     show_progress: bool,
-    interrupted: Arc<Mutex<bool>>
+    interrupted: Arc<Mutex<bool>>,
 ) -> Result<()> {
     use std::io::{self, Write};
-    
+
     let progress = if show_progress {
         let pb = ProgressBar::new_spinner();
         pb.set_style(
             ProgressStyle::default_spinner()
                 .template("{spinner:.green} {msg}")
-                .unwrap()
+                .unwrap(),
         );
         pb.set_message("Streaming output...");
         pb.enable_steady_tick(Duration::from_millis(100));
@@ -137,10 +128,10 @@ async fn print_stream_text(
     } else {
         None
     };
-    
+
     let mut chunk_count = 0;
     let mut in_tool_call = false;
-    
+
     while let Some(chunk) = stream.stream.next().await {
         // Check if interrupted
         if *interrupted.lock().await {
@@ -150,15 +141,15 @@ async fn print_stream_text(
             eprintln!("\n⚠️ Stream interrupted by Ctrl+C");
             break;
         }
-        
+
         let chunk = chunk?;
         chunk_count += 1;
-        
+
         // Update progress message
         if let Some(ref pb) = progress {
             pb.set_message(format!("Processing chunk {}", chunk_count));
         }
-        
+
         // Print chunk content based on its type
         match &chunk.content {
             llmspell_core::types::ChunkContent::Text(text) => {
@@ -202,7 +193,7 @@ async fn print_stream_text(
                 } else {
                     "📎 Media content".to_string()
                 };
-                
+
                 if let Some(ref pb) = progress {
                     pb.suspend(|| {
                         println!("\n{}", media_msg);
@@ -240,13 +231,13 @@ async fn print_stream_text(
             }
         }
     }
-    
+
     // Clean up progress bar
     if let Some(pb) = progress {
         pb.finish_with_message("Stream complete");
         pb.finish_and_clear();
     }
-    
+
     println!(); // Final newline
     Ok(())
 }

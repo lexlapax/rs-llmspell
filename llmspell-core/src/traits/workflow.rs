@@ -127,11 +127,7 @@ pub struct StepResult {
 
 impl StepResult {
     /// Create a successful result
-    pub fn success(
-        step_id: ComponentId,
-        output: AgentOutput,
-        duration: Duration,
-    ) -> Self {
+    pub fn success(step_id: ComponentId, output: AgentOutput, duration: Duration) -> Self {
         Self {
             step_id,
             output,
@@ -396,8 +392,8 @@ pub trait Workflow: BaseAgent {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ComponentMetadata;
     use crate::types::{AgentInput, ExecutionContext};
+    use crate::ComponentMetadata;
     use std::sync::Arc;
     use tokio::sync::Mutex;
 

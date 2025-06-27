@@ -6,11 +6,7 @@ pub mod rig;
 
 // Re-export main types
 pub use abstraction::{
-    ProviderCapabilities,
-    ProviderConfig,
-    ProviderInstance,
-    ProviderRegistry,
-    ProviderManager,
+    ProviderCapabilities, ProviderConfig, ProviderInstance, ProviderManager, ProviderRegistry,
 };
 
 // Re-export provider factories

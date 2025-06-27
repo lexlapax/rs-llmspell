@@ -32,12 +32,12 @@ now I'm going to ask you a series of questions about the architecture documented
     - [ ] Todo: 
         - [ ] 
         - [ ] 
-- [ ] **Task/question 1.2** Question 2
-    - Does the architecture allow llms to accomodate streaming requirements for clients?
-    - Do the subsequent layers above? core, agent, tools, workflow, and above that engine, cli, repl allow for streaming?
+- [ ] **Task/question 1.2** developer facing apis for lua
+    - Does the architecture and design follow consistent guidelines for lua (like snake_case not camelCase for function name) or dot notation (self has to be explicit) and colon notation (self is assumed) 
+    - Do other script examples follow similar guidelines for standard conventions in javascript or python in the architecture document
     - do you need to do external research/web research for this question?
     - How does the `/docs/technical/rs-llmspell-complete-architecture.md` need to change? 
-    - does the change require changes to what was accomplished in `/doc/in-progress/PHASE00-DONE.md`, what and how so?
+    - does the change require changes to what was accomplished in `/doc/in-progress/PHASE00-DONE.md`, and `/doc/in-progress/PHASE01-DONE.md` what and how so?
     - does the change require changes to subsequent phases as documented in `/doc/in-progress/implementation-phases.md`, what and how so?
     - [ ] Answer: 
         - 
@@ -48,12 +48,12 @@ now I'm going to ask you a series of questions about the architecture documented
 
 ### Section 2: Changes to architecture document and implementation plan
 **Instructions** Read Section 1 questions, answers and todos and propose a detailed change to the the documents in the task sections outlined below: for each question below, first answer the first task `Changes to document`, then pause and ask if you should do the second part `Applied changes to document`, one at a time.
-- [ ] **Task/question 2.1** changes to overall architecture in `/docs/technical/rs-llmspell-final-architecture.md` keeping in mind we've already accomplished last phase changes as documented in `/docs/in-progress/PHASE01-DONE.md`. Ensure the entire document makes holistic architecture sense, do not just add new sections, the updates may need to be interspersed across sections.
+- [ ] **Task/question 2.1** changes to overall architecture in `/docs/technical/rs-llmspell-final-architecture.md` keeping in mind we've already accomplished last phase changes as documented in `/docs/in-progress/PHASE00-DONE.md` and `/docs/in-progress/PHASE01-DONE.md`. Ensure the entire document makes holistic architecture sense, do not just add new sections, the updates may need to be interspersed across sections.
     - [ ] **Task 2.1.1** Changes to document
         - 
         - 
     - [ ] **Task 2.1.2** Applied changes to document <date>
-- [ ] **Task/question 2.2** changes to implementation plan in `/docs/in-progress/implementation-phases.md` keeping in mind we've already accomplished last phase changes as documented in `/docs/in-progress/PHASE01-DONE.md`. Ensure the entire document makes sense from a dependency, scoping complexity perspective for each subsequent/yet to be done phase. Take into account the changes above in Task/question 2.1. do not just add new sections, the updates may need to be interspersed across sections for each phase.
+- [ ] **Task/question 2.2** changes to implementation plan in `/docs/in-progress/implementation-phases.md` keeping in mind we've already accomplished last phase changes as documented in `/docs/in-progress/PHASE00-DONE.md` and `/docs/in-progress/PHASE01-DONE.md`. Ensure the entire document makes sense from a dependency, scoping complexity perspective for each subsequent/yet to be done phase. Take into account the changes above in Task/question 2.1. do not just add new sections, the updates may need to be interspersed across sections for each phase.
     - [ ] **Task 2.2.1** Changes to document
         - 
         - 
@@ -62,7 +62,7 @@ now I'm going to ask you a series of questions about the architecture documented
 
 ### Section 3: Transition to next phase
 **Instructions** Read Section 1 and section 2 above and complete the following tasks/questions: 
-- [ ] **Task/question 3.1** Based on the `/docs/technical/rs-llmspell-final-architecture.md`, and the `/docs/in-progress/implemenation-phases.md`, are you ready to create a detailed design doc for phase 02 `/docs/in-progress/phase-02-design-doc.md` in the style of `/docs/in-progress/phase-00-design-doc.md` and a todo list `/docs/in-progress/PHASE02-TODO.md` in the style of `/docs/in-progress/PHASE00-TODO.md`? if not what needs to be done? you can also look at output of previous phase `/docs/in-progress/PHASE00-TODO-DONE.md`, `/docs/in-progress/PHASE01_HANDOFF_PACKAGE.md` and `/docs/in-progress/PHASE01_KNOWLEDGE_TRANSFER.md` to inform your answers and todos.
+- [ ] **Task/question 3.1** Based on the `/docs/technical/rs-llmspell-final-architecture.md`, and the `/docs/in-progress/implemenation-phases.md`, and the `/docs/in-progress/KNOWN_ISSUES.md` are you ready to create a detailed design doc for phase 02 `/docs/in-progress/phase-02-design-doc.md` in the style of `/docs/in-progress/phase-00-design-doc.md` and a todo list `/docs/in-progress/PHASE02-TODO.md` in the style of `/docs/in-progress/PHASE00-TODO.md`? if not what needs to be done? you can also look at output of previous phase `/docs/in-progress/PHASE01-DONE.md`, `/docs/in-progress/PHASE02_HANDOFF.md` and `/docs/in-progress/PHASE01_KNOWLEDGE_TRANSFER.md` to inform your answers and todos.
     - [ ] Answer: 
         - 
         - 

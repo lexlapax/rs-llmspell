@@ -804,7 +804,7 @@
 - [ ] No warnings
 - [ ] Looks professional
 
-### Task 1.6.2: User Guide and Examples (`/docs/user-guide`)
+### Task 1.6.2: User Guide and Examples (`/docs/user-guide/`, `/examples/`)
 **Priority**: HIGH  
 **Estimated Time**: 4 hours  
 **Assignee**: Documentation Team
@@ -813,8 +813,8 @@
 **Description**: Create user-facing guides and examples.
 
 **Acceptance Criteria:**
-- [ ] Getting started guide
-- [ ] Streaming example script
+- [ ] Getting started guide in `/docs/user-guide/`
+- [ ] Streaming example script in `/examples/`
 - [ ] Multimodal example (stub)
 - [ ] Error handling guide
 - [ ] Performance tips

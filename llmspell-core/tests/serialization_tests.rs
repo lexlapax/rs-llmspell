@@ -84,7 +84,10 @@ fn test_agent_output_json_roundtrip() {
 
     assert_eq!(output.text, deserialized.text);
     assert_eq!(output.metadata.confidence, deserialized.metadata.confidence);
-    assert_eq!(output.metadata.token_count, deserialized.metadata.token_count);
+    assert_eq!(
+        output.metadata.token_count,
+        deserialized.metadata.token_count
+    );
     assert_eq!(output.metadata.model, deserialized.metadata.model);
 }
 
@@ -258,7 +261,9 @@ fn test_workflow_step_json_roundtrip() {
 fn test_step_result_json_roundtrip() {
     let step_id = ComponentId::from_name("test-step");
     let mut metadata = llmspell_core::types::OutputMetadata::default();
-    metadata.extra.insert("records".to_string(), serde_json::json!(100));
+    metadata
+        .extra
+        .insert("records".to_string(), serde_json::json!(100));
     let output = AgentOutput::text("Completed successfully".to_string()).with_metadata(metadata);
 
     let success_result = StepResult::success(step_id, output, std::time::Duration::from_secs(1));

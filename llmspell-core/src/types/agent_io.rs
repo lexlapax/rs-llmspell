@@ -160,11 +160,13 @@ impl AgentInput {
 
 impl fmt::Display for AgentInput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "AgentInput {{ text: \"{}\", media: {} items", 
-            if self.text.len() > 50 { 
-                format!("{}...", &self.text[..50]) 
-            } else { 
-                self.text.clone() 
+        write!(
+            f,
+            "AgentInput {{ text: \"{}\", media: {} items",
+            if self.text.len() > 50 {
+                format!("{}...", &self.text[..50])
+            } else {
+                self.text.clone()
             },
             self.media.len()
         )?;
@@ -318,11 +320,13 @@ impl AgentOutput {
 
 impl fmt::Display for AgentOutput {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "AgentOutput {{ text: \"{}\", media: {} items", 
-            if self.text.len() > 50 { 
-                format!("{}...", &self.text[..50]) 
-            } else { 
-                self.text.clone() 
+        write!(
+            f,
+            "AgentOutput {{ text: \"{}\", media: {} items",
+            if self.text.len() > 50 {
+                format!("{}...", &self.text[..50])
+            } else {
+                self.text.clone()
             },
             self.media.len()
         )?;
@@ -488,8 +492,7 @@ mod tests {
     #[test]
     fn test_agent_output_with_transfer() {
         let agent_id = ComponentId::from_name("next-agent");
-        let output = AgentOutput::text("Transferring to specialist")
-            .with_transfer(agent_id);
+        let output = AgentOutput::text("Transferring to specialist").with_transfer(agent_id);
 
         assert!(output.is_transfer());
         assert_eq!(output.transfer_to, Some(agent_id));
@@ -499,7 +502,10 @@ mod tests {
     fn test_execution_context() {
         let context = ExecutionContext::with_conversation("conv-123".to_string())
             .with_data("user_name".to_string(), Value::String("Alice".to_string()))
-            .with_data("session_type".to_string(), Value::String("chat".to_string()));
+            .with_data(
+                "session_type".to_string(),
+                Value::String("chat".to_string()),
+            );
 
         assert_eq!(context.conversation_id, Some("conv-123".to_string()));
         assert_eq!(context.data.len(), 2);

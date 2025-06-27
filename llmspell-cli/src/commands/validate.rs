@@ -4,8 +4,8 @@
 use crate::cli::OutputFormat;
 use crate::config;
 use anyhow::Result;
-use std::path::{Path, PathBuf};
 use serde_json::json;
+use std::path::{Path, PathBuf};
 
 /// Validate configuration file
 pub async fn validate_config(
@@ -15,7 +15,7 @@ pub async fn validate_config(
     let path = config_path.as_deref();
     let mut warnings = Vec::new();
     let mut errors = Vec::new();
-    
+
     // Try to load the configuration
     let (config_result, actual_path) = match path {
         Some(p) => {
@@ -29,7 +29,7 @@ pub async fn validate_config(
             (result, discovered_path)
         }
     };
-    
+
     // Check if configuration loaded successfully
     let valid = match config_result {
         Ok(config) => {
@@ -40,11 +40,13 @@ pub async fn validate_config(
                     if config.providers.providers.is_empty() {
                         warnings.push("No providers configured".to_string());
                     }
-                    
+
                     if !config.runtime.security.allow_network_access {
-                        warnings.push("Network access is disabled - LLM providers won't work".to_string());
+                        warnings.push(
+                            "Network access is disabled - LLM providers won't work".to_string(),
+                        );
                     }
-                    
+
                     true
                 }
                 Err(e) => {
@@ -58,7 +60,7 @@ pub async fn validate_config(
             false
         }
     };
-    
+
     let validation_result = json!({
         "valid": valid,
         "path": actual_path,
@@ -73,20 +75,20 @@ pub async fn validate_config(
         OutputFormat::Text | OutputFormat::Pretty => {
             println!("Configuration validation:");
             println!("  File: {}", actual_path);
-            
+
             if valid {
                 println!("  Status: ✓ Valid");
             } else {
                 println!("  Status: ✗ Invalid");
             }
-            
+
             if !warnings.is_empty() {
                 println!("\nWarnings:");
                 for warning in &warnings {
                     println!("  ⚠ {}", warning);
                 }
             }
-            
+
             if !errors.is_empty() {
                 println!("\nErrors:");
                 for error in &errors {
@@ -99,7 +101,7 @@ pub async fn validate_config(
     if !valid {
         anyhow::bail!("Configuration validation failed");
     }
-    
+
     Ok(())
 }
 
@@ -111,7 +113,7 @@ async fn discover_actual_path() -> String {
             return path.to_string();
         }
     }
-    
+
     // Check home directory
     if let Ok(home) = std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE")) {
         for filename in &[".llmspell.toml", ".config/llmspell.toml"] {
@@ -121,6 +123,6 @@ async fn discover_actual_path() -> String {
             }
         }
     }
-    
+
     "(no config file found - using defaults)".to_string()
 }

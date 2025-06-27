@@ -96,8 +96,7 @@ fn bench_serialization(c: &mut Criterion) {
         .with_data("key1".to_string(), serde_json::json!("value1"))
         .with_data("key2".to_string(), serde_json::json!(42))
         .with_data("key3".to_string(), serde_json::json!({"nested": "value"}));
-    let input = AgentInput::text("test prompt")
-        .with_context(context);
+    let input = AgentInput::text("test prompt").with_context(context);
 
     group.bench_function("AgentInput_serialize", |b| {
         b.iter(|| serde_json::to_string(black_box(&input)).unwrap())
@@ -127,8 +126,7 @@ fn bench_agent_operations(c: &mut Criterion) {
                 .with_data("key1".to_string(), serde_json::json!("value1"))
                 .with_data("key2".to_string(), serde_json::json!(42))
                 .with_data("key3".to_string(), serde_json::json!(true));
-            AgentInput::text("test")
-                .with_context(context)
+            AgentInput::text("test").with_context(context)
         })
     });
 
@@ -136,8 +134,7 @@ fn bench_agent_operations(c: &mut Criterion) {
         .with_data("key1".to_string(), serde_json::json!("value1"))
         .with_data("key2".to_string(), serde_json::json!(42))
         .with_data("key3".to_string(), serde_json::json!(true));
-    let input = AgentInput::text("test")
-        .with_context(context);
+    let input = AgentInput::text("test").with_context(context);
 
     group.bench_function("AgentInput_get_context", |b| {
         b.iter(|| {
@@ -160,9 +157,8 @@ fn bench_agent_operations(c: &mut Criterion) {
             metadata.confidence = Some(0.95);
             metadata.token_count = Some(150);
             metadata.model = Some("gpt-4".to_string());
-            
-            AgentOutput::text("result")
-                .with_metadata(metadata)
+
+            AgentOutput::text("result").with_metadata(metadata)
         })
     });
 

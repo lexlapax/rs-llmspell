@@ -9,7 +9,7 @@
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::io;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 /// System information structure
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -434,6 +434,7 @@ pub fn is_running_in_container() -> bool {
     #[cfg(target_os = "linux")]
     {
         use std::fs;
+        use std::path::Path;
         // Check for /.dockerenv or /.containerenv
         Path::new("/.dockerenv").exists() 
             || Path::new("/.containerenv").exists()
@@ -478,8 +479,8 @@ pub fn is_running_in_vm() -> bool {
                     || content.contains("xen")
             })
             .unwrap_or(false)
-            || Path::new("/proc/xen").exists()
-            || Path::new("/sys/hypervisor/type").exists()
+            || std::path::Path::new("/proc/xen").exists()
+            || std::path::Path::new("/sys/hypervisor/type").exists()
     }
 
     #[cfg(not(target_os = "linux"))]

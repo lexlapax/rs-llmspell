@@ -2,8 +2,8 @@
 //! ABOUTME: Provides an interactive read-eval-print loop
 
 use crate::cli::ScriptEngine;
-use llmspell_bridge::RuntimeConfig;
 use anyhow::Result;
+use llmspell_bridge::RuntimeConfig;
 use std::path::PathBuf;
 
 /// Start an interactive REPL session
@@ -15,7 +15,7 @@ pub async fn start_repl(
     println!("LLMSpell REPL - {} engine", engine.as_str());
     println!("Type 'exit' or press Ctrl+D to quit");
     println!();
-    
+
     // TODO: Implement full REPL in Phase 2
     anyhow::bail!("REPL mode not implemented yet (coming in Phase 2)")
 }

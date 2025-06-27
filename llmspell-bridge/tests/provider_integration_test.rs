@@ -1,6 +1,9 @@
 //! Test provider integration with script runtime
 
-use llmspell_bridge::{RuntimeConfig, ScriptRuntime, providers::{ProviderManagerConfig, ProviderConfig}};
+use llmspell_bridge::{
+    providers::{ProviderConfig, ProviderManagerConfig},
+    RuntimeConfig, ScriptRuntime,
+};
 use std::collections::HashMap;
 
 #[tokio::test]
@@ -18,7 +21,7 @@ async fn test_lua_agent_creation_with_mock_provider() {
             extra: HashMap::new(),
         },
     );
-    
+
     let runtime_config = RuntimeConfig {
         default_engine: "lua".to_string(),
         providers: ProviderManagerConfig {
@@ -27,10 +30,10 @@ async fn test_lua_agent_creation_with_mock_provider() {
         },
         ..Default::default()
     };
-    
+
     // Create runtime with Lua engine
     let runtime = ScriptRuntime::new_with_lua(runtime_config).await;
-    
+
     // For now, we expect this to fail since we don't have a mock provider implementation
     assert!(runtime.is_err());
 }
@@ -39,7 +42,7 @@ async fn test_lua_agent_creation_with_mock_provider() {
 async fn test_lua_script_provider_access() {
     let runtime_config = RuntimeConfig::default();
     let runtime = ScriptRuntime::new_with_lua(runtime_config).await.unwrap();
-    
+
     // Test script that tries to create an agent
     let script = r#"
         -- Try to create an agent (will fail without provider config)
@@ -53,10 +56,10 @@ async fn test_lua_script_provider_access() {
         -- We expect this to fail for now
         return not success
     "#;
-    
+
     let result = runtime.execute_script(script).await;
     assert!(result.is_ok());
-    
+
     // The script should return true (meaning Agent.create failed as expected)
     if let Ok(output) = result {
         assert_eq!(output.output, serde_json::Value::Bool(true));

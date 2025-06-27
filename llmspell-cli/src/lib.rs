@@ -3,8 +3,8 @@
 
 pub mod cli;
 pub mod commands;
-pub mod output;
 pub mod config;
+pub mod output;
 
 // Re-export commonly used types for testing
 pub use cli::OutputFormat;

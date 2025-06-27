@@ -1,7 +1,7 @@
 //! ABOUTME: Engine factory for creating script engines by name or configuration
 //! ABOUTME: Supports built-in engines (Lua, JavaScript) and third-party plugins
 
-use crate::engine::bridge::{ScriptEngineBridge, EngineFeatures};
+use crate::engine::bridge::{EngineFeatures, ScriptEngineBridge};
 use llmspell_core::error::LLMSpellError;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -12,7 +12,9 @@ pub struct EngineFactory;
 
 impl EngineFactory {
     /// Create a Lua engine with the given configuration
-    pub fn create_lua_engine(config: &LuaConfig) -> Result<Box<dyn ScriptEngineBridge>, LLMSpellError> {
+    pub fn create_lua_engine(
+        config: &LuaConfig,
+    ) -> Result<Box<dyn ScriptEngineBridge>, LLMSpellError> {
         #[cfg(feature = "lua")]
         {
             use crate::lua::LuaEngine;
@@ -26,10 +28,12 @@ impl EngineFactory {
             })
         }
     }
-    
+
     /// Create a JavaScript engine with the given configuration
     #[allow(unused_variables)]
-    pub fn create_javascript_engine(config: &JSConfig) -> Result<Box<dyn ScriptEngineBridge>, LLMSpellError> {
+    pub fn create_javascript_engine(
+        config: &JSConfig,
+    ) -> Result<Box<dyn ScriptEngineBridge>, LLMSpellError> {
         #[cfg(feature = "javascript")]
         {
             use crate::javascript::JSEngine;
@@ -38,28 +42,36 @@ impl EngineFactory {
         #[cfg(not(feature = "javascript"))]
         {
             Err(LLMSpellError::Component {
-                message: "JavaScript engine not enabled. Enable the 'javascript' feature.".to_string(),
+                message: "JavaScript engine not enabled. Enable the 'javascript' feature."
+                    .to_string(),
                 source: None,
             })
         }
     }
-    
+
     /// Create an engine by name with the given configuration
-    pub fn create_from_name(name: &str, config: &Value) -> Result<Box<dyn ScriptEngineBridge>, LLMSpellError> {
+    pub fn create_from_name(
+        name: &str,
+        config: &Value,
+    ) -> Result<Box<dyn ScriptEngineBridge>, LLMSpellError> {
         match name {
             "lua" => {
-                let lua_config = serde_json::from_value::<LuaConfig>(config.clone())
-                    .map_err(|e| LLMSpellError::Validation {
-                        field: Some("config".to_string()),
-                        message: format!("Invalid Lua configuration: {}", e),
+                let lua_config =
+                    serde_json::from_value::<LuaConfig>(config.clone()).map_err(|e| {
+                        LLMSpellError::Validation {
+                            field: Some("config".to_string()),
+                            message: format!("Invalid Lua configuration: {}", e),
+                        }
                     })?;
                 Self::create_lua_engine(&lua_config)
             }
             "javascript" | "js" => {
-                let js_config = serde_json::from_value::<JSConfig>(config.clone())
-                    .map_err(|e| LLMSpellError::Validation {
-                        field: Some("config".to_string()),
-                        message: format!("Invalid JavaScript configuration: {}", e),
+                let js_config =
+                    serde_json::from_value::<JSConfig>(config.clone()).map_err(|e| {
+                        LLMSpellError::Validation {
+                            field: Some("config".to_string()),
+                            message: format!("Invalid JavaScript configuration: {}", e),
+                        }
                     })?;
                 Self::create_javascript_engine(&js_config)
             }
@@ -77,11 +89,11 @@ impl EngineFactory {
             }
         }
     }
-    
+
     /// List all available engines (built-in and plugins)
     pub fn list_available_engines() -> Vec<EngineInfo> {
         let mut engines = vec![];
-        
+
         #[cfg(feature = "lua")]
         engines.push(EngineInfo {
             name: "lua".to_string(),
@@ -89,7 +101,7 @@ impl EngineFactory {
             version: "5.4".to_string(),
             features: crate::lua::LuaEngine::engine_features(),
         });
-        
+
         #[cfg(feature = "javascript")]
         engines.push(EngineInfo {
             name: "javascript".to_string(),
@@ -97,7 +109,7 @@ impl EngineFactory {
             version: "ES2020".to_string(),
             features: crate::javascript::JSEngine::engine_features(),
         });
-        
+
         // Add registered plugins
         let registry = PLUGIN_REGISTRY.read().unwrap();
         for (name, plugin) in registry.iter() {
@@ -108,7 +120,7 @@ impl EngineFactory {
                 features: plugin.supported_features(),
             });
         }
-        
+
         engines
     }
 }
@@ -199,7 +211,7 @@ pub enum ModuleResolution {
 // Plugin system for third-party engines
 
 lazy_static::lazy_static! {
-    static ref PLUGIN_REGISTRY: Arc<RwLock<HashMap<String, Box<dyn ScriptEnginePlugin>>>> = 
+    static ref PLUGIN_REGISTRY: Arc<RwLock<HashMap<String, Box<dyn ScriptEnginePlugin>>>> =
         Arc::new(RwLock::new(HashMap::new()));
 }
 
@@ -207,16 +219,16 @@ lazy_static::lazy_static! {
 pub trait ScriptEnginePlugin: Send + Sync {
     /// Get the name of this engine
     fn engine_name(&self) -> &str;
-    
+
     /// Get a description of this engine
     fn description(&self) -> String;
-    
+
     /// Get the version of this engine
     fn version(&self) -> String;
-    
+
     /// Create an instance of this engine
     fn create_engine(&self, config: Value) -> Result<Box<dyn ScriptEngineBridge>, LLMSpellError>;
-    
+
     /// Get the features supported by this engine
     fn supported_features(&self) -> EngineFeatures;
 }
@@ -236,7 +248,7 @@ pub fn unregister_engine_plugin(name: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_lua_config_default() {
         let config = LuaConfig::default();
@@ -244,7 +256,7 @@ mod tests {
         assert!(!config.debug);
         assert!(config.package_paths.is_empty());
     }
-    
+
     #[test]
     fn test_js_config_default() {
         let config = JSConfig::default();
@@ -252,7 +264,7 @@ mod tests {
         assert_eq!(config.max_heap_size, Some(100_000_000));
         assert!(config.enable_console);
     }
-    
+
     #[test]
     fn test_engine_factory_unknown_engine() {
         let result = EngineFactory::create_from_name("unknown", &Value::Null);

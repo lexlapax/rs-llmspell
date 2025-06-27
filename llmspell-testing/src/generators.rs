@@ -94,13 +94,7 @@ pub fn agent_input_strategy() -> impl Strategy<Value = AgentInput> {
 
 /// Strategy for generating AgentOutput
 pub fn agent_output_strategy() -> impl Strategy<Value = AgentOutput> {
-    (
-        ".*",
-        prop::collection::vec(any::<u8>(), 0..100),
-    )
-        .prop_map(|(text, _)| {
-            AgentOutput::text(text)
-        })
+    (".*", prop::collection::vec(any::<u8>(), 0..100)).prop_map(|(text, _)| AgentOutput::text(text))
 }
 
 /// Strategy for generating ExecutionContext

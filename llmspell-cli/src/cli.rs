@@ -53,9 +53,9 @@ impl ScriptEngine {
 
     pub fn is_available(&self) -> bool {
         match self {
-            ScriptEngine::Lua => true,  // Available in Phase 1
-            ScriptEngine::Javascript => false,  // Phase 5
-            ScriptEngine::Python => false,  // Phase 9
+            ScriptEngine::Lua => true,         // Available in Phase 1
+            ScriptEngine::Javascript => false, // Phase 5
+            ScriptEngine::Python => false,     // Phase 9
         }
     }
 
@@ -134,13 +134,13 @@ pub enum Commands {
         #[arg(long)]
         all: bool,
     },
-    
+
     /// Initialize configuration file
     Init {
         /// Output path for configuration file
         #[arg(short, long, default_value = "llmspell.toml")]
         output: PathBuf,
-        
+
         /// Force overwrite existing file
         #[arg(short, long)]
         force: bool,

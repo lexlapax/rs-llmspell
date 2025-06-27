@@ -1,10 +1,10 @@
 //! ABOUTME: Exec command implementation for inline script execution
 //! ABOUTME: Executes script code provided directly on the command line
 
-use crate::cli::{ScriptEngine, OutputFormat};
+use crate::cli::{OutputFormat, ScriptEngine};
 use crate::output::{format_output, print_stream};
-use llmspell_bridge::RuntimeConfig;
 use anyhow::Result;
+use llmspell_bridge::RuntimeConfig;
 
 /// Execute inline script code
 pub async fn execute_inline_script(

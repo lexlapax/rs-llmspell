@@ -4,9 +4,9 @@
 #[cfg(feature = "lua")]
 mod tests {
     use llmspell_bridge::{
-        engine::factory::{LuaConfig, EngineFactory},
-        registry::ComponentRegistry,
+        engine::factory::{EngineFactory, LuaConfig},
         providers::{ProviderManager, ProviderManagerConfig},
+        registry::ComponentRegistry,
     };
     use std::sync::Arc;
 
@@ -14,23 +14,27 @@ mod tests {
     async fn test_lua_streaming_api_injection() {
         let config = LuaConfig::default();
         let mut engine = EngineFactory::create_lua_engine(&config).unwrap();
-        
+
         // Create mock registry and provider manager
         let registry = Arc::new(ComponentRegistry::new());
         let provider_config = ProviderManagerConfig::default();
         let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
-        
+
         // Inject APIs including streaming
         let result = engine.inject_apis(&registry, &providers);
         assert!(result.is_ok(), "Failed to inject APIs with streaming");
-        
+
         // Test that Streaming global exists
         let script = "return Streaming ~= nil";
         let output = engine.execute_script(script).await;
-        
+
         match output {
             Ok(result) => {
-                assert_eq!(result.output.as_bool(), Some(true), "Streaming global not found");
+                assert_eq!(
+                    result.output.as_bool(),
+                    Some(true),
+                    "Streaming global not found"
+                );
             }
             Err(e) => panic!("Script execution failed: {:?}", e),
         }
@@ -40,15 +44,15 @@ mod tests {
     async fn test_lua_coroutine_streaming() {
         let config = LuaConfig::default();
         let mut engine = EngineFactory::create_lua_engine(&config).unwrap();
-        
+
         // Create mock registry and provider manager
         let registry = Arc::new(ComponentRegistry::new());
         let provider_config = ProviderManagerConfig::default();
         let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
-        
+
         // Inject APIs
         engine.inject_apis(&registry, &providers).unwrap();
-        
+
         // Test creating a stream with coroutines
         let script = r#"
             local stream = Streaming.create(function()
@@ -64,9 +68,9 @@ mod tests {
                 hasCollect = type(stream.collect) == "function"
             }
         "#;
-        
+
         let output = engine.execute_script(script).await;
-        
+
         match output {
             Ok(result) => {
                 let obj = result.output.as_object().expect("Expected object result");
@@ -83,15 +87,15 @@ mod tests {
     async fn test_lua_tool_api() {
         let config = LuaConfig::default();
         let mut engine = EngineFactory::create_lua_engine(&config).unwrap();
-        
+
         // Create mock registry and provider manager
         let registry = Arc::new(ComponentRegistry::new());
         let provider_config = ProviderManagerConfig::default();
         let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
-        
+
         // Inject APIs
         engine.inject_apis(&registry, &providers).unwrap();
-        
+
         // Test Tool API
         let script = r#"
             -- Check Tool global exists
@@ -111,9 +115,9 @@ mod tests {
                 toolWorks = toolWorks
             }
         "#;
-        
+
         let output = engine.execute_script(script).await;
-        
+
         match output {
             Ok(result) => {
                 let obj = result.output.as_object().expect("Expected object result");
@@ -129,15 +133,15 @@ mod tests {
     async fn test_lua_workflow_api() {
         let config = LuaConfig::default();
         let mut engine = EngineFactory::create_lua_engine(&config).unwrap();
-        
+
         // Create mock registry and provider manager
         let registry = Arc::new(ComponentRegistry::new());
         let provider_config = ProviderManagerConfig::default();
         let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
-        
+
         // Inject APIs
         engine.inject_apis(&registry, &providers).unwrap();
-        
+
         // Test Workflow API
         let script = r#"
             -- Check Workflow global exists
@@ -163,17 +167,32 @@ mod tests {
                 parHasExecute = par and type(par.execute) == "function"
             }
         "#;
-        
+
         let output = engine.execute_script(script).await;
-        
+
         match output {
             Ok(result) => {
                 let obj = result.output.as_object().expect("Expected object result");
-                assert_eq!(obj.get("workflowExists").and_then(|v| v.as_bool()), Some(true));
-                assert_eq!(obj.get("seqType").and_then(|v| v.as_str()), Some("sequential"));
-                assert_eq!(obj.get("parType").and_then(|v| v.as_str()), Some("parallel"));
-                assert_eq!(obj.get("seqHasExecute").and_then(|v| v.as_bool()), Some(true));
-                assert_eq!(obj.get("parHasExecute").and_then(|v| v.as_bool()), Some(true));
+                assert_eq!(
+                    obj.get("workflowExists").and_then(|v| v.as_bool()),
+                    Some(true)
+                );
+                assert_eq!(
+                    obj.get("seqType").and_then(|v| v.as_str()),
+                    Some("sequential")
+                );
+                assert_eq!(
+                    obj.get("parType").and_then(|v| v.as_str()),
+                    Some("parallel")
+                );
+                assert_eq!(
+                    obj.get("seqHasExecute").and_then(|v| v.as_bool()),
+                    Some(true)
+                );
+                assert_eq!(
+                    obj.get("parHasExecute").and_then(|v| v.as_bool()),
+                    Some(true)
+                );
             }
             Err(e) => panic!("Script execution failed: {:?}", e),
         }
@@ -183,19 +202,19 @@ mod tests {
     async fn test_lua_streaming_execution() {
         let config = LuaConfig::default();
         let mut engine = EngineFactory::create_lua_engine(&config).unwrap();
-        
+
         // Create mock registry and provider manager
         let registry = Arc::new(ComponentRegistry::new());
         let provider_config = ProviderManagerConfig::default();
         let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
-        
+
         // Inject APIs first
         engine.inject_apis(&registry, &providers).unwrap();
-        
+
         // Test that streaming execution returns appropriate error for now
         let script = "return 'test'";
         let stream_result = engine.execute_script_streaming(script).await;
-        
+
         // For now, this should work as we have a basic implementation
         match stream_result {
             Ok(_) => println!("Streaming execution succeeded"),

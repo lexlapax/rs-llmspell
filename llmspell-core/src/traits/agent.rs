@@ -259,8 +259,8 @@ pub trait Agent: BaseAgent {
 
 #[cfg(test)]
 mod tests {
-    use crate::types::{AgentInput, AgentOutput, ExecutionContext};
     use super::*;
+    use crate::types::{AgentInput, AgentOutput, ExecutionContext};
     use crate::ComponentMetadata;
     use std::collections::VecDeque;
 

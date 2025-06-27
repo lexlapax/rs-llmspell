@@ -245,29 +245,36 @@ async fn test_metadata_immutability() {
 
 #[tokio::test]
 async fn test_execution_context_concurrent_access() {
-    let context = Arc::new(
-        {
-            let mut context = ExecutionContext::with_conversation("shared-session".to_string());
-            context.user_id = Some("user-123".to_string());
-            context
-                .with_data("KEY1".to_string(), serde_json::json!("value1"))
-                .with_data("KEY2".to_string(), serde_json::json!("value2"))
-        },
-    );
+    let context = Arc::new({
+        let mut context = ExecutionContext::with_conversation("shared-session".to_string());
+        context.user_id = Some("user-123".to_string());
+        context
+            .with_data("KEY1".to_string(), serde_json::json!("value1"))
+            .with_data("KEY2".to_string(), serde_json::json!("value2"))
+    });
 
     let mut handles = Vec::new();
     for i in 0..20 {
         let context_clone = Arc::clone(&context);
         let handle = tokio::spawn(async move {
             // Concurrent reads
-            assert_eq!(context_clone.conversation_id, Some("shared-session".to_string()));
+            assert_eq!(
+                context_clone.conversation_id,
+                Some("shared-session".to_string())
+            );
             assert_eq!(context_clone.user_id, Some("user-123".to_string()));
 
             // Access data variables
             if i % 2 == 0 {
-                assert_eq!(context_clone.data.get("KEY1"), Some(&serde_json::json!("value1")));
+                assert_eq!(
+                    context_clone.data.get("KEY1"),
+                    Some(&serde_json::json!("value1"))
+                );
             } else {
-                assert_eq!(context_clone.data.get("KEY2"), Some(&serde_json::json!("value2")));
+                assert_eq!(
+                    context_clone.data.get("KEY2"),
+                    Some(&serde_json::json!("value2"))
+                );
             }
         });
         handles.push(handle);

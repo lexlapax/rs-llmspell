@@ -143,7 +143,11 @@ pub trait BaseAgent: Send + Sync {
     ///
     /// The default implementation returns a NotImplemented error, indicating
     /// that the component does not support streaming execution.
-    async fn stream_execute(&self, _input: AgentInput, _context: ExecutionContext) -> Result<AgentStream> {
+    async fn stream_execute(
+        &self,
+        _input: AgentInput,
+        _context: ExecutionContext,
+    ) -> Result<AgentStream> {
         Err(crate::LLMSpellError::Component {
             message: "Streaming execution not supported by this component".to_string(),
             source: None,
@@ -295,10 +299,10 @@ mod tests {
 
         // Test that streaming is not supported by default
         assert!(!agent.supports_streaming());
-        
+
         // Test that multimodal is not supported by default
         assert!(!agent.supports_multimodal());
-        
+
         // Test that only text is supported by default
         let supported_types = agent.supported_media_types();
         assert_eq!(supported_types.len(), 1);
@@ -309,7 +313,7 @@ mod tests {
         let context = ExecutionContext::new();
         let stream_result = agent.stream_execute(input, context).await;
         assert!(stream_result.is_err());
-        
+
         if let Err(crate::LLMSpellError::Component { message, .. }) = stream_result {
             assert!(message.contains("Streaming execution not supported"));
         } else {

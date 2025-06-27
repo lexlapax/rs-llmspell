@@ -378,8 +378,8 @@ pub trait Tool: BaseAgent {
 
 #[cfg(test)]
 mod tests {
-    use crate::types::{AgentInput, AgentOutput, ExecutionContext};
     use super::*;
+    use crate::types::{AgentInput, AgentOutput, ExecutionContext};
     use crate::ComponentMetadata;
 
     #[test]

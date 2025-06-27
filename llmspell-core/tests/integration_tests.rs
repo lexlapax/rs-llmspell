@@ -53,7 +53,10 @@ impl BaseAgent for TestAgent {
         conv.push(ConversationMessage::assistant(response.clone()));
 
         let mut metadata = llmspell_core::types::OutputMetadata::default();
-        metadata.extra.insert("execution_count".to_string(), serde_json::json!(*self.execution_count.lock().unwrap()));
+        metadata.extra.insert(
+            "execution_count".to_string(),
+            serde_json::json!(*self.execution_count.lock().unwrap()),
+        );
         Ok(AgentOutput::text(response).with_metadata(metadata))
     }
 
@@ -118,7 +121,9 @@ impl BaseAgent for TestTool {
         *self.invocation_count.lock().unwrap() += 1;
 
         // Parse parameters from input parameters
-        let params = input.parameters.get("params")
+        let params = input
+            .parameters
+            .get("params")
             .ok_or_else(|| LLMSpellError::Validation {
                 message: "Missing params in parameters".to_string(),
                 field: Some("params".to_string()),
@@ -284,10 +289,13 @@ async fn test_tool_execution_and_validation() {
         "text": "HELLO",
         "operation": "lowercase"
     });
-    let input = AgentInput::text("transform".to_string())
-        .with_parameter("params".to_string(), params);
+    let input =
+        AgentInput::text("transform".to_string()).with_parameter("params".to_string(), params);
     let output = tool
-        .execute(input, ExecutionContext::with_conversation("test".to_string()))
+        .execute(
+            input,
+            ExecutionContext::with_conversation("test".to_string()),
+        )
         .await
         .unwrap();
     assert_eq!(output.text, "hello");
@@ -297,10 +305,13 @@ async fn test_tool_execution_and_validation() {
         "text": "hello",
         "operation": "reverse"
     });
-    let input = AgentInput::text("transform".to_string())
-        .with_parameter("params".to_string(), params);
+    let input =
+        AgentInput::text("transform".to_string()).with_parameter("params".to_string(), params);
     let output = tool
-        .execute(input, ExecutionContext::with_conversation("test".to_string()))
+        .execute(
+            input,
+            ExecutionContext::with_conversation("test".to_string()),
+        )
         .await
         .unwrap();
     assert_eq!(output.text, "olleh");
@@ -362,7 +373,10 @@ async fn test_execution_context_environment() {
 
     assert_eq!(context.conversation_id, Some("test-session".to_string()));
     assert_eq!(context.user_id, Some("user-123".to_string()));
-    assert_eq!(context.data.get("LOG_LEVEL"), Some(&serde_json::json!("debug")));
+    assert_eq!(
+        context.data.get("LOG_LEVEL"),
+        Some(&serde_json::json!("debug"))
+    );
     assert_eq!(context.data.get("ENV"), Some(&serde_json::json!("test")));
     assert_eq!(context.data.get("MISSING"), None);
 }

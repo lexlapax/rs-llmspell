@@ -2,27 +2,24 @@
 //! ABOUTME: Foundation for multi-language script execution (Lua, JavaScript, Python, etc.)
 
 use async_trait::async_trait;
-use llmspell_core::{
-    error::LLMSpellError,
-    types::AgentStream,
-};
+use llmspell_core::{error::LLMSpellError, types::AgentStream};
 use serde_json::Value;
 use std::sync::Arc;
 
 /// Core abstraction for script execution engines
-/// 
+///
 /// This trait enables language-agnostic script execution by providing
 /// a common interface that all script engines must implement.
 #[async_trait]
 pub trait ScriptEngineBridge: Send + Sync {
     /// Execute a script and return the output
     async fn execute_script(&self, script: &str) -> Result<ScriptOutput, LLMSpellError>;
-    
+
     /// Execute a script with streaming output support
     async fn execute_script_streaming(&self, script: &str) -> Result<ScriptStream, LLMSpellError>;
-    
+
     /// Inject language-agnostic APIs into the engine
-    /// 
+    ///
     /// This method is called during initialization to inject:
     /// - Agent creation and execution APIs
     /// - Tool discovery and execution APIs
@@ -33,22 +30,22 @@ pub trait ScriptEngineBridge: Send + Sync {
         registry: &Arc<crate::ComponentRegistry>,
         providers: &Arc<crate::ProviderManager>,
     ) -> Result<(), LLMSpellError>;
-    
+
     /// Get the name of this script engine
     fn get_engine_name(&self) -> &'static str;
-    
+
     /// Check if this engine supports streaming execution
     fn supports_streaming(&self) -> bool;
-    
+
     /// Check if this engine supports multimodal content
     fn supports_multimodal(&self) -> bool;
-    
+
     /// Get the features supported by this engine
     fn supported_features(&self) -> EngineFeatures;
-    
+
     /// Get the current execution context
     fn get_execution_context(&self) -> Result<ExecutionContext, LLMSpellError>;
-    
+
     /// Set the execution context
     fn set_execution_context(&mut self, context: ExecutionContext) -> Result<(), LLMSpellError>;
 }

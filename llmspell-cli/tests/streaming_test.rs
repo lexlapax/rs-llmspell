@@ -1,11 +1,11 @@
 //! ABOUTME: Tests for streaming output functionality
 //! ABOUTME: Validates progress indicators and Ctrl+C handling
 
+use chrono::Utc;
+use futures::stream;
+use llmspell_bridge::engine::{ScriptMetadata, ScriptStream};
 use llmspell_cli::{output::print_stream, OutputFormat};
 use llmspell_core::types::{AgentChunk, ChunkContent, ChunkMetadata, ControlMessage};
-use llmspell_bridge::engine::{ScriptStream, ScriptMetadata};
-use futures::stream;
-use chrono::Utc;
 
 #[tokio::test]
 async fn test_streaming_text_output() {

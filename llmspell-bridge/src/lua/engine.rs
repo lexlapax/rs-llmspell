@@ -1,21 +1,21 @@
 //! ABOUTME: LuaEngine implementation of ScriptEngineBridge trait
 //! ABOUTME: Provides Lua 5.4 script execution with coroutine-based streaming
 
-use crate::engine::{
-    ScriptEngineBridge, ScriptOutput, ScriptStream, ScriptMetadata,
-    EngineFeatures, ExecutionContext,
-    factory::{LuaConfig, StdlibLevel},
-};
 use crate::engine::types::{ApiSurface, ScriptEngineError};
+use crate::engine::{
+    factory::{LuaConfig, StdlibLevel},
+    EngineFeatures, ExecutionContext, ScriptEngineBridge, ScriptMetadata, ScriptOutput,
+    ScriptStream,
+};
 use crate::{ComponentRegistry, ProviderManager};
 use async_trait::async_trait;
 use llmspell_core::error::LLMSpellError;
+use serde_json::Value;
 use std::sync::Arc;
 use std::time::Instant;
-use serde_json::Value;
 
 /// Lua script engine implementation
-/// 
+///
 /// Note: mlua requires unsafe Send/Sync implementation for thread safety
 pub struct LuaEngine {
     #[cfg(feature = "lua")]
@@ -41,7 +41,7 @@ impl LuaEngine {
                 StdlibLevel::Safe => Lua::new(), // TODO: restrict stdlib
                 StdlibLevel::Full => Lua::new(),
             };
-            
+
             Ok(Self {
                 lua: Arc::new(parking_lot::Mutex::new(lua)),
                 _config: config.clone(),
@@ -49,7 +49,7 @@ impl LuaEngine {
                 execution_context: ExecutionContext::default(),
             })
         }
-        
+
         #[cfg(not(feature = "lua"))]
         {
             Err(LLMSpellError::Component {
@@ -58,7 +58,7 @@ impl LuaEngine {
             })
         }
     }
-    
+
     /// Get the supported features for Lua
     pub fn engine_features() -> EngineFeatures {
         EngineFeatures {
@@ -67,7 +67,7 @@ impl LuaEngine {
             multimodal: true,
             debugging: false, // Not implemented yet
             modules: true,
-            max_script_size: Some(10_000_000), // 10MB
+            max_script_size: Some(10_000_000),    // 10MB
             max_execution_time_ms: Some(300_000), // 5 minutes
         }
     }
@@ -84,18 +84,18 @@ impl ScriptEngineBridge for LuaEngine {
                     source: None,
                 });
             }
-            
+
             let start_time = Instant::now();
             let lua = self.lua.lock();
-            
+
             // Execute the script
             let result: mlua::Result<mlua::Value> = lua.load(script).eval();
-            
+
             match result {
                 Ok(value) => {
                     // Convert Lua value to JSON
                     let output = lua_value_to_json(&lua, value)?;
-                    
+
                     Ok(ScriptOutput {
                         output,
                         console_output: vec![], // TODO: Capture console output
@@ -107,15 +107,14 @@ impl ScriptEngineBridge for LuaEngine {
                         },
                     })
                 }
-                Err(e) => {
-                    Err(ScriptEngineError::ExecutionError {
-                        engine: "lua".to_string(),
-                        details: e.to_string(),
-                    }.into())
+                Err(e) => Err(ScriptEngineError::ExecutionError {
+                    engine: "lua".to_string(),
+                    details: e.to_string(),
                 }
+                .into()),
             }
         }
-        
+
         #[cfg(not(feature = "lua"))]
         {
             Err(LLMSpellError::Component {
@@ -124,7 +123,7 @@ impl ScriptEngineBridge for LuaEngine {
             })
         }
     }
-    
+
     async fn execute_script_streaming(&self, script: &str) -> Result<ScriptStream, LLMSpellError> {
         #[cfg(feature = "lua")]
         {
@@ -134,15 +133,15 @@ impl ScriptEngineBridge for LuaEngine {
                     source: None,
                 });
             }
-            
+
             // For now, implement a simple non-streaming execution that returns a single chunk
             // Full streaming with coroutines requires more complex handling due to Send constraints
             let start_time = Instant::now();
             let lua = self.lua.lock();
-            
+
             // Execute the script
             let result: mlua::Result<mlua::Value> = lua.load(script).eval();
-            
+
             // Create a single chunk with the result
             let chunk = match result {
                 Ok(value) => {
@@ -152,7 +151,7 @@ impl ScriptEngineBridge for LuaEngine {
                         stream_id: "lua-stream".to_string(),
                         chunk_index: 0,
                         content: llmspell_core::types::ChunkContent::Text(
-                            serde_json::to_string(&output).unwrap_or_else(|_| "null".to_string())
+                            serde_json::to_string(&output).unwrap_or_else(|_| "null".to_string()),
                         ),
                         metadata: llmspell_core::types::ChunkMetadata {
                             is_final: true,
@@ -163,26 +162,24 @@ impl ScriptEngineBridge for LuaEngine {
                         timestamp: chrono::Utc::now(),
                     }
                 }
-                Err(e) => {
-                    llmspell_core::types::AgentChunk {
-                        stream_id: "lua-stream".to_string(),
-                        chunk_index: 0,
-                        content: llmspell_core::types::ChunkContent::Control(
-                            llmspell_core::types::ControlMessage::StreamCancelled {
-                                reason: format!("Script execution failed: {}", e),
-                            }
-                        ),
-                        metadata: Default::default(),
-                        timestamp: chrono::Utc::now(),
-                    }
-                }
+                Err(e) => llmspell_core::types::AgentChunk {
+                    stream_id: "lua-stream".to_string(),
+                    chunk_index: 0,
+                    content: llmspell_core::types::ChunkContent::Control(
+                        llmspell_core::types::ControlMessage::StreamCancelled {
+                            reason: format!("Script execution failed: {}", e),
+                        },
+                    ),
+                    metadata: Default::default(),
+                    timestamp: chrono::Utc::now(),
+                },
             };
-            
+
             // Create a stream from a single chunk
             use futures::stream;
             let chunk_stream = stream::once(async move { Ok(chunk) });
             let boxed_stream: llmspell_core::types::AgentStream = Box::pin(chunk_stream);
-            
+
             Ok(ScriptStream {
                 stream: boxed_stream,
                 metadata: ScriptMetadata {
@@ -193,7 +190,7 @@ impl ScriptEngineBridge for LuaEngine {
                 },
             })
         }
-        
+
         #[cfg(not(feature = "lua"))]
         {
             Err(LLMSpellError::Component {
@@ -202,7 +199,7 @@ impl ScriptEngineBridge for LuaEngine {
             })
         }
     }
-    
+
     fn inject_apis(
         &mut self,
         registry: &Arc<ComponentRegistry>,
@@ -211,47 +208,52 @@ impl ScriptEngineBridge for LuaEngine {
         #[cfg(feature = "lua")]
         {
             let lua = self.lua.lock();
-            
+
             // Get the API surface definition
             let api_surface = ApiSurface::standard();
-            
+
             // Inject Agent API
-            super::api::inject_agent_api(&lua, &api_surface.agent_api, registry.clone(), providers.clone())?;
-            
+            super::api::inject_agent_api(
+                &lua,
+                &api_surface.agent_api,
+                registry.clone(),
+                providers.clone(),
+            )?;
+
             // Inject Tool API
             super::api::inject_tool_api(&lua, &api_surface.tool_api, registry.clone())?;
-            
+
             // Inject Workflow API
             super::api::inject_workflow_api(&lua, &api_surface.workflow_api, registry.clone())?;
-            
+
             // Inject Streaming API
             super::api::inject_streaming_api(&lua, &api_surface.streaming_api)?;
-            
+
             self.api_injected = true;
         }
         Ok(())
     }
-    
+
     fn get_engine_name(&self) -> &'static str {
         "lua"
     }
-    
+
     fn supports_streaming(&self) -> bool {
         true
     }
-    
+
     fn supports_multimodal(&self) -> bool {
         true
     }
-    
+
     fn supported_features(&self) -> EngineFeatures {
         Self::engine_features()
     }
-    
+
     fn get_execution_context(&self) -> Result<ExecutionContext, LLMSpellError> {
         Ok(self.execution_context.clone())
     }
-    
+
     fn set_execution_context(&mut self, context: ExecutionContext) -> Result<(), LLMSpellError> {
         self.execution_context = context;
         Ok(())
@@ -260,9 +262,9 @@ impl ScriptEngineBridge for LuaEngine {
 
 #[cfg(feature = "lua")]
 /// Convert a Lua value to JSON
-fn lua_value_to_json(lua: &mlua::Lua, value: mlua::Value) -> Result<Value, LLMSpellError> {
+fn lua_value_to_json(_lua: &mlua::Lua, value: mlua::Value) -> Result<Value, LLMSpellError> {
     use mlua::Value as LuaValue;
-    
+
     match value {
         LuaValue::Nil => Ok(Value::Null),
         LuaValue::Boolean(b) => Ok(Value::Bool(b)),
@@ -287,7 +289,7 @@ fn lua_value_to_json(lua: &mlua::Lua, value: mlua::Value) -> Result<Value, LLMSp
                         message: format!("Failed to get table value: {}", e),
                         source: None,
                     })?;
-                    array.push(lua_value_to_json(lua, value)?);
+                    array.push(lua_value_to_json(_lua, value)?);
                 }
                 Ok(Value::Array(array))
             } else {
@@ -298,13 +300,13 @@ fn lua_value_to_json(lua: &mlua::Lua, value: mlua::Value) -> Result<Value, LLMSp
                         message: format!("Failed to iterate table: {}", e),
                         source: None,
                     })?;
-                    
+
                     if let LuaValue::String(key_str) = k {
                         let key = key_str.to_str().map_err(|e| LLMSpellError::Component {
                             message: format!("Failed to convert table key: {}", e),
                             source: None,
                         })?;
-                        map.insert(key.to_string(), lua_value_to_json(lua, v)?);
+                        map.insert(key.to_string(), lua_value_to_json(_lua, v)?);
                     }
                 }
                 Ok(Value::Object(map))
@@ -328,12 +330,10 @@ fn is_lua_array(table: &mlua::Table) -> bool {
             }
         }
         // Check if there are any non-numeric keys
-        for pair in table.clone().pairs::<mlua::Value, mlua::Value>() {
-            if let Ok((k, _)) = pair {
-                match k {
-                    mlua::Value::Integer(i) if i >= 1 && i <= len as i64 => continue,
-                    _ => return false,
-                }
+        for (k, _) in table.clone().pairs::<mlua::Value, mlua::Value>().flatten() {
+            match k {
+                mlua::Value::Integer(i) if i >= 1 && i <= len => continue,
+                _ => return false,
             }
         }
         true

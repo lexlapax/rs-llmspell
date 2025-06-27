@@ -38,7 +38,7 @@ pub const MAX_BINARY_SIZE: usize = 1024 * 1024 * 1024; // 1GB
 pub enum MediaContent {
     /// Plain text content
     Text(String),
-    
+
     /// Image data with format and metadata
     Image {
         /// Raw image bytes
@@ -48,7 +48,7 @@ pub enum MediaContent {
         /// Image metadata
         metadata: ImageMetadata,
     },
-    
+
     /// Audio data with format and metadata
     Audio {
         /// Raw audio bytes
@@ -58,7 +58,7 @@ pub enum MediaContent {
         /// Audio metadata
         metadata: AudioMetadata,
     },
-    
+
     /// Video data with format and metadata
     Video {
         /// Raw video bytes
@@ -68,7 +68,7 @@ pub enum MediaContent {
         /// Video metadata
         metadata: VideoMetadata,
     },
-    
+
     /// Generic binary data
     Binary {
         /// Raw binary bytes
@@ -229,17 +229,34 @@ impl fmt::Display for MediaContent {
             MediaContent::Text(text) => {
                 write!(f, "Text({} chars)", text.len())
             }
-            MediaContent::Image { format, metadata, .. } => {
-                write!(f, "Image({:?}, {}x{})", format, metadata.width, metadata.height)
+            MediaContent::Image {
+                format, metadata, ..
+            } => {
+                write!(
+                    f,
+                    "Image({:?}, {}x{})",
+                    format, metadata.width, metadata.height
+                )
             }
-            MediaContent::Audio { format, metadata, .. } => {
+            MediaContent::Audio {
+                format, metadata, ..
+            } => {
                 write!(f, "Audio({:?}, {}ms)", format, metadata.duration_ms)
             }
-            MediaContent::Video { format, metadata, .. } => {
-                write!(f, "Video({:?}, {}x{}, {}ms)", 
-                    format, metadata.width, metadata.height, metadata.duration_ms)
+            MediaContent::Video {
+                format, metadata, ..
+            } => {
+                write!(
+                    f,
+                    "Video({:?}, {}x{}, {}ms)",
+                    format, metadata.width, metadata.height, metadata.duration_ms
+                )
             }
-            MediaContent::Binary { mime_type, filename, data } => {
+            MediaContent::Binary {
+                mime_type,
+                filename,
+                data,
+            } => {
                 write!(f, "Binary({} bytes", data.len())?;
                 if let Some(mime) = mime_type {
                     write!(f, ", {}", mime)?;
@@ -326,7 +343,7 @@ impl MediaContent {
             MediaContent::Binary { data, .. } => data.len(),
         }
     }
-    
+
     /// Get the media type of this content
     pub fn media_type(&self) -> MediaType {
         match self {
@@ -337,7 +354,7 @@ impl MediaContent {
             MediaContent::Binary { .. } => MediaType::Binary,
         }
     }
-    
+
     /// Validate size constraints
     pub fn validate_size(&self) -> Result<(), String> {
         let size = self.size_bytes();
@@ -348,7 +365,7 @@ impl MediaContent {
             MediaContent::Video { .. } => (MAX_VIDEO_SIZE, "video"),
             MediaContent::Binary { .. } => (MAX_BINARY_SIZE, "binary"),
         };
-        
+
         if size > max_size {
             Err(format!(
                 "{} size {} bytes exceeds maximum {} bytes",
@@ -372,7 +389,7 @@ impl ImageFormat {
             ImageFormat::Tiff => "image/tiff",
         }
     }
-    
+
     /// Get common file extensions for the format
     pub fn extensions(&self) -> &'static [&'static str] {
         match self {
@@ -397,7 +414,7 @@ impl AudioFormat {
             AudioFormat::M4a => "audio/mp4",
         }
     }
-    
+
     /// Get common file extensions for the format
     pub fn extensions(&self) -> &'static [&'static str] {
         match self {
@@ -421,7 +438,7 @@ impl VideoFormat {
             VideoFormat::Mkv => "video/x-matroska",
         }
     }
-    
+
     /// Get common file extensions for the format
     pub fn extensions(&self) -> &'static [&'static str] {
         match self {
@@ -438,7 +455,7 @@ impl VideoFormat {
 
 impl TryFrom<&str> for ImageFormat {
     type Error = String;
-    
+
     fn try_from(ext: &str) -> Result<Self, Self::Error> {
         match ext.to_lowercase().as_str() {
             "png" => Ok(ImageFormat::Png),
@@ -454,7 +471,7 @@ impl TryFrom<&str> for ImageFormat {
 
 impl TryFrom<&str> for AudioFormat {
     type Error = String;
-    
+
     fn try_from(ext: &str) -> Result<Self, Self::Error> {
         match ext.to_lowercase().as_str() {
             "mp3" => Ok(AudioFormat::Mp3),
@@ -469,7 +486,7 @@ impl TryFrom<&str> for AudioFormat {
 
 impl TryFrom<&str> for VideoFormat {
     type Error = String;
-    
+
     fn try_from(ext: &str) -> Result<Self, Self::Error> {
         match ext.to_lowercase().as_str() {
             "mp4" => Ok(VideoFormat::Mp4),
@@ -485,7 +502,7 @@ impl TryFrom<&str> for VideoFormat {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_media_content_text() {
         let content = MediaContent::Text("Hello, world!".to_string());
@@ -494,7 +511,7 @@ mod tests {
         assert!(content.validate_size().is_ok());
         assert_eq!(format!("{}", content), "Text(13 chars)");
     }
-    
+
     #[test]
     fn test_media_content_image() {
         let content = MediaContent::Image {
@@ -508,13 +525,13 @@ mod tests {
                 dpi: Some(72),
             },
         };
-        
+
         assert_eq!(content.size_bytes(), 3);
         assert_eq!(content.media_type(), MediaType::Image);
         assert!(content.validate_size().is_ok());
         assert_eq!(format!("{}", content), "Image(Jpeg, 1920x1080)");
     }
-    
+
     #[test]
     fn test_media_content_audio() {
         let content = MediaContent::Audio {
@@ -527,13 +544,13 @@ mod tests {
                 bitrate: Some(320000),
             },
         };
-        
+
         assert_eq!(content.size_bytes(), 1024);
         assert_eq!(content.media_type(), MediaType::Audio);
         assert!(content.validate_size().is_ok());
         assert_eq!(format!("{}", content), "Audio(Mp3, 180000ms)");
     }
-    
+
     #[test]
     fn test_media_content_video() {
         let content = MediaContent::Video {
@@ -547,13 +564,13 @@ mod tests {
                 codec: Some("h264".to_string()),
             },
         };
-        
+
         assert_eq!(content.size_bytes(), 2048);
         assert_eq!(content.media_type(), MediaType::Video);
         assert!(content.validate_size().is_ok());
         assert_eq!(format!("{}", content), "Video(Mp4, 1920x1080, 60000ms)");
     }
-    
+
     #[test]
     fn test_media_content_binary() {
         let content = MediaContent::Binary {
@@ -561,13 +578,16 @@ mod tests {
             mime_type: Some("application/pdf".to_string()),
             filename: Some("document.pdf".to_string()),
         };
-        
+
         assert_eq!(content.size_bytes(), 512);
         assert_eq!(content.media_type(), MediaType::Binary);
         assert!(content.validate_size().is_ok());
-        assert_eq!(format!("{}", content), "Binary(512 bytes, application/pdf, document.pdf)");
+        assert_eq!(
+            format!("{}", content),
+            "Binary(512 bytes, application/pdf, document.pdf)"
+        );
     }
-    
+
     #[test]
     fn test_size_validation() {
         // Test oversized image
@@ -582,41 +602,41 @@ mod tests {
                 dpi: None,
             },
         };
-        
+
         assert!(oversized_image.validate_size().is_err());
     }
-    
+
     #[test]
     fn test_image_format_conversions() {
         assert_eq!(ImageFormat::try_from("png").unwrap(), ImageFormat::Png);
         assert_eq!(ImageFormat::try_from("JPG").unwrap(), ImageFormat::Jpeg);
         assert_eq!(ImageFormat::try_from("jpeg").unwrap(), ImageFormat::Jpeg);
         assert!(ImageFormat::try_from("unknown").is_err());
-        
+
         assert_eq!(ImageFormat::Png.mime_type(), "image/png");
         assert_eq!(ImageFormat::Jpeg.extensions(), &["jpg", "jpeg"]);
     }
-    
+
     #[test]
     fn test_audio_format_conversions() {
         assert_eq!(AudioFormat::try_from("mp3").unwrap(), AudioFormat::Mp3);
         assert_eq!(AudioFormat::try_from("WAV").unwrap(), AudioFormat::Wav);
         assert!(AudioFormat::try_from("unknown").is_err());
-        
+
         assert_eq!(AudioFormat::Mp3.mime_type(), "audio/mpeg");
         assert_eq!(AudioFormat::Ogg.extensions(), &["ogg", "oga"]);
     }
-    
+
     #[test]
     fn test_video_format_conversions() {
         assert_eq!(VideoFormat::try_from("mp4").unwrap(), VideoFormat::Mp4);
         assert_eq!(VideoFormat::try_from("WEBM").unwrap(), VideoFormat::Webm);
         assert!(VideoFormat::try_from("unknown").is_err());
-        
+
         assert_eq!(VideoFormat::Mp4.mime_type(), "video/mp4");
         assert_eq!(VideoFormat::Mkv.extensions(), &["mkv"]);
     }
-    
+
     #[test]
     fn test_display_implementations() {
         assert_eq!(format!("{}", ImageFormat::Png), "PNG");
@@ -625,7 +645,7 @@ mod tests {
         assert_eq!(format!("{}", ColorSpace::RGB), "RGB");
         assert_eq!(format!("{}", MediaType::Image), "Image");
     }
-    
+
     #[test]
     fn test_serialization() {
         let metadata = ImageMetadata {
@@ -635,13 +655,13 @@ mod tests {
             has_transparency: false,
             dpi: Some(72),
         };
-        
+
         let json = serde_json::to_string(&metadata).unwrap();
         let deserialized: ImageMetadata = serde_json::from_str(&json).unwrap();
-        
+
         assert_eq!(metadata, deserialized);
     }
-    
+
     #[test]
     fn test_media_content_serialization() {
         let content = MediaContent::Image {
@@ -655,12 +675,14 @@ mod tests {
                 dpi: None,
             },
         };
-        
+
         let json = serde_json::to_string(&content).unwrap();
         let deserialized: MediaContent = serde_json::from_str(&json).unwrap();
-        
+
         match deserialized {
-            MediaContent::Image { format, metadata, .. } => {
+            MediaContent::Image {
+                format, metadata, ..
+            } => {
                 assert_eq!(format, ImageFormat::Jpeg);
                 assert_eq!(metadata.width, 800);
                 assert_eq!(metadata.height, 600);

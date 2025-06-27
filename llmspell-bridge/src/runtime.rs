@@ -2,15 +2,86 @@
 //! ABOUTME: Central execution orchestrator supporting multiple script engines
 
 use crate::{
-    engine::{ScriptEngineBridge, ScriptOutput, ScriptStream, EngineFactory, LuaConfig, JSConfig},
-    registry::ComponentRegistry,
+    engine::{EngineFactory, JSConfig, LuaConfig, ScriptEngineBridge, ScriptOutput, ScriptStream},
     providers::{ProviderManager, ProviderManagerConfig},
+    registry::ComponentRegistry,
 };
 use llmspell_core::error::LLMSpellError;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, RwLock};
 
 /// Central script runtime that uses ScriptEngineBridge abstraction
+/// 
+/// The `ScriptRuntime` is the main entry point for executing scripts in LLMSpell.
+/// It provides a language-agnostic interface that can work with multiple script
+/// engines (Lua, JavaScript, Python, etc.) through the `ScriptEngineBridge` trait.
+/// 
+/// # Examples
+/// 
+/// ## Basic Script Execution
+/// 
+/// ```rust,no_run
+/// use llmspell_bridge::{ScriptRuntime, RuntimeConfig};
+/// 
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// // Create a runtime with default configuration
+/// let config = RuntimeConfig::default();
+/// let runtime = ScriptRuntime::new_with_lua(config).await?;
+/// 
+/// // Execute a simple Lua script
+/// let output = runtime.execute_script("return 42").await?;
+/// println!("Result: {:?}", output.output);
+/// # Ok(())
+/// # }
+/// ```
+/// 
+/// ## Working with Agents (Placeholder - Phase 2)
+/// 
+/// ```rust,no_run
+/// use llmspell_bridge::{ScriptRuntime, RuntimeConfig};
+/// 
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// let runtime = ScriptRuntime::new_with_lua(RuntimeConfig::default()).await?;
+/// 
+/// let script = r#"
+///     -- Create an agent (placeholder functionality)
+///     local agent = Agent.create({
+///         name = "assistant",
+///         system_prompt = "You are a helpful assistant"
+///     })
+///     
+///     -- Execute the agent (returns placeholder response)
+///     local response = agent:execute("Hello!")
+///     return response.text
+/// "#;
+/// 
+/// let output = runtime.execute_script(script).await?;
+/// # Ok(())
+/// # }
+/// ```
+/// 
+/// ## Streaming Execution
+/// 
+/// ```rust,no_run
+/// use llmspell_bridge::{ScriptRuntime, RuntimeConfig};
+/// use futures::StreamExt;
+/// 
+/// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+/// let runtime = ScriptRuntime::new_with_lua(RuntimeConfig::default()).await?;
+/// 
+/// // Check if streaming is supported
+/// if runtime.supports_streaming() {
+///     let mut stream = runtime.execute_script_streaming("return 'streaming output'").await?;
+///     
+///     // Process chunks as they arrive
+///     while let Some(chunk) = stream.stream.next().await {
+///         let chunk = chunk?;
+///         println!("Received chunk: {:?}", chunk);
+///     }
+/// }
+/// # Ok(())
+/// # }
+/// ```
 pub struct ScriptRuntime {
     /// Language-agnostic script engine
     engine: Box<dyn ScriptEngineBridge>,
@@ -26,26 +97,46 @@ pub struct ScriptRuntime {
 
 impl ScriptRuntime {
     /// Create a new runtime with Lua engine
+    /// 
+    /// # Examples
+    /// 
+    /// ```rust,no_run
+    /// use llmspell_bridge::{ScriptRuntime, RuntimeConfig};
+    /// 
+    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+    /// // With default configuration
+    /// let runtime = ScriptRuntime::new_with_lua(RuntimeConfig::default()).await?;
+    /// 
+    /// // With custom configuration
+    /// let mut config = RuntimeConfig::default();
+    /// config.runtime.security.allow_file_access = true;
+    /// let runtime = ScriptRuntime::new_with_lua(config).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub async fn new_with_lua(config: RuntimeConfig) -> Result<Self, LLMSpellError> {
         let lua_config = config.engines.lua.clone();
         let engine = EngineFactory::create_lua_engine(&lua_config)?;
         Self::new_with_engine(engine, config).await
     }
-    
+
     /// Create a new runtime with JavaScript engine
     pub async fn new_with_javascript(config: RuntimeConfig) -> Result<Self, LLMSpellError> {
         let js_config = config.engines.javascript.clone();
         let engine = EngineFactory::create_javascript_engine(&js_config)?;
         Self::new_with_engine(engine, config).await
     }
-    
+
     /// Create a new runtime with a specific engine by name
-    pub async fn new_with_engine_name(engine_name: &str, config: RuntimeConfig) -> Result<Self, LLMSpellError> {
+    pub async fn new_with_engine_name(
+        engine_name: &str,
+        config: RuntimeConfig,
+    ) -> Result<Self, LLMSpellError> {
         let engine_config = config.get_engine_config(engine_name)?;
         let engine = EngineFactory::create_from_name(engine_name, &engine_config)?;
         Self::new_with_engine(engine, config).await
     }
-    
+
     /// Core initialization with any engine
     async fn new_with_engine(
         mut engine: Box<dyn ScriptEngineBridge>,
@@ -53,14 +144,14 @@ impl ScriptRuntime {
     ) -> Result<Self, LLMSpellError> {
         // Create component registry
         let registry = Arc::new(ComponentRegistry::new());
-        
+
         // Create provider manager
         let provider_config = config.providers.clone();
         let provider_manager = Arc::new(ProviderManager::new(provider_config).await?);
-        
+
         // Inject APIs into the engine
         engine.inject_apis(&registry, &provider_manager)?;
-        
+
         // Create execution context
         let execution_context = Arc::new(RwLock::new(crate::engine::ExecutionContext {
             working_directory: std::env::current_dir()
@@ -71,7 +162,7 @@ impl ScriptRuntime {
             state: serde_json::Value::Object(serde_json::Map::new()),
             security: config.runtime.security.clone().into(),
         }));
-        
+
         Ok(Self {
             engine,
             registry,
@@ -80,60 +171,69 @@ impl ScriptRuntime {
             _config: config,
         })
     }
-    
+
     /// Execute a script and return the output
     pub async fn execute_script(&self, script: &str) -> Result<ScriptOutput, LLMSpellError> {
         self.engine.execute_script(script).await
     }
-    
+
     /// Execute a script with streaming output
-    pub async fn execute_script_streaming(&self, script: &str) -> Result<ScriptStream, LLMSpellError> {
+    pub async fn execute_script_streaming(
+        &self,
+        script: &str,
+    ) -> Result<ScriptStream, LLMSpellError> {
         if !self.engine.supports_streaming() {
             return Err(LLMSpellError::Component {
-                message: format!("{} engine does not support streaming execution", self.engine.get_engine_name()),
+                message: format!(
+                    "{} engine does not support streaming execution",
+                    self.engine.get_engine_name()
+                ),
                 source: None,
             });
         }
         self.engine.execute_script_streaming(script).await
     }
-    
+
     /// Get the name of the current engine
     pub fn get_engine_name(&self) -> &'static str {
         self.engine.get_engine_name()
     }
-    
+
     /// Check if the engine supports streaming
     pub fn supports_streaming(&self) -> bool {
         self.engine.supports_streaming()
     }
-    
+
     /// Check if the engine supports multimodal content
     pub fn supports_multimodal(&self) -> bool {
         self.engine.supports_multimodal()
     }
-    
+
     /// Get the engine's supported features
     pub fn get_engine_features(&self) -> crate::engine::EngineFeatures {
         self.engine.supported_features()
     }
-    
+
     /// Get the component registry
     pub fn registry(&self) -> &Arc<ComponentRegistry> {
         &self.registry
     }
-    
+
     /// Get the provider manager
     pub fn provider_manager(&self) -> &Arc<ProviderManager> {
         &self.provider_manager
     }
-    
+
     /// Get the current execution context
     pub fn get_execution_context(&self) -> crate::engine::ExecutionContext {
         self.execution_context.read().unwrap().clone()
     }
-    
+
     /// Update the execution context
-    pub fn set_execution_context(&self, context: crate::engine::ExecutionContext) -> Result<(), LLMSpellError> {
+    pub fn set_execution_context(
+        &self,
+        context: crate::engine::ExecutionContext,
+    ) -> Result<(), LLMSpellError> {
         let mut ctx = self.execution_context.write().unwrap();
         *ctx = context;
         Ok(())
@@ -171,7 +271,9 @@ impl RuntimeConfig {
             "lua" => Ok(serde_json::to_value(&self.engines.lua)?),
             "javascript" | "js" => Ok(serde_json::to_value(&self.engines.javascript)?),
             custom => {
-                self.engines.custom.get(custom)
+                self.engines
+                    .custom
+                    .get(custom)
                     .cloned()
                     .ok_or_else(|| LLMSpellError::Validation {
                         field: Some("engine".to_string()),
@@ -180,7 +282,7 @@ impl RuntimeConfig {
             }
         }
     }
-    
+
     /// Check if an engine is configured
     pub fn supports_engine(&self, engine_name: &str) -> bool {
         match engine_name {
@@ -191,22 +293,12 @@ impl RuntimeConfig {
 }
 
 /// Engine configurations
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct EngineConfigs {
     pub lua: LuaConfig,
     pub javascript: JSConfig,
     #[serde(flatten)]
     pub custom: std::collections::HashMap<String, serde_json::Value>,
-}
-
-impl Default for EngineConfigs {
-    fn default() -> Self {
-        Self {
-            lua: LuaConfig::default(),
-            javascript: JSConfig::default(),
-            custom: std::collections::HashMap::new(),
-        }
-    }
 }
 
 /// Global runtime configuration
@@ -256,7 +348,7 @@ impl Default for SecurityConfig {
             allow_file_access: false,
             allow_network_access: true,
             allow_process_spawn: false,
-            max_memory_bytes: Some(50_000_000), // 50MB
+            max_memory_bytes: Some(50_000_000),   // 50MB
             max_execution_time_ms: Some(300_000), // 5 minutes
         }
     }
@@ -277,7 +369,7 @@ impl From<SecurityConfig> for crate::engine::SecurityContext {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_runtime_config_default() {
         let config = RuntimeConfig::default();
@@ -286,7 +378,7 @@ mod tests {
         assert!(config.supports_engine("javascript"));
         assert!(!config.supports_engine("python"));
     }
-    
+
     #[test]
     fn test_security_config_conversion() {
         let config = SecurityConfig::default();
