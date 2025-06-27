@@ -22,6 +22,7 @@ anyhow.workspace = true
 tracing.workspace = true
 lazy_static.workspace = true
 parking_lot.workspace = true
+uuid = { workspace = true }
 
 # Script engine dependencies (feature-gated)
 mlua = { workspace = true, optional = true }
