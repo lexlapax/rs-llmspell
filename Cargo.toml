@@ -70,7 +70,7 @@ boa_engine = "0.18"
 quickjs_runtime = "0.12"
 
 # LLM providers and AI
-rig-core = "0.4"
+rig-core = "0.13"
 candle-core = "0.7"
 candle-nn = "0.7"
 candle-transformers = "0.7"
