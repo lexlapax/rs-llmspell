@@ -49,7 +49,7 @@ cargo test --workspace          # Run all tests
 
 # Documentation Validation Tools
 cargo install cargo-deadlinks    # Install documentation link checker
-cargo install markdown-link-check # Install markdown link validator
+npm install -g markdown-link-check # Install markdown link validator (npm package)
 cargo deadlinks --dir target/doc # Check internal documentation links
 markdown-link-check README.md    # Validate README links
 

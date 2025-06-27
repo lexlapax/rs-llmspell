@@ -11,7 +11,7 @@
 **All-Phases-Document**: docs/in-progress/implementation-phases.md
 **Design-Document**: docs/in-progress/phase-01-design-doc.md
 
-> **📢 UPDATE**: Phase 0 complete! Phase 1 Tasks 1.0-1.3 complete! Provider integration working. Moving to CLI implementation (Tasks 1.4).
+> **📢 UPDATE**: Phase 0 complete! Phase 1 Tasks 1.0-1.4 complete! Full CLI implementation with configuration loading, validation, and init commands. Moving to testing phase (Tasks 1.5).
 
 > **📋 Actionable Task List**: This document breaks down Phase 1 implementation into specific, measurable tasks with clear acceptance criteria.
 
@@ -56,9 +56,9 @@
 - [x] Task 1.3.1: Create Provider Abstraction Layer ✅
 - [x] Task 1.3.2: Implement Rig Provider Wrapper ✅
 - [x] Task 1.3.3: Integrate Providers with Bridge-Based ScriptRuntime ✅
-- [ ] Task 1.4.1: Create Multi-Engine CLI Structure
-- [ ] Task 1.4.2: Add Streaming Output Support
-- [ ] Task 1.4.3: Add Configuration Loading
+- [x] Task 1.4.1: Create Multi-Engine CLI Structure ✅
+- [x] Task 1.4.2: Add Streaming Output Support ✅
+- [x] Task 1.4.3: Add Configuration Loading ✅
 - [ ] Task 1.5.1: Bridge Abstraction and Unit Test Suite
 - [ ] Task 1.5.2: Bridge-Based Integration Test Suite
 - [ ] Task 1.5.3: Memory and Performance Validation
@@ -563,11 +563,11 @@
 **Description**: Implement CLI with engine selection support.
 
 **Acceptance Criteria:**
-- [ ] CLI parsing with clap and --engine flag
-- [ ] Run subcommand supports engine selection (--engine lua)
-- [ ] Engine validation and helpful error messages
-- [ ] Multi-engine configuration loading
-- [ ] Version information correct
+- [x] CLI parsing with clap and --engine flag
+- [x] Run subcommand supports engine selection (--engine lua)
+- [x] Engine validation and helpful error messages
+- [x] Multi-engine configuration loading
+- [x] Version information correct
 
 **Implementation Steps:**
 1. Set up clap in llmspell-cli with engine selection
@@ -578,10 +578,12 @@
 6. Add version from cargo
 
 **Definition of Done:**
-- [ ] CLI supports --engine lua flag
-- [ ] Engine validation provides clear errors
-- [ ] Help text explains engine options
-- [ ] Ready for --engine javascript in Phase 5
+- [x] CLI supports --engine lua flag
+- [x] Engine validation provides clear errors
+- [x] Help text explains engine options
+- [x] Ready for --engine javascript in Phase 5
+
+**Completed**: 2025-06-27T14:30:00
 
 ### Task 1.4.2: Add Streaming Output Support
 **Priority**: HIGH  
@@ -592,11 +594,11 @@
 **Description**: Implement streaming output display with progress indicators.
 
 **Acceptance Criteria:**
-- [ ] --stream flag enables streaming
-- [ ] Progress spinner/bar shows
-- [ ] Output displayed incrementally
-- [ ] Clean output formatting
-- [ ] Ctrl+C handling works
+- [x] --stream flag enables streaming
+- [x] Progress spinner/bar shows
+- [x] Output displayed incrementally
+- [x] Clean output formatting
+- [x] Ctrl+C handling works
 
 **Implementation Steps:**
 1. Add streaming flag to CLI
@@ -607,10 +609,12 @@
 6. Test with mock streams
 
 **Definition of Done:**
-- [ ] Streaming looks professional
-- [ ] No display artifacts
-- [ ] Interruption handled cleanly
-- [ ] Performance smooth
+- [x] Streaming looks professional
+- [x] No display artifacts
+- [x] Interruption handled cleanly
+- [x] Performance smooth
+
+**Completed**: 2025-06-27T04:35:00
 
 ### Task 1.4.3: Add Configuration Loading
 **Priority**: MEDIUM  
@@ -621,11 +625,11 @@
 **Description**: Load configuration from files and environment.
 
 **Acceptance Criteria:**
-- [ ] Config file discovery works
-- [ ] Environment overrides supported
-- [ ] Default configuration sensible
-- [ ] Config errors helpful
-- [ ] --config flag works
+- [x] Config file discovery works
+- [x] Environment overrides supported
+- [x] Default configuration sensible
+- [x] Config errors helpful
+- [x] --config flag works
 
 **Implementation Steps:**
 1. Add config module to CLI
@@ -636,10 +640,12 @@
 6. Validate configuration
 
 **Definition of Done:**
-- [ ] Config loading tested
-- [ ] Precedence documented
-- [ ] Errors guide fixes
-- [ ] Examples provided
+- [x] Config loading tested
+- [x] Precedence documented
+- [x] Errors guide fixes
+- [x] Examples provided
+
+**Completed**: 2025-06-27T05:00:00
 
 ---
 
@@ -863,13 +869,13 @@
 - ✅ All crates compile without warnings
 - ✅ Utils crate provides common utilities
 - ✅ Streaming and multimodal types accessible
-- [ ] ScriptEngineBridge abstraction works (not just Lua integration)
-- [ ] Engine factory pattern functional
-- [ ] Directory structure supports multi-language from day one
-- [ ] API injection is language-agnostic (ready for Phase 5)
-- [ ] Can execute Lua scripts through ScriptEngineBridge abstraction
-- [ ] Runtime can switch between engines (even with only Lua implemented)
-- [ ] Third-party engine plugin interface defined
+- [x] ScriptEngineBridge abstraction works (not just Lua integration) ✅
+- [x] Engine factory pattern functional ✅
+- [x] Directory structure supports multi-language from day one ✅
+- [x] API injection is language-agnostic (ready for Phase 5) ✅
+- [x] Can execute Lua scripts through ScriptEngineBridge abstraction ✅
+- [x] Runtime can switch between engines (even with only Lua implemented) ✅
+- [x] Third-party engine plugin interface defined ✅
 - [ ] Memory usage <50MB (including bridge overhead)
 - [ ] Bridge performance overhead <5%
 - [ ] >90% test coverage including bridge abstraction
