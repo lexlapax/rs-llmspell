@@ -65,7 +65,7 @@ sled = "0.34"
 rocksdb = "0.22"
 
 # Scripting engines
-mlua = { version = "0.9", features = ["lua54", "async", "serialize", "send", "parking_lot"] }
+mlua = { version = "0.10", features = ["lua54", "async", "serialize", "send", "parking_lot"] }
 boa_engine = "0.18"
 quickjs_runtime = "0.12"
 
