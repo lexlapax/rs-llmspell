@@ -6,6 +6,9 @@
 **Phase**: 0 (Foundation Infrastructure)  
 **Timeline**: Weeks 1-2 (10 working days)  
 **Priority**: CRITICAL (MVP Prerequisite)
+**Arch-Document**: docs/technical/rs-llmspell-final-architecture.md
+**All-Phases-Document**: docs/in-progress/implementation-phases.md
+**Design-Document**: docs/in-progress/phase-00-design-doc.md
 
 > **📋 Actionable Task List**: This document breaks down Phase 0 implementation into specific, measurable tasks with clear acceptance criteria.
 
@@ -840,7 +843,7 @@
 
 ---
 
-## Handoff to Phase 1
+## Handoff to Phase 1 (`/docs/in-progress/PHASE01_HANDOFF_PACKAGE.md`)
 
 ### Deliverables Package
 - [ ] Complete foundation crate compilation
@@ -852,7 +855,7 @@
 - [ ] Testing approach and coverage requirements
 - [ ] Performance characteristics documentation
 
-### Knowledge Transfer Session
+### Knowledge Transfer Session (`/docs/in-progress/PHASE01_KNOWLEDGE_TRANSFER.md`)
 - [ ] Architecture walkthrough with Phase 1 team
 - [ ] Code patterns and conventions review
 - [ ] Testing strategy explanation

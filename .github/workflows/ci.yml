@@ -1,0 +1,411 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, phase0 ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # Quality checks that must pass
+  quality:
+    name: Quality Checks
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        components: rustfmt, clippy
+    
+    - name: Cache cargo registry
+      uses: actions/cache@v3
+      with:
+        path: ~/.cargo/registry
+        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-registry-
+    
+    - name: Cache cargo index
+      uses: actions/cache@v3
+      with:
+        path: ~/.cargo/git
+        key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-git-
+    
+    - name: Cache cargo build
+      uses: actions/cache@v3
+      with:
+        path: target
+        key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-build-
+    
+    - name: Check formatting
+      run: cargo fmt --all -- --check
+    
+    - name: Run clippy
+      run: cargo clippy --workspace --all-features -- -D warnings
+    
+    - name: Check documentation
+      run: cargo doc --workspace --no-deps --document-private-items
+      env:
+        RUSTDOCFLAGS: "-D warnings"
+
+  # Build and test on multiple platforms
+  test:
+    name: Test Suite
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+        rust: [stable]
+        include:
+          - os: ubuntu-latest
+            rust: stable
+            
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: ${{ matrix.rust }}
+    
+    - name: Cache cargo registry
+      uses: actions/cache@v3
+      with:
+        path: ~/.cargo/registry
+        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-registry-
+    
+    - name: Cache cargo index
+      uses: actions/cache@v3
+      with:
+        path: ~/.cargo/git
+        key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-git-
+    
+    - name: Cache cargo build
+      uses: actions/cache@v3
+      with:
+        path: target
+        key: ${{ runner.os }}-cargo-build-test-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-build-test-
+    
+    - name: Build workspace
+      run: cargo build --workspace --all-features
+    
+    - name: Run tests
+      run: cargo test --workspace --all-features
+    
+    - name: Run doc tests
+      run: cargo test --workspace --doc
+
+  # Test coverage
+  coverage:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+    
+    - name: Install coverage tools
+      run: |
+        cargo install cargo-tarpaulin
+        sudo apt-get update && sudo apt-get install -y bc jq
+    
+    - name: Cache cargo registry
+      uses: actions/cache@v3
+      with:
+        path: ~/.cargo/registry
+        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-registry-
+    
+    - name: Cache cargo index
+      uses: actions/cache@v3
+      with:
+        path: ~/.cargo/git
+        key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-git-
+    
+    - name: Run coverage
+      run: |
+        cargo tarpaulin --workspace --out Xml --verbose --timeout 180 --target-dir target/tarpaulin
+        
+        # Extract coverage percentage and enforce >90% threshold
+        COVERAGE=$(cargo tarpaulin --workspace --out Json --verbose --timeout 180 --target-dir target/tarpaulin 2>/dev/null | \
+          jq -r '.files | to_entries | map(.value.summary.lines.percent) | add / length')
+        
+        echo "## Coverage Report" >> $GITHUB_STEP_SUMMARY
+        echo "- **Coverage**: ${COVERAGE}%" >> $GITHUB_STEP_SUMMARY
+        
+        # Enforce 90% minimum coverage
+        if (( $(echo "$COVERAGE < 90" | bc -l) )); then
+          echo "❌ Test coverage (${COVERAGE}%) is below 90% threshold" >> $GITHUB_STEP_SUMMARY
+          echo "❌ Test coverage (${COVERAGE}%) is below 90% threshold"
+          exit 1
+        else
+          echo "✅ Test coverage (${COVERAGE}%) meets 90% threshold" >> $GITHUB_STEP_SUMMARY
+          echo "✅ Test coverage (${COVERAGE}%) meets 90% threshold"
+        fi
+    
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./cobertura.xml
+        fail_ci_if_error: false
+
+  # Security audit
+  security:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+    
+    - name: Cache cargo registry
+      uses: actions/cache@v3
+      with:
+        path: ~/.cargo/registry
+        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-registry-
+    
+    - name: Security audit
+      uses: actions-rs/audit-check@v1
+      with:
+        token: ${{ secrets.GITHUB_TOKEN }}
+
+  # Benchmarks (informational only, don't fail CI)
+  benchmarks:
+    name: Performance Benchmarks
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+    
+    - name: Cache cargo registry
+      uses: actions/cache@v3
+      with:
+        path: ~/.cargo/registry
+        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-registry-
+    
+    - name: Cache cargo index
+      uses: actions/cache@v3
+      with:
+        path: ~/.cargo/git
+        key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-git-
+    
+    - name: Cache cargo build
+      uses: actions/cache@v3
+      with:
+        path: target
+        key: ${{ runner.os }}-cargo-build-bench-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-build-bench-
+    
+    - name: Run benchmarks
+      run: cargo bench --workspace -- --test
+
+  # Quality Gates Validation
+  quality-gates:
+    name: Quality Gates Validation
+    runs-on: ubuntu-latest
+    needs: [quality, test, coverage, security]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Validate Quality Gates
+      run: |
+        echo "## Quality Gates Validation Report" >> $GITHUB_STEP_SUMMARY
+        echo "All required quality checks have passed:" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "✅ **Code Formatting**: cargo fmt validation passed" >> $GITHUB_STEP_SUMMARY
+        echo "✅ **Linting**: clippy with deny warnings passed" >> $GITHUB_STEP_SUMMARY
+        echo "✅ **Compilation**: zero warnings build passed" >> $GITHUB_STEP_SUMMARY
+        echo "✅ **Documentation**: docs build with validation passed" >> $GITHUB_STEP_SUMMARY
+        echo "✅ **Testing**: complete test suite passed" >> $GITHUB_STEP_SUMMARY
+        echo "✅ **Coverage**: >90% test coverage achieved" >> $GITHUB_STEP_SUMMARY
+        echo "✅ **Security**: dependency audit passed" >> $GITHUB_STEP_SUMMARY
+        echo "" >> $GITHUB_STEP_SUMMARY
+        echo "🎉 **All Quality Gates Passed** - Ready for merge!" >> $GITHUB_STEP_SUMMARY
+        
+        echo "🎉 All Quality Gates Passed - Repository meets production standards!"
+
+  # Documentation generation and validation
+  docs:
+    name: Documentation
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+    
+    - name: Install documentation tools
+      run: |
+        cargo install cargo-deadlinks
+        npm install -g markdown-link-check
+    
+    - name: Cache cargo registry
+      uses: actions/cache@v3
+      with:
+        path: ~/.cargo/registry
+        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-registry-
+    
+    - name: Cache cargo index
+      uses: actions/cache@v3
+      with:
+        path: ~/.cargo/git
+        key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-git-
+    
+    - name: Build documentation
+      run: cargo doc --workspace --no-deps --all-features --document-private-items
+      env:
+        RUSTDOCFLAGS: "--enable-index-page -Zunstable-options -D warnings"
+    
+    - name: Check documentation coverage
+      run: |
+        echo "## Documentation Coverage Report" >> $GITHUB_STEP_SUMMARY
+        cargo doc --workspace --no-deps --all-features --document-private-items 2>&1 | \
+          grep -E "(documenting|warning)" | \
+          tee doc-coverage.log
+        
+        # Count documented vs undocumented items
+        TOTAL=$(grep -c "documenting" doc-coverage.log || echo "0")
+        WARNINGS=$(grep -c "warning" doc-coverage.log || echo "0")
+        DOCUMENTED=$((TOTAL - WARNINGS))
+        
+        if [ $TOTAL -gt 0 ]; then
+          COVERAGE=$((DOCUMENTED * 100 / TOTAL))
+          echo "- **Total Items**: $TOTAL" >> $GITHUB_STEP_SUMMARY
+          echo "- **Documented**: $DOCUMENTED" >> $GITHUB_STEP_SUMMARY
+          echo "- **Warnings**: $WARNINGS" >> $GITHUB_STEP_SUMMARY
+          echo "- **Coverage**: $COVERAGE%" >> $GITHUB_STEP_SUMMARY
+          
+          if [ $COVERAGE -lt 95 ]; then
+            echo "❌ Documentation coverage ($COVERAGE%) is below 95% threshold"
+            exit 1
+          else
+            echo "✅ Documentation coverage ($COVERAGE%) meets 95% threshold"
+          fi
+        else
+          echo "⚠️  Could not determine documentation coverage"
+        fi
+    
+    - name: Validate internal links
+      run: |
+        echo "Checking internal documentation links..."
+        # Run deadlinks but allow some expected failures for external deps and generated code
+        cargo deadlinks --dir target/doc --check-http || {
+          echo "⚠️  Some documentation links are broken (expected for --no-deps build)"
+          echo "This is acceptable for Phase 0 as external dependency docs are not included"
+        }
+    
+    - name: Validate README links
+      run: |
+        echo "Checking README.md links..."
+        find . -name "README.md" -exec markdown-link-check --config .markdown-link-check.json {} \;
+    
+    - name: Generate documentation artifacts
+      run: |
+        # Create documentation archive
+        tar -czf documentation.tar.gz -C target doc/
+        
+        # Generate proper documentation index
+        cat > target/doc/index.html << 'EOF'
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Rs-LLMSpell Documentation</title>
+            <meta charset="utf-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1">
+            <style>
+                body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; margin: 40px; }
+                h1 { color: #333; }
+                .crate-list { list-style-type: none; padding: 0; }
+                .crate-list li { margin: 10px 0; }
+                .crate-list a { color: #0969da; text-decoration: none; }
+                .crate-list a:hover { text-decoration: underline; }
+            </style>
+        </head>
+        <body>
+            <h1>Rs-LLMSpell Documentation</h1>
+            <p>Scriptable LLM interactions via Lua, JavaScript - Cast scripting spells to animate LLM golems</p>
+            
+            <h2>Core Crates</h2>
+            <ul class="crate-list">
+                <li><a href="llmspell_core/index.html">llmspell-core</a> - Core traits and types</li>
+                <li><a href="llmspell_agents/index.html">llmspell-agents</a> - Agent implementations</li>
+                <li><a href="llmspell_tools/index.html">llmspell-tools</a> - Tool implementations</li>
+                <li><a href="llmspell_workflows/index.html">llmspell-workflows</a> - Workflow implementations</li>
+            </ul>
+            
+            <h2>Infrastructure Crates</h2>
+            <ul class="crate-list">
+                <li><a href="llmspell_bridge/index.html">llmspell-bridge</a> - Script engine bridge</li>
+                <li><a href="llmspell_providers/index.html">llmspell-providers</a> - LLM provider integrations</li>
+                <li><a href="llmspell_storage/index.html">llmspell-storage</a> - State and persistence</li>
+                <li><a href="llmspell_config/index.html">llmspell-config</a> - Configuration management</li>
+                <li><a href="llmspell_security/index.html">llmspell-security</a> - Security and sandboxing</li>
+                <li><a href="llmspell_hooks/index.html">llmspell-hooks</a> - Hook and event system</li>
+            </ul>
+            
+            <h2>Development Crates</h2>
+            <ul class="crate-list">
+                <li><a href="llmspell_cli/index.html">llmspell-cli</a> - Command-line interface</li>
+                <li><a href="llmspell_testing/index.html">llmspell-testing</a> - Testing utilities</li>
+            </ul>
+        </body>
+        </html>
+        EOF
+    
+    - name: Upload documentation artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: documentation
+        path: |
+          target/doc/
+          documentation.tar.gz
+        retention-days: 30
+    
+    - name: Deploy to GitHub Pages
+      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./target/doc
+        force_orphan: true

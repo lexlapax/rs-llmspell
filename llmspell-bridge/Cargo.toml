@@ -1,0 +1,34 @@
+[package]
+name = "llmspell-bridge"
+description = "Script engine bridge for rs-llmspell"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+llmspell-core = { path = "../llmspell-core" }
+llmspell-providers = { path = "../llmspell-providers" }
+llmspell-utils = { path = "../llmspell-utils" }
+tokio.workspace = true
+tokio-stream.workspace = true
+async-trait.workspace = true
+futures.workspace = true
+chrono.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+lazy_static.workspace = true
+parking_lot.workspace = true
+uuid = { workspace = true }
+
+# Script engine dependencies (feature-gated)
+mlua = { workspace = true, optional = true }
+boa_engine = { workspace = true, optional = true }
+
+[features]
+default = ["lua"]
+lua = ["dep:mlua"]
+javascript = ["dep:boa_engine"]

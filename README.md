@@ -2,7 +2,11 @@
 
 **Scriptable LLM interactions** via Lua, JavaScript - Cast scripting spells to animate LLM golems 🧙‍♂️✨
 
-Rs-LLMSpell is a **production-ready scriptable LLM interaction framework** that revolutionizes AI application development through multi-language orchestration, comprehensive built-in libraries, and enterprise-grade infrastructure.
+> ⚠️ **ALPHA SOFTWARE**: This is version 0.1.0-alpha.1, a development preview release.
+> Core features like agent execution are not yet implemented. This release is for
+> testing the architecture and providing feedback only. See [Current Status](#current-status) below.
+
+Rs-LLMSpell is a **scriptable LLM interaction framework** that revolutionizes AI application development through multi-language orchestration, comprehensive built-in libraries, and made with a production-readiness mindset.
 
 ```lua
 -- Example spell: Multi-agent research workflow
@@ -41,7 +45,7 @@ local result = research_spell:cast({
 })
 ```
 
-## 🚀 Revolutionary Features
+## 🚀 Features
 
 ### **🎯 Multi-Language Scripting**
 - **Lua**: High-performance scripting with cooperative async
@@ -49,7 +53,7 @@ local result = research_spell:cast({
 - **Python**: Planned support for data science integration
 - **Identical APIs**: Same capabilities across all languages
 
-### **🏗️ Production-Ready Infrastructure**
+### **🏗️ Production-Minded Infrastructure**
 - **Built-in Hooks & Events**: 20+ hook points for logging, metrics, security
 - **State Management**: Persistent agent state with transaction support
 - **Circuit Breakers**: Automatic failure recovery and resource protection
@@ -94,23 +98,93 @@ Workflow ← Sequential, Parallel, Conditional, Loop
 
 **Key Principle**: Every component implements the same foundational interfaces, enabling seamless composition and orchestration.
 
+## 🛠️ Current Status
+
+### **⚠️ Alpha Release 0.1.0-alpha.1**
+
+**Release Date**: June 27, 2025  
+**Status**: Development Preview - Architecture Testing Only
+
+#### **✅ What's Working**
+- Lua script execution with ScriptEngineBridge abstraction
+- Provider listing (no actual LLM calls)
+- CLI with basic commands (`run`, `exec`, `info`, `providers`)
+- Streaming infrastructure (stub implementation)
+- Multimodal types (structure only)
+- Configuration system
+- Security sandboxing
+
+#### **❌ What's NOT Working Yet**
+- **Agent execution** - `Agent.create()` returns mock data only
+- **Tool execution** - Tools cannot be called
+- **Workflow orchestration** - Not implemented
+- **Actual LLM calls** - Provider integration is listing only
+- **JavaScript/Python** - Only Lua is available
+
+#### **📋 Phase Completion Status**
+- ✅ Phase 0: Foundation Infrastructure (Complete)
+- ✅ Phase 1: Core Execution Runtime (Complete)
+- 🔜 Phase 2: Agent Implementation (Next)
+- 🔜 Phase 3: Tool System (Future)
+- 🔜 Phase 4: Workflow Orchestration (Future)
+
+### **🎯 Safe to Use For**
+- Testing the ScriptEngineBridge architecture
+- Evaluating Lua script execution performance
+- Reviewing API design and providing feedback
+- Understanding the project structure
+- Contributing to core infrastructure
+
+### **⚠️ NOT Ready For**
+- Production use
+- Building actual LLM applications
+- Agent-based workflows
+- Tool integration
+- Real LLM API calls
+
 ## 🛠️ Project Status
 
-### **🎉 Architecture Complete - Implementation Ready**
+### **🎉 Phase 1 Complete - Architecture Validated**
 
-**Phase 0-13**: Complete architectural research and design ✅  
-**Phase 0**: Foundation Infrastructure **[READY TO START]** 🚀  
+**Current Status**: Core runtime implemented, ready for agent development
+**Latest Update**: 2025-06-27
 
-- ✅ **15,034+ line standalone architecture document**
-- ✅ **16-phase implementation roadmap defined**
-- ✅ **Complete technology stack selection**
-- ✅ **Comprehensive built-in library specification**
-- ✅ **Production-ready infrastructure design**
-- ✅ **Multi-language bridge architecture**
+#### **✅ Phase 0 Achievements**
+- 12-crate workspace with zero warnings
+- 165 comprehensive tests passing
+- Complete CI/CD pipeline operational
+- >95% documentation coverage
+- Performance benchmarking framework ready
 
-**Next Steps**: Phase 0 implementation (foundation traits, workspace setup, CI/CD)
+#### **🚀 Phase 1 Starting Now**
+- **Goal**: Core Execution Runtime with Lua scripting
+- **Timeline**: 10 working days (Weeks 3-4)
+- **New Features**: Streaming support, multimodal content, utils crate
+- **Deliverables**: Working Lua scripts calling LLM agents
 
-## 🔮 What Makes Rs-LLMSpell Revolutionary
+### **🎯 Implementation Roadmap**
+
+**Architecture**: Complete research and design (Phases 1-13) ✅  
+**Phase 0**: Foundation Infrastructure ✅ **[COMPLETE]**
+**Phase 1**: Core Execution Runtime 🚀 **[IN PROGRESS]**  
+
+#### **Completed Deliverables**
+- ✅ **15,034+ line architecture document** with streaming/multimodal updates
+- ✅ **12-crate workspace** operational with CI/CD pipeline
+- ✅ **Complete trait hierarchy** implemented and tested
+- ✅ **165 tests** with >90% coverage
+- ✅ **Phase 1 design** and task breakdown ready
+
+#### **Phase 1 Focus (Current)**
+- 🔄 `llmspell-utils` crate for shared utilities
+- 🔄 Streaming execution support
+- 🔄 Multimodal content types
+- 🔄 Basic Lua script runtime
+- 🔄 CLI with streaming output
+
+**Timeline**: Phase 1 implementation - 10 working days
+
+## 🔮 What Makes Rs-LLMSpell Different?
 
 ### **The AI Development Crisis We Solve**
 - **Development Velocity Barrier**: Compilation cycles kill AI experimentation
@@ -124,7 +198,7 @@ Workflow ← Sequential, Parallel, Conditional, Loop
 - **🔧 Production Ready**: Built-in hooks, events, monitoring, and security
 - **🌐 Language Agnostic**: Same capabilities across Lua, JavaScript, Python
 - **⚡ High Performance**: Rust core with zero-cost abstractions
-- **🛡️ Enterprise Security**: Comprehensive threat model and mitigations
+- **🛡️ Thought-through Security**: Comprehensive threat model and mitigations
 - **🔌 Flexible Integration**: Standalone framework or native library
 
 ## 💡 Usage Patterns
@@ -217,7 +291,7 @@ cargo fmt
 
 ### **Getting Help**
 - **Architecture Questions**: Review the complete architecture document
-- **Implementation**: Track Phase 0 progress in TODO.md
+- **Implementation**: Track Phase 1 progress in TODO.md
 - **Discussion**: GitHub Discussions for design decisions
 
 ### **Contributing**

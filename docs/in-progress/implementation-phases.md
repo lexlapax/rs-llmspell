@@ -57,27 +57,53 @@ Rs-LLMSpell follows a carefully structured 16-phase implementation approach that
 **Priority**: CRITICAL (MVP Core)
 
 **MVP Scope**:
-- `ScriptRuntime` with embedded mode only
+- `ScriptEngineBridge` trait implementation (language-agnostic foundation)
+- `LuaEngine` as first concrete implementation of ScriptEngineBridge
 - `ComponentLifecycleManager` with basic 5-phase initialization
-- `mlua` integration with basic API injection
+- Language-agnostic API injection through bridge pattern
+- Factory pattern for runtime creation with different engines
+- Lua coroutine-based streaming support through bridge
 - Simple LLM provider integration using `rig`
+- Provider capability detection for multimodal support
+- Provider abstraction layer for future multimodal providers (mistral.rs, etc.)
 - In-memory state management
 
 **Essential Components**:
-- `BaseAgent` trait implementation
-- `Agent` trait with basic LLM calling
-- `Tool` trait with schema validation
-- Basic CLI entry point (`llmspell run script.lua`)
+- `llmspell-utils` crate with shared utilities
+- `ScriptEngineBridge` trait for language abstraction
+- `LuaEngine` implementing ScriptEngineBridge
+- Engine factory pattern for future extensibility
+- Language-agnostic ScriptRuntime using Box<dyn ScriptEngineBridge>
+- `BaseAgent` trait implementation with streaming support
+- `Agent` trait with basic LLM calling and multimodal types
+- `Tool` trait with schema validation and streaming interface
+- Basic CLI entry point (`llmspell run script.lua --engine lua`) with streaming output support
+- Multimodal content types (`MediaContent`, enhanced `AgentInput`/`AgentOutput`)
 
 **Success Criteria**:
-- [ ] Can execute simple Lua scripts with Agent/Tool APIs
+- [ ] `llmspell-utils` crate provides common utilities to all crates
+- [ ] ScriptEngineBridge abstraction works (not just Lua integration)
+- [ ] Engine factory pattern functional
+- [ ] Directory structure supports multi-language from day one
+- [ ] API injection is language-agnostic (ready for Phase 5)
+- [ ] Can execute simple Lua scripts through ScriptEngineBridge abstraction
 - [ ] LLM providers can be called from scripts
 - [ ] Basic tool execution works
+- [ ] Streaming methods defined (implementation can be stub)
+- [ ] Multimodal types compile and are accessible from scripts
 - [ ] Error propagation from scripts to CLI
+- [ ] Runtime can switch between engines (even with only Lua implemented)
+- [ ] Third-party engine plugin interface defined
 - [ ] Memory usage stays under 50MB for simple scripts
 
 **Testing Requirements**:
+- ScriptEngineBridge trait behavior tests
+- Engine factory pattern validation
+- Cross-engine API consistency framework (ready for Phase 5)
 - Script execution integration tests
+- Language-agnostic API injection testing
+- Bridge abstraction unit tests
+- Engine implementation compliance tests
 - LLM provider mock testing
 - Memory usage benchmarks
 - Error handling validation
@@ -91,23 +117,37 @@ Rs-LLMSpell follows a carefully structured 16-phase implementation approach that
 **Priority**: CRITICAL (MVP Essential)
 
 **MVP Scope** (Core Tools Only):
-- **File System**: `FileReadTool`, `FileWriteTool`, `DirectoryListTool`
-- **HTTP**: `HttpRequestTool`, `WebScrapeTool`
+- **File System**: `FileReadTool` (streaming), `FileWriteTool` (streaming), `DirectoryListTool`
+- **HTTP**: `HttpRequestTool`, `WebScrapeTool` (streaming)
 - **Utilities**: `CalculatorTool`, `JsonTool`, `TextTool`
 - **System**: `CommandTool` (sandboxed), `EnvironmentTool`
+- **Multimodal**: `ImageProcessor` (stub), `OcrExtractor` (stub)
 
 **Essential Components**:
 - Tool registry and discovery system
-- Tool schema validation
+- Tool schema validation with media type support
+- Streaming tool interface implementation
 - Security sandboxing for tools
 - Tool error handling and timeout management
+- **Provider Enhancement Features** (moved from Phase 1):
+  - `ModelSpecifier` implementation for provider abstraction
+  - `ProviderManager` to parse "provider/model" syntax (e.g., "openai/gpt-4", "anthropic/claude-3")
+  - Base URL overrides in agent configuration for custom endpoints
+  - CLI support for new model specification syntax
+  - Built-in tools examples using convenience syntax
 
 **Success Criteria**:
 - [ ] 12+ core built-in tools functional
+- [ ] Streaming tools can return data progressively
+- [ ] Multimodal tool stubs compile and register properly
 - [ ] All tools have comprehensive schemas
 - [ ] Tool security sandbox prevents unauthorized access
 - [ ] Tool execution timeout enforcement works
 - [ ] Tools can be called from both Agent and direct script context
+- [ ] ModelSpecifier parsing works for all supported providers
+- [ ] CLI accepts both full configuration and "provider/model" syntax
+- [ ] Base URL overrides function correctly for custom endpoints
+- [ ] All built-in tool examples use convenient model syntax
 
 **Testing Requirements**:
 - Individual tool unit tests
@@ -127,18 +167,23 @@ Rs-LLMSpell follows a carefully structured 16-phase implementation approach that
 - `SequentialWorkflow` for step-by-step execution
 - `ConditionalWorkflow` for branching logic
 - `LoopWorkflow` for iterative processes
+- `StreamingWorkflow` for real-time data processing
 - Basic workflow state management
+- Multimodal workflow examples
 
 **Essential Components**:
 - `Workflow` trait implementation
-- Workflow execution engine
+- Workflow execution engine with streaming support
 - State passing between workflow steps
+- Backpressure handling for streaming workflows
 - Error handling and recovery in workflows
 
 **Success Criteria**:
 - [ ] Sequential workflows execute correctly
 - [ ] Conditional workflows handle branching logic
 - [ ] Loop workflows with proper termination conditions
+- [ ] Streaming workflows handle backpressure properly
+- [ ] Multimodal data flows through workflows correctly
 - [ ] Workflow state is preserved between steps
 - [ ] Workflow errors don't crash the runtime
 
@@ -182,32 +227,80 @@ Rs-LLMSpell follows a carefully structured 16-phase implementation approach that
 
 ### **Phase 5: JavaScript Engine Support (Weeks 11-12)**
 
-**Goal**: Add JavaScript scripting support with cross-engine compatibility  
+**Goal**: Add JavaScript as second script engine using existing ScriptEngineBridge infrastructure  
 **Priority**: MEDIUM (Enhancement)
 
 **Components**:
 - JavaScript engine integration (`boa` or `quickjs`)
-- `ScriptEngineBridge` trait implementation
-- Cross-engine API compatibility layer
+- `JSEngine` implementing existing ScriptEngineBridge trait
+- ScriptRuntime::new_with_javascript() factory method
+- Reuse existing language-agnostic API injection framework
 - JavaScript Promise-based async patterns
+- Streaming support via async generators
+- Media type marshalling (base64/typed arrays)
+- **Model Specification Features**:
+  - Implement same ModelSpecifier parsing in JavaScript bridge
+  - Ensure JavaScript API matches Lua API for model specification
+  - Support both full configuration and "provider/model" syntax in scripts
+  - JavaScript-specific tests for convenience syntax
+  - Consistent error handling for invalid model specifications
 
 **Success Criteria**:
-- [ ] JavaScript scripts can execute with same API as Lua
-- [ ] Cross-engine compatibility maintained
-- [ ] JavaScript async/await patterns work
+- [ ] JSEngine implements ScriptEngineBridge (same interface as LuaEngine)
+- [ ] Existing ScriptRuntime works with JSEngine without changes
+- [ ] CLI supports --engine javascript flag
+- [ ] Same API surface available in JavaScript as Lua (validated by tests)
+- [ ] JavaScript async/await patterns work through bridge
+- [ ] Streaming via async generators functional through bridge
+- [ ] Media types properly marshalled through bridge abstraction
 - [ ] Performance comparable to Lua execution
 - [ ] Error handling consistent across engines
+- [ ] Model specification syntax identical between Lua and JavaScript
+- [ ] "provider/model" convenience syntax works in JavaScript scripts
+- [ ] JavaScript tests validate all model specification formats
 
 **Testing Requirements**:
-- Cross-engine API compatibility tests
+- Cross-engine API compatibility tests (using existing framework)
+- JavaScript-specific behavior tests
+- Engine switching integration tests
+- Performance comparison benchmarks (Lua vs JavaScript)
 - JavaScript async pattern validation
-- Performance comparison benchmarks
 - Error handling consistency tests
 - Cross-engine integration tests
 
 ---
 
-### **Phase 6: REPL Interactive Mode (Weeks 13-14)**
+### **Phase 5.5: Multimodal Tools Implementation (Weeks 12-13)**
+
+**Goal**: Implement comprehensive multimodal processing tools  
+**Priority**: MEDIUM (Feature Enhancement)
+
+**Components**:
+- Image processing tools (resize, crop, format conversion)
+- OCR tool with multiple language support
+- Video processing tools (frame extraction, thumbnail generation)
+- Audio transcription tool (stub with interface)
+- Media format conversion utilities
+- Integration with multimodal workflows
+
+**Success Criteria**:
+- [ ] Image processing tools handle common formats (PNG, JPEG, WebP)
+- [ ] OCR tool extracts text from images accurately
+- [ ] Video tools can extract frames and generate thumbnails
+- [ ] Audio transcription interface defined (implementation can be stub)
+- [ ] Tools integrate smoothly with streaming workflows
+- [ ] Media type validation works correctly
+
+**Testing Requirements**:
+- Individual tool functionality tests
+- Media format compatibility tests
+- Integration tests with workflows
+- Performance benchmarks for media processing
+- Error handling for invalid media
+
+---
+
+### **Phase 6: REPL Interactive Mode (Weeks 14-15)**
 
 **Goal**: Implement interactive REPL for development and debugging  
 **Priority**: MEDIUM (Developer Experience)
@@ -218,6 +311,9 @@ Rs-LLMSpell follows a carefully structured 16-phase implementation approach that
 - Multi-line input handling
 - Tab completion and history
 - REPL-specific commands (`.help`, `.save`, `.load`)
+- Streaming output display with progress indicators
+- Media file input/output support
+- Multimodal content preview capabilities
 
 **Success Criteria**:
 - [ ] REPL starts and accepts commands
@@ -225,6 +321,9 @@ Rs-LLMSpell follows a carefully structured 16-phase implementation approach that
 - [ ] Multi-line scripts can be entered
 - [ ] Tab completion works for APIs
 - [ ] Command history is saved and restored
+- [ ] Streaming outputs display progressively
+- [ ] Can load and display media files
+- [ ] Multimodal outputs preview correctly
 
 **Testing Requirements**:
 - REPL command execution tests
@@ -274,6 +373,12 @@ Rs-LLMSpell follows a carefully structured 16-phase implementation approach that
 - `Scheduler` component with cron/interval triggers
 - Service integration (systemd/launchd)
 - API endpoints for external control
+- **Model Specification Support**:
+  - REST API must accept both full configuration and "provider/model" formats
+  - Configuration file schema should support convenience syntax
+  - Ensure backward compatibility for existing configurations
+  - API documentation includes both specification formats
+  - Service configuration examples using convenience syntax
 
 **Success Criteria**:
 - [ ] Daemon mode runs continuously
@@ -281,6 +386,10 @@ Rs-LLMSpell follows a carefully structured 16-phase implementation approach that
 - [ ] Service can be controlled via system service manager
 - [ ] API endpoints respond to external requests
 - [ ] Resource usage remains stable over long periods
+- [ ] REST API accepts both model specification formats
+- [ ] Configuration files support convenience syntax
+- [ ] Backward compatibility maintained for existing configs
+- [ ] API documentation covers both formats
 
 **Testing Requirements**:
 - Long-running stability tests
@@ -495,10 +604,13 @@ Rs-LLMSpell follows a carefully structured 16-phase implementation approach that
 - `Agent` - LLM wrapper with specialized prompts
 - `Tool` - LLM-callable functions with schema validation
 - `Workflow` - Deterministic orchestration patterns
+- `ScriptEngineBridge` - Language abstraction for script engines
 
 **Essential Components**:
 - `ScriptRuntime` - Central execution orchestrator
-- `mlua` bridge - Lua scripting engine integration
+- `ScriptEngineBridge` - Language abstraction layer
+- `LuaEngine` - First concrete engine implementation
+- Engine factory pattern - Runtime creation with different engines
 - Basic built-in tools - 12+ core tools across categories
 - Basic workflow patterns - Sequential, conditional, loop
 
@@ -527,14 +639,22 @@ Rs-LLMSpell follows a carefully structured 16-phase implementation approach that
 ### Priority Order
 
 1. **Immediate Priority** (Phases 0-3): MVP foundation
+   - Phase 1.2 MUST implement ScriptEngineBridge foundation
+   - NO direct Lua coupling allowed in ScriptRuntime
+   - Bridge pattern implementation is CRITICAL for future phases
 2. **High Priority** (Phases 4, 15): Production essentials
 3. **Medium Priority** (Phases 5-7, 13-14): Enhancement features
+   - Phase 5 becomes much simpler due to existing bridge infrastructure
+   - Additional engines can be added as medium priority features
 4. **Low Priority** (Phases 8-12): Advanced integrations
 
 ### Breaking Changes Strategy
 
 - **Pre-1.0**: Breaking changes allowed between any phases
+- **Phase 1.2 Exception**: ScriptEngineBridge API must be stable before Phase 2
+- **Engine Interface Stability**: ScriptEngineBridge API frozen after Phase 1.2
 - **Post-1.0**: Breaking changes only at major version boundaries
+- **Engine Plugin API**: Stable interface for third-party engines from Phase 1.2
 - **Migration tooling**: Provide migration tools for configuration and state
 - **Deprecation cycle**: 2-phase deprecation cycle for API changes
 
@@ -552,6 +672,10 @@ Each phase must pass:
 - **Phase 0**: No prerequisites
 - **Phases 1-3**: Sequential dependency (each depends on previous)
 - **Phases 4+**: Depends on MVP completion (Phases 0-3)
+- **Phase 5**: Depends on MVP completion + ScriptEngineBridge foundation from Phase 1.2
+- **Cross-language testing**: Can begin in Phase 1 with bridge abstraction tests
+- **Engine implementations**: Can be developed in parallel once ScriptEngineBridge is stable
+- **Third-party engines**: Can be added after Phase 1.2 completion using bridge pattern
 - **Cross-cutting features**: Can be developed in parallel where dependencies allow
 
 ---
@@ -560,23 +684,34 @@ Each phase must pass:
 
 ### Estimated Timeline
 
-- **MVP Completion**: 8 weeks (Phases 0-3)
+- **MVP with Bridge Foundation**: 8 weeks (Phases 0-3, including proper Phase 1.2)
+- **Multi-Language Ready**: 12 weeks (Phases 0-5, bridge foundation makes Phase 5 faster)
 - **Production Ready**: 16 weeks (Phases 0-7, 15)
-- **Full Feature Set**: 32 weeks (All phases)
+- **Full Feature Set**: 30 weeks (All phases, Phase 5 simplified by bridge foundation)
 
 ### Resource Requirements
 
 - **Core Development**: 1-2 full-time developers
+- **Bridge Architecture**: 0.5 FTE dedicated to ScriptEngineBridge design in Phase 1.2
+- **Engine Implementation**: Can parallelize after bridge foundation
 - **Testing and QA**: 0.5 full-time equivalent
+- **Cross-Engine Testing**: Additional 0.25 FTE for multi-language validation
 - **Documentation**: 0.25 full-time equivalent
 - **DevOps/Infrastructure**: 0.25 full-time equivalent
 
 ### Risk Mitigation
 
 - **Dependency risks**: Alternative crate selections identified
+  - **mlua alternatives**: If mlua doesn't work with bridge pattern, have alternatives ready
+  - **JavaScript engine selection**: Choose engine that works well with bridge pattern
+  - **Bridge trait design**: Get trait design right in Phase 1.2, hard to change later
 - **Performance risks**: Early benchmarking and optimization
+  - **Performance Risk**: Bridge abstraction must not add significant overhead
 - **Complexity risks**: Phased approach allows course correction
+  - **Bridge Abstraction Complexity**: Start simple, ensure it works with Lua first
+  - **API Injection Complexity**: Design language-agnostic APIs carefully
 - **Integration risks**: Comprehensive testing at each phase
+- **Architecture Risk**: CRITICAL - implement bridge pattern correctly in Phase 1.2 or face major refactoring in Phase 5
 
 ---
 

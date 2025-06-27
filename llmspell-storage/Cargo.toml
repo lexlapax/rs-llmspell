@@ -1,0 +1,17 @@
+[package]
+name = "llmspell-storage"
+description = "State management and persistence for rs-llmspell"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+llmspell-core = { path = "../llmspell-core" }
+tokio.workspace = true
+async-trait.workspace = true
+serde.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+sled.workspace = true

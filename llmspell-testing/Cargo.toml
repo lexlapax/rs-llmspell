@@ -1,0 +1,22 @@
+[package]
+name = "llmspell-testing"
+description = "Testing utilities and helpers for rs-llmspell"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+llmspell-core = { path = "../llmspell-core" }
+tokio.workspace = true
+mockall.workspace = true
+proptest.workspace = true
+criterion.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+tracing.workspace = true
+async-trait.workspace = true
+chrono.workspace = true
+uuid.workspace = true

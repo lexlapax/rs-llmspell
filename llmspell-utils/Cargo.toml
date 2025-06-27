@@ -1,0 +1,58 @@
+[package]
+name = "llmspell-utils"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
+
+[dependencies]
+# Async runtime
+tokio = { workspace = true }
+tokio-stream = { workspace = true }
+futures = { workspace = true }
+async-trait = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+toml = { workspace = true }
+
+# UUID and time handling
+uuid = { workspace = true }
+chrono = { workspace = true }
+
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Logging and tracing
+tracing = { workspace = true }
+
+# Cross-platform filesystem operations
+path-clean = { workspace = true }
+walkdir = { workspace = true }
+
+# Concurrency primitives
+crossbeam = { workspace = true }
+parking_lot = { workspace = true }
+
+# Environment and process management
+which = { workspace = true }
+
+# Random number generation
+rand = { workspace = true }
+
+# Platform-specific dependencies
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util", "macros"] }
+proptest = { workspace = true }
+criterion = { workspace = true }
+
+[[bench]]
+name = "file_utils_benchmarks"
+harness = false

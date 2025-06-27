@@ -2053,6 +2053,11 @@ llmspell-core:
   - BaseAgent trait, ScriptRuntime, ComponentRegistry
   - Core abstractions and lifecycle management
     ↓
+llmspell-utils:
+  - Shared utilities for all crates
+  - File helpers, async patterns, string utils
+  - System info, error builders, path normalization
+    ↓
 llmspell-bridge: 
   - ScriptEngineBridge, ExternalRuntimeBridge, C API
   - Abstraction layer for all external integrations
@@ -2399,39 +2404,648 @@ impl AgentRuntime {
 }
 ```
 
+## Multimodal Content Architecture
+
+Rs-LLMSpell provides comprehensive support for multimodal content, enabling agents to process and generate images, audio, video, and binary data alongside text.
+
+### Core Multimodal Types
+
+```rust
+use std::fmt;
+
+/// Represents different types of media content
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum MediaContent {
+    /// Plain text content
+    Text(String),
+    
+    /// Image content with format
+    Image {
+        data: Vec<u8>,
+        format: ImageFormat,
+        metadata: ImageMetadata,
+    },
+    
+    /// Audio content with format
+    Audio {
+        data: Vec<u8>,
+        format: AudioFormat,
+        metadata: AudioMetadata,
+    },
+    
+    /// Video content with format
+    Video {
+        data: Vec<u8>,
+        format: VideoFormat,
+        metadata: VideoMetadata,
+    },
+    
+    /// Generic binary content
+    Binary {
+        data: Vec<u8>,
+        mime_type: String,
+        filename: Option<String>,
+    },
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum ImageFormat {
+    Png,
+    Jpeg,
+    Webp,
+    Gif,
+    Svg,
+    Tiff,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ImageMetadata {
+    pub width: u32,
+    pub height: u32,
+    pub color_space: ColorSpace,
+    pub has_transparency: bool,
+    pub dpi: Option<(u32, u32)>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum AudioFormat {
+    Mp3,
+    Wav,
+    Flac,
+    Ogg,
+    M4a,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AudioMetadata {
+    pub duration_ms: u64,
+    pub sample_rate: u32,
+    pub channels: u8,
+    pub bitrate: Option<u32>,
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum VideoFormat {
+    Mp4,
+    Webm,
+    Avi,
+    Mov,
+    Mkv,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VideoMetadata {
+    pub duration_ms: u64,
+    pub width: u32,
+    pub height: u32,
+    pub fps: f32,
+    pub codec: String,
+}
+```
+
+### Extended Agent Input/Output
+
+```rust
+/// Enhanced agent input with multimodal support
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentInput {
+    /// Text prompt or instruction
+    pub text: String,
+    
+    /// Optional media content
+    pub media: Vec<MediaContent>,
+    
+    /// Context from previous interactions
+    pub context: Option<ExecutionContext>,
+    
+    /// Parameters for execution
+    pub parameters: HashMap<String, Value>,
+    
+    /// Preferred output modalities
+    pub output_modalities: Vec<MediaType>,
+}
+
+/// Enhanced agent output with multimodal support
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentOutput {
+    /// Primary text response
+    pub text: String,
+    
+    /// Generated or processed media
+    pub media: Vec<MediaContent>,
+    
+    /// Tool calls made during execution
+    pub tool_calls: Vec<ToolCall>,
+    
+    /// Metadata about the execution
+    pub metadata: OutputMetadata,
+    
+    /// Next agent to transfer to (if any)
+    pub transfer_to: Option<ComponentId>,
+}
+
+impl AgentInput {
+    /// Create a text-only input
+    pub fn text(text: impl Into<String>) -> Self {
+        Self {
+            text: text.into(),
+            media: vec![],
+            context: None,
+            parameters: HashMap::new(),
+            output_modalities: vec![MediaType::Text],
+        }
+    }
+    
+    /// Add media content to the input
+    pub fn with_media(mut self, media: MediaContent) -> Self {
+        self.media.push(media);
+        self
+    }
+    
+    /// Add multiple media items
+    pub fn with_media_vec(mut self, media: Vec<MediaContent>) -> Self {
+        self.media.extend(media);
+        self
+    }
+}
+```
+
+### Multimodal Provider Abstraction
+
+```rust
+/// Provider capability detection
+pub trait ProviderCapabilities {
+    /// Check if provider supports specific media type
+    fn supports_media_type(&self, media_type: &MediaType) -> bool;
+    
+    /// Get maximum size for media type
+    fn max_media_size(&self, media_type: &MediaType) -> Option<usize>;
+    
+    /// Check if provider supports streaming
+    fn supports_streaming(&self) -> bool;
+    
+    /// Get supported input modalities
+    fn input_modalities(&self) -> Vec<MediaType>;
+    
+    /// Get supported output modalities  
+    fn output_modalities(&self) -> Vec<MediaType>;
+}
+
+/// Enhanced provider instance with multimodal support
+#[async_trait]
+pub trait ProviderInstance: Send + Sync {
+    // ... existing methods ...
+    
+    /// Complete with multimodal input
+    async fn complete_multimodal(
+        &self,
+        messages: Vec<MultimodalMessage>,
+        options: CompletionOptions,
+    ) -> Result<MultimodalResponse>;
+    
+    /// Get provider capabilities
+    fn capabilities(&self) -> &dyn ProviderCapabilities;
+}
+
+/// Message with multimodal content
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MultimodalMessage {
+    pub role: MessageRole,
+    pub content: Vec<MessageContent>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum MessageContent {
+    Text(String),
+    Image { 
+        data: Vec<u8>, 
+        format: ImageFormat,
+        detail: ImageDetail,
+    },
+    Audio {
+        data: Vec<u8>,
+        format: AudioFormat,
+    },
+}
+
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
+pub enum ImageDetail {
+    Auto,
+    High,
+    Low,
+}
+```
+
+### Multimodal Tool Examples
+
+```rust
+/// Image processing tool
+pub struct ImageProcessor {
+    supported_formats: HashSet<ImageFormat>,
+}
+
+#[async_trait]
+impl Tool for ImageProcessor {
+    fn input_media_types(&self) -> Vec<MediaType> {
+        vec![MediaType::Image]
+    }
+    
+    fn output_media_types(&self) -> Vec<MediaType> {
+        vec![MediaType::Image, MediaType::Text]
+    }
+    
+    async fn execute_tool(&self, input: ToolInput) -> Result<ToolOutput> {
+        let operation = input.get_string("operation")?;
+        let image = input.get_media("image")?;
+        
+        match operation.as_str() {
+            "resize" => {
+                let width = input.get_u32("width")?;
+                let height = input.get_u32("height")?;
+                let resized = self.resize_image(image, width, height).await?;
+                Ok(ToolOutput::with_media(resized))
+            }
+            "extract_text" => {
+                let text = self.ocr(image).await?;
+                Ok(ToolOutput::text(text))
+            }
+            "analyze" => {
+                let analysis = self.analyze_image(image).await?;
+                Ok(ToolOutput::json(analysis))
+            }
+            _ => Err(LLMSpellError::InvalidInput("Unknown operation".into()))
+        }
+    }
+}
+
+/// Video processing tool
+pub struct VideoProcessor {
+    ffmpeg: FfmpegWrapper,
+}
+
+#[async_trait]
+impl Tool for VideoProcessor {
+    fn input_media_types(&self) -> Vec<MediaType> {
+        vec![MediaType::Video]
+    }
+    
+    fn output_media_types(&self) -> Vec<MediaType> {
+        vec![MediaType::Video, MediaType::Image, MediaType::Audio]
+    }
+    
+    async fn execute_tool(&self, input: ToolInput) -> Result<ToolOutput> {
+        let operation = input.get_string("operation")?;
+        let video = input.get_media("video")?;
+        
+        match operation.as_str() {
+            "extract_frames" => {
+                let count = input.get_u32("count").unwrap_or(10);
+                let frames = self.extract_frames(video, count).await?;
+                Ok(ToolOutput::with_media_vec(frames))
+            }
+            "extract_audio" => {
+                let audio = self.extract_audio(video).await?;
+                Ok(ToolOutput::with_media(audio))
+            }
+            "generate_thumbnail" => {
+                let time = input.get_f32("time").unwrap_or(0.0);
+                let thumbnail = self.generate_thumbnail(video, time).await?;
+                Ok(ToolOutput::with_media(thumbnail))
+            }
+            _ => Err(LLMSpellError::InvalidInput("Unknown operation".into()))
+        }
+    }
+}
+```
+
+### Script Bridge Media Marshalling
+
+#### Lua Media Handling
+
+```lua
+-- Lua example with media content
+local function process_image_with_agent(agent, image_path)
+    -- Load image file
+    local image_data = Files.read_binary(image_path)
+    
+    -- Create multimodal input
+    local input = {
+        text = "Analyze this image and describe what you see",
+        media = {
+            {
+                type = "image",
+                format = "png",
+                data = image_data,  -- Binary data as string
+                metadata = {
+                    width = 1920,
+                    height = 1080
+                }
+            }
+        }
+    }
+    
+    -- Execute agent
+    local result = agent:execute(input)
+    
+    -- Handle multimodal output
+    if result.media and #result.media > 0 then
+        for i, media in ipairs(result.media) do
+            if media.type == "image" then
+                -- Save processed image
+                Files.write_binary("output_" .. i .. ".png", media.data)
+            end
+        end
+    end
+    
+    return result.text
+end
+```
+
+#### JavaScript Media Handling
+
+```javascript
+// JavaScript example with media content
+async function analyzeImageWithAgent(agent, imageBuffer) {
+    // Create multimodal input
+    const input = {
+        text: "Extract text from this image using OCR",
+        media: [{
+            type: 'image',
+            format: 'jpeg',
+            data: imageBuffer,  // Uint8Array or Buffer
+            metadata: {
+                width: 1920,
+                height: 1080,
+                colorSpace: 'sRGB'
+            }
+        }]
+    };
+    
+    // Execute agent
+    const result = await agent.execute(input);
+    
+    // Handle mixed media output
+    result.media.forEach((media, index) => {
+        switch(media.type) {
+            case 'image':
+                // Process image data
+                saveImage(`processed_${index}.png`, media.data);
+                break;
+            case 'audio':
+                // Handle audio data
+                playAudio(media.data, media.format);
+                break;
+        }
+    });
+    
+    return result.text;
+}
+
+// Type conversion utilities
+const MediaUtils = {
+    // Convert base64 to Uint8Array
+    base64ToBytes(base64) {
+        const binary = atob(base64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) {
+            bytes[i] = binary.charCodeAt(i);
+        }
+        return bytes;
+    },
+    
+    // Convert Uint8Array to base64
+    bytesToBase64(bytes) {
+        return btoa(String.fromCharCode(...bytes));
+    }
+};
+```
+
+### Multimodal Workflow Example
+
+```rust
+// Example: Document processing workflow with OCR and analysis
+pub struct DocumentAnalysisWorkflow {
+    ocr_tool: Arc<OcrTool>,
+    image_analyzer: Arc<ImageAnalyzer>,
+    text_analyzer: Arc<Agent>,
+    summarizer: Arc<Agent>,
+}
+
+impl DocumentAnalysisWorkflow {
+    pub async fn analyze_document(&self, document: MediaContent) -> Result<AnalysisResult> {
+        // Step 1: Extract text from document/image
+        let ocr_result = match document {
+            MediaContent::Image { data, format, .. } => {
+                self.ocr_tool.execute_tool(ToolInput::new()
+                    .with_media("image", document)
+                    .with_param("enhance", true)).await?
+            },
+            MediaContent::Binary { data, mime_type, .. } if mime_type.starts_with("application/pdf") => {
+                // Handle PDF documents
+                self.pdf_extractor.execute_tool(ToolInput::new()
+                    .with_media("document", document)).await?
+            },
+            _ => return Err(LLMSpellError::UnsupportedMediaType)
+        };
+        
+        // Step 2: Analyze visual elements
+        let visual_analysis = self.image_analyzer.execute(AgentInput {
+            text: "Analyze visual elements, layout, and design",
+            media: vec![document.clone()],
+            ..Default::default()
+        }).await?;
+        
+        // Step 3: Analyze extracted text
+        let text_analysis = self.text_analyzer.execute(AgentInput::text(
+            format!("Analyze this text:\n{}", ocr_result.get_string("text")?)
+        )).await?;
+        
+        // Step 4: Generate comprehensive summary
+        let summary = self.summarizer.execute(AgentInput::text(
+            format!("Summarize these analyses:\nVisual: {}\nText: {}", 
+                visual_analysis.text, text_analysis.text)
+        )).await?;
+        
+        Ok(AnalysisResult {
+            extracted_text: ocr_result.get_string("text")?,
+            visual_elements: visual_analysis,
+            text_analysis,
+            summary: summary.text,
+        })
+    }
+}
+```
+
 ---
 
 ## Component Hierarchy
 
-Rs-LLMSpell implements a **four-tier component hierarchy** inspired by go-llms but enhanced for Rust's type system and modern async patterns. This hierarchy provides clear separation of concerns while enabling powerful composition patterns.
+Rs-LLMSpell implements a **multi-layered architectural hierarchy** inspired by go-llms but enhanced for Rust's type system and modern async patterns. This hierarchy provides clear separation of concerns while enabling powerful composition patterns and multi-language scripting capabilities.
 
 ### Hierarchy Overview
 
 ```
-BaseAgent (Foundation Trait)
-    ├── Agent (LLM-Powered Components)
-    │   ├── ChatAgent
-    │   ├── ResearchAgent  
-    │   ├── AnalysisAgent
-    │   ├── CodeAgent
-    │   └── CustomAgent
+ScriptRuntime (Central Orchestrator)
+    ├── ScriptEngineBridge (Language Abstraction)
+    │   ├── LuaEngine (mlua integration)
+    │   ├── JavaScriptEngine (boa/v8 integration)
+    │   ├── PythonEngine (pyo3 integration - future)
+    │   └── PluginEngine (third-party engines)
     │
-    ├── Tool (Functional Components)
-    │   ├── BuiltinTool
-    │   │   ├── WebSearchTool
-    │   │   ├── FileSystemTool
-    │   │   ├── CalculatorTool
-    │   │   └── ...40+ more
-    │   ├── AgentWrappedTool (Agents as Tools)
-    │   └── CustomTool
+    ├── ComponentRegistry (Component Management)
+    │   └── BaseAgent (Foundation Trait)
+    │       ├── Agent (LLM-Powered Components)
+    │       │   ├── ChatAgent
+    │       │   ├── ResearchAgent  
+    │       │   ├── AnalysisAgent
+    │       │   ├── CodeAgent
+    │       │   └── CustomAgent
+    │       │
+    │       ├── Tool (Functional Components)
+    │       │   ├── BuiltinTool
+    │       │   │   ├── WebSearchTool
+    │       │   │   ├── FileSystemTool
+    │       │   │   ├── CalculatorTool
+    │       │   │   └── ...40+ more
+    │       │   ├── AgentWrappedTool (Agents as Tools)
+    │       │   └── CustomTool
+    │       │
+    │       └── Workflow (Orchestration Components)
+    │           ├── SequentialWorkflow
+    │           ├── ParallelWorkflow
+    │           ├── ConditionalWorkflow
+    │           ├── LoopWorkflow
+    │           ├── FanOutWorkflow
+    │           └── CustomWorkflow
     │
-    └── Workflow (Orchestration Components)
-        ├── SequentialWorkflow
-        ├── ParallelWorkflow
-        ├── ConditionalWorkflow
-        ├── LoopWorkflow
-        ├── FanOutWorkflow
-        └── CustomWorkflow
+    ├── ProviderManager (LLM Provider Integration)
+    │   ├── RigProvider (OpenAI, Anthropic, Ollama)
+    │   ├── LocalProvider (candle integration)
+    │   └── CustomProvider
+    │
+    └── ExecutionContext (Runtime State Management)
+        ├── StateManager
+        ├── HookExecutor
+        └── EventBus
+```
+
+### ScriptRuntime: Central Orchestrator
+
+**ScriptRuntime** serves as the central orchestrator for the entire rs-llmspell system, managing component lifecycles, coordinating between script engines, and providing a unified execution environment.
+
+```rust
+pub struct ScriptRuntime {
+    engine: Box<dyn ScriptEngineBridge>,    // Language-agnostic script execution
+    registry: Arc<ComponentRegistry>,       // Component management
+    provider_manager: Arc<ProviderManager>, // LLM provider access
+    execution_context: Arc<RwLock<ExecutionContext>>, // Runtime state
+}
+
+impl ScriptRuntime {
+    /// Create runtime with specific script engine
+    pub async fn new_with_lua(config: RuntimeConfig) -> Result<Self> {
+        let engine = Box::new(LuaEngine::new(config.lua)?);
+        Self::new_with_engine(engine, config).await
+    }
+    
+    pub async fn new_with_javascript(config: RuntimeConfig) -> Result<Self> {
+        let engine = Box::new(JavaScriptEngine::new(config.javascript)?);
+        Self::new_with_engine(engine, config).await
+    }
+    
+    /// Unified constructor with dependency injection
+    async fn new_with_engine(
+        mut engine: Box<dyn ScriptEngineBridge>, 
+        config: RuntimeConfig
+    ) -> Result<Self> {
+        let registry = Arc::new(ComponentRegistry::new());
+        let provider_manager = Arc::new(ProviderManager::new(config.providers)?);
+        
+        // Inject APIs into the script engine
+        engine.inject_apis(&registry, &provider_manager)?;
+        
+        Ok(Self {
+            engine,
+            registry,
+            provider_manager,
+            execution_context: Arc::new(RwLock::new(ExecutionContext::new())),
+        })
+    }
+    
+    /// Execute script with automatic language detection
+    pub async fn execute_script(&self, script: &str) -> Result<ScriptOutput> {
+        self.engine.execute_script(script).await
+    }
+    
+    /// Execute script with streaming output
+    pub async fn execute_script_streaming(&self, script: &str) -> Result<ScriptStream> {
+        self.engine.execute_script_streaming(script).await
+    }
+}
+```
+
+### ScriptEngineBridge: Language Abstraction Layer
+
+**ScriptEngineBridge** provides a unified interface for all script engines, enabling identical capabilities across Lua, JavaScript, Python, and future languages.
+
+```rust
+#[async_trait]
+pub trait ScriptEngineBridge: Send + Sync {
+    /// Execute script and return result
+    async fn execute_script(&self, script: &str) -> Result<ScriptOutput>;
+    
+    /// Execute script with streaming output
+    async fn execute_script_streaming(&self, script: &str) -> Result<ScriptStream>;
+    
+    /// Inject rs-llmspell APIs into the script environment
+    fn inject_apis(
+        &mut self, 
+        registry: &ComponentRegistry, 
+        providers: &ProviderManager
+    ) -> Result<()>;
+    
+    /// Get engine identification
+    fn get_engine_name(&self) -> &'static str;
+    fn get_engine_version(&self) -> &'static str;
+    
+    /// Capability detection
+    fn supports_streaming(&self) -> bool;
+    fn supports_async(&self) -> bool;
+    fn supports_multimodal(&self) -> bool;
+    
+    /// Resource management
+    fn memory_usage(&self) -> usize;
+    fn reset_environment(&mut self) -> Result<()>;
+}
+
+/// Engine factory for runtime selection
+pub struct ScriptEngineFactory;
+
+impl ScriptEngineFactory {
+    pub fn create_engine(
+        engine_type: ScriptEngineType,
+        config: &RuntimeConfig,
+    ) -> Result<Box<dyn ScriptEngineBridge>> {
+        match engine_type {
+            ScriptEngineType::Lua => Ok(Box::new(LuaEngine::new(config.lua.clone())?)),
+            ScriptEngineType::JavaScript => Ok(Box::new(JavaScriptEngine::new(config.javascript.clone())?)),
+            ScriptEngineType::Python => Ok(Box::new(PythonEngine::new(config.python.clone())?)),
+            ScriptEngineType::Plugin(name) => {
+                // Load third-party engine via plugin system
+                PluginEngine::load_from_registry(&name, config)
+            }
+        }
+    }
+    
+    pub fn detect_engine_from_file(path: &Path) -> ScriptEngineType {
+        match path.extension().and_then(|ext| ext.to_str()) {
+            Some("lua") => ScriptEngineType::Lua,
+            Some("js") | Some("mjs") => ScriptEngineType::JavaScript,
+            Some("py") => ScriptEngineType::Python,
+            _ => ScriptEngineType::Lua, // Default to Lua
+        }
+    }
+}
 ```
 
 ### BaseAgent: Universal Foundation
@@ -2492,6 +3106,17 @@ pub trait BaseAgent: Send + Sync + Observable + SecureComponent + Clone {
     async fn execute(&mut self, input: AgentInput) -> Result<AgentOutput>;
     async fn validate_input(&self, input: &AgentInput) -> Result<ValidationResult>;
     async fn prepare_execution(&mut self, input: &AgentInput) -> Result<ExecutionContext>;
+    
+    // Streaming Execution Interface
+    async fn stream_execute(&mut self, input: AgentInput) -> Result<AgentStream> {
+        // Default implementation returns NotImplemented error
+        Err(LLMSpellError::NotImplemented("Streaming not supported by this agent".into()))
+    }
+    
+    // Multimodal Support
+    fn supports_streaming(&self) -> bool { false }
+    fn supports_multimodal(&self) -> bool { false }
+    fn supported_media_types(&self) -> Vec<MediaType> { vec![MediaType::Text] }
     
     // Capability and Dependency Management
     fn capabilities(&self) -> &ComponentCapabilities;
@@ -2833,6 +3458,16 @@ pub trait Tool: BaseAgent {
     
     // Execution interface (simpler than full BaseAgent)
     async fn execute_tool(&self, input: ToolInput) -> Result<ToolOutput>;
+    
+    // Streaming interface for tools
+    async fn stream_call(&self, input: ToolInput) -> Result<ToolStream> {
+        // Default implementation
+        Err(LLMSpellError::NotImplemented("Tool streaming not supported".into()))
+    }
+    
+    // Media type support
+    fn input_media_types(&self) -> Vec<MediaType> { vec![MediaType::Text] }
+    fn output_media_types(&self) -> Vec<MediaType> { vec![MediaType::Text] }
     
     // Tool composition
     fn can_chain_with(&self, other: &dyn Tool) -> bool;
@@ -3318,334 +3953,393 @@ This comprehensive component hierarchy provides:
 
 Rs-LLMSpell follows a **bridge-first philosophy** where we leverage existing, battle-tested crates rather than reimplementing functionality. This approach ensures reliability, reduces maintenance burden, and allows us to focus on the unique value proposition of scriptable LLM orchestration.
 
-### Script Engine Bridge Architecture
+### Language-Agnostic Script Runtime Architecture
 
-The bridge layer provides a unified interface between script engines and the Rust application layer:
-
-```rust
-// Script Engine Bridge trait implemented by all engines (both embedded and external)
-#[async_trait]
-pub trait ScriptEngineBridge: Send + Sync {
-    // Lifecycle management
-    async fn initialize(&mut self, runtime: &ScriptRuntime) -> Result<()>;
-    async fn shutdown(&mut self) -> Result<()>;
-    
-    // Global API injection
-    async fn inject_globals(&mut self, globals: &GlobalAPISet) -> Result<()>;
-    
-    // Script execution
-    async fn execute_script(&mut self, script: &str) -> Result<ScriptResult>;
-    async fn execute_file(&mut self, path: &Path) -> Result<ScriptResult>;
-    
-    // Type conversion
-    fn convert_to_script_value(&self, rust_value: Value) -> Result<ScriptValue>;
-    fn convert_from_script_value(&self, script_value: ScriptValue) -> Result<Value>;
-    
-    // Error handling
-    fn translate_error(&self, error: ScriptError) -> LLMSpellError;
-}
-
-// External Runtime Bridge for library mode integration
-#[async_trait]
-pub trait ExternalRuntimeBridge: ScriptEngineBridge {
-    // External runtime specific methods
-    async fn attach_to_external_state(&mut self, external_state: ExternalState) -> Result<()>;
-    async fn inject_globals_external(&mut self, globals: &GlobalAPISet, external_state: &mut ExternalState) -> Result<()>;
-    fn get_external_runtime_info(&self) -> ExternalRuntimeInfo;
-    async fn handle_external_errors(&self, error: ExternalError) -> Result<LLMSpellError>;
-}
-
-// Global APIs available to all script engines
-pub struct GlobalAPISet {
-    pub agent_factory: Arc<AgentFactory>,
-    pub tool_registry: Arc<ToolRegistry>,
-    pub workflow_factory: Arc<WorkflowFactory>,
-    pub logger: Arc<Logger>,
-    pub state_manager: Arc<StateManager>,
-    pub event_bus: Arc<EventBus>,
-    pub security_context: SecurityContext,
-    pub config_accessor: Arc<ConfigAccessor>,
-    pub utils: Arc<UtilityFunctions>,
-}
-```
-
-### C API Layer for Library Mode
-
-The C API provides the stable interface for external runtime integration, enabling `require("llmspell")` functionality:
+The core design principle is **language abstraction from day one**. Even in Phase 1.2 when we only implement Lua support, the architecture enforces proper abstraction to enable seamless addition of JavaScript (Phase 5) and Python (future) without refactoring:
 
 ```rust
-// C API exports for library mode
-#[repr(C)]
-pub struct LibraryContext {
-    runtime: *mut ScriptRuntime,
-    error_buffer: [c_char; 1024],
-    last_error: Option<LLMSpellError>,
+// Language-agnostic ScriptRuntime - the central orchestrator
+pub struct ScriptRuntime {
+    engine: Box<dyn ScriptEngineBridge>,    // Language-agnostic script execution
+    registry: Arc<ComponentRegistry>,       // Component management
+    provider_manager: Arc<ProviderManager>, // LLM provider access
+    execution_context: Arc<RwLock<ExecutionContext>>, // Runtime state
 }
 
-// Library initialization (called by require())
-#[no_mangle]
-pub extern "C" fn llmspell_init_library(
-    config_source: *const c_char,
-    init_strategy: SelectiveInitStrategy,
-    external_state: *mut c_void
-) -> *mut LibraryContext {
-    // Initialize runtime in library mode
-    // Handle external configuration sources
-    // Setup selective component initialization
-}
-
-#[no_mangle]
-pub extern "C" fn llmspell_inject_globals(
-    ctx: *mut LibraryContext,
-    external_state: *mut c_void,
-    engine_type: EngineType
-) -> c_int {
-    // Inject globals into external runtime state
-    // Handle engine-specific injection patterns
-}
-
-#[no_mangle]
-pub extern "C" fn llmspell_create_tool(
-    ctx: *mut LibraryContext,
-    name: *const c_char,
-    config: *const c_char
-) -> *mut c_void {
-    // Create tools from external runtime
-    // Support tools-only mode
-}
-
-#[no_mangle]
-pub extern "C" fn llmspell_cleanup(ctx: *mut LibraryContext) {
-    // Proper resource cleanup for external runtime
-    // Handle async runtime shutdown
-}
-
-// External Runtime Context
-pub struct ExternalRuntimeContext {
-    pub engine_type: EngineType,
-    pub version_info: RuntimeVersionInfo,
-    pub threading_model: ThreadingModel,
-    pub memory_manager: ExternalMemoryManager,
-    pub error_handler: ExternalErrorHandler,
-}
-
-#[derive(Debug, Clone)]
-pub enum EngineType {
-    ExternalLua { version: String, state: *mut lua_State },
-    ExternalNodeJS { version: String, isolate: *mut v8::Isolate },
-    ExternalPython { version: String, interpreter: *mut pyo3::PyObject },
-}
-```
-
-### External Lua Runtime Bridge
-
-Specialized bridge for integrating with external Lua runtimes:
-
-```rust
-pub struct ExternalLuaBridge {
-    external_state: *mut lua_State,
-    llmspell_table: LuaRegistryKey,
-    async_scheduler: ExternalLuaScheduler,
-    error_translator: LuaErrorTranslator,
-}
-
-impl ExternalRuntimeBridge for ExternalLuaBridge {
-    async fn attach_to_external_state(&mut self, external_state: ExternalState) -> Result<()> {
-        match external_state {
-            ExternalState::Lua(lua_state) => {
-                self.external_state = lua_state;
-                // Create llmspell table in external Lua registry
-                self.setup_llmspell_namespace()?;
-                Ok(())
-            }
-            _ => Err(LLMSpellError::InvalidExternalState("Expected Lua state")),
-        }
+impl ScriptRuntime {
+    // Factory pattern for different engines
+    pub async fn new_with_lua(config: RuntimeConfig) -> Result<Self> {
+        let engine = Box::new(LuaEngine::new(config.lua_config).await?);
+        Self::new_with_engine(engine, config).await
     }
     
-    async fn inject_globals_external(&mut self, globals: &GlobalAPISet, external_state: &mut ExternalState) -> Result<()> {
-        // Inject globals into external Lua state (not internal mlua context)
-        self.inject_agent_api(globals.agent_factory.clone())?;
-        self.inject_tools_api(globals.tool_registry.clone())?;
-        self.inject_workflow_api(globals.workflow_factory.clone())?;
-        Ok(())
+    pub async fn new_with_javascript(config: RuntimeConfig) -> Result<Self> {
+        let engine = Box::new(JavaScriptEngine::new(config.js_config).await?);
+        Self::new_with_engine(engine, config).await
     }
-}
-```
-
-### Lua Bridge Implementation
-
-The Lua bridge leverages `mlua` for safe, ergonomic Lua integration:
-
-```rust
-pub struct LuaEngineBridge {
-    lua: Arc<Mutex<mlua::Lua>>,
-    async_manager: LuaAsyncManager,
-    global_injector: LuaGlobalInjector,
-    type_converter: LuaTypeConverter,
-}
-
-impl LuaEngineBridge {
-    pub async fn new(config: &LuaEngineConfig, runtime: &ScriptRuntime) -> Result<Self> {
-        // Create Lua instance with security-appropriate libraries
-        let lua = Self::create_lua_instance(config)?;
+    
+    // Internal constructor that works with any engine
+    async fn new_with_engine(
+        mut engine: Box<dyn ScriptEngineBridge>, 
+        config: RuntimeConfig
+    ) -> Result<Self> {
+        let registry = Arc::new(ComponentRegistry::new());
+        let provider_manager = Arc::new(ProviderManager::new(config.providers)?);
+        let execution_context = Arc::new(RwLock::new(ExecutionContext::new()));
         
-        // Set up async support
-        let async_manager = LuaAsyncManager::new(lua.clone());
-        
-        // Create global injector
-        let global_injector = LuaGlobalInjector::new(runtime.agent_runtime.clone());
+        // Inject APIs into the engine (language-agnostic)
+        engine.inject_apis(&registry, &provider_manager, &execution_context).await?;
         
         Ok(Self {
-            lua: Arc::new(Mutex::new(lua)),
-            async_manager,
-            global_injector,
-            type_converter: LuaTypeConverter::new(),
+            engine,
+            registry,
+            provider_manager,
+            execution_context,
         })
     }
     
-    async fn inject_globals(&mut self, globals: &GlobalAPISet) -> Result<()> {
-        let lua = self.lua.lock().await;
-        let globals_table = lua.globals();
+    // Language-agnostic script execution
+    pub async fn execute_script(&self, script: &str) -> Result<ScriptOutput> {
+        self.engine.execute_script(script).await
+    }
+    
+    pub async fn execute_script_streaming(&self, script: &str) -> Result<ScriptStream> {
+        self.engine.execute_script_streaming(script).await
+    }
+}
+```
+
+### Script Engine Bridge Trait
+
+The `ScriptEngineBridge` trait provides the abstraction layer that enables multi-language support:
+
+```rust
+// Language abstraction trait - implemented by all script engines
+#[async_trait]
+pub trait ScriptEngineBridge: Send + Sync {
+    // Engine identification
+    fn engine_name(&self) -> &'static str;
+    fn engine_version(&self) -> &str;
+    fn supports_streaming(&self) -> bool;
+    fn supports_multimodal(&self) -> bool;
+    
+    // Script execution (core functionality)
+    async fn execute_script(&self, script: &str) -> Result<ScriptOutput>;
+    async fn execute_script_streaming(&self, script: &str) -> Result<ScriptStream>;
+    async fn execute_file(&self, path: &Path) -> Result<ScriptOutput>;
+    
+    // API injection (language-specific but interface-consistent)
+    async fn inject_apis(
+        &mut self,
+        registry: &ComponentRegistry,
+        providers: &ProviderManager,
+        context: &ExecutionContext,
+    ) -> Result<()>;
+    
+    // Type conversion (language-specific implementation)
+    fn convert_rust_to_script(&self, value: &Value) -> Result<ScriptValue>;
+    fn convert_script_to_rust(&self, value: ScriptValue) -> Result<Value>;
+    
+    // Error handling abstraction
+    fn translate_script_error(&self, error: Box<dyn Error>) -> LLMSpellError;
+    
+    // Engine lifecycle
+    async fn initialize(&mut self) -> Result<()>;
+    async fn shutdown(&mut self) -> Result<()>;
+}
+```
+
+### Multi-Language Engine Implementations
+
+#### Lua Engine Implementation
+
+```rust
+// Lua-specific implementation of ScriptEngineBridge
+pub struct LuaEngine {
+    lua: Arc<Mutex<mlua::Lua>>,
+    api_injector: LuaAPIInjector,
+    stream_manager: LuaStreamManager,
+}
+
+impl LuaEngine {
+    pub async fn new(config: LuaEngineConfig) -> Result<Self> {
+        let lua = Self::create_secured_lua_instance(&config)?;
         
-        // Inject Agent API
-        self.global_injector.inject_agent_api(&lua, &globals_table, &globals.agent_factory)?;
+        Ok(Self {
+            lua: Arc::new(Mutex::new(lua)),
+            api_injector: LuaAPIInjector::new(),
+            stream_manager: LuaStreamManager::new(),
+        })
+    }
+    
+    fn create_secured_lua_instance(config: &LuaEngineConfig) -> Result<mlua::Lua> {
+        let lua = mlua::Lua::new();
         
-        // Inject Tools API
-        self.global_injector.inject_tools_api(&lua, &globals_table, &globals.tool_registry)?;
+        // Security: Disable dangerous standard library functions
+        let globals = lua.globals();
+        for dangerous_func in &["io", "os", "debug", "package", "dofile", "loadfile"] {
+            globals.set(*dangerous_func, mlua::Nil)?;
+        }
         
-        // Inject Workflow API
-        self.global_injector.inject_workflow_api(&lua, &globals_table, &globals.workflow_factory)?;
-        
-        // Inject Logger as a global
-        self.global_injector.inject_logger(&lua, &globals_table, &globals.logger)?;
-        
-        // Inject other globals
-        self.global_injector.inject_state_api(&lua, &globals_table, &globals.state_manager)?;
-        self.global_injector.inject_event_api(&lua, &globals_table, &globals.event_bus)?;
-        self.global_injector.inject_security_api(&lua, &globals_table, &globals.security_context)?;
-        self.global_injector.inject_config_api(&lua, &globals_table, &globals.config_accessor)?;
-        self.global_injector.inject_utils(&lua, &globals_table, &globals.utils)?;
-        
-        Ok(())
+        Ok(lua)
     }
 }
 
-// Lua-specific global injection
-pub struct LuaGlobalInjector {
-    agent_runtime: Arc<AgentRuntime>,
+#[async_trait]
+impl ScriptEngineBridge for LuaEngine {
+    fn engine_name(&self) -> &'static str { "lua" }
+    fn engine_version(&self) -> &str { "5.4" }
+    fn supports_streaming(&self) -> bool { true }
+    fn supports_multimodal(&self) -> bool { true }
+    
+    async fn execute_script(&self, script: &str) -> Result<ScriptOutput> {
+        let lua = self.lua.lock().await;
+        let result: mlua::Value = lua.load(script).eval_async().await?;
+        Ok(self.convert_lua_to_output(result)?)
+    }
+    
+    async fn execute_script_streaming(&self, script: &str) -> Result<ScriptStream> {
+        // Lua coroutine-based streaming implementation
+        self.stream_manager.create_streaming_execution(&self.lua, script).await
+    }
+    
+    async fn inject_apis(
+        &mut self,
+        registry: &ComponentRegistry,
+        providers: &ProviderManager,
+        context: &ExecutionContext,
+    ) -> Result<()> {
+        self.api_injector.inject_agent_api(&self.lua, registry).await?;
+        self.api_injector.inject_tool_api(&self.lua, registry).await?;
+        self.api_injector.inject_provider_api(&self.lua, providers).await?;
+        self.api_injector.inject_workflow_api(&self.lua, registry).await?;
+        Ok(())
+    }
+    
+    fn convert_rust_to_script(&self, value: &Value) -> Result<ScriptValue> {
+        // Rust Value -> Lua mlua::Value conversion
+        self.convert_value_to_lua(value)
+    }
+    
+    fn convert_script_to_rust(&self, value: ScriptValue) -> Result<Value> {
+        // Lua mlua::Value -> Rust Value conversion  
+        self.convert_lua_to_value(value)
+    }
+}
+```
+
+#### JavaScript Engine Implementation (Future - Phase 5)
+
+```rust
+// JavaScript-specific implementation of ScriptEngineBridge  
+pub struct JavaScriptEngine {
+    context: boa_engine::Context,
+    api_injector: JavaScriptAPIInjector,
+    stream_manager: JavaScriptStreamManager,
 }
 
-impl LuaGlobalInjector {
-    pub fn inject_agent_api(
-        &self,
-        lua: &Lua,
-        globals: &Table,
-        agent_factory: &Arc<AgentFactory>,
+impl JavaScriptEngine {
+    pub async fn new(config: JavaScriptEngineConfig) -> Result<Self> {
+        let context = Self::create_secured_js_context(&config)?;
+        
+        Ok(Self {
+            context,
+            api_injector: JavaScriptAPIInjector::new(),
+            stream_manager: JavaScriptStreamManager::new(),
+        })
+    }
+}
+
+#[async_trait]
+impl ScriptEngineBridge for JavaScriptEngine {
+    fn engine_name(&self) -> &'static str { "javascript" }
+    fn engine_version(&self) -> &str { "ES2022" }
+    fn supports_streaming(&self) -> bool { true }
+    fn supports_multimodal(&self) -> bool { true }
+    
+    async fn execute_script(&self, script: &str) -> Result<ScriptOutput> {
+        let result = self.context.eval(script)?;
+        Ok(self.convert_js_to_output(result)?)
+    }
+    
+    async fn execute_script_streaming(&self, script: &str) -> Result<ScriptStream> {
+        // JavaScript async generator-based streaming implementation
+        self.stream_manager.create_streaming_execution(&self.context, script).await
+    }
+    
+    async fn inject_apis(
+        &mut self,
+        registry: &ComponentRegistry,
+        providers: &ProviderManager,
+        context: &ExecutionContext,
     ) -> Result<()> {
+        // Same API surface, different injection implementation
+        self.api_injector.inject_agent_api(&mut self.context, registry).await?;
+        self.api_injector.inject_tool_api(&mut self.context, registry).await?;
+        self.api_injector.inject_provider_api(&mut self.context, providers).await?;
+        self.api_injector.inject_workflow_api(&mut self.context, registry).await?;
+        Ok(())
+    }
+    
+    // JavaScript-specific type conversions
+    fn convert_rust_to_script(&self, value: &Value) -> Result<ScriptValue> {
+        self.convert_value_to_js(value)
+    }
+    
+    fn convert_script_to_rust(&self, value: ScriptValue) -> Result<Value> {
+        self.convert_js_to_value(value)
+    }
+}
+```
+
+### Language-Agnostic API Injection
+
+Each engine implements the same API surface using language-specific patterns:
+
+```rust
+// Lua API injection - using coroutines for async operations
+impl LuaAPIInjector {
+    pub async fn inject_agent_api(&self, lua: &Arc<Mutex<mlua::Lua>>, registry: &ComponentRegistry) -> Result<()> {
+        let lua = lua.lock().await;
+        let globals = lua.globals();
+        
+        // Create Agent table with constructor function
         let agent_table = lua.create_table()?;
-        let factory = agent_factory.clone();
-        let runtime = self.agent_runtime.clone();
+        let registry_clone = registry.clone();
         
-        // Agent.new(config) -> Agent
-        let new_fn = lua.create_async_function(move |lua, config: Table| {
-            let factory = factory.clone();
-            let runtime = runtime.clone();
+        let create_fn = lua.create_async_function(move |_lua, config: mlua::Table| {
+            let registry = registry_clone.clone();
             async move {
+                // Convert Lua table to AgentConfig
                 let agent_config = lua_table_to_agent_config(config)?;
-                let agent = factory.create_agent(agent_config).await?;
                 
-                // Wrap agent for Lua with runtime binding
-                Ok(LuaAgent::new(agent, runtime))
+                // Create agent through registry
+                let agent = registry.create_agent(agent_config).await?;
+                
+                // Return Lua userdata wrapping the agent
+                Ok(LuaAgent::new(agent))
             }
         })?;
-        agent_table.set("new", new_fn)?;
         
-        // Agent.template(name, config) -> Agent
-        let template_fn = lua.create_async_function(move |lua, (name, config): (String, Table)| {
-            let factory = factory.clone();
-            let runtime = runtime.clone();
-            async move {
-                let agent_config = lua_table_to_agent_config(config)?;
-                let agent = factory.create_from_template(&name, agent_config).await?;
-                Ok(LuaAgent::new(agent, runtime))
-            }
-        })?;
-        agent_table.set("template", template_fn)?;
-        
+        agent_table.set("create", create_fn)?;
         globals.set("Agent", agent_table)?;
         Ok(())
     }
 }
-```
 
-### JavaScript Bridge Implementation
-
-The JavaScript bridge can use either `boa` (pure Rust) or `v8` (for performance):
-
-```rust
-pub struct JavaScriptEngineBridge {
-    engine: JSEngine,
-    async_manager: JSAsyncManager,
-    global_injector: JSGlobalInjector,
-    type_converter: JSTypeConverter,
-}
-
-enum JSEngine {
-    Boa(boa_engine::Context),
-    V8(v8::Isolate),
-}
-
-impl JavaScriptEngineBridge {
-    pub async fn new(config: &JavaScriptEngineConfig, runtime: &ScriptRuntime) -> Result<Self> {
-        let engine = match config.engine_type {
-            JSEngineType::Boa => JSEngine::Boa(Self::create_boa_context(config)?),
-            JSEngineType::V8 => JSEngine::V8(Self::create_v8_isolate(config)?),
-        };
+// JavaScript API injection - using Promises for async operations
+impl JavaScriptAPIInjector {
+    pub async fn inject_agent_api(&self, context: &mut boa_engine::Context, registry: &ComponentRegistry) -> Result<()> {
+        let registry_clone = registry.clone();
         
-        let async_manager = JSAsyncManager::new(&engine);
-        let global_injector = JSGlobalInjector::new(runtime.agent_runtime.clone());
-        
-        Ok(Self {
-            engine,
-            async_manager,
-            global_injector,
-            type_converter: JSTypeConverter::new(),
-        })
-    }
-    
-    async fn inject_globals(&mut self, globals: &GlobalAPISet) -> Result<()> {
-        match &mut self.engine {
-            JSEngine::Boa(context) => {
-                self.inject_globals_boa(context, globals).await
+        // Create Agent constructor that returns a Promise
+        let agent_constructor = FunctionObjectBuilder::new(
+            context,
+            move |_this, args, context| {
+                let config = args.get(0).expect("Missing config parameter");
+                let agent_config = js_value_to_agent_config(config, context)?;
+                
+                // Create Promise for async agent creation
+                let promise = JsPromise::new(
+                    |resolvers, context| {
+                        // Async agent creation logic
+                        let registry = registry_clone.clone();
+                        let agent = registry.create_agent(agent_config).await?;
+                        
+                        // Resolve with JavaScript agent wrapper
+                        resolvers.resolve.call(&JsValue::undefined(), &[JSAgent::new(agent).into()], context)
+                    },
+                    context,
+                )?;
+                
+                Ok(promise.into())
             }
-            JSEngine::V8(isolate) => {
-                self.inject_globals_v8(isolate, globals).await
-            }
-        }
-    }
-    
-    async fn inject_globals_boa(&self, context: &mut boa_engine::Context, globals: &GlobalAPISet) -> Result<()> {
-        // Create Agent constructor
-        let agent_constructor = FunctionObjectBuilder::new(context, |this, args, context| {
-            // Agent constructor implementation
-            let config = args.get(0).ok_or("Missing config")?;
-            let agent_config = js_value_to_agent_config(config, context)?;
-            
-            // Create promise for async agent creation
-            let promise = JsPromise::new(...);
-            Ok(promise.into())
-        })
+        )
         .name("Agent")
         .length(1)
         .constructor(true)
         .build();
         
         context.register_global_property("Agent", agent_constructor, Attribute::all());
-        
-        // Inject other globals similarly...
         Ok(())
     }
 }
+```
+
+### Engine Factory and Plugin System
+
+```rust
+// Engine factory for runtime creation
+pub struct ScriptEngineFactory;
+
+impl ScriptEngineFactory {
+    pub async fn create_engine(
+        engine_type: EngineType, 
+        config: EngineConfig
+    ) -> Result<Box<dyn ScriptEngineBridge>> {
+        match engine_type {
+            EngineType::Lua => {
+                let engine = LuaEngine::new(config.lua_config).await?;
+                Ok(Box::new(engine))
+            }
+            EngineType::JavaScript => {
+                let engine = JavaScriptEngine::new(config.js_config).await?;
+                Ok(Box::new(engine))
+            }
+            EngineType::Plugin(plugin_name) => {
+                // Third-party plugin engine
+                let engine = PluginEngineLoader::load(&plugin_name, config).await?;
+                Ok(engine)
+            }
+        }
+    }
+    
+    pub fn supported_engines() -> Vec<&'static str> {
+        vec!["lua", "javascript"] // + any loaded plugins
+    }
+}
+
+// Plugin interface for third-party engines
+pub trait ScriptEnginePlugin: Send + Sync {
+    fn plugin_name(&self) -> &'static str;
+    fn supported_versions(&self) -> Vec<&'static str>;
+    async fn create_engine(&self, config: PluginConfig) -> Result<Box<dyn ScriptEngineBridge>>;
+}
+```
+
+### External Runtime Integration (Library Mode)
+
+For library mode integration (e.g., `require("llmspell")` in existing Lua applications):
+
+```rust
+// External runtime bridge for library mode
+#[async_trait]
+pub trait ExternalRuntimeBridge: ScriptEngineBridge {
+    async fn attach_to_external_state(&mut self, external_state: ExternalState) -> Result<()>;
+    async fn inject_into_external_context(&self, external_context: &mut dyn Any) -> Result<()>;
+    fn get_external_runtime_info(&self) -> ExternalRuntimeInfo;
+}
+
+// External Lua bridge implementation
+pub struct ExternalLuaBridge {
+    external_lua_state: *mut lua_State,
+    runtime: Arc<ScriptRuntime>,
+    api_injector: LuaAPIInjector,
+}
+
+impl ExternalRuntimeBridge for ExternalLuaBridge {
+    async fn attach_to_external_state(&mut self, external_state: ExternalState) -> Result<()> {
+        match external_state {
+            ExternalState::Lua(lua_state) => {
+                self.external_lua_state = lua_state;
+                self.setup_llmspell_namespace()?;
+                Ok(())
+            }
+            _ => Err(LLMSpellError::InvalidExternalState),
+        }
+    }
+}
+```
 ```
 
 ### Bridge Technology Choices
@@ -3722,6 +4416,257 @@ This section details the script-level APIs available to developers. Rs-LLMSpell 
 3.  **Native Module Integration**: Importing `rs-llmspell` as a library into existing Lua or JavaScript applications to add agentic capabilities.
 
 All modes expose the same core functionalities, ensuring a consistent developer experience across different usage patterns.
+
+### Language-Agnostic API Design
+
+Rs-LLMSpell provides **identical API surfaces** across all supported script engines. The same operations work consistently whether you're using Lua, JavaScript, or Python, with only syntax differences between languages.
+
+#### Cross-Language API Equivalence
+
+The following examples demonstrate identical functionality across different engines:
+
+**Agent Creation and Execution:**
+
+```lua
+-- Lua syntax
+local agent = Agent.create({
+    name = "researcher",
+    provider = "openai",
+    model = "gpt-4",
+    system_prompt = "You are a research assistant.",
+    base_url = "https://custom-api.example.com/v1"  -- Optional: custom API endpoint
+})
+
+-- Convenience syntax with provider/model string
+local agent2 = Agent.create({
+    name = "analyst",
+    model = "anthropic/claude-3-sonnet",  -- Provider parsed from string
+    system_prompt = "You are a data analyst."
+})
+
+-- Using just model name (uses default provider)
+local agent3 = Agent.create({
+    name = "writer",
+    model = "gpt-4-turbo",  -- Uses default provider from config
+    system_prompt = "You are a technical writer."
+})
+
+local result = agent:execute({
+    query = "Latest AI developments",
+    max_tokens = 500
+})
+```
+
+```javascript
+// JavaScript syntax - identical functionality
+const agent = Agent.create({
+    name: "researcher", 
+    provider: "openai",
+    model: "gpt-4",
+    system_prompt: "You are a research assistant.",
+    base_url: "https://custom-api.example.com/v1"  // Optional: custom API endpoint
+});
+
+// Convenience syntax with provider/model string
+const agent2 = Agent.create({
+    name: "analyst",
+    model: "anthropic/claude-3-sonnet",  // Provider parsed from string
+    system_prompt: "You are a data analyst."
+});
+
+// Using just model name (uses default provider)
+const agent3 = Agent.create({
+    name: "writer",
+    model: "gpt-4-turbo",  // Uses default provider from config
+    system_prompt: "You are a technical writer."
+});
+
+const result = await agent.execute({
+    query: "Latest AI developments",
+    max_tokens: 500
+});
+```
+
+```python
+# Python syntax - same operations
+agent = Agent.create({
+    "name": "researcher",
+    "provider": "openai", 
+    "model": "gpt-4",
+    "system_prompt": "You are a research assistant.",
+    "base_url": "https://custom-api.example.com/v1"  # Optional: custom API endpoint
+})
+
+# Convenience syntax with provider/model string
+agent2 = Agent.create({
+    "name": "analyst",
+    "model": "anthropic/claude-3-sonnet",  # Provider parsed from string
+    "system_prompt": "You are a data analyst."
+})
+
+# Using just model name (uses default provider)
+agent3 = Agent.create({
+    "name": "writer",
+    "model": "gpt-4-turbo",  # Uses default provider from config
+    "system_prompt": "You are a technical writer."
+})
+
+result = await agent.execute({
+    "query": "Latest AI developments",
+    "max_tokens": 500
+})
+```
+
+**Streaming Operations:**
+
+```lua
+-- Lua: Coroutine-based streaming
+local stream = agent:stream_execute({query = "Write a long article"})
+for chunk in stream do
+    print(chunk.content)
+    coroutine.yield() -- Allow other operations
+end
+```
+
+```javascript
+// JavaScript: Async generator streaming
+const stream = agent.streamExecute({query: "Write a long article"});
+for await (const chunk of stream) {
+    console.log(chunk.content);
+}
+```
+
+```python
+# Python: Async iterator streaming
+stream = agent.stream_execute({"query": "Write a long article"})
+async for chunk in stream:
+    print(chunk.content)
+```
+
+**Tool Usage:**
+
+```lua
+-- Lua tool execution
+local search_tool = Tool.get("web_search")
+local results = search_tool:execute({
+    query = "rust programming",
+    limit = 10
+})
+```
+
+```javascript
+// JavaScript tool execution - identical interface
+const searchTool = Tool.get("web_search");
+const results = await searchTool.execute({
+    query: "rust programming",
+    limit: 10
+});
+```
+
+```python
+# Python tool execution
+search_tool = Tool.get("web_search")
+results = await search_tool.execute({
+    "query": "rust programming", 
+    "limit": 10
+})
+```
+
+#### Engine Selection and Switching
+
+Users can choose their preferred engine or switch engines based on requirements:
+
+```bash
+# CLI engine selection
+llmspell --engine lua run script.lua
+llmspell --engine javascript run script.js
+llmspell --engine python run script.py
+
+# Runtime engine switching
+llmspell repl --engine lua      # Start Lua REPL
+llmspell> .switch javascript    # Switch to JavaScript
+llmspell> .switch python        # Switch to Python
+```
+
+**Programmatic Engine Selection:**
+
+```rust
+// Runtime configuration with engine preference
+let config = RuntimeConfig {
+    preferred_engines: vec!["lua", "javascript", "python"],
+    fallback_strategy: FallbackStrategy::Auto,
+    engine_specific: EngineConfigs {
+        lua: LuaConfig { jit_enabled: true, ..Default::default() },
+        javascript: JSConfig { engine_type: JSEngineType::Boa, ..Default::default() },
+        python: PythonConfig { asyncio_mode: true, ..Default::default() },
+    }
+};
+
+// Automatic engine selection based on availability and capabilities
+let runtime = ScriptRuntime::new_with_config(config).await?;
+
+// Or explicit engine selection
+let lua_runtime = ScriptRuntime::new_with_lua(config.clone()).await?;
+let js_runtime = ScriptRuntime::new_with_javascript(config.clone()).await?;
+```
+
+#### Language-Specific Optimizations
+
+While the API surface is identical, each engine provides language-specific optimizations:
+
+| Feature | Lua Implementation | JavaScript Implementation | Python Implementation |
+|---------|-------------------|---------------------------|----------------------|
+| **Async Patterns** | Coroutines with cooperative yielding | Native Promises and async/await | Native asyncio integration |
+| **Error Handling** | pcall/xpcall patterns | try/catch with Promise rejection | try/except with async context |
+| **Type Conversion** | Userdata with metamethods | Prototype-based object wrapping | Class-based object wrapping |
+| **Memory Management** | Lua GC with manual collection hints | JavaScript GC with WeakRef support | Python GC with reference counting |
+| **Performance** | LuaJIT optimization | V8 JIT (when available) | CPython optimizations |
+
+#### Cross-Engine Compatibility
+
+Scripts can be designed to work across multiple engines with minimal changes:
+
+```lua
+-- Lua version (core logic)
+function analyze_data(data)
+    local analyzer = Agent.get("data_analyst")
+    local insights = analyzer:execute({
+        data = data,
+        analysis_type = "statistical"
+    })
+    return insights
+end
+```
+
+```javascript
+// JavaScript version (same logic, different syntax)
+function analyzeData(data) {
+    const analyzer = Agent.get("data_analyst");
+    const insights = await analyzer.execute({
+        data: data,
+        analysis_type: "statistical"
+    });
+    return insights;
+}
+```
+
+**Automatic Translation Tools:**
+
+```bash
+# Convert between script languages (future feature)
+llmspell translate script.lua --to javascript > script.js
+llmspell translate script.js --to python > script.py
+
+# Validate cross-engine compatibility
+llmspell validate script.lua --engines lua,javascript,python
+```
+
+This language-agnostic design ensures that:
+
+- **Users can choose their preferred language** without losing functionality
+- **Teams can migrate between engines** without rewriting business logic  
+- **Libraries and tools** work consistently across all supported languages
+- **Learning curve is minimized** for developers familiar with any supported language
 
 ### Interactive REPL Mode Architecture
 
@@ -4702,6 +5647,10 @@ local research_agent = Agent.new({
     description = "Multi-source research specialist",
     provider = "anthropic",
     model = "claude-3-sonnet",
+    base_url = nil,  -- Optional: defaults to provider's standard endpoint
+    
+    -- Alternative: use convenient provider/model syntax
+    -- model = "anthropic/claude-3-sonnet",  -- Provider inferred from string
     
     -- System prompt with Lua string literals
     system_prompt = [[
@@ -6084,6 +7033,129 @@ class WebScrapingTool extends Tools.BaseTool {
 
 // Register custom tool
 Tools.register(new WebScrapingTool());
+```
+
+#### 3. **JavaScript Agent Configuration**
+JavaScript supports flexible agent configuration with provider/model syntax and runtime overrides:
+
+```javascript
+// JavaScript agent configuration examples
+const researchAgent = await Agent.create({
+    name: "comprehensive_researcher",
+    description: "Multi-source research specialist",
+    model: "anthropic/claude-3-sonnet",  // Provider parsed from string
+    base_url: null,  // Optional: defaults to provider's standard endpoint
+    
+    system_prompt: `
+        You are a comprehensive research specialist with expertise in:
+        - Academic literature analysis
+        - Market trend identification  
+        - Technical documentation synthesis
+        - Data-driven insight generation
+        
+        Always provide sources and confidence levels for your findings.
+    `,
+    
+    // Advanced configuration
+    config: {
+        temperature: 0.3,
+        max_tokens: 4000,
+        timeout: 120000,
+        
+        // Resource limits
+        resources: {
+            max_memory: "512MB",
+            max_execution_time: 300,
+            max_concurrent_tools: 3
+        },
+        
+        // Error handling
+        error_strategy: {
+            retry_count: 3,
+            retry_delay: 5000,
+            fallback_behavior: "use_cached_data"
+        }
+    },
+    
+    // Tools configuration
+    tools: [
+        await Tools.get("web_search"),
+        await Tools.get("scholarly_search"),
+        await Tools.get("pdf_analyzer"),
+        await Tools.get("citation_formatter"),
+        
+        // Custom tool with inline configuration
+        await Tools.create("custom_analyzer", {
+            category: "analysis",
+            input_schema: {
+                type: "object",
+                properties: {
+                    data: { type: "array" },
+                    analysis_type: { type: "string" }
+                }
+            },
+            execute: async (input) => {
+                const { data, analysis_type } = input;
+                
+                let result = {};
+                if (analysis_type === "trend_analysis") {
+                    result = await analyzeTrends(data);
+                } else if (analysis_type === "sentiment_analysis") {
+                    result = await analyzeSentiment(data);
+                }
+                
+                return {
+                    result,
+                    metadata: {
+                        analysis_type,
+                        data_points: data.length
+                    }
+                };
+            }
+        })
+    ],
+    
+    // Memory configuration
+    memory: {
+        type: "conversation",
+        max_entries: 100,
+        persistence: true,
+        storage_path: "./agent_memory/"
+    }
+});
+
+// Simplified creation with provider/model syntax
+const quickAgent = await Agent.create({
+    name: "quick_assistant",
+    model: "openai/gpt-4-turbo",  // Provider inferred
+    system_prompt: "You are a helpful assistant."
+});
+
+// Using custom API endpoints
+const customEndpointAgent = await Agent.create({
+    name: "corporate_agent",
+    model: "openai/gpt-4",
+    base_url: "https://api-gateway.company.com/v1",  // Corporate proxy
+    system_prompt: "You are a corporate assistant with access to internal data."
+});
+
+// Runtime provider configuration
+await Provider.configure({
+    provider: "anthropic",
+    base_url: "https://custom-claude-api.com",
+    max_tokens: 8192,
+    timeout: 60000
+});
+
+// Agents created after configuration use the new settings
+const configuredAgent = await Agent.create({
+    name: "post_config_agent",
+    model: "anthropic/claude-3-opus",  // Will use custom base_url
+    system_prompt: "You are configured with custom settings."
+});
+```
+
+```javascript
 
 // Data processing with lodash
 class DataProcessor {
@@ -6655,16 +7727,16 @@ Rs-LLMSpell provides a comprehensive library of **40+ production-ready tools** o
 #### 1. **File System Operations** (8 tools)
 Tools for secure file and directory operations with comprehensive sandboxing.
 
-| Tool Name | Description | Key Features | Security Level |
-|-----------|-------------|--------------|----------------|
-| `file_reader` | Read files with format detection | UTF-8, binary, encoding detection | High |
-| `file_writer` | Write files with atomic operations | Atomic writes, backup creation | High |
-| `directory_lister` | List directory contents | Recursive, filtering, metadata | Medium |
-| `file_metadata` | Extract file information | Size, dates, permissions, checksums | Low |
-| `file_search` | Search files by content/name | Regex, glob patterns, indexing | Medium |
-| `file_archiver` | Create/extract archives | ZIP, TAR, compression levels | High |
-| `file_watcher` | Monitor file changes | Real-time events, batch processing | Medium |
-| `file_converter` | Convert between formats | Text encodings, line endings | Low |
+| Tool Name | Description | Key Features | Security Level | Streaming |
+|-----------|-------------|--------------|----------------|-----------|
+| `file_reader` | Read files with format detection | UTF-8, binary, encoding detection | High | Yes |
+| `file_writer` | Write files with atomic operations | Atomic writes, backup creation | High | Yes |
+| `directory_lister` | List directory contents | Recursive, filtering, metadata | Medium | No |
+| `file_metadata` | Extract file information | Size, dates, permissions, checksums | Low | No |
+| `file_search` | Search files by content/name | Regex, glob patterns, indexing | Medium | Yes |
+| `file_archiver` | Create/extract archives | ZIP, TAR, compression levels | High | Yes |
+| `file_watcher` | Monitor file changes | Real-time events, batch processing | Medium | Yes |
+| `file_converter` | Convert between formats | Text encodings, line endings | Low | No |
 
 ```lua
 -- File operations examples
@@ -6692,10 +7764,10 @@ local files = Tools.get("directory_lister"):execute({
 #### 2. **Web and Network Operations** (7 tools)
 Comprehensive web access with rate limiting, caching, and security controls.
 
-| Tool Name | Description | Key Features | Rate Limits |
-|-----------|-------------|--------------|-------------|
-| `web_search` | Multi-provider search | Google, Bing, DuckDuckGo fallback | 30/min |
-| `web_scraper` | Extract web content | CSS selectors, JavaScript rendering | 20/min |
+| Tool Name | Description | Key Features | Rate Limits | Streaming |
+|-----------|-------------|--------------|-------------|-----------|
+| `web_search` | Multi-provider search | Google, Bing, DuckDuckGo fallback | 30/min | No |
+| `web_scraper` | Extract web content | CSS selectors, JavaScript rendering | 20/min | Yes |
 | `http_client` | HTTP/HTTPS requests | REST APIs, custom headers, auth | 60/min |
 | `url_analyzer` | Analyze URL structure | Domain info, security scoring | 100/min |
 | `webpage_monitor` | Monitor page changes | Content diffs, scheduling | 10/min |
@@ -7018,6 +8090,87 @@ const academicPapers = await Tools.get("academic_searcher").execute({
     include_abstracts: true,
     sort_by: "relevance" // relevance, date, citations
 });
+```
+
+#### 9. **Multimodal Processing Tools** (8 tools)
+Advanced tools for processing images, audio, video, and mixed media content.
+
+| Tool Name | Description | Input Types | Output Types | Streaming |
+|-----------|-------------|-------------|--------------|-----------|
+| `image_analyzer` | Computer vision analysis | Image | Text, JSON | No |
+| `ocr_extractor` | Optical character recognition | Image, PDF | Text | Yes |
+| `video_processor` | Video manipulation | Video | Video, Images, Audio | Yes |
+| `audio_transcriber` | Speech to text | Audio | Text | Yes |
+| `image_generator` | AI image generation | Text | Image | Yes |
+| `media_converter` | Format conversion | Any media | Any media | Yes |
+| `face_detector` | Face detection/recognition | Image, Video | JSON, Image | No |
+| `scene_analyzer` | Scene understanding | Image, Video | Text, JSON | No |
+
+```lua
+-- Multimodal tools examples
+local ocr_result = Tools.get("ocr_extractor"):execute({
+    image = image_data,  -- binary image data
+    languages = {"en", "es"},
+    enhance_quality = true,
+    output_format = "structured",  -- text, structured, json
+    confidence_threshold = 0.8
+})
+
+local video_frames = Tools.get("video_processor"):execute({
+    operation = "extract_frames",
+    video = video_data,
+    interval = 1.0,  -- extract frame every 1 second
+    format = "png",
+    resize = { width = 1280, height = 720 }
+})
+
+-- Streaming example
+local transcription_stream = Tools.get("audio_transcriber"):stream_call({
+    audio = audio_stream,
+    language = "auto",  -- auto-detect
+    real_time = true,
+    include_timestamps = true,
+    speaker_diarization = true
+})
+
+for chunk in transcription_stream do
+    print("Speaker " .. chunk.speaker .. ": " .. chunk.text)
+end
+```
+
+```javascript
+// Advanced multimodal processing
+const sceneAnalysis = await Tools.get("scene_analyzer").execute({
+    image: imageBuffer,
+    analysis_types: ["objects", "text", "faces", "emotions"],
+    return_annotated_image: true,
+    confidence_threshold: 0.7
+});
+
+// Process video with multiple outputs
+const videoOutputs = await Tools.get("video_processor").execute({
+    operation: "multi_extract",
+    video: videoFile,
+    outputs: {
+        thumbnail: { time: 5.0, format: "jpeg" },
+        preview: { duration: 10, format: "gif" },
+        audio: { format: "mp3", bitrate: 128 },
+        subtitles: { format: "srt", language: "en" }
+    }
+});
+
+// Stream processing for real-time applications
+const imageStream = await Tools.get("image_generator").streamCall({
+    prompt: "A beautiful sunset over mountains",
+    style: "photorealistic",
+    resolution: { width: 1920, height: 1080 },
+    steps: 50,
+    stream_interval: 10  // Send update every 10 steps
+});
+
+for await (const progressImage of imageStream) {
+    updatePreview(progressImage);
+}
 ```
 
 ### Tool Discovery and Management
@@ -8650,6 +9803,220 @@ benchmarks = ["criterion"]
 testing-utils = ["tokio-test", "tempfile"]
 ```
 
+### Script Engine Abstraction Strategy
+
+Rs-LLMSpell implements **language abstraction from Phase 1.2 onwards** to enable seamless multi-language support without refactoring. This critical architectural decision ensures that JavaScript (Phase 5) and Python (future) can be added as drop-in replacements.
+
+#### ScriptEngineBridge Architecture
+
+```rust
+// Central abstraction layer - implemented by all script engines
+#[async_trait]
+pub trait ScriptEngineBridge: Send + Sync {
+    // Engine identification and capabilities
+    fn engine_name(&self) -> &'static str;
+    fn engine_version(&self) -> &str;
+    fn supports_streaming(&self) -> bool;
+    fn supports_multimodal(&self) -> bool;
+    
+    // Core execution interface (identical across all engines)
+    async fn execute_script(&self, script: &str) -> Result<ScriptOutput>;
+    async fn execute_script_streaming(&self, script: &str) -> Result<ScriptStream>;
+    async fn execute_file(&self, path: &Path) -> Result<ScriptOutput>;
+    
+    // API injection (language-agnostic interface)
+    async fn inject_apis(
+        &mut self,
+        registry: &ComponentRegistry,
+        providers: &ProviderManager,
+        context: &ExecutionContext,
+    ) -> Result<()>;
+    
+    // Type conversion (engine-specific implementation)
+    fn convert_rust_to_script(&self, value: &Value) -> Result<ScriptValue>;
+    fn convert_script_to_rust(&self, value: ScriptValue) -> Result<Value>;
+    
+    // Error handling abstraction
+    fn translate_script_error(&self, error: Box<dyn Error>) -> LLMSpellError;
+}
+```
+
+#### Engine Implementation Matrix
+
+| Feature | Lua Engine (Phase 1.2) | JavaScript Engine (Phase 5) | Python Engine (Future) |
+|---------|-------------------------|------------------------------|------------------------|
+| **Crate** | `mlua` | `boa_engine` | `pyo3` |
+| **Async Pattern** | Coroutines | Promises/async-await | asyncio integration |
+| **Streaming** | `coroutine.yield()` | Async generators | Async iterators |
+| **Type System** | Dynamic with userdata | Dynamic with prototypes | Dynamic with type hints |
+| **Error Model** | Lua errors → Rust | JS exceptions → Rust | Python exceptions → Rust |
+| **Security** | Restricted stdlib | Sandboxed context | Restricted imports |
+| **Performance** | JIT compiled (LuaJIT) | Interpreted/JIT (future) | Interpreted |
+
+#### Concrete Engine Implementations
+
+```rust
+// Lua engine implementation (Phase 1.2)
+pub struct LuaEngine {
+    lua: Arc<Mutex<mlua::Lua>>,
+    api_injector: LuaAPIInjector,
+    stream_manager: LuaStreamManager,
+}
+
+// JavaScript engine implementation (Phase 5)
+pub struct JavaScriptEngine {
+    context: boa_engine::Context,
+    api_injector: JavaScriptAPIInjector,
+    stream_manager: JavaScriptStreamManager,
+}
+
+// Python engine implementation (Future)
+pub struct PythonEngine {
+    py: pyo3::Python,
+    api_injector: PythonAPIInjector,
+    stream_manager: PythonStreamManager,
+}
+
+// All implement the same ScriptEngineBridge trait with identical interface
+#[async_trait]
+impl ScriptEngineBridge for LuaEngine { /* Lua-specific implementation */ }
+
+#[async_trait] 
+impl ScriptEngineBridge for JavaScriptEngine { /* JavaScript-specific implementation */ }
+
+#[async_trait]
+impl ScriptEngineBridge for PythonEngine { /* Python-specific implementation */ }
+```
+
+#### Third-Party Plugin Architecture
+
+```rust
+// Plugin interface for extending with additional script engines
+pub trait ScriptEnginePlugin: Send + Sync {
+    fn plugin_name(&self) -> &'static str;
+    fn supported_versions(&self) -> Vec<&'static str>;
+    fn engine_features(&self) -> EngineFeatures;
+    
+    // Factory method for creating engine instances
+    async fn create_engine(&self, config: PluginConfig) -> Result<Box<dyn ScriptEngineBridge>>;
+    
+    // Plugin metadata
+    fn plugin_version(&self) -> semver::Version;
+    fn minimum_rs_llmspell_version(&self) -> semver::Version;
+}
+
+// Plugin registration system
+pub struct PluginRegistry {
+    plugins: DashMap<String, Arc<dyn ScriptEnginePlugin>>,
+    loaded_engines: DashMap<String, EngineInfo>,
+}
+
+impl PluginRegistry {
+    // Load external plugin at runtime
+    pub async fn load_plugin(&self, plugin_path: &Path) -> Result<()> {
+        // Use libloading to dynamically load plugin .so/.dll/.dylib
+        let lib = libloading::Library::new(plugin_path)?;
+        
+        // Get plugin factory function
+        let create_plugin: libloading::Symbol<fn() -> Box<dyn ScriptEnginePlugin>> =
+            unsafe { lib.get(b"create_plugin")? };
+        
+        let plugin = create_plugin();
+        self.register_plugin(plugin).await?;
+        Ok(())
+    }
+    
+    // Third-party engines can be used seamlessly
+    pub async fn create_engine(&self, engine_name: &str, config: EngineConfig) -> Result<Box<dyn ScriptEngineBridge>> {
+        match engine_name {
+            "lua" => Ok(Box::new(LuaEngine::new(config.lua_config).await?)),
+            "javascript" => Ok(Box::new(JavaScriptEngine::new(config.js_config).await?)),
+            plugin_name => {
+                if let Some(plugin) = self.plugins.get(plugin_name) {
+                    plugin.create_engine(config.plugin_config).await
+                } else {
+                    Err(LLMSpellError::UnknownEngine(plugin_name.to_string()))
+                }
+            }
+        }
+    }
+}
+
+// Example third-party plugin: Ruby engine
+pub struct RubyEnginePlugin;
+
+impl ScriptEnginePlugin for RubyEnginePlugin {
+    fn plugin_name(&self) -> &'static str { "ruby" }
+    fn supported_versions(&self) -> Vec<&'static str> { vec!["3.0", "3.1", "3.2"] }
+    
+    async fn create_engine(&self, config: PluginConfig) -> Result<Box<dyn ScriptEngineBridge>> {
+        Ok(Box::new(RubyEngine::new(config)?))
+    }
+}
+
+// Third-party Ruby engine implements the same ScriptEngineBridge interface
+struct RubyEngine { /* Magnus-based Ruby integration */ }
+
+#[async_trait]
+impl ScriptEngineBridge for RubyEngine {
+    fn engine_name(&self) -> &'static str { "ruby" }
+    // ... same interface as Lua/JavaScript engines
+}
+```
+
+#### Engine Selection Strategy
+
+```rust
+// Runtime engine selection with fallback hierarchy
+pub struct EngineSelector {
+    preferred_engines: Vec<String>,
+    capability_requirements: EngineCapabilities,
+}
+
+impl EngineSelector {
+    pub async fn select_optimal_engine(&self, available: &[String]) -> Result<String> {
+        // 1. Check preferred engines in order
+        for preferred in &self.preferred_engines {
+            if available.contains(preferred) {
+                if self.validate_capabilities(preferred).await? {
+                    return Ok(preferred.clone());
+                }
+            }
+        }
+        
+        // 2. Fallback to any compatible engine
+        for engine in available {
+            if self.validate_capabilities(engine).await? {
+                return Ok(engine.clone());
+            }
+        }
+        
+        Err(LLMSpellError::NoCompatibleEngine)
+    }
+}
+
+// Usage: Engine selection at runtime
+let selector = EngineSelector {
+    preferred_engines: vec!["lua".into(), "javascript".into()],
+    capability_requirements: EngineCapabilities {
+        streaming: true,
+        multimodal: false,
+        async_support: true,
+    },
+};
+
+let engine_name = selector.select_optimal_engine(&available_engines).await?;
+let runtime = ScriptRuntime::new_with_engine_name(&engine_name, config).await?;
+```
+
+This abstraction strategy ensures that:
+
+- **Phase 1.2** implements proper abstraction even with only Lua
+- **Phase 5** adds JavaScript without refactoring existing code
+- **Third-party developers** can add new languages (Ruby, Go, etc.) as plugins
+- **Users** can switch engines transparently based on their needs
+- **API surface** remains identical across all engines
+
 ## LLM Provider Integration
 
 ### Rig Crate Integration Strategy
@@ -8693,8 +10060,14 @@ impl LLMProviderBridge {
         }
     }
     
-    pub async fn register_openai_provider(&self, api_key: String, model: String) -> Result<()> {
-        let client = openai::Client::from_api_key(api_key);
+    pub async fn register_openai_provider(&self, api_key: String, model: String, base_url: Option<String>) -> Result<()> {
+        let mut client = openai::Client::from_api_key(api_key);
+        
+        // Support custom base URL for API-compatible endpoints
+        if let Some(url) = base_url {
+            client = client.with_base_url(url);
+        }
+        
         let model = client.model(&model).build();
         
         let provider = OpenAIProvider::new(model);
@@ -8710,8 +10083,14 @@ impl LLMProviderBridge {
         Ok(())
     }
     
-    pub async fn register_anthropic_provider(&self, api_key: String, model: String) -> Result<()> {
-        let client = anthropic::Client::from_api_key(api_key);
+    pub async fn register_anthropic_provider(&self, api_key: String, model: String, base_url: Option<String>) -> Result<()> {
+        let mut client = anthropic::Client::from_api_key(api_key);
+        
+        // Support custom base URL for API-compatible endpoints
+        if let Some(url) = base_url {
+            client = client.with_base_url(url);
+        }
+        
         let model = client.model(&model).build();
         
         let provider = AnthropicProvider::new(model);
@@ -8768,6 +10147,226 @@ impl LLMProviderBridge {
         self.complete_with_provider(&selected_provider, prompt, config).await
     }
 }
+```
+
+#### Model String Parsing and Provider Resolution
+
+Rs-LLMSpell supports convenient "provider/model" syntax for simplified agent creation:
+
+```rust
+#[derive(Debug, Clone)]
+pub struct ModelSpecifier {
+    pub provider: String,
+    pub model: String,
+    pub base_url: Option<String>,
+}
+
+impl ModelSpecifier {
+    /// Parse a model string in the format:
+    /// - "provider/model" (e.g., "openai/gpt-4", "anthropic/claude-3-sonnet")
+    /// - "model" (uses default provider)
+    /// - Full specification with custom base URL
+    pub fn parse(model_str: &str, default_provider: &str) -> Result<Self> {
+        // Check for provider/model syntax
+        if let Some(slash_pos) = model_str.find('/') {
+            let provider = model_str[..slash_pos].to_string();
+            let model = model_str[slash_pos + 1..].to_string();
+            
+            Ok(ModelSpecifier {
+                provider,
+                model,
+                base_url: None,
+            })
+        } else {
+            // No slash - use default provider
+            Ok(ModelSpecifier {
+                provider: default_provider.to_string(),
+                model: model_str.to_string(),
+                base_url: None,
+            })
+        }
+    }
+    
+    /// Parse with base URL override
+    pub fn parse_with_base_url(
+        model_str: &str, 
+        default_provider: &str,
+        base_url: Option<String>
+    ) -> Result<Self> {
+        let mut spec = Self::parse(model_str, default_provider)?;
+        spec.base_url = base_url;
+        Ok(spec)
+    }
+}
+
+impl LLMProviderBridge {
+    /// Register a provider from a model specifier
+    pub async fn register_from_spec(
+        &self,
+        spec: &ModelSpecifier,
+        api_key: String,
+    ) -> Result<()> {
+        match spec.provider.as_str() {
+            "openai" => {
+                self.register_openai_provider(api_key, spec.model.clone(), spec.base_url.clone()).await
+            }
+            "anthropic" => {
+                self.register_anthropic_provider(api_key, spec.model.clone(), spec.base_url.clone()).await
+            }
+            "local" => {
+                self.register_local_provider(spec.model.clone()).await
+            }
+            _ => Err(LLMSpellError::Provider(format!("Unknown provider: {}", spec.provider)))
+        }
+    }
+    
+    /// Smart agent creation with model string parsing
+    pub async fn create_agent_from_string(
+        &self,
+        name: &str,
+        model_str: &str,
+        system_prompt: &str,
+        base_url: Option<String>,
+    ) -> Result<Agent> {
+        let spec = ModelSpecifier::parse_with_base_url(
+            model_str, 
+            &self.default_provider,
+            base_url
+        )?;
+        
+        // Ensure provider is registered
+        if !self.providers.contains_key(&spec.provider) {
+            // Auto-register with environment variable API key
+            let api_key = self.get_api_key_for_provider(&spec.provider)?;
+            self.register_from_spec(&spec, api_key).await?;
+        }
+        
+        // Create agent with resolved provider
+        Agent::new(
+            name,
+            &spec.provider,
+            &spec.model,
+            system_prompt,
+        )
+    }
+}
+```
+
+#### Provider Configuration and Runtime Overrides
+
+Rs-LLMSpell supports flexible provider configuration with multiple levels of override:
+
+```rust
+// Provider configuration hierarchy
+pub enum ConfigSource {
+    Default,        // Built-in defaults
+    ConfigFile,     // From configuration file
+    Environment,    // From environment variables
+    Runtime,        // Runtime overrides (highest priority)
+}
+
+impl ProvidersConfig {
+    /// Apply runtime configuration overrides
+    pub fn apply_runtime_override(
+        &mut self,
+        provider: &str,
+        overrides: ProviderOverride,
+    ) -> Result<()> {
+        if let Some(config) = self.providers.get_mut(provider) {
+            // Apply overrides with priority
+            if let Some(base_url) = overrides.base_url {
+                config.base_url = Some(base_url);
+            }
+            if let Some(model) = overrides.model {
+                config.model = model;
+            }
+            if let Some(api_key) = overrides.api_key {
+                config.api_key = Some(api_key);
+            }
+            if let Some(timeout) = overrides.timeout_seconds {
+                config.timeout_seconds = timeout;
+            }
+            Ok(())
+        } else {
+            // Create new provider config from overrides
+            let mut new_config = ProviderConfig::default_for_type(&provider)?;
+            new_config.apply_overrides(overrides);
+            self.providers.insert(provider.to_string(), new_config);
+            Ok(())
+        }
+    }
+}
+
+// Script API for runtime configuration
+impl ScriptProviderAPI {
+    /// Configure provider at runtime from scripts
+    pub fn configure_provider(&self, args: Table) -> Result<()> {
+        let provider = args.get::<String>("provider")?;
+        let overrides = ProviderOverride {
+            base_url: args.get_optional::<String>("base_url")?,
+            model: args.get_optional::<String>("model")?,
+            api_key: args.get_optional::<String>("api_key")?,
+            timeout_seconds: args.get_optional::<u64>("timeout")?,
+            max_tokens: args.get_optional::<u32>("max_tokens")?,
+            temperature: args.get_optional::<f32>("temperature")?,
+        };
+        
+        self.provider_bridge.apply_runtime_override(&provider, overrides)?;
+        Ok(())
+    }
+}
+```
+
+**Configuration Examples:**
+
+```lua
+-- Lua: Runtime provider configuration
+Provider.configure({
+    provider = "openai",
+    base_url = "https://custom-gateway.company.com/v1",
+    timeout = 60,
+    max_tokens = 8192
+})
+
+-- Create agent with runtime-configured provider
+local agent = Agent.create({
+    name = "custom_agent",
+    model = "openai/gpt-4",  -- Will use the custom base_url
+    system_prompt = "You are a helpful assistant."
+})
+
+-- Override for specific agent only
+local special_agent = Agent.create({
+    name = "special_agent",
+    model = "anthropic/claude-3-opus",
+    base_url = "https://high-priority-endpoint.com",  -- Agent-specific override
+    system_prompt = "You are a specialized analyst."
+})
+```
+
+```javascript
+// JavaScript: Runtime provider configuration
+await Provider.configure({
+    provider: "openai",
+    base_url: "https://custom-gateway.company.com/v1",
+    timeout: 60,
+    max_tokens: 8192
+});
+
+// Create agent with runtime-configured provider
+const agent = await Agent.create({
+    name: "custom_agent",
+    model: "openai/gpt-4",  // Will use the custom base_url
+    system_prompt: "You are a helpful assistant."
+});
+
+// Override for specific agent only
+const specialAgent = await Agent.create({
+    name: "special_agent",
+    model: "anthropic/claude-3-opus",
+    base_url: "https://high-priority-endpoint.com",  // Agent-specific override
+    system_prompt: "You are a specialized analyst."
+});
 ```
 
 #### Local Model Integration with Candle
@@ -9970,6 +11569,373 @@ impl JavaScriptAsyncManager {
 pub struct JsPromiseCallback {
     pub promise_id: String,
     pub script: String,
+}
+```
+
+## Streaming Execution Model
+
+Rs-LLMSpell provides comprehensive streaming support across all layers of the architecture, enabling real-time processing of LLM outputs and efficient handling of large data streams.
+
+### Core Streaming Types
+
+```rust
+use tokio::stream::Stream;
+use tokio::sync::mpsc;
+use std::pin::Pin;
+
+/// Represents a chunk of streaming agent output
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentChunk {
+    /// Unique identifier for this stream
+    pub stream_id: String,
+    
+    /// Sequential chunk number
+    pub chunk_index: u64,
+    
+    /// The actual content chunk
+    pub content: ChunkContent,
+    
+    /// Metadata about this chunk
+    pub metadata: ChunkMetadata,
+    
+    /// Timestamp when chunk was generated
+    pub timestamp: Instant,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ChunkContent {
+    /// Text content chunk
+    Text(String),
+    
+    /// Partial tool call being constructed
+    ToolCallProgress {
+        tool_id: String,
+        partial_args: serde_json::Value,
+    },
+    
+    /// Completed tool call result
+    ToolCallComplete {
+        tool_id: String,
+        result: ToolOutput,
+    },
+    
+    /// Media content chunk (for multimodal streaming)
+    Media {
+        media_type: MediaType,
+        data: Vec<u8>,
+        is_final: bool,
+    },
+    
+    /// Control message (e.g., thinking, planning)
+    Control(ControlMessage),
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChunkMetadata {
+    /// Indicates if this is the final chunk
+    pub is_final: bool,
+    
+    /// Token count in this chunk (if applicable)
+    pub token_count: Option<u32>,
+    
+    /// Model being used (for multi-model workflows)
+    pub model: Option<String>,
+    
+    /// Current reasoning step (for CoT)
+    pub reasoning_step: Option<String>,
+}
+
+/// Streaming output type for agents
+pub type AgentStream = Pin<Box<dyn Stream<Item = Result<AgentChunk, LLMSpellError>> + Send>>;
+```
+
+### Streaming BaseAgent Extension
+
+The BaseAgent trait is extended with streaming capabilities:
+
+```rust
+pub trait BaseAgent: Send + Sync + Observable + Hookable {
+    // ... existing methods ...
+    
+    /// Execute the agent with streaming output
+    async fn stream_execute(&mut self, input: AgentInput) -> Result<AgentStream> {
+        // Default implementation returns NotImplemented error
+        Err(LLMSpellError::NotImplemented("Streaming not supported".into()))
+    }
+    
+    /// Check if this agent supports streaming
+    fn supports_streaming(&self) -> bool {
+        false // Default to false, override in implementations
+    }
+    
+    /// Get streaming configuration for this agent
+    fn streaming_config(&self) -> StreamingConfig {
+        StreamingConfig::default()
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StreamingConfig {
+    /// Maximum chunk size in tokens
+    pub chunk_size: usize,
+    
+    /// Buffer size for backpressure handling
+    pub buffer_size: usize,
+    
+    /// Timeout for individual chunks
+    pub chunk_timeout: Duration,
+    
+    /// Whether to emit partial tool calls
+    pub emit_partial_tool_calls: bool,
+    
+    /// Compression for large media chunks
+    pub compress_media_chunks: bool,
+}
+```
+
+### Streaming Workflow Orchestration
+
+```rust
+pub struct StreamingWorkflow {
+    agents: Vec<Box<dyn BaseAgent>>,
+    flow_control: FlowController,
+    aggregator: StreamAggregator,
+}
+
+impl StreamingWorkflow {
+    /// Execute workflow with streaming output
+    pub async fn stream_execute(
+        &mut self,
+        input: WorkflowInput,
+    ) -> Result<WorkflowStream> {
+        let (tx, rx) = mpsc::channel(self.flow_control.buffer_size());
+        
+        // Spawn orchestration task
+        let agents = self.agents.clone();
+        let flow_control = self.flow_control.clone();
+        let aggregator = self.aggregator.clone();
+        
+        tokio::spawn(async move {
+            for agent in agents {
+                if !agent.supports_streaming() {
+                    // Fall back to regular execution
+                    let output = agent.execute(input.clone()).await?;
+                    tx.send(Ok(AgentChunk::from_output(output))).await?;
+                } else {
+                    // Stream from agent
+                    let mut stream = agent.stream_execute(input.clone()).await?;
+                    
+                    while let Some(chunk) = stream.next().await {
+                        // Apply flow control
+                        flow_control.check_backpressure().await?;
+                        
+                        // Process chunk through aggregator
+                        let processed = aggregator.process(chunk?).await?;
+                        
+                        // Forward to output stream
+                        tx.send(Ok(processed)).await?;
+                    }
+                }
+            }
+            Ok::<(), LLMSpellError>(())
+        });
+        
+        Ok(Box::pin(ReceiverStream::new(rx)))
+    }
+}
+```
+
+### Backpressure and Flow Control
+
+```rust
+pub struct FlowController {
+    /// Maximum in-flight chunks
+    max_in_flight: usize,
+    
+    /// Current in-flight counter
+    in_flight: Arc<AtomicUsize>,
+    
+    /// Pause threshold
+    pause_threshold: f64,
+    
+    /// Resume threshold  
+    resume_threshold: f64,
+    
+    /// Backpressure strategy
+    strategy: BackpressureStrategy,
+}
+
+#[derive(Debug, Clone)]
+pub enum BackpressureStrategy {
+    /// Drop oldest chunks when buffer full
+    DropOldest,
+    
+    /// Drop newest chunks when buffer full
+    DropNewest,
+    
+    /// Pause upstream when buffer full
+    PauseUpstream,
+    
+    /// Buffer to disk when memory full
+    SpillToDisk { path: PathBuf },
+}
+
+impl FlowController {
+    pub async fn check_backpressure(&self) -> Result<()> {
+        let current = self.in_flight.load(Ordering::Relaxed);
+        let threshold = (self.max_in_flight as f64 * self.pause_threshold) as usize;
+        
+        if current > threshold {
+            match &self.strategy {
+                BackpressureStrategy::PauseUpstream => {
+                    // Wait until below resume threshold
+                    while self.in_flight.load(Ordering::Relaxed) > 
+                          (self.max_in_flight as f64 * self.resume_threshold) as usize {
+                        tokio::time::sleep(Duration::from_millis(10)).await;
+                    }
+                }
+                BackpressureStrategy::DropOldest => {
+                    // Handled by bounded channel
+                }
+                BackpressureStrategy::DropNewest => {
+                    return Err(LLMSpellError::BackpressureExceeded);
+                }
+                BackpressureStrategy::SpillToDisk { path } => {
+                    // Implement disk spilling
+                    todo!("Implement disk spilling")
+                }
+            }
+        }
+        
+        Ok(())
+    }
+}
+```
+
+### Script Bridge Streaming Support
+
+#### Lua Streaming with Coroutines
+
+```lua
+-- Lua streaming example using coroutines
+local function stream_agent_execution(agent, input)
+    return coroutine.create(function()
+        local stream = agent:stream_execute(input)
+        
+        while true do
+            local chunk = stream:next()
+            if not chunk then break end
+            
+            -- Yield each chunk to caller
+            coroutine.yield(chunk)
+            
+            -- Process chunk
+            if chunk.content.type == "text" then
+                print(chunk.content.text)
+            elseif chunk.content.type == "tool_call_progress" then
+                print("Tool call in progress:", chunk.content.tool_id)
+            end
+        end
+    end)
+end
+
+-- Usage
+local stream_co = stream_agent_execution(agent, { query = "Analyze this data" })
+while coroutine.status(stream_co) ~= "dead" do
+    local ok, chunk = coroutine.resume(stream_co)
+    if ok and chunk then
+        -- Handle chunk
+        process_chunk(chunk)
+    end
+end
+```
+
+#### JavaScript Streaming with Async Generators
+
+```javascript
+// JavaScript streaming using async generators
+async function* streamAgentExecution(agent, input) {
+    const stream = await agent.streamExecute(input);
+    
+    for await (const chunk of stream) {
+        // Process and yield chunk
+        if (chunk.content.type === 'text') {
+            yield { type: 'text', data: chunk.content.text };
+        } else if (chunk.content.type === 'tool_call_progress') {
+            yield { type: 'progress', tool: chunk.content.toolId };
+        }
+        
+        // Check for control messages
+        if (chunk.metadata.isFinal) {
+            yield { type: 'complete', summary: chunk };
+        }
+    }
+}
+
+// Usage with async iteration
+for await (const processed of streamAgentExecution(agent, input)) {
+    console.log('Received:', processed);
+    updateUI(processed);
+}
+```
+
+### Streaming Tool Interface
+
+Tools can also support streaming for long-running operations:
+
+```rust
+pub trait Tool: BaseAgent {
+    // ... existing methods ...
+    
+    /// Execute tool with streaming output
+    async fn stream_call(&self, input: ToolInput) -> Result<ToolStream> {
+        // Default implementation
+        Err(LLMSpellError::NotImplemented("Tool streaming not supported".into()))
+    }
+    
+    /// Check if tool supports streaming
+    fn supports_streaming(&self) -> bool {
+        false
+    }
+}
+
+/// Example: Streaming file reader tool
+pub struct StreamingFileReader {
+    chunk_size: usize,
+}
+
+#[async_trait]
+impl Tool for StreamingFileReader {
+    async fn stream_call(&self, input: ToolInput) -> Result<ToolStream> {
+        let path = input.get_string("path")?;
+        let file = tokio::fs::File::open(path).await?;
+        let reader = BufReader::new(file);
+        
+        let stream = ReaderStream::new(reader)
+            .map(|result| {
+                result.map(|bytes| {
+                    AgentChunk {
+                        stream_id: Uuid::new_v4().to_string(),
+                        chunk_index: 0, // Would be incremented
+                        content: ChunkContent::Text(String::from_utf8_lossy(&bytes).into()),
+                        metadata: ChunkMetadata {
+                            is_final: false,
+                            token_count: None,
+                            model: None,
+                            reasoning_step: None,
+                        },
+                        timestamp: Instant::now(),
+                    }
+                })
+                .map_err(|e| LLMSpellError::from(e))
+            });
+            
+        Ok(Box::pin(stream))
+    }
+    
+    fn supports_streaming(&self) -> bool {
+        true
+    }
 }
 ```
 
@@ -17030,11 +18996,198 @@ impl ContainerManager {
 
 ### Script Engine Testing
 
+The ScriptEngineBridge architecture enables comprehensive testing strategies that ensure all engines behave consistently while validating engine-specific implementations.
+
+#### Bridge-Pattern Testing Architecture
+
 ```rust
 pub struct ScriptEngineTester {
+    // Individual engine test suites
     lua_test_suite: LuaTestSuite,
     javascript_test_suite: JavaScriptTestSuite,
+    python_test_suite: PythonTestSuite,
+    
+    // Cross-engine compatibility testing
     cross_engine_test_suite: CrossEngineTestSuite,
+    
+    // Bridge pattern validation
+    bridge_conformance_tester: BridgeConformanceTester,
+    
+    // Plugin engine testing framework
+    plugin_engine_tester: PluginEngineTester,
+}
+
+impl ScriptEngineTester {
+    pub async fn run_all_tests(&self) -> Result<ScriptEngineTestResults> {
+        let mut results = ScriptEngineTestResults::new();
+        
+        // 1. Test each engine implementation independently
+        results.lua_results = self.test_engine_implementation("lua").await?;
+        results.javascript_results = self.test_engine_implementation("javascript").await?;
+        
+        // 2. Test bridge pattern conformance for all engines
+        results.bridge_conformance = self.test_bridge_conformance().await?;
+        
+        // 3. Test cross-engine compatibility (same script, different engines)
+        results.cross_engine_compatibility = self.test_cross_engine_compatibility().await?;
+        
+        // 4. Test plugin engines if any are loaded
+        results.plugin_engine_results = self.test_plugin_engines().await?;
+        
+        Ok(results)
+    }
+    
+    // Test that any engine properly implements ScriptEngineBridge
+    async fn test_engine_implementation(&self, engine_name: &str) -> Result<EngineTestResult> {
+        let engine = self.create_test_engine(engine_name).await?;
+        let mut test_result = EngineTestResult::new(engine_name);
+        
+        // Test 1: Basic ScriptEngineBridge interface compliance
+        test_result.add_test(self.test_bridge_interface_compliance(&engine).await?);
+        
+        // Test 2: Script execution capabilities
+        test_result.add_test(self.test_script_execution(&engine).await?);
+        
+        // Test 3: API injection functionality
+        test_result.add_test(self.test_api_injection(&engine).await?);
+        
+        // Test 4: Error handling and translation
+        test_result.add_test(self.test_error_handling(&engine).await?);
+        
+        // Test 5: Type conversion accuracy
+        test_result.add_test(self.test_type_conversion(&engine).await?);
+        
+        Ok(test_result)
+    }
+    
+    // Test that all engines provide identical behavior for the same operations
+    async fn test_cross_engine_compatibility(&self) -> Result<CrossEngineTestResult> {
+        let test_cases = self.get_cross_engine_test_cases();
+        let available_engines = vec!["lua", "javascript"]; // Add "python" when available
+        let mut results = CrossEngineTestResult::new();
+        
+        for test_case in test_cases {
+            let mut engine_outputs = HashMap::new();
+            
+            // Run the same test case on all engines
+            for engine_name in &available_engines {
+                let engine = self.create_test_engine(engine_name).await?;
+                let output = engine.execute_script(&test_case.script).await?;
+                engine_outputs.insert(engine_name.clone(), output);
+            }
+            
+            // Verify all engines produced equivalent results
+            let compatibility_result = self.verify_output_equivalence(engine_outputs)?;
+            results.add_test_case_result(test_case.name, compatibility_result);
+        }
+        
+        Ok(results)
+    }
+    
+    // Test bridge pattern conformance - ensures all engines implement the interface correctly
+    async fn test_bridge_conformance(&self) -> Result<BridgeConformanceTestResult> {
+        let mut results = BridgeConformanceTestResult::new();
+        
+        for engine_name in &["lua", "javascript"] {
+            let engine = self.create_test_engine(engine_name).await?;
+            
+            // Test 1: All required trait methods are implemented
+            results.add_test(self.test_trait_method_implementation(&engine).await?);
+            
+            // Test 2: Error translation consistency
+            results.add_test(self.test_error_translation_consistency(&engine).await?);
+            
+            // Test 3: API injection consistency
+            results.add_test(self.test_api_injection_consistency(&engine).await?);
+            
+            // Test 4: Type conversion roundtrip accuracy
+            results.add_test(self.test_type_conversion_roundtrip(&engine).await?);
+            
+            // Test 5: Streaming interface compliance
+            results.add_test(self.test_streaming_interface_compliance(&engine).await?);
+        }
+        
+        Ok(results)
+    }
+    
+    // Test third-party plugin engines
+    async fn test_plugin_engines(&self) -> Result<PluginEngineTestResult> {
+        let mut results = PluginEngineTestResult::new();
+        let loaded_plugins = self.plugin_engine_tester.get_loaded_plugins();
+        
+        for plugin in loaded_plugins {
+            // Test 1: Plugin implements ScriptEngineBridge correctly
+            let bridge_test = self.test_plugin_bridge_implementation(&plugin).await?;
+            results.add_plugin_test(plugin.name(), bridge_test);
+            
+            // Test 2: Plugin integrates with ScriptRuntime factory pattern
+            let integration_test = self.test_plugin_runtime_integration(&plugin).await?;
+            results.add_plugin_test(plugin.name(), integration_test);
+            
+            // Test 3: Plugin cross-compatibility with built-in engines
+            let compatibility_test = self.test_plugin_cross_compatibility(&plugin).await?;
+            results.add_plugin_test(plugin.name(), compatibility_test);
+        }
+        
+        Ok(results)
+    }
+    
+    // Generate test cases that should work identically across all engines
+    fn get_cross_engine_test_cases(&self) -> Vec<CrossEngineTestCase> {
+        vec![
+            CrossEngineTestCase {
+                name: "basic_agent_creation",
+                script: r#"
+                    local agent = Agent.create({
+                        name = "test_agent",
+                        provider = "mock",
+                        model = "test-model"
+                    })
+                    return agent:get_name()
+                "#.to_string(),
+                expected_result: ScriptValue::String("test_agent".to_string()),
+            },
+            CrossEngineTestCase {
+                name: "tool_execution",
+                script: r#"
+                    local tool = Tool.get("echo")
+                    local result = tool:execute({message = "hello world"})
+                    return result.output
+                "#.to_string(),
+                expected_result: ScriptValue::String("hello world".to_string()),
+            },
+            CrossEngineTestCase {
+                name: "error_handling",
+                script: r#"
+                    local success, error = pcall(function()
+                        return Agent.get("nonexistent_agent")
+                    end)
+                    return {success = success, has_error = not success}
+                "#.to_string(),
+                expected_result: ScriptValue::Object(vec![
+                    ("success".to_string(), ScriptValue::Boolean(false)),
+                    ("has_error".to_string(), ScriptValue::Boolean(true)),
+                ]),
+            },
+        ]
+    }
+    
+    // Verify that different engines produce equivalent outputs
+    fn verify_output_equivalence(&self, outputs: HashMap<String, ScriptOutput>) -> Result<bool> {
+        let first_output = outputs.values().next().unwrap();
+        
+        for (engine_name, output) in &outputs {
+            if !self.outputs_are_equivalent(first_output, output) {
+                tracing::warn!(
+                    "Output mismatch detected between engines. Expected: {:?}, Got from {}: {:?}",
+                    first_output, engine_name, output
+                );
+                return Ok(false);
+            }
+        }
+        
+        Ok(true)
+    }
 }
 
 impl ScriptEngineTester {
@@ -21238,15 +23391,46 @@ pub trait Tool {
 **Implementation Priorities:**
 1. Core trait hierarchy (BaseAgent, Agent, Tool, Workflow)
 2. Basic LLM provider integration using rig
-3. Minimal Lua bridge with mlua
-4. In-memory state management
-5. Basic hook system infrastructure
+3. **🎯 CRITICAL: ScriptEngineBridge abstraction layer FIRST**
+4. LuaEngine as first ScriptEngineBridge implementation
+5. ScriptRuntime with factory pattern for future extensibility
+6. In-memory state management
+7. Basic hook system infrastructure
+
+**ARCHITECTURAL REQUIREMENT - Phase 1.2:**
+The ScriptEngineBridge abstraction MUST be implemented from day one, even though only Lua is supported initially. This prevents the need for major refactoring when adding JavaScript in Phase 5.
+
+```rust
+// Phase 1.2 MUST implement this abstraction pattern:
+pub struct ScriptRuntime {
+    engine: Box<dyn ScriptEngineBridge>,    // NOT direct Lua coupling!
+    registry: Arc<ComponentRegistry>,
+    provider_manager: Arc<ProviderManager>,
+    execution_context: Arc<RwLock<ExecutionContext>>,
+}
+
+impl ScriptRuntime {
+    pub async fn new_with_lua(config: RuntimeConfig) -> Result<Self> {
+        let engine = Box::new(LuaEngine::new(config.lua_config).await?);
+        Self::new_with_engine(engine, config).await  // Factory pattern from start
+    }
+}
+
+// LuaEngine implements ScriptEngineBridge - proper abstraction
+#[async_trait]
+impl ScriptEngineBridge for LuaEngine {
+    async fn execute_script(&self, script: &str) -> Result<ScriptOutput> { /* ... */ }
+    async fn inject_apis(&mut self, registry: &ComponentRegistry, /* ... */) -> Result<()> { /* ... */ }
+    // ... other ScriptEngineBridge methods
+}
+```
 
 **Deliverables:**
-- Working agent execution
-- Tool calling from scripts
-- Basic error handling
-- Simple examples
+- Working agent execution through ScriptEngineBridge abstraction
+- Tool calling from scripts via language-agnostic API injection
+- Factory pattern for engine creation (ready for JavaScript in Phase 5)
+- Basic error handling with abstracted error translation
+- Simple examples demonstrating proper abstraction usage
 
 **Phase 2: Scripting and Tools (Weeks 5-8)**
 ```lua
@@ -21270,16 +23454,44 @@ print("Result:", result.output)
 
 **Implementation Priorities:**
 1. Complete built-in tools library (40+ tools)
-2. JavaScript bridge with boa_engine
-3. Cross-engine compatibility layer
+2. **JavaScriptEngine as second ScriptEngineBridge implementation**
+3. Drop-in engine switching via existing factory pattern
 4. Persistent state with sled
 5. Event system implementation
 
+**ARCHITECTURAL ADVANTAGE - Phase 2:**
+Because Phase 1.2 implemented proper abstraction, adding JavaScript requires NO refactoring of existing code:
+
+```rust
+// Phase 2: JavaScript engine drops right into existing abstraction
+pub struct JavaScriptEngine {
+    context: boa_engine::Context,
+    api_injector: JavaScriptAPIInjector,
+    stream_manager: JavaScriptStreamManager,
+}
+
+#[async_trait]
+impl ScriptEngineBridge for JavaScriptEngine {
+    // Same interface as LuaEngine - identical method signatures
+    async fn execute_script(&self, script: &str) -> Result<ScriptOutput> { /* JS-specific */ }
+    async fn inject_apis(&mut self, registry: &ComponentRegistry, /* ... */) -> Result<()> { /* JS-specific */ }
+}
+
+// ScriptRuntime unchanged - just add factory method
+impl ScriptRuntime {
+    pub async fn new_with_javascript(config: RuntimeConfig) -> Result<Self> {
+        let engine = Box::new(JavaScriptEngine::new(config.js_config).await?);
+        Self::new_with_engine(engine, config).await  // Same factory pattern!
+    }
+}
+```
+
 **Deliverables:**
-- Multi-language scripting support
-- Comprehensive tool library
-- Persistent agent state
-- Event-driven architecture
+- **Seamless multi-language scripting** (Lua + JavaScript with identical APIs)
+- Comprehensive tool library accessible from both engines
+- **Zero refactoring** required for existing Lua-based code
+- Persistent agent state with engine abstraction
+- Event-driven architecture supporting both engines
 
 **Phase 3: Advanced Features (Weeks 9-12)**
 ```javascript
@@ -22540,13 +24752,29 @@ pub trait Workflow: Send + Sync {
 
 **Agent Creation and Management:**
 ```lua
--- Create new agent
+-- Create new agent with explicit provider
 local agent = Agent.new({
     name = "my_agent",
+    provider = "openai",
     model = "gpt-4",
     temperature = 0.7,
     max_tokens = 2048,
     tools = { HttpTool.new(), FileSystemTool.new() }
+})
+
+-- Create agent with provider/model syntax
+local agent2 = Agent.new({
+    name = "claude_agent",
+    model = "anthropic/claude-3-sonnet",  -- Provider parsed from string
+    system_prompt = "You are a helpful assistant."
+})
+
+-- Create agent with custom base URL
+local agent3 = Agent.new({
+    name = "custom_agent",
+    model = "openai/gpt-4",
+    base_url = "https://custom-api.company.com/v1",  -- Override API endpoint
+    system_prompt = "You are connected to a custom endpoint."
 })
 
 -- Execute agent
@@ -22711,13 +24939,29 @@ Hooks.register("before_llm_call", {
 
 **Agent Creation and Management:**
 ```javascript
-// Create new agent
+// Create new agent with explicit provider
 const agent = new Agent({
     name: 'my_agent',
+    provider: 'openai',
     model: 'gpt-4',
     temperature: 0.7,
     maxTokens: 2048,
     tools: [new HttpTool(), new FileSystemTool()]
+});
+
+// Create agent with provider/model syntax
+const agent2 = await Agent.create({
+    name: 'claude_agent',
+    model: 'anthropic/claude-3-sonnet',  // Provider parsed from string
+    system_prompt: 'You are a helpful assistant.'
+});
+
+// Create agent with custom base URL
+const agent3 = await Agent.create({
+    name: 'custom_agent',
+    model: 'openai/gpt-4',
+    base_url: 'https://custom-api.company.com/v1',  // Override API endpoint
+    system_prompt: 'You are connected to a custom endpoint.'
 });
 
 // Execute agent
@@ -22932,7 +25176,7 @@ pub enum WorkflowErrorCode {
     MergeFailed = 3010,
 }
 
-// Script errors (4000-4999)
+// Script errors (4000-4999) - Language-agnostic abstraction
 pub enum ScriptErrorCode {
     SyntaxError = 4001,
     RuntimeError = 4002,
@@ -22944,6 +25188,107 @@ pub enum ScriptErrorCode {
     PermissionDenied = 4008,
     ResourceExhausted = 4009,
     InvalidFunction = 4010,
+}
+
+// Language-specific script engine errors abstracted through bridge
+pub enum ScriptEngineError {
+    ExecutionError { 
+        engine: String, 
+        details: String,
+        error_code: ScriptErrorCode,
+        source_location: Option<SourceLocation>,
+    },
+    CompilationError {
+        engine: String,
+        details: String,
+        line: Option<u32>,
+        column: Option<u32>,
+    },
+    RuntimeError {
+        engine: String,
+        error_type: String,  // "TypeError", "ReferenceError", etc.
+        message: String,
+        stack_trace: Option<String>,
+    },
+    EngineSpecificError {
+        engine: String,
+        native_error: Box<dyn std::error::Error + Send + Sync>,
+    }
+}
+
+impl ScriptEngineError {
+    // Abstract factory for creating errors from different engines
+    pub fn from_lua_error(lua_err: mlua::Error) -> Self {
+        match lua_err {
+            mlua::Error::SyntaxError { message, incomplete_input } => {
+                ScriptEngineError::CompilationError {
+                    engine: "lua".to_string(),
+                    details: message,
+                    line: None, // mlua doesn't always provide line numbers
+                    column: None,
+                }
+            }
+            mlua::Error::RuntimeError(msg) => {
+                ScriptEngineError::RuntimeError {
+                    engine: "lua".to_string(),
+                    error_type: "RuntimeError".to_string(),
+                    message: msg,
+                    stack_trace: None, // Could be enhanced with debug info
+                }
+            }
+            _ => ScriptEngineError::EngineSpecificError {
+                engine: "lua".to_string(),
+                native_error: Box::new(lua_err),
+            }
+        }
+    }
+    
+    pub fn from_javascript_error(js_err: boa_engine::JsError) -> Self {
+        ScriptEngineError::RuntimeError {
+            engine: "javascript".to_string(),
+            error_type: js_err.kind().to_string(),
+            message: js_err.to_string(),
+            stack_trace: js_err.stack_trace(),
+        }
+    }
+    
+    pub fn from_python_error(py_err: pyo3::PyErr) -> Self {
+        ScriptEngineError::RuntimeError {
+            engine: "python".to_string(),
+            error_type: py_err.get_type().name().to_string(),
+            message: py_err.to_string(),
+            stack_trace: py_err.traceback().map(|tb| tb.format().unwrap_or_default()),
+        }
+    }
+}
+
+// Bridge-abstracted error translation
+impl ScriptEngineBridge for LuaEngine {
+    fn translate_script_error(&self, error: Box<dyn Error>) -> LLMSpellError {
+        if let Some(lua_err) = error.downcast_ref::<mlua::Error>() {
+            let script_err = ScriptEngineError::from_lua_error(lua_err.clone());
+            LLMSpellError::ScriptEngine(script_err)
+        } else {
+            LLMSpellError::ScriptEngine(ScriptEngineError::EngineSpecificError {
+                engine: "lua".to_string(),
+                native_error: error,
+            })
+        }
+    }
+}
+
+impl ScriptEngineBridge for JavaScriptEngine {
+    fn translate_script_error(&self, error: Box<dyn Error>) -> LLMSpellError {
+        if let Some(js_err) = error.downcast_ref::<boa_engine::JsError>() {
+            let script_err = ScriptEngineError::from_javascript_error(js_err.clone());
+            LLMSpellError::ScriptEngine(script_err)
+        } else {
+            LLMSpellError::ScriptEngine(ScriptEngineError::EngineSpecificError {
+                engine: "javascript".to_string(),
+                native_error: error,
+            })
+        }
+    }
 }
 
 // Hook and Event errors (5000-5999)
@@ -23144,7 +25489,7 @@ default = "openai"                  # Default LLM provider
 [providers.openai]
 api_key_env = "OPENAI_API_KEY"     # Environment variable for API key
 api_key_file = "/path/to/key"      # File path for API key
-base_url = "https://api.openai.com/v1" # API base URL
+base_url = "https://api.openai.com/v1" # API base URL (can be overridden at runtime)
 model = "gpt-4"                     # Default model
 timeout = 30000                     # Request timeout in milliseconds
 retry_attempts = 3                  # Number of retry attempts
@@ -23153,15 +25498,30 @@ max_tokens = 4096                   # Maximum tokens per request
 temperature = 0.7                   # Default temperature
 rate_limit_requests_per_minute = 60 # Rate limit
 
+# Support for custom/local API endpoints
+[providers.openai_custom]
+api_key_env = "CUSTOM_OPENAI_KEY"
+base_url = "https://custom-llm-gateway.internal/v1"  # Corporate proxy/gateway
+model = "gpt-4"
+timeout = 30000
+# Inherits other settings from default openai config
+
 [providers.anthropic]
 api_key_env = "ANTHROPIC_API_KEY"
-base_url = "https://api.anthropic.com"
+base_url = "https://api.anthropic.com"  # Can be overridden for API-compatible services
 model = "claude-3-sonnet-20240229"
 timeout = 30000
 retry_attempts = 3
 retry_delay = 1000
 max_tokens = 4096
 temperature = 0.7
+
+# Example: Using a local API-compatible service
+[providers.local_claude]
+api_key_env = "LOCAL_API_KEY"
+base_url = "http://localhost:8080"  # Local Claude-compatible API
+model = "claude-local"
+timeout = 60000  # Longer timeout for local models
 
 [providers.local]
 enabled = false                     # Enable local model support
