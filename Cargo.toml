@@ -98,7 +98,7 @@ rand = "0.8"
 clap = { version = "4.5", features = ["derive", "env"] }
 
 # Environment and process management
-which = "6.0"
+which = "8.0"
 
 [profile.dev]
 opt-level = 0
