@@ -6,9 +6,9 @@ use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criteri
 use llmspell_core::{
     traits::{
         agent::ConversationMessage,
-        base_agent::{AgentInput, AgentOutput},
         workflow::{RetryPolicy, WorkflowStep},
     },
+    types::{AgentInput, AgentOutput, ExecutionContext, OutputMetadata},
     ComponentId, ComponentMetadata, LLMSpellError, Version,
 };
 use std::time::Duration;
@@ -92,10 +92,12 @@ fn bench_serialization(c: &mut Criterion) {
     });
 
     // AgentInput with context
-    let input = AgentInput::new("test prompt".to_string())
-        .with_context("key1".to_string(), serde_json::json!("value1"))
-        .with_context("key2".to_string(), serde_json::json!(42))
-        .with_context("key3".to_string(), serde_json::json!({"nested": "value"}));
+    let context = ExecutionContext::new()
+        .with_data("key1".to_string(), serde_json::json!("value1"))
+        .with_data("key2".to_string(), serde_json::json!(42))
+        .with_data("key3".to_string(), serde_json::json!({"nested": "value"}));
+    let input = AgentInput::text("test prompt")
+        .with_context(context);
 
     group.bench_function("AgentInput_serialize", |b| {
         b.iter(|| serde_json::to_string(black_box(&input)).unwrap())
@@ -116,42 +118,51 @@ fn bench_agent_operations(c: &mut Criterion) {
 
     // AgentInput creation and context manipulation
     group.bench_function("AgentInput_creation", |b| {
-        b.iter(|| AgentInput::new(black_box("test prompt".to_string())))
+        b.iter(|| AgentInput::text(black_box("test prompt")))
     });
 
     group.bench_function("AgentInput_with_context", |b| {
         b.iter(|| {
-            AgentInput::new("test".to_string())
-                .with_context("key1".to_string(), serde_json::json!("value1"))
-                .with_context("key2".to_string(), serde_json::json!(42))
-                .with_context("key3".to_string(), serde_json::json!(true))
+            let context = ExecutionContext::new()
+                .with_data("key1".to_string(), serde_json::json!("value1"))
+                .with_data("key2".to_string(), serde_json::json!(42))
+                .with_data("key3".to_string(), serde_json::json!(true));
+            AgentInput::text("test")
+                .with_context(context)
         })
     });
 
-    let input = AgentInput::new("test".to_string())
-        .with_context("key1".to_string(), serde_json::json!("value1"))
-        .with_context("key2".to_string(), serde_json::json!(42))
-        .with_context("key3".to_string(), serde_json::json!(true));
+    let context = ExecutionContext::new()
+        .with_data("key1".to_string(), serde_json::json!("value1"))
+        .with_data("key2".to_string(), serde_json::json!(42))
+        .with_data("key3".to_string(), serde_json::json!(true));
+    let input = AgentInput::text("test")
+        .with_context(context);
 
     group.bench_function("AgentInput_get_context", |b| {
         b.iter(|| {
-            let _ = input.get_context(black_box("key1"));
-            let _ = input.get_context(black_box("key2"));
-            let _ = input.get_context(black_box("nonexistent"));
+            if let Some(ctx) = &input.context {
+                let _ = ctx.data.get(black_box("key1"));
+                let _ = ctx.data.get(black_box("key2"));
+                let _ = ctx.data.get(black_box("nonexistent"));
+            }
         })
     });
 
     // AgentOutput operations
     group.bench_function("AgentOutput_creation", |b| {
-        b.iter(|| AgentOutput::new(black_box("result".to_string())))
+        b.iter(|| AgentOutput::text(black_box("result")))
     });
 
     group.bench_function("AgentOutput_with_metadata", |b| {
         b.iter(|| {
-            AgentOutput::new("result".to_string())
-                .with_metadata("confidence".to_string(), serde_json::json!(0.95))
-                .with_metadata("tokens".to_string(), serde_json::json!(150))
-                .with_metadata("model".to_string(), serde_json::json!("gpt-4"))
+            let mut metadata = OutputMetadata::default();
+            metadata.confidence = Some(0.95);
+            metadata.token_count = Some(150);
+            metadata.model = Some("gpt-4".to_string());
+            
+            AgentOutput::text("result")
+                .with_metadata(metadata)
         })
     });
 
@@ -272,13 +283,14 @@ fn bench_memory_usage(c: &mut Criterion) {
 
     group.bench_function("AgentInput_with_large_context", |b| {
         b.iter(|| {
-            let mut input = AgentInput::new("test".to_string());
+            let mut context = ExecutionContext::new();
             for i in 0..100 {
-                input = input.with_context(
+                context = context.with_data(
                     format!("key{}", i),
                     serde_json::json!({"data": "x".repeat(100)}),
                 );
             }
+            let input = AgentInput::text("test").with_context(context);
             black_box(input);
         })
     });

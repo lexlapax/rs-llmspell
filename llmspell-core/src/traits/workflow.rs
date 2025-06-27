@@ -2,7 +2,7 @@
 //! ABOUTME: Extends BaseAgent with step management and execution planning
 
 use super::base_agent::BaseAgent;
-use crate::types::{AgentInput, AgentOutput, ExecutionContext};
+use crate::types::AgentOutput;
 use crate::{ComponentId, Result};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -397,6 +397,7 @@ pub trait Workflow: BaseAgent {
 mod tests {
     use super::*;
     use crate::ComponentMetadata;
+    use crate::types::{AgentInput, ExecutionContext};
     use std::sync::Arc;
     use tokio::sync::Mutex;
 

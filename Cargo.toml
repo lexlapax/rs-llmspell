@@ -65,7 +65,7 @@ sled = "0.34"
 rocksdb = "0.22"
 
 # Scripting engines
-mlua = { version = "0.9", features = ["lua54", "async", "serialize"] }
+mlua = { version = "0.9", features = ["lua54", "async", "serialize", "send", "parking_lot"] }
 boa_engine = "0.18"
 quickjs_runtime = "0.12"
 
@@ -89,6 +89,7 @@ walkdir = "2.5"
 # Concurrency primitives
 crossbeam = "0.8"
 parking_lot = "0.12"
+lazy_static = "1.4"
 
 # Random number generation
 rand = "0.8"
