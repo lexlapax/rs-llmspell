@@ -4433,7 +4433,22 @@ local agent = Agent.create({
     name = "researcher",
     provider = "openai",
     model = "gpt-4",
-    system_prompt = "You are a research assistant."
+    system_prompt = "You are a research assistant.",
+    base_url = "https://custom-api.example.com/v1"  -- Optional: custom API endpoint
+})
+
+-- Convenience syntax with provider/model string
+local agent2 = Agent.create({
+    name = "analyst",
+    model = "anthropic/claude-3-sonnet",  -- Provider parsed from string
+    system_prompt = "You are a data analyst."
+})
+
+-- Using just model name (uses default provider)
+local agent3 = Agent.create({
+    name = "writer",
+    model = "gpt-4-turbo",  -- Uses default provider from config
+    system_prompt = "You are a technical writer."
 })
 
 local result = agent:execute({
@@ -4448,7 +4463,22 @@ const agent = Agent.create({
     name: "researcher", 
     provider: "openai",
     model: "gpt-4",
-    system_prompt: "You are a research assistant."
+    system_prompt: "You are a research assistant.",
+    base_url: "https://custom-api.example.com/v1"  // Optional: custom API endpoint
+});
+
+// Convenience syntax with provider/model string
+const agent2 = Agent.create({
+    name: "analyst",
+    model: "anthropic/claude-3-sonnet",  // Provider parsed from string
+    system_prompt: "You are a data analyst."
+});
+
+// Using just model name (uses default provider)
+const agent3 = Agent.create({
+    name: "writer",
+    model: "gpt-4-turbo",  // Uses default provider from config
+    system_prompt: "You are a technical writer."
 });
 
 const result = await agent.execute({
@@ -4463,7 +4493,22 @@ agent = Agent.create({
     "name": "researcher",
     "provider": "openai", 
     "model": "gpt-4",
-    "system_prompt": "You are a research assistant."
+    "system_prompt": "You are a research assistant.",
+    "base_url": "https://custom-api.example.com/v1"  # Optional: custom API endpoint
+})
+
+# Convenience syntax with provider/model string
+agent2 = Agent.create({
+    "name": "analyst",
+    "model": "anthropic/claude-3-sonnet",  # Provider parsed from string
+    "system_prompt": "You are a data analyst."
+})
+
+# Using just model name (uses default provider)
+agent3 = Agent.create({
+    "name": "writer",
+    "model": "gpt-4-turbo",  # Uses default provider from config
+    "system_prompt": "You are a technical writer."
 })
 
 result = await agent.execute({
@@ -5602,6 +5647,10 @@ local research_agent = Agent.new({
     description = "Multi-source research specialist",
     provider = "anthropic",
     model = "claude-3-sonnet",
+    base_url = nil,  -- Optional: defaults to provider's standard endpoint
+    
+    -- Alternative: use convenient provider/model syntax
+    -- model = "anthropic/claude-3-sonnet",  -- Provider inferred from string
     
     -- System prompt with Lua string literals
     system_prompt = [[
@@ -6984,6 +7033,129 @@ class WebScrapingTool extends Tools.BaseTool {
 
 // Register custom tool
 Tools.register(new WebScrapingTool());
+```
+
+#### 3. **JavaScript Agent Configuration**
+JavaScript supports flexible agent configuration with provider/model syntax and runtime overrides:
+
+```javascript
+// JavaScript agent configuration examples
+const researchAgent = await Agent.create({
+    name: "comprehensive_researcher",
+    description: "Multi-source research specialist",
+    model: "anthropic/claude-3-sonnet",  // Provider parsed from string
+    base_url: null,  // Optional: defaults to provider's standard endpoint
+    
+    system_prompt: `
+        You are a comprehensive research specialist with expertise in:
+        - Academic literature analysis
+        - Market trend identification  
+        - Technical documentation synthesis
+        - Data-driven insight generation
+        
+        Always provide sources and confidence levels for your findings.
+    `,
+    
+    // Advanced configuration
+    config: {
+        temperature: 0.3,
+        max_tokens: 4000,
+        timeout: 120000,
+        
+        // Resource limits
+        resources: {
+            max_memory: "512MB",
+            max_execution_time: 300,
+            max_concurrent_tools: 3
+        },
+        
+        // Error handling
+        error_strategy: {
+            retry_count: 3,
+            retry_delay: 5000,
+            fallback_behavior: "use_cached_data"
+        }
+    },
+    
+    // Tools configuration
+    tools: [
+        await Tools.get("web_search"),
+        await Tools.get("scholarly_search"),
+        await Tools.get("pdf_analyzer"),
+        await Tools.get("citation_formatter"),
+        
+        // Custom tool with inline configuration
+        await Tools.create("custom_analyzer", {
+            category: "analysis",
+            input_schema: {
+                type: "object",
+                properties: {
+                    data: { type: "array" },
+                    analysis_type: { type: "string" }
+                }
+            },
+            execute: async (input) => {
+                const { data, analysis_type } = input;
+                
+                let result = {};
+                if (analysis_type === "trend_analysis") {
+                    result = await analyzeTrends(data);
+                } else if (analysis_type === "sentiment_analysis") {
+                    result = await analyzeSentiment(data);
+                }
+                
+                return {
+                    result,
+                    metadata: {
+                        analysis_type,
+                        data_points: data.length
+                    }
+                };
+            }
+        })
+    ],
+    
+    // Memory configuration
+    memory: {
+        type: "conversation",
+        max_entries: 100,
+        persistence: true,
+        storage_path: "./agent_memory/"
+    }
+});
+
+// Simplified creation with provider/model syntax
+const quickAgent = await Agent.create({
+    name: "quick_assistant",
+    model: "openai/gpt-4-turbo",  // Provider inferred
+    system_prompt: "You are a helpful assistant."
+});
+
+// Using custom API endpoints
+const customEndpointAgent = await Agent.create({
+    name: "corporate_agent",
+    model: "openai/gpt-4",
+    base_url: "https://api-gateway.company.com/v1",  // Corporate proxy
+    system_prompt: "You are a corporate assistant with access to internal data."
+});
+
+// Runtime provider configuration
+await Provider.configure({
+    provider: "anthropic",
+    base_url: "https://custom-claude-api.com",
+    max_tokens: 8192,
+    timeout: 60000
+});
+
+// Agents created after configuration use the new settings
+const configuredAgent = await Agent.create({
+    name: "post_config_agent",
+    model: "anthropic/claude-3-opus",  // Will use custom base_url
+    system_prompt: "You are configured with custom settings."
+});
+```
+
+```javascript
 
 // Data processing with lodash
 class DataProcessor {
@@ -9888,8 +10060,14 @@ impl LLMProviderBridge {
         }
     }
     
-    pub async fn register_openai_provider(&self, api_key: String, model: String) -> Result<()> {
-        let client = openai::Client::from_api_key(api_key);
+    pub async fn register_openai_provider(&self, api_key: String, model: String, base_url: Option<String>) -> Result<()> {
+        let mut client = openai::Client::from_api_key(api_key);
+        
+        // Support custom base URL for API-compatible endpoints
+        if let Some(url) = base_url {
+            client = client.with_base_url(url);
+        }
+        
         let model = client.model(&model).build();
         
         let provider = OpenAIProvider::new(model);
@@ -9905,8 +10083,14 @@ impl LLMProviderBridge {
         Ok(())
     }
     
-    pub async fn register_anthropic_provider(&self, api_key: String, model: String) -> Result<()> {
-        let client = anthropic::Client::from_api_key(api_key);
+    pub async fn register_anthropic_provider(&self, api_key: String, model: String, base_url: Option<String>) -> Result<()> {
+        let mut client = anthropic::Client::from_api_key(api_key);
+        
+        // Support custom base URL for API-compatible endpoints
+        if let Some(url) = base_url {
+            client = client.with_base_url(url);
+        }
+        
         let model = client.model(&model).build();
         
         let provider = AnthropicProvider::new(model);
@@ -9963,6 +10147,226 @@ impl LLMProviderBridge {
         self.complete_with_provider(&selected_provider, prompt, config).await
     }
 }
+```
+
+#### Model String Parsing and Provider Resolution
+
+Rs-LLMSpell supports convenient "provider/model" syntax for simplified agent creation:
+
+```rust
+#[derive(Debug, Clone)]
+pub struct ModelSpecifier {
+    pub provider: String,
+    pub model: String,
+    pub base_url: Option<String>,
+}
+
+impl ModelSpecifier {
+    /// Parse a model string in the format:
+    /// - "provider/model" (e.g., "openai/gpt-4", "anthropic/claude-3-sonnet")
+    /// - "model" (uses default provider)
+    /// - Full specification with custom base URL
+    pub fn parse(model_str: &str, default_provider: &str) -> Result<Self> {
+        // Check for provider/model syntax
+        if let Some(slash_pos) = model_str.find('/') {
+            let provider = model_str[..slash_pos].to_string();
+            let model = model_str[slash_pos + 1..].to_string();
+            
+            Ok(ModelSpecifier {
+                provider,
+                model,
+                base_url: None,
+            })
+        } else {
+            // No slash - use default provider
+            Ok(ModelSpecifier {
+                provider: default_provider.to_string(),
+                model: model_str.to_string(),
+                base_url: None,
+            })
+        }
+    }
+    
+    /// Parse with base URL override
+    pub fn parse_with_base_url(
+        model_str: &str, 
+        default_provider: &str,
+        base_url: Option<String>
+    ) -> Result<Self> {
+        let mut spec = Self::parse(model_str, default_provider)?;
+        spec.base_url = base_url;
+        Ok(spec)
+    }
+}
+
+impl LLMProviderBridge {
+    /// Register a provider from a model specifier
+    pub async fn register_from_spec(
+        &self,
+        spec: &ModelSpecifier,
+        api_key: String,
+    ) -> Result<()> {
+        match spec.provider.as_str() {
+            "openai" => {
+                self.register_openai_provider(api_key, spec.model.clone(), spec.base_url.clone()).await
+            }
+            "anthropic" => {
+                self.register_anthropic_provider(api_key, spec.model.clone(), spec.base_url.clone()).await
+            }
+            "local" => {
+                self.register_local_provider(spec.model.clone()).await
+            }
+            _ => Err(LLMSpellError::Provider(format!("Unknown provider: {}", spec.provider)))
+        }
+    }
+    
+    /// Smart agent creation with model string parsing
+    pub async fn create_agent_from_string(
+        &self,
+        name: &str,
+        model_str: &str,
+        system_prompt: &str,
+        base_url: Option<String>,
+    ) -> Result<Agent> {
+        let spec = ModelSpecifier::parse_with_base_url(
+            model_str, 
+            &self.default_provider,
+            base_url
+        )?;
+        
+        // Ensure provider is registered
+        if !self.providers.contains_key(&spec.provider) {
+            // Auto-register with environment variable API key
+            let api_key = self.get_api_key_for_provider(&spec.provider)?;
+            self.register_from_spec(&spec, api_key).await?;
+        }
+        
+        // Create agent with resolved provider
+        Agent::new(
+            name,
+            &spec.provider,
+            &spec.model,
+            system_prompt,
+        )
+    }
+}
+```
+
+#### Provider Configuration and Runtime Overrides
+
+Rs-LLMSpell supports flexible provider configuration with multiple levels of override:
+
+```rust
+// Provider configuration hierarchy
+pub enum ConfigSource {
+    Default,        // Built-in defaults
+    ConfigFile,     // From configuration file
+    Environment,    // From environment variables
+    Runtime,        // Runtime overrides (highest priority)
+}
+
+impl ProvidersConfig {
+    /// Apply runtime configuration overrides
+    pub fn apply_runtime_override(
+        &mut self,
+        provider: &str,
+        overrides: ProviderOverride,
+    ) -> Result<()> {
+        if let Some(config) = self.providers.get_mut(provider) {
+            // Apply overrides with priority
+            if let Some(base_url) = overrides.base_url {
+                config.base_url = Some(base_url);
+            }
+            if let Some(model) = overrides.model {
+                config.model = model;
+            }
+            if let Some(api_key) = overrides.api_key {
+                config.api_key = Some(api_key);
+            }
+            if let Some(timeout) = overrides.timeout_seconds {
+                config.timeout_seconds = timeout;
+            }
+            Ok(())
+        } else {
+            // Create new provider config from overrides
+            let mut new_config = ProviderConfig::default_for_type(&provider)?;
+            new_config.apply_overrides(overrides);
+            self.providers.insert(provider.to_string(), new_config);
+            Ok(())
+        }
+    }
+}
+
+// Script API for runtime configuration
+impl ScriptProviderAPI {
+    /// Configure provider at runtime from scripts
+    pub fn configure_provider(&self, args: Table) -> Result<()> {
+        let provider = args.get::<String>("provider")?;
+        let overrides = ProviderOverride {
+            base_url: args.get_optional::<String>("base_url")?,
+            model: args.get_optional::<String>("model")?,
+            api_key: args.get_optional::<String>("api_key")?,
+            timeout_seconds: args.get_optional::<u64>("timeout")?,
+            max_tokens: args.get_optional::<u32>("max_tokens")?,
+            temperature: args.get_optional::<f32>("temperature")?,
+        };
+        
+        self.provider_bridge.apply_runtime_override(&provider, overrides)?;
+        Ok(())
+    }
+}
+```
+
+**Configuration Examples:**
+
+```lua
+-- Lua: Runtime provider configuration
+Provider.configure({
+    provider = "openai",
+    base_url = "https://custom-gateway.company.com/v1",
+    timeout = 60,
+    max_tokens = 8192
+})
+
+-- Create agent with runtime-configured provider
+local agent = Agent.create({
+    name = "custom_agent",
+    model = "openai/gpt-4",  -- Will use the custom base_url
+    system_prompt = "You are a helpful assistant."
+})
+
+-- Override for specific agent only
+local special_agent = Agent.create({
+    name = "special_agent",
+    model = "anthropic/claude-3-opus",
+    base_url = "https://high-priority-endpoint.com",  -- Agent-specific override
+    system_prompt = "You are a specialized analyst."
+})
+```
+
+```javascript
+// JavaScript: Runtime provider configuration
+await Provider.configure({
+    provider: "openai",
+    base_url: "https://custom-gateway.company.com/v1",
+    timeout: 60,
+    max_tokens: 8192
+});
+
+// Create agent with runtime-configured provider
+const agent = await Agent.create({
+    name: "custom_agent",
+    model: "openai/gpt-4",  // Will use the custom base_url
+    system_prompt: "You are a helpful assistant."
+});
+
+// Override for specific agent only
+const specialAgent = await Agent.create({
+    name: "special_agent",
+    model: "anthropic/claude-3-opus",
+    base_url: "https://high-priority-endpoint.com",  // Agent-specific override
+    system_prompt: "You are a specialized analyst."
+});
 ```
 
 #### Local Model Integration with Candle
@@ -24348,13 +24752,29 @@ pub trait Workflow: Send + Sync {
 
 **Agent Creation and Management:**
 ```lua
--- Create new agent
+-- Create new agent with explicit provider
 local agent = Agent.new({
     name = "my_agent",
+    provider = "openai",
     model = "gpt-4",
     temperature = 0.7,
     max_tokens = 2048,
     tools = { HttpTool.new(), FileSystemTool.new() }
+})
+
+-- Create agent with provider/model syntax
+local agent2 = Agent.new({
+    name = "claude_agent",
+    model = "anthropic/claude-3-sonnet",  -- Provider parsed from string
+    system_prompt = "You are a helpful assistant."
+})
+
+-- Create agent with custom base URL
+local agent3 = Agent.new({
+    name = "custom_agent",
+    model = "openai/gpt-4",
+    base_url = "https://custom-api.company.com/v1",  -- Override API endpoint
+    system_prompt = "You are connected to a custom endpoint."
 })
 
 -- Execute agent
@@ -24519,13 +24939,29 @@ Hooks.register("before_llm_call", {
 
 **Agent Creation and Management:**
 ```javascript
-// Create new agent
+// Create new agent with explicit provider
 const agent = new Agent({
     name: 'my_agent',
+    provider: 'openai',
     model: 'gpt-4',
     temperature: 0.7,
     maxTokens: 2048,
     tools: [new HttpTool(), new FileSystemTool()]
+});
+
+// Create agent with provider/model syntax
+const agent2 = await Agent.create({
+    name: 'claude_agent',
+    model: 'anthropic/claude-3-sonnet',  // Provider parsed from string
+    system_prompt: 'You are a helpful assistant.'
+});
+
+// Create agent with custom base URL
+const agent3 = await Agent.create({
+    name: 'custom_agent',
+    model: 'openai/gpt-4',
+    base_url: 'https://custom-api.company.com/v1',  // Override API endpoint
+    system_prompt: 'You are connected to a custom endpoint.'
 });
 
 // Execute agent
@@ -25053,7 +25489,7 @@ default = "openai"                  # Default LLM provider
 [providers.openai]
 api_key_env = "OPENAI_API_KEY"     # Environment variable for API key
 api_key_file = "/path/to/key"      # File path for API key
-base_url = "https://api.openai.com/v1" # API base URL
+base_url = "https://api.openai.com/v1" # API base URL (can be overridden at runtime)
 model = "gpt-4"                     # Default model
 timeout = 30000                     # Request timeout in milliseconds
 retry_attempts = 3                  # Number of retry attempts
@@ -25062,15 +25498,30 @@ max_tokens = 4096                   # Maximum tokens per request
 temperature = 0.7                   # Default temperature
 rate_limit_requests_per_minute = 60 # Rate limit
 
+# Support for custom/local API endpoints
+[providers.openai_custom]
+api_key_env = "CUSTOM_OPENAI_KEY"
+base_url = "https://custom-llm-gateway.internal/v1"  # Corporate proxy/gateway
+model = "gpt-4"
+timeout = 30000
+# Inherits other settings from default openai config
+
 [providers.anthropic]
 api_key_env = "ANTHROPIC_API_KEY"
-base_url = "https://api.anthropic.com"
+base_url = "https://api.anthropic.com"  # Can be overridden for API-compatible services
 model = "claude-3-sonnet-20240229"
 timeout = 30000
 retry_attempts = 3
 retry_delay = 1000
 max_tokens = 4096
 temperature = 0.7
+
+# Example: Using a local API-compatible service
+[providers.local_claude]
+api_key_env = "LOCAL_API_KEY"
+base_url = "http://localhost:8080"  # Local Claude-compatible API
+model = "claude-local"
+timeout = 60000  # Longer timeout for local models
 
 [providers.local]
 enabled = false                     # Enable local model support

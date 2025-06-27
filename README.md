@@ -2,6 +2,10 @@
 
 **Scriptable LLM interactions** via Lua, JavaScript - Cast scripting spells to animate LLM golems 🧙‍♂️✨
 
+> ⚠️ **ALPHA SOFTWARE**: This is version 0.1.0-alpha.1, a development preview release.
+> Core features like agent execution are not yet implemented. This release is for
+> testing the architecture and providing feedback only. See [Current Status](#current-status) below.
+
 Rs-LLMSpell is a **scriptable LLM interaction framework** that revolutionizes AI application development through multi-language orchestration, comprehensive built-in libraries, and made with a production-readiness mindset.
 
 ```lua
@@ -94,12 +98,56 @@ Workflow ← Sequential, Parallel, Conditional, Loop
 
 **Key Principle**: Every component implements the same foundational interfaces, enabling seamless composition and orchestration.
 
+## 🛠️ Current Status
+
+### **⚠️ Alpha Release 0.1.0-alpha.1**
+
+**Release Date**: June 27, 2025  
+**Status**: Development Preview - Architecture Testing Only
+
+#### **✅ What's Working**
+- Lua script execution with ScriptEngineBridge abstraction
+- Provider listing (no actual LLM calls)
+- CLI with basic commands (`run`, `exec`, `info`, `providers`)
+- Streaming infrastructure (stub implementation)
+- Multimodal types (structure only)
+- Configuration system
+- Security sandboxing
+
+#### **❌ What's NOT Working Yet**
+- **Agent execution** - `Agent.create()` returns mock data only
+- **Tool execution** - Tools cannot be called
+- **Workflow orchestration** - Not implemented
+- **Actual LLM calls** - Provider integration is listing only
+- **JavaScript/Python** - Only Lua is available
+
+#### **📋 Phase Completion Status**
+- ✅ Phase 0: Foundation Infrastructure (Complete)
+- ✅ Phase 1: Core Execution Runtime (Complete)
+- 🔜 Phase 2: Agent Implementation (Next)
+- 🔜 Phase 3: Tool System (Future)
+- 🔜 Phase 4: Workflow Orchestration (Future)
+
+### **🎯 Safe to Use For**
+- Testing the ScriptEngineBridge architecture
+- Evaluating Lua script execution performance
+- Reviewing API design and providing feedback
+- Understanding the project structure
+- Contributing to core infrastructure
+
+### **⚠️ NOT Ready For**
+- Production use
+- Building actual LLM applications
+- Agent-based workflows
+- Tool integration
+- Real LLM API calls
+
 ## 🛠️ Project Status
 
-### **🎉 Phase 0 Complete - Ready for Phase 1 Implementation**
+### **🎉 Phase 1 Complete - Architecture Validated**
 
-**Current Status**: Foundation infrastructure established, moving to core functionality
-**Latest Update**: 2025-06-26 (Evening)
+**Current Status**: Core runtime implemented, ready for agent development
+**Latest Update**: 2025-06-27
 
 #### **✅ Phase 0 Achievements**
 - 12-crate workspace with zero warnings

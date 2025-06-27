@@ -129,6 +129,12 @@ Rs-LLMSpell follows a carefully structured 16-phase implementation approach that
 - Streaming tool interface implementation
 - Security sandboxing for tools
 - Tool error handling and timeout management
+- **Provider Enhancement Features** (moved from Phase 1):
+  - `ModelSpecifier` implementation for provider abstraction
+  - `ProviderManager` to parse "provider/model" syntax (e.g., "openai/gpt-4", "anthropic/claude-3")
+  - Base URL overrides in agent configuration for custom endpoints
+  - CLI support for new model specification syntax
+  - Built-in tools examples using convenience syntax
 
 **Success Criteria**:
 - [ ] 12+ core built-in tools functional
@@ -138,6 +144,10 @@ Rs-LLMSpell follows a carefully structured 16-phase implementation approach that
 - [ ] Tool security sandbox prevents unauthorized access
 - [ ] Tool execution timeout enforcement works
 - [ ] Tools can be called from both Agent and direct script context
+- [ ] ModelSpecifier parsing works for all supported providers
+- [ ] CLI accepts both full configuration and "provider/model" syntax
+- [ ] Base URL overrides function correctly for custom endpoints
+- [ ] All built-in tool examples use convenient model syntax
 
 **Testing Requirements**:
 - Individual tool unit tests
@@ -228,6 +238,12 @@ Rs-LLMSpell follows a carefully structured 16-phase implementation approach that
 - JavaScript Promise-based async patterns
 - Streaming support via async generators
 - Media type marshalling (base64/typed arrays)
+- **Model Specification Features**:
+  - Implement same ModelSpecifier parsing in JavaScript bridge
+  - Ensure JavaScript API matches Lua API for model specification
+  - Support both full configuration and "provider/model" syntax in scripts
+  - JavaScript-specific tests for convenience syntax
+  - Consistent error handling for invalid model specifications
 
 **Success Criteria**:
 - [ ] JSEngine implements ScriptEngineBridge (same interface as LuaEngine)
@@ -239,6 +255,9 @@ Rs-LLMSpell follows a carefully structured 16-phase implementation approach that
 - [ ] Media types properly marshalled through bridge abstraction
 - [ ] Performance comparable to Lua execution
 - [ ] Error handling consistent across engines
+- [ ] Model specification syntax identical between Lua and JavaScript
+- [ ] "provider/model" convenience syntax works in JavaScript scripts
+- [ ] JavaScript tests validate all model specification formats
 
 **Testing Requirements**:
 - Cross-engine API compatibility tests (using existing framework)
@@ -354,6 +373,12 @@ Rs-LLMSpell follows a carefully structured 16-phase implementation approach that
 - `Scheduler` component with cron/interval triggers
 - Service integration (systemd/launchd)
 - API endpoints for external control
+- **Model Specification Support**:
+  - REST API must accept both full configuration and "provider/model" formats
+  - Configuration file schema should support convenience syntax
+  - Ensure backward compatibility for existing configurations
+  - API documentation includes both specification formats
+  - Service configuration examples using convenience syntax
 
 **Success Criteria**:
 - [ ] Daemon mode runs continuously
@@ -361,6 +386,10 @@ Rs-LLMSpell follows a carefully structured 16-phase implementation approach that
 - [ ] Service can be controlled via system service manager
 - [ ] API endpoints respond to external requests
 - [ ] Resource usage remains stable over long periods
+- [ ] REST API accepts both model specification formats
+- [ ] Configuration files support convenience syntax
+- [ ] Backward compatibility maintained for existing configs
+- [ ] API documentation covers both formats
 
 **Testing Requirements**:
 - Long-running stability tests
