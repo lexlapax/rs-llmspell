@@ -124,9 +124,9 @@ Workflow ← Sequential, Parallel, Conditional, Loop
 #### **📋 Phase Completion Status**
 - ✅ Phase 0: Foundation Infrastructure (Complete)
 - ✅ Phase 1: Core Execution Runtime (Complete)
-- 🔜 Phase 2: Agent Implementation (Next)
-- 🔜 Phase 3: Tool System (Future)
-- 🔜 Phase 4: Workflow Orchestration (Future)
+- 🔄 Phase 2: Built-in Tools Library (In Progress)
+- 🔜 Phase 3: Workflow Orchestration (Next)
+- 🔜 Phase 4: Hook and Event System (Future)
 
 ### **🎯 Safe to Use For**
 - Testing the ScriptEngineBridge architecture
@@ -144,45 +144,60 @@ Workflow ← Sequential, Parallel, Conditional, Loop
 
 ## 🛠️ Project Status
 
-### **🎉 Phase 1 Complete - Architecture Validated**
+### **🚀 Phase 2 In Progress - Built-in Tools Library**
 
-**Current Status**: Core runtime implemented, ready for agent development
+**Current Status**: Building comprehensive tools library and provider enhancements
 **Latest Update**: 2025-06-27
 
-#### **✅ Phase 0 Achievements**
-- 12-crate workspace with zero warnings
-- 165 comprehensive tests passing
-- Complete CI/CD pipeline operational
-- >95% documentation coverage
-- Performance benchmarking framework ready
+#### **✅ Phase 0 & 1 Achievements**
+- ✅ **13-crate workspace** with zero warnings (including llmspell-utils)
+- ✅ **200+ comprehensive tests** passing across all crates
+- ✅ **Complete CI/CD pipeline** with quality gates enforced
+- ✅ **ScriptEngineBridge** abstraction for multi-language support
+- ✅ **Lua runtime** with basic agent/tool APIs implemented
+- ✅ **Streaming support** integrated throughout the architecture
+- ✅ **Multimodal types** (Image, Audio, Video, Binary content)
+- ✅ **CLI enhancement** with progress indicators and streaming output
 
-#### **🚀 Phase 1 Starting Now**
-- **Goal**: Core Execution Runtime with Lua scripting
-- **Timeline**: 10 working days (Weeks 3-4)
-- **New Features**: Streaming support, multimodal content, utils crate
-- **Deliverables**: Working Lua scripts calling LLM agents
+#### **🔄 Phase 2 Implementation (Current)**
+- **Goal**: Built-in tools library with provider enhancements
+- **Timeline**: 10 working days
+- **Key Features**:
+  - ModelSpecifier for "provider/model" syntax (e.g., "openai/gpt-4")
+  - 12+ core tools across 5 categories (file, web, data, system, multimodal)
+  - Tool registry with capability discovery
+  - Security sandboxing for safe execution
+  - Base URL overrides for custom endpoints
 
 ### **🎯 Implementation Roadmap**
 
-**Architecture**: Complete research and design (Phases 1-13) ✅  
-**Phase 0**: Foundation Infrastructure ✅ **[COMPLETE]**
-**Phase 1**: Core Execution Runtime 🚀 **[IN PROGRESS]**  
+**16-Phase Journey**: From MVP Foundation to Production Platform
 
-#### **Completed Deliverables**
-- ✅ **15,034+ line architecture document** with streaming/multimodal updates
-- ✅ **12-crate workspace** operational with CI/CD pipeline
-- ✅ **Complete trait hierarchy** implemented and tested
-- ✅ **165 tests** with >90% coverage
-- ✅ **Phase 1 design** and task breakdown ready
+#### **MVP Foundation (Phases 0-3)**
+- ✅ **Phase 0**: Foundation Infrastructure - Complete
+- ✅ **Phase 1**: Core Execution Runtime - Complete  
+- 🔄 **Phase 2**: Built-in Tools Library - In Progress
+- 🔜 **Phase 3**: Workflow Orchestration - Next
 
-#### **Phase 1 Focus (Current)**
-- 🔄 `llmspell-utils` crate for shared utilities
-- 🔄 Streaming execution support
-- 🔄 Multimodal content types
-- 🔄 Basic Lua script runtime
-- 🔄 CLI with streaming output
+#### **Production Features (Phases 4-7)**
+- **Phase 4**: Hook and Event System
+- **Phase 5**: JavaScript Engine Support
+- **Phase 6**: REPL Interactive Mode
+- **Phase 7**: Persistent State Management
 
-**Timeline**: Phase 1 implementation - 10 working days
+#### **Advanced Integration (Phases 8-12)**
+- **Phase 8**: Daemon and Service Mode
+- **Phase 9**: MCP Tool Integration
+- **Phase 10**: MCP Server Mode
+- **Phase 11**: A2A Client Support
+- **Phase 12**: A2A Server Support
+
+#### **Platform Support (Phases 13-15)**
+- **Phase 13**: Library Mode Support
+- **Phase 14**: Cross-Platform Support
+- **Phase 15**: Production Optimization
+
+**Timeline**: MVP (Phases 0-3) - 8 weeks total, Production Ready - 16 weeks
 
 ## 🔮 What Makes Rs-LLMSpell Different?
 
@@ -240,31 +255,37 @@ llmspell run examples/hello_world.lua
 
 ## 🏗️ Development
 
-### **Current Focus: Phase 0 Implementation**
-- **Foundation Infrastructure**: Core traits, workspace setup, CI/CD
-- **Target**: 2 weeks, 37 specific tasks with acceptance criteria
-- **Goal**: Compilable foundation ready for Phase 1 (Agent implementations)
+### **Current Focus: Phase 2 Implementation**
+- **Built-in Tools Library**: 12+ core tools with streaming support
+- **Provider Enhancements**: ModelSpecifier and base URL overrides
+- **Security Sandboxing**: Safe tool execution environment
+- **Target**: 10 working days, 22 specific tasks with acceptance criteria
 
-### **Contributing to Phase 0**
+### **Contributing to Phase 2**
 ```bash
-# Get involved in foundation development
+# Get involved in tools development
 git clone https://github.com/lexlapax/rs-llmspell
 cd rs-llmspell
 
-# See current Phase 0 tasks
-cat TODO.md | grep -A5 "Phase 0.1"
+# See current Phase 2 tasks
+cat TODO.md | grep -A5 "Phase 2"
 
 # Development workflow
 cargo check --workspace
 cargo test --workspace  
 cargo clippy -- -D warnings
 cargo fmt
+
+# Test specific Phase 2 components
+cargo test -p llmspell-tools
+cargo test -p llmspell-providers
 ```
 
 ### **Architecture Documentation**
 - **Complete Architecture**: [`docs/technical/rs-llmspell-final-architecture.md`](docs/technical/rs-llmspell-final-architecture.md) (15,034+ lines)
-- **Implementation Phases**: [`docs/in-progress/implementation-phases.md`](docs/in-progress/implementation-phases.md)
-- **Phase 0 Design**: [`docs/in-progress/phase-00-design-doc.md`](docs/in-progress/phase-00-design-doc.md)
+- **Implementation Phases**: [`docs/in-progress/implementation-phases.md`](docs/in-progress/implementation-phases.md) (16-phase roadmap)
+- **Phase 2 Design**: [`docs/in-progress/phase-02-design-doc.md`](docs/in-progress/phase-02-design-doc.md) (Current focus)
+- **Phase 2 Tasks**: [`docs/in-progress/PHASE02-TODO.md`](docs/in-progress/PHASE02-TODO.md) (22 implementation tasks)
 
 ## 📦 Core Technology Stack
 
@@ -295,9 +316,12 @@ cargo fmt
 - **Discussion**: GitHub Discussions for design decisions
 
 ### **Contributing**
-- **Phase 0**: Foundation infrastructure (current focus)
-- **Phase 1-3**: MVP implementation (agents, tools, workflows)
-- **Phase 4+**: Advanced features and optimization
+- **Phase 0-1**: Foundation and core runtime ✅ Complete
+- **Phase 2**: Built-in tools library 🔄 Current focus
+- **Phase 3**: Workflow orchestration (Next up)
+- **Phase 4-7**: Production features (hooks, JavaScript, REPL, state)
+- **Phase 8-12**: Advanced integrations (MCP, A2A protocols)
+- **Phase 13-15**: Platform support and optimization
 
 **Development Philosophy**: Bridge-first design, comprehensive testing, production-ready from day one.
 

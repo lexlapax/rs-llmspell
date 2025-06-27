@@ -11,6 +11,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+use crate::ModelSpecifier;
+
 /// Capabilities that a provider might support
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct ProviderCapabilities {
@@ -265,6 +267,133 @@ impl ProviderManager {
             })
     }
 
+    /// Create and initialize a provider from a ModelSpecifier
+    /// 
+    /// This method handles the core functionality for Task 2.1.2:
+    /// - Parses the ModelSpecifier to determine provider and model
+    /// - Applies base URL overrides if specified
+    /// - Creates provider configuration with proper fallbacks
+    /// - Initializes the provider and makes it available
+    /// 
+    /// # Arguments
+    /// * `spec` - ModelSpecifier containing provider/model information
+    /// * `base_url_override` - Optional base URL to override default endpoints
+    /// * `api_key` - Optional API key (falls back to environment variables)
+    /// 
+    /// # Returns
+    /// Returns the initialized provider instance
+    /// 
+    /// # Examples
+    /// ```no_run
+    /// # use llmspell_providers::{ProviderManager, ModelSpecifier};
+    /// # #[tokio::main]
+    /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let manager = ProviderManager::new();
+    /// 
+    /// // Basic usage with provider/model syntax
+    /// let spec = ModelSpecifier::parse("openai/gpt-4")?;
+    /// let provider = manager.create_agent_from_spec(spec, None, None).await?;
+    /// 
+    /// // With base URL override
+    /// let spec = ModelSpecifier::parse("openai/gpt-4")?;
+    /// let provider = manager.create_agent_from_spec(
+    ///     spec, 
+    ///     Some("https://api.custom.com/v1"), 
+    ///     Some("custom-api-key")
+    /// ).await?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub async fn create_agent_from_spec(
+        &self,
+        spec: ModelSpecifier,
+        base_url_override: Option<&str>,
+        api_key: Option<&str>,
+    ) -> Result<Arc<Box<dyn ProviderInstance>>, LLMSpellError> {
+        // Determine the provider name
+        let provider_name = match &spec.provider {
+            Some(provider) => provider.clone(),
+            None => {
+                // If no provider specified, try to use default
+                let default = self.default_provider.read().await;
+                if let Some(default_provider) = default.as_ref() {
+                    // Extract provider name from "provider:model" format
+                    if let Some(colon_pos) = default_provider.find(':') {
+                        default_provider[..colon_pos].to_string()
+                    } else {
+                        return Err(LLMSpellError::Configuration {
+                            message: "No provider specified and no valid default provider available".to_string(),
+                            source: None,
+                        });
+                    }
+                } else {
+                    return Err(LLMSpellError::Configuration {
+                        message: "No provider specified and no default provider configured".to_string(),
+                        source: None,
+                    });
+                }
+            }
+        };
+
+        // Create provider configuration
+        let mut config = ProviderConfig::new(&provider_name, &spec.model);
+
+        // Apply base URL override with precedence:
+        // 1. Function parameter (highest priority)
+        // 2. ModelSpecifier base_url
+        // 3. Default provider endpoint (lowest priority)
+        if let Some(base_url) = base_url_override {
+            config.endpoint = Some(base_url.to_string());
+        } else if let Some(base_url) = &spec.base_url {
+            config.endpoint = Some(base_url.clone());
+        }
+
+        // Set API key with fallback to environment variables
+        if let Some(api_key) = api_key {
+            config.api_key = Some(api_key.to_string());
+        } else {
+            // Try to load from environment
+            if let Ok(env_config) = ProviderConfig::from_env(&provider_name) {
+                if config.api_key.is_none() {
+                    config.api_key = env_config.api_key;
+                }
+                if config.endpoint.is_none() {
+                    config.endpoint = env_config.endpoint;
+                }
+            }
+        }
+
+        // Create a unique instance name
+        let instance_name = format!("{}:{}", provider_name, spec.model);
+
+        // Check if we already have this instance
+        {
+            let instances = self.instances.read().await;
+            if let Some(existing) = instances.get(&instance_name) {
+                return Ok(existing.clone());
+            }
+        }
+
+        // Create the provider instance
+        let registry = self.registry.read().await;
+        let provider = registry.create(config)?;
+
+        // Validate the provider
+        provider.validate().await?;
+
+        // Store the instance
+        let provider_arc = Arc::new(provider);
+        let mut instances = self.instances.write().await;
+        instances.insert(instance_name, provider_arc.clone());
+
+        Ok(provider_arc)
+    }
+
+    /// Get the default provider instance
+    pub async fn get_default_provider(&self) -> Result<Arc<Box<dyn ProviderInstance>>, LLMSpellError> {
+        self.get_provider(None).await
+    }
+
     /// Set the default provider
     pub async fn set_default_provider(&self, name: impl Into<String>) -> Result<(), LLMSpellError> {
         let name = name.into();
@@ -389,5 +518,90 @@ mod tests {
 
         let types = manager.available_provider_types().await;
         assert!(types.contains(&"mock".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_create_agent_from_spec_no_provider() {
+        use crate::ModelSpecifier;
+        
+        let manager = ProviderManager::new();
+        let spec = ModelSpecifier::parse("gpt-4").unwrap();
+        
+        // Should fail when no provider specified and no default
+        let result = manager.create_agent_from_spec(spec, None, None).await;
+        assert!(result.is_err());
+        
+        if let Err(LLMSpellError::Configuration { message, .. }) = result {
+            assert!(message.contains("No provider specified"));
+        }
+    }
+
+    #[tokio::test]
+    async fn test_create_agent_from_spec_unknown_provider() {
+        use crate::ModelSpecifier;
+        
+        let manager = ProviderManager::new();
+        let spec = ModelSpecifier::parse("unknown/model").unwrap();
+        
+        // Should fail when provider not registered
+        let result = manager.create_agent_from_spec(spec, None, None).await;
+        assert!(result.is_err());
+        
+        if let Err(LLMSpellError::Configuration { message, .. }) = result {
+            assert!(message.contains("Unknown provider"));
+        }
+    }
+
+    #[tokio::test]
+    async fn test_model_specifier_base_url_precedence() {
+        use crate::ModelSpecifier;
+        
+        let manager = ProviderManager::new();
+        
+        // Register a mock provider that tracks configuration
+        manager
+            .register_provider("test", |config| {
+                // Verify base URL is set correctly
+                assert_eq!(config.endpoint, Some("https://override.com".to_string()));
+                Err(LLMSpellError::Provider {
+                    message: "Test validation".to_string(),
+                    provider: Some("test".to_string()),
+                    source: None,
+                })
+            })
+            .await;
+
+        let spec = ModelSpecifier::parse_with_base_url(
+            "test/model", 
+            Some("https://spec.com")
+        ).unwrap();
+        
+        // Override parameter should take precedence over spec base_url
+        let result = manager.create_agent_from_spec(
+            spec, 
+            Some("https://override.com"), 
+            None
+        ).await;
+        
+        // Should fail at validation (expected for our mock)
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_model_specifier_provider_extraction() {
+        use crate::ModelSpecifier;
+        
+        // Test different provider/model formats
+        let spec1 = ModelSpecifier::parse("openai/gpt-4").unwrap();
+        assert_eq!(spec1.provider, Some("openai".to_string()));
+        assert_eq!(spec1.model, "gpt-4");
+        
+        let spec2 = ModelSpecifier::parse("openrouter/deepseek/model").unwrap();
+        assert_eq!(spec2.provider, Some("openrouter/deepseek".to_string()));
+        assert_eq!(spec2.model, "model");
+        
+        let spec3 = ModelSpecifier::parse("claude-3").unwrap();
+        assert_eq!(spec3.provider, None);
+        assert_eq!(spec3.model, "claude-3");
     }
 }
