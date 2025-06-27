@@ -1,4 +1,7 @@
 //! ABOUTME: llmspell-tools implementation crate
-//! ABOUTME: Foundation stub for future implementation
+//! ABOUTME: Built-in tools library with registry, security sandbox, and tool implementations
 
-// Module stub - to be implemented in later phases
+pub mod registry;
+
+// Re-export main types
+pub use registry::{ToolRegistry, ToolInfo, CapabilityMatcher, RegistryStatistics};

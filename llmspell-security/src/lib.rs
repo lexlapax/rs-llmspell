@@ -1,4 +1,14 @@
 //! ABOUTME: llmspell-security implementation crate
-//! ABOUTME: Foundation stub for future implementation
+//! ABOUTME: Security sandbox for safe tool execution with file, network, and resource controls
 
-// Module stub - to be implemented in later phases
+pub mod sandbox;
+
+// Re-export main types
+pub use sandbox::{
+    IntegratedSandbox, 
+    SandboxContext, 
+    SandboxViolation,
+    FileSandbox,
+    NetworkSandbox,
+    ResourceMonitor,
+};

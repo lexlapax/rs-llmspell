@@ -36,9 +36,9 @@
 - [x] Task 2.1.1: Implement ModelSpecifier 2025-06-27
 - [x] Task 2.1.2: Update ProviderManager 2025-06-27
 - [x] Task 2.1.3: Update Script APIs 2025-06-27
-- [ ] Task 2.2.1: Enhance Tool Trait <date>
-- [ ] Task 2.2.2: Implement Tool Registry <date>
-- [ ] Task 2.2.3: Security Sandbox Implementation <date>
+- [x] Task 2.2.1: Enhance Tool Trait 2025-06-27
+- [x] Task 2.2.2: Implement Tool Registry 2025-06-27
+- [x] Task 2.2.3: Security Sandbox Implementation 2025-06-27
 - [ ] Task 2.3.1: WebSearchTool <date>
 - [ ] Task 2.3.2: SemanticSearchTool <date>
 - [ ] Task 2.3.3: CodeSearchTool <date>
@@ -69,11 +69,11 @@
 **Description**: Create ModelSpecifier struct to parse provider/model syntax.
 
 **Acceptance Criteria:**
-- [ ] ModelSpecifier struct with provider, model, base_url fields
-- [ ] `parse()` method handles "provider/model" and "model" formats
-- [ ] `parse_with_base_url()` method for base URL overrides
-- [ ] Handles nested paths like "openrouter/deepseek/model"
-- [ ] Comprehensive unit tests for all parsing scenarios
+- [x] ModelSpecifier struct with provider, model, base_url fields
+- [x] `parse()` method handles "provider/model" and "model" formats
+- [x] `parse_with_base_url()` method for base URL overrides
+- [x] Handles nested paths like "openrouter/deepseek/model"
+- [x] Comprehensive unit tests for all parsing scenarios
 
 **Implementation Steps:**
 1. Create `llmspell-providers/src/model_specifier.rs`
@@ -84,10 +84,10 @@
 6. Document parsing rules and examples
 
 **Definition of Done:**
-- [ ] All parsing formats work correctly
-- [ ] Tests cover >95% of code paths
-- [ ] No panics on malformed input
-- [ ] Documentation complete
+- [x] All parsing formats work correctly
+- [x] Tests cover >95% of code paths
+- [x] No panics on malformed input
+- [x] Documentation complete
 
 ### Task 2.1.2: Update ProviderManager
 **Priority**: CRITICAL  
@@ -98,11 +98,11 @@
 **Description**: Enhance ProviderManager to use ModelSpecifier for agent creation.
 
 **Acceptance Criteria:**
-- [ ] `create_agent_from_spec()` method implemented
-- [ ] Provider resolution from model string works
-- [ ] Base URL overrides applied correctly
-- [ ] Fallback to default provider when none specified
-- [ ] Error handling for missing providers
+- [x] `create_agent_from_spec()` method implemented
+- [x] Provider resolution from model string works
+- [x] Base URL overrides applied correctly
+- [x] Fallback to default provider when none specified
+- [x] Error handling for missing providers
 
 **Implementation Steps:**
 1. Update `llmspell-providers/src/manager.rs`
@@ -113,10 +113,10 @@
 6. Write integration tests
 
 **Definition of Done:**
-- [ ] All agent creation paths tested
-- [ ] Provider resolution works correctly
-- [ ] Base URL precedence documented
-- [ ] Backward compatibility maintained
+- [x] All agent creation paths tested
+- [x] Provider resolution works correctly
+- [x] Base URL precedence documented
+- [x] Backward compatibility maintained
 
 ### Task 2.1.3: Update Script APIs
 **Priority**: HIGH  
@@ -127,11 +127,11 @@
 **Description**: Update Lua (and prepare for JS/Python) APIs to support new syntax.
 
 **Acceptance Criteria:**
-- [ ] Lua Agent.create supports model string syntax
-- [ ] Base URL parameter works in agent config
-- [ ] Examples updated to show new syntax
-- [ ] Old syntax still works (backward compatible)
-- [ ] Error messages helpful for invalid syntax
+- [x] Lua Agent.create supports model string syntax
+- [x] Base URL parameter works in agent config
+- [x] Examples updated to show new syntax
+- [x] Old syntax still works (backward compatible)
+- [x] Error messages helpful for invalid syntax
 
 **Implementation Steps:**
 1. Update `llmspell-bridge/src/lua/api/agent.rs`
@@ -142,10 +142,10 @@
 6. Document migration path
 
 **Definition of Done:**
-- [ ] Lua scripts can use new syntax
-- [ ] Integration tests pass
-- [ ] Examples demonstrate both syntaxes
-- [ ] Migration guide written
+- [x] Lua scripts can use new syntax
+- [x] Integration tests pass
+- [x] Examples demonstrate both syntaxes
+- [x] Migration guide written
 
 ---
 
@@ -160,11 +160,11 @@
 **Description**: Add streaming and security methods to Tool trait.
 
 **Acceptance Criteria:**
-- [ ] `stream_execute()` method with default implementation
-- [ ] `security_requirements()` method added
-- [ ] `resource_limits()` method added
-- [ ] Trait remains object-safe
-- [ ] Default implementations sensible
+- [x] `stream_execute()` method with default implementation
+- [x] `security_requirements()` method added
+- [x] `resource_limits()` method added
+- [x] Trait remains object-safe
+- [x] Default implementations sensible
 
 **Implementation Steps:**
 1. Update `llmspell-core/src/traits/tool.rs`
@@ -175,10 +175,10 @@
 6. Verify trait object safety
 
 **Definition of Done:**
-- [ ] Enhanced trait compiles
-- [ ] Default implementations work
-- [ ] Mocks updated
-- [ ] Documentation complete
+- [x] Enhanced trait compiles
+- [x] Default implementations work
+- [x] Mocks updated
+- [x] Documentation complete
 
 ### Task 2.2.2: Implement Tool Registry
 **Priority**: CRITICAL  
@@ -189,11 +189,11 @@
 **Description**: Create tool registry with discovery and validation.
 
 **Acceptance Criteria:**
-- [ ] ToolRegistry struct with storage and metadata
-- [ ] Register method validates tools
-- [ ] Discovery by capability works
-- [ ] Category-based organization
-- [ ] Thread-safe for concurrent access
+- [x] ToolRegistry struct with storage and metadata
+- [x] Register method validates tools
+- [x] Discovery by capability works
+- [x] Category-based organization
+- [x] Thread-safe for concurrent access
 
 **Implementation Steps:**
 1. Create `llmspell-tools/src/registry.rs`
@@ -204,10 +204,10 @@
 6. Write comprehensive tests
 
 **Definition of Done:**
-- [ ] Registry operations thread-safe
-- [ ] Discovery returns correct tools
-- [ ] Validation prevents bad tools
-- [ ] Performance benchmarked
+- [x] Registry operations thread-safe
+- [x] Discovery returns correct tools
+- [x] Validation prevents bad tools
+- [x] Performance benchmarked
 
 ### Task 2.2.3: Security Sandbox Implementation
 **Priority**: CRITICAL  
@@ -218,11 +218,11 @@
 **Description**: Implement security sandboxing for tool execution.
 
 **Acceptance Criteria:**
-- [ ] FileSandbox restricts file access
-- [ ] NetworkSandbox controls network access
-- [ ] ResourceMonitor tracks usage
-- [ ] Sandbox integrates with tool execution
-- [ ] Security violations logged
+- [x] FileSandbox restricts file access
+- [x] NetworkSandbox controls network access
+- [x] ResourceMonitor tracks usage
+- [x] Sandbox integrates with tool execution
+- [x] Security violations logged
 
 **Implementation Steps:**
 1. Create `llmspell-security/src/sandbox/mod.rs`
@@ -233,10 +233,10 @@
 6. Write security tests
 
 **Definition of Done:**
-- [ ] Sandbox prevents unauthorized access
-- [ ] Resource limits enforced
-- [ ] Security tests comprehensive
-- [ ] Performance overhead <5%
+- [x] Sandbox prevents unauthorized access
+- [x] Resource limits enforced
+- [x] Security tests comprehensive
+- [x] Performance overhead <5%
 
 ---
 
