@@ -513,8 +513,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_rate_limiting() {
-        let mut config = WebSearchConfig::default();
-        config.rate_limit = 2; // Very low limit for testing
+        let config = WebSearchConfig {
+            rate_limit: 2, // Very low limit for testing
+            ..Default::default()
+        };
         let tool = WebSearchTool::new(config);
 
         // First two searches should work

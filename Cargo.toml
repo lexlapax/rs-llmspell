@@ -67,7 +67,7 @@ rocksdb = "0.22"
 
 # Scripting engines
 mlua = { version = "0.9", features = ["lua54", "async", "serialize", "send", "parking_lot"] }
-boa_engine = "0.18"
+boa_engine = "0.20"
 quickjs_runtime = "0.12"
 
 # LLM providers and AI

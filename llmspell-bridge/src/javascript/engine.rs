@@ -2,8 +2,7 @@
 //! ABOUTME: Provides JavaScript (ES2020) execution with async generator streaming
 
 use crate::engine::{
-    EngineFeatures, ExecutionContext, JSConfig, ScriptEngineBridge, ScriptMetadata, ScriptOutput,
-    ScriptStream, SecurityContext,
+    EngineFeatures, ExecutionContext, JSConfig, ScriptEngineBridge, ScriptOutput, ScriptStream,
 };
 use crate::{ComponentRegistry, ProviderManager};
 use async_trait::async_trait;
@@ -12,14 +11,14 @@ use std::sync::Arc;
 
 /// JavaScript script engine implementation
 pub struct JSEngine {
-    config: JSConfig,
+    _config: JSConfig,
 }
 
 impl JSEngine {
     /// Create a new JavaScript engine with the given configuration
     pub fn new(config: &JSConfig) -> Result<Self, LLMSpellError> {
         Ok(Self {
-            config: config.clone(),
+            _config: config.clone(),
         })
     }
 

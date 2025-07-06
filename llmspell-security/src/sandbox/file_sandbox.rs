@@ -362,7 +362,7 @@ mod tests {
         // Test path traversal attempt - create a path that goes above the allowed directory
         // This should be caught as path traversal since it tries to go above the allowed root
         let traversal_path = Path::new("../../../../etc/passwd");
-        let result = sandbox.read_file(&traversal_path).await;
+        let result = sandbox.read_file(traversal_path).await;
         assert!(result.is_err());
 
         // The actual behavior: our normalization resolves to /etc/passwd which fails as unauthorized access
