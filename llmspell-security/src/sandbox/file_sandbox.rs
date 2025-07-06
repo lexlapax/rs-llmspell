@@ -106,9 +106,9 @@ impl FileSandbox {
     /// Safe file read operation
     pub async fn read_file(&mut self, path: &Path) -> Result<Vec<u8>> {
         let safe_path = self.validate_path(path)?;
-        
+
         debug!("Reading file: {:?}", safe_path);
-        
+
         async_fs::read(&safe_path).await.map_err(|e| {
             let violation = SandboxViolation::FileAccess {
                 path: safe_path.to_string_lossy().to_string(),
@@ -126,21 +126,21 @@ impl FileSandbox {
     /// Safe file write operation
     pub async fn write_file(&mut self, path: &Path, contents: &[u8]) -> Result<()> {
         let safe_path = self.validate_path(path)?;
-        
+
         debug!("Writing file: {:?}", safe_path);
-        
+
         // Ensure parent directory exists
         if let Some(parent) = safe_path.parent() {
             if !parent.exists() {
-                async_fs::create_dir_all(parent).await.map_err(|e| {
-                    LLMSpellError::Security {
+                async_fs::create_dir_all(parent)
+                    .await
+                    .map_err(|e| LLMSpellError::Security {
                         message: format!("Cannot create parent directory: {}", e),
                         violation_type: Some("directory_creation".to_string()),
-                    }
-                })?;
+                    })?;
             }
         }
-        
+
         async_fs::write(&safe_path, contents).await.map_err(|e| {
             let violation = SandboxViolation::FileAccess {
                 path: safe_path.to_string_lossy().to_string(),
@@ -158,19 +158,19 @@ impl FileSandbox {
     /// Safe file append operation
     pub async fn append_file(&mut self, path: &Path, contents: &[u8]) -> Result<()> {
         let safe_path = self.validate_path(path)?;
-        
+
         debug!("Appending to file: {:?}", safe_path);
-        
+
         // Read existing content
         let mut existing = if safe_path.exists() {
             self.read_file(&safe_path).await?
         } else {
             Vec::new()
         };
-        
+
         // Append new content
         existing.extend_from_slice(contents);
-        
+
         // Write back
         self.write_file(&safe_path, &existing).await
     }
@@ -178,9 +178,9 @@ impl FileSandbox {
     /// Safe directory creation
     pub async fn create_dir(&mut self, path: &Path) -> Result<()> {
         let safe_path = self.validate_path(path)?;
-        
+
         debug!("Creating directory: {:?}", safe_path);
-        
+
         async_fs::create_dir_all(&safe_path).await.map_err(|e| {
             let violation = SandboxViolation::FileAccess {
                 path: safe_path.to_string_lossy().to_string(),
@@ -198,9 +198,9 @@ impl FileSandbox {
     /// Safe file deletion
     pub async fn delete_file(&mut self, path: &Path) -> Result<()> {
         let safe_path = self.validate_path(path)?;
-        
+
         debug!("Deleting file: {:?}", safe_path);
-        
+
         async_fs::remove_file(&safe_path).await.map_err(|e| {
             let violation = SandboxViolation::FileAccess {
                 path: safe_path.to_string_lossy().to_string(),
@@ -218,9 +218,9 @@ impl FileSandbox {
     /// Safe directory listing
     pub async fn list_dir(&mut self, path: &Path) -> Result<Vec<PathBuf>> {
         let safe_path = self.validate_path(path)?;
-        
+
         debug!("Listing directory: {:?}", safe_path);
-        
+
         let mut entries = Vec::new();
         let mut read_dir = async_fs::read_dir(&safe_path).await.map_err(|e| {
             let violation = SandboxViolation::FileAccess {
@@ -234,16 +234,19 @@ impl FileSandbox {
                 violation_type: Some("directory_list".to_string()),
             }
         })?;
-        
-        while let Some(entry) = read_dir.next_entry().await.map_err(|e| {
-            LLMSpellError::Security {
-                message: format!("Error reading directory entry: {}", e),
-                violation_type: Some("directory_list".to_string()),
-            }
-        })? {
+
+        while let Some(entry) =
+            read_dir
+                .next_entry()
+                .await
+                .map_err(|e| LLMSpellError::Security {
+                    message: format!("Error reading directory entry: {}", e),
+                    violation_type: Some("directory_list".to_string()),
+                })?
+        {
             entries.push(entry.path());
         }
-        
+
         Ok(entries)
     }
 
@@ -256,9 +259,9 @@ impl FileSandbox {
     /// Get file metadata
     pub async fn file_metadata(&mut self, path: &Path) -> Result<fs::Metadata> {
         let safe_path = self.validate_path(path)?;
-        
+
         debug!("Getting metadata for: {:?}", safe_path);
-        
+
         async_fs::metadata(&safe_path).await.map_err(|e| {
             let violation = SandboxViolation::FileAccess {
                 path: safe_path.to_string_lossy().to_string(),
@@ -287,7 +290,7 @@ impl FileSandbox {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use llmspell_core::traits::tool::{SecurityRequirements, ResourceLimits};
+    use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
     use std::path::PathBuf;
     use tempfile::TempDir;
 
@@ -295,8 +298,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let temp_path = temp_dir.path().to_string_lossy().to_string();
 
-        let security_reqs = SecurityRequirements::safe()
-            .with_file_access(&temp_path);
+        let security_reqs = SecurityRequirements::safe().with_file_access(&temp_path);
 
         let context = SandboxContext::new(
             "test-sandbox".to_string(),
@@ -323,7 +325,10 @@ mod tests {
 
         // Test append
         let append_content = b" More content.";
-        sandbox.append_file(&test_file, append_content).await.unwrap();
+        sandbox
+            .append_file(&test_file, append_content)
+            .await
+            .unwrap();
 
         let full_content = sandbox.read_file(&test_file).await.unwrap();
         assert_eq!(full_content, b"Hello, sandbox! More content.");
@@ -365,8 +370,10 @@ mod tests {
         match result.unwrap_err() {
             LLMSpellError::Security { violation_type, .. } => {
                 // Path normalization correctly prevents traversal and results in unauthorized access
-                assert!(violation_type == Some("file_access".to_string()) || 
-                       violation_type == Some("path_traversal".to_string()));
+                assert!(
+                    violation_type == Some("file_access".to_string())
+                        || violation_type == Some("path_traversal".to_string())
+                );
             }
             _ => panic!("Expected Security error"),
         }

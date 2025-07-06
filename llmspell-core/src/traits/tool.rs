@@ -2,7 +2,10 @@
 //! ABOUTME: Extends BaseAgent with parameter validation and tool categorization
 
 use super::base_agent::BaseAgent;
-use crate::{Result, types::{AgentInput, AgentStream}};
+use crate::{
+    types::{AgentInput, AgentStream},
+    Result,
+};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -491,7 +494,7 @@ pub trait Tool: BaseAgent {
     ) -> Result<AgentStream> {
         // Default implementation: execute normally and convert to a single chunk stream
         let output = self.execute(input, context).await?;
-        
+
         // Convert AgentOutput to AgentChunk
         let chunk = crate::types::AgentChunk {
             stream_id: format!("tool-{}", uuid::Uuid::new_v4()),
@@ -505,7 +508,7 @@ pub trait Tool: BaseAgent {
             },
             timestamp: chrono::Utc::now(),
         };
-        
+
         // Create a simple stream with just the final chunk
         use futures::stream;
         let stream = stream::once(async move { Ok(chunk) });

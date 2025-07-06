@@ -5,10 +5,6 @@ pub mod sandbox;
 
 // Re-export main types
 pub use sandbox::{
-    IntegratedSandbox, 
-    SandboxContext, 
+    FileSandbox, IntegratedSandbox, NetworkSandbox, ResourceMonitor, SandboxContext,
     SandboxViolation,
-    FileSandbox,
-    NetworkSandbox,
-    ResourceMonitor,
 };

@@ -49,31 +49,31 @@ impl ModelSpecifier {
     }
 
     /// Parse a model specification string
-    /// 
+    ///
     /// Supported formats:
     /// - "model" -> ModelSpecifier { provider: None, model: "model", base_url: None }
     /// - "provider/model" -> ModelSpecifier { provider: Some("provider"), model: "model", base_url: None }
     /// - "provider/subprovider/model" -> ModelSpecifier { provider: Some("provider/subprovider"), model: "model", base_url: None }
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```rust
     /// # use llmspell_providers::ModelSpecifier;
     /// let spec = ModelSpecifier::parse("gpt-4").unwrap();
     /// assert_eq!(spec.model, "gpt-4");
     /// assert_eq!(spec.provider, None);
-    /// 
+    ///
     /// let spec = ModelSpecifier::parse("openai/gpt-4").unwrap();
     /// assert_eq!(spec.model, "gpt-4");
     /// assert_eq!(spec.provider, Some("openai".to_string()));
-    /// 
+    ///
     /// let spec = ModelSpecifier::parse("openrouter/deepseek/model").unwrap();
     /// assert_eq!(spec.model, "model");
     /// assert_eq!(spec.provider, Some("openrouter/deepseek".to_string()));
     /// ```
     pub fn parse(spec: &str) -> Result<Self, LLMSpellError> {
         let spec = spec.trim();
-        
+
         if spec.is_empty() {
             return Err(LLMSpellError::Configuration {
                 message: "Model specification cannot be empty".to_string(),
@@ -83,7 +83,7 @@ impl ModelSpecifier {
 
         // Split by '/' and handle different cases
         let parts: Vec<&str> = spec.split('/').collect();
-        
+
         match parts.len() {
             1 => {
                 // Just a model name
@@ -96,8 +96,8 @@ impl ModelSpecifier {
             n if n > 2 => {
                 // provider/subprovider/.../model
                 // Join all parts except the last as provider
-                let provider = parts[..n-1].join("/");
-                let model = parts[n-1];
+                let provider = parts[..n - 1].join("/");
+                let model = parts[n - 1];
                 Ok(Self::with_provider(provider, model))
             }
             _ => {
@@ -111,23 +111,20 @@ impl ModelSpecifier {
     }
 
     /// Parse a model specification with an optional base URL override
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```rust
     /// # use llmspell_providers::ModelSpecifier;
     /// let spec = ModelSpecifier::parse_with_base_url(
-    ///     "openai/gpt-4", 
+    ///     "openai/gpt-4",
     ///     Some("https://api.custom.com/v1")
     /// ).unwrap();
     /// assert_eq!(spec.model, "gpt-4");
     /// assert_eq!(spec.provider, Some("openai".to_string()));
     /// assert_eq!(spec.base_url, Some("https://api.custom.com/v1".to_string()));
     /// ```
-    pub fn parse_with_base_url(
-        spec: &str, 
-        base_url: Option<&str>
-    ) -> Result<Self, LLMSpellError> {
+    pub fn parse_with_base_url(spec: &str, base_url: Option<&str>) -> Result<Self, LLMSpellError> {
         let mut model_spec = Self::parse(spec)?;
         model_spec.base_url = base_url.map(|url| url.to_string());
         Ok(model_spec)
@@ -147,12 +144,13 @@ impl ModelSpecifier {
     pub fn has_base_url(&self) -> bool {
         self.base_url.is_some()
     }
+}
 
-    /// Convert to a string representation
-    pub fn to_string(&self) -> String {
+impl std::fmt::Display for ModelSpecifier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.provider {
-            Some(provider) => format!("{}/{}", provider, self.model),
-            None => self.model.clone(),
+            Some(provider) => write!(f, "{}/{}", provider, self.model),
+            None => write!(f, "{}", self.model),
         }
     }
 }
@@ -162,12 +160,6 @@ impl FromStr for ModelSpecifier {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Self::parse(s)
-    }
-}
-
-impl std::fmt::Display for ModelSpecifier {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.to_string())
     }
 }
 
@@ -228,11 +220,10 @@ mod tests {
 
     #[test]
     fn test_parse_with_base_url() {
-        let spec = ModelSpecifier::parse_with_base_url(
-            "openai/gpt-4", 
-            Some("https://api.custom.com/v1")
-        ).unwrap();
-        
+        let spec =
+            ModelSpecifier::parse_with_base_url("openai/gpt-4", Some("https://api.custom.com/v1"))
+                .unwrap();
+
         assert_eq!(spec.model, "gpt-4");
         assert_eq!(spec.provider, Some("openai".to_string()));
         assert_eq!(spec.base_url, Some("https://api.custom.com/v1".to_string()));
@@ -299,10 +290,10 @@ mod tests {
     #[test]
     fn test_serde_serialization() {
         let spec = ModelSpecifier::with_base_url("openai", "gpt-4", "https://api.custom.com");
-        
+
         // Test serialization
         let serialized = serde_json::to_string(&spec).unwrap();
-        
+
         // Test deserialization
         let deserialized: ModelSpecifier = serde_json::from_str(&serialized).unwrap();
         assert_eq!(spec, deserialized);

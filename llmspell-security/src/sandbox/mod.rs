@@ -10,7 +10,7 @@ pub use network_sandbox::NetworkSandbox;
 pub use resource_monitor::ResourceMonitor;
 
 use llmspell_core::{
-    traits::tool::{SecurityRequirements, ResourceLimits},
+    traits::tool::{ResourceLimits, SecurityRequirements},
     Result,
 };
 use serde::{Deserialize, Serialize};
@@ -59,19 +59,19 @@ impl SandboxContext {
     /// Check if a file path is allowed
     pub fn is_path_allowed(&self, path: &Path) -> bool {
         let path_str = path.to_string_lossy();
-        
+
         // Check wildcard permissions
         if self.allowed_paths.contains(&"*".to_string()) {
             return true;
         }
-        
+
         // Check exact matches and prefix matches
         for allowed in &self.allowed_paths {
             if allowed == "*" || path_str == *allowed || path_str.starts_with(allowed) {
                 return true;
             }
         }
-        
+
         false
     }
 
@@ -81,14 +81,14 @@ impl SandboxContext {
         if self.allowed_domains.contains(&"*".to_string()) {
             return true;
         }
-        
+
         // Check exact matches and suffix matches
         for allowed in &self.allowed_domains {
             if allowed == "*" || domain == *allowed || domain.ends_with(allowed) {
                 return true;
             }
         }
-        
+
         false
     }
 
@@ -98,7 +98,7 @@ impl SandboxContext {
         if self.allowed_env_vars.contains(&"*".to_string()) {
             return true;
         }
-        
+
         // Check exact matches
         self.allowed_env_vars.contains(&var.to_string())
     }
@@ -191,27 +191,52 @@ pub enum SandboxViolation {
         reason: String,
     },
     /// Environment access violation
-    EnvironmentAccess {
-        variable: String,
-        reason: String,
-    },
+    EnvironmentAccess { variable: String, reason: String },
 }
 
 impl std::fmt::Display for SandboxViolation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SandboxViolation::FileAccess { path, operation, reason } => {
-                write!(f, "File access violation: {} on '{}' - {}", operation, path, reason)
+            SandboxViolation::FileAccess {
+                path,
+                operation,
+                reason,
+            } => {
+                write!(
+                    f,
+                    "File access violation: {} on '{}' - {}",
+                    operation, path, reason
+                )
             }
-            SandboxViolation::NetworkAccess { domain, operation, reason } => {
-                write!(f, "Network access violation: {} to '{}' - {}", operation, domain, reason)
+            SandboxViolation::NetworkAccess {
+                domain,
+                operation,
+                reason,
+            } => {
+                write!(
+                    f,
+                    "Network access violation: {} to '{}' - {}",
+                    operation, domain, reason
+                )
             }
-            SandboxViolation::ResourceLimit { resource, limit, actual, reason } => {
-                write!(f, "Resource limit violation: {} exceeded limit {} with {} - {}", 
-                       resource, limit, actual, reason)
+            SandboxViolation::ResourceLimit {
+                resource,
+                limit,
+                actual,
+                reason,
+            } => {
+                write!(
+                    f,
+                    "Resource limit violation: {} exceeded limit {} with {} - {}",
+                    resource, limit, actual, reason
+                )
             }
             SandboxViolation::EnvironmentAccess { variable, reason } => {
-                write!(f, "Environment access violation: '{}' - {}", variable, reason)
+                write!(
+                    f,
+                    "Environment access violation: '{}' - {}",
+                    variable, reason
+                )
             }
         }
     }
@@ -220,7 +245,7 @@ impl std::fmt::Display for SandboxViolation {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use llmspell_core::traits::tool::{SecurityRequirements, ResourceLimits};
+    use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
 
     #[test]
     fn test_sandbox_context_creation() {
@@ -231,15 +256,14 @@ mod tests {
 
         let resource_limits = ResourceLimits::strict();
 
-        let context = SandboxContext::new(
-            "test-sandbox".to_string(),
-            security_reqs,
-            resource_limits,
-        );
+        let context =
+            SandboxContext::new("test-sandbox".to_string(), security_reqs, resource_limits);
 
         assert_eq!(context.id, "test-sandbox");
         assert!(context.allowed_paths.contains(&"/tmp".to_string()));
-        assert!(context.allowed_domains.contains(&"api.example.com".to_string()));
+        assert!(context
+            .allowed_domains
+            .contains(&"api.example.com".to_string()));
         assert!(context.allowed_env_vars.contains(&"HOME".to_string()));
     }
 
@@ -249,11 +273,8 @@ mod tests {
             .with_file_access("/tmp")
             .with_file_access("/var/log");
 
-        let context = SandboxContext::new(
-            "test".to_string(),
-            security_reqs,
-            ResourceLimits::strict(),
-        );
+        let context =
+            SandboxContext::new("test".to_string(), security_reqs, ResourceLimits::strict());
 
         assert!(context.is_path_allowed(Path::new("/tmp/test.txt")));
         assert!(context.is_path_allowed(Path::new("/var/log/app.log")));
@@ -266,11 +287,8 @@ mod tests {
             .with_network_access("api.example.com")
             .with_network_access(".github.com");
 
-        let context = SandboxContext::new(
-            "test".to_string(),
-            security_reqs,
-            ResourceLimits::strict(),
-        );
+        let context =
+            SandboxContext::new("test".to_string(), security_reqs, ResourceLimits::strict());
 
         assert!(context.is_domain_allowed("api.example.com"));
         assert!(context.is_domain_allowed("api.github.com"));
@@ -283,11 +301,8 @@ mod tests {
             .with_env_access("HOME")
             .with_env_access("PATH");
 
-        let context = SandboxContext::new(
-            "test".to_string(),
-            security_reqs,
-            ResourceLimits::strict(),
-        );
+        let context =
+            SandboxContext::new("test".to_string(), security_reqs, ResourceLimits::strict());
 
         assert!(context.is_env_var_allowed("HOME"));
         assert!(context.is_env_var_allowed("PATH"));

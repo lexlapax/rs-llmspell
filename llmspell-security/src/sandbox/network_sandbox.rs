@@ -144,7 +144,7 @@ impl NetworkSandbox {
     /// Check rate limits for a domain
     async fn check_rate_limit(&mut self, domain: &str) -> Result<()> {
         let mut limiters = self.rate_limiters.write().await;
-        
+
         let limiter = limiters
             .entry(domain.to_string())
             .or_insert_with(|| RateLimiter::new(self.default_rate_limit.clone()));
@@ -170,9 +170,9 @@ impl NetworkSandbox {
     /// Make a safe HTTP GET request
     pub async fn get(&mut self, url: &str) -> Result<String> {
         self.validate_request(url, "GET").await?;
-        
+
         debug!("Making GET request to: {}", url);
-        
+
         // In a real implementation, you would use a proper HTTP client
         // For now, we'll simulate the request
         self.simulate_http_request(url, "GET").await
@@ -181,9 +181,13 @@ impl NetworkSandbox {
     /// Make a safe HTTP POST request
     pub async fn post(&mut self, url: &str, body: &str) -> Result<String> {
         self.validate_request(url, "POST").await?;
-        
-        debug!("Making POST request to: {} with body length: {}", url, body.len());
-        
+
+        debug!(
+            "Making POST request to: {} with body length: {}",
+            url,
+            body.len()
+        );
+
         // In a real implementation, you would use a proper HTTP client
         self.simulate_http_request(url, "POST").await
     }
@@ -191,18 +195,22 @@ impl NetworkSandbox {
     /// Make a safe HTTP PUT request
     pub async fn put(&mut self, url: &str, body: &str) -> Result<String> {
         self.validate_request(url, "PUT").await?;
-        
-        debug!("Making PUT request to: {} with body length: {}", url, body.len());
-        
+
+        debug!(
+            "Making PUT request to: {} with body length: {}",
+            url,
+            body.len()
+        );
+
         self.simulate_http_request(url, "PUT").await
     }
 
     /// Make a safe HTTP DELETE request
     pub async fn delete(&mut self, url: &str) -> Result<String> {
         self.validate_request(url, "DELETE").await?;
-        
+
         debug!("Making DELETE request to: {}", url);
-        
+
         self.simulate_http_request(url, "DELETE").await
     }
 
@@ -211,7 +219,7 @@ impl NetworkSandbox {
         // In a real implementation, this would use reqwest or similar
         // For testing purposes, we'll return a mock response
         tokio::time::sleep(Duration::from_millis(100)).await; // Simulate network delay
-        
+
         Ok(format!(
             "{{\"mock_response\": true, \"url\": \"{}\", \"method\": \"{}\", \"status\": 200}}",
             url, method
@@ -269,7 +277,7 @@ pub struct DomainStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use llmspell_core::traits::tool::{SecurityRequirements, ResourceLimits};
+    use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
 
     fn create_test_sandbox() -> NetworkSandbox {
         let security_reqs = SecurityRequirements::safe()
@@ -290,10 +298,16 @@ mod tests {
         let mut sandbox = create_test_sandbox();
 
         // Valid domain
-        assert!(sandbox.validate_request("https://api.example.com/data", "GET").await.is_ok());
+        assert!(sandbox
+            .validate_request("https://api.example.com/data", "GET")
+            .await
+            .is_ok());
 
         // Invalid domain
-        assert!(sandbox.validate_request("https://malicious.com/data", "GET").await.is_err());
+        assert!(sandbox
+            .validate_request("https://malicious.com/data", "GET")
+            .await
+            .is_err());
     }
 
     #[test]
@@ -301,7 +315,9 @@ mod tests {
         let sandbox = create_test_sandbox();
 
         assert_eq!(
-            sandbox.extract_domain("https://api.example.com/v1/data").unwrap(),
+            sandbox
+                .extract_domain("https://api.example.com/v1/data")
+                .unwrap(),
             "api.example.com"
         );
         assert_eq!(
@@ -309,7 +325,9 @@ mod tests {
             "github.com"
         );
         assert_eq!(
-            sandbox.extract_domain("https://sub.domain.com/path?query=1").unwrap(),
+            sandbox
+                .extract_domain("https://sub.domain.com/path?query=1")
+                .unwrap(),
             "sub.domain.com"
         );
     }
@@ -320,8 +338,14 @@ mod tests {
 
         // Test all HTTP methods
         assert!(sandbox.get("https://api.example.com/data").await.is_ok());
-        assert!(sandbox.post("https://api.example.com/data", "{}").await.is_ok());
-        assert!(sandbox.put("https://api.example.com/data", "{}").await.is_ok());
+        assert!(sandbox
+            .post("https://api.example.com/data", "{}")
+            .await
+            .is_ok());
+        assert!(sandbox
+            .put("https://api.example.com/data", "{}")
+            .await
+            .is_ok());
         assert!(sandbox.delete("https://api.example.com/data").await.is_ok());
     }
 

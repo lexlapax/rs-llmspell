@@ -39,7 +39,7 @@
 - [x] Task 2.2.1: Enhance Tool Trait 2025-06-27
 - [x] Task 2.2.2: Implement Tool Registry 2025-06-27
 - [x] Task 2.2.3: Security Sandbox Implementation 2025-06-27
-- [ ] Task 2.3.1: WebSearchTool <date>
+- [x] Task 2.3.1: WebSearchTool 2025-07-06
 - [ ] Task 2.3.2: SemanticSearchTool <date>
 - [ ] Task 2.3.3: CodeSearchTool <date>
 - [ ] Task 2.4.1: JsonProcessorTool <date>
@@ -251,11 +251,11 @@
 **Description**: Implement web search tool with multiple providers.
 
 **Acceptance Criteria:**
-- [ ] Supports multiple search providers (Google, Bing, DuckDuckGo)
-- [ ] Rate limiting implemented
-- [ ] Result formatting consistent
-- [ ] Streaming results supported
-- [ ] API key management secure
+- [x] Supports multiple search providers (Google, Bing, DuckDuckGo)
+- [x] Rate limiting implemented
+- [x] Result formatting consistent
+- [x] Streaming results supported
+- [x] API key management secure
 
 **Implementation Steps:**
 1. Create `llmspell-tools/src/search/web_search.rs`
@@ -266,10 +266,10 @@
 6. Write tests with mocked APIs
 
 **Definition of Done:**
-- [ ] All providers work correctly
-- [ ] Rate limits respected
-- [ ] Tests use mocked responses
-- [ ] Documentation includes examples
+- [x] All providers work correctly
+- [x] Rate limits respected
+- [x] Tests use mocked responses
+- [x] Documentation includes examples
 
 ### Task 2.3.2: SemanticSearchTool
 **Priority**: HIGH  

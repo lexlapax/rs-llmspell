@@ -11,38 +11,38 @@ use serde::{Deserialize, Serialize};
 use std::sync::{Arc, RwLock};
 
 /// Central script runtime that uses ScriptEngineBridge abstraction
-/// 
+///
 /// The `ScriptRuntime` is the main entry point for executing scripts in LLMSpell.
 /// It provides a language-agnostic interface that can work with multiple script
 /// engines (Lua, JavaScript, Python, etc.) through the `ScriptEngineBridge` trait.
-/// 
+///
 /// # Examples
-/// 
+///
 /// ## Basic Script Execution
-/// 
+///
 /// ```rust,no_run
 /// use llmspell_bridge::{ScriptRuntime, RuntimeConfig};
-/// 
+///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// // Create a runtime with default configuration
 /// let config = RuntimeConfig::default();
 /// let runtime = ScriptRuntime::new_with_lua(config).await?;
-/// 
+///
 /// // Execute a simple Lua script
 /// let output = runtime.execute_script("return 42").await?;
 /// println!("Result: {:?}", output.output);
 /// # Ok(())
 /// # }
 /// ```
-/// 
+///
 /// ## Working with Agents (Placeholder - Phase 2)
-/// 
+///
 /// ```rust,no_run
 /// use llmspell_bridge::{ScriptRuntime, RuntimeConfig};
-/// 
+///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// let runtime = ScriptRuntime::new_with_lua(RuntimeConfig::default()).await?;
-/// 
+///
 /// let script = r#"
 ///     -- Create an agent (placeholder functionality)
 ///     local agent = Agent.create({
@@ -54,21 +54,21 @@ use std::sync::{Arc, RwLock};
 ///     local response = agent:execute("Hello!")
 ///     return response.text
 /// "#;
-/// 
+///
 /// let output = runtime.execute_script(script).await?;
 /// # Ok(())
 /// # }
 /// ```
-/// 
+///
 /// ## Streaming Execution
-/// 
+///
 /// ```rust,no_run
 /// use llmspell_bridge::{ScriptRuntime, RuntimeConfig};
 /// use futures::StreamExt;
-/// 
+///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// let runtime = ScriptRuntime::new_with_lua(RuntimeConfig::default()).await?;
-/// 
+///
 /// // Check if streaming is supported
 /// if runtime.supports_streaming() {
 ///     let mut stream = runtime.execute_script_streaming("return 'streaming output'").await?;
@@ -97,16 +97,16 @@ pub struct ScriptRuntime {
 
 impl ScriptRuntime {
     /// Create a new runtime with Lua engine
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```rust,no_run
     /// use llmspell_bridge::{ScriptRuntime, RuntimeConfig};
-    /// 
+    ///
     /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
     /// // With default configuration
     /// let runtime = ScriptRuntime::new_with_lua(RuntimeConfig::default()).await?;
-    /// 
+    ///
     /// // With custom configuration
     /// let mut config = RuntimeConfig::default();
     /// config.runtime.security.allow_file_access = true;

@@ -45,7 +45,8 @@ pub fn inject_agent_api(
                 let system_prompt: Option<String> = args.get("system_prompt").ok();
                 let temperature: Option<f32> = args.get("temperature").ok();
                 let max_tokens: Option<usize> = args.get("max_tokens").ok();
-                let max_conversation_length: Option<usize> = args.get("max_conversation_length").ok();
+                let max_conversation_length: Option<usize> =
+                    args.get("max_conversation_length").ok();
                 let base_url: Option<String> = args.get("base_url").ok();
                 let api_key: Option<String> = args.get("api_key").ok();
 
@@ -58,40 +59,56 @@ pub fn inject_agent_api(
                 };
 
                 // Handle model specification with new syntax support
-                let provider = if let Some(model_str) = args.get::<_, Option<String>>("model").ok().flatten() {
+                let provider = if let Some(model_str) =
+                    args.get::<_, Option<String>>("model").ok().flatten()
+                {
                     // New syntax: "provider/model" or "model"
                     let model_spec = ModelSpecifier::parse(&model_str).map_err(|e| {
-                        mlua::Error::RuntimeError(format!("Invalid model specification '{}': {}", model_str, e))
+                        mlua::Error::RuntimeError(format!(
+                            "Invalid model specification '{}': {}",
+                            model_str, e
+                        ))
                     })?;
 
-                    providers.as_ref().create_agent_from_spec(
-                        model_spec,
-                        base_url.as_deref(),
-                        api_key.as_deref(),
-                    ).await.map_err(|e| {
-                        mlua::Error::RuntimeError(format!("Failed to create agent from spec: {}", e))
-                    })?
+                    providers
+                        .as_ref()
+                        .create_agent_from_spec(model_spec, base_url.as_deref(), api_key.as_deref())
+                        .await
+                        .map_err(|e| {
+                            mlua::Error::RuntimeError(format!(
+                                "Failed to create agent from spec: {}",
+                                e
+                            ))
+                        })?
                 } else if let (Some(provider_name), Some(model_name)) = (
                     args.get::<_, Option<String>>("provider").ok().flatten(),
-                    args.get::<_, Option<String>>("model_name").ok().flatten()
+                    args.get::<_, Option<String>>("model_name").ok().flatten(),
                 ) {
                     // Legacy syntax: separate provider and model_name fields
                     let model_spec = ModelSpecifier::with_provider(provider_name, model_name);
-                    providers.as_ref().create_agent_from_spec(
-                        model_spec,
-                        base_url.as_deref(),
-                        api_key.as_deref(),
-                    ).await.map_err(|e| {
-                        mlua::Error::RuntimeError(format!("Failed to create agent from legacy spec: {}", e))
-                    })?
-                } else if let Some(provider_name) = args.get::<_, Option<String>>("provider").ok().flatten() {
+                    providers
+                        .as_ref()
+                        .create_agent_from_spec(model_spec, base_url.as_deref(), api_key.as_deref())
+                        .await
+                        .map_err(|e| {
+                            mlua::Error::RuntimeError(format!(
+                                "Failed to create agent from legacy spec: {}",
+                                e
+                            ))
+                        })?
+                } else if let Some(provider_name) =
+                    args.get::<_, Option<String>>("provider").ok().flatten()
+                {
                     // Legacy syntax with just provider (use default model)
-                    providers.get_provider(Some(&provider_name)).await.map_err(|e| {
-                        mlua::Error::RuntimeError(format!(
-                            "Failed to get provider '{}': {}",
-                            provider_name, e
-                        ))
-                    })?
+                    providers
+                        .get_provider(Some(&provider_name))
+                        .await
+                        .map_err(|e| {
+                            mlua::Error::RuntimeError(format!(
+                                "Failed to get provider '{}': {}",
+                                provider_name, e
+                            ))
+                        })?
                 } else {
                     // No provider specified, use default
                     providers.get_default_provider().await.map_err(|e| {

@@ -69,7 +69,10 @@ impl ResourceMonitor {
         }
 
         self.start_time = Instant::now();
-        debug!("Resource monitoring started for sandbox: {}", self.context.id);
+        debug!(
+            "Resource monitoring started for sandbox: {}",
+            self.context.id
+        );
 
         // Start background monitoring task
         let usage = Arc::clone(&self.current_usage);
@@ -118,7 +121,8 @@ impl ResourceMonitor {
                 }
 
                 if let Some(limit) = resource_limits.max_file_ops_per_sec {
-                    let ops_per_sec = current.file_operations as f64 / current.timestamp.elapsed().as_secs_f64().max(1.0);
+                    let ops_per_sec = current.file_operations as f64
+                        / current.timestamp.elapsed().as_secs_f64().max(1.0);
                     if ops_per_sec > limit as f64 {
                         viols.push(SandboxViolation::ResourceLimit {
                             resource: "file_operations".to_string(),
@@ -141,7 +145,10 @@ impl ResourceMonitor {
             *active = false;
         }
 
-        debug!("Resource monitoring stopped for sandbox: {}", self.context.id);
+        debug!(
+            "Resource monitoring stopped for sandbox: {}",
+            self.context.id
+        );
         Ok(())
     }
 
@@ -254,16 +261,16 @@ impl ResourceMonitor {
     async fn collect_system_usage() -> ResourceUsage {
         // In a real implementation, this would use system APIs to get actual usage
         // For testing, we'll simulate some usage
-        let mut usage = ResourceUsage::default();
-        
-        // Simulate some memory usage growth
-        usage.memory_bytes = (Instant::now().elapsed().as_secs() * 1024 * 1024).min(50 * 1024 * 1024);
-        
-        // Simulate CPU time
-        usage.cpu_time_ms = Instant::now().elapsed().as_millis() as u64 / 10;
-        
-        usage.timestamp = Instant::now();
-        usage
+        let now = Instant::now();
+
+        ResourceUsage {
+            memory_bytes: (now.elapsed().as_secs() * 1024 * 1024).min(50 * 1024 * 1024),
+            cpu_time_ms: now.elapsed().as_millis() as u64 / 10,
+            network_bytes: 0,
+            file_operations: 0,
+            custom_usage: HashMap::new(),
+            timestamp: now,
+        }
     }
 
     /// Check if any violations occurred
@@ -356,17 +363,14 @@ pub struct EfficiencyMetrics {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use llmspell_core::traits::tool::{SecurityRequirements, ResourceLimits};
+    use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
 
     fn create_test_monitor() -> ResourceMonitor {
         let security_reqs = SecurityRequirements::safe();
         let resource_limits = ResourceLimits::strict();
 
-        let context = SandboxContext::new(
-            "test-monitor".to_string(),
-            security_reqs,
-            resource_limits,
-        );
+        let context =
+            SandboxContext::new("test-monitor".to_string(), security_reqs, resource_limits);
 
         ResourceMonitor::new(context).unwrap()
     }
@@ -439,14 +443,9 @@ mod tests {
     #[tokio::test]
     async fn test_limit_enforcement() {
         let security_reqs = SecurityRequirements::safe();
-        let resource_limits = ResourceLimits::strict()
-            .with_network_limit(512); // Very low limit
+        let resource_limits = ResourceLimits::strict().with_network_limit(512); // Very low limit
 
-        let context = SandboxContext::new(
-            "test-limit".to_string(),
-            security_reqs,
-            resource_limits,
-        );
+        let context = SandboxContext::new("test-limit".to_string(), security_reqs, resource_limits);
 
         let monitor = ResourceMonitor::new(context).unwrap();
 

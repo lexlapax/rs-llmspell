@@ -3,13 +3,18 @@
 
 use llmspell_core::{
     error::LLMSpellError,
-    traits::tool::{Tool, ToolCategory, SecurityLevel, SecurityRequirements, ResourceLimits},
+    traits::tool::{ResourceLimits, SecurityLevel, SecurityRequirements, Tool, ToolCategory},
     Result,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+
+// Type alias to simplify the complex tool storage type
+type ToolStorage = Arc<RwLock<HashMap<String, Arc<Box<dyn Tool>>>>>;
+type MetadataCache = Arc<RwLock<HashMap<String, ToolInfo>>>;
+type CategoryIndex = Arc<RwLock<HashMap<ToolCategory, Vec<String>>>>;
 
 /// Metadata about a registered tool
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -33,7 +38,7 @@ pub struct ToolInfo {
 }
 
 /// Capability matcher for tool discovery
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct CapabilityMatcher {
     /// Required categories (any of these)
     pub categories: Option<Vec<ToolCategory>>,
@@ -43,17 +48,6 @@ pub struct CapabilityMatcher {
     pub capabilities: HashMap<String, serde_json::Value>,
     /// Text-based search terms
     pub search_terms: Vec<String>,
-}
-
-impl Default for CapabilityMatcher {
-    fn default() -> Self {
-        Self {
-            categories: None,
-            max_security_level: None,
-            capabilities: HashMap::new(),
-            search_terms: Vec::new(),
-        }
-    }
 }
 
 impl CapabilityMatcher {
@@ -115,7 +109,8 @@ impl CapabilityMatcher {
 
         // Check search terms (case-insensitive search in name and description)
         if !self.search_terms.is_empty() {
-            let searchable_text = format!("{} {}", tool_info.name, tool_info.description).to_lowercase();
+            let searchable_text =
+                format!("{} {}", tool_info.name, tool_info.description).to_lowercase();
             for term in &self.search_terms {
                 if !searchable_text.contains(&term.to_lowercase()) {
                     return false;
@@ -130,11 +125,11 @@ impl CapabilityMatcher {
 /// Thread-safe tool registry for managing tool instances
 pub struct ToolRegistry {
     /// Storage for tool instances
-    tools: Arc<RwLock<HashMap<String, Arc<Box<dyn Tool>>>>>,
+    tools: ToolStorage,
     /// Cached tool metadata for fast lookups
-    metadata_cache: Arc<RwLock<HashMap<String, ToolInfo>>>,
+    metadata_cache: MetadataCache,
     /// Category index for fast category-based lookups
-    category_index: Arc<RwLock<HashMap<ToolCategory, Vec<String>>>>,
+    category_index: CategoryIndex,
 }
 
 impl ToolRegistry {
@@ -148,7 +143,7 @@ impl ToolRegistry {
     }
 
     /// Register a tool in the registry
-    pub async fn register<T>(&self, name: String, tool: T) -> Result<()> 
+    pub async fn register<T>(&self, name: String, tool: T) -> Result<()>
     where
         T: Tool + 'static,
     {
@@ -156,7 +151,7 @@ impl ToolRegistry {
         self.validate_tool(&tool).await?;
 
         let tool_arc = Arc::new(Box::new(tool) as Box<dyn Tool>);
-        
+
         // Extract metadata
         let metadata = tool_arc.metadata();
         let schema = tool_arc.schema();
@@ -329,8 +324,12 @@ impl ToolRegistry {
         {
             let cache = self.metadata_cache.read().await;
             for tool_info in cache.values() {
-                *category_counts.entry(tool_info.category.clone()).or_insert(0) += 1;
-                *security_level_counts.entry(tool_info.security_level.clone()).or_insert(0) += 1;
+                *category_counts
+                    .entry(tool_info.category.clone())
+                    .or_insert(0) += 1;
+                *security_level_counts
+                    .entry(tool_info.security_level.clone())
+                    .or_insert(0) += 1;
             }
         }
 
@@ -365,15 +364,15 @@ pub struct RegistryStatistics {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use async_trait::async_trait;
     use llmspell_core::{
         traits::{
             base_agent::BaseAgent,
-            tool::{ToolSchema, ParameterDef, ParameterType},
+            tool::{ParameterDef, ParameterType, ToolSchema},
         },
         types::{AgentInput, AgentOutput, ExecutionContext},
         ComponentMetadata,
     };
-    use async_trait::async_trait;
 
     // Mock tool for testing
     struct MockTool {
@@ -400,7 +399,11 @@ mod tests {
             &self.metadata
         }
 
-        async fn execute(&self, _input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+        async fn execute(
+            &self,
+            _input: AgentInput,
+            _context: ExecutionContext,
+        ) -> Result<AgentOutput> {
             Ok(AgentOutput::text(format!("Executed {}", self.name)))
         }
 
@@ -442,18 +445,22 @@ mod tests {
     #[tokio::test]
     async fn test_tool_registration() {
         let registry = ToolRegistry::new();
-        
-        let tool = MockTool::new("test_tool".to_string(), ToolCategory::Utility, SecurityLevel::Safe);
+
+        let tool = MockTool::new(
+            "test_tool".to_string(),
+            ToolCategory::Utility,
+            SecurityLevel::Safe,
+        );
         let result = registry.register("test_tool".to_string(), tool).await;
         assert!(result.is_ok());
 
         // Check that tool is registered
         assert!(registry.contains_tool("test_tool").await);
-        
+
         // Check that we can retrieve it
         let retrieved = registry.get_tool("test_tool").await;
         assert!(retrieved.is_some());
-        
+
         // Check metadata
         let info = registry.get_tool_info("test_tool").await;
         assert!(info.is_some());
@@ -466,37 +473,45 @@ mod tests {
     #[tokio::test]
     async fn test_tool_discovery() {
         let registry = ToolRegistry::new();
-        
+
         // Register tools with different categories and security levels
         let tools = vec![
-            ("file_tool", ToolCategory::Filesystem, SecurityLevel::Restricted),
+            (
+                "file_tool",
+                ToolCategory::Filesystem,
+                SecurityLevel::Restricted,
+            ),
             ("web_tool", ToolCategory::Web, SecurityLevel::Safe),
             ("data_tool", ToolCategory::Data, SecurityLevel::Privileged),
             ("util_tool", ToolCategory::Utility, SecurityLevel::Safe),
         ];
-        
+
         for (name, category, level) in tools {
             let tool = MockTool::new(name.to_string(), category, level);
             registry.register(name.to_string(), tool).await.unwrap();
         }
 
         // Test category-based discovery
-        let filesystem_tools = registry.get_tools_by_category(&ToolCategory::Filesystem).await;
+        let filesystem_tools = registry
+            .get_tools_by_category(&ToolCategory::Filesystem)
+            .await;
         assert_eq!(filesystem_tools.len(), 1);
         assert!(filesystem_tools.contains(&"file_tool".to_string()));
 
         // Test capability-based discovery
-        let safe_tools = registry.get_tools_for_security_level(SecurityLevel::Safe).await;
+        let safe_tools = registry
+            .get_tools_for_security_level(SecurityLevel::Safe)
+            .await;
         assert_eq!(safe_tools.len(), 2); // web_tool and util_tool
 
         // Test search with matcher
         let matcher = CapabilityMatcher::new()
             .with_categories(vec![ToolCategory::Web, ToolCategory::Utility])
             .with_max_security_level(SecurityLevel::Safe);
-        
+
         let discovered = registry.discover_tools(&matcher).await;
         assert_eq!(discovered.len(), 2);
-        
+
         let names: Vec<String> = discovered.iter().map(|t| t.name.clone()).collect();
         assert!(names.contains(&"web_tool".to_string()));
         assert!(names.contains(&"util_tool".to_string()));
@@ -505,12 +520,12 @@ mod tests {
     #[tokio::test]
     async fn test_tool_validation() {
         let registry = ToolRegistry::new();
-        
+
         // Tool with empty name should fail validation
         struct InvalidTool {
             metadata: ComponentMetadata,
         }
-        
+
         impl InvalidTool {
             fn new() -> Self {
                 // Create invalid metadata with empty name
@@ -519,14 +534,18 @@ mod tests {
                 Self { metadata }
             }
         }
-        
+
         #[async_trait]
         impl BaseAgent for InvalidTool {
             fn metadata(&self) -> &ComponentMetadata {
                 &self.metadata
             }
 
-            async fn execute(&self, _input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+            async fn execute(
+                &self,
+                _input: AgentInput,
+                _context: ExecutionContext,
+            ) -> Result<AgentOutput> {
                 Ok(AgentOutput::text("test".to_string()))
             }
 
@@ -562,17 +581,24 @@ mod tests {
     #[tokio::test]
     async fn test_tool_unregistration() {
         let registry = ToolRegistry::new();
-        
-        let tool = MockTool::new("temp_tool".to_string(), ToolCategory::Utility, SecurityLevel::Safe);
-        registry.register("temp_tool".to_string(), tool).await.unwrap();
-        
+
+        let tool = MockTool::new(
+            "temp_tool".to_string(),
+            ToolCategory::Utility,
+            SecurityLevel::Safe,
+        );
+        registry
+            .register("temp_tool".to_string(), tool)
+            .await
+            .unwrap();
+
         // Verify it's registered
         assert!(registry.contains_tool("temp_tool").await);
-        
+
         // Unregister it
         let result = registry.unregister_tool("temp_tool").await;
         assert!(result.is_ok());
-        
+
         // Verify it's gone
         assert!(!registry.contains_tool("temp_tool").await);
         assert!(registry.get_tool("temp_tool").await.is_none());
@@ -582,19 +608,19 @@ mod tests {
     #[tokio::test]
     async fn test_registry_statistics() {
         let registry = ToolRegistry::new();
-        
+
         let tools = vec![
             ("file1", ToolCategory::Filesystem, SecurityLevel::Safe),
             ("file2", ToolCategory::Filesystem, SecurityLevel::Restricted),
             ("web1", ToolCategory::Web, SecurityLevel::Safe),
             ("data1", ToolCategory::Data, SecurityLevel::Privileged),
         ];
-        
+
         for (name, category, level) in tools {
             let tool = MockTool::new(name.to_string(), category, level);
             registry.register(name.to_string(), tool).await.unwrap();
         }
-        
+
         let stats = registry.get_statistics().await;
         assert_eq!(stats.total_tools, 4);
         assert_eq!(stats.total_categories, 3);
@@ -628,17 +654,14 @@ mod tests {
             .with_categories(vec![ToolCategory::Utility, ToolCategory::Web]);
         assert!(matcher.matches(&tool_info));
 
-        let matcher = CapabilityMatcher::new()
-            .with_categories(vec![ToolCategory::Filesystem]);
+        let matcher = CapabilityMatcher::new().with_categories(vec![ToolCategory::Filesystem]);
         assert!(!matcher.matches(&tool_info));
 
         // Test security level match
-        let matcher = CapabilityMatcher::new()
-            .with_max_security_level(SecurityLevel::Safe);
+        let matcher = CapabilityMatcher::new().with_max_security_level(SecurityLevel::Safe);
         assert!(matcher.matches(&tool_info));
 
-        let matcher = CapabilityMatcher::new()
-            .with_max_security_level(SecurityLevel::Restricted);
+        let matcher = CapabilityMatcher::new().with_max_security_level(SecurityLevel::Restricted);
         assert!(matcher.matches(&tool_info)); // Safe <= Restricted
 
         // Test capability match
@@ -651,12 +674,10 @@ mod tests {
         assert!(!matcher.matches(&tool_info));
 
         // Test search terms
-        let matcher = CapabilityMatcher::new()
-            .with_search_terms(vec!["test".to_string()]);
+        let matcher = CapabilityMatcher::new().with_search_terms(vec!["test".to_string()]);
         assert!(matcher.matches(&tool_info));
 
-        let matcher = CapabilityMatcher::new()
-            .with_search_terms(vec!["nonexistent".to_string()]);
+        let matcher = CapabilityMatcher::new().with_search_terms(vec!["nonexistent".to_string()]);
         assert!(!matcher.matches(&tool_info));
     }
 }

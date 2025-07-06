@@ -268,37 +268,37 @@ impl ProviderManager {
     }
 
     /// Create and initialize a provider from a ModelSpecifier
-    /// 
+    ///
     /// This method handles the core functionality for Task 2.1.2:
     /// - Parses the ModelSpecifier to determine provider and model
     /// - Applies base URL overrides if specified
     /// - Creates provider configuration with proper fallbacks
     /// - Initializes the provider and makes it available
-    /// 
+    ///
     /// # Arguments
     /// * `spec` - ModelSpecifier containing provider/model information
     /// * `base_url_override` - Optional base URL to override default endpoints
     /// * `api_key` - Optional API key (falls back to environment variables)
-    /// 
+    ///
     /// # Returns
     /// Returns the initialized provider instance
-    /// 
+    ///
     /// # Examples
     /// ```no_run
     /// # use llmspell_providers::{ProviderManager, ModelSpecifier};
     /// # #[tokio::main]
     /// # async fn main() -> Result<(), Box<dyn std::error::Error>> {
     /// let manager = ProviderManager::new();
-    /// 
+    ///
     /// // Basic usage with provider/model syntax
     /// let spec = ModelSpecifier::parse("openai/gpt-4")?;
     /// let provider = manager.create_agent_from_spec(spec, None, None).await?;
-    /// 
+    ///
     /// // With base URL override
     /// let spec = ModelSpecifier::parse("openai/gpt-4")?;
     /// let provider = manager.create_agent_from_spec(
-    ///     spec, 
-    ///     Some("https://api.custom.com/v1"), 
+    ///     spec,
+    ///     Some("https://api.custom.com/v1"),
     ///     Some("custom-api-key")
     /// ).await?;
     /// # Ok(())
@@ -322,13 +322,16 @@ impl ProviderManager {
                         default_provider[..colon_pos].to_string()
                     } else {
                         return Err(LLMSpellError::Configuration {
-                            message: "No provider specified and no valid default provider available".to_string(),
+                            message:
+                                "No provider specified and no valid default provider available"
+                                    .to_string(),
                             source: None,
                         });
                     }
                 } else {
                     return Err(LLMSpellError::Configuration {
-                        message: "No provider specified and no default provider configured".to_string(),
+                        message: "No provider specified and no default provider configured"
+                            .to_string(),
                         source: None,
                     });
                 }
@@ -390,7 +393,9 @@ impl ProviderManager {
     }
 
     /// Get the default provider instance
-    pub async fn get_default_provider(&self) -> Result<Arc<Box<dyn ProviderInstance>>, LLMSpellError> {
+    pub async fn get_default_provider(
+        &self,
+    ) -> Result<Arc<Box<dyn ProviderInstance>>, LLMSpellError> {
         self.get_provider(None).await
     }
 
@@ -523,14 +528,14 @@ mod tests {
     #[tokio::test]
     async fn test_create_agent_from_spec_no_provider() {
         use crate::ModelSpecifier;
-        
+
         let manager = ProviderManager::new();
         let spec = ModelSpecifier::parse("gpt-4").unwrap();
-        
+
         // Should fail when no provider specified and no default
         let result = manager.create_agent_from_spec(spec, None, None).await;
         assert!(result.is_err());
-        
+
         if let Err(LLMSpellError::Configuration { message, .. }) = result {
             assert!(message.contains("No provider specified"));
         }
@@ -539,14 +544,14 @@ mod tests {
     #[tokio::test]
     async fn test_create_agent_from_spec_unknown_provider() {
         use crate::ModelSpecifier;
-        
+
         let manager = ProviderManager::new();
         let spec = ModelSpecifier::parse("unknown/model").unwrap();
-        
+
         // Should fail when provider not registered
         let result = manager.create_agent_from_spec(spec, None, None).await;
         assert!(result.is_err());
-        
+
         if let Err(LLMSpellError::Configuration { message, .. }) = result {
             assert!(message.contains("Unknown provider"));
         }
@@ -555,9 +560,9 @@ mod tests {
     #[tokio::test]
     async fn test_model_specifier_base_url_precedence() {
         use crate::ModelSpecifier;
-        
+
         let manager = ProviderManager::new();
-        
+
         // Register a mock provider that tracks configuration
         manager
             .register_provider("test", |config| {
@@ -571,18 +576,14 @@ mod tests {
             })
             .await;
 
-        let spec = ModelSpecifier::parse_with_base_url(
-            "test/model", 
-            Some("https://spec.com")
-        ).unwrap();
-        
+        let spec =
+            ModelSpecifier::parse_with_base_url("test/model", Some("https://spec.com")).unwrap();
+
         // Override parameter should take precedence over spec base_url
-        let result = manager.create_agent_from_spec(
-            spec, 
-            Some("https://override.com"), 
-            None
-        ).await;
-        
+        let result = manager
+            .create_agent_from_spec(spec, Some("https://override.com"), None)
+            .await;
+
         // Should fail at validation (expected for our mock)
         assert!(result.is_err());
     }
@@ -590,16 +591,16 @@ mod tests {
     #[tokio::test]
     async fn test_model_specifier_provider_extraction() {
         use crate::ModelSpecifier;
-        
+
         // Test different provider/model formats
         let spec1 = ModelSpecifier::parse("openai/gpt-4").unwrap();
         assert_eq!(spec1.provider, Some("openai".to_string()));
         assert_eq!(spec1.model, "gpt-4");
-        
+
         let spec2 = ModelSpecifier::parse("openrouter/deepseek/model").unwrap();
         assert_eq!(spec2.provider, Some("openrouter/deepseek".to_string()));
         assert_eq!(spec2.model, "model");
-        
+
         let spec3 = ModelSpecifier::parse("claude-3").unwrap();
         assert_eq!(spec3.provider, None);
         assert_eq!(spec3.model, "claude-3");

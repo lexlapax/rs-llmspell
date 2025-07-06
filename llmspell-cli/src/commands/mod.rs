@@ -49,10 +49,10 @@ pub async fn create_runtime(engine: ScriptEngine, config: RuntimeConfig) -> Resu
             .await
             .map_err(|e| anyhow::anyhow!("Failed to create Lua runtime: {}", e)),
         ScriptEngine::Javascript => {
-            anyhow::bail!("JavaScript engine not implemented yet (coming in Phase 5)")
+            anyhow::bail!("JavaScript engine not available yet (coming in Phase 5)")
         }
         ScriptEngine::Python => {
-            anyhow::bail!("Python engine not implemented yet (coming in Phase 9)")
+            anyhow::bail!("Python engine not available yet (coming in Phase 9)")
         }
     }
 }

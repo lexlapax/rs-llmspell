@@ -27,7 +27,7 @@ pub async fn list_providers(
             println!("{}", serde_json::to_string_pretty(&providers)?);
         }
         OutputFormat::Text | OutputFormat::Pretty => {
-            println!("Available LLM Providers:");
+            println!("Available Providers:");
             println!();
             for provider in &providers {
                 if let Some(name) = provider.get("name").and_then(|v| v.as_str()) {
