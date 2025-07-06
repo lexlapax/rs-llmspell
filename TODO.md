@@ -5,7 +5,7 @@
 **Status**: READY TO START  
 **Started**: Not yet started  
 **Phase**: 2 (Built-in Tools Library)  
-**Timeline**: Weeks 5-6 (10 working days)  
+**Timeline**: Weeks 5-6 (11 working days - extended for real API implementations)  
 **Priority**: CRITICAL (Core Functionality)
 **Arch-Document**: docs/technical/rs-llmspell-final-architecture.md
 **Design-Document**: docs/in-progress/phase-02-design-doc.md
@@ -32,24 +32,40 @@
 - [ ] Performance: <10ms tool initialization
 - [ ] Complete documentation for all tools
 
-**Progress Update (2025-06-27):**
+**Progress Update (2025-07-06):**
 - [x] Task 2.1.1: Implement ModelSpecifier 2025-06-27
 - [x] Task 2.1.2: Update ProviderManager 2025-06-27
 - [x] Task 2.1.3: Update Script APIs 2025-06-27
 - [x] Task 2.2.1: Enhance Tool Trait 2025-06-27
 - [x] Task 2.2.2: Implement Tool Registry 2025-06-27
 - [x] Task 2.2.3: Security Sandbox Implementation 2025-06-27
-- [x] Task 2.3.1: WebSearchTool 2025-07-06
-- [ ] Task 2.3.2: SemanticSearchTool <date>
-- [ ] Task 2.3.3: CodeSearchTool <date>
-- [ ] Task 2.4.1: JsonProcessorTool <date>
-- [ ] Task 2.4.2: CsvAnalyzerTool <date>
-- [ ] Task 2.4.3: HttpRequestTool <date>
-- [ ] Task 2.4.4: GraphQLQueryTool <date>
-- [ ] Task 2.5.1: FileOperationsTool <date>
-- [ ] Task 2.5.2: ArchiveHandlerTool <date>
-- [ ] Task 2.5.3: TemplateEngineTool <date>
-- [ ] Task 2.5.4: DataValidationTool <date>
+- [x] Task 2.3.1: WebSearchTool Mock Framework 2025-07-06 (mock implementation only)
+- [ ] Task 2.3.1: JsonProcessorTool <date>
+- [ ] Task 2.3.2: CsvAnalyzerTool <date>
+- [ ] Task 2.3.3: HttpRequestTool <date>
+- [ ] Task 2.3.4: GraphQLQueryTool <date>
+- [ ] Task 2.4.1: FileOperationsTool <date>
+- [ ] Task 2.4.2: ArchiveHandlerTool <date>
+- [ ] Task 2.4.3: TemplateEngineTool <date>
+- [ ] Task 2.4.4: DataValidationTool <date>
+- [ ] Task 2.5.1: WebSearchTool (Real Implementation) <date>
+  - [ ] Task 2.5.1.1: DuckDuckGo provider (no API key required)
+  - [ ] Task 2.5.1.2: Google Custom Search provider (with API key support)
+  - [ ] Task 2.5.1.3: Bing Search provider (with API key support)
+  - [ ] Task 2.5.1.4: Configuration and API key management
+  - [ ] Task 2.5.1.5: Integration tests with real APIs
+- [ ] Task 2.5.2: SemanticSearchTool <date>
+  - [ ] Task 2.5.2.1: Embedding model integration
+  - [ ] Task 2.5.2.2: Vector store abstraction
+  - [ ] Task 2.5.2.3: In-memory vector store implementation
+  - [ ] Task 2.5.2.4: Similarity search algorithms
+  - [ ] Task 2.5.2.5: Integration with external vector DBs (optional)
+- [ ] Task 2.5.3: CodeSearchTool <date>
+  - [ ] Task 2.5.3.1: Tree-sitter parser integration
+  - [ ] Task 2.5.3.2: Language-specific parsers (Rust, Python, JS)
+  - [ ] Task 2.5.3.3: Symbol extraction and indexing
+  - [ ] Task 2.5.3.4: Full-text search implementation
+  - [ ] Task 2.5.3.5: Git integration for repository search
 - [ ] Task 2.6.1: Script Integration Tests <date>
 - [ ] Task 2.6.2: Security Validation <date>
 - [ ] Task 2.6.3: Performance Optimization <date>
@@ -240,100 +256,9 @@
 
 ---
 
-## Phase 2.3: Search Tools Implementation (Days 4-5)
+## Phase 2.3: Data Processing Tools (Days 4-5)
 
-### Task 2.3.1: WebSearchTool
-**Priority**: HIGH  
-**Estimated Time**: 4 hours  
-**Assignee**: Tools Team
-**Dependencies**: Core infrastructure complete
-
-**Description**: Implement web search tool with multiple providers.
-
-**Acceptance Criteria:**
-- [x] Supports multiple search providers (Google, Bing, DuckDuckGo)
-- [x] Rate limiting implemented
-- [x] Result formatting consistent
-- [x] Streaming results supported
-- [x] API key management secure
-
-**Implementation Steps:**
-1. Create `llmspell-tools/src/search/web_search.rs`
-2. Implement provider abstraction
-3. Add rate limiting logic
-4. Create result formatters
-5. Implement streaming support
-6. Write tests with mocked APIs
-
-**Definition of Done:**
-- [x] All providers work correctly
-- [x] Rate limits respected
-- [x] Tests use mocked responses
-- [x] Documentation includes examples
-
-### Task 2.3.2: SemanticSearchTool
-**Priority**: HIGH  
-**Estimated Time**: 5 hours  
-**Assignee**: Tools Team
-**Dependencies**: Core infrastructure complete
-
-**Description**: Implement semantic search over vector stores.
-
-**Acceptance Criteria:**
-- [ ] Embedding model abstraction works
-- [ ] Multiple vector stores supported
-- [ ] Similarity search accurate
-- [ ] Metadata filtering supported
-- [ ] Performance optimized
-
-**Implementation Steps:**
-1. Create `llmspell-tools/src/search/semantic_search.rs`
-2. Define EmbeddingModel trait
-3. Define VectorStore trait
-4. Implement similarity search
-5. Add metadata filtering
-6. Optimize with caching
-
-**Definition of Done:**
-- [ ] Search results relevant
-- [ ] Multiple backends tested
-- [ ] Performance benchmarked
-- [ ] Examples provided
-
-### Task 2.3.3: CodeSearchTool
-**Priority**: MEDIUM  
-**Estimated Time**: 4 hours  
-**Assignee**: Tools Team
-**Dependencies**: Core infrastructure complete
-
-**Description**: Implement code search with language awareness.
-
-**Acceptance Criteria:**
-- [ ] Supports major languages (Rust, Python, JS, etc.)
-- [ ] Symbol search works
-- [ ] Full-text search accurate
-- [ ] Git integration optional
-- [ ] Results include context
-
-**Implementation Steps:**
-1. Create `llmspell-tools/src/search/code_search.rs`
-2. Integrate tree-sitter parsers
-3. Build search index
-4. Implement symbol extraction
-5. Add context extraction
-6. Test with real codebases
-
-**Definition of Done:**
-- [ ] Multiple languages supported
-- [ ] Search accuracy validated
-- [ ] Performance acceptable
-- [ ] Git integration tested
-
----
-
-## Phase 2.4: Data Processing Tools (Days 6-7)
-
-### Task 2.4.1: JsonProcessorTool
+### Task 2.3.1: JsonProcessorTool
 **Priority**: HIGH  
 **Estimated Time**: 4 hours  
 **Assignee**: Data Team
@@ -362,7 +287,7 @@
 - [ ] Validation accurate
 - [ ] Examples comprehensive
 
-### Task 2.4.2: CsvAnalyzerTool
+### Task 2.3.2: CsvAnalyzerTool
 **Priority**: MEDIUM  
 **Estimated Time**: 3 hours  
 **Assignee**: Data Team
@@ -391,7 +316,7 @@
 - [ ] Memory efficient
 - [ ] Documentation complete
 
-### Task 2.4.3: HttpRequestTool
+### Task 2.3.3: HttpRequestTool
 **Priority**: HIGH  
 **Estimated Time**: 4 hours  
 **Assignee**: API Team
@@ -420,7 +345,7 @@
 - [ ] Retries configurable
 - [ ] Rate limits respected
 
-### Task 2.4.4: GraphQLQueryTool
+### Task 2.3.4: GraphQLQueryTool
 **Priority**: MEDIUM  
 **Estimated Time**: 5 hours  
 **Assignee**: API Team
@@ -451,9 +376,9 @@
 
 ---
 
-## Phase 2.5: File System and Utility Tools (Day 8)
+## Phase 2.4: File System and Utility Tools (Day 6)
 
-### Task 2.5.1: FileOperationsTool
+### Task 2.4.1: FileOperationsTool
 **Priority**: HIGH  
 **Estimated Time**: 4 hours  
 **Assignee**: System Team
@@ -482,7 +407,7 @@
 - [ ] Sandbox effective
 - [ ] Documentation clear
 
-### Task 2.5.2: ArchiveHandlerTool
+### Task 2.4.2: ArchiveHandlerTool
 **Priority**: MEDIUM  
 **Estimated Time**: 3 hours  
 **Assignee**: System Team
@@ -511,7 +436,7 @@
 - [ ] Paths sanitized
 - [ ] Performance good
 
-### Task 2.5.3: TemplateEngineTool
+### Task 2.4.3: TemplateEngineTool
 **Priority**: LOW  
 **Estimated Time**: 3 hours  
 **Assignee**: Utility Team
@@ -540,7 +465,7 @@
 - [ ] Filters extensible
 - [ ] Examples clear
 
-### Task 2.5.4: DataValidationTool
+### Task 2.4.4: DataValidationTool
 **Priority**: LOW  
 **Estimated Time**: 2 hours  
 **Assignee**: Utility Team
@@ -571,7 +496,167 @@
 
 ---
 
-## Phase 2.6: Integration and Testing (Days 9-10)
+## Phase 2.5: External API and Search Tools (Days 7-9)
+
+### Task 2.5.1: WebSearchTool (Real Implementation)
+**Priority**: MEDIUM  
+**Estimated Time**: 8 hours  
+**Assignee**: Tools Team
+**Dependencies**: HttpRequestTool complete
+
+**Description**: Implement real web search providers with API integration.
+
+**Acceptance Criteria:**
+- [ ] At least one no-API-key provider works (DuckDuckGo)
+- [ ] API key management secure and configurable
+- [ ] Real search results returned and parsed
+- [ ] Rate limiting respects provider limits
+- [ ] Error handling for API failures
+
+**Implementation Steps:**
+1. Update `llmspell-tools/src/search/web_search.rs`
+2. Implement real HTTP calls to search APIs
+3. Add API key configuration support
+4. Implement response parsing for each provider
+5. Add retry logic for transient failures
+6. Create integration tests with real APIs
+
+**Subtasks:**
+- [ ] Task 2.5.1.1: DuckDuckGo provider (no API key required)
+  - Implement HTML scraping or instant answer API
+  - Handle rate limiting without API key
+  - Parse results from HTML/JSON response
+- [ ] Task 2.5.1.2: Google Custom Search provider (with API key support)
+  - Implement Google Custom Search JSON API
+  - Add API key configuration
+  - Handle quota limits and errors
+- [ ] Task 2.5.1.3: Bing Search provider (with API key support)
+  - Implement Bing Web Search API v7
+  - Add subscription key handling
+  - Parse Bing-specific response format
+- [ ] Task 2.5.1.4: Configuration and API key management
+  - Add provider configuration to RuntimeConfig
+  - Support environment variables for API keys
+  - Document configuration in examples
+- [ ] Task 2.5.1.5: Integration tests with real APIs
+  - Test with real API calls (rate limited)
+  - Verify response parsing accuracy
+  - Test error scenarios (quota exceeded, etc.)
+
+**Definition of Done:**
+- [ ] At least DuckDuckGo works without API key
+- [ ] API key providers work when configured
+- [ ] Real search results returned
+- [ ] Integration tests pass with real APIs
+- [ ] Documentation shows configuration examples
+
+### Task 2.5.2: SemanticSearchTool
+**Priority**: LOW  
+**Estimated Time**: 10 hours  
+**Assignee**: ML Team
+**Dependencies**: Core infrastructure complete
+
+**Description**: Implement semantic search over vector stores with embeddings.
+
+**Acceptance Criteria:**
+- [ ] Embedding generation works
+- [ ] Vector similarity search accurate
+- [ ] In-memory vector store functional
+- [ ] Metadata filtering supported
+- [ ] Performance acceptable for small datasets
+
+**Implementation Steps:**
+1. Create `llmspell-tools/src/search/semantic_search.rs`
+2. Design embedding model abstraction
+3. Implement in-memory vector store
+4. Add similarity search algorithms
+5. Create metadata filtering system
+6. Test with sample datasets
+
+**Subtasks:**
+- [ ] Task 2.5.2.1: Embedding model integration
+  - Define EmbeddingModel trait
+  - Implement with sentence-transformers or similar
+  - Support both local and API-based models
+- [ ] Task 2.5.2.2: Vector store abstraction
+  - Define VectorStore trait
+  - Support different backends (memory, disk, external)
+  - Handle vector dimensions dynamically
+- [ ] Task 2.5.2.3: In-memory vector store implementation
+  - Implement basic vector storage
+  - Add indexing for performance
+  - Support metadata storage
+- [ ] Task 2.5.2.4: Similarity search algorithms
+  - Implement cosine similarity
+  - Add k-nearest neighbors search
+  - Support threshold-based filtering
+- [ ] Task 2.5.2.5: Integration with external vector DBs (optional)
+  - Add Qdrant/Weaviate/Pinecone adapters
+  - Implement async operations
+  - Handle connection failures
+
+**Definition of Done:**
+- [ ] Can embed text and search by similarity
+- [ ] In-memory store handles 10k+ vectors
+- [ ] Metadata filtering works correctly
+- [ ] Examples demonstrate usage
+- [ ] Performance benchmarked
+
+### Task 2.5.3: CodeSearchTool
+**Priority**: LOW  
+**Estimated Time**: 12 hours  
+**Assignee**: Tools Team
+**Dependencies**: FileOperationsTool complete
+
+**Description**: Implement code search with syntax awareness and symbol extraction.
+
+**Acceptance Criteria:**
+- [ ] Parses code with tree-sitter
+- [ ] Extracts symbols (functions, classes, etc.)
+- [ ] Full-text search with context
+- [ ] Supports Rust, Python, JavaScript
+- [ ] Git integration optional
+
+**Implementation Steps:**
+1. Create `llmspell-tools/src/search/code_search.rs`
+2. Integrate tree-sitter parsers
+3. Build symbol extraction system
+4. Implement search index
+5. Add context extraction
+6. Test with real repositories
+
+**Subtasks:**
+- [ ] Task 2.5.3.1: Tree-sitter parser integration
+  - Add tree-sitter dependency
+  - Load language grammars dynamically
+  - Handle parsing errors gracefully
+- [ ] Task 2.5.3.2: Language-specific parsers (Rust, Python, JS)
+  - Implement Rust parser and symbol extraction
+  - Implement Python parser and symbol extraction
+  - Implement JavaScript/TypeScript parser
+- [ ] Task 2.5.3.3: Symbol extraction and indexing
+  - Extract function/class/variable definitions
+  - Build symbol index with locations
+  - Support incremental updates
+- [ ] Task 2.5.3.4: Full-text search implementation
+  - Implement text search with ranking
+  - Add context window extraction
+  - Support regex patterns
+- [ ] Task 2.5.3.5: Git integration for repository search
+  - Integrate with git2 library
+  - Support searching specific branches/commits
+  - Handle large repositories efficiently
+
+**Definition of Done:**
+- [ ] Can parse and index code files
+- [ ] Symbol search returns accurate results
+- [ ] Full-text search includes context
+- [ ] Supports at least 3 languages
+- [ ] Performance acceptable for medium repos
+
+---
+
+## Phase 2.6: Integration and Testing (Days 10-11)
 
 ### Task 2.6.1: Script Integration Tests
 **Priority**: CRITICAL  
@@ -725,10 +810,10 @@
 ### Critical Path
 1. **Days 1-2**: Provider enhancement (ModelSpecifier)
 2. **Days 3-4**: Core infrastructure (Registry, Sandbox)
-3. **Days 4-5**: Search tools (Web, Semantic, Code)
-4. **Days 6-7**: Data/API tools (JSON, HTTP, GraphQL)
-5. **Day 8**: File/Utility tools
-6. **Days 9-10**: Integration, Security, Documentation
+3. **Days 4-5**: Data Processing tools (JSON, CSV, HTTP, GraphQL)
+4. **Day 6**: File/Utility tools
+5. **Days 7-9**: External API tools (Web, Semantic, Code Search)
+6. **Days 10-11**: Integration, Security, Documentation
 
 ### Resource Allocation
 - **Provider Team**: ModelSpecifier and ProviderManager updates
