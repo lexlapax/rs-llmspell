@@ -6,6 +6,7 @@ pub mod data;
 pub mod fs;
 pub mod registry;
 pub mod search;
+pub mod util;
 
 // Re-export main types
 pub use registry::{CapabilityMatcher, RegistryStatistics, ToolInfo, ToolRegistry};
@@ -15,3 +16,4 @@ pub use api::{GraphQLQueryTool, HttpRequestTool};
 pub use data::{CsvAnalyzerTool, JsonProcessorTool};
 pub use fs::{ArchiveHandlerTool, FileOperationsTool};
 pub use search::WebSearchTool;
+pub use util::{DataValidationTool, TemplateEngineTool};

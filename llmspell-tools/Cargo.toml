@@ -53,6 +53,14 @@ zip = "2.2"
 tar = "0.4"
 flate2 = "1.0"
 
+# Template engines
+tera = "1.20"
+handlebars = "6.3"
+
+# Validation dependencies
+regex = "1.11"
+url = "2.5"
+
 [dev-dependencies]
 uuid = { version = "1.17", features = ["v4"] }
 tempfile = "3.20"
