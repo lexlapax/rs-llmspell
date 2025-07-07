@@ -597,36 +597,37 @@
 - [x] Uses shared utilities (DRY) ✅ (encoding module in llmspell-utils)
 - [x] Tests cover all algorithms and edge cases ✅ (9 tests passing)
 
-### Task 2.5.4: Base64EncoderTool
+### Task 2.5.4: Base64EncoderTool ✅
 **Priority**: LOW  
 **Estimated Time**: 2 hours  
 **Assignee**: Tools Team
 **Dependencies**: llmspell-utils encoding functions, add to llmspell-utils, functions that make sense
+**Completed**: 2025-07-07
 
 **Description**: Base64 encoding/decoding tool.
 
 **Acceptance Criteria:**
-- [ ] Standard Base64 encoding/decoding
-- [ ] URL-safe Base64 support
-- [ ] Binary data handling
-- [ ] Uses llmspell-utils encoding functions, existing or newly added
+- [x] Standard Base64 encoding/decoding ✅
+- [x] URL-safe Base64 support ✅
+- [x] Binary data handling ✅
+- [x] Uses llmspell-utils encoding functions, existing or newly added ✅
 
 **Implementation Steps:**
-1. Create `llmspell-tools/src/util/base64_encoder.rs`
-2. Check if base64 functions exist in llmspell-utils, add if needed
-3. Implement Tool trait with encode/decode operations
-4. Support both standard and URL-safe variants
-5. Handle binary data and file encoding
-6. Add proper error handling for invalid input
-7. Write tests for various data types
-8. Document differences between encoding types
+1. Create `llmspell-tools/src/util/base64_encoder.rs` ✅
+2. Check if base64 functions exist in llmspell-utils, add if needed ✅ (already existed)
+3. Implement Tool trait with encode/decode operations ✅
+4. Support both standard and URL-safe variants ✅
+5. Handle binary data and file encoding ✅
+6. Add proper error handling for invalid input ✅
+7. Write tests for various data types ✅
+8. Document differences between encoding types ✅
 
 **Definition of Done:**
-- [ ] Standard and URL-safe encoding work
-- [ ] Binary data handled correctly
-- [ ] Decoding validates input properly
-- [ ] Uses shared utilities (DRY)
-- [ ] Tests cover edge cases
+- [x] Standard and URL-safe encoding work ✅
+- [x] Binary data handled correctly ✅
+- [x] Decoding validates input properly ✅
+- [x] Uses shared utilities (DRY) ✅ (uses llmspell-utils encoding functions)
+- [x] Tests cover edge cases ✅ (6 unit tests, 8 integration tests)
 
 ### Task 2.5.5: DiffCalculatorTool
 **Priority**: LOW  
