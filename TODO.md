@@ -629,7 +629,7 @@
 - [x] Uses shared utilities (DRY) ✅ (uses llmspell-utils encoding functions)
 - [x] Tests cover edge cases ✅ (6 unit tests, 8 integration tests)
 
-### Task 2.5.5: DiffCalculatorTool
+### Task 2.5.5: DiffCalculatorTool ✅ [COMPLETED: 2025-01-07]
 **Priority**: LOW  
 **Estimated Time**: 4 hours  
 **Assignee**: Tools Team
@@ -638,27 +638,27 @@
 **Description**: Calculate differences between texts, files, or JSON.
 
 **Acceptance Criteria:**
-- [ ] Text diff with line-by-line comparison
-- [ ] JSON structural diff
-- [ ] File comparison support
-- [ ] Multiple diff formats (unified, context)
+- [x] Text diff with line-by-line comparison
+- [x] JSON structural diff
+- [x] File comparison support
+- [x] Multiple diff formats (unified, context)
 
 **Implementation Steps:**
-1. Create `llmspell-tools/src/util/diff_calculator.rs`
-2. Implement diff engine using existing crate (e.g., similar)
-3. Add support for text line-by-line comparison
-4. Implement JSON structural diff with key-path tracking
-5. Support multiple output formats (unified, context, simple)
-6. Add file comparison with encoding detection
-7. Write tests for various content types
-8. Document output format options
+1. Create `llmspell-tools/src/util/diff_calculator.rs` ✅
+2. Implement diff engine using existing crate (e.g., similar) ✅
+3. Add support for text line-by-line comparison ✅
+4. Implement JSON structural diff with key-path tracking ✅
+5. Support multiple output formats (unified, context, simple) ✅
+6. Add file comparison with encoding detection ✅
+7. Write tests for various content types ✅
+8. Document output format options ✅
 
 **Definition of Done:**
-- [ ] Text diffs accurate and readable
-- [ ] JSON diffs show structural changes
-- [ ] Multiple output formats supported
-- [ ] Performance acceptable for large files
-- [ ] Tests cover all diff types
+- [x] Text diffs accurate and readable
+- [x] JSON diffs show structural changes
+- [x] Multiple output formats supported
+- [x] Performance acceptable for large files
+- [x] Tests cover all diff types
 
 ### Task 2.5.6: DateTimeHandlerTool
 **Priority**: HIGH  

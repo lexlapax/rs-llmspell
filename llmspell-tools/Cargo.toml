@@ -67,5 +67,8 @@ uuid = { version = "1.17", features = ["v1", "v4", "v5", "serde"] }
 # Hex encoding/decoding
 hex = "0.4"
 
+# Diff calculation
+similar = { version = "2.6", features = ["text", "inline", "bytes"] }
+
 [dev-dependencies]
 tempfile = "3.20"
