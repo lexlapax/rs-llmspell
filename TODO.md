@@ -23,7 +23,7 @@
 **Success Criteria Summary:**
 - [x] ModelSpecifier parses `provider/model` syntax correctly ✅
 - [x] Base URL overrides work at agent creation time ✅
-- [ ] 25 self-contained tools fully implemented and tested (8/25 complete)
+- [ ] 25 self-contained tools fully implemented and tested (9/25 complete)
 - [x] Tool registry with discovery and validation ✅
 - [x] Security sandboxing prevents unauthorized access ✅
 - [ ] All tools support streaming where applicable
@@ -48,12 +48,13 @@
 - [x] Task 2.4.2: ArchiveHandlerTool 2025-07-07
 - [x] Task 2.4.3: TemplateEngineTool 2025-07-07
 - [x] Task 2.4.4: DataValidationTool 2025-07-07
+- [x] Task 2.5.1: TextManipulatorTool 2025-07-07
 - [ ] **MOVED TO PHASE 2.5**: WebSearchTool (external dependency)
 - [ ] **MOVED TO PHASE 3.5**: CodeSearchTool (complex infrastructure)
 - [ ] **MOVED TO PHASE 3.5**: SemanticSearchTool (vector storage needed)
 
 **NEW SELF-CONTAINED TOOLS TO ADD:**
-- [ ] Task 2.5: Utilities & Helpers Tools (Days 7-8)
+- [ ] Task 2.5: Utilities & Helpers Tools (Days 7-8) - IN PROGRESS (1/7 complete)
 - [ ] Task 2.6: File System Extended Tools (Day 9)
 - [ ] Task 2.7: System Integration Tools (Day 10)
 - [ ] Task 2.8: Simple Media Tools (Day 11)
@@ -507,38 +508,39 @@
 
 ## Phase 2.5: Utilities & Helpers Tools (Days 7-8)
 
-### Task 2.5.1: TextManipulatorTool
+### Task 2.5.1: TextManipulatorTool ✅
 **Priority**: HIGH  
 **Estimated Time**: 3 hours  
 **Assignee**: Tools Team
-**Dependencies**: llmspell-utils text functions
+**Dependencies**: llmspell-utils text functions, add to llmspell-utils, functions that make sense
+**Completed**: 2025-07-07
 
 **Description**: Text manipulation and transformation tool using llmspell-utils.
 
 **Acceptance Criteria:**
-- [ ] String operations: uppercase, lowercase, reverse, trim
-- [ ] Pattern replacement with regex support
-- [ ] Text formatting operations
-- [ ] Uses llmspell-utils text processing functions
+- [x] String operations: uppercase, lowercase, reverse, trim ✅
+- [x] Pattern replacement with regex support ✅ (via replace operation)
+- [x] Text formatting operations ✅ (17 operations total)
+- [x] Uses llmspell-utils text processing functions ✅
 
 **Implementation Steps:**
-1. Create `llmspell-tools/src/util/text_manipulator.rs`
-2. Implement Tool trait with schema
-3. Use llmspell-utils text functions for operations
-4. Add comprehensive tests
-5. Document usage examples
+1. [x] Create `llmspell-tools/src/util/text_manipulator.rs` ✅
+2. [x] Implement Tool trait with schema ✅
+3. [x] Use llmspell-utils text functions for operations ✅
+4. [x] Add comprehensive tests ✅
+5. [x] Document usage examples ✅
 
 **Definition of Done:**
-- [ ] All text operations work correctly
-- [ ] Regex patterns handled safely
-- [ ] Uses shared utilities (DRY)
-- [ ] Tests cover edge cases
+- [x] All text operations work correctly ✅ (17 operations implemented)
+- [x] Regex patterns handled safely ✅ (through replace operation)
+- [x] Uses shared utilities (DRY) ✅ (8 new functions added to llmspell-utils)
+- [x] Tests cover edge cases ✅ (comprehensive test suite)
 
 ### Task 2.5.2: UuidGeneratorTool
 **Priority**: MEDIUM  
 **Estimated Time**: 2 hours  
 **Assignee**: Tools Team
-**Dependencies**: llmspell-utils encoding functions
+**Dependencies**: llmspell-utils encoding functions, add to llmspell-utils, functions that make sense
 
 **Description**: UUID generation tool supporting multiple versions.
 
@@ -552,7 +554,7 @@
 **Priority**: MEDIUM  
 **Estimated Time**: 3 hours  
 **Assignee**: Tools Team
-**Dependencies**: llmspell-utils encoding functions
+**Dependencies**: llmspell-utils encoding functions, add to llmspell-utils, functions that make sense
 
 **Description**: Hash calculation and verification tool.
 
@@ -566,7 +568,7 @@
 **Priority**: LOW  
 **Estimated Time**: 2 hours  
 **Assignee**: Tools Team
-**Dependencies**: llmspell-utils encoding functions
+**Dependencies**: llmspell-utils encoding functions, add to llmspell-utils, functions that make sense
 
 **Description**: Base64 encoding/decoding tool.
 
@@ -574,7 +576,7 @@
 - [ ] Standard Base64 encoding/decoding
 - [ ] URL-safe Base64 support
 - [ ] Binary data handling
-- [ ] Uses llmspell-utils encoding functions
+- [ ] Uses llmspell-utils encoding functions, existing or newly added
 
 ### Task 2.5.5: DiffCalculatorTool
 **Priority**: LOW  
@@ -627,7 +629,7 @@
 **Priority**: HIGH  
 **Estimated Time**: 4 hours  
 **Assignee**: System Team
-**Dependencies**: llmspell-utils file monitoring
+**Dependencies**: llmspell-utils file monitoring functions, add to llmspell-utils, functions that make sense
 
 **Description**: File system monitoring and change detection.
 
@@ -635,13 +637,13 @@
 - [ ] Watch files and directories for changes
 - [ ] Event types: create, modify, delete, rename
 - [ ] Pattern-based filtering
-- [ ] Uses llmspell-utils file monitoring
+- [ ] Uses llmspell-utils functions, existing or newly added
 
 ### Task 2.6.2: FileConverterTool
 **Priority**: MEDIUM  
 **Estimated Time**: 3 hours  
 **Assignee**: System Team
-**Dependencies**: llmspell-utils encoding detection
+**Dependencies**: llmspell-utils encoding functions, add to llmspell-utils, functions that make sense
 
 **Description**: File format and encoding conversion.
 
@@ -649,7 +651,7 @@
 - [ ] Encoding detection and conversion
 - [ ] Text format conversions
 - [ ] Line ending conversions
-- [ ] Uses llmspell-utils encoding functions
+- [ ] Uses llmspell-utils functions, existing or newly added
 
 ### Task 2.6.3: FileSearchTool
 **Priority**: MEDIUM  
@@ -673,7 +675,7 @@
 **Priority**: HIGH  
 **Estimated Time**: 2 hours  
 **Assignee**: System Team
-**Dependencies**: llmspell-utils system functions
+**Dependencies**: llmspell-utils system functions, add to llmspell-utils, functions that make sense
 
 **Description**: Environment variable and system information reader.
 
@@ -701,7 +703,7 @@
 **Priority**: LOW  
 **Estimated Time**: 2 hours  
 **Assignee**: System Team
-**Dependencies**: llmspell-utils system functions
+**Dependencies**: llmspell-utils system functions, add to llmspell-utils, functions that make sense
 
 **Description**: Check service availability and ports.
 
@@ -709,13 +711,13 @@
 - [ ] TCP port checking
 - [ ] Service health verification
 - [ ] Network connectivity tests
-- [ ] Uses llmspell-utils port checking
+- [ ] Uses llmspell-utils functions, existing or newly added
 
 ### Task 2.7.4: SystemMonitorTool
 **Priority**: LOW  
 **Estimated Time**: 3 hours  
 **Assignee**: System Team
-**Dependencies**: llmspell-utils system monitoring
+**Dependencies**: llmspell-utils system functions, add to llmspell-utils, functions that make sense
 
 **Description**: System resource monitoring.
 
@@ -723,7 +725,7 @@
 - [ ] CPU usage monitoring
 - [ ] Memory usage statistics
 - [ ] Disk space information
-- [ ] Uses llmspell-utils resource monitoring
+- [ ] Uses llmspell-utils functions, existing or newly added
 
 ---
 

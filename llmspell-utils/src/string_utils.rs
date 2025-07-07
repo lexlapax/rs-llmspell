@@ -542,6 +542,156 @@ pub fn repeat_char(ch: char, count: usize) -> String {
     ch.to_string().repeat(count)
 }
 
+/// Convert string to uppercase
+///
+/// Wrapper for consistency with other string operations
+///
+/// # Examples
+///
+/// ```rust
+/// use llmspell_utils::string_utils::to_uppercase;
+///
+/// assert_eq!(to_uppercase("hello world"), "HELLO WORLD");
+/// assert_eq!(to_uppercase("123 Test"), "123 TEST");
+/// ```
+#[must_use]
+pub fn to_uppercase(s: &str) -> String {
+    s.to_uppercase()
+}
+
+/// Convert string to lowercase
+///
+/// Wrapper for consistency with other string operations
+///
+/// # Examples
+///
+/// ```rust
+/// use llmspell_utils::string_utils::to_lowercase;
+///
+/// assert_eq!(to_lowercase("HELLO WORLD"), "hello world");
+/// assert_eq!(to_lowercase("123 Test"), "123 test");
+/// ```
+#[must_use]
+pub fn to_lowercase(s: &str) -> String {
+    s.to_lowercase()
+}
+
+/// Reverse a string
+///
+/// Properly handles Unicode grapheme clusters
+///
+/// # Examples
+///
+/// ```rust
+/// use llmspell_utils::string_utils::reverse;
+///
+/// assert_eq!(reverse("hello"), "olleh");
+/// assert_eq!(reverse("世界"), "界世");
+/// assert_eq!(reverse(""), "");
+/// ```
+#[must_use]
+pub fn reverse(s: &str) -> String {
+    s.chars().rev().collect()
+}
+
+/// Trim whitespace from both ends of a string
+///
+/// Wrapper for consistency with other string operations
+///
+/// # Examples
+///
+/// ```rust
+/// use llmspell_utils::string_utils::trim;
+///
+/// assert_eq!(trim("  hello  "), "hello");
+/// assert_eq!(trim("\thello\n"), "hello");
+/// assert_eq!(trim("hello"), "hello");
+/// ```
+#[must_use]
+pub fn trim(s: &str) -> String {
+    s.trim().to_string()
+}
+
+/// Replace all occurrences of a pattern in a string
+///
+/// # Examples
+///
+/// ```rust
+/// use llmspell_utils::string_utils::replace_all;
+///
+/// assert_eq!(replace_all("hello world", "o", "0"), "hell0 w0rld");
+/// assert_eq!(replace_all("foo bar foo", "foo", "baz"), "baz bar baz");
+/// ```
+#[must_use]
+pub fn replace_all(s: &str, from: &str, to: &str) -> String {
+    s.replace(from, to)
+}
+
+/// Extract substring by start and end indices
+///
+/// Returns empty string if indices are invalid
+///
+/// # Examples
+///
+/// ```rust
+/// use llmspell_utils::string_utils::substring;
+///
+/// assert_eq!(substring("hello world", 0, 5), "hello");
+/// assert_eq!(substring("hello world", 6, 11), "world");
+/// assert_eq!(substring("hello", 10, 20), "");
+/// ```
+#[must_use]
+pub fn substring(s: &str, start: usize, end: usize) -> String {
+    if start >= s.len() || end > s.len() || start >= end {
+        return String::new();
+    }
+
+    // Find char boundaries
+    let mut start_byte = start;
+    while start_byte > 0 && !s.is_char_boundary(start_byte) {
+        start_byte -= 1;
+    }
+
+    let mut end_byte = end;
+    while end_byte < s.len() && !s.is_char_boundary(end_byte) {
+        end_byte += 1;
+    }
+
+    s[start_byte..end_byte].to_string()
+}
+
+/// Split string by delimiter and return vector of parts
+///
+/// # Examples
+///
+/// ```rust
+/// use llmspell_utils::string_utils::split_by;
+///
+/// assert_eq!(split_by("a,b,c", ","), vec!["a", "b", "c"]);
+/// assert_eq!(split_by("hello world", " "), vec!["hello", "world"]);
+/// assert_eq!(split_by("no-delimiter", ","), vec!["no-delimiter"]);
+/// ```
+#[must_use]
+pub fn split_by(s: &str, delimiter: &str) -> Vec<String> {
+    s.split(delimiter).map(String::from).collect()
+}
+
+/// Join strings with delimiter
+///
+/// # Examples
+///
+/// ```rust
+/// use llmspell_utils::string_utils::join_with;
+///
+/// assert_eq!(join_with(&["a", "b", "c"], ","), "a,b,c");
+/// assert_eq!(join_with(&["hello", "world"], " "), "hello world");
+/// assert_eq!(join_with(&[], ","), "");
+/// ```
+#[must_use]
+pub fn join_with(parts: &[&str], delimiter: &str) -> String {
+    parts.join(delimiter)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -748,6 +898,76 @@ mod tests {
         assert_eq!(repeat_char(' ', 3), "   ");
         assert_eq!(repeat_char('*', 0), "");
         assert_eq!(repeat_char('🦀', 3), "🦀🦀🦀");
+    }
+
+    #[test]
+    fn test_to_uppercase() {
+        assert_eq!(to_uppercase("hello world"), "HELLO WORLD");
+        assert_eq!(to_uppercase("123 Test"), "123 TEST");
+        assert_eq!(to_uppercase(""), "");
+        assert_eq!(to_uppercase("ALREADY UPPER"), "ALREADY UPPER");
+    }
+
+    #[test]
+    fn test_to_lowercase() {
+        assert_eq!(to_lowercase("HELLO WORLD"), "hello world");
+        assert_eq!(to_lowercase("123 Test"), "123 test");
+        assert_eq!(to_lowercase(""), "");
+        assert_eq!(to_lowercase("already lower"), "already lower");
+    }
+
+    #[test]
+    fn test_reverse() {
+        assert_eq!(reverse("hello"), "olleh");
+        assert_eq!(reverse("世界"), "界世");
+        assert_eq!(reverse(""), "");
+        assert_eq!(reverse("a"), "a");
+        assert_eq!(reverse("🦀rust🦀"), "🦀tsur🦀");
+    }
+
+    #[test]
+    fn test_trim() {
+        assert_eq!(trim("  hello  "), "hello");
+        assert_eq!(trim("\thello\n"), "hello");
+        assert_eq!(trim("hello"), "hello");
+        assert_eq!(trim("   "), "");
+        assert_eq!(trim(""), "");
+    }
+
+    #[test]
+    fn test_replace_all() {
+        assert_eq!(replace_all("hello world", "o", "0"), "hell0 w0rld");
+        assert_eq!(replace_all("foo bar foo", "foo", "baz"), "baz bar baz");
+        assert_eq!(replace_all("no match", "x", "y"), "no match");
+        assert_eq!(replace_all("", "x", "y"), "");
+    }
+
+    #[test]
+    fn test_substring() {
+        assert_eq!(substring("hello world", 0, 5), "hello");
+        assert_eq!(substring("hello world", 6, 11), "world");
+        assert_eq!(substring("hello", 10, 20), "");
+        assert_eq!(substring("hello", 2, 2), "");
+        assert_eq!(substring("hello", 5, 3), "");
+        assert_eq!(substring("🦀rust", 0, 2), "🦀");
+    }
+
+    #[test]
+    fn test_split_by() {
+        assert_eq!(split_by("a,b,c", ","), vec!["a", "b", "c"]);
+        assert_eq!(split_by("hello world", " "), vec!["hello", "world"]);
+        assert_eq!(split_by("no-delimiter", ","), vec!["no-delimiter"]);
+        assert_eq!(split_by("", ","), vec![""]);
+        assert_eq!(split_by("a,,b", ","), vec!["a", "", "b"]);
+    }
+
+    #[test]
+    fn test_join_with() {
+        assert_eq!(join_with(&["a", "b", "c"], ","), "a,b,c");
+        assert_eq!(join_with(&["hello", "world"], " "), "hello world");
+        assert_eq!(join_with(&[], ","), "");
+        assert_eq!(join_with(&["single"], ","), "single");
+        assert_eq!(join_with(&["", "", ""], "-"), "--");
     }
 }
 

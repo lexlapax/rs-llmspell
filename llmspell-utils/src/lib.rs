@@ -77,8 +77,9 @@ pub use serialization::{
     to_toml, to_yaml, Format,
 };
 pub use string_utils::{
-    dedent, indent, is_valid_identifier, normalize_whitespace, sanitize, to_camel_case,
-    to_pascal_case, to_snake_case, truncate, word_wrap,
+    dedent, indent, is_valid_identifier, join_with, normalize_whitespace, replace_all, reverse,
+    sanitize, split_by, substring, to_camel_case, to_lowercase, to_pascal_case, to_snake_case,
+    to_uppercase, trim, truncate, word_wrap,
 };
 pub use system_info::{
     find_executable, format_bytes, get_cpu_count, get_home_directory, get_hostname,
