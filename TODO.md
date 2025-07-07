@@ -1,11 +1,11 @@
-# Phase 2: Built-in Tools Library - TODO List
+# Phase 2: Self-Contained Tools Library - TODO List
 
-**Version**: 1.0  
-**Date**: June 2025  
-**Status**: READY TO START  
-**Started**: Not yet started  
-**Phase**: 2 (Built-in Tools Library)  
-**Timeline**: Weeks 5-6 (11 working days - extended for real API implementations)  
+**Version**: 2.0  
+**Date**: July 2025  
+**Status**: IN PROGRESS  
+**Started**: June 27, 2025  
+**Phase**: 2 (Self-Contained Tools Library)  
+**Timeline**: Weeks 5-8 (14 working days - extended for 25 tools)  
 **Priority**: CRITICAL (Core Functionality)
 **Arch-Document**: docs/technical/rs-llmspell-final-architecture.md
 **Design-Document**: docs/in-progress/phase-02-design-doc.md
@@ -18,19 +18,20 @@
 
 ## Overview
 
-**Goal**: Implement comprehensive built-in tools library with ModelSpecifier provider enhancements rolled from Phase 1.
+**Goal**: Implement comprehensive self-contained tools library with 25 self-contained tools across all categories, focusing on tools without external dependencies. ModelSpecifier provider enhancements rolled from Phase 1.
 
 **Success Criteria Summary:**
-- [ ] ModelSpecifier parses `provider/model` syntax correctly
-- [ ] Base URL overrides work at agent creation time
-- [ ] 12+ built-in tools fully implemented and tested
-- [ ] Tool registry with discovery and validation
-- [ ] Security sandboxing prevents unauthorized access
+- [x] ModelSpecifier parses `provider/model` syntax correctly ✅
+- [x] Base URL overrides work at agent creation time ✅
+- [ ] 25 self-contained tools fully implemented and tested (8/25 complete)
+- [x] Tool registry with discovery and validation ✅
+- [x] Security sandboxing prevents unauthorized access ✅
 - [ ] All tools support streaming where applicable
+- [ ] All tools use llmspell-utils for common operations (DRY)
 - [ ] Agent-tool integration works seamlessly in scripts
 - [ ] >90% test coverage across all tools
 - [ ] Performance: <10ms tool initialization
-- [ ] Complete documentation for all tools
+- [ ] Complete documentation for all 25 tools
 
 **Progress Update (2025-07-07):**
 - [x] Task 2.1.1: Implement ModelSpecifier 2025-06-27
@@ -47,29 +48,17 @@
 - [x] Task 2.4.2: ArchiveHandlerTool 2025-07-07
 - [x] Task 2.4.3: TemplateEngineTool 2025-07-07
 - [x] Task 2.4.4: DataValidationTool 2025-07-07
-- [ ] Task 2.5.1: WebSearchTool (Real Implementation) <date>
-  - [ ] Task 2.5.1.1: DuckDuckGo provider (no API key required)
-  - [ ] Task 2.5.1.2: Google Custom Search provider (with API key support)
-  - [ ] Task 2.5.1.3: Bing Search provider (with API key support)
-  - [ ] Task 2.5.1.4: Configuration and API key management
-  - [ ] Task 2.5.1.5: Integration tests with real APIs
-- [ ] Task 2.5.2: CodeSearchTool <date>
-  - [ ] Task 2.5.2.1: Tree-sitter parser integration
-  - [ ] Task 2.5.2.2: Language-specific parsers (Rust, Python, JS)
-  - [ ] Task 2.5.2.3: Symbol extraction and indexing
-  - [ ] Task 2.5.2.4: Full-text search implementation
-  - [ ] Task 2.5.2.5: Git integration for repository search
-- [ ] Task 2.5.3: SemanticSearchTool <date>
-  - [ ] Task 2.5.3.1: Embedding model integration
-  - [ ] Task 2.5.3.2: Vector store abstraction
-  - [ ] Task 2.5.3.3: In-memory vector store implementation
-  - [ ] Task 2.5.3.4: Similarity search algorithms
-  - [ ] Task 2.5.3.5: Integration with external vector DBs (optional)
-- [ ] Task 2.6.1: Script Integration Tests <date>
-- [ ] Task 2.6.2: Security Validation <date>
-- [ ] Task 2.6.3: Performance Optimization <date>
-- [ ] Task 2.6.4: Documentation and Examples <date>
-- [ ] Task 2.6.5: Phase 3 Handoff Package <date>
+- [ ] **MOVED TO PHASE 2.5**: WebSearchTool (external dependency)
+- [ ] **MOVED TO PHASE 3.5**: CodeSearchTool (complex infrastructure)
+- [ ] **MOVED TO PHASE 3.5**: SemanticSearchTool (vector storage needed)
+
+**NEW SELF-CONTAINED TOOLS TO ADD:**
+- [ ] Task 2.5: Utilities & Helpers Tools (Days 7-8)
+- [ ] Task 2.6: File System Extended Tools (Day 9)
+- [ ] Task 2.7: System Integration Tools (Day 10)
+- [ ] Task 2.8: Simple Media Tools (Day 11)
+- [ ] Task 2.9: Common Utilities Enhancement (Day 12)
+- [ ] Task 2.10: Integration, Testing & Documentation (Days 13-14)
 
 ---
 
@@ -516,169 +505,316 @@
 
 ---
 
-## Phase 2.5: External API and Search Tools (Days 7-9)
+## Phase 2.5: Utilities & Helpers Tools (Days 7-8)
 
-### Task 2.5.1: WebSearchTool (Real Implementation)
+### Task 2.5.1: TextManipulatorTool
+**Priority**: HIGH  
+**Estimated Time**: 3 hours  
+**Assignee**: Tools Team
+**Dependencies**: llmspell-utils text functions
+
+**Description**: Text manipulation and transformation tool using llmspell-utils.
+
+**Acceptance Criteria:**
+- [ ] String operations: uppercase, lowercase, reverse, trim
+- [ ] Pattern replacement with regex support
+- [ ] Text formatting operations
+- [ ] Uses llmspell-utils text processing functions
+
+**Implementation Steps:**
+1. Create `llmspell-tools/src/util/text_manipulator.rs`
+2. Implement Tool trait with schema
+3. Use llmspell-utils text functions for operations
+4. Add comprehensive tests
+5. Document usage examples
+
+**Definition of Done:**
+- [ ] All text operations work correctly
+- [ ] Regex patterns handled safely
+- [ ] Uses shared utilities (DRY)
+- [ ] Tests cover edge cases
+
+### Task 2.5.2: UuidGeneratorTool
 **Priority**: MEDIUM  
-**Estimated Time**: 8 hours  
+**Estimated Time**: 2 hours  
 **Assignee**: Tools Team
-**Dependencies**: HttpRequestTool complete
+**Dependencies**: llmspell-utils encoding functions
 
-**Description**: Implement real web search providers with API integration.
+**Description**: UUID generation tool supporting multiple versions.
 
 **Acceptance Criteria:**
-- [ ] At least one no-API-key provider works (DuckDuckGo)
-- [ ] API key management secure and configurable
-- [ ] Real search results returned and parsed
-- [ ] Rate limiting respects provider limits
-- [ ] Error handling for API failures
+- [ ] UUID v4 (random) generation
+- [ ] UUID v1 (timestamp) generation
+- [ ] Custom format support
+- [ ] Uses llmspell-utils UUID functions
 
-**Implementation Steps:**
-1. Update `llmspell-tools/src/search/web_search.rs`
-2. Implement real HTTP calls to search APIs
-3. Add API key configuration support
-4. Implement response parsing for each provider
-5. Add retry logic for transient failures
-6. Create integration tests with real APIs
-
-**Subtasks:**
-- [ ] Task 2.5.1.1: DuckDuckGo provider (no API key required)
-  - Implement HTML scraping or instant answer API
-  - Handle rate limiting without API key
-  - Parse results from HTML/JSON response
-- [ ] Task 2.5.1.2: Google Custom Search provider (with API key support)
-  - Implement Google Custom Search JSON API
-  - Add API key configuration
-  - Handle quota limits and errors
-- [ ] Task 2.5.1.3: Bing Search provider (with API key support)
-  - Implement Bing Web Search API v7
-  - Add subscription key handling
-  - Parse Bing-specific response format
-- [ ] Task 2.5.1.4: Configuration and API key management
-  - Add provider configuration to RuntimeConfig
-  - Support environment variables for API keys
-  - Document configuration in examples
-- [ ] Task 2.5.1.5: Integration tests with real APIs
-  - Test with real API calls (rate limited)
-  - Verify response parsing accuracy
-  - Test error scenarios (quota exceeded, etc.)
-
-**Definition of Done:**
-- [ ] At least DuckDuckGo works without API key
-- [ ] API key providers work when configured
-- [ ] Real search results returned
-- [ ] Integration tests pass with real APIs
-- [ ] Documentation shows configuration examples
-
-### Task 2.5.2: CodeSearchTool
-**Priority**: LOW  
-**Estimated Time**: 12 hours  
+### Task 2.5.3: HashCalculatorTool
+**Priority**: MEDIUM  
+**Estimated Time**: 3 hours  
 **Assignee**: Tools Team
-**Dependencies**: FileOperationsTool complete
+**Dependencies**: llmspell-utils encoding functions
 
-**Description**: Implement code search with syntax awareness and symbol extraction.
+**Description**: Hash calculation and verification tool.
 
 **Acceptance Criteria:**
-- [ ] Parses code with tree-sitter
-- [ ] Extracts symbols (functions, classes, etc.)
-- [ ] Full-text search with context
-- [ ] Supports Rust, Python, JavaScript
-- [ ] Git integration optional
+- [ ] MD5, SHA-1, SHA-256, SHA-512 support
+- [ ] File and string hashing
+- [ ] Hash verification functionality
+- [ ] Uses llmspell-utils hash functions
 
-**Implementation Steps:**
-1. Create `llmspell-tools/src/search/code_search.rs`
-2. Integrate tree-sitter parsers
-3. Build symbol extraction system
-4. Implement search index
-5. Add context extraction
-6. Test with real repositories
-
-**Subtasks:**
-- [ ] Task 2.5.2.1: Tree-sitter parser integration
-  - Add tree-sitter dependency
-  - Load language grammars dynamically
-  - Handle parsing errors gracefully
-- [ ] Task 2.5.2.2: Language-specific parsers (Rust, Python, JS)
-  - Implement Rust parser and symbol extraction
-  - Implement Python parser and symbol extraction
-  - Implement JavaScript/TypeScript parser
-- [ ] Task 2.5.2.3: Symbol extraction and indexing
-  - Extract function/class/variable definitions
-  - Build symbol index with locations
-  - Support incremental updates
-- [ ] Task 2.5.2.4: Full-text search implementation
-  - Implement text search with ranking
-  - Add context window extraction
-  - Support regex patterns
-- [ ] Task 2.5.2.5: Git integration for repository search
-  - Integrate with git2 library
-  - Support searching specific branches/commits
-  - Handle large repositories efficiently
-
-**Definition of Done:**
-- [ ] Can parse and index code files
-- [ ] Symbol search returns accurate results
-- [ ] Full-text search includes context
-- [ ] Supports at least 3 languages
-- [ ] Performance acceptable for medium repos
-
-### Task 2.5.3: SemanticSearchTool
+### Task 2.5.4: Base64EncoderTool
 **Priority**: LOW  
-**Estimated Time**: 10 hours  
-**Assignee**: ML Team
-**Dependencies**: Core infrastructure complete
+**Estimated Time**: 2 hours  
+**Assignee**: Tools Team
+**Dependencies**: llmspell-utils encoding functions
 
-**Description**: Implement semantic search over vector stores with embeddings.
+**Description**: Base64 encoding/decoding tool.
 
 **Acceptance Criteria:**
-- [ ] Embedding generation works
-- [ ] Vector similarity search accurate
-- [ ] In-memory vector store functional
-- [ ] Metadata filtering supported
-- [ ] Performance acceptable for small datasets
+- [ ] Standard Base64 encoding/decoding
+- [ ] URL-safe Base64 support
+- [ ] Binary data handling
+- [ ] Uses llmspell-utils encoding functions
 
-**Implementation Steps:**
-1. Create `llmspell-tools/src/search/semantic_search.rs`
-2. Design embedding model abstraction
-3. Implement in-memory vector store
-4. Add similarity search algorithms
-5. Create metadata filtering system
-6. Test with sample datasets
+### Task 2.5.5: DiffCalculatorTool
+**Priority**: LOW  
+**Estimated Time**: 4 hours  
+**Assignee**: Tools Team
+**Dependencies**: Core infrastructure
 
-**Subtasks:**
-- [ ] Task 2.5.3.1: Embedding model integration
-  - Define EmbeddingModel trait
-  - Implement with sentence-transformers or similar
-  - Support both local and API-based models
-- [ ] Task 2.5.3.2: Vector store abstraction
-  - Define VectorStore trait
-  - Support different backends (memory, disk, external)
-  - Handle vector dimensions dynamically
-- [ ] Task 2.5.3.3: In-memory vector store implementation
-  - Implement basic vector storage
-  - Add indexing for performance
-  - Support metadata storage
-- [ ] Task 2.5.3.4: Similarity search algorithms
-  - Implement cosine similarity
-  - Add k-nearest neighbors search
-  - Support threshold-based filtering
-- [ ] Task 2.5.3.5: Integration with external vector DBs (optional)
-  - Add Qdrant/Weaviate/Pinecone adapters
-  - Implement async operations
-  - Handle connection failures
+**Description**: Calculate differences between texts, files, or JSON.
 
-**Definition of Done:**
-- [ ] Can embed text and search by similarity
-- [ ] In-memory store handles 10k+ vectors
-- [ ] Metadata filtering works correctly
-- [ ] Examples demonstrate usage
-- [ ] Performance benchmarked
+**Acceptance Criteria:**
+- [ ] Text diff with line-by-line comparison
+- [ ] JSON structural diff
+- [ ] File comparison support
+- [ ] Multiple diff formats (unified, context)
+
+### Task 2.5.6: DateTimeHandlerTool
+**Priority**: HIGH  
+**Estimated Time**: 3 hours  
+**Assignee**: Tools Team
+**Dependencies**: llmspell-utils time functions
+
+**Description**: Comprehensive date/time manipulation tool.
+
+**Acceptance Criteria:**
+- [ ] Date parsing from multiple formats
+- [ ] Timezone conversion
+- [ ] Date arithmetic operations
+- [ ] Uses llmspell-utils time functions
+- [ ] Current Date and time 
+
+### Task 2.5.7: CalculatorTool
+**Priority**: MEDIUM  
+**Estimated Time**: 3 hours  
+**Assignee**: Tools Team
+**Dependencies**: Expression parser
+
+**Description**: Mathematical expression calculator.
+
+**Acceptance Criteria:**
+- [ ] Basic arithmetic operations
+- [ ] Scientific functions (sin, cos, log, etc.)
+- [ ] Variable support
+- [ ] Expression validation
 
 ---
 
-## Phase 2.6: Integration and Testing (Days 10-11)
+## Phase 2.6: File System Extended Tools (Day 9)
 
-### Task 2.6.1: Script Integration Tests
+### Task 2.6.1: FileWatcherTool
+**Priority**: HIGH  
+**Estimated Time**: 4 hours  
+**Assignee**: System Team
+**Dependencies**: llmspell-utils file monitoring
+
+**Description**: File system monitoring and change detection.
+
+**Acceptance Criteria:**
+- [ ] Watch files and directories for changes
+- [ ] Event types: create, modify, delete, rename
+- [ ] Pattern-based filtering
+- [ ] Uses llmspell-utils file monitoring
+
+### Task 2.6.2: FileConverterTool
+**Priority**: MEDIUM  
+**Estimated Time**: 3 hours  
+**Assignee**: System Team
+**Dependencies**: llmspell-utils encoding detection
+
+**Description**: File format and encoding conversion.
+
+**Acceptance Criteria:**
+- [ ] Encoding detection and conversion
+- [ ] Text format conversions
+- [ ] Line ending conversions
+- [ ] Uses llmspell-utils encoding functions
+
+### Task 2.6.3: FileSearchTool
+**Priority**: MEDIUM  
+**Estimated Time**: 3 hours  
+**Assignee**: System Team
+**Dependencies**: File operations
+
+**Description**: Content search within files.
+
+**Acceptance Criteria:**
+- [ ] Pattern matching in file contents
+- [ ] Recursive directory search
+- [ ] File type filtering
+- [ ] Context extraction around matches
+
+---
+
+## Phase 2.7: System Integration Tools (Day 10)
+
+### Task 2.7.1: EnvironmentReaderTool
+**Priority**: HIGH  
+**Estimated Time**: 2 hours  
+**Assignee**: System Team
+**Dependencies**: llmspell-utils system functions
+
+**Description**: Environment variable and system information reader.
+
+**Acceptance Criteria:**
+- [ ] Read environment variables
+- [ ] System information (OS, CPU, memory)
+- [ ] PATH resolution
+- [ ] Uses llmspell-utils system queries
+
+### Task 2.7.2: ProcessExecutorTool
+**Priority**: HIGH  
+**Estimated Time**: 4 hours  
+**Assignee**: System Team
+**Dependencies**: Process sandbox
+
+**Description**: Sandboxed command execution.
+
+**Acceptance Criteria:**
+- [ ] Execute system commands safely
+- [ ] Process sandboxing and limits
+- [ ] Output capture and streaming
+- [ ] Timeout and resource limits
+
+### Task 2.7.3: ServiceCheckerTool
+**Priority**: LOW  
+**Estimated Time**: 2 hours  
+**Assignee**: System Team
+**Dependencies**: llmspell-utils system functions
+
+**Description**: Check service availability and ports.
+
+**Acceptance Criteria:**
+- [ ] TCP port checking
+- [ ] Service health verification
+- [ ] Network connectivity tests
+- [ ] Uses llmspell-utils port checking
+
+### Task 2.7.4: SystemMonitorTool
+**Priority**: LOW  
+**Estimated Time**: 3 hours  
+**Assignee**: System Team
+**Dependencies**: llmspell-utils system monitoring
+
+**Description**: System resource monitoring.
+
+**Acceptance Criteria:**
+- [ ] CPU usage monitoring
+- [ ] Memory usage statistics
+- [ ] Disk space information
+- [ ] Uses llmspell-utils resource monitoring
+
+---
+
+## Phase 2.8: Simple Media Tools (Day 11)
+
+### Task 2.8.1: AudioProcessorTool
+**Priority**: LOW  
+**Estimated Time**: 4 hours  
+**Assignee**: Media Team
+**Dependencies**: Basic audio libraries
+
+**Description**: Basic audio file operations.
+
+**Acceptance Criteria:**
+- [ ] Audio format detection
+- [ ] Metadata extraction
+- [ ] Basic format conversion (WAV, MP3)
+- [ ] Duration and bitrate info
+
+### Task 2.8.2: VideoProcessorTool
+**Priority**: LOW  
+**Estimated Time**: 4 hours  
+**Assignee**: Media Team
+**Dependencies**: Basic video libraries
+
+**Description**: Basic video file operations.
+
+**Acceptance Criteria:**
+- [ ] Video format detection
+- [ ] Frame extraction
+- [ ] Thumbnail generation
+- [ ] Duration and resolution info
+
+### Task 2.8.3: ImageProcessorTool Enhancement
+**Priority**: MEDIUM  
+**Estimated Time**: 2 hours  
+**Assignee**: Media Team
+**Dependencies**: Existing implementation
+
+**Description**: Ensure comprehensive image processing.
+
+**Acceptance Criteria:**
+- [ ] Format conversion (PNG, JPEG, WebP)
+- [ ] Basic operations (resize, crop, rotate)
+- [ ] Metadata extraction
+- [ ] Thumbnail generation
+
+---
+
+## Phase 2.9: Common Utilities Enhancement (Day 12)
+
+### Task 2.9.1: Enhance llmspell-utils
+**Priority**: CRITICAL  
+**Estimated Time**: 4 hours  
+**Assignee**: Core Team
+**Dependencies**: All previous tools
+
+**Description**: Extract and consolidate common utilities.
+
+**Implementation Steps:**
+1. Text processing utilities (manipulation, regex, formatting)
+2. Hash and encoding utilities (SHA, MD5, Base64, UUID)
+3. File monitoring utilities (watchers, change detection)
+4. System query utilities (env vars, process info, resources)
+5. Time utilities (parsing, formatting, timezone conversion)
+
+**Definition of Done:**
+- [ ] All common functions extracted to llmspell-utils
+- [ ] Clear module organization
+- [ ] Comprehensive documentation
+- [ ] Unit tests for all utilities
+
+### Task 2.9.2: Refactor Existing Tools
+**Priority**: HIGH  
+**Estimated Time**: 4 hours  
+**Assignee**: Full Team
+**Dependencies**: Task 2.9.1
+
+**Description**: Update all tools to use shared utilities.
+
+**Acceptance Criteria:**
+- [ ] All 26+ tools use llmspell-utils
+- [ ] No duplicate code across tools
+- [ ] Tool-specific logic clearly separated
+- [ ] Tests still pass after refactoring
+
+---
+
+## Phase 2.10: Integration, Testing & Documentation (Days 13-14)
+
+### Task 2.10.1: Script Integration Tests
 **Priority**: CRITICAL  
 **Estimated Time**: 5 hours  
 **Assignee**: Full Team
@@ -687,11 +823,12 @@
 **Description**: Comprehensive integration testing with scripts.
 
 **Acceptance Criteria:**
-- [ ] All tools callable from Lua
+- [ ] All 25 tools callable from Lua
 - [ ] Provider enhancement works in scripts
-- [ ] Tool chaining tested
+- [ ] Tool chaining tested across categories
+- [ ] DRY principle verified (llmspell-utils usage)
 - [ ] Error propagation correct
-- [ ] Performance acceptable
+- [ ] Performance acceptable for all tools
 
 **Implementation Steps:**
 1. Create integration test suite
@@ -702,12 +839,12 @@
 6. Document patterns
 
 **Definition of Done:**
-- [ ] All tools tested from scripts
+- [ ] All 25 tools tested from scripts
 - [ ] Common patterns documented
 - [ ] Performance benchmarked
 - [ ] No integration issues
 
-### Task 2.6.2: Security Validation
+### Task 2.10.2: Security Validation
 **Priority**: CRITICAL  
 **Estimated Time**: 4 hours  
 **Assignee**: Security Team
@@ -736,7 +873,7 @@
 - [ ] Audit documented
 - [ ] Fixes implemented
 
-### Task 2.6.3: Performance Optimization
+### Task 2.10.3: Performance Optimization
 **Priority**: HIGH  
 **Estimated Time**: 4 hours  
 **Assignee**: Performance Team
@@ -765,7 +902,7 @@
 - [ ] Optimizations documented
 - [ ] No regressions
 
-### Task 2.6.4: Documentation and Examples
+### Task 2.10.4: Documentation and Examples
 **Priority**: HIGH  
 **Estimated Time**: 5 hours  
 **Assignee**: Full Team
@@ -794,7 +931,7 @@
 - [ ] Guides helpful
 - [ ] API reference accurate
 
-### Task 2.6.5: Phase 3 Handoff Package
+### Task 2.10.5: Phase 3 Handoff Package
 **Priority**: CRITICAL  
 **Estimated Time**: 3 hours  
 **Assignee**: Team Lead
@@ -828,33 +965,37 @@
 ## Summary Dashboard
 
 ### Critical Path
-1. **Days 1-2**: Provider enhancement (ModelSpecifier)
-2. **Days 3-4**: Core infrastructure (Registry, Sandbox)
-3. **Days 4-5**: Data Processing tools (JSON, CSV, HTTP, GraphQL)
-4. **Day 6**: File/Utility tools
-5. **Days 7-9**: External API tools (Web, Semantic, Code Search)
-6. **Days 10-11**: Integration, Security, Documentation
+1. **Days 1-2**: Provider enhancement (ModelSpecifier) ✅
+2. **Day 3**: Core infrastructure (Registry, Sandbox) ✅
+3. **Days 4-6**: Data Processing & File tools (8 tools) ✅
+4. **Days 7-8**: Utilities & Helpers tools (7 tools)
+5. **Day 9**: File System Extended tools (3 tools)
+6. **Day 10**: System Integration tools (4 tools)
+7. **Day 11**: Simple Media tools (3 tools)
+8. **Day 12**: Common Utilities Enhancement (DRY)
+9. **Days 13-14**: Integration, Testing, Documentation
 
 ### Resource Allocation
-- **Provider Team**: ModelSpecifier and ProviderManager updates
-- **Core Team**: Tool trait, Registry implementation
-- **Security Team**: Sandbox implementation and validation
-- **Tools Team**: All 12+ tool implementations
-- **All**: Integration testing and documentation
+- **Provider Team**: ModelSpecifier and ProviderManager updates ✅
+- **Core Team**: Tool trait, Registry, llmspell-utils enhancement
+- **Security Team**: Sandbox implementation and system tool validation
+- **Tools Team**: All 25 tool implementations (8/25 complete)
+- **All**: Integration testing, refactoring, and documentation
 
 ### Risk Areas
-1. **External API Dependencies**: Use mocks extensively
-2. **Security Vulnerabilities**: Continuous security testing
-3. **Performance Targets**: Early profiling and optimization
-4. **Tool Complexity**: Start with simpler tools
-5. **Schedule**: 10 days ambitious for 12+ tools
+1. **System Tool Security**: Enhanced sandboxing for system integration
+2. **Media Processing Performance**: Resource limits and optimization
+3. **Tool Count Increase**: 25 tools vs original 12 tools
+4. **DRY Implementation**: Time for utility extraction and refactoring
+5. **Schedule**: 14 days for 25 comprehensive tools
 
 ### Success Metrics
-- [ ] ModelSpecifier parsing works for all formats
-- [ ] 12+ tools fully implemented and tested
+- [x] ModelSpecifier parsing works for all formats ✅
+- [ ] 25 self-contained tools fully implemented and tested (8/25)
+- [ ] All tools use llmspell-utils (DRY principle)
 - [ ] >90% test coverage achieved
 - [ ] <10ms tool initialization verified
-- [ ] Security sandbox prevents all escapes
-- [ ] Documentation comprehensive
+- [x] Security sandbox prevents all escapes ✅
+- [ ] Documentation comprehensive for all 25 tools
 - [ ] Performance benchmarks in CI
-- [ ] Phase 3 handoff ready
+- [ ] Phase 3 handoff with comprehensive tool library

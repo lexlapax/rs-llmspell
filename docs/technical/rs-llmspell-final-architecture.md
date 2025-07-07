@@ -2065,6 +2065,7 @@ llmspell-bridge:
 llmspell-agents: AgentRuntime, Agent implementations
 llmspell-tools: ToolRegistry, Tool implementations  
 llmspell-workflows: WorkflowEngine, Workflow implementations
+llmspell-rag: RAG patterns, retrieval strategies (Phase 3.5)
     ↓
 llmspell-cli: CLI entry point, command handling
 llmspell-repl: REPL implementation, interactive mode
@@ -3344,6 +3345,70 @@ pub trait Agent: BaseAgent {
     // Learning and Adaptation  
     async fn learn_from_feedback(&mut self, feedback: Feedback) -> Result<()>;
     fn learning_config(&self) -> &LearningConfig;
+}
+```
+
+#### Agent Memory System
+
+Agents in rs-llmspell leverage a multi-tiered memory architecture that combines different storage backends for optimal performance and capability:
+
+```rust
+pub struct AgentMemorySystem {
+    // Short-term memory: Fast key-value access for recent interactions
+    short_term: Box<dyn StorageBackend>,
+    
+    // Long-term memory: Vector storage for semantic retrieval (Phase 3.5)
+    long_term: Option<Box<dyn VectorStorageBackend>>,
+    
+    // Episodic memory: Time-indexed combination of both
+    episodic: EpisodicMemory,
+    
+    // Working memory: In-process state for current task
+    working: WorkingMemory,
+}
+
+impl AgentMemorySystem {
+    /// Store recent interaction in short-term memory
+    pub async fn store_interaction(&mut self, interaction: Interaction) -> Result<()> {
+        let key = format!("interaction:{}", interaction.id);
+        let value = serde_json::to_vec(&interaction)?;
+        self.short_term.set(&key, value).await
+    }
+    
+    /// Semantic search across long-term memory (Phase 3.5)
+    pub async fn semantic_recall(&self, query: &str, k: usize) -> Result<Vec<MemoryItem>> {
+        if let Some(vector_store) = &self.long_term {
+            let embedding = self.generate_embedding(query).await?;
+            let results = vector_store.search_similar(&embedding, k, None).await?;
+            self.hydrate_memory_items(results).await
+        } else {
+            // Fallback to keyword search in short-term memory
+            self.keyword_search(query).await
+        }
+    }
+    
+    /// Combine memories for context-aware responses
+    pub async fn build_context(&self, query: &str) -> Result<Context> {
+        let recent = self.get_recent_interactions(5).await?;
+        let relevant = self.semantic_recall(query, 10).await?;
+        let working_state = self.working.get_state();
+        
+        Ok(Context {
+            recent_interactions: recent,
+            relevant_memories: relevant,
+            working_memory: working_state,
+            timestamp: SystemTime::now(),
+        })
+    }
+}
+
+// Memory types for different retention and access patterns
+pub enum MemoryType {
+    ShortTerm,      // Recent interactions, fast access
+    LongTerm,       // Semantic knowledge, vector search
+    Episodic,       // Time-based sequences of events
+    Working,        // Current task state
+    Procedural,     // Learned patterns and behaviors
 }
 ```
 
@@ -7720,7 +7785,7 @@ secureLogger.info("User login", {
 
 ## Complete Built-in Tools Catalog
 
-Rs-LLMSpell provides a comprehensive library of **40+ production-ready tools** organized into 8 categories. These tools are immediately available in all scripting environments and provide essential functionality for AI workflows.
+Rs-LLMSpell provides a comprehensive library of **42+ production-ready tools** organized into 8 categories. These tools are immediately available in all scripting environments and provide essential functionality for AI workflows.
 
 ### Tool Organization by Category
 
@@ -8049,13 +8114,15 @@ Tools.get("slack_integration"):execute({
 })
 ```
 
-#### 8. **Specialized Domain Tools** (3 tools)
+#### 8. **Specialized Domain Tools** (5 tools)
 Domain-specific tools for specialized use cases.
 
 | Tool Name | Description | Domain | Capabilities |
 |-----------|-------------|---------|--------------|
 | `pdf_processor` | PDF operations | Documents | Extract text, metadata, split/merge |
 | `image_processor` | Image manipulation | Media | Resize, format conversion, metadata |
+| `audio_processor` | Audio file operations | Media | Format conversion, metadata extraction, waveform analysis |
+| `video_processor` | Video file operations | Media | Format conversion, frame extraction, metadata analysis |
 | `academic_searcher` | Academic paper search | Research | arXiv, PubMed, Google Scholar |
 
 ```javascript
@@ -8172,6 +8239,10 @@ for await (const progressImage of imageStream) {
     updatePreview(progressImage);
 }
 ```
+
+> **Note on Search Tools**: Two advanced search tools (`SemanticSearchTool` and `CodeSearchTool`) have been deferred to Phase 3.5 to be implemented alongside the vector storage infrastructure and llmspell-rag crate. These tools will provide:
+> - **SemanticSearchTool**: Vector-based similarity search using embeddings for natural language queries across documents
+> - **CodeSearchTool**: AST-based code search with tree-sitter integration for symbol extraction and intelligent code navigation
 
 ### Tool Discovery and Management
 
@@ -8703,6 +8774,14 @@ SpecializedTool (category-specific behavior)
 - **Output Filtering**: Sensitive data redaction
 - **Audit Logging**: All tool executions logged with context
 - **Rate Limiting**: Per-tool and per-user rate limits
+
+**Media Processing Security:**
+- **File Validation**: Verify file headers match claimed format
+- **Size Limits**: Enforce maximum file sizes for audio/video processing
+- **Process Isolation**: Run FFmpeg/media libraries in separate process
+- **Resource Quotas**: CPU/memory limits for transcoding operations
+- **Timeout Enforcement**: Maximum processing time per media file
+- **Output Sanitization**: Strip potentially malicious metadata
 
 ### Tool Testing Architecture
 
@@ -9797,6 +9876,9 @@ local-models = ["candle"]
 mcp-support = ["tokio-tungstenite", "serde_json"]
 a2a-protocol = ["tokio-tungstenite", "bincode"]
 distributed = ["tokio-tungstenite"]
+vector-storage = ["hnsw", "tantivy"] # Phase 3.5
+media-tools = ["symphonia", "image"] # Audio/video processing
+rag-patterns = ["vector-storage"] # Phase 3.5
 
 # Development Tools
 benchmarks = ["criterion"]
@@ -10543,6 +10625,65 @@ pub trait StorageTransaction: Send + Sync {
     async fn commit(self: Box<Self>) -> Result<()>;
     async fn rollback(self: Box<Self>) -> Result<()>;
 }
+```
+
+#### Vector Storage Backend
+
+In addition to key-value storage, rs-llmspell supports vector storage for semantic search, RAG patterns, and agent memory. This will be implemented in Phase 3.5.
+
+```rust
+use serde_json::Value;
+
+#[async_trait]
+pub trait VectorStorageBackend: Send + Sync {
+    // Core Vector Operations
+    async fn insert_vector(
+        &self, 
+        id: &str, 
+        vector: &[f32], 
+        metadata: Option<Value>
+    ) -> Result<()>;
+    
+    async fn search_similar(
+        &self, 
+        query: &[f32], 
+        k: usize, 
+        threshold: Option<f32>
+    ) -> Result<Vec<(String, f32, Option<Value>)>>;
+    
+    async fn update_vector(&self, id: &str, vector: &[f32]) -> Result<()>;
+    
+    async fn delete_vector(&self, id: &str) -> Result<()>;
+    
+    async fn get_vector(&self, id: &str) -> Result<Option<(Vec<f32>, Option<Value>)>>;
+    
+    // Batch Operations
+    async fn insert_vectors_batch(
+        &self,
+        items: &[(String, Vec<f32>, Option<Value>)]
+    ) -> Result<()>;
+    
+    // Index Management
+    async fn create_index(&self, config: IndexConfig) -> Result<()>;
+    async fn optimize_index(&self) -> Result<()>;
+    
+    // Metadata and Stats
+    fn vector_dimensions(&self) -> usize;
+    fn index_size(&self) -> Result<usize>;
+    fn similarity_metric(&self) -> SimilarityMetric;
+}
+
+#[derive(Debug, Clone)]
+pub enum SimilarityMetric {
+    Cosine,
+    Euclidean,
+    DotProduct,
+}
+
+// Planned implementations for Phase 3.5:
+// - InMemoryVectorBackend: Simple in-memory implementation
+// - DiskVectorBackend: Persistent vector storage using HNSW
+// - ExternalVectorBackend: Adapters for Qdrant, Weaviate, Pinecone
 ```
 
 #### Sled Backend Implementation
@@ -23538,7 +23679,56 @@ const report = await workflow.run({ topic: "Rust async patterns" });
 - Protocol integration
 - Performance benchmarks
 
-**Phase 4: Production Readiness (Weeks 13-16)**
+**Phase 3.5: Vector Storage and Search Infrastructure (Weeks 13-14)**
+```rust
+// Vector storage implementation
+impl VectorStorageBackend for InMemoryVectorBackend {
+    async fn search_similar(
+        &self, 
+        query: &[f32], 
+        k: usize, 
+        threshold: Option<f32>
+    ) -> Result<Vec<(String, f32, Option<Value>)>> {
+        // HNSW-based similarity search
+        self.index.search(query, k, threshold)
+    }
+}
+
+// llmspell-rag crate patterns
+pub struct RAGPipeline {
+    chunker: Box<dyn DocumentChunker>,
+    embedder: Box<dyn Embedder>,
+    vector_store: Box<dyn VectorStorageBackend>,
+    retriever: Box<dyn Retriever>,
+}
+
+// Tool implementations using infrastructure
+pub struct SemanticSearchTool {
+    vector_store: Arc<dyn VectorStorageBackend>,
+    embedder: Arc<dyn Embedder>,
+}
+
+pub struct CodeSearchTool {
+    parser: TreeSitterParser,
+    index: TantivyIndex,
+    symbol_extractor: SymbolExtractor,
+}
+```
+
+**Implementation Priorities:**
+1. VectorStorageBackend implementations
+2. llmspell-rag crate with RAG patterns
+3. SemanticSearchTool using vector storage
+4. CodeSearchTool with tree-sitter integration
+5. Agent memory integration
+
+**Deliverables:**
+- Vector storage backends (memory, disk, external)
+- RAG pipeline abstractions
+- Working semantic and code search tools
+- Agent memory system prototype
+
+**Phase 4: Production Readiness (Weeks 15-18)**
 ```toml
 # Production configuration by Phase 4
 [server]

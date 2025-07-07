@@ -1,10 +1,10 @@
 # Phase 2: Built-in Tools Library - Design Document
 
-**Version**: 1.0  
-**Date**: June 2025  
+**Version**: 2.0  
+**Date**: July 2025  
 **Status**: Implementation Ready  
-**Phase**: 2 (Built-in Tools Library)  
-**Timeline**: Weeks 5-6 (10 working days)  
+**Phase**: 2 (Self-Contained Tools Library)  
+**Timeline**: Weeks 5-8 (14 working days)  
 **Priority**: CRITICAL (Core Functionality)
 
 > **📋 Detailed Implementation Guide**: This document provides complete specifications for implementing Phase 2 built-in tools library and provider enhancements for rs-llmspell.
@@ -14,21 +14,24 @@
 ## Phase Overview
 
 ### Goal
-Implement comprehensive built-in tools library with 12+ essential tools, complete agent-tool integration, and enhance provider system with convenient model specification syntax.
+Implement comprehensive self-contained tools library with 26+ essential tools across all categories, complete agent-tool integration, and enhance provider system with convenient model specification syntax. Focus on tools without external dependencies.
 
 ### Core Principles
 - **Tool First Design**: Every tool must have clear schema and validation
 - **Provider Enhancement**: Support intuitive `provider/model` syntax
+- **Self-Contained First**: No external API dependencies in Phase 2
 - **Streaming Ready**: All tools support streaming where applicable
 - **Security by Default**: Tools run in sandboxed environments
 - **Bridge Pattern**: Tools work consistently across all script engines
+- **DRY Principle**: Common utilities in llmspell-utils, tool logic in llmspell-tools
 
 ### Success Criteria
-- [ ] 12+ functional built-in tools with complete implementations
+- [ ] 26+ functional self-contained tools with complete implementations
 - [ ] ModelSpecifier supports `provider/model` syntax parsing
 - [ ] Base URL overrides work at agent creation time
 - [ ] Tool registry with discovery and validation
-- [ ] Security sandboxing for filesystem and network access
+- [ ] Security sandboxing for filesystem and system access
+- [ ] All tools use llmspell-utils for common operations (DRY)
 - [ ] All tools have comprehensive tests and documentation
 - [ ] Agent-tool integration works seamlessly in scripts
 - [ ] Performance benchmarks show <10ms tool initialization
@@ -144,30 +147,46 @@ pub trait Tool: Send + Sync {
 }
 ```
 
-### 1.3 Built-in Tools Implementation
+### 1.3 Self-Contained Tools Implementation
 
 **Tool Categories and Implementations:**
 
-#### 1.3.1 Search Tools (3 tools)
+#### 1.3.1 Utilities & Helpers Tools (7 tools)
 
 ```rust
-// llmspell-tools/src/search/web_search.rs
-pub struct WebSearchTool {
-    client: reqwest::Client,
-    api_key: Option<String>,
-    provider: SearchProvider,
+// llmspell-tools/src/util/text_manipulator.rs
+pub struct TextManipulatorTool {
+    // Uses llmspell-utils text processing functions
 }
 
-// llmspell-tools/src/search/semantic_search.rs
-pub struct SemanticSearchTool {
-    embedding_model: Box<dyn EmbeddingModel>,
-    vector_store: Box<dyn VectorStore>,
+// llmspell-tools/src/util/uuid_generator.rs
+pub struct UuidGeneratorTool {
+    // Uses llmspell-utils UUID generation
 }
 
-// llmspell-tools/src/search/code_search.rs
-pub struct CodeSearchTool {
-    index_path: PathBuf,
-    language_parsers: HashMap<String, Box<dyn LanguageParser>>,
+// llmspell-tools/src/util/hash_calculator.rs
+pub struct HashCalculatorTool {
+    // Uses llmspell-utils hash functions
+}
+
+// llmspell-tools/src/util/base64_encoder.rs
+pub struct Base64EncoderTool {
+    // Uses llmspell-utils encoding functions
+}
+
+// llmspell-tools/src/util/diff_calculator.rs
+pub struct DiffCalculatorTool {
+    diff_engine: DiffEngine,
+}
+
+// llmspell-tools/src/util/date_time_handler.rs
+pub struct DateTimeHandlerTool {
+    // Uses llmspell-utils time functions
+}
+
+// llmspell-tools/src/util/calculator.rs
+pub struct CalculatorTool {
+    expression_parser: ExpressionParser,
 }
 ```
 
@@ -186,14 +205,10 @@ pub struct CsvAnalyzerTool {
     encoding_detector: EncodingDetector,
 }
 
-// llmspell-tools/src/data/xml_transformer.rs
-pub struct XmlTransformerTool {
-    xslt_processor: XsltProcessor,
-    xpath_engine: XPathEngine,
-}
+// Removed XmlTransformerTool - moved to Phase 2.5 (external dependency)
 ```
 
-#### 1.3.3 External API Tools (2 tools)
+#### 1.3.3 API Tools (2 tools) - Self-contained HTTP/GraphQL
 
 ```rust
 // llmspell-tools/src/api/http_request.rs
@@ -210,7 +225,7 @@ pub struct GraphQLQueryTool {
 }
 ```
 
-#### 1.3.4 File System Tools (2 tools)
+#### 1.3.4 File System Tools (5 tools)
 
 ```rust
 // llmspell-tools/src/fs/file_operations.rs
@@ -224,9 +239,67 @@ pub struct ArchiveHandlerTool {
     supported_formats: Vec<ArchiveFormat>,
     extraction_limits: ExtractionLimits,
 }
+
+// llmspell-tools/src/fs/file_watcher.rs
+pub struct FileWatcherTool {
+    // Uses llmspell-utils file monitoring
+}
+
+// llmspell-tools/src/fs/file_converter.rs
+pub struct FileConverterTool {
+    // Uses llmspell-utils encoding detection
+}
+
+// llmspell-tools/src/fs/file_search.rs
+pub struct FileSearchTool {
+    // Self-contained content search
+}
 ```
 
-#### 1.3.5 Utility Tools (2 tools)
+#### 1.3.5 System Integration Tools (4 tools)
+
+```rust
+// llmspell-tools/src/system/environment_reader.rs
+pub struct EnvironmentReaderTool {
+    // Uses llmspell-utils system queries
+}
+
+// llmspell-tools/src/system/process_executor.rs
+pub struct ProcessExecutorTool {
+    sandbox: ProcessSandbox,
+}
+
+// llmspell-tools/src/system/service_checker.rs
+pub struct ServiceCheckerTool {
+    // Uses llmspell-utils system monitoring
+}
+
+// llmspell-tools/src/system/system_monitor.rs
+pub struct SystemMonitorTool {
+    // Uses llmspell-utils resource monitoring
+}
+```
+
+#### 1.3.6 Simple Media Tools (3 tools)
+
+```rust
+// llmspell-tools/src/media/audio_processor.rs
+pub struct AudioProcessorTool {
+    // Basic audio operations only
+}
+
+// llmspell-tools/src/media/video_processor.rs
+pub struct VideoProcessorTool {
+    // Basic video operations only
+}
+
+// llmspell-tools/src/media/image_processor.rs
+pub struct ImageProcessorTool {
+    // Basic image operations
+}
+```
+
+#### 1.3.7 Utility Tools (2 tools)
 
 ```rust
 // llmspell-tools/src/util/template_engine.rs
@@ -242,7 +315,50 @@ pub struct DataValidationTool {
 }
 ```
 
-### 1.4 Tool Registry System
+### 1.4 Common Utilities Enhancement (llmspell-utils)
+
+**DRY Principle Implementation:**
+
+```rust
+// llmspell-utils/src/text.rs
+pub mod text {
+    pub fn manipulate(text: &str, operation: TextOp) -> String { /* ... */ }
+    pub fn regex_match(text: &str, pattern: &str) -> Vec<Match> { /* ... */ }
+    pub fn format_template(template: &str, vars: &HashMap<String, String>) -> String { /* ... */ }
+}
+
+// llmspell-utils/src/encoding.rs
+pub mod encoding {
+    pub fn hash_data(data: &[u8], algorithm: HashAlgorithm) -> Vec<u8> { /* ... */ }
+    pub fn base64_encode(data: &[u8]) -> String { /* ... */ }
+    pub fn base64_decode(encoded: &str) -> Result<Vec<u8>> { /* ... */ }
+    pub fn generate_uuid(version: UuidVersion) -> String { /* ... */ }
+}
+
+// llmspell-utils/src/file_monitor.rs
+pub mod file_monitor {
+    pub fn watch_path(path: &Path, callback: WatchCallback) -> WatchHandle { /* ... */ }
+    pub fn detect_encoding(data: &[u8]) -> Encoding { /* ... */ }
+    pub fn convert_encoding(data: &[u8], from: Encoding, to: Encoding) -> Vec<u8> { /* ... */ }
+}
+
+// llmspell-utils/src/system.rs
+pub mod system {
+    pub fn read_env_vars() -> HashMap<String, String> { /* ... */ }
+    pub fn get_system_info() -> SystemInfo { /* ... */ }
+    pub fn monitor_resources() -> ResourceStats { /* ... */ }
+    pub fn check_port(port: u16) -> bool { /* ... */ }
+}
+
+// llmspell-utils/src/time.rs
+pub mod time {
+    pub fn parse_datetime(input: &str) -> Result<DateTime<Utc>> { /* ... */ }
+    pub fn format_datetime(dt: DateTime<Utc>, format: &str) -> String { /* ... */ }
+    pub fn convert_timezone(dt: DateTime<Utc>, tz: &str) -> DateTime<FixedOffset> { /* ... */ }
+}
+```
+
+### 1.5 Tool Registry System
 
 ```rust
 // llmspell-tools/src/registry.rs
@@ -371,31 +487,29 @@ end
 Each tool must define a complete JSON Schema for parameter validation:
 
 ```rust
-impl Tool for WebSearchTool {
+impl Tool for TextManipulatorTool {
     fn schema(&self) -> ToolSchema {
         ToolSchema {
-            name: "web_search".to_string(),
-            description: "Search the web for information".to_string(),
+            name: "text_manipulator".to_string(),
+            description: "Manipulate and transform text".to_string(),
             parameters: json!({
                 "type": "object",
                 "properties": {
-                    "query": {
+                    "text": {
                         "type": "string",
-                        "description": "Search query"
+                        "description": "Input text to manipulate"
                     },
-                    "max_results": {
-                        "type": "integer",
-                        "minimum": 1,
-                        "maximum": 100,
-                        "default": 10
-                    },
-                    "search_type": {
+                    "operation": {
                         "type": "string",
-                        "enum": ["web", "news", "images", "videos"],
-                        "default": "web"
+                        "enum": ["uppercase", "lowercase", "reverse", "trim", "replace"],
+                        "description": "Operation to perform"
+                    },
+                    "options": {
+                        "type": "object",
+                        "description": "Additional options for the operation"
                     }
                 },
-                "required": ["query"]
+                "required": ["text", "operation"]
             }),
         }
     }
@@ -452,41 +566,52 @@ Each tool requires:
 - Add base_url override support
 - Update script APIs
 
-### Phase 2.2: Core Tool Infrastructure (Days 3-4)
+### Phase 2.2: Core Tool Infrastructure (Day 3)
 - Enhanced Tool trait
 - Tool registry implementation
 - Security sandbox setup
 - Resource monitoring
 
-### Phase 2.3: Search Tools (Days 4-5)
-- WebSearchTool
-- SemanticSearchTool
-- CodeSearchTool
+### Phase 2.3: Utilities & Helpers Tools (Days 4-5)
+- TextManipulatorTool, UuidGeneratorTool, HashCalculatorTool
+- Base64EncoderTool, DiffCalculatorTool
+- DateTimeHandlerTool, CalculatorTool
 
-### Phase 2.4: Data & API Tools (Days 6-7)
-- JsonProcessorTool
-- CsvAnalyzerTool
-- HttpRequestTool
-- GraphQLQueryTool
+### Phase 2.4: Data Processing & File System Tools (Days 6-7)
+- JsonProcessorTool, CsvAnalyzerTool
+- FileOperationsTool, ArchiveHandlerTool
+- FileWatcherTool, FileConverterTool, FileSearchTool
 
-### Phase 2.5: File & Utility Tools (Days 8)
-- FileOperationsTool
-- ArchiveHandlerTool
-- TemplateEngineTool
-- DataValidationTool
+### Phase 2.5: System Integration Tools (Day 8)
+- EnvironmentReaderTool, ProcessExecutorTool
+- ServiceCheckerTool, SystemMonitorTool
 
-### Phase 2.6: Integration & Testing (Days 9-10)
+### Phase 2.6: API & Simple Media Tools (Day 9)
+- HttpRequestTool, GraphQLQueryTool
+- AudioProcessorTool, VideoProcessorTool, ImageProcessorTool
+
+### Phase 2.7: Common Utilities Enhancement (Day 10)
+- Enhance llmspell-utils with common functions
+- Refactor existing tools to use shared utilities
+- Remove duplicate code across implementations
+
+### Phase 2.8: Utility Tools & Integration (Days 11-12)
+- TemplateEngineTool, DataValidationTool
 - Script integration tests
 - Performance optimization
-- Documentation
+
+### Phase 2.9: Testing & Documentation (Days 13-14)
+- Comprehensive tool testing
 - Security validation
+- Documentation and examples
+- Phase 3 handoff preparation
 
 ---
 
 ## 4. Success Metrics
 
 ### Functional Requirements
-- ✅ All 12 tools implemented and tested
+- ✅ All 26+ self-contained tools implemented and tested
 - ✅ ModelSpecifier parses all syntax variants
 - ✅ Tool registry discovers by capability
 - ✅ Security sandbox prevents violations
@@ -509,15 +634,16 @@ Each tool requires:
 ## 5. Risk Mitigation
 
 ### Technical Risks
-1. **External API Dependencies**: Mock services for testing
-2. **Security Vulnerabilities**: Comprehensive sandbox testing
-3. **Performance Degradation**: Continuous benchmarking
+1. **System Tool Security**: Enhanced sandbox testing for system integration
+2. **Media Processing Performance**: Resource limits and optimization
+3. **Security Vulnerabilities**: Comprehensive sandbox testing
 4. **Cross-platform Issues**: Test on Linux/macOS/Windows
 
 ### Schedule Risks
-1. **Complex Tool Implementation**: Start with simpler tools
-2. **Security Testing Time**: Parallelize with development
-3. **Documentation Overhead**: Write as we code
+1. **Tool Count Increase**: 26+ tools vs original 12 tools
+2. **Utility Refactoring Time**: DRY principle implementation
+3. **Security Testing Time**: Parallelize with development
+4. **Documentation Overhead**: Write as we code
 
 ---
 
@@ -530,12 +656,19 @@ Each tool requires:
 - `jsonschema`: Schema validation
 - `regex`: Pattern matching
 - `csv`: CSV processing
-- `quick-xml`: XML handling
+- `notify`: File system watching
+- `encoding_rs`: Encoding detection
+- `sysinfo`: System information
+- `sha2`, `md5`: Hash algorithms
+- `base64`: Base64 encoding
+- `uuid`: UUID generation
+- `chrono`: Date/time handling
+- `zip`, `tar`: Archive handling
 
 ### Internal Dependencies
 - `llmspell-core`: Trait definitions
-- `llmspell-utils`: Shared utilities
-- `llmspell-security`: Sandboxing
+- `llmspell-utils`: Enhanced shared utilities (DRY principle)
+- `llmspell-security`: Sandboxing (enhanced for system tools)
 - `llmspell-providers`: Agent creation
 
 ---
@@ -544,10 +677,11 @@ Each tool requires:
 
 ### Code Deliverables
 1. Enhanced provider system with ModelSpecifier
-2. 12+ fully functional built-in tools
-3. Tool registry with discovery
-4. Security sandbox implementation
-5. Comprehensive test suite
+2. 26+ fully functional self-contained tools
+3. Enhanced llmspell-utils with common utilities
+4. Tool registry with discovery
+5. Security sandbox implementation (enhanced for system tools)
+6. Comprehensive test suite (26+ tools covered)
 
 ### Documentation Deliverables
 1. Tool usage guide
