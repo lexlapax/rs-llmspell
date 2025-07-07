@@ -59,6 +59,9 @@ pub mod serialization;
 /// Encoding and hashing utilities
 pub mod encoding;
 
+/// Time and date utilities
+pub mod time;
+
 // Re-export commonly used types and functions
 pub use async_utils::{
     concurrent_map, race_to_success, retry_async, timeout, timeout_with_default, AsyncError,
@@ -91,4 +94,9 @@ pub use string_utils::{
 pub use system_info::{
     find_executable, format_bytes, get_cpu_count, get_home_directory, get_hostname,
     get_system_info, get_username, OperatingSystem, SystemInfo,
+};
+pub use time::{
+    add_duration, convert_timezone, days_in_month, duration_between, end_of_day, format_datetime,
+    format_duration, is_leap_year, now_local, now_utc, parse_datetime, start_of_day,
+    subtract_duration, weekday_name, TimeError, TimeResult, DATE_FORMATS,
 };

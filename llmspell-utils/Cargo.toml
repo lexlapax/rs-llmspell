@@ -22,6 +22,7 @@ toml = { workspace = true }
 # UUID and time handling
 uuid = { workspace = true }
 chrono = { workspace = true }
+chrono-tz = "0.10"
 
 # Error handling
 anyhow = { workspace = true }
