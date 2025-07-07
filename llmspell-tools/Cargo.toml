@@ -17,3 +17,25 @@ chrono.workspace = true
 anyhow.workspace = true
 tracing.workspace = true
 jsonschema.workspace = true
+csv = "1.3"
+encoding_rs = "0.8"
+chardetng = "0.1"
+
+# Parquet support
+arrow = "54.0"
+parquet = "54.0"
+
+# Excel support
+calamine = "0.26"
+xlsxwriter = "0.6"
+
+# Base64 encoding
+base64 = "0.22"
+
+# JSON processing with jq
+jaq-core = "1.5"
+jaq-interpret = "1.5"
+jaq-parse = "1.0"
+jaq-syn = "1.0"
+jaq-std = "1.5"
+indexmap = "2.10.0"

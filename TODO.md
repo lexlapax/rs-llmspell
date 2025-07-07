@@ -39,9 +39,8 @@
 - [x] Task 2.2.1: Enhance Tool Trait 2025-06-27
 - [x] Task 2.2.2: Implement Tool Registry 2025-06-27
 - [x] Task 2.2.3: Security Sandbox Implementation 2025-06-27
-- [x] Task 2.3.1: WebSearchTool Mock Framework 2025-07-06 (mock implementation only)
 - [x] Task 2.3.1: JsonProcessorTool 2025-07-07
-- [ ] Task 2.3.2: CsvAnalyzerTool <date>
+- [x] Task 2.3.2: CsvAnalyzerTool 2025-07-07
 - [ ] Task 2.3.3: HttpRequestTool <date>
 - [ ] Task 2.3.4: GraphQLQueryTool <date>
 - [ ] Task 2.4.1: FileOperationsTool <date>
@@ -267,11 +266,11 @@
 **Description**: JSON processing with jq-like syntax.
 
 **Acceptance Criteria:**
-- [ ] jq syntax support comprehensive
-- [ ] Schema validation works
-- [ ] Streaming large files supported
-- [ ] Error messages helpful
-- [ ] Common operations optimized
+- [x] jq syntax support comprehensive (full jaq engine integrated)
+- [x] Schema validation works
+- [x] Streaming large files supported (JSON lines streaming)
+- [x] Error messages helpful
+- [x] Common operations optimized
 
 **Implementation Steps:**
 1. Create `llmspell-tools/src/data/json_processor.rs`
@@ -282,10 +281,10 @@
 6. Benchmark performance
 
 **Definition of Done:**
-- [ ] jq compatibility high
-- [ ] Large files handled
-- [ ] Validation accurate
-- [ ] Examples comprehensive
+- [x] jq compatibility high (using jaq - Rust jq implementation)
+- [x] Large files handled (streaming for JSON lines)
+- [x] Validation accurate
+- [x] Examples comprehensive
 
 ### Task 2.3.2: CsvAnalyzerTool
 **Priority**: MEDIUM  
@@ -296,11 +295,11 @@
 **Description**: CSV analysis and processing tool.
 
 **Acceptance Criteria:**
-- [ ] Encoding detection automatic
-- [ ] Statistical analysis provided
-- [ ] Data type inference works
-- [ ] Large files streamed
-- [ ] Export formats supported
+- [x] Encoding detection automatic
+- [x] Statistical analysis provided
+- [x] Data type inference works
+- [x] Large files streamed (implemented streaming statistics)
+- [x] Export formats supported (5/5 - added Parquet, Excel)
 
 **Implementation Steps:**
 1. Create `llmspell-tools/src/data/csv_analyzer.rs`
@@ -311,10 +310,10 @@
 6. Test with various CSV formats
 
 **Definition of Done:**
-- [ ] Handles malformed CSV
-- [ ] Statistics accurate
-- [ ] Memory efficient
-- [ ] Documentation complete
+- [x] Handles malformed CSV
+- [x] Statistics accurate
+- [x] Memory efficient (streaming stats, chunked processing)
+- [x] Documentation complete
 
 ### Task 2.3.3: HttpRequestTool
 **Priority**: HIGH  

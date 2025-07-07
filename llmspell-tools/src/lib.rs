@@ -9,5 +9,5 @@ pub mod search;
 pub use registry::{CapabilityMatcher, RegistryStatistics, ToolInfo, ToolRegistry};
 
 // Re-export tools
-pub use data::JsonProcessorTool;
+pub use data::{CsvAnalyzerTool, JsonProcessorTool};
 pub use search::WebSearchTool;

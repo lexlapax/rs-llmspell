@@ -31,7 +31,7 @@ async fn test_json_processor_complex_workflow() {
     let input = AgentInput::text("extract company name").with_parameter(
         "parameters".to_string(),
         json!({
-            "operation": "transform",
+            "operation": "query",
             "input": complex_json.clone(),
             "query": ".company.name"
         }),
@@ -47,7 +47,7 @@ async fn test_json_processor_complex_workflow() {
     let input = AgentInput::text("extract employees").with_parameter(
         "parameters".to_string(),
         json!({
-            "operation": "transform",
+            "operation": "query",
             "input": complex_json.clone(),
             "query": ".company.employees"
         }),
@@ -111,10 +111,8 @@ async fn test_json_processor_schema_validation_complex() {
         .execute(input, ExecutionContext::default())
         .await
         .unwrap();
-    let metadata = &output.metadata;
-    let result = metadata.extra.get("result").unwrap();
-    let validation = result.get("validation").unwrap();
-    assert_eq!(validation.get("is_valid").unwrap(), true);
+    let validation_result: serde_json::Value = serde_json::from_str(&output.text).unwrap();
+    assert_eq!(validation_result["is_valid"], true);
 
     // Invalid product (missing required field)
     let invalid_product = json!({
@@ -138,12 +136,10 @@ async fn test_json_processor_schema_validation_complex() {
         .execute(input, ExecutionContext::default())
         .await
         .unwrap();
-    let metadata = &output.metadata;
-    let result = metadata.extra.get("result").unwrap();
-    let validation = result.get("validation").unwrap();
-    assert_eq!(validation.get("is_valid").unwrap(), false);
+    let validation_result: serde_json::Value = serde_json::from_str(&output.text).unwrap();
+    assert_eq!(validation_result["is_valid"], false);
 
-    let errors = validation.get("errors").unwrap().as_array().unwrap();
+    let errors = validation_result["errors"].as_array().unwrap();
     assert!(!errors.is_empty());
 }
 
@@ -162,9 +158,9 @@ async fn test_json_processor_array_filtering() {
     let input = AgentInput::text("filter electronics").with_parameter(
         "parameters".to_string(),
         json!({
-            "operation": "filter",
+            "operation": "query",
             "input": products,
-            "query": ".category == \"electronics\""
+            "query": ".[] | select(.category == \"electronics\")"
         }),
     );
 
@@ -211,8 +207,9 @@ async fn test_json_processor_merge_complex() {
     let input = AgentInput::text("merge configs").with_parameter(
         "parameters".to_string(),
         json!({
-            "operation": "merge",
-            "input": configs
+            "operation": "query",
+            "input": configs,
+            "query": "reduce .[] as $item ({}; . * $item)"
         }),
     );
 
@@ -222,15 +219,14 @@ async fn test_json_processor_merge_complex() {
         .unwrap();
     let merged: serde_json::Value = serde_json::from_str(&output.text).unwrap();
 
-    // Check merged structure - note that merge is shallow, so later objects overwrite earlier ones
-    // The last "database" object only has username/password, so it overwrites the entire database object
+    // Check merged structure - the * operator does a deep merge
+    assert_eq!(merged["database"]["host"], "localhost");
+    assert_eq!(merged["database"]["port"], 5432);
     assert_eq!(merged["database"]["username"], "admin");
     assert_eq!(merged["database"]["password"], "secret");
-    assert!(merged["database"]["host"].is_null()); // host was overwritten
 
-    // The last "cache" object only has ttl, so it overwrites the entire cache object
+    assert_eq!(merged["cache"]["enabled"], true);
     assert_eq!(merged["cache"]["ttl"], 3600);
-    assert!(merged["cache"]["enabled"].is_null()); // enabled was overwritten
 
     assert_eq!(merged["api"]["version"], "v2");
 }
@@ -292,7 +288,7 @@ async fn test_json_processor_error_handling() {
     let input = AgentInput::text("bad query").with_parameter(
         "parameters".to_string(),
         json!({
-            "operation": "transform",
+            "operation": "query",
             "input": {"test": "value"},
             "query": ".nonexistent.field"
         }),
@@ -300,4 +296,184 @@ async fn test_json_processor_error_handling() {
 
     let result = tool.execute(input, ExecutionContext::default()).await;
     assert!(result.is_err());
+}
+
+#[tokio::test]
+async fn test_enhanced_jq_complex_workflow() {
+    let tool = JsonProcessorTool::default();
+
+    // Complex data processing workflow
+    let users_data = json!([
+        {"name": "Alice", "age": 30, "active": true, "score": 85},
+        {"name": "Bob", "age": 25, "active": false, "score": 92},
+        {"name": "Charlie", "age": 35, "active": true, "score": 78},
+        {"name": "David", "age": 28, "active": true, "score": 95},
+        {"name": "Eve", "age": 22, "active": false, "score": 88}
+    ]);
+
+    // Test 1: Extract all ages and sort them
+    let input = AgentInput::text("extract ages").with_parameter(
+        "parameters".to_string(),
+        json!({
+            "operation": "query",
+            "input": users_data.clone(),
+            "query": "map(.age) | sort"
+        }),
+    );
+
+    let output = tool
+        .execute(input, ExecutionContext::default())
+        .await
+        .unwrap();
+    // Should contain all ages sorted: 22, 25, 28, 30, 35
+    assert!(output.text.contains("22"));
+    assert!(output.text.contains("25"));
+    assert!(output.text.contains("28"));
+    assert!(output.text.contains("30"));
+    assert!(output.text.contains("35"));
+
+    // Test 2: Get top 3 scores
+    let input = AgentInput::text("top scores").with_parameter(
+        "parameters".to_string(),
+        json!({
+            "operation": "query",
+            "input": users_data.clone(),
+            "query": "map(.score) | sort | .[2:]"
+        }),
+    );
+
+    let output = tool
+        .execute(input, ExecutionContext::default())
+        .await
+        .unwrap();
+    // Should contain top 3 scores: 88, 92, 95
+    assert!(output.text.contains("88"));
+    assert!(output.text.contains("92"));
+    assert!(output.text.contains("95"));
+
+    // Test 3: Complex nested object processing
+    let nested_data = json!({
+        "company": {
+            "name": "TechCorp",
+            "departments": {
+                "engineering": {
+                    "employees": ["Alice", "Bob", "Charlie"],
+                    "budget": 1000000
+                },
+                "sales": {
+                    "employees": ["David", "Eve"],
+                    "budget": 500000
+                }
+            }
+        }
+    });
+
+    let input = AgentInput::text("get departments").with_parameter(
+        "parameters".to_string(),
+        json!({
+            "operation": "query",
+            "input": nested_data,
+            "query": ".company.departments | keys"
+        }),
+    );
+
+    let output = tool
+        .execute(input, ExecutionContext::default())
+        .await
+        .unwrap();
+    assert!(output.text.contains("\"engineering\""));
+    assert!(output.text.contains("\"sales\""));
+}
+
+#[tokio::test]
+async fn test_streaming_json_lines() {
+    let tool = JsonProcessorTool::default();
+
+    // Test streaming with transformation
+    let log_lines = r#"{"timestamp": "2024-01-01T10:00:00Z", "level": "INFO", "message": "Server started"}
+{"timestamp": "2024-01-01T10:00:05Z", "level": "ERROR", "message": "Connection failed"}
+{"timestamp": "2024-01-01T10:00:10Z", "level": "INFO", "message": "Request processed"}
+{"timestamp": "2024-01-01T10:00:15Z", "level": "WARN", "message": "High memory usage"}
+{"timestamp": "2024-01-01T10:00:20Z", "level": "ERROR", "message": "Database timeout"}"#;
+
+    // Extract all levels to verify streaming works
+    let input = AgentInput::text("extract levels").with_parameter(
+        "parameters".to_string(),
+        json!({
+            "operation": "stream",
+            "content": log_lines,
+            "query": ".level"
+        }),
+    );
+
+    let output = tool
+        .execute(input, ExecutionContext::default())
+        .await
+        .unwrap();
+    // Should have all 5 levels
+    assert!(output.text.contains("\"INFO\""));
+    assert!(output.text.contains("\"ERROR\""));
+    assert!(output.text.contains("\"WARN\""));
+
+    // Count by level
+    let input = AgentInput::text("count levels").with_parameter(
+        "parameters".to_string(),
+        json!({
+            "operation": "stream",
+            "content": log_lines,
+            "query": ".level"
+        }),
+    );
+
+    let output = tool
+        .execute(input, ExecutionContext::default())
+        .await
+        .unwrap();
+    // Should have extracted all levels
+    assert!(output.text.contains("INFO"));
+    assert!(output.text.contains("ERROR"));
+    assert!(output.text.contains("WARN"));
+}
+
+#[tokio::test]
+async fn test_advanced_array_operations() {
+    let tool = JsonProcessorTool::default();
+
+    // Test array slicing with edge cases
+    let array_data = json!([0, 1, 2, 3, 4, 5, 6, 7, 8, 9]);
+
+    // Test various slice operations - check content not exact format
+    let test_cases = vec![
+        (
+            ".[]",
+            vec!["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"],
+        ), // All elements
+        (".[2:10]", vec!["2", "3", "4", "5", "6", "7", "8", "9"]), // From index 2 to end
+        (".[0:5]", vec!["0", "1", "2", "3", "4"]),                 // First 5 elements
+        (".[2:5]", vec!["2", "3", "4"]),                           // Range
+    ];
+
+    for (query, expected_values) in test_cases {
+        let input = AgentInput::text("slice array").with_parameter(
+            "parameters".to_string(),
+            json!({
+                "operation": "query",
+                "input": array_data.clone(),
+                "query": query
+            }),
+        );
+
+        let output = tool
+            .execute(input, ExecutionContext::default())
+            .await
+            .unwrap();
+        for value in expected_values {
+            assert!(
+                output.text.contains(value),
+                "Query {} failed - missing value {}",
+                query,
+                value
+            );
+        }
+    }
 }
