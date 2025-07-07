@@ -201,6 +201,12 @@ pub enum LLMSpellError {
         source: Option<Box<dyn std::error::Error + Send + Sync>>,
     },
 
+    #[error("Rate limit error: {message}")]
+    RateLimit {
+        message: String,
+        retry_after: Option<u64>,
+    },
+
     #[error("Internal error: {message}")]
     Internal {
         message: String,
@@ -214,7 +220,9 @@ impl LLMSpellError {
     pub fn category(&self) -> ErrorCategory {
         match self {
             Self::Configuration { .. } => ErrorCategory::Configuration,
-            Self::Provider { .. } | Self::Network { .. } => ErrorCategory::Network,
+            Self::Provider { .. } | Self::Network { .. } | Self::RateLimit { .. } => {
+                ErrorCategory::Network
+            }
             Self::Resource { .. } | Self::Timeout { .. } => ErrorCategory::Resource,
             Self::Security { .. } => ErrorCategory::Security,
             Self::Validation { .. } | Self::Component { .. } => ErrorCategory::Logic,
@@ -240,7 +248,10 @@ impl LLMSpellError {
     /// Check if the error is retryable
     pub fn is_retryable(&self) -> bool {
         match self {
-            Self::Network { .. } | Self::Timeout { .. } | Self::Provider { .. } => true,
+            Self::Network { .. }
+            | Self::Timeout { .. }
+            | Self::Provider { .. }
+            | Self::RateLimit { .. } => true,
             Self::Resource { .. } => true,
             Self::Storage { operation, .. } => {
                 // Some storage operations are retryable

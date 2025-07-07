@@ -31,6 +31,7 @@ use std::collections::HashMap;
 pub enum ToolCategory {
     Filesystem,
     Web,
+    Api,
     Analysis,
     Data,
     System,
@@ -43,6 +44,7 @@ impl std::fmt::Display for ToolCategory {
         match self {
             ToolCategory::Filesystem => write!(f, "filesystem"),
             ToolCategory::Web => write!(f, "web"),
+            ToolCategory::Api => write!(f, "api"),
             ToolCategory::Analysis => write!(f, "analysis"),
             ToolCategory::Data => write!(f, "data"),
             ToolCategory::System => write!(f, "system"),

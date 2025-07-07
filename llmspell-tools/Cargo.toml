@@ -17,6 +17,7 @@ chrono.workspace = true
 anyhow.workspace = true
 tracing.workspace = true
 jsonschema.workspace = true
+reqwest.workspace = true
 csv = "1.3"
 encoding_rs = "0.8"
 chardetng = "0.1"
