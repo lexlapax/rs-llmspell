@@ -2,6 +2,7 @@
 //! ABOUTME: Provides template rendering, validation, and other utilities
 
 pub mod base64_encoder;
+pub mod calculator;
 pub mod data_validation;
 pub mod date_time_handler;
 pub mod diff_calculator;
@@ -11,6 +12,7 @@ pub mod text_manipulator;
 pub mod uuid_generator;
 
 pub use base64_encoder::Base64EncoderTool;
+pub use calculator::CalculatorTool;
 pub use data_validation::{
     DataValidationConfig, DataValidationTool, ValidationError, ValidationResult, ValidationRule,
     ValidationRules,

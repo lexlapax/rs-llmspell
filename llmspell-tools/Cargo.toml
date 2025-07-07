@@ -70,5 +70,8 @@ hex = "0.4"
 # Diff calculation
 similar = { version = "2.6", features = ["text", "inline", "bytes"] }
 
+# Expression evaluation
+evalexpr = "11.3"
+
 [dev-dependencies]
 tempfile = "3.20"
