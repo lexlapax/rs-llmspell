@@ -44,6 +44,13 @@ which = { workspace = true }
 # Random number generation
 rand = { workspace = true }
 
+# Hashing algorithms
+sha2 = "0.10"
+sha1 = "0.10"
+md5 = "0.7"
+base64 = "0.22"
+hex = "0.4"
+
 # Platform-specific dependencies
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

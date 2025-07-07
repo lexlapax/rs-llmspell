@@ -23,7 +23,7 @@
 **Success Criteria Summary:**
 - [x] ModelSpecifier parses `provider/model` syntax correctly ✅
 - [x] Base URL overrides work at agent creation time ✅
-- [ ] 25 self-contained tools fully implemented and tested (10/25 complete)
+- [ ] 25 self-contained tools fully implemented and tested (11/25 complete)
 - [x] Tool registry with discovery and validation ✅
 - [x] Security sandboxing prevents unauthorized access ✅
 - [ ] All tools support streaming where applicable
@@ -55,7 +55,7 @@
 - [ ] **MOVED TO PHASE 3.5**: SemanticSearchTool (vector storage needed)
 
 **NEW SELF-CONTAINED TOOLS TO ADD:**
-- [ ] Task 2.5: Utilities & Helpers Tools (Days 7-8) - IN PROGRESS (2/7 complete)
+- [ ] Task 2.5: Utilities & Helpers Tools (Days 7-8) - IN PROGRESS (3/7 complete)
 - [ ] Task 2.6: File System Extended Tools (Day 9)
 - [ ] Task 2.7: System Integration Tools (Day 10)
 - [ ] Task 2.8: Simple Media Tools (Day 11)
@@ -565,19 +565,20 @@
 - [x] Uses shared utilities (DRY) ✅ (id_generator functions from llmspell-utils)
 - [x] Tests cover all operations ✅ (9 comprehensive tests passing)
 
-### Task 2.5.3: HashCalculatorTool
+### Task 2.5.3: HashCalculatorTool ✅
 **Priority**: MEDIUM  
 **Estimated Time**: 3 hours  
 **Assignee**: Tools Team
 **Dependencies**: llmspell-utils encoding functions, add to llmspell-utils, functions that make sense
+**Completed**: 2025-07-07
 
 **Description**: Hash calculation and verification tool.
 
 **Acceptance Criteria:**
-- [ ] MD5, SHA-1, SHA-256, SHA-512 support
-- [ ] File and string hashing
-- [ ] Hash verification functionality
-- [ ] Uses llmspell-utils hash functions
+- [x] MD5, SHA-1, SHA-256, SHA-512 support ✅
+- [x] File and string hashing ✅
+- [x] Hash verification functionality ✅
+- [x] Uses llmspell-utils hash functions ✅
 
 **Implementation Steps:**
 1. Create `llmspell-tools/src/util/hash_calculator.rs`
@@ -590,11 +591,11 @@
 8. Document usage examples
 
 **Definition of Done:**
-- [ ] All hash algorithms work correctly
-- [ ] File hashing memory-efficient (streaming)
-- [ ] Hash verification accurate
-- [ ] Uses shared utilities (DRY)
-- [ ] Tests cover all algorithms and edge cases
+- [x] All hash algorithms work correctly ✅ (MD5, SHA-1, SHA-256, SHA-512)
+- [x] File hashing memory-efficient (streaming) ✅ (8KB buffer streaming)
+- [x] Hash verification accurate ✅
+- [x] Uses shared utilities (DRY) ✅ (encoding module in llmspell-utils)
+- [x] Tests cover all algorithms and edge cases ✅ (9 tests passing)
 
 ### Task 2.5.4: Base64EncoderTool
 **Priority**: LOW  
@@ -1069,7 +1070,7 @@
 5. Consolidate system query utilities (env vars, process info, resources)
 6. Extract time utilities (parsing, formatting, timezone conversion)
 7. Organize into logical modules with clear APIs
-8. Write comprehensive tests for all utilities
+8. Write comprehensive tests for all utilities including benchmark tests
 
 **Definition of Done:**
 - [ ] All common functions extracted to llmspell-utils

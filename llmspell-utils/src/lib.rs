@@ -56,10 +56,17 @@ pub mod id_generator;
 /// Serialization and deserialization helpers
 pub mod serialization;
 
+/// Encoding and hashing utilities
+pub mod encoding;
+
 // Re-export commonly used types and functions
 pub use async_utils::{
     concurrent_map, race_to_success, retry_async, timeout, timeout_with_default, AsyncError,
     AsyncResult, BoxedResultFuture, Cancellable, RetryConfig,
+};
+pub use encoding::{
+    base64_decode, base64_decode_url_safe, base64_encode, base64_encode_url_safe, from_hex_string,
+    hash_data, hash_file, hash_string, to_hex_string, verify_hash, HashAlgorithm,
 };
 pub use error_builders::{templates, BuiltError, ErrorBuilder, WithContext};
 pub use file_utils::{
