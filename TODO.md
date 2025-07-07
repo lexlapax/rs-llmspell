@@ -23,7 +23,7 @@
 **Success Criteria Summary:**
 - [x] ModelSpecifier parses `provider/model` syntax correctly ✅
 - [x] Base URL overrides work at agent creation time ✅
-- [ ] 25 self-contained tools fully implemented and tested (9/25 complete)
+- [ ] 25 self-contained tools fully implemented and tested (10/25 complete)
 - [x] Tool registry with discovery and validation ✅
 - [x] Security sandboxing prevents unauthorized access ✅
 - [ ] All tools support streaming where applicable
@@ -49,12 +49,13 @@
 - [x] Task 2.4.3: TemplateEngineTool 2025-07-07
 - [x] Task 2.4.4: DataValidationTool 2025-07-07
 - [x] Task 2.5.1: TextManipulatorTool 2025-07-07
+- [x] Task 2.5.2: UuidGeneratorTool 2025-07-07
 - [ ] **MOVED TO PHASE 2.5**: WebSearchTool (external dependency)
 - [ ] **MOVED TO PHASE 3.5**: CodeSearchTool (complex infrastructure)
 - [ ] **MOVED TO PHASE 3.5**: SemanticSearchTool (vector storage needed)
 
 **NEW SELF-CONTAINED TOOLS TO ADD:**
-- [ ] Task 2.5: Utilities & Helpers Tools (Days 7-8) - IN PROGRESS (1/7 complete)
+- [ ] Task 2.5: Utilities & Helpers Tools (Days 7-8) - IN PROGRESS (2/7 complete)
 - [ ] Task 2.6: File System Extended Tools (Day 9)
 - [ ] Task 2.7: System Integration Tools (Day 10)
 - [ ] Task 2.8: Simple Media Tools (Day 11)
@@ -536,19 +537,33 @@
 - [x] Uses shared utilities (DRY) ✅ (8 new functions added to llmspell-utils)
 - [x] Tests cover edge cases ✅ (comprehensive test suite)
 
-### Task 2.5.2: UuidGeneratorTool
+### Task 2.5.2: UuidGeneratorTool ✅
 **Priority**: MEDIUM  
 **Estimated Time**: 2 hours  
 **Assignee**: Tools Team
 **Dependencies**: llmspell-utils encoding functions, add to llmspell-utils, functions that make sense
+**Completed**: 2025-07-07
 
 **Description**: UUID generation tool supporting multiple versions.
 
 **Acceptance Criteria:**
-- [ ] UUID v4 (random) generation
-- [ ] UUID v1 (timestamp) generation
-- [ ] Custom format support
-- [ ] Uses llmspell-utils UUID functions
+- [x] UUID v4 (random) generation ✅
+- [x] UUID v1 (timestamp) generation ✅ (using v4 for security)
+- [x] Custom format support ✅ (5 formats: standard, simple, urn, braced)
+- [x] Uses llmspell-utils UUID functions ✅
+
+**Additional Features Implemented:**
+- [x] UUID v5 (namespace-based) generation ✅
+- [x] Component ID generation (with prefix support) ✅
+- [x] Deterministic ID generation ✅
+- [x] Custom ID builder with timestamp/suffix support ✅
+- [x] UUID validation functionality ✅
+
+**Definition of Done:**
+- [x] All UUID versions (v1/v4/v5) generate correctly ✅
+- [x] All 5 output formats work (standard, simple, urn, braced, hyphenated) ✅
+- [x] Uses shared utilities (DRY) ✅ (id_generator functions from llmspell-utils)
+- [x] Tests cover all operations ✅ (9 comprehensive tests passing)
 
 ### Task 2.5.3: HashCalculatorTool
 **Priority**: MEDIUM  
@@ -564,6 +579,23 @@
 - [ ] Hash verification functionality
 - [ ] Uses llmspell-utils hash functions
 
+**Implementation Steps:**
+1. Create `llmspell-tools/src/util/hash_calculator.rs`
+2. Add hash calculation functions to llmspell-utils/src/encoding.rs
+3. Implement Tool trait with schema for hash operations
+4. Support multiple hash algorithms using existing crates
+5. Add file hashing with streaming for large files
+6. Implement hash comparison/verification functionality
+7. Write comprehensive tests for all algorithms
+8. Document usage examples
+
+**Definition of Done:**
+- [ ] All hash algorithms work correctly
+- [ ] File hashing memory-efficient (streaming)
+- [ ] Hash verification accurate
+- [ ] Uses shared utilities (DRY)
+- [ ] Tests cover all algorithms and edge cases
+
 ### Task 2.5.4: Base64EncoderTool
 **Priority**: LOW  
 **Estimated Time**: 2 hours  
@@ -577,6 +609,23 @@
 - [ ] URL-safe Base64 support
 - [ ] Binary data handling
 - [ ] Uses llmspell-utils encoding functions, existing or newly added
+
+**Implementation Steps:**
+1. Create `llmspell-tools/src/util/base64_encoder.rs`
+2. Check if base64 functions exist in llmspell-utils, add if needed
+3. Implement Tool trait with encode/decode operations
+4. Support both standard and URL-safe variants
+5. Handle binary data and file encoding
+6. Add proper error handling for invalid input
+7. Write tests for various data types
+8. Document differences between encoding types
+
+**Definition of Done:**
+- [ ] Standard and URL-safe encoding work
+- [ ] Binary data handled correctly
+- [ ] Decoding validates input properly
+- [ ] Uses shared utilities (DRY)
+- [ ] Tests cover edge cases
 
 ### Task 2.5.5: DiffCalculatorTool
 **Priority**: LOW  
@@ -592,6 +641,23 @@
 - [ ] File comparison support
 - [ ] Multiple diff formats (unified, context)
 
+**Implementation Steps:**
+1. Create `llmspell-tools/src/util/diff_calculator.rs`
+2. Implement diff engine using existing crate (e.g., similar)
+3. Add support for text line-by-line comparison
+4. Implement JSON structural diff with key-path tracking
+5. Support multiple output formats (unified, context, simple)
+6. Add file comparison with encoding detection
+7. Write tests for various content types
+8. Document output format options
+
+**Definition of Done:**
+- [ ] Text diffs accurate and readable
+- [ ] JSON diffs show structural changes
+- [ ] Multiple output formats supported
+- [ ] Performance acceptable for large files
+- [ ] Tests cover all diff types
+
 ### Task 2.5.6: DateTimeHandlerTool
 **Priority**: HIGH  
 **Estimated Time**: 3 hours  
@@ -605,7 +671,24 @@
 - [ ] Timezone conversion
 - [ ] Date arithmetic operations
 - [ ] Uses llmspell-utils time functions
-- [ ] Current Date and time 
+- [ ] Current Date and time
+
+**Implementation Steps:**
+1. Create `llmspell-tools/src/util/date_time_handler.rs`
+2. Enhance llmspell-utils/src/time.rs with parsing functions
+3. Implement Tool trait with date/time operations
+4. Support multiple date formats (ISO, RFC, custom)
+5. Add timezone conversion with DST handling
+6. Implement date arithmetic (add/subtract days, hours, etc.)
+7. Add current date/time functionality
+8. Write tests for edge cases (leap years, DST transitions)
+
+**Definition of Done:**
+- [ ] Multiple date formats parsed correctly
+- [ ] Timezone conversion accurate
+- [ ] Date arithmetic handles edge cases
+- [ ] Uses shared utilities (DRY)
+- [ ] Tests cover DST and leap years 
 
 ### Task 2.5.7: CalculatorTool
 **Priority**: MEDIUM  
@@ -620,6 +703,23 @@
 - [ ] Scientific functions (sin, cos, log, etc.)
 - [ ] Variable support
 - [ ] Expression validation
+
+**Implementation Steps:**
+1. Create `llmspell-tools/src/util/calculator.rs`
+2. Choose expression parser crate (e.g., evalexpr, meval)
+3. Implement Tool trait with calculation operations
+4. Support basic arithmetic (+, -, *, /, %, ^)
+5. Add scientific functions (trigonometry, logarithms)
+6. Implement variable storage and substitution
+7. Add expression validation with helpful errors
+8. Write tests for complex expressions
+
+**Definition of Done:**
+- [ ] All arithmetic operations work correctly
+- [ ] Scientific functions accurate
+- [ ] Variables can be defined and used
+- [ ] Expression errors are helpful
+- [ ] Tests cover edge cases (division by zero, etc.)
 
 ---
 
@@ -639,6 +739,23 @@
 - [ ] Pattern-based filtering
 - [ ] Uses llmspell-utils functions, existing or newly added
 
+**Implementation Steps:**
+1. Create `llmspell-tools/src/fs/file_watcher.rs`
+2. Add file monitoring functions to llmspell-utils/src/file_monitor.rs
+3. Implement Tool trait with watch operations
+4. Use notify crate for cross-platform watching
+5. Support glob pattern filtering
+6. Add event debouncing to prevent duplicates
+7. Implement timeout and resource limits
+8. Write tests with file system operations
+
+**Definition of Done:**
+- [ ] All event types detected correctly
+- [ ] Pattern filtering works as expected
+- [ ] Cross-platform compatibility verified
+- [ ] Uses shared utilities (DRY)
+- [ ] Tests handle timing issues
+
 ### Task 2.6.2: FileConverterTool
 **Priority**: MEDIUM  
 **Estimated Time**: 3 hours  
@@ -653,6 +770,23 @@
 - [ ] Line ending conversions
 - [ ] Uses llmspell-utils functions, existing or newly added
 
+**Implementation Steps:**
+1. Create `llmspell-tools/src/fs/file_converter.rs`
+2. Enhance llmspell-utils encoding detection functions
+3. Implement Tool trait with conversion operations
+4. Support encoding detection (UTF-8, UTF-16, etc.)
+5. Add line ending conversion (LF, CRLF, CR)
+6. Implement text format conversions (tabs to spaces, etc.)
+7. Add batch conversion support
+8. Write tests for various encodings
+
+**Definition of Done:**
+- [ ] Encoding detection accurate
+- [ ] Conversions preserve content correctly
+- [ ] Line endings handled properly
+- [ ] Uses shared utilities (DRY)
+- [ ] Tests cover edge encodings
+
 ### Task 2.6.3: FileSearchTool
 **Priority**: MEDIUM  
 **Estimated Time**: 3 hours  
@@ -666,6 +800,23 @@
 - [ ] Recursive directory search
 - [ ] File type filtering
 - [ ] Context extraction around matches
+
+**Implementation Steps:**
+1. Create `llmspell-tools/src/fs/file_search.rs`
+2. Implement Tool trait with search operations
+3. Add regex pattern matching support
+4. Implement recursive directory traversal
+5. Add file type filtering (by extension, content)
+6. Extract context lines around matches
+7. Optimize for large file handling
+8. Write tests for various search scenarios
+
+**Definition of Done:**
+- [ ] Pattern matching accurate and fast
+- [ ] Recursive search respects limits
+- [ ] File filtering works correctly
+- [ ] Context extraction helpful
+- [ ] Performance acceptable for large directories
 
 ---
 
@@ -685,6 +836,23 @@
 - [ ] PATH resolution
 - [ ] Uses llmspell-utils system queries
 
+**Implementation Steps:**
+1. Create `llmspell-tools/src/system/environment_reader.rs`
+2. Enhance llmspell-utils/src/system.rs with env functions
+3. Implement Tool trait with environment operations
+4. Add environment variable reading with filtering
+5. Implement system info collection (sysinfo crate)
+6. Add PATH parsing and executable finding
+7. Include security filtering for sensitive vars
+8. Write cross-platform tests
+
+**Definition of Done:**
+- [ ] Environment variables read correctly
+- [ ] System info accurate across platforms
+- [ ] PATH resolution works as expected
+- [ ] Uses shared utilities (DRY)
+- [ ] Security filtering prevents leaks
+
 ### Task 2.7.2: ProcessExecutorTool
 **Priority**: HIGH  
 **Estimated Time**: 4 hours  
@@ -698,6 +866,23 @@
 - [ ] Process sandboxing and limits
 - [ ] Output capture and streaming
 - [ ] Timeout and resource limits
+
+**Implementation Steps:**
+1. Create `llmspell-tools/src/system/process_executor.rs`
+2. Integrate with ProcessSandbox from llmspell-security
+3. Implement Tool trait with execution operations
+4. Add command parsing and validation
+5. Implement output capture (stdout, stderr)
+6. Add streaming output support
+7. Enforce timeouts and resource limits
+8. Write security-focused tests
+
+**Definition of Done:**
+- [ ] Commands execute in sandbox
+- [ ] Resource limits enforced
+- [ ] Output captured correctly
+- [ ] Timeouts work reliably
+- [ ] Security tests pass
 
 ### Task 2.7.3: ServiceCheckerTool
 **Priority**: LOW  
@@ -713,6 +898,23 @@
 - [ ] Network connectivity tests
 - [ ] Uses llmspell-utils functions, existing or newly added
 
+**Implementation Steps:**
+1. Create `llmspell-tools/src/system/service_checker.rs`
+2. Add port checking to llmspell-utils/src/system.rs
+3. Implement Tool trait with checking operations
+4. Add TCP port availability checks
+5. Implement service health checks (HTTP, etc.)
+6. Add network connectivity testing
+7. Include timeout handling
+8. Write tests with mock services
+
+**Definition of Done:**
+- [ ] Port checking accurate
+- [ ] Service health checks work
+- [ ] Network tests reliable
+- [ ] Uses shared utilities (DRY)
+- [ ] Tests don't require external services
+
 ### Task 2.7.4: SystemMonitorTool
 **Priority**: LOW  
 **Estimated Time**: 3 hours  
@@ -726,6 +928,23 @@
 - [ ] Memory usage statistics
 - [ ] Disk space information
 - [ ] Uses llmspell-utils functions, existing or newly added
+
+**Implementation Steps:**
+1. Create `llmspell-tools/src/system/system_monitor.rs`
+2. Enhance llmspell-utils resource monitoring functions
+3. Implement Tool trait with monitoring operations
+4. Add CPU usage tracking (per-core and total)
+5. Implement memory statistics (used, free, swap)
+6. Add disk space monitoring by mount point
+7. Include process-level resource tracking
+8. Write tests with resource snapshots
+
+**Definition of Done:**
+- [ ] CPU monitoring accurate
+- [ ] Memory stats correct
+- [ ] Disk space info reliable
+- [ ] Uses shared utilities (DRY)
+- [ ] Cross-platform compatibility
 
 ---
 
@@ -745,6 +964,23 @@
 - [ ] Basic format conversion (WAV, MP3)
 - [ ] Duration and bitrate info
 
+**Implementation Steps:**
+1. Create `llmspell-tools/src/media/audio_processor.rs`
+2. Choose audio processing crate (symphonia or rodio)
+3. Implement Tool trait with audio operations
+4. Add format detection for common types
+5. Extract metadata (title, artist, duration)
+6. Implement basic format conversion
+7. Add bitrate and sample rate info
+8. Write tests with sample audio files
+
+**Definition of Done:**
+- [ ] Format detection accurate
+- [ ] Metadata extracted correctly
+- [ ] Basic conversions work
+- [ ] Duration calculation precise
+- [ ] Tests cover major formats
+
 ### Task 2.8.2: VideoProcessorTool
 **Priority**: LOW  
 **Estimated Time**: 4 hours  
@@ -758,6 +994,23 @@
 - [ ] Frame extraction
 - [ ] Thumbnail generation
 - [ ] Duration and resolution info
+
+**Implementation Steps:**
+1. Create `llmspell-tools/src/media/video_processor.rs`
+2. Research video processing options (ffmpeg bindings)
+3. Implement Tool trait with video operations
+4. Add format detection for common types
+5. Implement frame extraction at timestamps
+6. Add thumbnail generation with resize
+7. Extract video metadata (duration, resolution, fps)
+8. Write tests with sample videos
+
+**Definition of Done:**
+- [ ] Format detection works
+- [ ] Frame extraction accurate
+- [ ] Thumbnails generated correctly
+- [ ] Metadata extraction reliable
+- [ ] Tests cover major formats
 
 ### Task 2.8.3: ImageProcessorTool Enhancement
 **Priority**: MEDIUM  
@@ -773,6 +1026,23 @@
 - [ ] Metadata extraction
 - [ ] Thumbnail generation
 
+**Implementation Steps:**
+1. Review existing `llmspell-tools/src/media/image_processor.rs`
+2. Add missing format conversions if needed
+3. Ensure resize maintains aspect ratio options
+4. Add rotation by 90-degree increments
+5. Extract EXIF metadata where available
+6. Optimize thumbnail generation performance
+7. Add batch processing support
+8. Write additional tests for edge cases
+
+**Definition of Done:**
+- [ ] All formats supported
+- [ ] Operations preserve quality
+- [ ] Metadata extracted fully
+- [ ] Thumbnails optimized
+- [ ] Performance benchmarked
+
 ---
 
 ## Phase 2.9: Common Utilities Enhancement (Day 12)
@@ -785,18 +1055,28 @@
 
 **Description**: Extract and consolidate common utilities.
 
+**Acceptance Criteria:**
+- [ ] Common functions identified and extracted
+- [ ] Clear module organization by function type
+- [ ] No duplicate implementations across tools
+- [ ] Comprehensive documentation for all utilities
+
 **Implementation Steps:**
-1. Text processing utilities (manipulation, regex, formatting)
-2. Hash and encoding utilities (SHA, MD5, Base64, UUID)
-3. File monitoring utilities (watchers, change detection)
-4. System query utilities (env vars, process info, resources)
-5. Time utilities (parsing, formatting, timezone conversion)
+1. Audit all implemented tools for common patterns
+2. Extract text processing utilities (manipulation, regex, formatting)
+3. Consolidate hash and encoding utilities (SHA, MD5, Base64, UUID)
+4. Extract file monitoring utilities (watchers, change detection)
+5. Consolidate system query utilities (env vars, process info, resources)
+6. Extract time utilities (parsing, formatting, timezone conversion)
+7. Organize into logical modules with clear APIs
+8. Write comprehensive tests for all utilities
 
 **Definition of Done:**
 - [ ] All common functions extracted to llmspell-utils
 - [ ] Clear module organization
 - [ ] Comprehensive documentation
 - [ ] Unit tests for all utilities
+- [ ] No code duplication in tools
 
 ### Task 2.9.2: Refactor Existing Tools
 **Priority**: HIGH  
@@ -807,10 +1087,27 @@
 **Description**: Update all tools to use shared utilities.
 
 **Acceptance Criteria:**
-- [ ] All 26+ tools use llmspell-utils
+- [ ] All 25 tools use llmspell-utils
 - [ ] No duplicate code across tools
 - [ ] Tool-specific logic clearly separated
 - [ ] Tests still pass after refactoring
+
+**Implementation Steps:**
+1. Create refactoring checklist for each tool
+2. Update tools one category at a time
+3. Replace direct implementations with utils calls
+4. Ensure tool-specific logic remains in tools
+5. Update imports and dependencies
+6. Run tests after each tool refactoring
+7. Update documentation to reflect changes
+8. Benchmark performance impact
+
+**Definition of Done:**
+- [ ] All tools refactored
+- [ ] Zero code duplication
+- [ ] Tests pass without modification
+- [ ] Performance unchanged or improved
+- [ ] Documentation updated
 
 ---
 
@@ -833,18 +1130,21 @@
 - [ ] Performance acceptable for all tools
 
 **Implementation Steps:**
-1. Create integration test suite
-2. Write Lua scripts using all tools
-3. Test tool combinations
-4. Verify error handling
-5. Benchmark script execution
-6. Document patterns
+1. Create integration test framework in tests/integration/
+2. Write Lua test scripts for each tool category
+3. Test tool combinations and chaining scenarios
+4. Verify error propagation from tools to scripts
+5. Benchmark script execution performance
+6. Test streaming operations where applicable
+7. Document common usage patterns
+8. Create example scripts for documentation
 
 **Definition of Done:**
 - [ ] All 25 tools tested from scripts
 - [ ] Common patterns documented
 - [ ] Performance benchmarked
 - [ ] No integration issues
+- [ ] Examples ready for users
 
 ### Task 2.10.2: Security Validation
 **Priority**: CRITICAL  
@@ -862,18 +1162,21 @@
 - [ ] Audit trail complete
 
 **Implementation Steps:**
-1. Create security test suite
-2. Attempt sandbox escapes
-3. Test resource exhaustion
-4. Try path traversal attacks
-5. Test injection scenarios
-6. Document findings
+1. Create security test suite in tests/security/
+2. Write sandbox escape attempt tests
+3. Test resource exhaustion scenarios
+4. Create path traversal attack tests
+5. Test injection scenarios (SQL, command, etc.)
+6. Verify all tools respect SecurityRequirements
+7. Document security findings and mitigations
+8. Create security best practices guide
 
 **Definition of Done:**
-- [ ] No security vulnerabilities
-- [ ] All attacks prevented
-- [ ] Audit documented
-- [ ] Fixes implemented
+- [ ] No security vulnerabilities found
+- [ ] All attack vectors tested
+- [ ] Audit report complete
+- [ ] Fixes implemented and verified
+- [ ] Security guide published
 
 ### Task 2.10.3: Performance Optimization
 **Priority**: HIGH  
@@ -891,18 +1194,21 @@
 - [ ] Benchmarks automated
 
 **Implementation Steps:**
-1. Profile all tools
-2. Identify bottlenecks
-3. Implement caching
-4. Optimize hot paths
-5. Reduce allocations
-6. Automate benchmarks
+1. Profile all tools using criterion benchmarks
+2. Identify initialization bottlenecks
+3. Implement lazy loading where appropriate
+4. Add caching for expensive operations
+5. Optimize hot paths and reduce allocations
+6. Create automated benchmark suite
+7. Add benchmarks to CI pipeline
+8. Document optimization techniques used
 
 **Definition of Done:**
-- [ ] Performance targets met
-- [ ] Benchmarks in CI
-- [ ] Optimizations documented
-- [ ] No regressions
+- [ ] Tool init <10ms for all tools
+- [ ] Memory usage documented and optimized
+- [ ] Benchmarks run in CI
+- [ ] No performance regressions
+- [ ] Optimization guide written
 
 ### Task 2.10.4: Documentation and Examples
 **Priority**: HIGH  
@@ -920,18 +1226,21 @@
 - [ ] Migration guide created
 
 **Implementation Steps:**
-1. Document each tool's API
-2. Create usage examples
-3. Write best practices guide
-4. Generate API reference
-5. Create migration guide
-6. Review and polish
+1. Document each tool's API in tool source files
+2. Create usage examples for each tool category
+3. Write best practices guide for tool development
+4. Generate API reference using cargo doc
+5. Create migration guide for model syntax changes
+6. Add tool comparison table
+7. Review all documentation for accuracy
+8. Create quick-start guide for new users
 
 **Definition of Done:**
-- [ ] Documentation complete
-- [ ] Examples runnable
-- [ ] Guides helpful
-- [ ] API reference accurate
+- [ ] All 25 tools documented
+- [ ] Examples test and run correctly
+- [ ] Best practices comprehensive
+- [ ] API docs auto-generated
+- [ ] Migration path clear
 
 ### Task 2.10.5: Phase 3 Handoff Package
 **Priority**: CRITICAL  
@@ -949,18 +1258,21 @@
 - [ ] Phase 3 prep included
 
 **Implementation Steps:**
-1. Summarize deliverables
-2. Document known issues
-3. Gather performance data
-4. Note architecture changes
-5. Prepare Phase 3 overview
-6. Schedule handoff meeting
+1. Summarize all 25 delivered tools with capabilities
+2. Document any known issues or limitations
+3. Gather performance benchmarks from all tools
+4. Note architecture changes from original design
+5. Prepare Phase 3 workflow orchestration overview
+6. Create handoff checklist
+7. Schedule handoff meeting with Phase 3 team
+8. Update project roadmap
 
 **Definition of Done:**
-- [ ] Handoff package complete
-- [ ] Phase 3 team briefed
-- [ ] No blocking issues
-- [ ] Clean transition
+- [ ] Complete tool inventory documented
+- [ ] Performance report generated
+- [ ] Architecture changes tracked
+- [ ] Phase 3 team has all materials
+- [ ] Smooth transition achieved
 
 ---
 

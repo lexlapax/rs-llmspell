@@ -16,4 +16,4 @@ pub use api::{GraphQLQueryTool, HttpRequestTool};
 pub use data::{CsvAnalyzerTool, JsonProcessorTool};
 pub use fs::{ArchiveHandlerTool, FileOperationsTool};
 pub use search::WebSearchTool;
-pub use util::{DataValidationTool, TemplateEngineTool, TextManipulatorTool};
+pub use util::{DataValidationTool, TemplateEngineTool, TextManipulatorTool, UuidGeneratorTool};

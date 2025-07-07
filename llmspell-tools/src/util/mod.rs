@@ -4,6 +4,7 @@
 pub mod data_validation;
 pub mod template_engine;
 pub mod text_manipulator;
+pub mod uuid_generator;
 
 pub use data_validation::{
     DataValidationConfig, DataValidationTool, ValidationError, ValidationResult, ValidationRule,
@@ -11,3 +12,4 @@ pub use data_validation::{
 };
 pub use template_engine::{TemplateEngineConfig, TemplateEngineTool};
 pub use text_manipulator::{TextManipulatorConfig, TextManipulatorTool, TextOperation};
+pub use uuid_generator::{UuidGeneratorConfig, UuidGeneratorTool};
