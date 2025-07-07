@@ -177,6 +177,7 @@ self.hooks.execute(HookPoint::AfterExecution, &result).await?;
 ## Key Development Reminders
 
 - **Complete Tasks Fully**: No lazy implementations or deferrals. Read the **Definition of Done** for task.
+- **DRY**: Check existing crates in our library and reuse code. do not re-implement.
 - **No Shortcuts or simplification**: Web Research or ask user if complex coding issue
 - **Do not jump ahead** Stick to task hierarchy in TODO.md, re-read it after tasks again to make sure you didn't miss steps.
 - **Maintain Bridge Philosophy**: Use existing crates, don't reinvent

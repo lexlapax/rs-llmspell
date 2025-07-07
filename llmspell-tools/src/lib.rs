@@ -3,6 +3,7 @@
 
 pub mod api;
 pub mod data;
+pub mod fs;
 pub mod registry;
 pub mod search;
 
@@ -12,4 +13,5 @@ pub use registry::{CapabilityMatcher, RegistryStatistics, ToolInfo, ToolRegistry
 // Re-export tools
 pub use api::{GraphQLQueryTool, HttpRequestTool};
 pub use data::{CsvAnalyzerTool, JsonProcessorTool};
+pub use fs::FileOperationsTool;
 pub use search::WebSearchTool;

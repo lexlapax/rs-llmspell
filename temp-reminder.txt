@@ -2,7 +2,7 @@ just a file for a reminder of todos for metrics
 add tool categories - media, math, 
 add media processing category for tools - audio, video, image tools
 add math processing tools - calc 
-
+add utility - datetime functions
     Filesystem,
     Web,
     Analysis,

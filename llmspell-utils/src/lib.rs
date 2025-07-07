@@ -63,8 +63,10 @@ pub use async_utils::{
 };
 pub use error_builders::{templates, BuiltError, ErrorBuilder, WithContext};
 pub use file_utils::{
-    copy_file, ensure_dir, expand_path, is_absolute_path, join_paths, normalize_path, parent_dir,
-    read_file, remove_dir_all_if_exists, remove_file_if_exists, write_file, write_file_atomic,
+    append_file, copy_file, ensure_dir, expand_path, file_exists, get_metadata, is_absolute_path,
+    join_paths, list_dir, move_file, normalize_path, parent_dir, read_file,
+    remove_dir_all_if_exists, remove_file_if_exists, write_file, write_file_atomic, DirEntry,
+    FileMetadata,
 };
 pub use id_generator::{
     generate_component_id, generate_deterministic_id, generate_short_id, validate_component_id,

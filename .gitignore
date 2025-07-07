@@ -24,3 +24,4 @@ Thumbs.db
 # Build artifacts
 /dist/
 /build/
+tarpaulin-report.json

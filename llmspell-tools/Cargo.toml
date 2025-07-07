@@ -9,6 +9,7 @@ license.workspace = true
 
 [dependencies]
 llmspell-core = { path = "../llmspell-core" }
+llmspell-utils = { path = "../llmspell-utils" }
 tokio.workspace = true
 async-trait.workspace = true
 serde.workspace = true
@@ -33,6 +34,12 @@ xlsxwriter = "0.6"
 # Base64 encoding
 base64 = "0.22"
 
+# File operations
+tempfile = "3.20"
+
+# Security dependencies
+llmspell-security = { path = "../llmspell-security" }
+
 # JSON processing with jq
 jaq-core = "1.5"
 jaq-interpret = "1.5"
@@ -40,3 +47,6 @@ jaq-parse = "1.0"
 jaq-syn = "1.0"
 jaq-std = "1.5"
 indexmap = "2.10.0"
+
+[dev-dependencies]
+uuid = { version = "1.17", features = ["v4"] }
