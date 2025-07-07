@@ -9,6 +9,8 @@
 //! - Hex encoding/decoding
 
 use base64::{engine::general_purpose, Engine as _};
+use chardetng::EncodingDetector;
+use encoding_rs::UTF_8;
 use md5;
 use serde::{Deserialize, Serialize};
 use sha1::Sha1;
@@ -185,6 +187,262 @@ pub fn base64_decode_url_safe(encoded: &str) -> Result<Vec<u8>, base64::DecodeEr
     general_purpose::URL_SAFE.decode(encoded)
 }
 
+/// Text encoding types
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum TextEncoding {
+    /// UTF-8 encoding
+    Utf8,
+    /// UTF-16 Little Endian
+    Utf16Le,
+    /// UTF-16 Big Endian
+    Utf16Be,
+    /// Windows-1252 (Western European)
+    Windows1252,
+    /// ISO-8859-1 (Latin-1)
+    Iso88591,
+    /// ASCII encoding
+    Ascii,
+    /// Unknown/other encoding
+    Unknown,
+}
+
+impl std::fmt::Display for TextEncoding {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TextEncoding::Utf8 => write!(f, "UTF-8"),
+            TextEncoding::Utf16Le => write!(f, "UTF-16LE"),
+            TextEncoding::Utf16Be => write!(f, "UTF-16BE"),
+            TextEncoding::Windows1252 => write!(f, "Windows-1252"),
+            TextEncoding::Iso88591 => write!(f, "ISO-8859-1"),
+            TextEncoding::Ascii => write!(f, "ASCII"),
+            TextEncoding::Unknown => write!(f, "Unknown"),
+        }
+    }
+}
+
+/// Line ending types
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum LineEnding {
+    /// Unix line ending (LF)
+    Lf,
+    /// Windows line ending (CRLF)
+    Crlf,
+    /// Classic Mac line ending (CR)
+    Cr,
+    /// Mixed line endings
+    Mixed,
+}
+
+impl std::fmt::Display for LineEnding {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LineEnding::Lf => write!(f, "LF"),
+            LineEnding::Crlf => write!(f, "CRLF"),
+            LineEnding::Cr => write!(f, "CR"),
+            LineEnding::Mixed => write!(f, "Mixed"),
+        }
+    }
+}
+
+/// Detect the encoding of text data
+#[must_use]
+pub fn detect_text_encoding(data: &[u8]) -> TextEncoding {
+    // Check for BOM first
+    if data.starts_with(&[0xEF, 0xBB, 0xBF]) {
+        return TextEncoding::Utf8;
+    }
+    if data.starts_with(&[0xFF, 0xFE]) {
+        return TextEncoding::Utf16Le;
+    }
+    if data.starts_with(&[0xFE, 0xFF]) {
+        return TextEncoding::Utf16Be;
+    }
+
+    // Use chardet for detection
+    let mut detector = EncodingDetector::new();
+    detector.feed(data, true);
+    let encoding = detector.guess(None, true);
+
+    match encoding.name() {
+        "UTF-8" => TextEncoding::Utf8,
+        "UTF-16LE" => TextEncoding::Utf16Le,
+        "UTF-16BE" => TextEncoding::Utf16Be,
+        "windows-1252" => TextEncoding::Windows1252,
+        "ISO-8859-1" => TextEncoding::Iso88591,
+        "ASCII" => TextEncoding::Ascii,
+        _ => TextEncoding::Unknown,
+    }
+}
+
+/// Convert text from one encoding to another
+///
+/// # Errors
+///
+/// Returns an error if the source encoding is not supported or conversion fails
+pub fn convert_text_encoding(
+    data: &[u8],
+    from_encoding: TextEncoding,
+    to_encoding: TextEncoding,
+) -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
+    // Convert from source encoding to UTF-8 string
+    let text = decode_text(data, from_encoding)?;
+
+    // Convert from UTF-8 string to target encoding
+    encode_text(&text, to_encoding)
+}
+
+/// Decode text data to UTF-8 string
+///
+/// # Errors
+///
+/// Returns an error if the encoding is not supported or decoding fails
+pub fn decode_text(
+    data: &[u8],
+    encoding: TextEncoding,
+) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+    let encoding_rs = match encoding {
+        TextEncoding::Utf8 => UTF_8,
+        TextEncoding::Utf16Le => encoding_rs::UTF_16LE,
+        TextEncoding::Utf16Be => encoding_rs::UTF_16BE,
+        TextEncoding::Windows1252 | TextEncoding::Iso88591 => encoding_rs::WINDOWS_1252,
+        TextEncoding::Ascii => encoding_rs::UTF_8, // ASCII is subset of UTF-8
+        TextEncoding::Unknown => return Err("Unknown encoding cannot be decoded".into()),
+    };
+
+    let (text, _, had_errors) = encoding_rs.decode(data);
+    if had_errors && encoding != TextEncoding::Unknown {
+        return Err("Decoding errors encountered".into());
+    }
+
+    Ok(text.into_owned())
+}
+
+/// Encode UTF-8 string to specified encoding
+///
+/// # Errors
+///
+/// Returns an error if the encoding is not supported or encoding fails
+pub fn encode_text(
+    text: &str,
+    encoding: TextEncoding,
+) -> Result<Vec<u8>, Box<dyn std::error::Error + Send + Sync>> {
+    let encoding_rs = match encoding {
+        TextEncoding::Utf8 => UTF_8,
+        TextEncoding::Utf16Le => encoding_rs::UTF_16LE,
+        TextEncoding::Utf16Be => encoding_rs::UTF_16BE,
+        TextEncoding::Windows1252 | TextEncoding::Iso88591 => encoding_rs::WINDOWS_1252,
+        TextEncoding::Ascii => encoding_rs::UTF_8, // ASCII is subset of UTF-8
+        TextEncoding::Unknown => return Err("Cannot encode to unknown encoding".into()),
+    };
+
+    let (encoded, _, had_errors) = encoding_rs.encode(text);
+    if had_errors {
+        return Err("Encoding errors encountered".into());
+    }
+
+    Ok(encoded.into_owned())
+}
+
+/// Detect line ending type in text
+#[must_use]
+pub fn detect_line_ending(text: &str) -> LineEnding {
+    let crlf_count = text.matches("\r\n").count();
+    let lf_count = text.matches('\n').count() - crlf_count; // Subtract CRLF instances
+    let cr_count = text.matches('\r').count() - crlf_count; // Subtract CRLF instances
+
+    let total = crlf_count + lf_count + cr_count;
+    if total == 0 {
+        return LineEnding::Lf; // Default to LF if no line endings found
+    }
+
+    // Check if mixed
+    let mut types_found = 0;
+    if crlf_count > 0 {
+        types_found += 1;
+    }
+    if lf_count > 0 {
+        types_found += 1;
+    }
+    if cr_count > 0 {
+        types_found += 1;
+    }
+
+    if types_found > 1 {
+        return LineEnding::Mixed;
+    }
+
+    // Return the dominant type
+    if crlf_count > 0 {
+        LineEnding::Crlf
+    } else if lf_count > 0 {
+        LineEnding::Lf
+    } else {
+        LineEnding::Cr
+    }
+}
+
+/// Convert line endings in text
+#[must_use]
+pub fn convert_line_endings(text: &str, target: LineEnding) -> String {
+    let target_ending = match target {
+        LineEnding::Lf => "\n",
+        LineEnding::Crlf => "\r\n",
+        LineEnding::Cr => "\r",
+        LineEnding::Mixed => return text.to_string(), // No conversion for mixed
+    };
+
+    // First normalize all line endings to LF
+    let normalized = text
+        .replace("\r\n", "\n") // CRLF -> LF
+        .replace('\r', "\n"); // CR -> LF
+
+    // Then convert to target
+    if target_ending == "\n" {
+        normalized
+    } else {
+        normalized.replace('\n', target_ending)
+    }
+}
+
+/// Convert tabs to spaces
+#[must_use]
+pub fn tabs_to_spaces(text: &str, tab_size: usize) -> String {
+    let spaces = " ".repeat(tab_size);
+    text.replace('\t', &spaces)
+}
+
+/// Convert spaces to tabs (converts groups of spaces equal to `tab_size`)
+#[must_use]
+pub fn spaces_to_tabs(text: &str, tab_size: usize) -> String {
+    if tab_size == 0 {
+        return text.to_string();
+    }
+
+    let spaces = " ".repeat(tab_size);
+    text.replace(&spaces, "\t")
+}
+
+/// Remove BOM (Byte Order Mark) from data if present
+#[must_use]
+pub fn remove_bom(data: &[u8]) -> &[u8] {
+    // UTF-8 BOM
+    if data.starts_with(&[0xEF, 0xBB, 0xBF]) {
+        return &data[3..];
+    }
+    // UTF-16LE BOM
+    if data.starts_with(&[0xFF, 0xFE]) {
+        return &data[2..];
+    }
+    // UTF-16BE BOM
+    if data.starts_with(&[0xFE, 0xFF]) {
+        return &data[2..];
+    }
+
+    data
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -243,5 +501,121 @@ mod tests {
 
         let parsed = from_hex_string(&hex).unwrap();
         assert_eq!(parsed, data);
+    }
+
+    #[test]
+    fn test_text_encoding_detection() {
+        // UTF-8 with BOM
+        let utf8_bom = [0xEF, 0xBB, 0xBF, b'H', b'e', b'l', b'l', b'o'];
+        assert_eq!(detect_text_encoding(&utf8_bom), TextEncoding::Utf8);
+
+        // UTF-16LE with BOM
+        let utf16le_bom = [0xFF, 0xFE, b'H', 0x00, b'e', 0x00];
+        assert_eq!(detect_text_encoding(&utf16le_bom), TextEncoding::Utf16Le);
+
+        // UTF-16BE with BOM
+        let utf16be_bom = [0xFE, 0xFF, 0x00, b'H', 0x00, b'e'];
+        assert_eq!(detect_text_encoding(&utf16be_bom), TextEncoding::Utf16Be);
+
+        // Plain ASCII/UTF-8
+        let ascii = b"Hello World";
+        let detected = detect_text_encoding(ascii);
+        assert!(matches!(detected, TextEncoding::Utf8 | TextEncoding::Ascii));
+    }
+
+    #[test]
+    fn test_text_encoding_conversion() {
+        let text = "Hello, 世界!";
+        let utf8_bytes = text.as_bytes();
+
+        // UTF-8 to UTF-8 (identity)
+        let converted =
+            convert_text_encoding(utf8_bytes, TextEncoding::Utf8, TextEncoding::Utf8).unwrap();
+        assert_eq!(converted, utf8_bytes);
+
+        // UTF-8 to UTF-16LE
+        let utf16le =
+            convert_text_encoding(utf8_bytes, TextEncoding::Utf8, TextEncoding::Utf16Le).unwrap();
+        assert!(!utf16le.is_empty());
+
+        // Round trip: UTF-8 -> UTF-16LE -> UTF-8
+        let back_to_utf8 =
+            convert_text_encoding(&utf16le, TextEncoding::Utf16Le, TextEncoding::Utf8).unwrap();
+        assert_eq!(back_to_utf8, utf8_bytes);
+    }
+
+    #[test]
+    fn test_line_ending_detection() {
+        assert_eq!(detect_line_ending("line1\nline2\n"), LineEnding::Lf);
+        assert_eq!(detect_line_ending("line1\r\nline2\r\n"), LineEnding::Crlf);
+        assert_eq!(detect_line_ending("line1\rline2\r"), LineEnding::Cr);
+        assert_eq!(
+            detect_line_ending("line1\nline2\r\nline3"),
+            LineEnding::Mixed
+        );
+        assert_eq!(detect_line_ending("no line endings"), LineEnding::Lf); // Default
+    }
+
+    #[test]
+    fn test_line_ending_conversion() {
+        let text = "line1\r\nline2\nline3\r";
+
+        // Convert to LF
+        let lf = convert_line_endings(text, LineEnding::Lf);
+        assert_eq!(lf, "line1\nline2\nline3\n");
+
+        // Convert to CRLF
+        let crlf = convert_line_endings(text, LineEnding::Crlf);
+        assert_eq!(crlf, "line1\r\nline2\r\nline3\r\n");
+
+        // Convert to CR
+        let cr = convert_line_endings(text, LineEnding::Cr);
+        assert_eq!(cr, "line1\rline2\rline3\r");
+    }
+
+    #[test]
+    fn test_tabs_spaces_conversion() {
+        let text_with_tabs = "line1\tindented\ttext";
+        let text_with_spaces = "line1    indented    text";
+
+        // Tabs to spaces
+        let spaces = tabs_to_spaces(text_with_tabs, 4);
+        assert_eq!(spaces, text_with_spaces);
+
+        // Spaces to tabs
+        let tabs = spaces_to_tabs(text_with_spaces, 4);
+        assert_eq!(tabs, text_with_tabs);
+    }
+
+    #[test]
+    fn test_bom_removal() {
+        // UTF-8 BOM
+        let utf8_with_bom = [0xEF, 0xBB, 0xBF, b'H', b'e', b'l', b'l', b'o'];
+        let without_bom = remove_bom(&utf8_with_bom);
+        assert_eq!(without_bom, b"Hello");
+
+        // UTF-16LE BOM
+        let utf16le_with_bom = [0xFF, 0xFE, b'H', 0x00, b'e', 0x00];
+        let without_bom = remove_bom(&utf16le_with_bom);
+        assert_eq!(without_bom, &[b'H', 0x00, b'e', 0x00]);
+
+        // No BOM
+        let no_bom = b"Hello";
+        let result = remove_bom(no_bom);
+        assert_eq!(result, no_bom);
+    }
+
+    #[test]
+    fn test_decode_encode_text() {
+        let text = "Hello, World!";
+        let utf8_bytes = text.as_bytes();
+
+        // Decode UTF-8
+        let decoded = decode_text(utf8_bytes, TextEncoding::Utf8).unwrap();
+        assert_eq!(decoded, text);
+
+        // Encode to UTF-8
+        let encoded = encode_text(text, TextEncoding::Utf8).unwrap();
+        assert_eq!(encoded, utf8_bytes);
     }
 }
