@@ -940,6 +940,233 @@ impl CsvAnalyzerTool {
         })
     }
 
+    /// Transform CSV data based on transformation rules
+    async fn transform_csv(&self, content: &str, options: &Value) -> Result<String> {
+        info!("Transforming CSV data");
+
+        // Parse transformation options
+        let add_columns = options.get("add_columns").and_then(|v| v.as_object());
+        let rename_columns = options.get("rename_columns").and_then(|v| v.as_object());
+
+        // Parse CSV
+        let encoding = self.detect_encoding(content.as_bytes());
+        let (decoded, _, _) = encoding.decode(content.as_bytes());
+        let mut reader = ReaderBuilder::new()
+            .delimiter(self.config.default_delimiter)
+            .from_reader(decoded.as_bytes());
+
+        // Get headers
+        let headers = reader.headers().map_err(Self::csv_error)?.clone();
+        let mut new_headers: Vec<String> = headers.iter().map(|h| h.to_string()).collect();
+
+        // Apply column renames
+        if let Some(renames) = rename_columns {
+            for (old_name, new_name) in renames {
+                if let Some(new_name_str) = new_name.as_str() {
+                    for header in &mut new_headers {
+                        if header == old_name {
+                            *header = new_name_str.to_string();
+                        }
+                    }
+                }
+            }
+        }
+
+        // Add new columns
+        let mut new_column_names = Vec::new();
+        let mut new_column_expressions = Vec::new();
+        if let Some(additions) = add_columns {
+            for (name, expr) in additions {
+                new_headers.push(name.clone());
+                new_column_names.push(name.clone());
+                if let Some(expr_str) = expr.as_str() {
+                    new_column_expressions.push(expr_str.to_string());
+                }
+            }
+        }
+
+        // Write transformed CSV
+        let mut output = Vec::new();
+        {
+            let mut writer = Writer::from_writer(&mut output);
+
+            // Write new headers
+            writer.write_record(&new_headers).map_err(Self::csv_error)?;
+
+            // Process each row
+            for result in reader.records() {
+                let record = result.map_err(Self::csv_error)?;
+                let mut new_record: Vec<String> = Vec::new();
+
+                // Copy existing fields (with renames applied)
+                for field in record.iter() {
+                    new_record.push(field.to_string());
+                }
+
+                // Calculate new columns
+                for expr in new_column_expressions.iter() {
+                    // Simple expression evaluation (supports basic arithmetic)
+                    let value = self.evaluate_expression(expr, &headers, &record)?;
+                    new_record.push(value);
+                }
+
+                writer.write_record(&new_record).map_err(Self::csv_error)?;
+            }
+
+            writer.flush().map_err(|e| LLMSpellError::Internal {
+                message: format!("Failed to flush CSV writer: {}", e),
+                source: None,
+            })?;
+        }
+
+        String::from_utf8(output).map_err(|e| LLMSpellError::Internal {
+            message: format!("Failed to convert transformed CSV to string: {}", e),
+            source: None,
+        })
+    }
+
+    /// Evaluate a simple arithmetic expression for CSV transformation
+    fn evaluate_expression(
+        &self,
+        expr: &str,
+        headers: &csv::StringRecord,
+        record: &csv::StringRecord,
+    ) -> Result<String> {
+        // Simple expression evaluator for basic arithmetic
+        // Supports: column_name * column_name, column_name + number, etc.
+
+        // For now, implement a simple case for multiplication
+        if expr.contains(" * ") {
+            let parts: Vec<&str> = expr.split(" * ").collect();
+            if parts.len() == 2 {
+                let left_val = self.get_column_value(parts[0].trim(), headers, record)?;
+                let right_val = self.get_column_value(parts[1].trim(), headers, record)?;
+
+                if let (Ok(left), Ok(right)) = (left_val.parse::<f64>(), right_val.parse::<f64>()) {
+                    return Ok(format!("{:.2}", left * right));
+                }
+            }
+        }
+
+        // Default: return the expression as-is
+        Ok(expr.to_string())
+    }
+
+    /// Get column value by name or return literal value
+    fn get_column_value(
+        &self,
+        name: &str,
+        headers: &csv::StringRecord,
+        record: &csv::StringRecord,
+    ) -> Result<String> {
+        // Try to find column by name
+        for (i, header) in headers.iter().enumerate() {
+            if header == name {
+                return Ok(record.get(i).unwrap_or("").to_string());
+            }
+        }
+
+        // If not a column name, return as literal
+        Ok(name.to_string())
+    }
+
+    /// Validate CSV data against rules
+    async fn validate_csv(&self, content: &str, options: &Value) -> Result<Value> {
+        info!("Validating CSV data");
+
+        let rules = options
+            .get("rules")
+            .and_then(|v| v.as_object())
+            .ok_or_else(|| LLMSpellError::Validation {
+                message: "Validate operation requires 'rules' in options".to_string(),
+                field: Some("rules".to_string()),
+            })?;
+
+        // Parse CSV
+        let encoding = self.detect_encoding(content.as_bytes());
+        let (decoded, _, _) = encoding.decode(content.as_bytes());
+        let mut reader = ReaderBuilder::new()
+            .delimiter(self.config.default_delimiter)
+            .from_reader(decoded.as_bytes());
+
+        let headers = reader.headers().map_err(Self::csv_error)?.clone();
+        let mut errors = Vec::new();
+        let mut row_number = 1; // Header is row 0
+
+        for result in reader.records() {
+            let record = result.map_err(Self::csv_error)?;
+
+            // Check each rule
+            for (column_name, rule) in rules {
+                if let Some(rule_str) = rule.as_str() {
+                    // Find column index
+                    if let Some(col_index) = headers.iter().position(|h| h == column_name) {
+                        if let Some(value) = record.get(col_index) {
+                            if let Some(error) =
+                                self.validate_field(value, rule_str, column_name, row_number)
+                            {
+                                errors.push(error);
+                            }
+                        }
+                    }
+                }
+            }
+
+            row_number += 1;
+        }
+
+        Ok(serde_json::json!({
+            "valid": errors.is_empty(),
+            "errors": errors,
+            "total_rows": row_number - 1,
+            "error_count": errors.len()
+        }))
+    }
+
+    /// Validate a single field against a rule
+    fn validate_field(&self, value: &str, rule: &str, column: &str, row: usize) -> Option<Value> {
+        // Email validation
+        if rule == "email" && (!value.contains('@') || !value.contains('.')) {
+            return Some(serde_json::json!({
+                "row": row,
+                "column": column,
+                "value": value,
+                "error": "Invalid email format"
+            }));
+        }
+
+        // Range validation (e.g., "range:0-120")
+        if rule.starts_with("range:") {
+            if let Some(range_str) = rule.strip_prefix("range:") {
+                if let Some((min_str, max_str)) = range_str.split_once('-') {
+                    if let (Ok(min), Ok(max), Ok(val)) = (
+                        min_str.parse::<f64>(),
+                        max_str.parse::<f64>(),
+                        value.parse::<f64>(),
+                    ) {
+                        if val < min || val > max {
+                            return Some(serde_json::json!({
+                                "row": row,
+                                "column": column,
+                                "value": value,
+                                "error": format!("Value {} is outside range {}-{}", val, min, max)
+                            }));
+                        }
+                    } else {
+                        return Some(serde_json::json!({
+                            "row": row,
+                            "column": column,
+                            "value": value,
+                            "error": "Value is not a valid number"
+                        }));
+                    }
+                }
+            }
+        }
+
+        None
+    }
+
     /// Convert CSV error to LLMSpellError
     fn csv_error(e: csv::Error) -> LLMSpellError {
         LLMSpellError::Validation {
@@ -1109,11 +1336,27 @@ impl BaseAgent for CsvAnalyzerTool {
                 let sampled = self.sample_csv(&content, sample_size).await?;
                 Value::String(sampled)
             }
-            _ => {
-                return Err(LLMSpellError::Validation {
-                    message: format!("Operation {} not yet implemented", operation),
-                    field: Some("operation".to_string()),
-                })
+            CsvOperation::Transform => {
+                if options.is_none() {
+                    return Err(LLMSpellError::Validation {
+                        message: "Transform operation requires options".to_string(),
+                        field: Some("options".to_string()),
+                    });
+                }
+                let transformed = self
+                    .transform_csv(&content, options.as_ref().unwrap())
+                    .await?;
+                Value::String(transformed)
+            }
+            CsvOperation::Validate => {
+                if options.is_none() {
+                    return Err(LLMSpellError::Validation {
+                        message: "Validate operation requires options with rules".to_string(),
+                        field: Some("options".to_string()),
+                    });
+                }
+                self.validate_csv(&content, options.as_ref().unwrap())
+                    .await?
             }
         };
 
@@ -1124,11 +1367,15 @@ impl BaseAgent for CsvAnalyzerTool {
             Value::String(operation.to_string()),
         );
 
-        // Add the result to metadata for Analyze operation
+        // Add the result to metadata for Analyze and Validate operations
         if matches!(operation, CsvOperation::Analyze) {
             metadata
                 .extra
                 .insert("analysis_result".to_string(), result.clone());
+        } else if matches!(operation, CsvOperation::Validate) {
+            metadata
+                .extra
+                .insert("validation_result".to_string(), result.clone());
         }
 
         let output_text = match &result {

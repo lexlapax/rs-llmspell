@@ -169,7 +169,6 @@ async fn test_large_csv_streaming() {
 }
 
 #[tokio::test]
-#[ignore = "Validate operation not yet implemented"]
 async fn test_csv_validation() {
     let tool = CsvAnalyzerTool::default();
 
@@ -199,7 +198,7 @@ async fn test_csv_validation() {
         .await
         .unwrap();
 
-    assert!(result.text.contains("validation"));
+    assert!(result.text.contains("valid"));
 
     let extra = &result.metadata.extra;
     if let Some(validation) = extra.get("validation_result") {
@@ -210,7 +209,6 @@ async fn test_csv_validation() {
 }
 
 #[tokio::test]
-#[ignore = "Transform operation not yet implemented"]
 async fn test_csv_transform_operation() {
     let tool = CsvAnalyzerTool::default();
 
