@@ -10,6 +10,6 @@ pub mod search;
 pub use registry::{CapabilityMatcher, RegistryStatistics, ToolInfo, ToolRegistry};
 
 // Re-export tools
-pub use api::HttpRequestTool;
+pub use api::{GraphQLQueryTool, HttpRequestTool};
 pub use data::{CsvAnalyzerTool, JsonProcessorTool};
 pub use search::WebSearchTool;

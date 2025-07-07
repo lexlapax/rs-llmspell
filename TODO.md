@@ -42,7 +42,7 @@
 - [x] Task 2.3.1: JsonProcessorTool 2025-07-07
 - [x] Task 2.3.2: CsvAnalyzerTool 2025-07-07
 - [x] Task 2.3.3: HttpRequestTool 2025-07-07
-- [ ] Task 2.3.4: GraphQLQueryTool <date>
+- [x] Task 2.3.4: GraphQLQueryTool 2025-07-07
 - [ ] Task 2.4.1: FileOperationsTool <date>
 - [ ] Task 2.4.2: ArchiveHandlerTool <date>
 - [ ] Task 2.4.3: TemplateEngineTool <date>
@@ -353,11 +353,11 @@
 **Description**: GraphQL client with schema introspection.
 
 **Acceptance Criteria:**
-- [ ] Query execution works
-- [ ] Mutation support complete
-- [ ] Schema introspection cached
-- [ ] Variable substitution safe
-- [ ] Error handling comprehensive
+- [x] Query execution works
+- [x] Mutation support complete
+- [x] Schema introspection cached
+- [x] Variable substitution safe
+- [x] Error handling comprehensive
 
 **Implementation Steps:**
 1. Create `llmspell-tools/src/api/graphql_query.rs`
@@ -368,10 +368,10 @@
 6. Test with public APIs
 
 **Definition of Done:**
-- [ ] Queries execute correctly
-- [ ] Schema caching works
-- [ ] Variables handled safely
-- [ ] Examples provided
+- [x] Queries execute correctly
+- [x] Schema caching works
+- [x] Variables handled safely
+- [x] Examples provided
 
 ---
 
