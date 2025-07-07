@@ -13,5 +13,5 @@ pub use registry::{CapabilityMatcher, RegistryStatistics, ToolInfo, ToolRegistry
 // Re-export tools
 pub use api::{GraphQLQueryTool, HttpRequestTool};
 pub use data::{CsvAnalyzerTool, JsonProcessorTool};
-pub use fs::FileOperationsTool;
+pub use fs::{ArchiveHandlerTool, FileOperationsTool};
 pub use search::WebSearchTool;

@@ -44,7 +44,7 @@
 - [x] Task 2.3.3: HttpRequestTool 2025-07-07
 - [x] Task 2.3.4: GraphQLQueryTool 2025-07-07
 - [x] Task 2.4.1: FileOperationsTool 2025-07-07
-- [ ] Task 2.4.2: ArchiveHandlerTool <date>
+- [x] Task 2.4.2: ArchiveHandlerTool 2025-07-07
 - [ ] Task 2.4.3: TemplateEngineTool <date>
 - [ ] Task 2.4.4: DataValidationTool <date>
 - [ ] Task 2.5.1: WebSearchTool (Real Implementation) <date>
@@ -436,11 +436,11 @@
 **Description**: Archive extraction and creation tool.
 
 **Acceptance Criteria:**
-- [ ] ZIP/TAR/GZ formats supported
-- [ ] Extraction limits enforced
-- [ ] Compression levels configurable
-- [ ] Path safety maintained
-- [ ] Streaming supported
+- [x] ZIP/TAR/GZ formats supported
+- [x] Extraction limits enforced
+- [x] Compression levels configurable
+- [x] Path safety maintained
+- [x] Streaming supported
 
 **Implementation Steps:**
 1. Create `llmspell-tools/src/fs/archive_handler.rs`
@@ -451,10 +451,10 @@
 6. Test with various archives
 
 **Definition of Done:**
-- [ ] Formats handled correctly
-- [ ] Limits prevent bombs
-- [ ] Paths sanitized
-- [ ] Performance good
+- [x] Formats handled correctly
+- [x] Limits prevent bombs
+- [x] Paths sanitized
+- [x] Performance good
 
 ### Task 2.4.3: TemplateEngineTool
 **Priority**: LOW  
