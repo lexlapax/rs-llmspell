@@ -57,13 +57,14 @@
 - [x] Task 2.5.7: CalculatorTool 2025-07-07
 - [x] Task 2.6.1: FileWatcherTool 2025-07-07
 - [x] Task 2.6.2: FileConverterTool 2025-07-07 ✅
+- [x] Task 2.6.3: FileSearchTool 2025-07-07 ✅
 - [ ] **MOVED TO PHASE 2.5**: WebSearchTool (external dependency)
 - [ ] **MOVED TO PHASE 3.5**: CodeSearchTool (complex infrastructure)
 - [ ] **MOVED TO PHASE 3.5**: SemanticSearchTool (vector storage needed)
 
 **NEW SELF-CONTAINED TOOLS TO ADD:**
 - [x] Task 2.5: Utilities & Helpers Tools (Days 7-8) - COMPLETE (7/7 complete) ✅
-- [ ] Task 2.6: File System Extended Tools (Day 9) - IN PROGRESS (3/3 complete) ✅ Ready for Task 2.6.3
+- [x] Task 2.6: File System Extended Tools (Day 9) - COMPLETE (3/3 complete) ✅
 - [ ] Task 2.7: System Integration Tools (Day 10)
 - [ ] Task 2.8: Simple Media Tools (Day 11)
 - [ ] Task 2.9: Common Utilities Enhancement (Day 12)
@@ -808,27 +809,27 @@
 **Description**: Content search within files.
 
 **Acceptance Criteria:**
-- [ ] Pattern matching in file contents
-- [ ] Recursive directory search
-- [ ] File type filtering
-- [ ] Context extraction around matches
+- [x] Pattern matching in file contents ✅
+- [x] Recursive directory search ✅
+- [x] File type filtering ✅
+- [x] Context extraction around matches ✅
 
 **Implementation Steps:**
-1. Create `llmspell-tools/src/fs/file_search.rs`
-2. Implement Tool trait with search operations
-3. Add regex pattern matching support
-4. Implement recursive directory traversal
-5. Add file type filtering (by extension, content)
-6. Extract context lines around matches
-7. Optimize for large file handling
-8. Write tests for various search scenarios
+1. [x] Create `llmspell-tools/src/fs/file_search.rs` ✅
+2. [x] Implement Tool trait with search operations ✅
+3. [x] Add regex pattern matching support ✅
+4. [x] Implement recursive directory traversal ✅
+5. [x] Add file type filtering (by extension, content) ✅
+6. [x] Extract context lines around matches ✅
+7. [x] Optimize for large file handling ✅
+8. [x] Write tests for various search scenarios ✅
 
 **Definition of Done:**
-- [ ] Pattern matching accurate and fast
-- [ ] Recursive search respects limits
-- [ ] File filtering works correctly
-- [ ] Context extraction helpful
-- [ ] Performance acceptable for large directories
+- [x] Pattern matching accurate and fast ✅ (regex and literal support)
+- [x] Recursive search respects limits ✅ (depth and resource limits)
+- [x] File filtering works correctly ✅ (extension and directory filtering)
+- [x] Context extraction helpful ✅ (configurable context lines)
+- [x] Performance acceptable for large directories ✅ (streaming search, file size limits)
 
 ---
 

@@ -65,6 +65,9 @@ pub mod time;
 /// File system monitoring utilities
 pub mod file_monitor;
 
+/// File and content search utilities
+pub mod search;
+
 // Re-export commonly used types and functions
 pub use async_utils::{
     concurrent_map, race_to_success, retry_async, timeout, timeout_with_default, AsyncError,
@@ -85,6 +88,10 @@ pub use file_utils::{
 pub use id_generator::{
     generate_component_id, generate_deterministic_id, generate_short_id, validate_component_id,
     ComponentId, ComponentIdBuilder, NAMESPACE_AGENT, NAMESPACE_TOOL, NAMESPACE_WORKFLOW,
+};
+pub use search::{
+    search_in_directory, search_in_file, should_search_file, SearchMatch, SearchOptions,
+    SearchResult,
 };
 pub use serialization::{
     convert_format, from_json, from_toml, from_yaml, json, merge_json, to_json, to_json_pretty,
