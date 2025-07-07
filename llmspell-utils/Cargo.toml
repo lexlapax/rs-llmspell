@@ -52,6 +52,9 @@ md5 = "0.7"
 base64 = "0.22"
 hex = "0.4"
 
+# Pattern matching
+glob = "0.3"
+
 # Platform-specific dependencies
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

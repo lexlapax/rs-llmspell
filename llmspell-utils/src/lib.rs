@@ -62,6 +62,9 @@ pub mod encoding;
 /// Time and date utilities
 pub mod time;
 
+/// File system monitoring utilities
+pub mod file_monitor;
+
 // Re-export commonly used types and functions
 pub use async_utils::{
     concurrent_map, race_to_success, retry_async, timeout, timeout_with_default, AsyncError,
@@ -72,6 +75,7 @@ pub use encoding::{
     hash_data, hash_file, hash_string, to_hex_string, verify_hash, HashAlgorithm,
 };
 pub use error_builders::{templates, BuiltError, ErrorBuilder, WithContext};
+pub use file_monitor::{debounce_events, should_watch_path, FileEvent, FileEventType, WatchConfig};
 pub use file_utils::{
     append_file, copy_file, ensure_dir, expand_path, file_exists, get_metadata, is_absolute_path,
     join_paths, list_dir, move_file, normalize_path, parent_dir, read_file,
