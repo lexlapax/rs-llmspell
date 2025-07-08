@@ -23,11 +23,19 @@ use llmspell_core::{
     types::{AgentInput, AgentOutput, ExecutionContext},
     ComponentMetadata, LLMSpellError, Result,
 };
-use llmspell_utils::string_utils;
+use llmspell_utils::{
+    error_builders::llmspell::{component_error, validation_error},
+    params::{
+        extract_optional_object, extract_optional_u64, extract_parameters, extract_required_string,
+        extract_required_u64,
+    },
+    response::ResponseBuilder,
+    string_utils,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum TextOperation {
     Uppercase,
@@ -104,41 +112,25 @@ impl TextManipulatorTool {
             TextOperation::Reverse => Ok(string_utils::reverse(text)),
             TextOperation::Trim => Ok(string_utils::trim(text)),
             TextOperation::Replace => {
-                let opts = options.ok_or_else(|| LLMSpellError::Validation {
-                    message: "Replace operation requires 'from' and 'to' options".to_string(),
-                    field: Some("options".to_string()),
+                let opts = options.ok_or_else(|| {
+                    validation_error(
+                        "Replace operation requires 'from' and 'to' options",
+                        Some("options".to_string()),
+                    )
                 })?;
-                let from = opts.get("from").and_then(|v| v.as_str()).ok_or_else(|| {
-                    LLMSpellError::Validation {
-                        message: "Missing 'from' parameter".to_string(),
-                        field: Some("from".to_string()),
-                    }
-                })?;
-                let to = opts.get("to").and_then(|v| v.as_str()).ok_or_else(|| {
-                    LLMSpellError::Validation {
-                        message: "Missing 'to' parameter".to_string(),
-                        field: Some("to".to_string()),
-                    }
-                })?;
+                let from = extract_required_string(&opts, "from")?;
+                let to = extract_required_string(&opts, "to")?;
                 Ok(string_utils::replace_all(text, from, to))
             }
             TextOperation::Substring => {
-                let opts = options.ok_or_else(|| LLMSpellError::Validation {
-                    message: "Substring operation requires 'start' and 'end' options".to_string(),
-                    field: Some("options".to_string()),
+                let opts = options.ok_or_else(|| {
+                    validation_error(
+                        "Substring operation requires 'start' and 'end' options",
+                        Some("options".to_string()),
+                    )
                 })?;
-                let start = opts.get("start").and_then(|v| v.as_u64()).ok_or_else(|| {
-                    LLMSpellError::Validation {
-                        message: "Missing or invalid 'start' parameter".to_string(),
-                        field: Some("start".to_string()),
-                    }
-                })? as usize;
-                let end = opts.get("end").and_then(|v| v.as_u64()).ok_or_else(|| {
-                    LLMSpellError::Validation {
-                        message: "Missing or invalid 'end' parameter".to_string(),
-                        field: Some("end".to_string()),
-                    }
-                })? as usize;
+                let start = extract_required_u64(&opts, "start")? as usize;
+                let end = extract_required_u64(&opts, "end")? as usize;
                 Ok(string_utils::substring(text, start, end))
             }
             TextOperation::Split => {
@@ -148,21 +140,18 @@ impl TextManipulatorTool {
                     .and_then(|v| v.as_str())
                     .unwrap_or(" ");
                 let parts = string_utils::split_by(text, delimiter);
-                Ok(
-                    serde_json::to_string(&parts).map_err(|e| LLMSpellError::Component {
-                        message: format!("Failed to serialize split result: {}", e),
-                        source: Some(Box::new(e)),
-                    })?,
-                )
+                Ok(serde_json::to_string(&parts).map_err(|e| {
+                    component_error(format!("Failed to serialize split result: {}", e))
+                })?)
             }
             TextOperation::Join => {
                 // For join, the text is expected to be a JSON array of strings
-                let parts: Vec<String> =
-                    serde_json::from_str(text).map_err(|_| LLMSpellError::Validation {
-                        message: "Join operation requires text to be a JSON array of strings"
-                            .to_string(),
-                        field: Some("text".to_string()),
-                    })?;
+                let parts: Vec<String> = serde_json::from_str(text).map_err(|_| {
+                    validation_error(
+                        "Join operation requires text to be a JSON array of strings",
+                        Some("text".to_string()),
+                    )
+                })?;
                 let delimiter = options
                     .as_ref()
                     .and_then(|v| v.get("delimiter"))
@@ -178,8 +167,7 @@ impl TextManipulatorTool {
             TextOperation::Truncate => {
                 let max_len = options
                     .as_ref()
-                    .and_then(|v| v.get("max_length"))
-                    .and_then(|v| v.as_u64())
+                    .and_then(|v| extract_optional_u64(v, "max_length"))
                     .map(|v| v as usize)
                     .unwrap_or(self.config.default_truncate_length);
                 Ok(string_utils::truncate(text, max_len))
@@ -187,8 +175,7 @@ impl TextManipulatorTool {
             TextOperation::Indent => {
                 let spaces = options
                     .as_ref()
-                    .and_then(|v| v.get("spaces"))
-                    .and_then(|v| v.as_u64())
+                    .and_then(|v| extract_optional_u64(v, "spaces"))
                     .map(|v| v as usize)
                     .unwrap_or(self.config.default_indent_spaces);
                 Ok(string_utils::indent(text, spaces))
@@ -198,14 +185,99 @@ impl TextManipulatorTool {
             TextOperation::WordWrap => {
                 let width = options
                     .as_ref()
-                    .and_then(|v| v.get("width"))
-                    .and_then(|v| v.as_u64())
+                    .and_then(|v| extract_optional_u64(v, "width"))
                     .map(|v| v as usize)
                     .unwrap_or(self.config.default_wrap_width);
                 let lines = string_utils::word_wrap(text, width);
                 Ok(lines.join("\n"))
             }
         }
+    }
+
+    async fn validate_parameters(&self, params: &Value) -> Result<()> {
+        // Required parameters
+        extract_required_string(params, "text")?;
+        let operation_str = extract_required_string(params, "operation")?;
+
+        // Validate operation is valid
+        let valid_operations = [
+            "uppercase",
+            "lowercase",
+            "reverse",
+            "trim",
+            "replace",
+            "substring",
+            "split",
+            "join",
+            "snake_case",
+            "camel_case",
+            "pascal_case",
+            "sanitize",
+            "truncate",
+            "indent",
+            "dedent",
+            "normalize_whitespace",
+            "word_wrap",
+        ];
+
+        if !valid_operations.contains(&operation_str) {
+            return Err(validation_error(
+                format!(
+                    "Invalid operation: {}. Valid operations are: {}",
+                    operation_str,
+                    valid_operations.join(", ")
+                ),
+                Some("operation".to_string()),
+            ));
+        }
+
+        // Operation-specific validation
+        if let Some(options) = extract_optional_object(params, "options") {
+            match operation_str {
+                "replace" => {
+                    options
+                        .get("from")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| {
+                            validation_error("Missing 'from' parameter", Some("from".to_string()))
+                        })?;
+                    options.get("to").and_then(|v| v.as_str()).ok_or_else(|| {
+                        validation_error("Missing 'to' parameter", Some("to".to_string()))
+                    })?;
+                }
+                "substring" => {
+                    options
+                        .get("start")
+                        .and_then(|v| v.as_u64())
+                        .ok_or_else(|| {
+                            validation_error("Missing 'start' parameter", Some("start".to_string()))
+                        })?;
+                    options.get("end").and_then(|v| v.as_u64()).ok_or_else(|| {
+                        validation_error("Missing 'end' parameter", Some("end".to_string()))
+                    })?;
+                }
+                _ => {} // Other operations have optional parameters
+            }
+        } else {
+            // Check if options are required for this operation
+            match operation_str {
+                "replace" => {
+                    return Err(validation_error(
+                        "Replace operation requires 'options' with 'from' and 'to' fields",
+                        Some("options".to_string()),
+                    ));
+                }
+                "substring" => {
+                    return Err(validation_error(
+                        "Substring operation requires 'options' with 'start' and 'end' fields",
+                        Some("options".to_string()),
+                    ));
+                }
+                _ => {} // Options are optional for other operations
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -222,58 +294,50 @@ impl BaseAgent for TextManipulatorTool {
     }
 
     async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
-        // Get parameters from input
-        let params =
-            input
-                .parameters
-                .get("parameters")
-                .ok_or_else(|| LLMSpellError::Validation {
-                    message: "Missing parameters in input".to_string(),
-                    field: Some("parameters".to_string()),
-                })?;
+        // Get parameters using shared utility
+        let params = extract_parameters(&input)?;
 
         // Validate parameters
         self.validate_parameters(params).await?;
 
-        // Extract parameters
-        let text = params.get("text").and_then(|v| v.as_str()).ok_or_else(|| {
-            LLMSpellError::Validation {
-                message: "Missing 'text' parameter".to_string(),
-                field: Some("text".to_string()),
-            }
-        })?;
-
-        let operation_str = params
-            .get("operation")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| LLMSpellError::Validation {
-                message: "Missing 'operation' parameter".to_string(),
-                field: Some("operation".to_string()),
-            })?;
+        // Extract parameters using utilities
+        let text = extract_required_string(params, "text")?;
+        let operation_str = extract_required_string(params, "operation")?;
 
         let operation: TextOperation =
             serde_json::from_value(json!(operation_str)).map_err(|_| {
-                LLMSpellError::Validation {
-                    message: format!("Invalid operation: {}", operation_str),
-                    field: Some("operation".to_string()),
-                }
+                validation_error(
+                    format!("Invalid operation: {}", operation_str),
+                    Some("operation".to_string()),
+                )
             })?;
 
-        let options = params.get("options").cloned();
+        let options =
+            extract_optional_object(params, "options").map(|obj| Value::Object(obj.clone()));
 
         // Perform the operation
-        match self.perform_operation(text, operation, options) {
-            Ok(result) => Ok(AgentOutput::text(result)),
-            Err(e) => Err(e),
-        }
+        let result = self.perform_operation(text, operation, options)?;
+
+        // Build response using ResponseBuilder
+        let response = ResponseBuilder::success(operation_str)
+            .with_message(format!("Text {} operation completed", operation_str))
+            .with_result(json!({
+                "result": result,
+                "operation": operation_str,
+                "original_length": text.len(),
+                "result_length": result.len()
+            }))
+            .build();
+
+        Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
     }
 
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
         if input.text.is_empty() {
-            return Err(LLMSpellError::Validation {
-                message: "Input prompt cannot be empty".to_string(),
-                field: Some("prompt".to_string()),
-            });
+            return Err(validation_error(
+                "Input prompt cannot be empty",
+                Some("prompt".to_string()),
+            ));
         }
         Ok(())
     }
@@ -429,8 +493,11 @@ mod tests {
             let result = tool.execute(input, context.clone()).await;
             match result {
                 Ok(output) => {
+                    let response: Value = serde_json::from_str(&output.text).unwrap();
+                    assert!(response["success"].as_bool().unwrap_or(false));
+                    let result_text = response["result"]["result"].as_str().unwrap();
                     assert_eq!(
-                        output.text, expected,
+                        result_text, expected,
                         "Operation {} produced unexpected result",
                         operation
                     );
