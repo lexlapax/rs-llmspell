@@ -381,6 +381,45 @@ pub fn is_env_truthy(key: &str) -> bool {
     }
 }
 
+/// Get a single environment variable
+///
+/// Returns the value of an environment variable if it exists.
+///
+/// # Examples
+///
+/// ```rust
+/// use llmspell_utils::system_info::get_env_var;
+///
+/// if let Some(path) = get_env_var("PATH") {
+///     println!("PATH = {}", path);
+/// }
+/// ```
+#[must_use]
+pub fn get_env_var(key: &str) -> Option<String> {
+    env::var(key).ok()
+}
+
+/// Set an environment variable if allowed
+///
+/// Sets an environment variable. This is a wrapper around `std::env::set_var`
+/// that can be extended with additional security checks in the future.
+///
+/// # Examples
+///
+/// ```rust
+/// use llmspell_utils::system_info::set_env_var_if_allowed;
+///
+/// set_env_var_if_allowed("MY_VAR", "my_value").unwrap();
+/// ```
+///
+/// # Errors
+///
+/// Returns an error if setting the variable fails (currently never fails).
+pub fn set_env_var_if_allowed(key: &str, value: &str) -> Result<(), io::Error> {
+    env::set_var(key, value);
+    Ok(())
+}
+
 /// Get a list of all environment variables
 ///
 /// Returns a vector of (key, value) pairs for all environment variables.
@@ -630,6 +669,38 @@ mod tests {
 
         env::remove_var("TRUTHY_VAR");
         assert!(!is_env_truthy("TRUTHY_VAR"));
+    }
+
+    #[test]
+    fn test_get_env_var() {
+        // Test getting an existing variable (PATH should exist on all systems)
+        let path = get_env_var("PATH");
+        assert!(path.is_some());
+        assert!(!path.unwrap().is_empty());
+
+        // Test getting a non-existent variable
+        let nonexistent = get_env_var("NONEXISTENT_VAR_12345");
+        assert!(nonexistent.is_none());
+    }
+
+    #[test]
+    fn test_set_env_var_if_allowed() {
+        let test_key = "TEST_ENV_VAR_12345";
+        let test_value = "test_value";
+
+        // Clean up first
+        env::remove_var(test_key);
+
+        // Set the variable
+        let result = set_env_var_if_allowed(test_key, test_value);
+        assert!(result.is_ok());
+
+        // Verify it was set
+        let retrieved = get_env_var(test_key);
+        assert_eq!(retrieved, Some(test_value.to_string()));
+
+        // Clean up
+        env::remove_var(test_key);
     }
 
     #[test]
