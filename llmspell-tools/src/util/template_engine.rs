@@ -11,8 +11,16 @@ use llmspell_core::{
     types::{AgentInput, AgentOutput, ExecutionContext},
     ComponentMetadata, LLMSpellError, Result,
 };
+use llmspell_utils::{
+    error_builders::llmspell::{tool_error, validation_error},
+    params::{
+        extract_bool_with_default, extract_optional_object, extract_optional_string,
+        extract_parameters, extract_required_string,
+    },
+    response::ResponseBuilder,
+};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{json, Value};
 use tera::{Context as TeraContext, Tera};
 use tracing::info;
 
@@ -40,10 +48,10 @@ impl std::str::FromStr for TemplateEngine {
         match s.to_lowercase().as_str() {
             "tera" => Ok(TemplateEngine::Tera),
             "handlebars" | "hbs" => Ok(TemplateEngine::Handlebars),
-            _ => Err(LLMSpellError::Validation {
-                message: format!("Unknown template engine: {}", s),
-                field: Some("engine".to_string()),
-            }),
+            _ => Err(validation_error(
+                format!("Unknown template engine: {}", s),
+                Some("engine".to_string()),
+            )),
         }
     }
 }
@@ -174,25 +182,25 @@ impl TemplateEngineTool {
     /// Validate template and context sizes
     fn validate_sizes(&self, template: &str, context: &Value) -> Result<()> {
         if template.len() > self.config.max_template_size {
-            return Err(LLMSpellError::Validation {
-                message: format!(
+            return Err(validation_error(
+                format!(
                     "Template size {} exceeds maximum {}",
                     template.len(),
                     self.config.max_template_size
                 ),
-                field: Some("template".to_string()),
-            });
+                Some("template".to_string()),
+            ));
         }
 
         let context_size = serde_json::to_string(context)?.len();
         if context_size > self.config.max_context_size {
-            return Err(LLMSpellError::Validation {
-                message: format!(
+            return Err(validation_error(
+                format!(
                     "Context size {} exceeds maximum {}",
                     context_size, self.config.max_context_size
                 ),
-                field: Some("context".to_string()),
-            });
+                Some("context".to_string()),
+            ));
         }
 
         Ok(())
@@ -211,25 +219,28 @@ impl TemplateEngineTool {
         };
 
         tera.add_raw_template(template_name, template)
-            .map_err(|e| LLMSpellError::Validation {
-                message: format!("Invalid Tera template: {}", e),
-                field: Some("template".to_string()),
+            .map_err(|e| {
+                validation_error(
+                    format!("Invalid Tera template: {}", e),
+                    Some("template".to_string()),
+                )
             })?;
 
         // Convert JSON context to Tera context
-        let tera_context =
-            TeraContext::from_value(context.clone()).map_err(|e| LLMSpellError::Validation {
-                message: format!("Invalid context for Tera: {}", e),
-                field: Some("context".to_string()),
-            })?;
+        let tera_context = TeraContext::from_value(context.clone()).map_err(|e| {
+            validation_error(
+                format!("Invalid context for Tera: {}", e),
+                Some("context".to_string()),
+            )
+        })?;
 
         // Render the template
-        tera.render(template_name, &tera_context)
-            .map_err(|e| LLMSpellError::Tool {
-                message: format!("Template rendering failed: {}", e),
-                tool_name: Some("template_engine".to_string()),
-                source: Some(Box::new(e)),
-            })
+        tera.render(template_name, &tera_context).map_err(|e| {
+            tool_error(
+                format!("Template rendering failed: {}", e),
+                Some("template_engine".to_string()),
+            )
+        })
     }
 
     /// Render template using Handlebars engine
@@ -246,13 +257,12 @@ impl TemplateEngineTool {
         Self::register_builtin_filters(&mut Tera::default(), &mut handlebars);
 
         // Render the template directly
-        handlebars
-            .render_template(template, context)
-            .map_err(|e| LLMSpellError::Tool {
-                message: format!("Template rendering failed: {}", e),
-                tool_name: Some("template_engine".to_string()),
-                source: Some(Box::new(e)),
-            })
+        handlebars.render_template(template, context).map_err(|e| {
+            tool_error(
+                format!("Template rendering failed: {}", e),
+                Some("template_engine".to_string()),
+            )
+        })
     }
 
     /// Detect template engine from syntax hints
@@ -308,45 +318,23 @@ impl BaseAgent for TemplateEngineTool {
     }
 
     async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
-        let params =
-            input
-                .parameters
-                .get("parameters")
-                .ok_or_else(|| LLMSpellError::Validation {
-                    message: "Missing parameters".to_string(),
-                    field: Some("parameters".to_string()),
-                })?;
+        // Get parameters using shared utility
+        let params = extract_parameters(&input)?;
 
         // Extract parameters
-        let template = params
-            .get("template")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| LLMSpellError::Validation {
-                message: "Missing 'template' parameter".to_string(),
-                field: Some("template".to_string()),
-            })?;
-
-        let context = params
-            .get("context")
-            .cloned()
+        let template = extract_required_string(params, "template")?;
+        let context = extract_optional_object(params, "context")
+            .map(|obj| Value::Object(obj.clone()))
             .unwrap_or_else(|| Value::Object(serde_json::Map::new()));
+        let auto_detect = extract_bool_with_default(params, "auto_detect", true);
 
-        let engine = params
-            .get("engine")
-            .and_then(|v| v.as_str())
-            .map(|s| s.parse::<TemplateEngine>())
-            .transpose()?
-            .unwrap_or_else(|| {
-                if params
-                    .get("auto_detect")
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(true)
-                {
-                    Self::detect_engine(template)
-                } else {
-                    self.config.default_engine
-                }
-            });
+        let engine = if let Some(engine_str) = extract_optional_string(params, "engine") {
+            engine_str.parse::<TemplateEngine>()?
+        } else if auto_detect {
+            Self::detect_engine(template)
+        } else {
+            self.config.default_engine
+        };
 
         info!("Rendering template with {} engine", engine);
 
@@ -357,30 +345,36 @@ impl BaseAgent for TemplateEngineTool {
         let safe_template = self.sanitize_template(template)?;
 
         // Render template
-        let result = match engine {
+        let rendered = match engine {
             TemplateEngine::Tera => self.render_tera(&safe_template, &context)?,
             TemplateEngine::Handlebars => self.render_handlebars(&safe_template, &context)?,
         };
 
-        // Create output with metadata
-        let mut metadata = llmspell_core::types::OutputMetadata::default();
-        metadata
-            .extra
-            .insert("engine".to_string(), Value::String(engine.to_string()));
-        metadata.extra.insert(
-            "template_length".to_string(),
-            Value::Number(serde_json::Number::from(template.len())),
-        );
+        // Create response using ResponseBuilder
+        let response = ResponseBuilder::success("render_template")
+            .with_message(format!(
+                "Template rendered successfully using {} engine",
+                engine
+            ))
+            .with_result(json!({
+                "rendered": rendered,
+                "engine": engine.to_string(),
+                "template_length": template.len(),
+                "context_size": serde_json::to_string(&context)?.len()
+            }))
+            .with_metadata("engine", json!(engine.to_string()))
+            .with_metadata("template_length", json!(template.len()))
+            .build();
 
-        Ok(AgentOutput::text(result).with_metadata(metadata))
+        Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
     }
 
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
         if input.parameters.is_empty() {
-            return Err(LLMSpellError::Validation {
-                message: "No parameters provided".to_string(),
-                field: Some("parameters".to_string()),
-            });
+            return Err(validation_error(
+                "No parameters provided",
+                Some("parameters".to_string()),
+            ));
         }
         Ok(())
     }
@@ -493,7 +487,9 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(result.text, "Hello World!");
+        let output: Value = serde_json::from_str(&result.text).unwrap();
+        assert!(output["success"].as_bool().unwrap_or(false));
+        assert_eq!(output["result"]["rendered"], "Hello World!");
     }
 
     #[tokio::test]
@@ -515,7 +511,9 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(result.text, "Hello Alice!");
+        let output: Value = serde_json::from_str(&result.text).unwrap();
+        assert!(output["success"].as_bool().unwrap_or(false));
+        assert_eq!(output["result"]["rendered"], "Hello Alice!");
     }
 
     #[tokio::test]

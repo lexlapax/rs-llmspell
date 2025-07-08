@@ -10,6 +10,13 @@ use serde_json::{json, Value};
 use std::fs;
 use tempfile::TempDir;
 
+/// Helper to extract result from response wrapper
+fn extract_result(response_text: &str) -> Value {
+    let output: Value = serde_json::from_str(response_text).unwrap();
+    assert!(output["success"].as_bool().unwrap_or(false));
+    output["result"].clone()
+}
+
 #[tokio::test]
 async fn test_text_diff_formats() {
     let tool = DiffCalculatorTool::new();
@@ -32,7 +39,7 @@ async fn test_text_diff_formats() {
         .execute(input, ExecutionContext::default())
         .await
         .unwrap();
-    let output: Value = serde_json::from_str(&result.text).unwrap();
+    let output = extract_result(&result.text);
 
     assert_eq!(output["type"], "text");
     assert_eq!(output["format"], "unified");
@@ -57,7 +64,7 @@ async fn test_text_diff_formats() {
         .execute(input, ExecutionContext::default())
         .await
         .unwrap();
-    let output: Value = serde_json::from_str(&result.text).unwrap();
+    let output = extract_result(&result.text);
 
     assert_eq!(output["format"], "context");
     let diff = output["diff"].as_str().unwrap();
@@ -79,7 +86,7 @@ async fn test_text_diff_formats() {
         .execute(input, ExecutionContext::default())
         .await
         .unwrap();
-    let output: Value = serde_json::from_str(&result.text).unwrap();
+    let output = extract_result(&result.text);
 
     assert_eq!(output["format"], "inline");
     let diff = output["diff"].as_str().unwrap();
@@ -103,7 +110,7 @@ async fn test_text_diff_formats() {
         .execute(input, ExecutionContext::default())
         .await
         .unwrap();
-    let output: Value = serde_json::from_str(&result.text).unwrap();
+    let output = extract_result(&result.text);
 
     assert_eq!(output["format"], "simple");
     let diff = output["diff"].as_str().unwrap();
@@ -141,7 +148,7 @@ async fn test_json_diff_simple() {
         .execute(input, ExecutionContext::default())
         .await
         .unwrap();
-    let output: Value = serde_json::from_str(&result.text).unwrap();
+    let output = extract_result(&result.text);
 
     assert_eq!(output["type"], "json");
 
@@ -198,7 +205,7 @@ async fn test_json_diff_nested() {
         .execute(input, ExecutionContext::default())
         .await
         .unwrap();
-    let output: Value = serde_json::from_str(&result.text).unwrap();
+    let output = extract_result(&result.text);
 
     let diff = &output["diff"];
     assert_eq!(diff["added"]["user.settings.sound"], false);
@@ -241,7 +248,7 @@ async fn test_file_diff() {
         .execute(input, ExecutionContext::default())
         .await
         .unwrap();
-    let output: Value = serde_json::from_str(&result.text).unwrap();
+    let output = extract_result(&result.text);
 
     assert_eq!(output["type"], "text");
     let diff = output["diff"].as_str().unwrap();
@@ -286,7 +293,7 @@ async fn test_json_file_diff() {
         .execute(input, ExecutionContext::default())
         .await
         .unwrap();
-    let output: Value = serde_json::from_str(&result.text).unwrap();
+    let output = extract_result(&result.text);
 
     assert_eq!(output["type"], "json");
     let diff = &output["diff"];
@@ -315,7 +322,7 @@ async fn test_empty_diff() {
         .execute(input, ExecutionContext::default())
         .await
         .unwrap();
-    let output: Value = serde_json::from_str(&result.text).unwrap();
+    let output = extract_result(&result.text);
 
     let diff = output["diff"].as_str().unwrap();
     assert!(diff.contains("Total changes: 0"));
@@ -355,7 +362,7 @@ async fn test_large_text_diff() {
         .execute(input, ExecutionContext::default())
         .await
         .unwrap();
-    let output: Value = serde_json::from_str(&result.text).unwrap();
+    let output = extract_result(&result.text);
 
     assert_eq!(output["stats"]["old_lines"], 1000);
     assert_eq!(output["stats"]["new_lines"], 1000);

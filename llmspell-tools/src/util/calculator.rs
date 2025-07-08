@@ -25,6 +25,14 @@ use llmspell_core::{
     types::{AgentInput, AgentOutput, ExecutionContext},
     ComponentMetadata, LLMSpellError, Result,
 };
+use llmspell_utils::{
+    error_builders::llmspell::{tool_error, validation_error},
+    params::{
+        extract_optional_object, extract_parameters, extract_required_string,
+        extract_string_with_default,
+    },
+    response::ResponseBuilder,
+};
 use serde_json::{json, Value as JsonValue};
 use std::collections::HashMap;
 
@@ -99,11 +107,7 @@ impl CalculatorTool {
             _ => error.to_string(),
         };
 
-        LLMSpellError::Tool {
-            message,
-            tool_name: Some(self.metadata.name.clone()),
-            source: None,
-        }
+        tool_error(message, Some(self.metadata.name.clone()))
     }
 
     /// Convert evalexpr Value to JSON
@@ -126,25 +130,14 @@ impl CalculatorTool {
 
     /// Process calculator operation
     async fn process_operation(&self, params: &JsonValue) -> Result<JsonValue> {
-        let operation = params
-            .get("operation")
-            .and_then(|v| v.as_str())
-            .unwrap_or("evaluate");
+        let operation = extract_string_with_default(params, "operation", "evaluate");
 
         match operation {
             "evaluate" => {
-                let expression = params
-                    .get("expression")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| LLMSpellError::Validation {
-                        message: "Missing 'expression' parameter".to_string(),
-                        field: Some("expression".to_string()),
-                    })?;
+                let expression = extract_required_string(params, "expression")?;
 
                 // Get variables if provided
-                let variables = params
-                    .get("variables")
-                    .and_then(|v| v.as_object())
+                let variables = extract_optional_object(params, "variables")
                     .cloned()
                     .unwrap_or_default();
 
@@ -187,68 +180,77 @@ impl CalculatorTool {
                     final_variables.insert(name.clone(), self.value_to_json(&value));
                 }
 
-                Ok(json!({
-                    "operation": "evaluate",
-                    "expression": expression,
-                    "result": self.value_to_json(&result),
-                    "result_type": match &result {
-                        Value::String(_) => "string",
-                        Value::Float(_) => "float",
-                        Value::Int(_) => "integer",
-                        Value::Boolean(_) => "boolean",
-                        Value::Tuple(_) => "tuple",
-                        Value::Empty => "empty",
-                    },
-                    "variables": final_variables,
-                }))
+                let response = ResponseBuilder::success("evaluate")
+                    .with_message("Expression evaluated successfully")
+                    .with_result(json!({
+                        "expression": expression,
+                        "result": self.value_to_json(&result),
+                        "result_type": match &result {
+                            Value::String(_) => "string",
+                            Value::Float(_) => "float",
+                            Value::Int(_) => "integer",
+                            Value::Boolean(_) => "boolean",
+                            Value::Tuple(_) => "tuple",
+                            Value::Empty => "empty",
+                        },
+                        "variables": final_variables,
+                    }))
+                    .build();
+                Ok(response)
             }
             "validate" => {
-                let expression = params
-                    .get("expression")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| LLMSpellError::Validation {
-                        message: "Missing 'expression' parameter".to_string(),
-                        field: Some("expression".to_string()),
-                    })?;
+                let expression = extract_required_string(params, "expression")?;
 
                 // Try to parse the expression
                 match evalexpr::build_operator_tree(expression) {
-                    Ok(_) => Ok(json!({
-                        "operation": "validate",
-                        "expression": expression,
-                        "valid": true,
-                        "message": "Expression is valid"
-                    })),
-                    Err(e) => Ok(json!({
-                        "operation": "validate",
-                        "expression": expression,
-                        "valid": false,
-                        "error": self.convert_error(e).to_string()
-                    })),
+                    Ok(_) => {
+                        let response = ResponseBuilder::success("validate")
+                            .with_message("Expression is valid")
+                            .with_result(json!({
+                                "expression": expression,
+                                "valid": true,
+                            }))
+                            .build();
+                        Ok(response)
+                    }
+                    Err(e) => {
+                        let response = ResponseBuilder::success("validate")
+                            .with_message("Expression validation failed")
+                            .with_result(json!({
+                                "expression": expression,
+                                "valid": false,
+                                "error": self.convert_error(e).to_string()
+                            }))
+                            .build();
+                        Ok(response)
+                    }
                 }
             }
             "functions" => {
                 // List available functions
-                Ok(json!({
-                    "operation": "functions",
-                    "arithmetic": ["+", "-", "*", "/", "%", "^"],
-                    "comparison": ["==", "!=", "<", ">", "<=", ">="],
-                    "logical": ["&&", "||", "!"],
-                    "note": "Mathematical functions can be implemented as custom functions or variables",
-                    "string": ["len", "str::regex_matches", "str::regex_replace", "str::to_lowercase", "str::to_uppercase", "str::trim"],
-                    "type_checking": ["is_nan", "is_finite", "is_infinite", "is_normal"],
-                    "examples": {
-                        "basic": "2 + 3 * 4",
-                        "variables": "x^2 + y^2 where x=3, y=4",
-                        "functions": "pow(2, 3) or 2^3 for exponentiation",
-                        "complex": "sqrt(x^2 + y^2) * exp(-t)"
-                    }
-                }))
+                let response = ResponseBuilder::success("functions")
+                    .with_message("Available functions and operators")
+                    .with_result(json!({
+                        "arithmetic": ["+", "-", "*", "/", "%", "^"],
+                        "comparison": ["==", "!=", "<", ">", "<=", ">="],
+                        "logical": ["&&", "||", "!"],
+                        "note": "Mathematical functions can be implemented as custom functions or variables",
+                        "string": ["len", "str::regex_matches", "str::regex_replace", "str::to_lowercase", "str::to_uppercase", "str::trim"],
+                        "type_checking": ["is_nan", "is_finite", "is_infinite", "is_normal"],
+                        "examples": {
+                            "basic": "2 + 3 * 4",
+                            "variables": "x^2 + y^2 where x=3, y=4",
+                            "functions": "pow(2, 3) or 2^3 for exponentiation",
+                            "complex": "sqrt(x^2 + y^2) * exp(-t)"
+                        }
+                    }))
+                    .build();
+                Ok(response)
             }
-            _ => Err(LLMSpellError::Validation {
-                message: format!("Unknown operation: {operation}"),
-                field: Some("operation".to_string()),
-            }),
+            _ => Err(validation_error(
+                format!("Unknown operation: {operation}"),
+                Some("operation".to_string()),
+            )),
         }
     }
 }
@@ -260,15 +262,8 @@ impl BaseAgent for CalculatorTool {
     }
 
     async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
-        // Get parameters from input
-        let params =
-            input
-                .parameters
-                .get("parameters")
-                .ok_or_else(|| LLMSpellError::Validation {
-                    message: "Missing parameters in input".to_string(),
-                    field: Some("parameters".to_string()),
-                })?;
+        // Get parameters using shared utility
+        let params = extract_parameters(&input)?;
 
         // Process the operation
         let result = self.process_operation(params).await?;
@@ -281,10 +276,10 @@ impl BaseAgent for CalculatorTool {
 
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
         if input.text.is_empty() {
-            return Err(LLMSpellError::Validation {
-                message: "Input prompt cannot be empty".to_string(),
-                field: Some("prompt".to_string()),
-            });
+            return Err(validation_error(
+                "Input prompt cannot be empty",
+                Some("prompt".to_string()),
+            ));
         }
         Ok(())
     }
@@ -368,9 +363,9 @@ mod tests {
             .unwrap();
         let output: JsonValue = serde_json::from_str(&result.text).unwrap();
 
-        assert_eq!(output["operation"], "evaluate");
-        assert_eq!(output["result"], 14);
-        assert_eq!(output["result_type"], "integer");
+        assert!(output["success"].as_bool().unwrap_or(false));
+        assert_eq!(output["result"]["result"], 14);
+        assert_eq!(output["result"]["result_type"], "integer");
     }
 
     #[tokio::test]
@@ -395,9 +390,10 @@ mod tests {
             .unwrap();
         let output: JsonValue = serde_json::from_str(&result.text).unwrap();
 
-        assert_eq!(output["result"], 25.0);
-        assert_eq!(output["variables"]["x"], 3.0);
-        assert_eq!(output["variables"]["y"], 4.0);
+        assert!(output["success"].as_bool().unwrap_or(false));
+        assert_eq!(output["result"]["result"], 25.0);
+        assert_eq!(output["result"]["variables"]["x"], 3.0);
+        assert_eq!(output["result"]["variables"]["y"], 4.0);
     }
 
     #[tokio::test]
@@ -419,8 +415,9 @@ mod tests {
             .unwrap();
         let output: JsonValue = serde_json::from_str(&result.text).unwrap();
 
-        assert_eq!(output["result"], 8.0);
-        assert_eq!(output["result_type"], "float");
+        assert!(output["success"].as_bool().unwrap_or(false));
+        assert_eq!(output["result"]["result"], 8.0);
+        assert_eq!(output["result"]["result_type"], "float");
 
         // Test modulo
         let input = AgentInput::text("modulo").with_parameter(
@@ -437,8 +434,9 @@ mod tests {
             .unwrap();
         let output: JsonValue = serde_json::from_str(&result.text).unwrap();
 
-        assert_eq!(output["result"], 2);
-        assert_eq!(output["result_type"], "integer");
+        assert!(output["success"].as_bool().unwrap_or(false));
+        assert_eq!(output["result"]["result"], 2);
+        assert_eq!(output["result"]["result_type"], "integer");
     }
 
     #[tokio::test]
@@ -460,7 +458,8 @@ mod tests {
             .unwrap();
         let output: JsonValue = serde_json::from_str(&result.text).unwrap();
 
-        assert_eq!(output["valid"], true);
+        assert!(output["success"].as_bool().unwrap_or(false));
+        assert_eq!(output["result"]["valid"], true);
 
         // Invalid expression
         let input = AgentInput::text("validate invalid").with_parameter(
@@ -477,9 +476,10 @@ mod tests {
             .unwrap();
         let output: JsonValue = serde_json::from_str(&result.text).unwrap();
 
-        assert_eq!(output["valid"], false);
+        assert!(output["success"].as_bool().unwrap_or(false));
+        assert_eq!(output["result"]["valid"], false);
         // The error message should indicate an issue with the expression
-        assert!(output.get("error").is_some());
+        assert!(output["result"].get("error").is_some());
     }
 
     #[tokio::test]
@@ -516,10 +516,10 @@ mod tests {
             .unwrap();
         let output: JsonValue = serde_json::from_str(&result.text).unwrap();
 
-        assert_eq!(output["operation"], "functions");
-        assert!(output["arithmetic"].is_array());
-        assert!(output["logical"].is_array());
-        assert!(output["examples"].is_object());
+        assert!(output["success"].as_bool().unwrap_or(false));
+        assert!(output["result"]["arithmetic"].is_array());
+        assert!(output["result"]["logical"].is_array());
+        assert!(output["result"]["examples"].is_object());
     }
 
     #[tokio::test]

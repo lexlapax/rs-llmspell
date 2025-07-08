@@ -116,16 +116,26 @@ async fn test_runtime_engine_switching_placeholder() {
     let lua_runtime = ScriptRuntime::new_with_lua(config.clone()).await.unwrap();
     assert_eq!(lua_runtime.get_engine_name(), "lua");
 
-    // Attempt to create with JavaScript (will fail but shows the API)
+    // Attempt to create with JavaScript
     let js_runtime = ScriptRuntime::new_with_javascript(config).await;
 
-    // Currently fails because JavaScript not implemented in Phase 1
-    assert!(js_runtime.is_err());
+    #[cfg(feature = "javascript")]
+    {
+        // When JavaScript feature is enabled, it should create successfully
+        assert!(js_runtime.is_ok());
+        if let Ok(runtime) = js_runtime {
+            assert_eq!(runtime.get_engine_name(), "javascript");
+        }
+    }
 
-    // But the error should indicate feature not enabled
-    if let Err(e) = js_runtime {
-        let error_msg = format!("{:?}", e);
-        assert!(error_msg.contains("JavaScript") || error_msg.contains("not enabled"));
+    #[cfg(not(feature = "javascript"))]
+    {
+        // When JavaScript feature is not enabled, it should fail
+        assert!(js_runtime.is_err());
+        if let Err(e) = js_runtime {
+            let error_msg = format!("{:?}", e);
+            assert!(error_msg.contains("JavaScript") || error_msg.contains("not enabled"));
+        }
     }
 }
 

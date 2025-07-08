@@ -10,9 +10,13 @@ use llmspell_core::{
     types::{AgentInput, AgentOutput, ExecutionContext},
     ComponentMetadata, LLMSpellError, Result,
 };
+use llmspell_utils::{
+    error_builders::llmspell::validation_error, params::extract_parameters,
+    response::ResponseBuilder,
+};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::collections::HashMap;
 use tracing::info;
 
@@ -188,16 +192,10 @@ impl DataValidationTool {
                     if phone_regex.is_match(s) {
                         Ok(())
                     } else {
-                        Err(LLMSpellError::Validation {
-                            message: "Invalid phone number format".to_string(),
-                            field: None,
-                        })
+                        Err(validation_error("Invalid phone number format", None))
                     }
                 } else {
-                    Err(LLMSpellError::Validation {
-                        message: "Value must be a string".to_string(),
-                        field: None,
-                    })
+                    Err(validation_error("Value must be a string", None))
                 }
             }),
         );
@@ -213,16 +211,16 @@ impl DataValidationTool {
                     if uuid_regex.is_match(s) {
                         Ok(())
                     } else {
-                        Err(LLMSpellError::Validation {
-                            message: "Invalid UUID format".to_string(),
-                            field: None,
-                        })
+                        Err(validation_error(
+                            "Invalid UUID format",
+                            None,
+                        ))
                     }
                 } else {
-                    Err(LLMSpellError::Validation {
-                        message: "Value must be a string".to_string(),
-                        field: None,
-                    })
+                    Err(validation_error(
+                        "Value must be a string",
+                        None,
+                    ))
                 }
             }),
         );
@@ -234,10 +232,7 @@ impl DataValidationTool {
                 if let Some(s) = value.as_str() {
                     let cleaned: String = s.chars().filter(|c| c.is_numeric()).collect();
                     if cleaned.len() < 13 || cleaned.len() > 19 {
-                        return Err(LLMSpellError::Validation {
-                            message: "Invalid credit card length".to_string(),
-                            field: None,
-                        });
+                        return Err(validation_error("Invalid credit card length", None));
                     }
 
                     // Basic Luhn algorithm
@@ -257,16 +252,10 @@ impl DataValidationTool {
                     if sum % 10 == 0 {
                         Ok(())
                     } else {
-                        Err(LLMSpellError::Validation {
-                            message: "Invalid credit card number".to_string(),
-                            field: None,
-                        })
+                        Err(validation_error("Invalid credit card number", None))
                     }
                 } else {
-                    Err(LLMSpellError::Validation {
-                        message: "Value must be a string".to_string(),
-                        field: None,
-                    })
+                    Err(validation_error("Value must be a string", None))
                 }
             }),
         );
@@ -312,10 +301,10 @@ impl DataValidationTool {
         match rule {
             ValidationRule::Required => {
                 if value.is_null() || (value.is_string() && value.as_str().unwrap().is_empty()) {
-                    return Err(LLMSpellError::Validation {
-                        message: self.get_error_message("required", field),
-                        field: Some(field.to_string()),
-                    });
+                    return Err(validation_error(
+                        self.get_error_message("required", field),
+                        Some(field.to_string()),
+                    ));
                 }
             }
 
@@ -330,10 +319,10 @@ impl DataValidationTool {
                 };
 
                 if actual_type != expected {
-                    return Err(LLMSpellError::Validation {
-                        message: format!("Expected type '{}', got '{}'", expected, actual_type),
-                        field: Some(field.to_string()),
-                    });
+                    return Err(validation_error(
+                        format!("Expected type '{}', got '{}'", expected, actual_type),
+                        Some(field.to_string()),
+                    ));
                 }
             }
 
@@ -342,36 +331,36 @@ impl DataValidationTool {
                     let len = s.len();
                     if let Some(min_len) = min {
                         if len < *min_len {
-                            return Err(LLMSpellError::Validation {
-                                message: format!("Length must be at least {}", min_len),
-                                field: Some(field.to_string()),
-                            });
+                            return Err(validation_error(
+                                format!("Length must be at least {}", min_len),
+                                Some(field.to_string()),
+                            ));
                         }
                     }
                     if let Some(max_len) = max {
                         if len > *max_len {
-                            return Err(LLMSpellError::Validation {
-                                message: format!("Length must be at most {}", max_len),
-                                field: Some(field.to_string()),
-                            });
+                            return Err(validation_error(
+                                format!("Length must be at most {}", max_len),
+                                Some(field.to_string()),
+                            ));
                         }
                     }
                 } else if let Some(arr) = value.as_array() {
                     let len = arr.len();
                     if let Some(min_len) = min {
                         if len < *min_len {
-                            return Err(LLMSpellError::Validation {
-                                message: format!("Array must have at least {} items", min_len),
-                                field: Some(field.to_string()),
-                            });
+                            return Err(validation_error(
+                                format!("Array must have at least {} items", min_len),
+                                Some(field.to_string()),
+                            ));
                         }
                     }
                     if let Some(max_len) = max {
                         if len > *max_len {
-                            return Err(LLMSpellError::Validation {
-                                message: format!("Array must have at most {} items", max_len),
-                                field: Some(field.to_string()),
-                            });
+                            return Err(validation_error(
+                                format!("Array must have at most {} items", max_len),
+                                Some(field.to_string()),
+                            ));
                         }
                     }
                 }
@@ -381,18 +370,18 @@ impl DataValidationTool {
                 if let Some(n) = value.as_f64() {
                     if let Some(min_val) = min {
                         if n < *min_val {
-                            return Err(LLMSpellError::Validation {
-                                message: format!("Value must be at least {}", min_val),
-                                field: Some(field.to_string()),
-                            });
+                            return Err(validation_error(
+                                format!("Value must be at least {}", min_val),
+                                Some(field.to_string()),
+                            ));
                         }
                     }
                     if let Some(max_val) = max {
                         if n > *max_val {
-                            return Err(LLMSpellError::Validation {
-                                message: format!("Value must be at most {}", max_val),
-                                field: Some(field.to_string()),
-                            });
+                            return Err(validation_error(
+                                format!("Value must be at most {}", max_val),
+                                Some(field.to_string()),
+                            ));
                         }
                     }
                 }
@@ -400,26 +389,28 @@ impl DataValidationTool {
 
             ValidationRule::Pattern { regex } => {
                 if let Some(s) = value.as_str() {
-                    let re = Regex::new(regex).map_err(|e| LLMSpellError::Validation {
-                        message: format!("Invalid regex pattern: {}", e),
-                        field: Some(field.to_string()),
+                    let re = Regex::new(regex).map_err(|e| {
+                        validation_error(
+                            format!("Invalid regex pattern: {}", e),
+                            Some(field.to_string()),
+                        )
                     })?;
 
                     if !re.is_match(s) {
-                        return Err(LLMSpellError::Validation {
-                            message: format!("Value does not match pattern: {}", regex),
-                            field: Some(field.to_string()),
-                        });
+                        return Err(validation_error(
+                            format!("Value does not match pattern: {}", regex),
+                            Some(field.to_string()),
+                        ));
                     }
                 }
             }
 
             ValidationRule::Enum { values } => {
                 if !values.contains(value) {
-                    return Err(LLMSpellError::Validation {
-                        message: format!("Value must be one of: {:?}", values),
-                        field: Some(field.to_string()),
-                    });
+                    return Err(validation_error(
+                        format!("Value must be one of: {:?}", values),
+                        Some(field.to_string()),
+                    ));
                 }
             }
 
@@ -428,10 +419,10 @@ impl DataValidationTool {
                     let email_regex =
                         Regex::new(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$").unwrap();
                     if !email_regex.is_match(s) {
-                        return Err(LLMSpellError::Validation {
-                            message: "Invalid email format".to_string(),
-                            field: Some(field.to_string()),
-                        });
+                        return Err(validation_error(
+                            "Invalid email format",
+                            Some(field.to_string()),
+                        ));
                     }
                 }
             }
@@ -439,10 +430,10 @@ impl DataValidationTool {
             ValidationRule::Url => {
                 if let Some(s) = value.as_str() {
                     if url::Url::parse(s).is_err() {
-                        return Err(LLMSpellError::Validation {
-                            message: "Invalid URL format".to_string(),
-                            field: Some(field.to_string()),
-                        });
+                        return Err(validation_error(
+                            "Invalid URL format",
+                            Some(field.to_string()),
+                        ));
                     }
                 }
             }
@@ -450,10 +441,10 @@ impl DataValidationTool {
             ValidationRule::Date { format } => {
                 if let Some(s) = value.as_str() {
                     if chrono::NaiveDateTime::parse_from_str(s, format).is_err() {
-                        return Err(LLMSpellError::Validation {
-                            message: format!("Invalid date format. Expected: {}", format),
-                            field: Some(field.to_string()),
-                        });
+                        return Err(validation_error(
+                            format!("Invalid date format. Expected: {}", format),
+                            Some(field.to_string()),
+                        ));
                     }
                 }
             }
@@ -462,10 +453,10 @@ impl DataValidationTool {
                 if let Some(validator) = self.custom_validators.get(name) {
                     validator(value)?;
                 } else {
-                    return Err(LLMSpellError::Validation {
-                        message: format!("Unknown custom validator: {}", name),
-                        field: Some(field.to_string()),
-                    });
+                    return Err(validation_error(
+                        format!("Unknown custom validator: {}", name),
+                        Some(field.to_string()),
+                    ));
                 }
             }
 
@@ -479,18 +470,18 @@ impl DataValidationTool {
                     // Check array length
                     if let Some(min) = min_items {
                         if arr.len() < *min {
-                            return Err(LLMSpellError::Validation {
-                                message: format!("Array must have at least {} items", min),
-                                field: Some(field.to_string()),
-                            });
+                            return Err(validation_error(
+                                format!("Array must have at least {} items", min),
+                                Some(field.to_string()),
+                            ));
                         }
                     }
                     if let Some(max) = max_items {
                         if arr.len() > *max {
-                            return Err(LLMSpellError::Validation {
-                                message: format!("Array must have at most {} items", max),
-                                field: Some(field.to_string()),
-                            });
+                            return Err(validation_error(
+                                format!("Array must have at most {} items", max),
+                                Some(field.to_string()),
+                            ));
                         }
                     }
 
@@ -500,10 +491,10 @@ impl DataValidationTool {
                         for item in arr {
                             let serialized = serde_json::to_string(item).unwrap();
                             if !seen.insert(serialized) {
-                                return Err(LLMSpellError::Validation {
-                                    message: "Array items must be unique".to_string(),
-                                    field: Some(field.to_string()),
-                                });
+                                return Err(validation_error(
+                                    "Array items must be unique",
+                                    Some(field.to_string()),
+                                ));
                             }
                         }
                     }
@@ -529,10 +520,10 @@ impl DataValidationTool {
                     // Check required fields
                     for req_field in required {
                         if !obj.contains_key(req_field) {
-                            return Err(LLMSpellError::Validation {
-                                message: format!("Missing required field: {}", req_field),
-                                field: Some(format!("{}.{}", field, req_field)),
-                            });
+                            return Err(validation_error(
+                                format!("Missing required field: {}", req_field),
+                                Some(format!("{}.{}", field, req_field)),
+                            ));
                         }
                     }
 
@@ -540,10 +531,10 @@ impl DataValidationTool {
                     if !additional_properties {
                         for key in obj.keys() {
                             if !properties.contains_key(key) {
-                                return Err(LLMSpellError::Validation {
-                                    message: format!("Additional property not allowed: {}", key),
-                                    field: Some(format!("{}.{}", field, key)),
-                                });
+                                return Err(validation_error(
+                                    format!("Additional property not allowed: {}", key),
+                                    Some(format!("{}.{}", field, key)),
+                                ));
                             }
                         }
                     }
@@ -590,35 +581,25 @@ impl BaseAgent for DataValidationTool {
     }
 
     async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
-        let params =
-            input
-                .parameters
-                .get("parameters")
-                .ok_or_else(|| LLMSpellError::Validation {
-                    message: "Missing parameters".to_string(),
-                    field: Some("parameters".to_string()),
-                })?;
+        // Get parameters using shared utility
+        let params = extract_parameters(&input)?;
 
         // Extract parameters
-        let data = params
-            .get("data")
-            .ok_or_else(|| LLMSpellError::Validation {
-                message: "Missing 'data' parameter".to_string(),
-                field: Some("data".to_string()),
-            })?;
+        let data = params.get("data").ok_or_else(|| {
+            validation_error("Missing 'data' parameter", Some("data".to_string()))
+        })?;
 
-        let rules = params
-            .get("rules")
-            .ok_or_else(|| LLMSpellError::Validation {
-                message: "Missing 'rules' parameter".to_string(),
-                field: Some("rules".to_string()),
-            })?;
+        let rules = params.get("rules").ok_or_else(|| {
+            validation_error("Missing 'rules' parameter", Some("rules".to_string()))
+        })?;
 
         // Parse validation rules
         let validation_rules: ValidationRules =
-            serde_json::from_value(rules.clone()).map_err(|e| LLMSpellError::Validation {
-                message: format!("Invalid rules format: {}", e),
-                field: Some("rules".to_string()),
+            serde_json::from_value(rules.clone()).map_err(|e| {
+                validation_error(
+                    format!("Invalid rules format: {}", e),
+                    Some("rules".to_string()),
+                )
             })?;
 
         info!(
@@ -635,28 +616,27 @@ impl BaseAgent for DataValidationTool {
             errors,
         };
 
-        // Create output
+        // Create response using ResponseBuilder
+        let response = ResponseBuilder::success("validate_data")
+            .with_message(if result.valid {
+                "Data validation passed"
+            } else {
+                "Data validation failed"
+            })
+            .with_result(serde_json::to_value(&result)?)
+            .with_metadata("rule_count", json!(validation_rules.rules.len()))
+            .with_metadata("error_count", json!(result.errors.len()))
+            .build();
 
-        // Add metadata
-        let mut metadata = llmspell_core::types::OutputMetadata::default();
-        metadata.extra.insert(
-            "rule_count".to_string(),
-            Value::Number(serde_json::Number::from(validation_rules.rules.len())),
-        );
-        metadata.extra.insert(
-            "error_count".to_string(),
-            Value::Number(serde_json::Number::from(result.errors.len())),
-        );
-
-        Ok(AgentOutput::text(serde_json::to_string_pretty(&result)?).with_metadata(metadata))
+        Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
     }
 
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
         if input.parameters.is_empty() {
-            return Err(LLMSpellError::Validation {
-                message: "No parameters provided".to_string(),
-                field: Some("parameters".to_string()),
-            });
+            return Err(validation_error(
+                "No parameters provided",
+                Some("parameters".to_string()),
+            ));
         }
         Ok(())
     }
@@ -725,7 +705,10 @@ mod tests {
             .await
             .unwrap();
 
-        let validation_result: ValidationResult = serde_json::from_str(&result.text).unwrap();
+        let output: Value = serde_json::from_str(&result.text).unwrap();
+        assert!(output["success"].as_bool().unwrap_or(false));
+        let validation_result: ValidationResult =
+            serde_json::from_value(output["result"].clone()).unwrap();
         assert!(!validation_result.valid);
         assert_eq!(validation_result.errors.len(), 1);
     }
@@ -749,7 +732,10 @@ mod tests {
             .await
             .unwrap();
 
-        let validation_result: ValidationResult = serde_json::from_str(&result.text).unwrap();
+        let output: Value = serde_json::from_str(&result.text).unwrap();
+        assert!(output["success"].as_bool().unwrap_or(false));
+        let validation_result: ValidationResult =
+            serde_json::from_value(output["result"].clone()).unwrap();
         assert!(!validation_result.valid);
         assert!(validation_result.errors[0]
             .message
@@ -775,7 +761,10 @@ mod tests {
             .await
             .unwrap();
 
-        let validation_result: ValidationResult = serde_json::from_str(&result.text).unwrap();
+        let output: Value = serde_json::from_str(&result.text).unwrap();
+        assert!(output["success"].as_bool().unwrap_or(false));
+        let validation_result: ValidationResult =
+            serde_json::from_value(output["result"].clone()).unwrap();
         assert!(!validation_result.valid);
         assert!(validation_result.errors[0].message.contains("at least 3"));
     }
@@ -800,7 +789,10 @@ mod tests {
             .await
             .unwrap();
 
-        let validation_result: ValidationResult = serde_json::from_str(&result.text).unwrap();
+        let output: Value = serde_json::from_str(&result.text).unwrap();
+        assert!(output["success"].as_bool().unwrap_or(false));
+        let validation_result: ValidationResult =
+            serde_json::from_value(output["result"].clone()).unwrap();
         assert!(validation_result.valid);
 
         // Invalid email
@@ -819,7 +811,10 @@ mod tests {
             .await
             .unwrap();
 
-        let validation_result: ValidationResult = serde_json::from_str(&result.text).unwrap();
+        let output: Value = serde_json::from_str(&result.text).unwrap();
+        assert!(output["success"].as_bool().unwrap_or(false));
+        let validation_result: ValidationResult =
+            serde_json::from_value(output["result"].clone()).unwrap();
         assert!(!validation_result.valid);
     }
 
@@ -842,7 +837,10 @@ mod tests {
             .await
             .unwrap();
 
-        let validation_result: ValidationResult = serde_json::from_str(&result.text).unwrap();
+        let output: Value = serde_json::from_str(&result.text).unwrap();
+        assert!(output["success"].as_bool().unwrap_or(false));
+        let validation_result: ValidationResult =
+            serde_json::from_value(output["result"].clone()).unwrap();
         assert!(validation_result.valid);
     }
 
@@ -894,7 +892,10 @@ mod tests {
             .await
             .unwrap();
 
-        let validation_result: ValidationResult = serde_json::from_str(&result.text).unwrap();
+        let output: Value = serde_json::from_str(&result.text).unwrap();
+        assert!(output["success"].as_bool().unwrap_or(false));
+        let validation_result: ValidationResult =
+            serde_json::from_value(output["result"].clone()).unwrap();
         assert!(validation_result.valid);
     }
 }

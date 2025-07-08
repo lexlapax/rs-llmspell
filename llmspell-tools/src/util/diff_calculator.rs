@@ -21,6 +21,11 @@ use llmspell_core::{
     types::{AgentInput, AgentOutput, ExecutionContext},
     ComponentMetadata, LLMSpellError, Result,
 };
+use llmspell_utils::{
+    error_builders::llmspell::{tool_error, validation_error},
+    params::{extract_optional_string, extract_parameters, extract_string_with_default},
+    response::ResponseBuilder,
+};
 use serde_json::{json, Value};
 use similar::{ChangeTag, DiffTag, TextDiff};
 use std::fs;
@@ -45,10 +50,10 @@ impl DiffFormat {
             "context" => Ok(DiffFormat::Context),
             "inline" => Ok(DiffFormat::Inline),
             "simple" => Ok(DiffFormat::Simple),
-            _ => Err(LLMSpellError::Validation {
-                message: format!("Invalid diff format: {}", s),
-                field: Some("format".to_string()),
-            }),
+            _ => Err(validation_error(
+                format!("Invalid diff format: {}", s),
+                Some("format".to_string()),
+            )),
         }
     }
 }
@@ -315,128 +320,128 @@ fn compare_json_values(old: &Value, new: &Value, path: &str, diff: &mut Value) -
 impl DiffCalculatorTool {
     /// Process diff operation
     async fn process_operation(&self, params: &Value) -> Result<Value> {
-        let diff_type = params
-            .get("type")
-            .and_then(|v| v.as_str())
-            .unwrap_or("text");
+        let diff_type = extract_string_with_default(params, "type", "text");
 
         match diff_type {
             "text" => {
                 // Get text inputs
                 let (old_text, new_text) = if let (Some(old_file), Some(new_file)) = (
-                    params.get("old_file").and_then(|v| v.as_str()),
-                    params.get("new_file").and_then(|v| v.as_str()),
+                    extract_optional_string(params, "old_file"),
+                    extract_optional_string(params, "new_file"),
                 ) {
                     // Read from files
-                    let old = fs::read_to_string(old_file).map_err(|e| LLMSpellError::Tool {
-                        message: format!("Failed to read old file: {}", e),
-                        tool_name: Some(self.metadata.name.clone()),
-                        source: None,
+                    let old = fs::read_to_string(old_file).map_err(|e| {
+                        tool_error(
+                            format!("Failed to read old file: {}", e),
+                            Some(self.metadata.name.clone()),
+                        )
                     })?;
-                    let new = fs::read_to_string(new_file).map_err(|e| LLMSpellError::Tool {
-                        message: format!("Failed to read new file: {}", e),
-                        tool_name: Some(self.metadata.name.clone()),
-                        source: None,
+                    let new = fs::read_to_string(new_file).map_err(|e| {
+                        tool_error(
+                            format!("Failed to read new file: {}", e),
+                            Some(self.metadata.name.clone()),
+                        )
                     })?;
                     (old, new)
                 } else if let (Some(old), Some(new)) = (
-                    params.get("old_text").and_then(|v| v.as_str()),
-                    params.get("new_text").and_then(|v| v.as_str()),
+                    extract_optional_string(params, "old_text"),
+                    extract_optional_string(params, "new_text"),
                 ) {
                     (old.to_string(), new.to_string())
                 } else {
-                    return Err(LLMSpellError::Validation {
-                        message:
-                            "Either (old_text, new_text) or (old_file, new_file) must be provided"
-                                .to_string(),
-                        field: Some("input".to_string()),
-                    });
+                    return Err(validation_error(
+                        "Either (old_text, new_text) or (old_file, new_file) must be provided",
+                        Some("input".to_string()),
+                    ));
                 };
 
                 // Get format
-                let format_str = params
-                    .get("format")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("unified");
+                let format_str = extract_string_with_default(params, "format", "unified");
                 let format = DiffFormat::from_str(format_str)?;
 
                 // Calculate diff
                 let diff_output = self.calculate_text_diff(&old_text, &new_text, format)?;
 
-                Ok(json!({
-                    "type": "text",
-                    "format": format_str,
-                    "diff": diff_output,
-                    "stats": {
-                        "old_lines": old_text.lines().count(),
-                        "new_lines": new_text.lines().count()
-                    }
-                }))
+                let response = ResponseBuilder::success("text_diff")
+                    .with_message("Text diff calculated successfully")
+                    .with_result(json!({
+                        "type": "text",
+                        "format": format_str,
+                        "diff": diff_output,
+                        "stats": {
+                            "old_lines": old_text.lines().count(),
+                            "new_lines": new_text.lines().count()
+                        }
+                    }))
+                    .build();
+                Ok(response)
             }
             "json" => {
                 // Get JSON inputs
                 let (old_json, new_json) = if let (Some(old_file), Some(new_file)) = (
-                    params.get("old_file").and_then(|v| v.as_str()),
-                    params.get("new_file").and_then(|v| v.as_str()),
+                    extract_optional_string(params, "old_file"),
+                    extract_optional_string(params, "new_file"),
                 ) {
                     // Read from files
-                    let old_content =
-                        fs::read_to_string(old_file).map_err(|e| LLMSpellError::Tool {
-                            message: format!("Failed to read old file: {}", e),
-                            tool_name: Some(self.metadata.name.clone()),
-                            source: None,
-                        })?;
-                    let new_content =
-                        fs::read_to_string(new_file).map_err(|e| LLMSpellError::Tool {
-                            message: format!("Failed to read new file: {}", e),
-                            tool_name: Some(self.metadata.name.clone()),
-                            source: None,
-                        })?;
+                    let old_content = fs::read_to_string(old_file).map_err(|e| {
+                        tool_error(
+                            format!("Failed to read old file: {}", e),
+                            Some(self.metadata.name.clone()),
+                        )
+                    })?;
+                    let new_content = fs::read_to_string(new_file).map_err(|e| {
+                        tool_error(
+                            format!("Failed to read new file: {}", e),
+                            Some(self.metadata.name.clone()),
+                        )
+                    })?;
 
-                    let old_json: Value =
-                        serde_json::from_str(&old_content).map_err(|e| LLMSpellError::Tool {
-                            message: format!("Failed to parse old JSON: {}", e),
-                            tool_name: Some(self.metadata.name.clone()),
-                            source: None,
-                        })?;
-                    let new_json: Value =
-                        serde_json::from_str(&new_content).map_err(|e| LLMSpellError::Tool {
-                            message: format!("Failed to parse new JSON: {}", e),
-                            tool_name: Some(self.metadata.name.clone()),
-                            source: None,
-                        })?;
+                    let old_json: Value = serde_json::from_str(&old_content).map_err(|e| {
+                        tool_error(
+                            format!("Failed to parse old JSON: {}", e),
+                            Some(self.metadata.name.clone()),
+                        )
+                    })?;
+                    let new_json: Value = serde_json::from_str(&new_content).map_err(|e| {
+                        tool_error(
+                            format!("Failed to parse new JSON: {}", e),
+                            Some(self.metadata.name.clone()),
+                        )
+                    })?;
                     (old_json, new_json)
                 } else if let (Some(old), Some(new)) =
                     (params.get("old_json"), params.get("new_json"))
                 {
                     (old.clone(), new.clone())
                 } else {
-                    return Err(LLMSpellError::Validation {
-                        message:
-                            "Either (old_json, new_json) or (old_file, new_file) must be provided"
-                                .to_string(),
-                        field: Some("input".to_string()),
-                    });
+                    return Err(validation_error(
+                        "Either (old_json, new_json) or (old_file, new_file) must be provided",
+                        Some("input".to_string()),
+                    ));
                 };
 
                 // Calculate JSON diff
                 let diff = self.calculate_json_diff(&old_json, &new_json)?;
 
-                Ok(json!({
-                    "type": "json",
-                    "diff": diff,
-                    "summary": {
-                        "added": diff["added"].as_object().map(|o| o.len()).unwrap_or(0),
-                        "removed": diff["removed"].as_object().map(|o| o.len()).unwrap_or(0),
-                        "modified": diff["modified"].as_object().map(|o| o.len()).unwrap_or(0),
-                        "unchanged": diff["unchanged"].as_array().map(|a| a.len()).unwrap_or(0)
-                    }
-                }))
+                let response = ResponseBuilder::success("json_diff")
+                    .with_message("JSON diff calculated successfully")
+                    .with_result(json!({
+                        "type": "json",
+                        "diff": diff,
+                        "summary": {
+                            "added": diff["added"].as_object().map(|o| o.len()).unwrap_or(0),
+                            "removed": diff["removed"].as_object().map(|o| o.len()).unwrap_or(0),
+                            "modified": diff["modified"].as_object().map(|o| o.len()).unwrap_or(0),
+                            "unchanged": diff["unchanged"].as_array().map(|a| a.len()).unwrap_or(0)
+                        }
+                    }))
+                    .build();
+                Ok(response)
             }
-            _ => Err(LLMSpellError::Validation {
-                message: format!("Invalid diff type: {}", diff_type),
-                field: Some("type".to_string()),
-            }),
+            _ => Err(validation_error(
+                format!("Invalid diff type: {}", diff_type),
+                Some("type".to_string()),
+            )),
         }
     }
 }
@@ -448,15 +453,8 @@ impl BaseAgent for DiffCalculatorTool {
     }
 
     async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
-        // Get parameters from input
-        let params =
-            input
-                .parameters
-                .get("parameters")
-                .ok_or_else(|| LLMSpellError::Validation {
-                    message: "Missing parameters in input".to_string(),
-                    field: Some("parameters".to_string()),
-                })?;
+        // Get parameters using shared utility
+        let params = extract_parameters(&input)?;
 
         // Process the operation
         let result = self.process_operation(params).await?;
@@ -469,10 +467,10 @@ impl BaseAgent for DiffCalculatorTool {
 
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
         if input.text.is_empty() {
-            return Err(LLMSpellError::Validation {
-                message: "Input prompt cannot be empty".to_string(),
-                field: Some("prompt".to_string()),
-            });
+            return Err(validation_error(
+                "Input prompt cannot be empty",
+                Some("prompt".to_string()),
+            ));
         }
         Ok(())
     }
@@ -597,9 +595,10 @@ mod tests {
             .unwrap();
         let output: Value = serde_json::from_str(&result.text).unwrap();
 
-        assert_eq!(output["type"], "text");
-        assert_eq!(output["format"], "unified");
-        assert!(output["diff"].as_str().unwrap().contains("@@"));
+        assert!(output["success"].as_bool().unwrap_or(false));
+        assert_eq!(output["result"]["type"], "text");
+        assert_eq!(output["result"]["format"], "unified");
+        assert!(output["result"]["diff"].as_str().unwrap().contains("@@"));
     }
 
     #[tokio::test]
@@ -624,9 +623,13 @@ mod tests {
             .unwrap();
         let output: Value = serde_json::from_str(&result.text).unwrap();
 
-        assert_eq!(output["type"], "text");
-        assert_eq!(output["format"], "simple");
-        assert!(output["diff"].as_str().unwrap().contains("Total changes:"));
+        assert!(output["success"].as_bool().unwrap_or(false));
+        assert_eq!(output["result"]["type"], "text");
+        assert_eq!(output["result"]["format"], "simple");
+        assert!(output["result"]["diff"]
+            .as_str()
+            .unwrap()
+            .contains("Total changes:"));
     }
 
     #[tokio::test]
@@ -661,12 +664,13 @@ mod tests {
             .unwrap();
         let output: Value = serde_json::from_str(&result.text).unwrap();
 
-        assert_eq!(output["type"], "json");
-        assert!(output["diff"]["added"]["job"].is_string());
-        assert!(output["diff"]["modified"]["age"].is_object());
-        assert!(output["diff"]["modified"]["city"].is_object());
-        assert_eq!(output["summary"]["added"], 1);
-        assert_eq!(output["summary"]["modified"], 3); // age, city, hobbies[]
+        assert!(output["success"].as_bool().unwrap_or(false));
+        assert_eq!(output["result"]["type"], "json");
+        assert!(output["result"]["diff"]["added"]["job"].is_string());
+        assert!(output["result"]["diff"]["modified"]["age"].is_object());
+        assert!(output["result"]["diff"]["modified"]["city"].is_object());
+        assert_eq!(output["result"]["summary"]["added"], 1);
+        assert_eq!(output["result"]["summary"]["modified"], 3); // age, city, hobbies[]
     }
 
     #[tokio::test]

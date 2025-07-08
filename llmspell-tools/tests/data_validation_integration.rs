@@ -9,7 +9,7 @@ use llmspell_tools::{
     util::{DataValidationConfig, ValidationResult},
     DataValidationTool,
 };
-use serde_json::json;
+use serde_json::{json, Value};
 
 #[tokio::test]
 async fn test_simple_required_validation() {
@@ -31,7 +31,10 @@ async fn test_simple_required_validation() {
         .await
         .unwrap();
 
-    let validation_result: ValidationResult = serde_json::from_str(&result.text).unwrap();
+    let output: Value = serde_json::from_str(&result.text).unwrap();
+    assert!(output["success"].as_bool().unwrap_or(false));
+    let validation_result: ValidationResult =
+        serde_json::from_value(output["result"].clone()).unwrap();
     assert!(!validation_result.valid);
     assert_eq!(validation_result.errors.len(), 1);
     assert!(validation_result.errors[0].message.contains("required"));
@@ -52,7 +55,10 @@ async fn test_simple_required_validation() {
         .await
         .unwrap();
 
-    let validation_result: ValidationResult = serde_json::from_str(&result.text).unwrap();
+    let output: Value = serde_json::from_str(&result.text).unwrap();
+    assert!(output["success"].as_bool().unwrap_or(false));
+    let validation_result: ValidationResult =
+        serde_json::from_value(output["result"].clone()).unwrap();
     assert!(validation_result.valid);
     assert_eq!(validation_result.errors.len(), 0);
 }
@@ -79,7 +85,10 @@ async fn test_multiple_validation_rules() {
         .await
         .unwrap();
 
-    let validation_result: ValidationResult = serde_json::from_str(&result.text).unwrap();
+    let output: Value = serde_json::from_str(&result.text).unwrap();
+    assert!(output["success"].as_bool().unwrap_or(false));
+    let validation_result: ValidationResult =
+        serde_json::from_value(output["result"].clone()).unwrap();
     assert!(!validation_result.valid);
     assert_eq!(validation_result.errors.len(), 1); // Only length validation should fail
     assert!(validation_result.errors[0].message.contains("at least 3"));
@@ -106,7 +115,10 @@ async fn test_numeric_range_validation() {
         .await
         .unwrap();
 
-    let validation_result: ValidationResult = serde_json::from_str(&result.text).unwrap();
+    let output: Value = serde_json::from_str(&result.text).unwrap();
+    assert!(output["success"].as_bool().unwrap_or(false));
+    let validation_result: ValidationResult =
+        serde_json::from_value(output["result"].clone()).unwrap();
     assert!(validation_result.valid);
 
     // Test value outside range
@@ -125,7 +137,10 @@ async fn test_numeric_range_validation() {
         .await
         .unwrap();
 
-    let validation_result: ValidationResult = serde_json::from_str(&result.text).unwrap();
+    let output: Value = serde_json::from_str(&result.text).unwrap();
+    assert!(output["success"].as_bool().unwrap_or(false));
+    let validation_result: ValidationResult =
+        serde_json::from_value(output["result"].clone()).unwrap();
     assert!(!validation_result.valid);
     assert!(validation_result.errors[0].message.contains("at most 65"));
 }
@@ -149,7 +164,10 @@ async fn test_enum_validation() {
         .await
         .unwrap();
 
-    let validation_result: ValidationResult = serde_json::from_str(&result.text).unwrap();
+    let output: Value = serde_json::from_str(&result.text).unwrap();
+    assert!(output["success"].as_bool().unwrap_or(false));
+    let validation_result: ValidationResult =
+        serde_json::from_value(output["result"].clone()).unwrap();
     assert!(validation_result.valid);
 
     // Test with invalid value
@@ -168,7 +186,10 @@ async fn test_enum_validation() {
         .await
         .unwrap();
 
-    let validation_result: ValidationResult = serde_json::from_str(&result.text).unwrap();
+    let output: Value = serde_json::from_str(&result.text).unwrap();
+    assert!(output["success"].as_bool().unwrap_or(false));
+    let validation_result: ValidationResult =
+        serde_json::from_value(output["result"].clone()).unwrap();
     assert!(!validation_result.valid);
     assert!(validation_result.errors[0]
         .message
@@ -195,7 +216,10 @@ async fn test_email_and_url_validation() {
         .await
         .unwrap();
 
-    let validation_result: ValidationResult = serde_json::from_str(&result.text).unwrap();
+    let output: Value = serde_json::from_str(&result.text).unwrap();
+    assert!(output["success"].as_bool().unwrap_or(false));
+    let validation_result: ValidationResult =
+        serde_json::from_value(output["result"].clone()).unwrap();
     assert!(validation_result.valid);
 
     // Test valid URL
@@ -214,7 +238,10 @@ async fn test_email_and_url_validation() {
         .await
         .unwrap();
 
-    let validation_result: ValidationResult = serde_json::from_str(&result.text).unwrap();
+    let output: Value = serde_json::from_str(&result.text).unwrap();
+    assert!(output["success"].as_bool().unwrap_or(false));
+    let validation_result: ValidationResult =
+        serde_json::from_value(output["result"].clone()).unwrap();
     assert!(validation_result.valid);
 }
 
@@ -237,7 +264,10 @@ async fn test_date_validation() {
         .await
         .unwrap();
 
-    let validation_result: ValidationResult = serde_json::from_str(&result.text).unwrap();
+    let output: Value = serde_json::from_str(&result.text).unwrap();
+    assert!(output["success"].as_bool().unwrap_or(false));
+    let validation_result: ValidationResult =
+        serde_json::from_value(output["result"].clone()).unwrap();
     assert!(validation_result.valid);
 
     // Test invalid date format
@@ -256,7 +286,10 @@ async fn test_date_validation() {
         .await
         .unwrap();
 
-    let validation_result: ValidationResult = serde_json::from_str(&result.text).unwrap();
+    let output: Value = serde_json::from_str(&result.text).unwrap();
+    assert!(output["success"].as_bool().unwrap_or(false));
+    let validation_result: ValidationResult =
+        serde_json::from_value(output["result"].clone()).unwrap();
     assert!(!validation_result.valid);
 }
 
@@ -290,7 +323,10 @@ async fn test_array_validation() {
         .await
         .unwrap();
 
-    let validation_result: ValidationResult = serde_json::from_str(&result.text).unwrap();
+    let output: Value = serde_json::from_str(&result.text).unwrap();
+    assert!(output["success"].as_bool().unwrap_or(false));
+    let validation_result: ValidationResult =
+        serde_json::from_value(output["result"].clone()).unwrap();
     assert!(validation_result.valid);
 
     // Test with duplicate items
@@ -312,7 +348,10 @@ async fn test_array_validation() {
         .await
         .unwrap();
 
-    let validation_result: ValidationResult = serde_json::from_str(&result.text).unwrap();
+    let output: Value = serde_json::from_str(&result.text).unwrap();
+    assert!(output["success"].as_bool().unwrap_or(false));
+    let validation_result: ValidationResult =
+        serde_json::from_value(output["result"].clone()).unwrap();
     assert!(!validation_result.valid);
     assert!(validation_result.errors[0].message.contains("unique"));
 }
@@ -404,7 +443,10 @@ async fn test_nested_object_validation() {
         .await
         .unwrap();
 
-    let validation_result: ValidationResult = serde_json::from_str(&result.text).unwrap();
+    let output: Value = serde_json::from_str(&result.text).unwrap();
+    assert!(output["success"].as_bool().unwrap_or(false));
+    let validation_result: ValidationResult =
+        serde_json::from_value(output["result"].clone()).unwrap();
     assert!(validation_result.valid);
 }
 
@@ -428,7 +470,10 @@ async fn test_custom_validators() {
         .await
         .unwrap();
 
-    let validation_result: ValidationResult = serde_json::from_str(&result.text).unwrap();
+    let output: Value = serde_json::from_str(&result.text).unwrap();
+    assert!(output["success"].as_bool().unwrap_or(false));
+    let validation_result: ValidationResult =
+        serde_json::from_value(output["result"].clone()).unwrap();
     assert!(validation_result.valid);
 
     // Test UUID validator
@@ -447,7 +492,10 @@ async fn test_custom_validators() {
         .await
         .unwrap();
 
-    let validation_result: ValidationResult = serde_json::from_str(&result.text).unwrap();
+    let output: Value = serde_json::from_str(&result.text).unwrap();
+    assert!(output["success"].as_bool().unwrap_or(false));
+    let validation_result: ValidationResult =
+        serde_json::from_value(output["result"].clone()).unwrap();
     assert!(validation_result.valid);
 
     // Test credit card validator
@@ -466,7 +514,10 @@ async fn test_custom_validators() {
         .await
         .unwrap();
 
-    let validation_result: ValidationResult = serde_json::from_str(&result.text).unwrap();
+    let output: Value = serde_json::from_str(&result.text).unwrap();
+    assert!(output["success"].as_bool().unwrap_or(false));
+    let validation_result: ValidationResult =
+        serde_json::from_value(output["result"].clone()).unwrap();
     assert!(validation_result.valid);
 }
 
@@ -493,7 +544,10 @@ async fn test_fail_fast_configuration() {
         .await
         .unwrap();
 
-    let validation_result: ValidationResult = serde_json::from_str(&result.text).unwrap();
+    let output: Value = serde_json::from_str(&result.text).unwrap();
+    assert!(output["success"].as_bool().unwrap_or(false));
+    let validation_result: ValidationResult =
+        serde_json::from_value(output["result"].clone()).unwrap();
     assert!(!validation_result.valid);
     assert_eq!(validation_result.errors.len(), 1); // Only first error due to fail_fast
 }
@@ -560,7 +614,10 @@ async fn test_validation_error_details() {
         .await
         .unwrap();
 
-    let validation_result: ValidationResult = serde_json::from_str(&result.text).unwrap();
+    let output: Value = serde_json::from_str(&result.text).unwrap();
+    assert!(output["success"].as_bool().unwrap_or(false));
+    let validation_result: ValidationResult =
+        serde_json::from_value(output["result"].clone()).unwrap();
     assert!(!validation_result.valid);
 
     // We should have at least 1 error (missing name field stops further validation)
@@ -569,15 +626,9 @@ async fn test_validation_error_details() {
         .message
         .contains("Missing required field"));
 
-    // Check metadata
+    // Check metadata in the response
     assert_eq!(
-        result
-            .metadata
-            .extra
-            .get("error_count")
-            .unwrap()
-            .as_u64()
-            .unwrap(),
+        output["metadata"]["error_count"].as_u64().unwrap(),
         validation_result.errors.len() as u64
     );
 }
