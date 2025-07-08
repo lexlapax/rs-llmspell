@@ -5,6 +5,7 @@ use crate::{
     engine::{EngineFactory, JSConfig, LuaConfig, ScriptEngineBridge, ScriptOutput, ScriptStream},
     providers::{ProviderManager, ProviderManagerConfig},
     registry::ComponentRegistry,
+    tools::register_all_tools,
 };
 use llmspell_core::error::LLMSpellError;
 use serde::{Deserialize, Serialize};
@@ -144,6 +145,12 @@ impl ScriptRuntime {
     ) -> Result<Self, LLMSpellError> {
         // Create component registry
         let registry = Arc::new(ComponentRegistry::new());
+
+        // Register all Phase 2 tools with the registry
+        register_all_tools(registry.clone()).map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to register tools: {}", e),
+            source: None,
+        })?;
 
         // Create provider manager
         let provider_config = config.providers.clone();

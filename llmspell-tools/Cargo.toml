@@ -86,3 +86,4 @@ winapi = { version = "0.3", features = ["fileapi"] }
 
 [dev-dependencies]
 tempfile = "3.20"
+futures = "0.3"

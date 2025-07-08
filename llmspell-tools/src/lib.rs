@@ -16,10 +16,15 @@ pub use registry::{CapabilityMatcher, RegistryStatistics, ToolInfo, ToolRegistry
 // Re-export tools
 pub use api::{GraphQLQueryTool, HttpRequestTool};
 pub use data::{CsvAnalyzerTool, JsonProcessorTool};
-pub use fs::{ArchiveHandlerTool, FileOperationsTool};
+pub use fs::{
+    ArchiveHandlerTool, FileConverterTool, FileOperationsTool, FileSearchTool, FileWatcherTool,
+};
 pub use media::{AudioProcessorTool, ImageProcessorTool, VideoProcessorTool};
 pub use search::WebSearchTool;
 pub use system::{
     EnvironmentReaderTool, ProcessExecutorTool, ServiceCheckerTool, SystemMonitorTool,
 };
-pub use util::{DataValidationTool, TemplateEngineTool, TextManipulatorTool, UuidGeneratorTool};
+pub use util::{
+    Base64EncoderTool, CalculatorTool, DataValidationTool, DateTimeHandlerTool, DiffCalculatorTool,
+    HashCalculatorTool, TemplateEngineTool, TextManipulatorTool, UuidGeneratorTool,
+};

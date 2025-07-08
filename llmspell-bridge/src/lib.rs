@@ -96,6 +96,7 @@ pub mod engine;
 pub mod providers;
 pub mod registry;
 pub mod runtime;
+pub mod tools;
 
 // Language-specific implementations (feature-gated)
 #[cfg(feature = "lua")]
