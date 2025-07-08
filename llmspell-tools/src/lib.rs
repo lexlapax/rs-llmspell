@@ -17,7 +17,7 @@ pub use registry::{CapabilityMatcher, RegistryStatistics, ToolInfo, ToolRegistry
 pub use api::{GraphQLQueryTool, HttpRequestTool};
 pub use data::{CsvAnalyzerTool, JsonProcessorTool};
 pub use fs::{ArchiveHandlerTool, FileOperationsTool};
-pub use media::AudioProcessorTool;
+pub use media::{AudioProcessorTool, VideoProcessorTool};
 pub use search::WebSearchTool;
 pub use system::{
     EnvironmentReaderTool, ProcessExecutorTool, ServiceCheckerTool, SystemMonitorTool,

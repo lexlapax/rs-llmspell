@@ -2,5 +2,7 @@
 //! ABOUTME: Provides format detection, metadata extraction, and basic media transformations
 
 pub mod audio_processor;
+pub mod video_processor;
 
 pub use audio_processor::{AudioMetadata, AudioProcessorConfig, AudioProcessorTool};
+pub use video_processor::{VideoMetadata, VideoProcessorConfig, VideoProcessorTool};
