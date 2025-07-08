@@ -4,6 +4,7 @@
 pub mod api;
 pub mod data;
 pub mod fs;
+pub mod media;
 pub mod registry;
 pub mod search;
 pub mod system;
@@ -16,6 +17,7 @@ pub use registry::{CapabilityMatcher, RegistryStatistics, ToolInfo, ToolRegistry
 pub use api::{GraphQLQueryTool, HttpRequestTool};
 pub use data::{CsvAnalyzerTool, JsonProcessorTool};
 pub use fs::{ArchiveHandlerTool, FileOperationsTool};
+pub use media::AudioProcessorTool;
 pub use search::WebSearchTool;
 pub use system::{
     EnvironmentReaderTool, ProcessExecutorTool, ServiceCheckerTool, SystemMonitorTool,

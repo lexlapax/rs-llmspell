@@ -35,6 +35,7 @@ pub enum ToolCategory {
     Analysis,
     Data,
     System,
+    Media,
     Utility,
     Custom(String),
 }
@@ -48,6 +49,7 @@ impl std::fmt::Display for ToolCategory {
             ToolCategory::Analysis => write!(f, "analysis"),
             ToolCategory::Data => write!(f, "data"),
             ToolCategory::System => write!(f, "system"),
+            ToolCategory::Media => write!(f, "media"),
             ToolCategory::Utility => write!(f, "utility"),
             ToolCategory::Custom(name) => write!(f, "{}", name),
         }
