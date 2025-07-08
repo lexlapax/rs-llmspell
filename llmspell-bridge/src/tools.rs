@@ -120,11 +120,6 @@ pub fn register_all_tools(
         WebSearchTool::new(Default::default())
     })?;
 
-    // Legacy tools for backward compatibility
-    register_tool(registry.clone(), "file_reader", || {
-        FileOperationsTool::new(Default::default())
-    })?;
-
     Ok(())
 }
 

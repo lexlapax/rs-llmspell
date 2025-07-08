@@ -1,5 +1,5 @@
--- utility-tools-working.lua
--- Working examples for utility tools using the actual API
+-- tools-utility-reference.lua
+-- Reference implementation for utility tools using the correct Tool API
 
 print("🔧 Utility Tools Working Examples")
 print("=================================")

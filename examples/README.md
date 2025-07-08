@@ -12,11 +12,18 @@ This directory contains comprehensive examples demonstrating the Phase 2 tools l
 - **`provider-info.lua`** - Provider information and configuration
 - **`multimodal-stub.lua`** - Multimodal interaction example
 
-### Phase 2 Tools Examples
-- **`tools-showcase.lua`** - Complete demonstration of all 25 tools
-- **`utility-tools-examples.lua`** - Focused examples for utility tools
-- **`file-system-tools.lua`** - File system operations with security
-- **`system-integration-tools.lua`** - System integration with security controls
+### Phase 2 Tools Examples (Updated Naming Convention)
+
+All tool example files follow the pattern: `tools-{category}.lua`
+
+- **`tools-showcase.lua`** - Complete demonstration of all 26 tools
+- **`tools-utility.lua`** - Utility tools (UUID, Base64, Hash, Text, Calculator, DateTime, etc.)
+- **`tools-filesystem.lua`** - File system operations with security sandboxing
+- **`tools-system.lua`** - System integration with security controls
+- **`tools-data.lua`** - Data processing tools (JSON, CSV, HTTP, GraphQL)
+- **`tools-media.lua`** - Media processing tools (Audio, Video, Image)
+- **`tools-security.lua`** - Security features and sandboxing demonstrations
+- **`tools-utility-reference.lua`** - Reference implementation showing correct Tool API usage
 
 ## 🚀 Running Examples
 
@@ -32,8 +39,8 @@ llmspell run examples/hello.lua
 llmspell run examples/basic-math.lua
 
 # Run tool demonstrations
-llmspell run examples/utility-tools-examples.lua
-llmspell run examples/file-system-tools.lua
+llmspell run examples/tools-utility.lua
+llmspell run examples/tools-filesystem.lua
 ```
 
 ### Advanced Usage
@@ -42,7 +49,10 @@ llmspell run examples/file-system-tools.lua
 llmspell run examples/tools-showcase.lua
 
 # Run system integration examples (requires elevated permissions)
-llmspell run examples/system-integration-tools.lua
+llmspell run examples/tools-system.lua
+
+# Run all examples
+llmspell run examples/tools-run-all.lua
 ```
 
 ## 📋 Tools Covered
@@ -114,14 +124,16 @@ All examples demonstrate secure usage:
 ### Beginner Examples
 - `hello.lua` - Basic script structure
 - `basic-math.lua` - Simple operations
-- `utility-tools-examples.lua` - Safe utility operations
+- `tools-utility.lua` - Safe utility operations
 
 ### Intermediate Examples
-- `file-system-tools.lua` - File operations with security
+- `tools-filesystem.lua` - File operations with security
+- `tools-data.lua` - Data processing operations
 - `tools-showcase.lua` - Multiple tool integration
 
 ### Advanced Examples
-- `system-integration-tools.lua` - System-level operations
+- `tools-system.lua` - System-level operations
+- `tools-security.lua` - Security testing and validation
 - Custom tool combinations and workflows
 
 ## 🎯 Use Cases

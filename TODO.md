@@ -78,6 +78,7 @@
 - [x] Task 2.8: Simple Media Tools (Day 11) - COMPLETE (3/3 complete) ✅
 - [x] Task 2.9: Common Utilities Enhancement (Day 12) - COMPLETE (2/2 complete) ✅
 - [ ] Task 2.10: Integration, Testing & Documentation (Days 13-14) - IN PROGRESS
+- [ ] Task 2.11: Handoff
 
 ---
 
@@ -1265,37 +1266,108 @@
 
 ### Task 2.10.4: Documentation and Examples
 **Priority**: HIGH  
-**Estimated Time**: 5 hours  
+**Estimated Time**: 8 hours  
 **Assignee**: Full Team
 **Dependencies**: All implementations complete
+**Status**: IN PROGRESS (2025-07-08)
 
-**Description**: Create comprehensive documentation.
+**Description**: Create comprehensive documentation and fix all Phase 2 tool examples.
+
+**Context**: Tool examples were created but use incorrect API. Need to fix all examples to use direct Tool API (Tool.list(), Tool.get(), tool.execute()) instead of agent-based approach.
 
 **Acceptance Criteria:**
 - [ ] Every tool documented
-- [ ] Usage examples provided
-- [ ] Best practices guide written
-- [ ] API reference complete
-- [ ] Migration guide created
+- [ ] All 25+ tools have working examples
+- [ ] All examples use correct Tool API
+- [ ] Examples run without errors via `llmspell run`
+- [ ] Performance benchmarks meet targets
+- [ ] Cross-platform compatibility verified
 
-**Implementation Steps:**
-1. Document each tool's API in tool source files
-2. Create usage examples for each tool category
-3. Write best practices guide for tool development
-4. Generate API reference using cargo doc
-5. Create migration guide for model syntax changes
-6. Add tool comparison table
-7. Review all documentation for accuracy
-8. Create quick-start guide for new users
+**Implementation Plan:**
 
-**Definition of Done:**
-- [ ] All 25 tools documented
-- [ ] Examples test and run correctly
-- [ ] Best practices comprehensive
-- [ ] API docs auto-generated
-- [ ] Migration path clear
+#### Phase 1: Create Core Testing Framework
+- [x] Create test-helpers.lua with common testing utilities
+- [x] Create tools-run-all.lua to execute all examples as suite
+- [x] Add error formatting and result validation helpers
+- [x] Add performance measurement utilities
 
-### Task 2.10.5: Phase 3 Handoff Package
+#### Phase 2: Fix Existing Examples (4 files)
+- [x] Fix tools-showcase.lua - Remove `require("llmspell.agent")`, use Tool API
+- [x] Fix tools-utility.lua (was utility-tools-examples.lua) - Convert agent:use_tool() to Tool API
+- [x] Fix tools-filesystem.lua (was file-system-tools.lua) - Update to correct API
+- [x] Fix tools-system.lua (was system-integration-tools.lua) - Update to correct API
+- [x] Use tools-utility-reference.lua as reference (was utility-tools-working.lua)
+
+#### Phase 3: Create New Category Examples
+- [x] Create tools-data.lua (was data-processing-examples.lua) - HTTP, GraphQL
+- [x] Create tools-media.lua (was media-processing-examples.lua) - Image, Audio, Video
+- [x] Create tools-security.lua (was security-examples.lua) - demonstrate security levels
+
+#### Phase 4: Create Integration Examples
+- [ ] Create tools-workflow.lua (multi-tool workflows)
+- [ ] Create tools-performance.lua (benchmarks)
+
+#### Phase 5: Testing and Documentation
+- [ ] Test each example with `llmspell run examples/[filename].lua`
+- [ ] Run complete test suite with tools-run-all.lua (was run-all-examples.lua)
+- [ ] Create test-report.md with results
+- [x] Update README.md with examples section
+- [ ] Create EXAMPLES.md with detailed explanations
+
+**Capabilities Being Tested:**
+1. **Direct Tool API Usage**: Tool.list(), Tool.get(), tool.execute(), tool.getSchema()
+2. **Parameter Handling**: Simple/complex parameters, validation, defaults
+3. **Return Value Processing**: Success/error handling, structured output, binary data
+4. **Cross-Tool Integration**: Output chaining, error propagation, state management
+5. **Security and Permissions**: Safe/restricted/privileged modes, error handling
+
+**Tools Coverage (25+ tools across 5 categories):**
+- Utility Tools (11): base64_encoder, calculator, data_validation, date_time_handler, diff_calculator, hash_calculator, template_engine, text_manipulator, uuid_generator, json_processor, csv_analyzer
+- File System Tools (6): file_operations, archive_handler, file_watcher, file_converter, file_search, directory_scanner
+- System Integration Tools (4): environment_reader, process_executor, service_checker, system_monitor
+- Data Processing Tools (2): http_request, graphql_query
+- Media Processing Tools (3): audio_processor, video_processor, image_processor
+
+**Example Files (Renamed for Consistency):**
+- tools-showcase.lua - Complete demonstration of all 25+ tools
+- tools-utility.lua - Utility tools examples
+- tools-filesystem.lua - File system operations with security
+- tools-system.lua - System integration with security controls
+- tools-data.lua - Data processing tools (JSON, CSV, HTTP, GraphQL)
+- tools-media.lua - Media processing tools (Audio, Video, Image)
+- tools-security.lua - Security features and sandboxing demonstrations
+- tools-utility-reference.lua - Reference implementation showing correct Tool API usage
+- tools-run-all.lua - Test runner for all examples
+- test-helpers.lua - Common testing utilities
+
+**Definition of Done (Per Example):**
+1. **Code Quality**: No syntax/runtime errors, follows Lua best practices, proper error handling
+2. **Functionality**: Uses correct Tool API, handles success/error cases, shows real-world patterns
+3. **Testing**: Runs via `llmspell run`, produces expected output, cross-platform compatible
+4. **Documentation**: Header comments, section explanations, expected output documented
+
+**Definition of Done (Overall):**
+- [ ] All 4 broken examples fixed and working
+- [ ] All 25+ tools demonstrated at least once
+- [ ] Test suite executes successfully
+- [ ] Performance targets met (<10ms init, <50ms simple ops)
+- [ ] Documentation complete and accurate
+- [ ] Cross-platform compatibility verified
+- [ ] No quality check warnings or errors
+- [ ] User can run any example without additional setup
+
+**Current Progress:**
+- [x] Created comprehensive examples for all 25 tools
+- [x] Discovered examples use incorrect API (agent-based)
+- [x] Fixed Tool.list() to show all Phase 2 tools
+- [x] Created tools-examples-todo.md plan
+- [x] Fixed all examples to use direct Tool API
+- [x] Renamed all examples to consistent tools-{category}.lua naming
+- [x] Removed redundant test files (test-api.lua, test-detailed-api.lua, test-working-api.lua)
+- [ ] Test all examples via command line
+- [ ] Create integration and performance examples
+
+### Task 2.11: Phase 3 Handoff Package
 **Priority**: CRITICAL  
 **Estimated Time**: 3 hours  
 **Assignee**: Team Lead
