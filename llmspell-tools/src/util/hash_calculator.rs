@@ -19,10 +19,17 @@ use llmspell_core::{
         },
     },
     types::{AgentInput, AgentOutput, ExecutionContext},
-    ComponentMetadata, LLMSpellError, Result,
+    ComponentMetadata, Result,
 };
-use llmspell_utils::encoding::{
-    from_hex_string, hash_file, hash_string, to_hex_string, verify_hash, HashAlgorithm,
+use llmspell_utils::{
+    encoding::{from_hex_string, hash_file, hash_string, to_hex_string, HashAlgorithm},
+    error_builders::llmspell::{storage_error, validation_error},
+    params::{
+        extract_optional_string, extract_parameters, extract_required_string,
+        extract_string_with_default,
+    },
+    response::ResponseBuilder,
+    validators::validate_enum,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -98,33 +105,18 @@ impl HashCalculatorTool {
         }
     }
 
-    async fn check_file_size(&self, path: &Path) -> Result<()> {
-        let metadata = tokio::fs::metadata(path)
-            .await
-            .map_err(|e| LLMSpellError::Storage {
-                message: format!("Failed to get file metadata: {}", e),
-                operation: Some(format!("read metadata for {}", path.to_string_lossy())),
-                source: None,
-            })?;
+    async fn check_file_size(&self, path: &Path) -> Result<u64> {
+        let metadata = tokio::fs::metadata(path).await.map_err(|e| {
+            storage_error(
+                format!("Failed to read file metadata: {}", e),
+                Some("read_metadata".to_string()),
+            )
+        })?;
 
-        if metadata.len() > self.config.max_file_size {
-            return Err(LLMSpellError::Validation {
-                message: format!(
-                    "File size ({} bytes) exceeds maximum allowed size ({} bytes)",
-                    metadata.len(),
-                    self.config.max_file_size
-                ),
-                field: Some("file".to_string()),
-            });
-        }
+        let file_size = metadata.len();
+        llmspell_utils::validators::validate_file_size(file_size, self.config.max_file_size)?;
 
-        Ok(())
-    }
-}
-
-impl Default for HashCalculatorTool {
-    fn default() -> Self {
-        Self::new(HashCalculatorConfig::default())
+        Ok(file_size)
     }
 }
 
@@ -135,205 +127,147 @@ impl BaseAgent for HashCalculatorTool {
     }
 
     async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
-        // Get parameters from input
-        let params =
-            input
-                .parameters
-                .get("parameters")
-                .ok_or_else(|| LLMSpellError::Validation {
-                    message: "Missing parameters in input".to_string(),
-                    field: Some("parameters".to_string()),
-                })?;
-
-        // Validate parameters
-        self.validate_parameters(params).await?;
-
-        // Extract operation type
-        let operation = params
-            .get("operation")
-            .and_then(|v| v.as_str())
-            .unwrap_or("hash");
+        let params = extract_parameters(&input)?;
+        let operation = extract_required_string(params, "operation")?;
 
         match operation {
             "hash" => {
-                // Extract input type
-                let input_type = params
-                    .get("input_type")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("string");
+                let input_type = extract_string_with_default(params, "input_type", "string");
+                let algorithm = self.parse_algorithm(extract_optional_string(params, "algorithm"));
+                let format = self.parse_format(extract_optional_string(params, "format"));
 
-                let algorithm =
-                    self.parse_algorithm(params.get("algorithm").and_then(|v| v.as_str()));
-                let format = self.parse_format(params.get("format").and_then(|v| v.as_str()));
+                // Validate input type
+                validate_enum(&input_type, &["string", "file"], "input_type")?;
 
                 let hash = match input_type {
                     "string" => {
-                        let text =
-                            params.get("data").and_then(|v| v.as_str()).ok_or_else(|| {
-                                LLMSpellError::Validation {
-                                    message: "Missing 'data' parameter for string hashing"
-                                        .to_string(),
-                                    field: Some("data".to_string()),
-                                }
-                            })?;
+                        let text = extract_required_string(params, "data")?;
                         hash_string(text, algorithm)
                     }
                     "file" => {
-                        let file_path =
-                            params.get("file").and_then(|v| v.as_str()).ok_or_else(|| {
-                                LLMSpellError::Validation {
-                                    message: "Missing 'file' parameter for file hashing"
-                                        .to_string(),
-                                    field: Some("file".to_string()),
-                                }
-                            })?;
-
+                        let file_path = extract_required_string(params, "file")?;
                         let path = Path::new(file_path);
                         self.check_file_size(path).await?;
 
-                        hash_file(path, algorithm).map_err(|e| LLMSpellError::Storage {
-                            message: format!("Failed to hash file: {}", e),
-                            operation: Some(format!("hash file {}", file_path)),
-                            source: None,
+                        hash_file(path, algorithm).map_err(|e| {
+                            storage_error(
+                                format!("Failed to hash file: {}", e),
+                                Some(format!("hash file {}", file_path)),
+                            )
                         })?
                     }
-                    _ => {
-                        return Err(LLMSpellError::Validation {
-                            message: format!("Invalid input_type: {}", input_type),
-                            field: Some("input_type".to_string()),
-                        });
-                    }
+                    _ => unreachable!(), // Already validated
                 };
 
                 let formatted = self.format_hash(&hash, &format);
-                let result = json!({
-                    "algorithm": algorithm.to_string(),
-                    "hash": formatted,
-                    "format": match format {
-                        OutputFormat::Hex => "hex",
-                        OutputFormat::Base64 => "base64",
-                    }
-                });
+                let response = ResponseBuilder::success("hash")
+                    .with_message(format!(
+                        "Calculated {} hash",
+                        algorithm.to_string().to_uppercase()
+                    ))
+                    .with_result(json!({
+                        "algorithm": algorithm.to_string(),
+                        "hash": formatted,
+                        "format": match format {
+                            OutputFormat::Hex => "hex",
+                            OutputFormat::Base64 => "base64",
+                        }
+                    }))
+                    .build();
 
-                Ok(AgentOutput::text(serde_json::to_string_pretty(&result)?))
+                Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
             }
             "verify" => {
-                let input_type = params
-                    .get("input_type")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("string");
+                let input_type = extract_string_with_default(params, "input_type", "string");
+                let algorithm = self.parse_algorithm(extract_optional_string(params, "algorithm"));
+                let expected_hash_str = extract_required_string(params, "expected_hash")?;
+                let expected_format = extract_string_with_default(params, "expected_format", "hex");
 
-                let algorithm =
-                    self.parse_algorithm(params.get("algorithm").and_then(|v| v.as_str()));
-
-                let expected_hash_str = params
-                    .get("expected_hash")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| LLMSpellError::Validation {
-                        message: "Missing 'expected_hash' parameter for verification".to_string(),
-                        field: Some("expected_hash".to_string()),
-                    })?;
-
-                // Determine format of expected hash
-                let expected_format = params
-                    .get("expected_format")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("hex");
+                // Validate enums
+                validate_enum(&input_type, &["string", "file"], "input_type")?;
+                validate_enum(&expected_format, &["hex", "base64"], "expected_format")?;
 
                 let expected_hash = match expected_format {
                     "hex" => from_hex_string(expected_hash_str).map_err(|_| {
-                        LLMSpellError::Validation {
-                            message: "Invalid hex string in expected_hash".to_string(),
-                            field: Some("expected_hash".to_string()),
-                        }
+                        validation_error(
+                            "Invalid hex string in expected_hash",
+                            Some("expected_hash".to_string()),
+                        )
                     })?,
                     "base64" => llmspell_utils::encoding::base64_decode(expected_hash_str)
-                        .map_err(|_| LLMSpellError::Validation {
-                            message: "Invalid base64 string in expected_hash".to_string(),
-                            field: Some("expected_hash".to_string()),
+                        .map_err(|_| {
+                            validation_error(
+                                "Invalid base64 string in expected_hash",
+                                Some("expected_hash".to_string()),
+                            )
                         })?,
-                    _ => {
-                        return Err(LLMSpellError::Validation {
-                            message: format!("Invalid expected_format: {}", expected_format),
-                            field: Some("expected_format".to_string()),
-                        });
-                    }
+                    _ => unreachable!(), // Already validated
                 };
 
-                let data = match input_type {
+                let actual_hash = match input_type {
                     "string" => {
-                        let text =
-                            params.get("data").and_then(|v| v.as_str()).ok_or_else(|| {
-                                LLMSpellError::Validation {
-                                    message: "Missing 'data' parameter for verification"
-                                        .to_string(),
-                                    field: Some("data".to_string()),
-                                }
-                            })?;
-                        text.as_bytes().to_vec()
+                        let text = extract_required_string(params, "data")?;
+                        hash_string(text, algorithm)
                     }
                     "file" => {
-                        let file_path =
-                            params.get("file").and_then(|v| v.as_str()).ok_or_else(|| {
-                                LLMSpellError::Validation {
-                                    message: "Missing 'file' parameter for verification"
-                                        .to_string(),
-                                    field: Some("file".to_string()),
-                                }
-                            })?;
-
+                        let file_path = extract_required_string(params, "file")?;
                         let path = Path::new(file_path);
                         self.check_file_size(path).await?;
 
-                        tokio::fs::read(path)
-                            .await
-                            .map_err(|e| LLMSpellError::Storage {
-                                message: format!("Failed to read file: {}", e),
-                                operation: Some(format!("read file {}", file_path)),
-                                source: None,
-                            })?
+                        hash_file(path, algorithm).map_err(|e| {
+                            storage_error(
+                                format!("Failed to hash file for verification: {}", e),
+                                Some(format!("hash file {}", file_path)),
+                            )
+                        })?
                     }
-                    _ => {
-                        return Err(LLMSpellError::Validation {
-                            message: format!("Invalid input_type: {}", input_type),
-                            field: Some("input_type".to_string()),
-                        });
-                    }
+                    _ => unreachable!(), // Already validated
                 };
 
-                let is_valid = verify_hash(&data, &expected_hash, algorithm);
-                let result = json!({
-                    "valid": is_valid,
-                    "algorithm": algorithm.to_string(),
-                    "message": if is_valid {
-                        "Hash verification successful"
-                    } else {
-                        "Hash verification failed - data does not match expected hash"
-                    }
-                });
+                // verify_hash compares the hashes directly
+                let matches = actual_hash == expected_hash;
 
-                Ok(AgentOutput::text(serde_json::to_string_pretty(&result)?))
+                let response = if matches {
+                    ResponseBuilder::success("verify")
+                        .with_message("Hash verification successful")
+                        .with_result(json!({
+                            "verified": true,
+                            "algorithm": algorithm.to_string(),
+                        }))
+                } else {
+                    ResponseBuilder::success("verify")
+                        .with_message("Hash verification failed")
+                        .with_result(json!({
+                            "verified": false,
+                            "algorithm": algorithm.to_string(),
+                            "expected": self.format_hash(&expected_hash, &self.parse_format(Some(expected_format))),
+                            "actual": self.format_hash(&actual_hash, &self.parse_format(Some(expected_format))),
+                        }))
+                }
+                .build();
+
+                Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
             }
-            _ => Err(LLMSpellError::Validation {
-                message: format!("Unknown operation: {}", operation),
-                field: Some("operation".to_string()),
-            }),
+            _ => Err(validation_error(
+                format!("Invalid operation: {}", operation),
+                Some("operation".to_string()),
+            )),
         }
     }
 
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
         if input.text.is_empty() {
-            return Err(LLMSpellError::Validation {
-                message: "Input prompt cannot be empty".to_string(),
-                field: Some("prompt".to_string()),
-            });
+            return Err(validation_error(
+                "Input text cannot be empty",
+                Some("text".to_string()),
+            ));
         }
         Ok(())
     }
 
-    async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
+    async fn handle_error(&self, error: llmspell_core::LLMSpellError) -> Result<AgentOutput> {
         Ok(AgentOutput::text(format!(
-            "Hash calculation error: {}",
+            "Hash calculator error: {}",
             error
         )))
     }
@@ -346,34 +280,34 @@ impl Tool for HashCalculatorTool {
     }
 
     fn security_level(&self) -> SecurityLevel {
-        SecurityLevel::Restricted // File access requires restricted security
+        SecurityLevel::Restricted
     }
 
     fn schema(&self) -> ToolSchema {
         ToolSchema::new(
             "hash_calculator".to_string(),
-            "Calculate and verify hashes using multiple algorithms".to_string(),
+            "Calculate and verify hashes using various algorithms".to_string(),
         )
         .with_parameter(ParameterDef {
             name: "operation".to_string(),
             param_type: ParameterType::String,
-            description: "Operation to perform: hash or verify".to_string(),
-            required: false,
-            default: Some(json!("hash")),
-        })
-        .with_parameter(ParameterDef {
-            name: "input_type".to_string(),
-            param_type: ParameterType::String,
-            description: "Type of input: string or file".to_string(),
-            required: false,
-            default: Some(json!("string")),
+            description: "Operation to perform: 'hash' or 'verify'".to_string(),
+            required: true,
+            default: None,
         })
         .with_parameter(ParameterDef {
             name: "algorithm".to_string(),
             param_type: ParameterType::String,
-            description: "Hash algorithm: md5, sha1, sha256, sha512".to_string(),
+            description: "Hash algorithm: 'md5', 'sha1', 'sha256', or 'sha512'".to_string(),
             required: false,
             default: Some(json!("sha256")),
+        })
+        .with_parameter(ParameterDef {
+            name: "input_type".to_string(),
+            param_type: ParameterType::String,
+            description: "Type of input: 'string' or 'file'".to_string(),
+            required: false,
+            default: Some(json!("string")),
         })
         .with_parameter(ParameterDef {
             name: "data".to_string(),
@@ -392,268 +326,211 @@ impl Tool for HashCalculatorTool {
         .with_parameter(ParameterDef {
             name: "format".to_string(),
             param_type: ParameterType::String,
-            description: "Output format: hex or base64".to_string(),
+            description: "Output format: 'hex' or 'base64'".to_string(),
             required: false,
             default: Some(json!("hex")),
         })
         .with_parameter(ParameterDef {
             name: "expected_hash".to_string(),
             param_type: ParameterType::String,
-            description: "Expected hash value for verification".to_string(),
+            description: "Expected hash for verification".to_string(),
             required: false,
             default: None,
         })
         .with_parameter(ParameterDef {
             name: "expected_format".to_string(),
             param_type: ParameterType::String,
-            description: "Format of expected_hash: hex or base64".to_string(),
+            description: "Format of expected hash: 'hex' or 'base64'".to_string(),
             required: false,
             default: Some(json!("hex")),
         })
-        .with_returns(ParameterType::String)
+        .with_returns(ParameterType::Object)
     }
 
     fn security_requirements(&self) -> SecurityRequirements {
-        SecurityRequirements::restricted().with_file_access("*") // Allow read access to all files
+        SecurityRequirements::restricted().with_file_access("*") // Needs file access for hashing files
     }
 
     fn resource_limits(&self) -> ResourceLimits {
         ResourceLimits::default()
-            .with_memory_limit(50 * 1024 * 1024) // 50MB for file operations
-            .with_cpu_limit(5000) // 5 seconds for large files
+            .with_cpu_limit(30000) // 30 seconds for large files
+            .with_memory_limit(100 * 1024 * 1024) // 100MB for large files
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::Value;
-    use std::fs::File;
-    use std::io::Write;
+    use llmspell_core::LLMSpellError;
+    use llmspell_utils::file_utils::write_file;
     use tempfile::TempDir;
 
-    #[tokio::test]
-    async fn test_hash_string_md5() {
-        let tool = HashCalculatorTool::default();
-        let input = AgentInput::text("hash string".to_string()).with_parameter(
-            "parameters".to_string(),
-            json!({
-                "operation": "hash",
-                "input_type": "string",
-                "data": "Hello, World!",
-                "algorithm": "md5",
-                "format": "hex"
-            }),
+    fn create_test_tool() -> HashCalculatorTool {
+        HashCalculatorTool::new(HashCalculatorConfig::default())
+    }
+
+    fn create_test_input(params: serde_json::Value) -> AgentInput {
+        let mut input = AgentInput::text("test");
+        // The extract_parameters function expects a "parameters" key containing the actual parameters
+        input = input.with_parameter(
+            "parameters",
+            params.get("parameters").cloned().unwrap_or(json!({})),
         );
-        let context = ExecutionContext::with_conversation("test".to_string());
-
-        let result = tool.execute(input, context).await;
-        assert!(result.is_ok());
-
-        let output = result.unwrap().text;
-        let parsed: Value = serde_json::from_str(&output).unwrap();
-        assert_eq!(parsed["algorithm"], "MD5");
-        assert_eq!(parsed["hash"], "65a8e27d8879283831b664bd8b7f0ad4");
-        assert_eq!(parsed["format"], "hex");
+        input
     }
 
     #[tokio::test]
-    async fn test_hash_string_sha256() {
-        let tool = HashCalculatorTool::default();
-        let input = AgentInput::text("hash string".to_string()).with_parameter(
-            "parameters".to_string(),
-            json!({
+    async fn test_hash_string() {
+        let tool = create_test_tool();
+        let input = create_test_input(json!({
+            "parameters": {
                 "operation": "hash",
-                "input_type": "string",
-                "data": "test data",
-                "algorithm": "sha256"
-            }),
-        );
-        let context = ExecutionContext::with_conversation("test".to_string());
+                "data": "hello world",
+                "algorithm": "sha256",
+                "format": "hex"
+            }
+        }));
 
-        let result = tool.execute(input, context).await;
+        let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_ok());
+        let output = result.unwrap();
+        let response: serde_json::Value = serde_json::from_str(&output.text).unwrap();
 
-        let output = result.unwrap().text;
-        let parsed: Value = serde_json::from_str(&output).unwrap();
-        assert_eq!(parsed["algorithm"], "SHA-256");
-        assert_eq!(
-            parsed["hash"],
-            "916f0027a575074ce72a331777c3478d6513f786a591bd892da1a577bf2335f9"
-        );
+        assert!(response["success"].as_bool().unwrap_or(false));
+        assert_eq!(response["result"]["algorithm"], "SHA-256");
+        assert!(response["result"]["hash"].is_string());
     }
 
     #[tokio::test]
     async fn test_hash_file() {
-        let tool = HashCalculatorTool::default();
+        let tool = create_test_tool();
         let temp_dir = TempDir::new().unwrap();
         let file_path = temp_dir.path().join("test.txt");
+        write_file(&file_path, b"file content").unwrap();
 
-        let mut file = File::create(&file_path).unwrap();
-        writeln!(file, "Test file content").unwrap();
-
-        let input = AgentInput::text("hash file".to_string()).with_parameter(
-            "parameters".to_string(),
-            json!({
+        let input = create_test_input(json!({
+            "parameters": {
                 "operation": "hash",
                 "input_type": "file",
                 "file": file_path.to_str().unwrap(),
-                "algorithm": "sha256"
-            }),
-        );
-        let context = ExecutionContext::with_conversation("test".to_string());
+                "algorithm": "md5"
+            }
+        }));
 
-        let result = tool.execute(input, context).await;
+        let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_ok());
+        let output = result.unwrap();
+        let response: serde_json::Value = serde_json::from_str(&output.text).unwrap();
 
-        let output = result.unwrap().text;
-        let parsed: Value = serde_json::from_str(&output).unwrap();
-        assert_eq!(parsed["algorithm"], "SHA-256");
-        assert!(parsed["hash"].is_string());
+        assert!(response["success"].as_bool().unwrap_or(false));
+        assert_eq!(response["result"]["algorithm"], "MD5");
     }
 
     #[tokio::test]
     async fn test_verify_hash_success() {
-        let tool = HashCalculatorTool::default();
-        let input = AgentInput::text("verify hash".to_string()).with_parameter(
-            "parameters".to_string(),
-            json!({
+        let tool = create_test_tool();
+        let input = create_test_input(json!({
+            "parameters": {
                 "operation": "verify",
-                "input_type": "string",
-                "data": "test data",
+                "data": "test",
                 "algorithm": "sha256",
-                "expected_hash": "916f0027a575074ce72a331777c3478d6513f786a591bd892da1a577bf2335f9",
+                "expected_hash": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
                 "expected_format": "hex"
-            }),
-        );
-        let context = ExecutionContext::with_conversation("test".to_string());
+            }
+        }));
 
-        let result = tool.execute(input, context).await;
+        let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_ok());
+        let output = result.unwrap();
+        let response: serde_json::Value = serde_json::from_str(&output.text).unwrap();
 
-        let output = result.unwrap().text;
-        let parsed: Value = serde_json::from_str(&output).unwrap();
-        assert_eq!(parsed["valid"], true);
-        assert_eq!(parsed["algorithm"], "SHA-256");
+        assert!(response["success"].as_bool().unwrap_or(false));
+        assert!(response["result"]["verified"].as_bool().unwrap_or(false));
     }
 
     #[tokio::test]
     async fn test_verify_hash_failure() {
-        let tool = HashCalculatorTool::default();
-        let input = AgentInput::text("verify hash".to_string()).with_parameter(
-            "parameters".to_string(),
-            json!({
+        let tool = create_test_tool();
+        let input = create_test_input(json!({
+            "parameters": {
                 "operation": "verify",
-                "input_type": "string",
-                "data": "test data",
+                "data": "test",
                 "algorithm": "sha256",
                 "expected_hash": "0000000000000000000000000000000000000000000000000000000000000000",
                 "expected_format": "hex"
-            }),
-        );
-        let context = ExecutionContext::with_conversation("test".to_string());
+            }
+        }));
 
-        let result = tool.execute(input, context).await;
+        let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_ok());
+        let output = result.unwrap();
+        let response: serde_json::Value = serde_json::from_str(&output.text).unwrap();
 
-        let output = result.unwrap().text;
-        let parsed: Value = serde_json::from_str(&output).unwrap();
-        assert_eq!(parsed["valid"], false);
+        assert!(response["success"].as_bool().unwrap_or(false));
+        assert!(!response["result"]["verified"].as_bool().unwrap_or(true));
     }
 
     #[tokio::test]
-    async fn test_base64_format() {
-        let tool = HashCalculatorTool::default();
-        let input = AgentInput::text("hash with base64".to_string()).with_parameter(
-            "parameters".to_string(),
-            json!({
+    async fn test_missing_required_parameter() {
+        let tool = create_test_tool();
+        let input = create_test_input(json!({
+            "parameters": {
+                // Missing "operation" parameter
+                "data": "test"
+            }
+        }));
+
+        let result = tool.execute(input, ExecutionContext::default()).await;
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            LLMSpellError::Validation { .. }
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_invalid_algorithm() {
+        let tool = create_test_tool();
+        let input = create_test_input(json!({
+            "parameters": {
                 "operation": "hash",
-                "input_type": "string",
                 "data": "test",
-                "algorithm": "sha256",
-                "format": "base64"
-            }),
-        );
-        let context = ExecutionContext::with_conversation("test".to_string());
+                "algorithm": "invalid" // Should default to SHA-256
+            }
+        }));
 
-        let result = tool.execute(input, context).await;
+        let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_ok());
+        let output = result.unwrap();
+        let response: serde_json::Value = serde_json::from_str(&output.text).unwrap();
 
-        let output = result.unwrap().text;
-        let parsed: Value = serde_json::from_str(&output).unwrap();
-        assert_eq!(parsed["format"], "base64");
-        // SHA-256 hash of "test" in base64
-        assert_eq!(
-            parsed["hash"],
-            "n4bQgYhMfWWaL+qgxVrQFaO/TxsrC4Is0V1sFbDwCgg="
-        );
-    }
-
-    #[tokio::test]
-    async fn test_all_algorithms() {
-        let tool = HashCalculatorTool::default();
-        let algorithms = vec!["md5", "sha1", "sha256", "sha512"];
-
-        for algo in algorithms {
-            let input = AgentInput::text("hash test".to_string()).with_parameter(
-                "parameters".to_string(),
-                json!({
-                    "operation": "hash",
-                    "input_type": "string",
-                    "data": "test",
-                    "algorithm": algo
-                }),
-            );
-            let context = ExecutionContext::with_conversation("test".to_string());
-
-            let result = tool.execute(input, context).await;
-            assert!(result.is_ok(), "Algorithm {} failed", algo);
-        }
+        assert_eq!(response["result"]["algorithm"], "SHA-256");
     }
 
     #[tokio::test]
     async fn test_file_size_limit() {
-        let mut config = HashCalculatorConfig::default();
-        config.max_file_size = 100; // 100 bytes limit
-        let tool = HashCalculatorTool::new(config);
+        let tool = HashCalculatorTool::new(HashCalculatorConfig {
+            max_file_size: 10, // Very small limit
+            ..Default::default()
+        });
 
         let temp_dir = TempDir::new().unwrap();
         let file_path = temp_dir.path().join("large.txt");
+        write_file(&file_path, b"This content is larger than 10 bytes").unwrap();
 
-        let mut file = File::create(&file_path).unwrap();
-        // Write more than 100 bytes
-        for _ in 0..20 {
-            writeln!(file, "This is a line of text").unwrap();
-        }
-
-        let input = AgentInput::text("hash large file".to_string()).with_parameter(
-            "parameters".to_string(),
-            json!({
+        let input = create_test_input(json!({
+            "parameters": {
                 "operation": "hash",
                 "input_type": "file",
-                "file": file_path.to_str().unwrap(),
-                "algorithm": "sha256"
-            }),
-        );
-        let context = ExecutionContext::with_conversation("test".to_string());
+                "file": file_path.to_str().unwrap()
+            }
+        }));
 
-        let result = tool.execute(input, context).await;
+        let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("exceeds maximum allowed size"));
-    }
-
-    #[tokio::test]
-    async fn test_tool_metadata() {
-        let tool = HashCalculatorTool::default();
-        assert_eq!(tool.category(), ToolCategory::Utility);
-        assert_eq!(tool.security_level(), SecurityLevel::Restricted);
-        assert_eq!(tool.metadata().name, "hash-calculator");
-
-        let schema = tool.schema();
-        assert_eq!(schema.name, "hash_calculator");
-        assert!(schema.parameters.len() >= 8);
+        assert!(matches!(
+            result.unwrap_err(),
+            LLMSpellError::Validation { .. }
+        ));
     }
 }

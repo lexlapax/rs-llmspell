@@ -22,15 +22,24 @@ use llmspell_core::{
     types::{AgentInput, AgentOutput, ExecutionContext},
     ComponentMetadata, LLMSpellError, Result,
 };
-use llmspell_utils::id_generator::{
-    generate_component_id, generate_deterministic_id, generate_short_id, ComponentIdBuilder,
-    NAMESPACE_AGENT, NAMESPACE_TOOL, NAMESPACE_WORKFLOW,
+use llmspell_utils::{
+    error_builders::llmspell::validation_error,
+    id_generator::{
+        generate_component_id, generate_deterministic_id, generate_short_id, ComponentIdBuilder,
+        NAMESPACE_AGENT, NAMESPACE_TOOL, NAMESPACE_WORKFLOW,
+    },
+    params::{
+        extract_optional_bool, extract_optional_string, extract_parameters,
+        extract_required_string, extract_string_with_default,
+    },
+    response::ResponseBuilder,
+    validators::validate_enum,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum UuidVersion {
     V1,
@@ -38,7 +47,7 @@ pub enum UuidVersion {
     V5,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum UuidFormat {
     Standard,
@@ -107,17 +116,21 @@ impl UuidGeneratorTool {
                     Some("x500") => Uuid::NAMESPACE_X500,
                     Some(custom) => {
                         // Try to parse as UUID
-                        Uuid::parse_str(custom).map_err(|_| LLMSpellError::Validation {
-                            message: format!("Invalid namespace UUID: {}", custom),
-                            field: Some("namespace".to_string()),
+                        Uuid::parse_str(custom).map_err(|_| {
+                            validation_error(
+                                format!("Invalid namespace UUID: {}", custom),
+                                Some("namespace".to_string()),
+                            )
                         })?
                     }
                     None => Uuid::NAMESPACE_DNS, // Default namespace
                 };
 
-                let name = name.ok_or_else(|| LLMSpellError::Validation {
-                    message: "UUID v5 requires a name parameter".to_string(),
-                    field: Some("name".to_string()),
+                let name = name.ok_or_else(|| {
+                    validation_error(
+                        "UUID v5 requires a name parameter",
+                        Some("name".to_string()),
+                    )
                 })?;
 
                 Ok(Uuid::new_v5(&namespace_uuid, name.as_bytes()))
@@ -132,6 +145,52 @@ impl UuidGeneratorTool {
             UuidFormat::Urn => uuid.urn().to_string(),
             UuidFormat::Braced => uuid.braced().to_string(),
         }
+    }
+
+    async fn validate_parameters(&self, params: &serde_json::Value) -> Result<()> {
+        // Extract operation type for validation
+        let operation = extract_string_with_default(params, "operation", "generate");
+
+        // Validate operation value
+        validate_enum(
+            &operation,
+            &[
+                "generate",
+                "component_id",
+                "deterministic",
+                "custom",
+                "validate",
+            ],
+            "operation",
+        )?;
+
+        // Operation-specific validations
+        match operation {
+            "generate" => {
+                // Validate version if provided
+                if let Some(version) = extract_optional_string(params, "version") {
+                    validate_enum(&version, &["v1", "1", "v4", "4", "v5", "5"], "version")?;
+                }
+                // Validate format if provided
+                if let Some(format) = extract_optional_string(params, "format") {
+                    validate_enum(
+                        &format,
+                        &["standard", "hyphenated", "simple", "urn", "braced"],
+                        "format",
+                    )?;
+                }
+            }
+            "deterministic" => {
+                // Deterministic requires name
+                extract_required_string(params, "name")?;
+            }
+            "validate" => {
+                // Validate requires uuid
+                extract_required_string(params, "uuid")?;
+            }
+            _ => {} // Other operations have optional parameters
+        }
+        Ok(())
     }
 }
 
@@ -148,73 +207,69 @@ impl BaseAgent for UuidGeneratorTool {
     }
 
     async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
-        // Get parameters from input
-        let params =
-            input
-                .parameters
-                .get("parameters")
-                .ok_or_else(|| LLMSpellError::Validation {
-                    message: "Missing parameters in input".to_string(),
-                    field: Some("parameters".to_string()),
-                })?;
+        // Get parameters from input using shared utility
+        let params = extract_parameters(&input)?;
 
         // Validate parameters
         self.validate_parameters(params).await?;
 
         // Extract operation type
-        let operation = params
-            .get("operation")
-            .and_then(|v| v.as_str())
-            .unwrap_or("generate");
+        let operation = extract_string_with_default(params, "operation", "generate");
 
         match operation {
             "generate" => {
                 // Extract version
-                let version = params
-                    .get("version")
-                    .and_then(|v| v.as_str())
+                let version = extract_optional_string(params, "version")
                     .map(|v| match v {
                         "v1" | "1" => UuidVersion::V1,
                         "v4" | "4" => UuidVersion::V4,
                         "v5" | "5" => UuidVersion::V5,
-                        _ => self.config.default_version.clone(),
+                        _ => self.config.default_version,
                     })
-                    .unwrap_or_else(|| self.config.default_version.clone());
+                    .unwrap_or(self.config.default_version);
 
                 // Extract namespace and name for v5
-                let namespace = params.get("namespace").and_then(|v| v.as_str());
-                let name = params.get("name").and_then(|v| v.as_str());
+                let namespace = extract_optional_string(params, "namespace");
+                let name = extract_optional_string(params, "name");
 
                 // Generate UUID
                 let uuid = self.generate_uuid(version, namespace, name)?;
 
                 // Extract format
-                let format = params
-                    .get("format")
-                    .and_then(|v| v.as_str())
+                let format = extract_optional_string(params, "format")
                     .map(|f| match f {
                         "standard" | "hyphenated" => UuidFormat::Hyphenated,
                         "simple" => UuidFormat::Simple,
                         "urn" => UuidFormat::Urn,
                         "braced" => UuidFormat::Braced,
-                        _ => self.config.default_format.clone(),
+                        _ => self.config.default_format,
                     })
-                    .unwrap_or_else(|| self.config.default_format.clone());
+                    .unwrap_or(self.config.default_format);
 
                 let formatted = self.format_uuid(uuid, &format);
-                Ok(AgentOutput::text(formatted))
+                let response = ResponseBuilder::success("generate")
+                    .with_message("UUID generated successfully")
+                    .with_result(json!({
+                        "uuid": formatted,
+                        "version": match version {
+                            UuidVersion::V1 => "v1",
+                            UuidVersion::V4 => "v4",
+                            UuidVersion::V5 => "v5",
+                        },
+                        "format": match format {
+                            UuidFormat::Standard | UuidFormat::Hyphenated => "hyphenated",
+                            UuidFormat::Simple => "simple",
+                            UuidFormat::Urn => "urn",
+                            UuidFormat::Braced => "braced",
+                        }
+                    }))
+                    .build();
+                Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
             }
             "component_id" => {
                 // Generate component ID using llmspell-utils
-                let prefix = params
-                    .get("prefix")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("component");
-
-                let short = params
-                    .get("short")
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(false);
+                let prefix = extract_string_with_default(params, "prefix", "component");
+                let short = extract_optional_bool(params, "short").unwrap_or(false);
 
                 let id = if short {
                     generate_short_id(prefix)
@@ -222,21 +277,20 @@ impl BaseAgent for UuidGeneratorTool {
                     generate_component_id(prefix)
                 };
 
-                Ok(AgentOutput::text(id))
+                let response = ResponseBuilder::success("component_id")
+                    .with_message("Component ID generated successfully")
+                    .with_result(json!({
+                        "id": id,
+                        "prefix": prefix,
+                        "short": short
+                    }))
+                    .build();
+                Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
             }
             "deterministic" => {
                 // Generate deterministic ID
-                let namespace = params
-                    .get("namespace")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("agent");
-
-                let name = params.get("name").and_then(|v| v.as_str()).ok_or_else(|| {
-                    LLMSpellError::Validation {
-                        message: "Deterministic ID requires a name parameter".to_string(),
-                        field: Some("name".to_string()),
-                    }
-                })?;
+                let namespace = extract_string_with_default(params, "namespace", "agent");
+                let name = extract_required_string(params, "name")?;
 
                 let namespace_uuid = match namespace {
                     "agent" => *NAMESPACE_AGENT,
@@ -246,47 +300,52 @@ impl BaseAgent for UuidGeneratorTool {
                 };
 
                 let id = generate_deterministic_id(&namespace_uuid, name);
-                Ok(AgentOutput::text(id))
+                let response = ResponseBuilder::success("deterministic")
+                    .with_message("Deterministic ID generated successfully")
+                    .with_result(json!({
+                        "id": id,
+                        "namespace": namespace,
+                        "name": name
+                    }))
+                    .build();
+                Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
             }
             "custom" => {
                 // Use ComponentIdBuilder for custom IDs
                 let mut builder = ComponentIdBuilder::new();
 
-                if let Some(prefix) = params.get("prefix").and_then(|v| v.as_str()) {
+                if let Some(prefix) = extract_optional_string(params, "prefix") {
                     builder = builder.with_prefix(prefix);
                 }
 
-                if params
-                    .get("timestamp")
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(false)
-                {
+                let timestamp = extract_optional_bool(params, "timestamp").unwrap_or(false);
+                if timestamp {
                     builder = builder.with_timestamp();
                 }
 
-                if params
-                    .get("short")
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(false)
-                {
+                let short = extract_optional_bool(params, "short").unwrap_or(false);
+                if short {
                     builder = builder.short();
                 }
 
-                if let Some(suffix) = params.get("suffix").and_then(|v| v.as_str()) {
+                if let Some(suffix) = extract_optional_string(params, "suffix") {
                     builder = builder.with_suffix(suffix);
                 }
 
                 let id = builder.build();
-                Ok(AgentOutput::text(id))
+                let response = ResponseBuilder::success("custom")
+                    .with_message("Custom ID generated successfully")
+                    .with_result(json!({
+                        "id": id,
+                        "timestamp": timestamp,
+                        "short": short
+                    }))
+                    .build();
+                Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
             }
             "validate" => {
                 // Validate a UUID
-                let uuid_str = params.get("uuid").and_then(|v| v.as_str()).ok_or_else(|| {
-                    LLMSpellError::Validation {
-                        message: "Validate operation requires a uuid parameter".to_string(),
-                        field: Some("uuid".to_string()),
-                    }
-                })?;
+                let uuid_str = extract_required_string(params, "uuid")?;
 
                 match Uuid::parse_str(uuid_str) {
                     Ok(uuid) => {
@@ -307,19 +366,19 @@ impl BaseAgent for UuidGeneratorTool {
                     }
                 }
             }
-            _ => Err(LLMSpellError::Validation {
-                message: format!("Unknown operation: {}", operation),
-                field: Some("operation".to_string()),
-            }),
+            _ => Err(validation_error(
+                format!("Unknown operation: {}", operation),
+                Some("operation".to_string()),
+            )),
         }
     }
 
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
         if input.text.is_empty() {
-            return Err(LLMSpellError::Validation {
-                message: "Input prompt cannot be empty".to_string(),
-                field: Some("prompt".to_string()),
-            });
+            return Err(validation_error(
+                "Input prompt cannot be empty",
+                Some("prompt".to_string()),
+            ));
         }
         Ok(())
     }
@@ -454,7 +513,10 @@ mod tests {
         assert!(result.is_ok());
 
         let output = result.unwrap().text;
-        assert!(Uuid::parse_str(&output).is_ok());
+        let response: Value = serde_json::from_str(&output).unwrap();
+        assert!(response["success"].as_bool().unwrap_or(false));
+        let uuid_str = response["result"]["uuid"].as_str().unwrap();
+        assert!(Uuid::parse_str(uuid_str).is_ok());
     }
 
     #[tokio::test]
@@ -475,7 +537,10 @@ mod tests {
         assert!(result.is_ok());
 
         let output = result.unwrap().text;
-        let uuid = Uuid::parse_str(&output).unwrap();
+        let response: Value = serde_json::from_str(&output).unwrap();
+        assert!(response["success"].as_bool().unwrap_or(false));
+        let uuid_str = response["result"]["uuid"].as_str().unwrap();
+        let uuid = Uuid::parse_str(uuid_str).unwrap();
         assert_eq!(uuid.get_version(), Some(uuid::Version::Sha1));
     }
 
@@ -496,7 +561,10 @@ mod tests {
         assert!(result.is_ok());
 
         let output = result.unwrap().text;
-        assert!(output.starts_with("test_"));
+        let response: Value = serde_json::from_str(&output).unwrap();
+        assert!(response["success"].as_bool().unwrap_or(false));
+        let id = response["result"]["id"].as_str().unwrap();
+        assert!(id.starts_with("test_"));
     }
 
     #[tokio::test]
@@ -518,7 +586,16 @@ mod tests {
 
         assert!(result1.is_ok());
         assert!(result2.is_ok());
-        assert_eq!(result1.unwrap().text, result2.unwrap().text);
+
+        let output1 = result1.unwrap().text;
+        let response1: Value = serde_json::from_str(&output1).unwrap();
+        let id1 = response1["result"]["id"].as_str().unwrap();
+
+        let output2 = result2.unwrap().text;
+        let response2: Value = serde_json::from_str(&output2).unwrap();
+        let id2 = response2["result"]["id"].as_str().unwrap();
+
+        assert_eq!(id1, id2);
     }
 
     #[tokio::test]
@@ -540,9 +617,12 @@ mod tests {
         assert!(result.is_ok());
 
         let output = result.unwrap().text;
-        assert!(output.starts_with("custom_"));
-        assert!(output.ends_with("_v1"));
-        assert!(output.contains("_")); // Contains timestamp separator
+        let response: Value = serde_json::from_str(&output).unwrap();
+        assert!(response["success"].as_bool().unwrap_or(false));
+        let id = response["result"]["id"].as_str().unwrap();
+        assert!(id.starts_with("custom_"));
+        assert!(id.ends_with("_v1"));
+        assert!(id.contains("_")); // Contains timestamp separator
     }
 
     #[tokio::test]
@@ -607,11 +687,14 @@ mod tests {
             assert!(result.is_ok(), "Format {} failed", format);
 
             let output = result.unwrap().text;
+            let response: Value = serde_json::from_str(&output).unwrap();
+            assert!(response["success"].as_bool().unwrap_or(false));
+            let uuid_str = response["result"]["uuid"].as_str().unwrap();
             match format {
-                "simple" => assert!(!output.contains('-')),
-                "urn" => assert!(output.starts_with("urn:uuid:")),
-                "braced" => assert!(output.starts_with('{') && output.ends_with('}')),
-                _ => assert!(output.contains('-')),
+                "simple" => assert!(!uuid_str.contains('-')),
+                "urn" => assert!(uuid_str.starts_with("urn:uuid:")),
+                "braced" => assert!(uuid_str.starts_with('{') && uuid_str.ends_with('}')),
+                _ => assert!(uuid_str.contains('-')),
             }
         }
     }

@@ -497,3 +497,127 @@ mod tests {
         assert_eq!(display, "Main message (code: E001, line: 42)");
     }
 }
+
+/// LLMSpellError-specific builders
+pub mod llmspell {
+    use llmspell_core::LLMSpellError;
+
+    /// Create a validation error
+    pub fn validation_error(message: impl Into<String>, field: Option<String>) -> LLMSpellError {
+        LLMSpellError::Validation {
+            message: message.into(),
+            field,
+        }
+    }
+
+    /// Create a storage error
+    pub fn storage_error(message: impl Into<String>, operation: Option<String>) -> LLMSpellError {
+        LLMSpellError::Storage {
+            message: message.into(),
+            operation,
+            source: None,
+        }
+    }
+
+    /// Create a tool error
+    pub fn tool_error(message: impl Into<String>, tool_name: Option<String>) -> LLMSpellError {
+        LLMSpellError::Tool {
+            message: message.into(),
+            tool_name,
+            source: None,
+        }
+    }
+
+    /// Create a configuration error
+    pub fn config_error(message: impl Into<String>) -> LLMSpellError {
+        LLMSpellError::Configuration {
+            message: message.into(),
+            source: None,
+        }
+    }
+
+    /// Create a component error
+    pub fn component_error(message: impl Into<String>) -> LLMSpellError {
+        LLMSpellError::Component {
+            message: message.into(),
+            source: None,
+        }
+    }
+
+    /// Create a workflow error
+    pub fn workflow_error(message: impl Into<String>, step: Option<String>) -> LLMSpellError {
+        LLMSpellError::Workflow {
+            message: message.into(),
+            step,
+            source: None,
+        }
+    }
+
+    /// Create a provider error
+    pub fn provider_error(message: impl Into<String>, provider: Option<String>) -> LLMSpellError {
+        LLMSpellError::Provider {
+            message: message.into(),
+            provider,
+            source: None,
+        }
+    }
+
+    /// Create a security error
+    pub fn security_error(
+        message: impl Into<String>,
+        violation_type: Option<String>,
+    ) -> LLMSpellError {
+        LLMSpellError::Security {
+            message: message.into(),
+            violation_type,
+        }
+    }
+
+    // Note: Hook error variant doesn't exist in LLMSpellError
+    // This is a placeholder for future implementation
+
+    /// Create a script error
+    pub fn script_error(
+        message: impl Into<String>,
+        language: Option<String>,
+        line: Option<usize>,
+    ) -> LLMSpellError {
+        LLMSpellError::Script {
+            message: message.into(),
+            language,
+            line,
+            source: None,
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn test_validation_error() {
+            let err = validation_error("Invalid input", Some("email".to_string()));
+            match err {
+                LLMSpellError::Validation { message, field } => {
+                    assert_eq!(message, "Invalid input");
+                    assert_eq!(field, Some("email".to_string()));
+                }
+                _ => panic!("Wrong error type"),
+            }
+        }
+
+        #[test]
+        fn test_tool_error() {
+            let err = tool_error("Tool failed", Some("json_processor".to_string()));
+            match err {
+                LLMSpellError::Tool {
+                    message, tool_name, ..
+                } => {
+                    assert_eq!(message, "Tool failed");
+                    assert_eq!(tool_name, Some("json_processor".to_string()));
+                }
+                _ => panic!("Wrong error type"),
+            }
+        }
+    }
+}

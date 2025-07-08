@@ -21,8 +21,14 @@ use llmspell_core::{
     types::{AgentInput, AgentOutput, ExecutionContext},
     ComponentMetadata, LLMSpellError, Result,
 };
-use llmspell_utils::encoding::{
-    base64_decode, base64_decode_url_safe, base64_encode, base64_encode_url_safe,
+use llmspell_utils::{
+    encoding::{base64_decode, base64_decode_url_safe, base64_encode, base64_encode_url_safe},
+    error_builders::llmspell::{storage_error, validation_error},
+    params::{
+        extract_optional_bool, extract_optional_string, extract_parameters, extract_required_string,
+    },
+    response::ResponseBuilder,
+    validators::validate_enum,
 };
 use serde_json::{json, Value};
 use std::fs;
@@ -55,52 +61,44 @@ impl Base64EncoderTool {
 
     /// Process Base64 operation
     async fn process_operation(&self, params: &Value) -> Result<Value> {
-        // Extract operation
-        let operation = params
-            .get("operation")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| LLMSpellError::Validation {
-                message: "Missing 'operation' parameter".to_string(),
-                field: Some("operation".to_string()),
-            })?;
+        // Extract parameters using utilities
+        let operation = extract_required_string(params, "operation")?;
+        validate_enum(&operation, &["encode", "decode"], "operation")?;
 
-        // Extract variant (default to standard)
-        let variant = params
-            .get("variant")
-            .and_then(|v| v.as_str())
-            .unwrap_or("standard");
+        let variant = extract_optional_string(params, "variant").unwrap_or("standard");
+        validate_enum(&variant, &["standard", "url-safe"], "variant")?;
 
         // Get input data
-        let input_data = if let Some(file_path) = params.get("input_file").and_then(|v| v.as_str())
-        {
-            // Read from file
-            fs::read(file_path).map_err(|e| LLMSpellError::Tool {
-                message: format!("Failed to read input file: {}", e),
-                tool_name: Some(self.metadata.name.clone()),
-                source: None,
-            })?
-        } else if let Some(input) = params.get("input").and_then(|v| v.as_str()) {
-            let binary_input = params
-                .get("binary_input")
-                .and_then(|v| v.as_bool())
-                .unwrap_or(false);
+        let input_file = extract_optional_string(params, "input_file");
+        let input_str = extract_optional_string(params, "input");
+        let binary_input = extract_optional_bool(params, "binary_input").unwrap_or(false);
 
+        let input_data = if let Some(file_path) = input_file {
+            // Read from file
+            fs::read(file_path).map_err(|e| {
+                storage_error(
+                    format!("Failed to read input file: {}", e),
+                    Some("read_file".to_string()),
+                )
+            })?
+        } else if let Some(input) = input_str {
             if binary_input {
                 // Parse hex string as binary
-                hex::decode(input).map_err(|e| LLMSpellError::Tool {
-                    message: format!("Failed to parse hex input: {}", e),
-                    tool_name: Some(self.metadata.name.clone()),
-                    source: None,
+                hex::decode(input).map_err(|e| {
+                    validation_error(
+                        format!("Failed to parse hex input: {}", e),
+                        Some("input".to_string()),
+                    )
                 })?
             } else {
                 // Use text input
                 input.as_bytes().to_vec()
             }
         } else {
-            return Err(LLMSpellError::Validation {
-                message: "Either 'input' or 'input_file' must be provided".to_string(),
-                field: Some("input".to_string()),
-            });
+            return Err(validation_error(
+                "Either 'input' or 'input_file' must be provided",
+                Some("input".to_string()),
+            ));
         };
 
         // Perform operation
@@ -113,17 +111,18 @@ impl Base64EncoderTool {
                 encoded.into_bytes()
             }
             "decode" => {
-                let input_str = if let Some(input) = params.get("input").and_then(|v| v.as_str()) {
+                let input_str = if let Some(input) = input_str {
                     input.to_string()
                 } else {
                     // Convert file data to string for decoding
-                    String::from_utf8(input_data).map_err(|e| LLMSpellError::Tool {
-                        message: format!(
-                            "Input file contains invalid UTF-8 for Base64 decoding: {}",
-                            e
-                        ),
-                        tool_name: Some(self.metadata.name.clone()),
-                        source: None,
+                    String::from_utf8(input_data).map_err(|e| {
+                        validation_error(
+                            format!(
+                                "Input file contains invalid UTF-8 for Base64 decoding: {}",
+                                e
+                            ),
+                            Some("input_file".to_string()),
+                        )
                     })?
                 };
 
@@ -132,46 +131,40 @@ impl Base64EncoderTool {
                     _ => base64_decode(&input_str),
                 };
 
-                decoded.map_err(|e| LLMSpellError::Tool {
-                    message: format!("Base64 decode error: {}", e),
-                    tool_name: Some(self.metadata.name.clone()),
-                    source: None,
+                decoded.map_err(|e| {
+                    validation_error(
+                        format!("Base64 decode error: {}", e),
+                        Some("input".to_string()),
+                    )
                 })?
             }
-            _ => {
-                return Err(LLMSpellError::Validation {
-                    message: format!("Invalid operation: {}", operation),
-                    field: Some("operation".to_string()),
-                });
-            }
+            _ => unreachable!(), // Already validated
         };
 
         // Handle output
-        if let Some(output_path) = params.get("output_file").and_then(|v| v.as_str()) {
+        let output_path = extract_optional_string(params, "output_file");
+
+        if let Some(path) = output_path {
             // Write to file
-            fs::write(output_path, &result_data).map_err(|e| LLMSpellError::Tool {
-                message: format!("Failed to write output file: {}", e),
-                tool_name: Some(self.metadata.name.clone()),
-                source: None,
+            fs::write(path, &result_data).map_err(|e| {
+                storage_error(
+                    format!("Failed to write output file: {}", e),
+                    Some("write_file".to_string()),
+                )
             })?;
 
             info!(
                 "Base64 {} completed: {} -> {}",
                 operation,
-                params
-                    .get("input_file")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("input"),
-                output_path
+                input_file.unwrap_or("input"),
+                path
             );
 
-            Ok(json!({
-                "success": true,
-                "operation": operation,
-                "variant": variant,
-                "output_file": output_path,
-                "size": result_data.len()
-            }))
+            Ok(ResponseBuilder::success(operation)
+                .with_message(format!("Base64 {} completed successfully", operation))
+                .with_metadata("variant", json!(variant))
+                .with_file_info(path, Some(result_data.len() as u64))
+                .build())
         } else {
             // Return as string
             let output = match operation {
@@ -186,13 +179,14 @@ impl Base64EncoderTool {
                 _ => unreachable!(),
             };
 
-            Ok(json!({
-                "success": true,
-                "operation": operation,
-                "variant": variant,
-                "output": output,
-                "binary": operation == "decode" && !output.is_ascii()
-            }))
+            Ok(ResponseBuilder::success(operation)
+                .with_message(format!("Base64 {} completed", operation))
+                .with_result(json!({
+                    "output": output,
+                    "variant": variant,
+                    "binary": operation == "decode" && !output.is_ascii()
+                }))
+                .build())
         }
     }
 }
@@ -204,31 +198,22 @@ impl BaseAgent for Base64EncoderTool {
     }
 
     async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
-        // Get parameters from input
-        let params =
-            input
-                .parameters
-                .get("parameters")
-                .ok_or_else(|| LLMSpellError::Validation {
-                    message: "Missing parameters in input".to_string(),
-                    field: Some("parameters".to_string()),
-                })?;
+        // Extract parameters using shared utility
+        let params = extract_parameters(&input)?;
 
         // Process the operation
         let result = self.process_operation(params).await?;
 
         // Return the result as JSON formatted text
-        Ok(AgentOutput::text(
-            serde_json::to_string_pretty(&result).unwrap(),
-        ))
+        Ok(AgentOutput::text(serde_json::to_string_pretty(&result)?))
     }
 
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
         if input.text.is_empty() {
-            return Err(LLMSpellError::Validation {
-                message: "Input prompt cannot be empty".to_string(),
-                field: Some("prompt".to_string()),
-            });
+            return Err(validation_error(
+                "Input prompt cannot be empty",
+                Some("prompt".to_string()),
+            ));
         }
         Ok(())
     }
@@ -337,7 +322,8 @@ mod tests {
             .await
             .unwrap();
         let output: Value = serde_json::from_str(&result.text).unwrap();
-        let encoded = output["output"].as_str().unwrap();
+        assert!(output["success"].as_bool().unwrap_or(false));
+        let encoded = output["result"]["output"].as_str().unwrap();
         assert_eq!(encoded, "SGVsbG8sIEJhc2U2NCE=");
 
         // Test standard decoding
@@ -354,7 +340,8 @@ mod tests {
             .await
             .unwrap();
         let output: Value = serde_json::from_str(&result.text).unwrap();
-        let decoded = output["output"].as_str().unwrap();
+        assert!(output["success"].as_bool().unwrap_or(false));
+        let decoded = output["result"]["output"].as_str().unwrap();
         assert_eq!(decoded, test_text);
     }
 
@@ -378,7 +365,8 @@ mod tests {
             .await
             .unwrap();
         let output: Value = serde_json::from_str(&result.text).unwrap();
-        let encoded = output["output"].as_str().unwrap();
+        assert!(output["success"].as_bool().unwrap_or(false));
+        let encoded = output["result"]["output"].as_str().unwrap();
         assert!(!encoded.contains('+'));
         assert!(!encoded.contains('/'));
 
@@ -397,7 +385,8 @@ mod tests {
             .await
             .unwrap();
         let output: Value = serde_json::from_str(&result.text).unwrap();
-        let decoded = output["output"].as_str().unwrap();
+        assert!(output["success"].as_bool().unwrap_or(false));
+        let decoded = output["result"]["output"].as_str().unwrap();
         assert_eq!(decoded, test_data);
     }
 
@@ -421,7 +410,8 @@ mod tests {
             .await
             .unwrap();
         let output: Value = serde_json::from_str(&result.text).unwrap();
-        let encoded = output["output"].as_str().unwrap();
+        assert!(output["success"].as_bool().unwrap_or(false));
+        let encoded = output["result"]["output"].as_str().unwrap();
         assert_eq!(encoded, "3q2+7w==");
     }
 
