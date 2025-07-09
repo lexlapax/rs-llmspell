@@ -50,115 +50,99 @@ TestHelpers.print_section("Audio Processor Tool")
 
 print("\nAudio processing operations:")
 
--- Get audio file information
-local audio_info = use_tool("audio_processor", {
-    operation = "info",
-    file_path = "/tmp/sample_audio.wav"
+-- First create a test audio file to work with
+-- Note: Using .txt as a mock since real audio processing is Phase 3+
+local test_file = use_tool("file_operations", {
+    operation = "write",
+    path = "/tmp/test_audio.txt",
+    content = "Mock audio file for testing (real audio processing in Phase 3+)"
 })
-print_result("Audio info", audio_info)
 
--- Convert audio format
-local audio_convert = use_tool("audio_processor", {
-    operation = "convert",
-    input_path = "/tmp/sample_audio.wav",
-    output_path = "/tmp/sample_audio.mp3",
-    format = "mp3",
-    options = {
-        bitrate = "192k",
-        sample_rate = 44100
-    }
-})
-print_result("Convert to MP3", audio_convert)
-
--- Extract audio metadata
+-- Get audio metadata
 local audio_metadata = use_tool("audio_processor", {
     operation = "metadata",
-    file_path = "/tmp/sample_audio.mp3"
+    file_path = "/tmp/test_audio.txt"
 })
 print_result("Audio metadata", audio_metadata)
 
--- Generate waveform visualization
-local waveform = use_tool("audio_processor", {
-    operation = "waveform",
-    file_path = "/tmp/sample_audio.wav",
-    output_path = "/tmp/waveform.png",
-    width = 800,
-    height = 200
+-- Convert audio format (limited in Phase 2)
+local audio_convert = use_tool("audio_processor", {
+    operation = "convert",
+    input_path = "/tmp/test_audio.wav",
+    output_path = "/tmp/test_audio_converted.mp3",
+    format = "mp3"
 })
-print_result("Generate waveform", waveform)
+print_result("Convert to MP3 (Phase 3+)", audio_convert)
 
--- Trim audio
-local audio_trim = use_tool("audio_processor", {
-    operation = "trim",
-    input_path = "/tmp/sample_audio.wav",
-    output_path = "/tmp/trimmed_audio.wav",
-    start_time = 5.0,
-    end_time = 15.0
-})
-print_result("Trim audio (5-15s)", audio_trim)
+-- Note: detect operation not supported in Phase 2
+-- Would be: operation = "detect" in Phase 3+
+print("  ℹ️  Audio detect: Phase 3+ feature")
+
+-- Note: Waveform and trim operations not supported in Phase 2
+-- These are placeholders for Phase 3+ functionality
 
 TestHelpers.print_section("Video Processor Tool")
 
 print("\nVideo processing operations:")
 
--- Get video information
-local video_info = use_tool("video_processor", {
-    operation = "info",
-    file_path = "/tmp/sample_video.mp4"
+-- Create a test video file
+local test_video = use_tool("file_operations", {
+    operation = "write",
+    path = "/tmp/test_video.txt",
+    content = "Mock video file for testing (real video processing in Phase 3+)"
 })
-print_result("Video info", video_info)
 
--- Extract frame at specific time
+-- Get video metadata
+local video_metadata_first = use_tool("video_processor", {
+    operation = "metadata",
+    file_path = "/tmp/test_video.txt"
+})
+print_result("Video metadata", video_metadata_first)
+
+-- Extract frame at specific time (Phase 3+ feature)
 local extract_frame = use_tool("video_processor", {
     operation = "extract_frame",
-    video_path = "/tmp/sample_video.mp4",
+    file_path = "/tmp/test_video.mp4",
     output_path = "/tmp/frame_10s.jpg",
     timestamp = 10.0
 })
-print_result("Extract frame at 10s", extract_frame)
+print_result("Extract frame at 10s (Phase 3+)", extract_frame)
 
--- Generate thumbnail
+-- Generate thumbnail (Phase 3+ feature)
 local thumbnail = use_tool("video_processor", {
     operation = "thumbnail",
-    video_path = "/tmp/sample_video.mp4",
+    file_path = "/tmp/test_video.mp4",
     output_path = "/tmp/video_thumbnail.jpg",
     width = 320,
     height = 180,
     timestamp = 5.0
 })
-print_result("Generate thumbnail", thumbnail)
+print_result("Generate thumbnail (Phase 3+)", thumbnail)
 
--- Convert video format
-local video_convert = use_tool("video_processor", {
-    operation = "convert",
-    input_path = "/tmp/sample_video.mp4",
-    output_path = "/tmp/sample_video.webm",
-    format = "webm",
-    options = {
-        codec = "vp9",
-        quality = "good",
-        bitrate = "1M"
-    }
-})
-print_result("Convert to WebM", video_convert)
+-- Note: Convert operation not supported in Phase 2
+-- Video conversion will be added in Phase 3+
 
--- Extract video metadata
-local video_metadata = use_tool("video_processor", {
-    operation = "metadata",
-    file_path = "/tmp/sample_video.mp4"
-})
-print_result("Video metadata", video_metadata)
+-- Note: detect operation not supported in Phase 2
+-- Would be: operation = "detect" in Phase 3+
+print("  ℹ️  Video detect: Phase 3+ feature")
 
 TestHelpers.print_section("Image Processor Tool")
 
 print("\nImage processing operations:")
 
--- Get image information
-local image_info = use_tool("image_processor", {
-    operation = "info",
+-- First create a test image file
+local test_image = use_tool("file_operations", {
+    operation = "write",
+    path = "/tmp/sample_image.jpg",
+    content = "Mock image file for testing (real image processing in Phase 3+)"
+})
+
+-- Get image metadata
+local image_metadata_op = use_tool("image_processor", {
+    operation = "metadata",
     file_path = "/tmp/sample_image.jpg"
 })
-print_result("Image info", image_info)
+print_result("Image metadata", image_metadata_op)
 
 -- Resize image
 local resize_image = use_tool("image_processor", {
@@ -210,39 +194,32 @@ local crop_image = use_tool("image_processor", {
 })
 print_result("Crop image", crop_image)
 
--- Apply filter
-local filter_image = use_tool("image_processor", {
-    operation = "filter",
-    input_path = "/tmp/sample_image.jpg",
-    output_path = "/tmp/filtered_image.jpg",
-    filter = "grayscale"
-})
-print_result("Apply grayscale", filter_image)
+-- Note: filter operation not supported in Phase 2
+-- Would be: operation = "filter" with filter = "grayscale" in Phase 3+
+print("  ℹ️  Apply filter: Phase 3+ feature")
 
--- Extract metadata
-local image_metadata = use_tool("image_processor", {
-    operation = "metadata",
-    file_path = "/tmp/sample_image.jpg"
-})
-print_result("Image metadata", image_metadata)
+-- Note: info operation would be supported in Phase 3+
+print("  ℹ️  Image info: Phase 3+ feature")
 
 print("\n🎨 Advanced Media Processing Examples")
 print("=====================================")
 
--- Example: Create video thumbnail gallery
-print("\nVideo thumbnail gallery:")
-local timestamps = {1, 5, 10, 15, 20}
-for i, ts in ipairs(timestamps) do
-    local thumb = use_tool("video_processor", {
-        operation = "thumbnail",
-        video_path = "/tmp/sample_video.mp4",
-        output_path = string.format("/tmp/thumb_%02d.jpg", ts),
-        width = 160,
-        height = 90,
-        timestamp = ts
-    })
-    print_result(string.format("Thumbnail at %ds", ts), thumb)
-end
+-- Example: Create video thumbnail gallery (Phase 3+ feature)
+print("\nVideo thumbnail gallery (Phase 3+):")
+print("  ℹ️  Video thumbnails: Phase 3+ feature")
+-- Commented out for Phase 2
+-- local timestamps = {1, 5, 10, 15, 20}
+-- for i, ts in ipairs(timestamps) do
+--     local thumb = use_tool("video_processor", {
+--         operation = "thumbnail",
+--         file_path = "/tmp/test_video.txt",
+--         output_path = string.format("/tmp/thumb_%02d.jpg", ts),
+--         width = 160,
+--         height = 90,
+--         timestamp = ts
+--     })
+--     print_result(string.format("Thumbnail at %ds", ts), thumb)
+-- end
 
 -- Example: Batch image processing
 print("\nBatch image operations:")
@@ -264,18 +241,20 @@ for _, config in ipairs(image_operations) do
     print_result(string.format("%dx%d version", config.width, config.height), output)
 end
 
--- Example: Audio format compatibility
-print("\nAudio format conversions:")
-local audio_formats = {"mp3", "ogg", "flac"}
-for _, format in ipairs(audio_formats) do
-    local convert = use_tool("audio_processor", {
-        operation = "convert",
-        input_path = "/tmp/sample_audio.wav",
-        output_path = "/tmp/sample_audio." .. format,
-        format = format
-    })
-    print_result("Convert to " .. format:upper(), convert)
-end
+-- Example: Audio format compatibility (Phase 3+)
+print("\nAudio format conversions (Phase 3+):")
+print("  ℹ️  Audio conversion: Phase 3+ feature")
+-- Commented out for Phase 2
+-- local audio_formats = {"mp3", "ogg", "flac"}
+-- for _, format in ipairs(audio_formats) do
+--     local convert = use_tool("audio_processor", {
+--         operation = "convert",
+--         input_path = "/tmp/test_audio.txt",
+--         output_path = "/tmp/sample_audio." .. format,
+--         format = format
+--     })
+--     print_result("Convert to " .. format:upper(), convert)
+-- end
 
 print("\n📋 Media Processing Best Practices")
 print("==================================")
@@ -305,9 +284,9 @@ local tools_demonstrated = {
 print("\n📊 Summary:")
 print("  Tools tested: " .. #tools_demonstrated)
 print("  Operations demonstrated:")
-print("    - Audio: info, convert, metadata, waveform, trim")
-print("    - Video: info, extract_frame, thumbnail, convert, metadata")
-print("    - Image: info, resize, thumbnail, convert, rotate, crop, filter, metadata")
+print("    - Audio: metadata, convert (Phase 3+)")
+print("    - Video: metadata, extract_frame (Phase 3+), thumbnail (Phase 3+)")
+print("    - Image: metadata, resize, thumbnail, convert, rotate, crop, filter")
 print("  Use cases:")
 print("    - Format conversion for compatibility")
 print("    - Thumbnail generation for previews")

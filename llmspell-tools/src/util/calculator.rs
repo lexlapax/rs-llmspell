@@ -10,10 +10,7 @@
 //! - Expression validation with helpful errors
 
 use async_trait::async_trait;
-use evalexpr::{
-    eval_with_context_mut, ContextWithMutableVariables, EvalexprError, HashMapContext,
-    IterateVariablesContext, Value,
-};
+use fasteval::Error as FastevalError;
 use llmspell_core::{
     traits::{
         base_agent::BaseAgent,
@@ -34,7 +31,7 @@ use llmspell_utils::{
     response::ResponseBuilder,
 };
 use serde_json::{json, Value as JsonValue};
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 /// Calculator tool for mathematical expressions
 #[derive(Debug, Clone)]
@@ -62,70 +59,57 @@ impl CalculatorTool {
         Self::default()
     }
 
-    /// Convert evalexpr error to LLMSpellError
-    fn convert_error(&self, error: EvalexprError) -> LLMSpellError {
-        let message = match &error {
-            EvalexprError::WrongOperatorArgumentAmount { expected, actual } => {
-                format!("Wrong number of arguments: expected {expected}, got {actual}")
-            }
-            EvalexprError::WrongFunctionArgumentAmount {
-                expected, actual, ..
-            } => {
-                format!("Wrong number of function arguments: expected {expected:?}, got {actual}")
-            }
-            EvalexprError::ExpectedString { actual } => {
-                format!("Expected string but got: {actual:?}")
-            }
-            EvalexprError::ExpectedInt { actual } => {
-                format!("Expected integer but got: {actual:?}")
-            }
-            EvalexprError::ExpectedFloat { actual } => {
-                format!("Expected number but got: {actual:?}")
-            }
-            EvalexprError::ExpectedNumber { actual } => {
-                format!("Expected number but got: {actual:?}")
-            }
-            EvalexprError::ExpectedBoolean { actual } => {
-                format!("Expected boolean but got: {actual:?}")
-            }
-            EvalexprError::DivisionError { dividend, divisor } => {
-                format!("Division error: {dividend} / {divisor}")
-            }
-            EvalexprError::ModulationError { dividend, divisor } => {
-                format!("Modulation error: {dividend} % {divisor}")
-            }
-            EvalexprError::InvalidRegex { regex, message } => {
-                format!("Invalid regex '{regex}': {message}")
-            }
-            EvalexprError::ContextNotMutable => "Context is not mutable".to_string(),
-            EvalexprError::VariableIdentifierNotFound(name) => {
-                format!("Variable '{name}' not found")
-            }
-            EvalexprError::FunctionIdentifierNotFound(name) => {
-                format!("Function '{name}' not found")
-            }
-            _ => error.to_string(),
-        };
-
-        tool_error(message, Some(self.metadata.name.clone()))
+    /// Convert fasteval error to LLMSpellError
+    fn convert_error(&self, error: FastevalError) -> LLMSpellError {
+        tool_error(error.to_string(), Some(self.metadata.name.clone()))
     }
 
-    /// Convert evalexpr Value to JSON
-    #[allow(clippy::only_used_in_recursion)]
-    fn value_to_json(&self, value: &Value) -> JsonValue {
-        match value {
-            Value::String(s) => json!(s),
-            Value::Float(f) => json!(f),
-            Value::Int(i) => json!(i),
-            Value::Boolean(b) => json!(b),
-            Value::Tuple(values) => {
-                json!(values
-                    .iter()
-                    .map(|v| self.value_to_json(v))
-                    .collect::<Vec<_>>())
+    /// Evaluate expression with custom functions and variables
+    fn evaluate_expression(
+        &self,
+        expression: &str,
+        variables: &serde_json::Map<String, JsonValue>,
+    ) -> Result<f64> {
+        // Preprocess custom functions
+        let processed_expr = self.preprocess_custom_functions(expression);
+
+        // Convert JSON variables to BTreeMap<String, f64>
+        let mut ns = BTreeMap::new();
+        for (name, value) in variables {
+            if let Some(n) = value.as_f64() {
+                ns.insert(name.clone(), n);
             }
-            Value::Empty => json!(null),
         }
+
+        // Evaluate using fasteval
+        fasteval::ez_eval(&processed_expr, &mut ns).map_err(|e| self.convert_error(e))
+    }
+
+    /// Preprocess expression to replace custom functions with their implementations
+    fn preprocess_custom_functions(&self, expression: &str) -> String {
+        use regex::Regex;
+        use std::sync::OnceLock;
+
+        // Use static regex for better performance
+        static SQRT_RE: OnceLock<Regex> = OnceLock::new();
+        static EXP_RE: OnceLock<Regex> = OnceLock::new();
+        static LN_RE: OnceLock<Regex> = OnceLock::new();
+
+        let mut result = expression.to_string();
+
+        // Replace sqrt(x) with (x)^0.5
+        let sqrt_re = SQRT_RE.get_or_init(|| Regex::new(r"sqrt\s*\(([^)]+)\)").unwrap());
+        result = sqrt_re.replace_all(&result, "($1)^0.5").to_string();
+
+        // Replace exp(x) with e()^(x)
+        let exp_re = EXP_RE.get_or_init(|| Regex::new(r"exp\s*\(([^)]+)\)").unwrap());
+        result = exp_re.replace_all(&result, "e()^($1)").to_string();
+
+        // Replace ln(x) with log(e(), x)
+        let ln_re = LN_RE.get_or_init(|| Regex::new(r"ln\s*\(([^)]+)\)").unwrap());
+        result = ln_re.replace_all(&result, "log(e(), $1)").to_string();
+
+        result
     }
 
     /// Process calculator operation
@@ -141,59 +125,29 @@ impl CalculatorTool {
                     .cloned()
                     .unwrap_or_default();
 
-                // Create context with variables
-                let mut context = HashMapContext::new();
-                for (name, value) in variables {
-                    match value {
-                        JsonValue::Number(n) => {
-                            if let Some(f) = n.as_f64() {
-                                context
-                                    .set_value(name.clone(), Value::Float(f))
-                                    .map_err(|e| self.convert_error(e))?;
-                            } else if let Some(i) = n.as_i64() {
-                                context
-                                    .set_value(name.clone(), Value::Int(i))
-                                    .map_err(|e| self.convert_error(e))?;
-                            }
-                        }
-                        JsonValue::Bool(b) => {
-                            context
-                                .set_value(name.clone(), Value::Boolean(b))
-                                .map_err(|e| self.convert_error(e))?;
-                        }
-                        JsonValue::String(s) => {
-                            context
-                                .set_value(name.clone(), Value::String(s.clone()))
-                                .map_err(|e| self.convert_error(e))?;
-                        }
-                        _ => {}
+                // Use our custom evaluation method
+                let result = self.evaluate_expression(expression, &variables)?;
+
+                // Handle special float values (infinity, NaN) that don't serialize well to JSON
+                let result_value = if result.is_infinite() {
+                    if result.is_sign_positive() {
+                        json!("Infinity")
+                    } else {
+                        json!("-Infinity")
                     }
-                }
-
-                // Evaluate expression
-                let result = eval_with_context_mut(expression, &mut context)
-                    .map_err(|e| self.convert_error(e))?;
-
-                // Get all variables after evaluation (in case expression defined new ones)
-                let mut final_variables = HashMap::new();
-                for (name, value) in context.iter_variables() {
-                    final_variables.insert(name.clone(), self.value_to_json(&value));
-                }
+                } else if result.is_nan() {
+                    json!("NaN")
+                } else {
+                    json!(result)
+                };
 
                 let response = ResponseBuilder::success("evaluate")
                     .with_message("Expression evaluated successfully")
                     .with_result(json!({
                         "expression": expression,
-                        "result": self.value_to_json(&result),
-                        "result_type": match &result {
-                            Value::String(_) => "string",
-                            Value::Float(_) => "float",
-                            Value::Int(_) => "integer",
-                            Value::Boolean(_) => "boolean",
-                            Value::Tuple(_) => "tuple",
-                            Value::Empty => "empty",
-                        },
-                        "variables": final_variables,
+                        "result": result_value,
+                        "result_type": if result.is_finite() { "float" } else { "special" },
+                        "variables": variables,
                     }))
                     .build();
                 Ok(response)
@@ -201,8 +155,9 @@ impl CalculatorTool {
             "validate" => {
                 let expression = extract_required_string(params, "expression")?;
 
-                // Try to parse the expression
-                match evalexpr::build_operator_tree(expression) {
+                // Try to evaluate the expression with empty variables to validate syntax
+                let empty_vars = serde_json::Map::new();
+                match self.evaluate_expression(expression, &empty_vars) {
                     Ok(_) => {
                         let response = ResponseBuilder::success("validate")
                             .with_message("Expression is valid")
@@ -219,7 +174,7 @@ impl CalculatorTool {
                             .with_result(json!({
                                 "expression": expression,
                                 "valid": false,
-                                "error": self.convert_error(e).to_string()
+                                "error": e.to_string()
                             }))
                             .build();
                         Ok(response)
@@ -234,15 +189,20 @@ impl CalculatorTool {
                         "arithmetic": ["+", "-", "*", "/", "%", "^"],
                         "comparison": ["==", "!=", "<", ">", "<=", ">="],
                         "logical": ["&&", "||", "!"],
-                        "note": "Mathematical functions can be implemented as custom functions or variables",
-                        "string": ["len", "str::regex_matches", "str::regex_replace", "str::to_lowercase", "str::to_uppercase", "str::trim"],
-                        "type_checking": ["is_nan", "is_finite", "is_infinite", "is_normal"],
+                        "trigonometric": ["sin", "cos", "tan", "asin", "acos", "atan"],
+                        "hyperbolic": ["sinh", "cosh", "tanh", "asinh", "acosh", "atanh"],
+                        "mathematical": ["sqrt", "exp", "ln", "log", "abs", "sign"],
+                        "rounding": ["int", "ceil", "floor", "round"],
+                        "constants": ["pi()", "e()"],
+                        "utility": ["min", "max"],
                         "examples": {
                             "basic": "2 + 3 * 4",
                             "variables": "x^2 + y^2 where x=3, y=4",
-                            "functions": "pow(2, 3) or 2^3 for exponentiation",
-                            "complex": "sqrt(x^2 + y^2) * exp(-t)"
-                        }
+                            "trigonometry": "sin(pi()/2) + cos(0)",
+                            "complex": "sqrt(x^2 + y^2) * exp(-t)",
+                            "logarithms": "log(10, 100) or ln(e())"
+                        },
+                        "note": "All trigonometric functions work in radians. Use deg/360*2*pi() to convert degrees."
                     }))
                     .build();
                 Ok(response)
@@ -371,8 +331,8 @@ mod tests {
         let output: JsonValue = serde_json::from_str(&result.text).unwrap();
 
         assert!(output["success"].as_bool().unwrap_or(false));
-        assert_eq!(output["result"]["result"], 14);
-        assert_eq!(output["result"]["result_type"], "integer");
+        assert_eq!(output["result"]["result"], 14.0);
+        assert_eq!(output["result"]["result_type"], "float");
     }
 
     #[tokio::test]
@@ -442,8 +402,8 @@ mod tests {
         let output: JsonValue = serde_json::from_str(&result.text).unwrap();
 
         assert!(output["success"].as_bool().unwrap_or(false));
-        assert_eq!(output["result"]["result"], 2);
-        assert_eq!(output["result"]["result_type"], "integer");
+        assert_eq!(output["result"]["result"], 2.0);
+        assert_eq!(output["result"]["result_type"], "float");
     }
 
     #[tokio::test]
@@ -501,9 +461,16 @@ mod tests {
             }),
         );
 
-        let result = tool.execute(input, ExecutionContext::default()).await;
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Division"));
+        let result = tool
+            .execute(input, ExecutionContext::default())
+            .await
+            .unwrap();
+        let output: JsonValue = serde_json::from_str(&result.text).unwrap();
+
+        // Fasteval returns infinity for division by zero
+        assert!(output["success"].as_bool().unwrap_or(false));
+        assert_eq!(output["result"]["result"], "Infinity");
+        assert_eq!(output["result"]["result_type"], "special");
     }
 
     #[tokio::test]
@@ -540,5 +507,64 @@ mod tests {
             .contains("Mathematical expression"));
         assert_eq!(tool.category(), ToolCategory::Utility);
         assert_eq!(tool.security_level(), SecurityLevel::Safe);
+    }
+
+    #[tokio::test]
+    async fn test_mathematical_functions() {
+        let tool = CalculatorTool::new();
+
+        // Test trigonometric functions
+        let input = AgentInput::text("trig").with_parameter(
+            "parameters",
+            json!({
+                "operation": "evaluate",
+                "expression": "sin(pi()/2)"
+            }),
+        );
+
+        let result = tool
+            .execute(input, ExecutionContext::default())
+            .await
+            .unwrap();
+        let output: JsonValue = serde_json::from_str(&result.text).unwrap();
+
+        assert!(output["success"].as_bool().unwrap_or(false));
+        assert!((output["result"]["result"].as_f64().unwrap() - 1.0).abs() < 0.0001);
+
+        // Test sqrt
+        let input = AgentInput::text("sqrt").with_parameter(
+            "parameters",
+            json!({
+                "operation": "evaluate",
+                "expression": "sqrt(16)"
+            }),
+        );
+
+        let result = tool
+            .execute(input, ExecutionContext::default())
+            .await
+            .unwrap();
+        let output: JsonValue = serde_json::from_str(&result.text).unwrap();
+
+        assert!(output["success"].as_bool().unwrap_or(false));
+        assert_eq!(output["result"]["result"], 4.0);
+
+        // Test logarithm
+        let input = AgentInput::text("log").with_parameter(
+            "parameters",
+            json!({
+                "operation": "evaluate",
+                "expression": "log(10, 100)"
+            }),
+        );
+
+        let result = tool
+            .execute(input, ExecutionContext::default())
+            .await
+            .unwrap();
+        let output: JsonValue = serde_json::from_str(&result.text).unwrap();
+
+        assert!(output["success"].as_bool().unwrap_or(false));
+        assert!((output["result"]["result"].as_f64().unwrap() - 2.0).abs() < 0.0001);
     }
 }

@@ -72,18 +72,26 @@ print_result("Read file", read_result)
 
 -- Get file metadata
 local info_result = use_tool("file_operations", {
-    operation = "info",
+    operation = "metadata",
     path = "/tmp/llmspell_test.md"
 })
 print_result("File info", info_result)
 
--- List directory contents
-local list_result = use_tool("file_operations", {
-    operation = "list",
-    path = "/tmp",
-    pattern = "llmspell*"
+-- Move file instead of list (list not supported)
+local move_result = use_tool("file_operations", {
+    operation = "move",
+    from = "/tmp/llmspell_test.md",
+    to = "/tmp/llmspell_test_moved.md"
 })
-print_result("Directory listing", list_result)
+print_result("Move file", move_result)
+
+-- Move it back
+local move_back = use_tool("file_operations", {
+    operation = "move",
+    from = "/tmp/llmspell_test_moved.md",
+    to = "/tmp/llmspell_test.md"
+})
+print_result("Move back", move_back)
 
 -- Create directory
 local mkdir_result = use_tool("file_operations", {
@@ -92,11 +100,11 @@ local mkdir_result = use_tool("file_operations", {
 })
 print_result("Create directory", mkdir_result)
 
--- Copy file
+-- Copy file (need 'from' not 'source')
 local copy_result = use_tool("file_operations", {
     operation = "copy",
-    source = "/tmp/llmspell_test.md",
-    destination = "/tmp/llmspell_test_dir/copied.md"
+    from = "/tmp/llmspell_test.md",
+    to = "/tmp/llmspell_test_dir/copied.md"
 })
 print_result("Copy file", copy_result)
 
@@ -120,11 +128,11 @@ local list_archive = use_tool("archive_handler", {
 })
 print_result("List archive", list_archive)
 
--- Extract archive
+-- Extract archive (need 'output_dir' not 'destination')
 local extract_result = use_tool("archive_handler", {
     operation = "extract",
     archive_path = "/tmp/llmspell_docs.zip",
-    destination = "/tmp/extracted"
+    output_dir = "/tmp/extracted"
 })
 print_result("Extract archive", extract_result)
 
@@ -132,32 +140,44 @@ TestHelpers.print_section("File Watcher Tool")
 
 print("\nFile monitoring:")
 
--- Watch a directory for changes (short duration for demo)
+-- Watch a directory for changes (needs 'paths' array)
 local watch_result = use_tool("file_watcher", {
     operation = "watch",
-    path = "/tmp/llmspell_test_dir",
+    paths = {"/tmp/llmspell_test_dir"},  -- paths must be an array
     events = {"create", "modify", "delete"},
-    timeout_ms = 1000,  -- 1 second timeout
+    timeout_ms = 1000,  -- 1 second timeout (now supports timeout_ms!)
     pattern = "*.md"
 })
-print_result("Watch directory", watch_result)
+
+if watch_result.success and watch_result.events and #watch_result.events > 0 then
+    print("  ✅ Watch directory: Captured " .. #watch_result.events .. " events")
+    for i, event in ipairs(watch_result.events) do
+        if i <= 3 then  -- Show first 3 events
+            print("    Event: " .. (event.kind or "unknown") .. " on " .. (event.path or "unknown"))
+        end
+    end
+elseif watch_result.success then
+    print("  ✅ Watch directory: No events detected (1 second timeout)")
+else
+    print_result("Watch directory", watch_result)
+end
 
 TestHelpers.print_section("File Converter Tool")
 
 print("\nFile conversions:")
 
--- Convert line endings
+-- Convert line endings (operation is 'line_endings' not 'convert_line_endings')
 local convert_line_endings = use_tool("file_converter", {
-    operation = "convert_line_endings",
+    operation = "line_endings",
     input_path = "/tmp/llmspell_test.md",
     output_path = "/tmp/llmspell_test_crlf.md",
     line_ending = "crlf"
 })
 print_result("Convert to CRLF", convert_line_endings)
 
--- Convert indentation
+-- Convert indentation (operation is 'indentation' not 'convert_indentation')
 local convert_indent = use_tool("file_converter", {
-    operation = "convert_indentation",
+    operation = "indentation",
     input_path = "/tmp/llmspell_test.md",
     output_path = "/tmp/llmspell_test_tabs.md",
     to_tabs = true,
@@ -165,12 +185,14 @@ local convert_indent = use_tool("file_converter", {
 })
 print_result("Convert to tabs", convert_indent)
 
--- Detect file encoding
-local detect_encoding = use_tool("file_converter", {
-    operation = "detect_encoding",
-    path = "/tmp/llmspell_test.md"
+-- Convert file encoding (encoding operation requires to_encoding)
+local convert_encoding = use_tool("file_converter", {
+    operation = "encoding",
+    input_path = "/tmp/llmspell_test.md",
+    output_path = "/tmp/llmspell_test_utf16.md",
+    to_encoding = "utf-16le"  -- Convert to UTF-16 Little Endian
 })
-print_result("Detect encoding", detect_encoding)
+print_result("Convert to UTF-16", convert_encoding)
 
 TestHelpers.print_section("File Search Tool")
 
@@ -220,6 +242,11 @@ print("✅ Atomic operations - writes are atomic to prevent corruption")
 print("✅ Resource limits - file size and operation limits enforced")
 print("✅ Error handling - proper error messages without information leakage")
 
+-- Note about file watcher on macOS
+print("\n📝 Note: On macOS, /tmp is a symlink to /private/tmp")
+print("   File watcher may show path validation warnings for /private/tmp paths")
+print("   This is expected behavior due to security sandboxing")
+
 print("\n📊 Performance Considerations")
 print("=============================")
 
@@ -231,19 +258,41 @@ print("✅ Fast initialization - tools start quickly")
 
 -- Cleanup example
 print("\n🧹 Cleanup:")
-local cleanup_result = use_tool("file_operations", {
+-- First delete the copied file
+local delete_copy = use_tool("file_operations", {
     operation = "delete",
-    path = "/tmp/llmspell_test_dir",
-    recursive = true
+    path = "/tmp/llmspell_test_dir/copied.md"
 })
-print_result("Delete directory", cleanup_result)
+print_result("Delete copied file", delete_copy)
+
+-- Then delete the directory (remove_dir not supported, so we skip it)
+-- For now, just note that directory cleanup would need external process
 
 -- Delete individual files
 local delete_file = use_tool("file_operations", {
     operation = "delete",
     path = "/tmp/llmspell_test.md"
 })
-print_result("Delete file", delete_file)
+print_result("Delete test file", delete_file)
+
+-- Delete other created files
+local delete_crlf = use_tool("file_operations", {
+    operation = "delete",
+    path = "/tmp/llmspell_test_crlf.md"
+})
+print_result("Delete CRLF file", delete_crlf)
+
+local delete_tabs = use_tool("file_operations", {
+    operation = "delete",
+    path = "/tmp/llmspell_test_tabs.md"
+})
+print_result("Delete tabs file", delete_tabs)
+
+local delete_utf16 = use_tool("file_operations", {
+    operation = "delete",
+    path = "/tmp/llmspell_test_utf16.md"
+})
+print_result("Delete UTF-16 file", delete_utf16)
 
 print("\n✅ File System Tools Examples Complete!")
 print("All operations performed safely within sandbox restrictions.")

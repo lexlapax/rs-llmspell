@@ -205,14 +205,12 @@ local post_request = use_tool("http_request", {
 })
 print_result("POST request", post_request)
 
--- Request with query parameters
+-- Request with query parameters (manual URL encoding since query_params not supported)
 local query_request = use_tool("http_request", {
     method = "GET",
-    url = "https://api.example.com/search",
-    query_params = {
-        q = "llmspell",
-        limit = 10,
-        offset = 0
+    url = "https://httpbin.org/get?q=llmspell&limit=10&offset=0",
+    headers = {
+        ["User-Agent"] = "LLMSpell-Example/1.0"
     }
 })
 print_result("Query params", query_request)
@@ -229,60 +227,57 @@ TestHelpers.print_section("GraphQL Query Tool")
 
 print("\nGraphQL operations:")
 
--- Simple GraphQL query
+-- Simple GraphQL query (using Countries API)
 local simple_query = [[
-query GetUser($id: ID!) {
-    user(id: $id) {
-        id
+query GetCountry($code: ID!) {
+    country(code: $code) {
+        code
         name
-        email
-        posts {
-            title
-            createdAt
-        }
-    }
-}
-]]
-
-local graphql_result = use_tool("graphql_query", {
-    endpoint = "https://api.example.com/graphql",
-    query = simple_query,
-    variables = {
-        id = "123"
-    }
-})
-print_result("GraphQL query", graphql_result)
-
--- GraphQL mutation
-local mutation = [[
-mutation CreatePost($input: PostInput!) {
-    createPost(input: $input) {
-        id
-        title
-        body
-        author {
+        capital
+        currency
+        languages {
+            code
             name
         }
     }
 }
 ]]
 
-local mutation_result = use_tool("graphql_query", {
-    endpoint = "https://api.example.com/graphql",
-    query = mutation,
+local graphql_result = use_tool("graphql_query", {
+    endpoint = "https://countries.trevorblades.com/graphql",
+    query = simple_query,
     variables = {
-        input = {
-            title = "New Post from LLMSpell",
-            body = "This is the post content",
-            authorId = "123"
-        }
+        code = "US"
     }
 })
-print_result("GraphQL mutation", mutation_result)
+print_result("GraphQL query", graphql_result)
 
--- GraphQL introspection
+-- GraphQL query with more data (using SpaceX API)
+local spacex_query = [[
+query GetLaunches($limit: Int!) {
+    launchesPast(limit: $limit) {
+        mission_name
+        launch_date_local
+        launch_success
+        rocket {
+            rocket_name
+        }
+    }
+}
+]]
+
+local spacex_result = use_tool("graphql_query", {
+    endpoint = "https://spacex-production.up.railway.app/",
+    query = spacex_query,
+    variables = {
+        limit = 3
+    }
+})
+print_result("SpaceX launches", spacex_result)
+
+-- GraphQL introspection (on Countries API)
 local introspection = use_tool("graphql_query", {
-    endpoint = "https://api.example.com/graphql",
+    endpoint = "https://countries.trevorblades.com/graphql",
     operation = "introspection"
 })
 print_result("Schema introspection", introspection)
@@ -342,7 +337,7 @@ print("  Operations demonstrated:")
 print("    - JSON: query, transform, validate, format")
 print("    - CSV: analyze, statistics, filter, convert")
 print("    - HTTP: GET, POST, headers, timeout")
-print("    - GraphQL: query, mutation, introspection")
+print("    - GraphQL: query, multiple queries, introspection")
 
 return {
     tools_demonstrated = #tools_demonstrated,

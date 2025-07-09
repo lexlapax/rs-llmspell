@@ -85,15 +85,19 @@ print()
 benchmarks.uuid = benchmark_tool("uuid_generator", {
     ["Generate v4"] = {format = "standard"},
     ["Generate v5"] = {version = "v5", namespace = "dns", name = "example.com"},
-    ["Component ID"] = {format = "component", prefix = "test"},
+    ["Generate simple"] = {format = "simple"},
     ["Batch (10)"] = {format = "standard", count = 10}
 })
 
 benchmarks.calculator = benchmark_tool("calculator", {
     ["Simple math"] = {expression = "2 + 2"},
-    ["Complex expr"] = {expression = "sqrt(16) + pow(2, 8) - 10 * 5"},
+    ["Complex expr"] = {expression = "16 + 2^8 - 10 * 5"},
     ["With variables"] = {expression = "a * b + c", variables = {a = 10, b = 20, c = 30}},
-    ["Trigonometry"] = {expression = "sin(pi/2) + cos(0) + tan(pi/4)"}
+    ["Arithmetic"] = {expression = "100 / 4 + 3 * 7 - 15"},
+    ["Trigonometry"] = {expression = "sin(pi()/2) + cos(0)"},
+    ["Square root"] = {expression = "sqrt(16) + sqrt(25)"},
+    ["Exponential"] = {expression = "exp(1) + exp(0)"},
+    ["Logarithm"] = {expression = "ln(e()) + log(10, 100)"}
 })
 
 benchmarks.text = benchmark_tool("text_manipulator", {
@@ -115,16 +119,16 @@ benchmarks.base64 = benchmark_tool("base64_encoder", {
 })
 
 benchmarks.hash = benchmark_tool("hash_calculator", {
-    ["MD5 small"] = {operation = "hash", algorithm = "md5", input = "test"},
-    ["SHA256 small"] = {operation = "hash", algorithm = "sha256", input = "test"},
-    ["SHA512 medium"] = {operation = "hash", algorithm = "sha512", input = string.rep("X", 1000)},
-    ["Multiple"] = {operation = "hash", algorithm = "sha256", input = "benchmark", format = "hex"}
+    ["MD5 small"] = {operation = "hash", algorithm = "md5", data = "test"},
+    ["SHA256 small"] = {operation = "hash", algorithm = "sha256", data = "test"},
+    ["SHA512 medium"] = {operation = "hash", algorithm = "sha512", data = string.rep("X", 1000)},
+    ["Multiple"] = {operation = "hash", algorithm = "sha256", data = "benchmark", format = "hex"}
 })
 
 benchmarks.json = benchmark_tool("json_processor", {
-    ["Parse simple"] = {operation = "parse", input = '{"key": "value"}'},
+    ["Query simple"] = {operation = "query", input = '{"key": "value"}', query = ".key"},
     ["Format complex"] = {operation = "query", input = '{"a":1,"b":{"c":2,"d":[3,4,5]}}', query = "."},
-    ["Query"] = {operation = "query", input = '{"users":[{"name":"Alice","age":30},{"name":"Bob","age":25}]}', query = ".users[0].name"},
+    ["Query nested"] = {operation = "query", input = '{"users":[{"name":"Alice","age":30},{"name":"Bob","age":25}]}', query = ".users[0].name"},
     ["Validate"] = {operation = "validate", input = '{"valid": true}', schema = {type = "object", properties = {valid = {type = "boolean"}}}}
 })
 
@@ -152,9 +156,9 @@ benchmarks.template = benchmark_tool("template_engine", {
 
 benchmarks.datetime = benchmark_tool("date_time_handler", {
     ["Current time"] = {operation = "now"},
-    ["Parse date"] = {operation = "parse", input = "2025-01-01", format = "%Y-%m-%d"},
-    ["Format date"] = {operation = "format", input = "2025-01-01T12:00:00Z", input_format = "%Y-%m-%dT%H:%M:%SZ", output_format = "%B %d, %Y"},
-    ["Add duration"] = {operation = "add", input = "2025-01-01", duration = "P30D", format = "%Y-%m-%d"}
+    ["Parse date"] = {operation = "parse", input = "2025-01-01"},
+    ["Convert timezone"] = {operation = "convert_timezone", input = "2025-01-01T12:00:00Z", from_tz = "UTC", to_tz = "America/New_York"},
+    ["Add duration"] = {operation = "add", input = "2025-01-01", duration = "30 days"}
 })
 
 benchmarks.diff = benchmark_tool("diff_calculator", {
@@ -177,9 +181,9 @@ print("[1m[35m🖥️ System Tools (Target: <200ms)[0m")
 print()
 
 benchmarks.env = benchmark_tool("environment_reader", {
-    ["Get single"] = {operation = "get", key = "PATH"},
-    ["Get all filtered"] = {operation = "get_all", filter = "HOME|USER|PATH"},
-    ["Check exists"] = {operation = "has", key = "HOME"}
+    ["Get single"] = {operation = "get", variable_name = "PATH"},
+    ["Get all"] = {operation = "get_all"},
+    ["Check exists"] = {operation = "has", variable_name = "HOME"}
 })
 
 -- Performance Summary

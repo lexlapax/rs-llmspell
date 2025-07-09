@@ -288,8 +288,13 @@ impl BaseAgent for FileWatcherTool {
                 let pattern = extract_optional_string(params, "pattern").map(|s| s.to_string());
                 let debounce_ms = extract_optional_u64(params, "debounce_ms")
                     .unwrap_or(self.config.default_debounce_ms);
-                let timeout_seconds = extract_optional_u64(params, "timeout_seconds")
-                    .unwrap_or(self.config.default_timeout);
+                // Support both timeout_ms and timeout_seconds for flexibility
+                let timeout_seconds = if let Some(ms) = extract_optional_u64(params, "timeout_ms") {
+                    ms.div_ceil(1000) // Round up to nearest second
+                } else {
+                    extract_optional_u64(params, "timeout_seconds")
+                        .unwrap_or(self.config.default_timeout)
+                };
                 let max_events = extract_optional_u64(params, "max_events")
                     .unwrap_or(self.config.max_events as u64)
                     as usize;
@@ -412,6 +417,14 @@ impl Tool for FileWatcherTool {
             description: "Timeout for watching in seconds".to_string(),
             required: false,
             default: Some(json!(300)),
+        })
+        .with_parameter(ParameterDef {
+            name: "timeout_ms".to_string(),
+            param_type: ParameterType::Number,
+            description: "Timeout for watching in milliseconds (alternative to timeout_seconds)"
+                .to_string(),
+            required: false,
+            default: None,
         })
         .with_parameter(ParameterDef {
             name: "max_events".to_string(),

@@ -54,6 +54,8 @@ end
 -- Results storage
 local results = {}
 local start_time = os.clock()
+local total_operations = 0
+local failed_operations = 0
 
 -- Main header
 print(TestHelpers.format_result(true, "LLMSpell Tool Examples Test Suite", "Starting..."))
@@ -79,23 +81,75 @@ for _, filename in ipairs(example_files) do
     TestHelpers.print_subsection("Running " .. filename)
     
     local file_start = os.clock()
+    
+    -- Capture stdout to analyze test results
+    local original_print = print
+    local captured_output = {}
+    local operation_count = 0
+    local failure_count = 0
+    local error_details = {}
+    
+    -- Override print to capture output
+    print = function(...)
+        local args = {...}
+        local line = table.concat(args, "\t")
+        table.insert(captured_output, line)
+        
+        -- Count operations and failures
+        if line:match("✅") then
+            operation_count = operation_count + 1
+        elseif line:match("❌") then
+            failure_count = failure_count + 1
+            -- Capture error details
+            local error_msg = line:match("❌%s*(.+)")
+            if error_msg then
+                table.insert(error_details, error_msg)
+            end
+        end
+        
+        -- Still print to console
+        original_print(...)
+    end
+    
     local success, error_msg = pcall(function()
         dofile(filename)
     end)
+    
+    -- Restore original print
+    print = original_print
+    
     local file_duration = (os.clock() - file_start) * 1000
     
     local result = {
         file = filename,
         success = success,
         duration = file_duration,
-        error = not success and error_msg or nil
+        error = not success and error_msg or nil,
+        operations = operation_count,
+        failures = failure_count,
+        error_details = error_details,
+        output = captured_output
     }
     
     table.insert(results, result)
+    total_operations = total_operations + operation_count
+    failed_operations = failed_operations + failure_count
     
     if success then
-        print(TestHelpers.format_result(true, filename, 
-            string.format("completed in %.2fms", file_duration)))
+        if failure_count > 0 then
+            print(TestHelpers.format_result(false, filename, 
+                string.format("completed with %d failures in %.2fms", failure_count, file_duration)))
+            -- Show first few error details
+            for i = 1, math.min(3, #error_details) do
+                print("  " .. error_details[i])
+            end
+            if #error_details > 3 then
+                print("  ... and " .. (#error_details - 3) .. " more errors")
+            end
+        else
+            print(TestHelpers.format_result(true, filename, 
+                string.format("completed in %.2fms (%d operations)", file_duration, operation_count)))
+        end
     else
         print(TestHelpers.format_result(false, filename, "failed to execute"))
         if error_msg then
@@ -130,10 +184,35 @@ print(string.format("Total duration: %.2fms", total_duration))
 print(string.format("Success rate: %.1f%%", 
     #results > 0 and (passed_count / #results * 100) or 0))
 
+print(string.format("\nTotal operations tested: %d", total_operations))
+print(string.format("Failed operations: %d", failed_operations))
+if total_operations > 0 then
+    print(string.format("Operation success rate: %.1f%%", 
+        (total_operations - failed_operations) / total_operations * 100))
+end
+
 if #failed_files > 0 then
     print("\nFailed examples:")
     for _, file in ipairs(failed_files) do
         print("  - " .. file)
+    end
+end
+
+-- Show examples with operation failures
+local examples_with_failures = {}
+for _, result in ipairs(results) do
+    if result.success and result.failures > 0 then
+        table.insert(examples_with_failures, result)
+    end
+end
+
+if #examples_with_failures > 0 then
+    print("\nExamples with failed operations:")
+    for _, result in ipairs(examples_with_failures) do
+        print(string.format("  - %s: %d failures", result.file, result.failures))
+        for i = 1, math.min(2, #result.error_details) do
+            print("      " .. result.error_details[i])
+        end
     end
 end
 
@@ -175,13 +254,16 @@ print(string.format("Coverage: %.1f%%",
 
 -- Final status
 print("\n" .. string.rep("=", 50))
-if failed_count == 0 then
-    print(TestHelpers.format_result(true, "TEST SUITE", "All examples passed!"))
-else
+if failed_count == 0 and failed_operations == 0 then
+    print(TestHelpers.format_result(true, "TEST SUITE", "All examples and operations passed!"))
+elseif failed_count > 0 then
     print(TestHelpers.format_result(false, "TEST SUITE", 
         string.format("%d examples failed", failed_count)))
+elseif failed_operations > 0 then
+    print(TestHelpers.format_result(false, "TEST SUITE", 
+        string.format("All examples ran but %d operations failed", failed_operations)))
 end
 print(string.rep("=", 50))
 
--- Exit with appropriate code
-os.exit(failed_count > 0 and 1 or 0)
+-- Exit with appropriate code (fail if any operations failed)
+os.exit((failed_count > 0 or failed_operations > 0) and 1 or 0)

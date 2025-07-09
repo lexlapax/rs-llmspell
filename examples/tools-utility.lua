@@ -206,6 +206,53 @@ local complex_calc = use_tool("calculator", {
 })
 print_result("(10 + 20) * 3 / 2", complex_calc)
 
+-- Mathematical functions
+print("\nMathematical functions:")
+
+-- Trigonometry
+local trig_calc = use_tool("calculator", {
+    operation = "evaluate",
+    expression = "sin(pi()/2) + cos(0) + tan(pi()/4)"
+})
+print_result("sin(π/2) + cos(0) + tan(π/4)", trig_calc)
+
+-- Square root and power
+local sqrt_calc = use_tool("calculator", {
+    operation = "evaluate",
+    expression = "sqrt(25) + sqrt(16) + 2^3"
+})
+print_result("sqrt(25) + sqrt(16) + 2^3", sqrt_calc)
+
+-- Exponential and logarithm
+local exp_calc = use_tool("calculator", {
+    operation = "evaluate",
+    expression = "exp(1) + ln(e()) + log(10, 100)"
+})
+print_result("exp(1) + ln(e) + log₁₀(100)", exp_calc)
+
+-- Combined with variables
+local advanced_calc = use_tool("calculator", {
+    operation = "evaluate",
+    expression = "sqrt(x^2 + y^2) * sin(theta)",
+    variables = {
+        x = 3,
+        y = 4,
+        theta = 0.927  -- ~53.13 degrees in radians
+    }
+})
+print_result("sqrt(x²+y²) * sin(θ) where x=3, y=4, θ=0.927", advanced_calc)
+
+-- List available functions
+local functions_list = use_tool("calculator", {
+    operation = "functions"
+})
+if functions_list.result and functions_list.result.trigonometric then
+    print("\nAvailable mathematical functions:")
+    print("  Trigonometric: " .. table.concat(functions_list.result.trigonometric, ", "))
+    print("  Mathematical: " .. table.concat(functions_list.result.mathematical, ", "))
+    print("  Constants: " .. table.concat(functions_list.result.constants, ", "))
+end
+
 TestHelpers.print_section("Date Time Handler Tool")
 
 -- Current date and time

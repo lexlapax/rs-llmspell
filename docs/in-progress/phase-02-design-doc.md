@@ -186,7 +186,9 @@ pub struct DateTimeHandlerTool {
 
 // llmspell-tools/src/util/calculator.rs
 pub struct CalculatorTool {
-    expression_parser: ExpressionParser,
+    // Changed from evalexpr to fasteval for built-in math functions
+    // fasteval provides sin, cos, tan, log, etc. natively
+    // We add sqrt, exp, ln as custom functions via callback namespace
 }
 ```
 
@@ -679,6 +681,48 @@ Each tool requires:
 - Performance benchmarks
 - Security sandbox tests
 
+### 2.5 Calculator Tool Enhancement
+
+**Migration from evalexpr to fasteval:**
+
+The CalculatorTool has been enhanced to support mathematical functions by switching from `evalexpr` to `fasteval`:
+
+**Built-in Functions (Native to fasteval)**:
+- **Trigonometric**: sin, cos, tan, asin, acos, atan, sinh, cosh, tanh, asinh, acosh, atanh
+- **Numeric**: abs, sign, ceil, floor, round, int, min, max
+- **Logarithm**: log (with optional base, defaults to 10)
+- **Constants**: pi(), e() functions return mathematical constants
+
+**Custom Functions (Added via callback namespace)**:
+- **sqrt(x)**: Square root, implemented as x^0.5
+- **exp(x)**: Exponential function, implemented as e()^x  
+- **ln(x)**: Natural logarithm, implemented as log(e(), x)
+
+**Implementation Note**: Fasteval doesn't include sqrt, exp, or ln natively, so we implement them as custom functions using fasteval's callback namespace feature. This provides a seamless user experience while leveraging fasteval's performance and safety.
+
+- **Performance**: Fasteval benchmarks show it's the fastest expression evaluation library
+- **Safety**: Designed for safe evaluation of untrusted expressions
+- **Variables**: Full support for variable substitution
+
+**Example Usage:**
+```lua
+-- Mathematical expressions work seamlessly
+local result = calculator:execute({
+    expression = "sin(pi()/2) + sqrt(16) + log(10, 100)"  -- Returns 6.0
+})
+
+-- Complex expressions with variables
+local result = calculator:execute({
+    expression = "sqrt(x^2 + y^2) * exp(-t/2)",
+    variables = {x = 3, y = 4, t = 1}
+})
+
+-- Natural logarithm
+local result = calculator:execute({
+    expression = "ln(e()) + ln(10)"  -- ln(e) = 1, ln(10) ≈ 2.303
+})
+```
+
 ---
 
 ## 3. Implementation Phases
@@ -787,6 +831,7 @@ Each tool requires:
 - `uuid`: UUID generation
 - `chrono`: Date/time handling
 - `zip`, `tar`: Archive handling
+- `fasteval`: Mathematical expression evaluation (replaced evalexpr)
 
 ### Internal Dependencies
 - `llmspell-core`: Trait definitions

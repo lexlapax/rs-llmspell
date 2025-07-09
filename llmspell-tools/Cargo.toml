@@ -71,7 +71,7 @@ hex = "0.4"
 similar = { version = "2.6", features = ["text", "inline", "bytes"] }
 
 # Expression evaluation
-evalexpr = "11.3"
+fasteval = "0.2"
 
 # File watching
 notify = "6.1"

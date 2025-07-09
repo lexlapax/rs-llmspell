@@ -4,7 +4,8 @@
 **Tester**: Claude Code  
 **Environment**: macOS, Debug Build  
 **Tool Count**: 26 tools (after removing legacy file_reader alias)
-**Latest Test Run**: 2025-07-09 10:27:56
+**Latest Test Run**: 2025-07-09 10:27:56  
+**Updated**: 2025-07-09 - Fixed HTTP endpoints in tools-data.lua
 
 ## Executive Summary
 
@@ -199,8 +200,15 @@ During detailed testing, found and fixed parameter mismatches in examples:
 - **JSON Operations**: Changed unsupported `format` → `query` with identity query
 
 ### Remaining Issues
-1. **Async/Coroutine Errors**: http_request, graphql_query, and service_checker fail with "attempt to yield from outside a coroutine"
-   - This is a Lua bridge limitation and cannot be fixed without architectural changes
+1. **Async/Coroutine Errors**: ✅ FIXED with Task 2.10.5 async bridge implementation
+   - http_request, graphql_query, and service_checker now work with Tool.executeAsync helper
+   - All HTTP endpoints updated to use real, working services:
+     - GitHub API for repository info
+     - JSONPlaceholder for POST testing
+     - httpbin.org for query parameter echo
+     - Countries GraphQL API for GraphQL queries
+     - SpaceX GraphQL API for launch data
+     - Note: query_params parameter not supported, use manual URL encoding
 2. **Edge Case Validations**: 
    - archive_handler still reports missing 'files' in some cases
    - Complex JSON schema validations may fail
@@ -241,4 +249,4 @@ The tool library is fully functional:
 - Rust Version: 1.83.0
 - Build: Debug
 - Initial Test Date: 2025-07-08
-- Updated with Fixes: 2025-07-09
+- Updated with Fixes: 2025-07-09 (async bridge + real HTTP endpoints)
