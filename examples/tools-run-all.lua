@@ -4,26 +4,52 @@
 -- Load test helpers
 local TestHelpers = dofile("examples/test-helpers.lua")
 
--- List of example files to run (in order)
-local example_files = {
-    -- Working reference
-    "examples/tools-utility-reference.lua",
+-- Auto-discover all tools-*.lua files in the examples directory
+local function discover_tool_examples()
+    local files = {}
+    local handle = io.popen("ls examples/tools-*.lua 2>/dev/null")
+    if handle then
+        for file in handle:lines() do
+            -- Skip tools-run-all.lua itself
+            if not file:match("tools%-run%-all%.lua$") then
+                table.insert(files, file)
+            end
+        end
+        handle:close()
+    end
     
-    -- Core examples
-    "examples/tools-showcase.lua",
-    "examples/tools-utility.lua", 
-    "examples/tools-filesystem.lua",
-    "examples/tools-system.lua",
+    -- Sort files for consistent ordering
+    table.sort(files)
     
-    -- Category examples
-    "examples/tools-data.lua",
-    "examples/tools-media.lua",
-    "examples/tools-security.lua",
+    -- Put reference file first if it exists
+    local ref_index = nil
+    for i, file in ipairs(files) do
+        if file:match("tools%-utility%-reference%.lua$") then
+            ref_index = i
+            break
+        end
+    end
     
-    -- Integration examples
-    "examples/tools-workflow.lua",
-    "examples/tools-performance.lua"
-}
+    if ref_index then
+        local ref_file = table.remove(files, ref_index)
+        table.insert(files, 1, ref_file)
+    end
+    
+    return files
+end
+
+-- List of example files to run (auto-discovered)
+local example_files = discover_tool_examples()
+
+if #example_files == 0 then
+    print("ERROR: No tools-*.lua example files found!")
+    os.exit(1)
+end
+
+print("\nDiscovered " .. #example_files .. " example files:")
+for i, file in ipairs(example_files) do
+    print(string.format("  %2d. %s", i, file))
+end
 
 -- Results storage
 local results = {}

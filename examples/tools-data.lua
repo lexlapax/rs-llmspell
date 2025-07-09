@@ -48,49 +48,49 @@ TestHelpers.print_section("JSON Processor Tool")
 
 print("\nJSON processing operations:")
 
--- Sample JSON data
-local sample_json = {
-    users = {
+-- Sample JSON data as a string to ensure proper parsing
+local sample_json_str = [[{
+    "users": [
         {
-            id = 1,
-            name = "Alice Johnson",
-            age = 30,
-            city = "New York",
-            skills = {"Python", "JavaScript", "Go"}
+            "id": 1,
+            "name": "Alice Johnson",
+            "age": 30,
+            "city": "New York",
+            "skills": ["Python", "JavaScript", "Go"]
         },
         {
-            id = 2,
-            name = "Bob Smith",
-            age = 25,
-            city = "San Francisco",
-            skills = {"Java", "Kotlin", "Swift"}
+            "id": 2,
+            "name": "Bob Smith",
+            "age": 25,
+            "city": "San Francisco",
+            "skills": ["Java", "Kotlin", "Swift"]
         },
         {
-            id = 3,
-            name = "Charlie Brown",
-            age = 35,
-            city = "Chicago",
-            skills = {"Rust", "C++", "Assembly"}
+            "id": 3,
+            "name": "Charlie Brown",
+            "age": 35,
+            "city": "Chicago",
+            "skills": ["Rust", "C++", "Assembly"]
         }
-    },
-    metadata = {
-        version = "1.0",
-        generated = "2024-07-08"
+    ],
+    "metadata": {
+        "version": "1.0",
+        "generated": "2024-07-08"
     }
-}
+}]]
 
 -- Query JSON with jq syntax
 local jq_query = use_tool("json_processor", {
     operation = "query",
-    json = sample_json,
+    input = sample_json_str,
     query = ".users[] | select(.age > 25) | {name, city}"
 })
 print_result("JQ query (age > 25)", jq_query)
 
 -- Transform JSON
 local transform = use_tool("json_processor", {
-    operation = "transform",
-    json = sample_json,
+    operation = "query",  -- transform is done via query
+    input = sample_json_str,
     query = ".users | map({fullName: .name, location: .city, yearsOfExperience: (.age - 20)})"
 })
 print_result("Transform users", transform)
@@ -116,16 +116,16 @@ local schema = {
 
 local validate_json = use_tool("json_processor", {
     operation = "validate",
-    json = sample_json,
+    input = sample_json_str,
     schema = schema
 })
 print_result("Schema validation", validate_json)
 
--- Pretty print JSON
+-- Pretty print JSON (format not supported, use query)
 local pretty_json = use_tool("json_processor", {
-    operation = "format",
-    json = {compact = true, data = {1, 2, 3}},
-    indent = 2
+    operation = "query",
+    input = {compact = true, data = {1, 2, 3}},
+    query = "."  -- Identity query to return formatted
 })
 print_result("Pretty print", pretty_json)
 
@@ -144,32 +144,34 @@ Eve Adams,32,Boston,88000]]
 -- Analyze CSV
 local csv_analysis = use_tool("csv_analyzer", {
     operation = "analyze",
-    csv_data = csv_data
+    content = csv_data
 })
 print_result("CSV analysis", csv_analysis)
 
--- Get statistics
+-- Get statistics (part of analyze operation)
 local csv_stats = use_tool("csv_analyzer", {
-    operation = "statistics",
-    csv_data = csv_data,
-    columns = {"age", "salary"}
+    operation = "analyze",
+    content = csv_data
 })
 print_result("Column statistics", csv_stats)
 
 -- Filter CSV data
 local csv_filter = use_tool("csv_analyzer", {
     operation = "filter",
-    csv_data = csv_data,
-    conditions = {
-        {column = "age", operator = ">", value = 30}
+    content = csv_data,
+    options = {
+        filter = "age > 30"  -- Simple filter expression
     }
 })
 print_result("Filter (age > 30)", csv_filter)
 
 -- Convert CSV to JSON
 local csv_to_json = use_tool("csv_analyzer", {
-    operation = "to_json",
-    csv_data = csv_data
+    operation = "convert",
+    content = csv_data,
+    options = {
+        format = "json"
+    }
 })
 print_result("CSV to JSON", csv_to_json)
 
@@ -281,7 +283,7 @@ print_result("GraphQL mutation", mutation_result)
 -- GraphQL introspection
 local introspection = use_tool("graphql_query", {
     endpoint = "https://api.example.com/graphql",
-    operation = "introspect"
+    operation = "introspection"
 })
 print_result("Schema introspection", introspection)
 
@@ -304,7 +306,7 @@ local api_response = {
 -- Extract and transform data
 local extracted = use_tool("json_processor", {
     operation = "query",
-    json = api_response,
+    input = api_response,  -- Changed from json to input
     query = ".data.users | sort_by(.score) | reverse | .[0:2]"
 })
 print_result("Top 2 users by score", extracted)
@@ -316,19 +318,12 @@ Widget A,100,9.99
 Widget B,75,14.99
 Widget C,150,7.99]]
 
--- Calculate revenue and add to CSV
+-- Calculate revenue and add to CSV (transform not fully implemented, use analyze)
 local enriched = use_tool("csv_analyzer", {
-    operation = "transform",
-    csv_data = sales_csv,
-    transformations = {
-        {
-            type = "add_column",
-            name = "revenue",
-            formula = "units * price"
-        }
-    }
+    operation = "analyze",
+    content = sales_csv  -- Changed from csv_data to content
 })
-print_result("Add revenue column", enriched)
+print_result("CSV analysis (transform not implemented)", enriched)
 
 print("\n✅ Data Processing Tools Examples Complete!")
 print("Demonstrated JSON processing, CSV analysis, HTTP requests, and GraphQL queries.")

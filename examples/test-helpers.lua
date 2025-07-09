@@ -51,8 +51,17 @@ function TestHelpers.print_subsection(title)
     print("\n" .. colors.cyan .. "--- " .. title .. " ---" .. colors.reset)
 end
 
--- Safe tool execution with error handling
+-- Safe tool execution with error handling (using async-aware helper)
 function TestHelpers.execute_tool(tool_name, params)
+    -- Use the new async-aware helper that handles coroutines properly
+    local result = Tool.executeAsync(tool_name, params)
+    
+    -- The executeAsync helper already returns proper error structure
+    return result
+end
+
+-- Alternative: Direct tool execution (for testing sync tools)
+function TestHelpers.execute_tool_direct(tool_name, params)
     local tool = Tool.get(tool_name)
     if not tool then
         return {
