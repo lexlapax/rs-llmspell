@@ -22,7 +22,11 @@ use llmspell_core::{
     ComponentMetadata, LLMSpellError, Result,
 };
 use llmspell_security::sandbox::{FileSandbox, SandboxContext};
-use llmspell_utils::file_monitor::{debounce_events, FileEvent, FileEventType, WatchConfig};
+use llmspell_utils::{
+    extract_optional_bool, extract_optional_string, extract_optional_u64, extract_parameters,
+    extract_required_array, extract_required_string,
+    file_monitor::{debounce_events, FileEvent, FileEventType, WatchConfig},
+};
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -257,34 +261,18 @@ impl BaseAgent for FileWatcherTool {
     }
 
     async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
-        // Get parameters from input
-        let params =
-            input
-                .parameters
-                .get("parameters")
-                .ok_or_else(|| LLMSpellError::Validation {
-                    message: "Missing parameters in input".to_string(),
-                    field: Some("parameters".to_string()),
-                })?;
+        // Get parameters using shared utility
+        let params = extract_parameters(&input)?;
 
         // Validate parameters
         self.validate_parameters(params).await?;
 
-        let operation = params["operation"]
-            .as_str()
-            .ok_or_else(|| LLMSpellError::Validation {
-                message: "Operation is required".to_string(),
-                field: Some("operation".to_string()),
-            })?;
+        let operation = extract_required_string(params, "operation")?;
 
         match operation {
             "watch" => {
-                let paths: Vec<PathBuf> = params["paths"]
-                    .as_array()
-                    .ok_or_else(|| LLMSpellError::Validation {
-                        message: "Paths are required for watch operation".to_string(),
-                        field: Some("paths".to_string()),
-                    })?
+                let paths_array = extract_required_array(params, "paths")?;
+                let paths: Vec<PathBuf> = paths_array
                     .iter()
                     .map(|v| {
                         v.as_str()
@@ -296,16 +284,13 @@ impl BaseAgent for FileWatcherTool {
                     })
                     .collect::<Result<Vec<_>>>()?;
 
-                let recursive = params["recursive"].as_bool().unwrap_or(true);
-                let pattern = params["pattern"].as_str().map(|s| s.to_string());
-                let debounce_ms = params["debounce_ms"]
-                    .as_u64()
+                let recursive = extract_optional_bool(params, "recursive").unwrap_or(true);
+                let pattern = extract_optional_string(params, "pattern").map(|s| s.to_string());
+                let debounce_ms = extract_optional_u64(params, "debounce_ms")
                     .unwrap_or(self.config.default_debounce_ms);
-                let timeout_seconds = params["timeout_seconds"]
-                    .as_u64()
+                let timeout_seconds = extract_optional_u64(params, "timeout_seconds")
                     .unwrap_or(self.config.default_timeout);
-                let max_events = params["max_events"]
-                    .as_u64()
+                let max_events = extract_optional_u64(params, "max_events")
                     .unwrap_or(self.config.max_events as u64)
                     as usize;
 
@@ -559,7 +544,7 @@ mod tests {
         assert!(result
             .unwrap_err()
             .to_string()
-            .contains("Paths are required"));
+            .contains("Missing required array parameter 'paths'"));
     }
 
     #[tokio::test]

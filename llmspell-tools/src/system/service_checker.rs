@@ -11,6 +11,7 @@ use llmspell_core::{
     ComponentMetadata, LLMSpellError, Result as LLMResult,
 };
 use llmspell_security::sandbox::SandboxContext;
+use llmspell_utils::{extract_optional_u64, extract_parameters, extract_required_string};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
@@ -451,70 +452,6 @@ impl ServiceCheckerTool {
             }
         }
     }
-
-    /// Validate check parameters
-    async fn validate_check_parameters(
-        &self,
-        params: &HashMap<String, serde_json::Value>,
-    ) -> LLMResult<()> {
-        // Check required parameters
-        if !params.contains_key("target") {
-            return Err(LLMSpellError::Validation {
-                message: "Missing required parameter: target".to_string(),
-                field: Some("target".to_string()),
-            });
-        }
-
-        if !params.contains_key("check_type") {
-            return Err(LLMSpellError::Validation {
-                message: "Missing required parameter: check_type".to_string(),
-                field: Some("check_type".to_string()),
-            });
-        }
-
-        // Validate target
-        if let Some(target) = params.get("target").and_then(|v| v.as_str()) {
-            if target.trim().is_empty() {
-                return Err(LLMSpellError::Validation {
-                    message: "Target cannot be empty".to_string(),
-                    field: Some("target".to_string()),
-                });
-            }
-        }
-
-        // Validate check_type
-        if let Some(check_type) = params.get("check_type").and_then(|v| v.as_str()) {
-            match check_type {
-                "tcp" | "http" | "https" | "dns" => {}
-                _ => {
-                    return Err(LLMSpellError::Validation {
-                        message: format!(
-                            "Invalid check_type: {}. Supported types: tcp, http, https, dns",
-                            check_type
-                        ),
-                        field: Some("check_type".to_string()),
-                    });
-                }
-            }
-        }
-
-        // Validate timeout if provided
-        if let Some(timeout_val) = params.get("timeout_seconds") {
-            if let Some(timeout_secs) = timeout_val.as_u64() {
-                if timeout_secs > self.config.max_timeout_seconds {
-                    return Err(LLMSpellError::Validation {
-                        message: format!(
-                            "Timeout {} exceeds maximum allowed timeout of {} seconds",
-                            timeout_secs, self.config.max_timeout_seconds
-                        ),
-                        field: Some("timeout_seconds".to_string()),
-                    });
-                }
-            }
-        }
-
-        Ok(())
-    }
 }
 
 #[async_trait]
@@ -528,20 +465,49 @@ impl BaseAgent for ServiceCheckerTool {
         input: AgentInput,
         _context: ExecutionContext,
     ) -> LLMResult<AgentOutput> {
-        self.validate_check_parameters(&input.parameters).await?;
-
-        let params = &input.parameters;
+        // Get parameters using shared utility
+        let params = extract_parameters(&input)?;
 
         // Extract required parameters
-        let target = params.get("target").and_then(|v| v.as_str()).unwrap(); // Safe due to validation
+        let target = extract_required_string(params, "target")?;
+        let check_type = extract_required_string(params, "check_type")?;
 
-        let check_type = params.get("check_type").and_then(|v| v.as_str()).unwrap(); // Safe due to validation
+        // Validate check_type
+        match check_type {
+            "tcp" | "http" | "https" | "dns" => {}
+            _ => {
+                return Err(LLMSpellError::Validation {
+                    message: format!(
+                        "Invalid check_type: {}. Supported types: tcp, http, https, dns",
+                        check_type
+                    ),
+                    field: Some("check_type".to_string()),
+                });
+            }
+        }
+
+        // Validate target is not empty
+        if target.trim().is_empty() {
+            return Err(LLMSpellError::Validation {
+                message: "Target cannot be empty".to_string(),
+                field: Some("target".to_string()),
+            });
+        }
 
         // Extract optional parameters
-        let timeout_seconds = params
-            .get("timeout_seconds")
-            .and_then(|v| v.as_u64())
+        let timeout_seconds = extract_optional_u64(params, "timeout_seconds")
             .unwrap_or(self.config.default_timeout_seconds);
+
+        // Validate timeout if provided
+        if timeout_seconds > self.config.max_timeout_seconds {
+            return Err(LLMSpellError::Validation {
+                message: format!(
+                    "Timeout {} exceeds maximum allowed timeout of {} seconds",
+                    timeout_seconds, self.config.max_timeout_seconds
+                ),
+                field: Some("timeout_seconds".to_string()),
+            });
+        }
 
         let timeout_duration = Duration::from_secs(timeout_seconds);
 
@@ -705,6 +671,7 @@ impl Tool for ServiceCheckerTool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
 
     fn create_test_tool() -> ServiceCheckerTool {
         let config = ServiceCheckerConfig::default();
@@ -719,14 +686,32 @@ mod tests {
         ServiceCheckerTool::new(config)
     }
 
+    fn create_test_input(text: &str, params: serde_json::Value) -> AgentInput {
+        AgentInput {
+            text: text.to_string(),
+            media: vec![],
+            context: None,
+            parameters: {
+                let mut map = HashMap::new();
+                map.insert("parameters".to_string(), params);
+                map
+            },
+            output_modalities: vec![],
+        }
+    }
+
     #[tokio::test]
     async fn test_tcp_check_localhost() {
         let tool = create_test_tool_with_custom_config();
 
-        let input = AgentInput::text("Check TCP port")
-            .with_parameter("target", "127.0.0.1:22")
-            .with_parameter("check_type", "tcp")
-            .with_parameter("timeout_seconds", 1);
+        let input = create_test_input(
+            "Check TCP port",
+            json!({
+                "target": "127.0.0.1:22",
+                "check_type": "tcp",
+                "timeout_seconds": 1
+            }),
+        );
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -740,10 +725,14 @@ mod tests {
     async fn test_http_check_invalid_url() {
         let tool = create_test_tool_with_custom_config();
 
-        let input = AgentInput::text("Check HTTP service")
-            .with_parameter("target", "http://nonexistent-domain-12345.invalid")
-            .with_parameter("check_type", "http")
-            .with_parameter("timeout_seconds", 1);
+        let input = create_test_input(
+            "Check HTTP service",
+            json!({
+                "target": "http://nonexistent-domain-12345.invalid",
+                "check_type": "http",
+                "timeout_seconds": 1
+            }),
+        );
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -756,9 +745,13 @@ mod tests {
     async fn test_dns_check_localhost() {
         let tool = create_test_tool_with_custom_config();
 
-        let input = AgentInput::text("Check DNS resolution")
-            .with_parameter("target", "localhost:80")
-            .with_parameter("check_type", "dns");
+        let input = create_test_input(
+            "Check DNS resolution",
+            json!({
+                "target": "localhost:80",
+                "check_type": "dns"
+            }),
+        );
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -771,9 +764,13 @@ mod tests {
     async fn test_blocked_port() {
         let tool = create_test_tool();
 
-        let input = AgentInput::text("Check blocked port")
-            .with_parameter("target", "127.0.0.1:7") // Echo port (blocked by default)
-            .with_parameter("check_type", "tcp");
+        let input = create_test_input(
+            "Check blocked port",
+            json!({
+                "target": "127.0.0.1:7", // Echo port (blocked by default)
+                "check_type": "tcp"
+            }),
+        );
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -787,9 +784,13 @@ mod tests {
     async fn test_blocked_domain() {
         let tool = create_test_tool();
 
-        let input = AgentInput::text("Check blocked domain")
-            .with_parameter("target", "evil.example.com:80")
-            .with_parameter("check_type", "tcp");
+        let input = create_test_input(
+            "Check blocked domain",
+            json!({
+                "target": "evil.example.com:80",
+                "check_type": "tcp"
+            }),
+        );
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -803,28 +804,41 @@ mod tests {
         let tool = create_test_tool();
 
         // Missing target
-        let input1 = AgentInput::text("Missing target").with_parameter("check_type", "tcp");
+        let input1 = create_test_input(
+            "Missing target",
+            json!({
+                "check_type": "tcp"
+            }),
+        );
         let result1 = tool.execute(input1, ExecutionContext::default()).await;
         assert!(result1.is_err());
         assert!(result1
             .unwrap_err()
             .to_string()
-            .contains("Missing required parameter: target"));
+            .contains("Missing required parameter 'target'"));
 
         // Missing check_type
-        let input2 =
-            AgentInput::text("Missing check type").with_parameter("target", "localhost:80");
+        let input2 = create_test_input(
+            "Missing check type",
+            json!({
+                "target": "localhost:80"
+            }),
+        );
         let result2 = tool.execute(input2, ExecutionContext::default()).await;
         assert!(result2.is_err());
         assert!(result2
             .unwrap_err()
             .to_string()
-            .contains("Missing required parameter: check_type"));
+            .contains("Missing required parameter 'check_type'"));
 
         // Invalid check_type
-        let input3 = AgentInput::text("Invalid check type")
-            .with_parameter("target", "localhost:80")
-            .with_parameter("check_type", "invalid");
+        let input3 = create_test_input(
+            "Invalid check type",
+            json!({
+                "target": "localhost:80",
+                "check_type": "invalid"
+            }),
+        );
         let result3 = tool.execute(input3, ExecutionContext::default()).await;
         assert!(result3.is_err());
         assert!(result3
@@ -833,18 +847,26 @@ mod tests {
             .contains("Invalid check_type"));
 
         // Empty target
-        let input4 = AgentInput::text("Empty target")
-            .with_parameter("target", "")
-            .with_parameter("check_type", "tcp");
+        let input4 = create_test_input(
+            "Empty target",
+            json!({
+                "target": "",
+                "check_type": "tcp"
+            }),
+        );
         let result4 = tool.execute(input4, ExecutionContext::default()).await;
         assert!(result4.is_err());
         assert!(result4.unwrap_err().to_string().contains("cannot be empty"));
 
         // Excessive timeout
-        let input5 = AgentInput::text("Excessive timeout")
-            .with_parameter("target", "localhost:80")
-            .with_parameter("check_type", "tcp")
-            .with_parameter("timeout_seconds", 100);
+        let input5 = create_test_input(
+            "Excessive timeout",
+            json!({
+                "target": "localhost:80",
+                "check_type": "tcp",
+                "timeout_seconds": 100
+            }),
+        );
         let result5 = tool.execute(input5, ExecutionContext::default()).await;
         assert!(result5.is_err());
         assert!(result5.unwrap_err().to_string().contains("exceeds maximum"));
@@ -937,10 +959,14 @@ mod tests {
     async fn test_https_url_transformation() {
         let tool = create_test_tool_with_custom_config();
 
-        let input = AgentInput::text("Check HTTPS service")
-            .with_parameter("target", "http://httpbin.org/status/200")
-            .with_parameter("check_type", "https")
-            .with_parameter("timeout_seconds", 5);
+        let input = create_test_input(
+            "Check HTTPS service",
+            json!({
+                "target": "http://httpbin.org/status/200",
+                "check_type": "https",
+                "timeout_seconds": 5
+            }),
+        );
 
         let result = tool
             .execute(input, ExecutionContext::default())

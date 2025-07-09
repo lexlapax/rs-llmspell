@@ -20,9 +20,11 @@ use llmspell_core::{
     ComponentMetadata, LLMSpellError, Result as LLMResult,
 };
 use llmspell_security::sandbox::SandboxContext;
+use llmspell_utils::{
+    extract_optional_f64, extract_optional_string, extract_parameters, extract_required_string,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 use tracing::debug;
@@ -306,12 +308,9 @@ impl VideoProcessorTool {
     }
 
     /// Validate processing parameters
-    async fn validate_parameters(
-        &self,
-        params: &HashMap<String, serde_json::Value>,
-    ) -> LLMResult<()> {
+    async fn validate_parameters(&self, params: &serde_json::Value) -> LLMResult<()> {
         // Validate operation
-        if let Some(operation) = params.get("operation").and_then(|v| v.as_str()) {
+        if let Some(operation) = extract_optional_string(params, "operation") {
             match operation {
                 "detect" | "metadata" | "thumbnail" | "extract_frame" => {}
                 _ => {
@@ -327,7 +326,7 @@ impl VideoProcessorTool {
         }
 
         // Validate file_path
-        if let Some(file_path) = params.get("file_path").and_then(|v| v.as_str()) {
+        if let Some(file_path) = extract_optional_string(params, "file_path") {
             if file_path.is_empty() {
                 return Err(LLMSpellError::Validation {
                     message: "File path cannot be empty".to_string(),
@@ -338,7 +337,7 @@ impl VideoProcessorTool {
 
         // Validate thumbnail/frame extraction parameters
         if matches!(
-            params.get("operation").and_then(|v| v.as_str()),
+            extract_optional_string(params, "operation"),
             Some("thumbnail") | Some("extract_frame")
         ) && params.get("output_path").is_none()
         {
@@ -364,23 +363,16 @@ impl BaseAgent for VideoProcessorTool {
         input: AgentInput,
         _context: ExecutionContext,
     ) -> LLMResult<AgentOutput> {
-        self.validate_parameters(&input.parameters).await?;
+        // Get parameters using shared utility
+        let params = extract_parameters(&input)?;
 
-        let params = &input.parameters;
-        let operation = params
-            .get("operation")
-            .and_then(|v| v.as_str())
-            .unwrap_or("metadata");
+        self.validate_parameters(params).await?;
+
+        let operation = extract_optional_string(params, "operation").unwrap_or("metadata");
 
         match operation {
             "detect" => {
-                let file_path = params
-                    .get("file_path")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| LLMSpellError::Validation {
-                        message: "file_path is required".to_string(),
-                        field: Some("file_path".to_string()),
-                    })?;
+                let file_path = extract_required_string(params, "file_path")?;
 
                 let path = Path::new(file_path);
                 let format = self.detect_format(path).await?;
@@ -399,13 +391,7 @@ impl BaseAgent for VideoProcessorTool {
             }
 
             "metadata" => {
-                let file_path = params
-                    .get("file_path")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| LLMSpellError::Validation {
-                        message: "file_path is required".to_string(),
-                        field: Some("file_path".to_string()),
-                    })?;
+                let file_path = extract_required_string(params, "file_path")?;
 
                 let path = Path::new(file_path);
                 let metadata = self.extract_metadata(path).await?;
@@ -438,23 +424,9 @@ impl BaseAgent for VideoProcessorTool {
             }
 
             "thumbnail" => {
-                let video_path = params
-                    .get("file_path")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| LLMSpellError::Validation {
-                        message: "file_path is required".to_string(),
-                        field: Some("file_path".to_string()),
-                    })?;
-
-                let output_path = params
-                    .get("output_path")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| LLMSpellError::Validation {
-                        message: "output_path is required".to_string(),
-                        field: Some("output_path".to_string()),
-                    })?;
-
-                let timestamp = params.get("timestamp_seconds").and_then(|v| v.as_f64());
+                let video_path = extract_required_string(params, "file_path")?;
+                let output_path = extract_required_string(params, "output_path")?;
+                let timestamp = extract_optional_f64(params, "timestamp_seconds");
 
                 let video = Path::new(video_path);
                 let output = Path::new(output_path);
@@ -477,26 +449,9 @@ impl BaseAgent for VideoProcessorTool {
             }
 
             "extract_frame" => {
-                let video_path = params
-                    .get("file_path")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| LLMSpellError::Validation {
-                        message: "file_path is required".to_string(),
-                        field: Some("file_path".to_string()),
-                    })?;
-
-                let output_path = params
-                    .get("output_path")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| LLMSpellError::Validation {
-                        message: "output_path is required".to_string(),
-                        field: Some("output_path".to_string()),
-                    })?;
-
-                let timestamp = params
-                    .get("timestamp_seconds")
-                    .and_then(|v| v.as_f64())
-                    .unwrap_or(0.0);
+                let video_path = extract_required_string(params, "file_path")?;
+                let output_path = extract_required_string(params, "output_path")?;
+                let timestamp = extract_optional_f64(params, "timestamp_seconds").unwrap_or(0.0);
 
                 let video = Path::new(video_path);
                 let output = Path::new(output_path);
@@ -591,12 +546,27 @@ impl Tool for VideoProcessorTool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
     use std::fs;
     use tempfile::TempDir;
 
     fn create_test_tool() -> VideoProcessorTool {
         let config = VideoProcessorConfig::default();
         VideoProcessorTool::new(config)
+    }
+
+    fn create_test_input(text: &str, params: serde_json::Value) -> AgentInput {
+        AgentInput {
+            text: text.to_string(),
+            media: vec![],
+            context: None,
+            parameters: {
+                let mut map = HashMap::new();
+                map.insert("parameters".to_string(), params);
+                map
+            },
+            output_modalities: vec![],
+        }
     }
 
     #[tokio::test]
@@ -663,9 +633,13 @@ mod tests {
 
         fs::write(&file_path, b"dummy mp4 content").unwrap();
 
-        let input = AgentInput::text("Extract metadata")
-            .with_parameter("operation", "metadata")
-            .with_parameter("file_path", file_path.to_str().unwrap());
+        let input = create_test_input(
+            "Extract metadata",
+            json!({
+                "operation": "metadata",
+                "file_path": file_path.to_str().unwrap()
+            }),
+        );
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -685,9 +659,13 @@ mod tests {
 
         fs::write(&file_path, b"dummy").unwrap();
 
-        let input = AgentInput::text("Detect format")
-            .with_parameter("operation", "detect")
-            .with_parameter("file_path", file_path.to_str().unwrap());
+        let input = create_test_input(
+            "Detect format",
+            json!({
+                "operation": "detect",
+                "file_path": file_path.to_str().unwrap()
+            }),
+        );
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -709,9 +687,13 @@ mod tests {
         // Create a file larger than the limit
         fs::write(&file_path, vec![0u8; 100]).unwrap();
 
-        let input = AgentInput::text("Extract metadata")
-            .with_parameter("operation", "metadata")
-            .with_parameter("file_path", file_path.to_str().unwrap());
+        let input = create_test_input(
+            "Extract metadata",
+            json!({
+                "operation": "metadata",
+                "file_path": file_path.to_str().unwrap()
+            }),
+        );
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -727,10 +709,14 @@ mod tests {
 
         fs::write(&video_path, b"dummy").unwrap();
 
-        let input = AgentInput::text("Generate thumbnail")
-            .with_parameter("operation", "thumbnail")
-            .with_parameter("file_path", video_path.to_str().unwrap())
-            .with_parameter("output_path", output_path.to_str().unwrap());
+        let input = create_test_input(
+            "Generate thumbnail",
+            json!({
+                "operation": "thumbnail",
+                "file_path": video_path.to_str().unwrap(),
+                "output_path": output_path.to_str().unwrap()
+            }),
+        );
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -746,11 +732,15 @@ mod tests {
 
         fs::write(&video_path, b"dummy").unwrap();
 
-        let input = AgentInput::text("Extract frame")
-            .with_parameter("operation", "extract_frame")
-            .with_parameter("file_path", video_path.to_str().unwrap())
-            .with_parameter("output_path", output_path.to_str().unwrap())
-            .with_parameter("timestamp_seconds", 5.0);
+        let input = create_test_input(
+            "Extract frame",
+            json!({
+                "operation": "extract_frame",
+                "file_path": video_path.to_str().unwrap(),
+                "output_path": output_path.to_str().unwrap(),
+                "timestamp_seconds": 5.0
+            }),
+        );
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -763,7 +753,12 @@ mod tests {
     async fn test_invalid_operation() {
         let tool = create_test_tool();
 
-        let input = AgentInput::text("Invalid operation").with_parameter("operation", "invalid");
+        let input = create_test_input(
+            "Invalid operation",
+            json!({
+                "operation": "invalid"
+            }),
+        );
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -778,19 +773,28 @@ mod tests {
         let tool = create_test_tool();
 
         // Missing file_path for metadata operation
-        let input = AgentInput::text("Extract metadata").with_parameter("operation", "metadata");
+        let input = create_test_input(
+            "Extract metadata",
+            json!({
+                "operation": "metadata"
+            }),
+        );
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
         assert!(result
             .unwrap_err()
             .to_string()
-            .contains("file_path is required"));
+            .contains("Missing required parameter 'file_path'"));
 
         // Missing output_path for thumbnail
-        let input = AgentInput::text("Generate thumbnail")
-            .with_parameter("operation", "thumbnail")
-            .with_parameter("file_path", "/tmp/video.mp4");
+        let input = create_test_input(
+            "Generate thumbnail",
+            json!({
+                "operation": "thumbnail",
+                "file_path": "/tmp/video.mp4"
+            }),
+        );
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -830,8 +834,12 @@ mod tests {
         fs::write(&file_path, b"dummy").unwrap();
 
         // No operation specified, should default to metadata
-        let input = AgentInput::text("Process video")
-            .with_parameter("file_path", file_path.to_str().unwrap());
+        let input = create_test_input(
+            "Process video",
+            json!({
+                "file_path": file_path.to_str().unwrap()
+            }),
+        );
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -845,9 +853,13 @@ mod tests {
     async fn test_empty_file_path() {
         let tool = create_test_tool();
 
-        let input = AgentInput::text("Detect format")
-            .with_parameter("operation", "detect")
-            .with_parameter("file_path", "");
+        let input = create_test_input(
+            "Detect format",
+            json!({
+                "operation": "detect",
+                "file_path": ""
+            }),
+        );
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());

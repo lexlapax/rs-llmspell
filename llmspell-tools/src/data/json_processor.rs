@@ -15,6 +15,7 @@ use llmspell_core::{
     types::{AgentInput, AgentOutput, ExecutionContext},
     ComponentMetadata, LLMSpellError, Result,
 };
+use llmspell_utils::extract_parameters;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader};
@@ -252,7 +253,22 @@ impl JsonProcessorTool {
             .unwrap_or("query");
         let operation: JsonOperation = operation_str.parse()?;
 
-        let input = params.get("input").cloned();
+        // Handle input - could be a JSON string or already parsed
+        let input = params.get("input").map(|v| {
+            if let Some(s) = v.as_str() {
+                // Try to parse string as JSON
+                match serde_json::from_str(s) {
+                    Ok(parsed) => parsed,
+                    Err(_) => {
+                        // If parsing fails, use the string itself
+                        v.clone()
+                    }
+                }
+            } else {
+                // Already a JSON value
+                v.clone()
+            }
+        });
         let query = params
             .get("query")
             .and_then(|v| v.as_str())
@@ -288,18 +304,13 @@ impl BaseAgent for JsonProcessorTool {
     }
 
     async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
-        let params =
-            input
-                .parameters
-                .get("parameters")
-                .ok_or_else(|| LLMSpellError::Validation {
-                    message: "Missing parameters".to_string(),
-                    field: Some("parameters".to_string()),
-                })?;
+        // Get parameters using shared utility
+        let params = extract_parameters(&input)?;
 
         let (operation, input_json, query) = self.parse_parameters(params)?;
 
         info!("Executing JSON {} operation", operation);
+        eprintln!("DEBUG: input_json = {:?}", input_json);
 
         let result = match operation {
             JsonOperation::Query => {

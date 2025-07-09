@@ -11,7 +11,10 @@ use llmspell_core::{
     ComponentMetadata, LLMSpellError, Result as LLMResult,
 };
 use llmspell_security::sandbox::SandboxContext;
-use llmspell_utils::system_info::find_executable;
+use llmspell_utils::{
+    extract_optional_array, extract_optional_object, extract_optional_string, extract_parameters,
+    extract_required_string, system_info::find_executable,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
@@ -365,13 +368,14 @@ impl ProcessExecutorTool {
         &self,
         params: &HashMap<String, serde_json::Value>,
     ) -> LLMResult<()> {
-        // Check required parameters
-        if !params.contains_key("executable") {
-            return Err(LLMSpellError::Validation {
-                message: "Missing required parameter: executable".to_string(),
-                field: Some("executable".to_string()),
-            });
-        }
+        // Check if parameters object exists (for direct validation)
+        let params = params
+            .get("parameters")
+            .and_then(|v| v.as_object())
+            .ok_or_else(|| LLMSpellError::Validation {
+                message: "Missing parameters object".to_string(),
+                field: Some("parameters".to_string()),
+            })?;
 
         // Validate executable
         if let Some(executable) = params.get("executable").and_then(|v| v.as_str()) {
@@ -429,18 +433,17 @@ impl BaseAgent for ProcessExecutorTool {
         input: AgentInput,
         _context: ExecutionContext,
     ) -> LLMResult<AgentOutput> {
+        // Get parameters using shared utility
+        let params = extract_parameters(&input)?;
+
         self.validate_execution_parameters(&input.parameters)
             .await?;
 
-        let params = &input.parameters;
-
         // Extract required parameters
-        let executable = params.get("executable").and_then(|v| v.as_str()).unwrap(); // Safe due to validation
+        let executable = extract_required_string(params, "executable")?;
 
         // Extract optional parameters
-        let args: Vec<String> = params
-            .get("arguments")
-            .and_then(|v| v.as_array())
+        let args: Vec<String> = extract_optional_array(params, "arguments")
             .map(|arr| {
                 arr.iter()
                     .filter_map(|v| v.as_str())
@@ -449,15 +452,10 @@ impl BaseAgent for ProcessExecutorTool {
             })
             .unwrap_or_default();
 
-        let working_dir = params
-            .get("working_directory")
-            .and_then(|v| v.as_str())
-            .map(Path::new);
+        let working_dir = extract_optional_string(params, "working_directory").map(Path::new);
 
-        let env_vars: Option<HashMap<String, String>> = params
-            .get("environment")
-            .and_then(|v| v.as_object())
-            .map(|obj| {
+        let env_vars: Option<HashMap<String, String>> =
+            extract_optional_object(params, "environment").map(|obj| {
                 obj.iter()
                     .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
                     .collect()
@@ -584,13 +582,31 @@ mod tests {
         ProcessExecutorTool::new(config)
     }
 
+    fn create_test_input(text: &str, params: serde_json::Value) -> AgentInput {
+        AgentInput {
+            text: text.to_string(),
+            media: vec![],
+            context: None,
+            parameters: {
+                let mut map = HashMap::new();
+                map.insert("parameters".to_string(), params);
+                map
+            },
+            output_modalities: vec![],
+        }
+    }
+
     #[tokio::test]
     async fn test_execute_simple_command() {
         let tool = create_test_tool();
 
-        let input = AgentInput::text("Execute echo command")
-            .with_parameter("executable", "echo")
-            .with_parameter("arguments", vec!["Hello", "World"]);
+        let input = create_test_input(
+            "Execute echo command",
+            json!({
+                "executable": "echo",
+                "arguments": ["Hello", "World"]
+            }),
+        );
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -603,9 +619,13 @@ mod tests {
     async fn test_execute_blocked_command() {
         let tool = create_test_tool();
 
-        let input = AgentInput::text("Execute blocked command")
-            .with_parameter("executable", "rm")
-            .with_parameter("arguments", vec!["-rf", "/"]);
+        let input = create_test_input(
+            "Execute blocked command",
+            json!({
+                "executable": "rm",
+                "arguments": ["-rf", "/"]
+            }),
+        );
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -616,9 +636,13 @@ mod tests {
     async fn test_execute_nonexistent_command() {
         let tool = create_test_tool();
 
-        let input = AgentInput::text("Execute nonexistent command")
-            .with_parameter("executable", "nonexistent_command_12345")
-            .with_parameter("arguments", vec!["arg1"]);
+        let input = create_test_input(
+            "Execute nonexistent command",
+            json!({
+                "executable": "nonexistent_command_12345",
+                "arguments": ["arg1"]
+            }),
+        );
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -630,12 +654,13 @@ mod tests {
         let tool = create_test_tool();
         let temp_dir = TempDir::new().unwrap();
 
-        let input = AgentInput::text("Execute pwd in temp directory")
-            .with_parameter("executable", "pwd")
-            .with_parameter(
-                "working_directory",
-                temp_dir.path().to_string_lossy().to_string(),
-            );
+        let input = create_test_input(
+            "Execute pwd in temp directory",
+            json!({
+                "executable": "pwd",
+                "working_directory": temp_dir.path().to_string_lossy()
+            }),
+        );
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -652,10 +677,14 @@ mod tests {
             "TEST_VAR": "test_value"
         });
 
-        let input = AgentInput::text("Execute command with environment")
-            .with_parameter("executable", "echo")
-            .with_parameter("arguments", vec!["$TEST_VAR"])
-            .with_parameter("environment", env);
+        let input = create_test_input(
+            "Execute command with environment",
+            json!({
+                "executable": "echo",
+                "arguments": ["$TEST_VAR"],
+                "environment": env
+            }),
+        );
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -669,9 +698,13 @@ mod tests {
         let tool = create_test_tool();
 
         // Test dangerous characters
-        let input1 = AgentInput::text("Execute with dangerous chars")
-            .with_parameter("executable", "echo; rm -rf /")
-            .with_parameter("arguments", vec!["test"]);
+        let input1 = create_test_input(
+            "Execute with dangerous chars",
+            json!({
+                "executable": "echo; rm -rf /",
+                "arguments": ["test"]
+            }),
+        );
 
         let result1 = tool.execute(input1, ExecutionContext::default()).await;
         assert!(result1.is_err());
@@ -681,9 +714,13 @@ mod tests {
             .contains("dangerous characters"));
 
         // Test path traversal
-        let input2 = AgentInput::text("Execute with path traversal")
-            .with_parameter("executable", "../../../bin/echo")
-            .with_parameter("arguments", vec!["test"]);
+        let input2 = create_test_input(
+            "Execute with path traversal",
+            json!({
+                "executable": "../../../bin/echo",
+                "arguments": ["test"]
+            }),
+        );
 
         let result2 = tool.execute(input2, ExecutionContext::default()).await;
         assert!(result2.is_err());
@@ -698,16 +735,27 @@ mod tests {
         let tool = create_test_tool();
 
         // Missing executable
-        let input1 = AgentInput::text("Missing executable");
+        let input1 = AgentInput {
+            text: "Missing executable".to_string(),
+            media: vec![],
+            context: None,
+            parameters: HashMap::new(),
+            output_modalities: vec![],
+        };
         let result1 = tool.execute(input1, ExecutionContext::default()).await;
         assert!(result1.is_err());
         assert!(result1
             .unwrap_err()
             .to_string()
-            .contains("Missing required parameter: executable"));
+            .contains("Missing parameters object"));
 
         // Empty executable
-        let input2 = AgentInput::text("Empty executable").with_parameter("executable", "");
+        let input2 = create_test_input(
+            "Empty executable",
+            json!({
+                "executable": ""
+            }),
+        );
         let result2 = tool.execute(input2, ExecutionContext::default()).await;
         assert!(result2.is_err());
         assert!(result2.unwrap_err().to_string().contains("cannot be empty"));
@@ -718,9 +766,13 @@ mod tests {
         let tool = create_test_tool();
 
         // Nonexistent directory
-        let input = AgentInput::text("Nonexistent working directory")
-            .with_parameter("executable", "echo")
-            .with_parameter("working_directory", "/nonexistent/directory/12345");
+        let input = create_test_input(
+            "Nonexistent working directory",
+            json!({
+                "executable": "echo",
+                "working_directory": "/nonexistent/directory/12345"
+            }),
+        );
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());

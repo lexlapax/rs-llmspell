@@ -231,25 +231,22 @@ print("==============================")
 print("\n🔧 Environment Reader:")
 local env_result = use_tool("environment_reader", {
     operation = "get",
-    variable = "PATH"
+    variable_name = "PATH"
 })
 print_result("PATH Variable", env_result)
 
 -- System Monitor Tool
 print("\n📊 System Monitor:")
 local system_info = use_tool("system_monitor", {
-    operation = "collect",
-    metrics = {"cpu", "memory", "disk"}
+    operation = "stats"
 })
 print_result("System Info", system_info)
 
 -- Service Checker Tool
 print("\n🔍 Service Checker:")
 local service_check = use_tool("service_checker", {
-    operation = "check_tcp",
-    host = "127.0.0.1",
-    port = 80,
-    timeout = 1
+    target = "127.0.0.1:80",
+    check_type = "tcp"
 })
 print_result("Service Check", service_check)
 
@@ -265,9 +262,11 @@ local json_data = {
         {name = "Charlie", age = 35, city = "Chicago"}
     }
 }
+-- Convert Lua table to JSON string for the tool
+local json_string = '{"users":[{"name":"Alice","age":30,"city":"New York"},{"name":"Bob","age":25,"city":"San Francisco"},{"name":"Charlie","age":35,"city":"Chicago"}]}'
 local json_query = use_tool("json_processor", {
     operation = "query",
-    json = json_data,
+    input = json_string,
     query = ".users[] | select(.age > 25) | .name"
 })
 print_result("JSON Query", json_query)
@@ -277,7 +276,7 @@ print("\n📈 CSV Analyzer:")
 local csv_data = "name,age,city\nAlice,30,New York\nBob,25,San Francisco\nCharlie,35,Chicago"
 local csv_analysis = use_tool("csv_analyzer", {
     operation = "analyze",
-    csv_data = csv_data
+    content = csv_data
 })
 print_result("CSV Analysis", csv_analysis)
 

@@ -14,6 +14,9 @@ use llmspell_core::{
     types::{AgentInput, AgentOutput, ExecutionContext},
     ComponentMetadata, LLMSpellError, Result,
 };
+use llmspell_utils::{
+    extract_optional_object, extract_optional_string, extract_parameters, extract_required_string,
+};
 use reqwest::{Client, Method, Response};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -369,29 +372,16 @@ impl HttpRequestTool {
 
     /// Parse parameters from input
     fn parse_parameters(&self, params: &Value) -> Result<HttpRequestParams> {
-        let method_str = params
-            .get("method")
-            .and_then(|v| v.as_str())
-            .unwrap_or("GET");
+        let method_str = extract_optional_string(params, "method").unwrap_or("GET");
         let method: HttpMethod = method_str.parse()?;
 
-        let url = params
-            .get("url")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| LLMSpellError::Validation {
-                message: "Missing required parameter 'url'".to_string(),
-                field: Some("url".to_string()),
-            })?
-            .to_string();
+        let url = extract_required_string(params, "url")?.to_string();
 
-        let headers = params
-            .get("headers")
-            .and_then(|v| v.as_object())
-            .map(|obj| {
-                obj.iter()
-                    .map(|(k, v)| (k.clone(), v.as_str().unwrap_or_default().to_string()))
-                    .collect()
-            });
+        let headers = extract_optional_object(params, "headers").map(|obj| {
+            obj.iter()
+                .map(|(k, v)| (k.clone(), v.as_str().unwrap_or_default().to_string()))
+                .collect()
+        });
 
         let body = params.get("body").cloned();
 
@@ -455,14 +445,8 @@ impl BaseAgent for HttpRequestTool {
     }
 
     async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
-        let params =
-            input
-                .parameters
-                .get("parameters")
-                .ok_or_else(|| LLMSpellError::Validation {
-                    message: "Missing parameters".to_string(),
-                    field: Some("parameters".to_string()),
-                })?;
+        // Get parameters using shared utility
+        let params = extract_parameters(&input)?;
 
         let request_params = self.parse_parameters(params)?;
 

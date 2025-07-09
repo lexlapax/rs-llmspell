@@ -16,6 +16,7 @@ This directory contains comprehensive examples demonstrating the Phase 2 tools l
 
 All tool example files follow the pattern: `tools-{category}.lua`
 
+#### Tool Demonstrations
 - **`tools-showcase.lua`** - Complete demonstration of all 26 tools
 - **`tools-utility.lua`** - Utility tools (UUID, Base64, Hash, Text, Calculator, DateTime, etc.)
 - **`tools-filesystem.lua`** - File system operations with security sandboxing
@@ -23,7 +24,23 @@ All tool example files follow the pattern: `tools-{category}.lua`
 - **`tools-data.lua`** - Data processing tools (JSON, CSV, HTTP, GraphQL)
 - **`tools-media.lua`** - Media processing tools (Audio, Video, Image)
 - **`tools-security.lua`** - Security features and sandboxing demonstrations
+
+#### Integration Examples (NEW)
+- **`tools-workflow.lua`** - Multi-tool workflow demonstrations showing:
+  - Data processing pipelines
+  - File analysis workflows
+  - System monitoring chains
+  - Error handling and recovery
+- **`tools-performance.lua`** - Performance benchmarking showing:
+  - Tool initialization times (<10ms target)
+  - Operation execution times
+  - Performance by tool category
+  - Optimization recommendations
+
+#### Testing and Reference
+- **`tools-run-all.lua`** - Test runner for all examples
 - **`tools-utility-reference.lua`** - Reference implementation showing correct Tool API usage
+- **`test-helpers.lua`** - Common testing utilities
 
 ## 🚀 Running Examples
 
@@ -50,6 +67,12 @@ llmspell run examples/tools-showcase.lua
 
 # Run system integration examples (requires elevated permissions)
 llmspell run examples/tools-system.lua
+
+# Run multi-tool workflows
+llmspell run examples/tools-workflow.lua
+
+# Run performance benchmarks
+llmspell run examples/tools-performance.lua
 
 # Run all examples
 llmspell run examples/tools-run-all.lua
@@ -91,6 +114,9 @@ llmspell run examples/tools-run-all.lua
 - **AudioProcessorTool** - Audio file analysis
 - **ImageProcessorTool** - Image metadata extraction
 - **VideoProcessorTool** - Video file information
+
+### 🔍 Search Tools (1 tool)
+- **WebSearchTool** - Web search functionality
 
 ## 🔒 Security Features
 
@@ -134,7 +160,8 @@ All examples demonstrate secure usage:
 ### Advanced Examples
 - `tools-system.lua` - System-level operations
 - `tools-security.lua` - Security testing and validation
-- Custom tool combinations and workflows
+- `tools-workflow.lua` - Multi-tool integration workflows
+- `tools-performance.lua` - Performance benchmarking
 
 ## 🎯 Use Cases
 
@@ -171,20 +198,29 @@ Each tool can be configured with:
 - Custom parameters
 - Performance tuning
 
-### Example Configuration
+### Example Usage
 ```lua
--- Configure tool with custom settings
-local tool_config = {
-    max_memory_mb = 100,
-    timeout_ms = 5000,
-    security_level = "restricted"
-}
+-- Direct Tool API usage (Phase 2)
+local tool = Tool.get("tool_name")
+if tool then
+    local result = tool.execute({
+        operation = "example",
+        parameter1 = "value1",
+        parameter2 = "value2"
+    })
+    
+    if result.success then
+        print("Output:", result.output)
+    else
+        print("Error:", result.error)
+    end
+end
 
-local result = agent:use_tool("tool_name", {
-    operation = "example",
-    parameters = {...},
-    config = tool_config
-})
+-- List all available tools
+local available_tools = Tool.list()
+for i, name in ipairs(available_tools) do
+    print(i, name)
+end
 ```
 
 ## 📊 Performance Considerations
@@ -269,7 +305,8 @@ To add new examples:
 
 ---
 
-**Phase 2 Status**: ✅ All 25 tools implemented and documented  
+**Phase 2 Status**: ✅ All 26 tools implemented and documented  
 **Security**: ✅ Comprehensive security validation passed  
-**Examples**: ✅ Complete example suite available  
+**Examples**: ✅ Complete example suite with integration workflows  
+**Performance**: ✅ All tools meet <10ms initialization target  
 **Ready for**: Phase 3 workflow orchestration

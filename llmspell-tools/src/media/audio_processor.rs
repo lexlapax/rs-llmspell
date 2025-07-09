@@ -19,9 +19,9 @@ use llmspell_core::{
     ComponentMetadata, LLMSpellError, Result as LLMResult,
 };
 use llmspell_security::sandbox::SandboxContext;
+use llmspell_utils::{extract_optional_string, extract_parameters, extract_required_string};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 use tracing::{debug, info};
@@ -402,12 +402,9 @@ impl AudioProcessorTool {
     }
 
     /// Validate processing parameters
-    async fn validate_parameters(
-        &self,
-        params: &HashMap<String, serde_json::Value>,
-    ) -> LLMResult<()> {
+    async fn validate_parameters(&self, params: &serde_json::Value) -> LLMResult<()> {
         // Validate operation
-        if let Some(operation) = params.get("operation").and_then(|v| v.as_str()) {
+        if let Some(operation) = extract_optional_string(params, "operation") {
             match operation {
                 "detect" | "metadata" | "convert" => {}
                 _ => {
@@ -423,14 +420,14 @@ impl AudioProcessorTool {
         }
 
         // Validate file_path
-        if let Some(file_path) = params.get("file_path").and_then(|v| v.as_str()) {
+        if let Some(file_path) = extract_optional_string(params, "file_path") {
             if file_path.is_empty() {
                 return Err(LLMSpellError::Validation {
                     message: "File path cannot be empty".to_string(),
                     field: Some("file_path".to_string()),
                 });
             }
-        } else if params.get("operation").and_then(|v| v.as_str()) != Some("convert") {
+        } else if extract_optional_string(params, "operation") != Some("convert") {
             return Err(LLMSpellError::Validation {
                 message: "file_path is required for this operation".to_string(),
                 field: Some("file_path".to_string()),
@@ -438,7 +435,7 @@ impl AudioProcessorTool {
         }
 
         // Validate conversion parameters
-        if params.get("operation").and_then(|v| v.as_str()) == Some("convert") {
+        if extract_optional_string(params, "operation") == Some("convert") {
             if params.get("input_path").is_none() {
                 return Err(LLMSpellError::Validation {
                     message: "input_path is required for convert operation".to_string(),
@@ -479,23 +476,16 @@ impl BaseAgent for AudioProcessorTool {
         input: AgentInput,
         _context: ExecutionContext,
     ) -> LLMResult<AgentOutput> {
-        self.validate_parameters(&input.parameters).await?;
+        // Get parameters using shared utility
+        let params = extract_parameters(&input)?;
 
-        let params = &input.parameters;
-        let operation = params
-            .get("operation")
-            .and_then(|v| v.as_str())
-            .unwrap_or("metadata");
+        self.validate_parameters(params).await?;
+
+        let operation = extract_optional_string(params, "operation").unwrap_or("metadata");
 
         match operation {
             "detect" => {
-                let file_path = params
-                    .get("file_path")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| LLMSpellError::Validation {
-                        message: "file_path is required".to_string(),
-                        field: Some("file_path".to_string()),
-                    })?;
+                let file_path = extract_required_string(params, "file_path")?;
 
                 let path = Path::new(file_path);
                 let format = self.detect_format(path).await?;
@@ -514,13 +504,7 @@ impl BaseAgent for AudioProcessorTool {
             }
 
             "metadata" => {
-                let file_path = params
-                    .get("file_path")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| LLMSpellError::Validation {
-                        message: "file_path is required".to_string(),
-                        field: Some("file_path".to_string()),
-                    })?;
+                let file_path = extract_required_string(params, "file_path")?;
 
                 let path = Path::new(file_path);
                 let metadata = self.extract_metadata(path).await?;
@@ -550,25 +534,11 @@ impl BaseAgent for AudioProcessorTool {
             }
 
             "convert" => {
-                let input_path = params
-                    .get("input_path")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| LLMSpellError::Validation {
-                        message: "input_path is required".to_string(),
-                        field: Some("input_path".to_string()),
-                    })?;
+                let input_path = extract_required_string(params, "input_path")?;
 
-                let output_path = params
-                    .get("output_path")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| LLMSpellError::Validation {
-                        message: "output_path is required".to_string(),
-                        field: Some("output_path".to_string()),
-                    })?;
+                let output_path = extract_required_string(params, "output_path")?;
 
-                let target_format = params
-                    .get("target_format")
-                    .and_then(|v| v.as_str())
+                let target_format = extract_optional_string(params, "target_format")
                     .map(|s| match s.to_lowercase().as_str() {
                         "wav" => AudioFormat::Wav,
                         "mp3" => AudioFormat::Mp3,
@@ -676,12 +646,27 @@ impl Tool for AudioProcessorTool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
     use std::fs;
     use tempfile::TempDir;
 
     fn create_test_tool() -> AudioProcessorTool {
         let config = AudioProcessorConfig::default();
         AudioProcessorTool::new(config)
+    }
+
+    fn create_test_input(text: &str, params: serde_json::Value) -> AgentInput {
+        AgentInput {
+            text: text.to_string(),
+            media: vec![],
+            context: None,
+            parameters: {
+                let mut map = HashMap::new();
+                map.insert("parameters".to_string(), params);
+                map
+            },
+            output_modalities: vec![],
+        }
     }
 
     fn create_test_wav_file(path: &Path) -> std::io::Result<()> {
@@ -759,9 +744,13 @@ mod tests {
 
         fs::write(&file_path, b"dummy mp3 content").unwrap();
 
-        let input = AgentInput::text("Extract metadata")
-            .with_parameter("operation", "metadata")
-            .with_parameter("file_path", file_path.to_str().unwrap());
+        let input = create_test_input(
+            "Extract metadata",
+            json!({
+                "operation": "metadata",
+                "file_path": file_path.to_str().unwrap()
+            }),
+        );
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -780,9 +769,13 @@ mod tests {
 
         create_test_wav_file(&file_path).unwrap();
 
-        let input = AgentInput::text("Detect format")
-            .with_parameter("operation", "detect")
-            .with_parameter("file_path", file_path.to_str().unwrap());
+        let input = create_test_input(
+            "Detect format",
+            json!({
+                "operation": "detect",
+                "file_path": file_path.to_str().unwrap()
+            }),
+        );
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -804,9 +797,13 @@ mod tests {
         // Create a file larger than the limit
         fs::write(&file_path, vec![0u8; 100]).unwrap();
 
-        let input = AgentInput::text("Extract metadata")
-            .with_parameter("operation", "metadata")
-            .with_parameter("file_path", file_path.to_str().unwrap());
+        let input = create_test_input(
+            "Extract metadata",
+            json!({
+                "operation": "metadata",
+                "file_path": file_path.to_str().unwrap()
+            }),
+        );
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -822,11 +819,15 @@ mod tests {
 
         create_test_wav_file(&input_path).unwrap();
 
-        let input = AgentInput::text("Convert audio")
-            .with_parameter("operation", "convert")
-            .with_parameter("input_path", input_path.to_str().unwrap())
-            .with_parameter("output_path", output_path.to_str().unwrap())
-            .with_parameter("target_format", "wav");
+        let input = create_test_input(
+            "Convert audio",
+            json!({
+                "operation": "convert",
+                "input_path": input_path.to_str().unwrap(),
+                "output_path": output_path.to_str().unwrap(),
+                "target_format": "wav"
+            }),
+        );
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -846,11 +847,15 @@ mod tests {
 
         create_test_wav_file(&input_path).unwrap();
 
-        let input = AgentInput::text("Convert audio")
-            .with_parameter("operation", "convert")
-            .with_parameter("input_path", input_path.to_str().unwrap())
-            .with_parameter("output_path", output_path.to_str().unwrap())
-            .with_parameter("target_format", "flac");
+        let input = create_test_input(
+            "Convert audio",
+            json!({
+                "operation": "convert",
+                "input_path": input_path.to_str().unwrap(),
+                "output_path": output_path.to_str().unwrap(),
+                "target_format": "flac"
+            }),
+        );
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -861,7 +866,12 @@ mod tests {
     async fn test_invalid_operation() {
         let tool = create_test_tool();
 
-        let input = AgentInput::text("Invalid operation").with_parameter("operation", "invalid");
+        let input = create_test_input(
+            "Invalid operation",
+            json!({
+                "operation": "invalid"
+            }),
+        );
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -876,7 +886,12 @@ mod tests {
         let tool = create_test_tool();
 
         // Missing file_path for metadata operation
-        let input = AgentInput::text("Extract metadata").with_parameter("operation", "metadata");
+        let input = create_test_input(
+            "Extract metadata",
+            json!({
+                "operation": "metadata"
+            }),
+        );
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -917,8 +932,12 @@ mod tests {
         create_test_wav_file(&file_path).unwrap();
 
         // No operation specified, should default to metadata
-        let input = AgentInput::text("Process audio")
-            .with_parameter("file_path", file_path.to_str().unwrap());
+        let input = create_test_input(
+            "Process audio",
+            json!({
+                "file_path": file_path.to_str().unwrap()
+            }),
+        );
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -932,9 +951,13 @@ mod tests {
     async fn test_empty_file_path() {
         let tool = create_test_tool();
 
-        let input = AgentInput::text("Detect format")
-            .with_parameter("operation", "detect")
-            .with_parameter("file_path", "");
+        let input = create_test_input(
+            "Detect format",
+            json!({
+                "operation": "detect",
+                "file_path": ""
+            }),
+        );
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -945,9 +968,13 @@ mod tests {
     async fn test_file_not_found() {
         let tool = create_test_tool();
 
-        let input = AgentInput::text("Extract metadata")
-            .with_parameter("operation", "metadata")
-            .with_parameter("file_path", "/non/existent/file.wav");
+        let input = create_test_input(
+            "Extract metadata",
+            json!({
+                "operation": "metadata",
+                "file_path": "/non/existent/file.wav"
+            }),
+        );
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());

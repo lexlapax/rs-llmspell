@@ -20,6 +20,10 @@ use llmspell_core::{
     ComponentMetadata, LLMSpellError, Result as LLMResult,
 };
 use llmspell_security::sandbox::SandboxContext;
+use llmspell_utils::{
+    extract_optional_bool, extract_optional_string, extract_optional_u64, extract_parameters,
+    extract_required_string,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
@@ -362,12 +366,9 @@ impl ImageProcessorTool {
     }
 
     /// Validate processing parameters
-    async fn validate_parameters(
-        &self,
-        params: &HashMap<String, serde_json::Value>,
-    ) -> LLMResult<()> {
+    async fn validate_parameters(&self, params: &serde_json::Value) -> LLMResult<()> {
         // Validate operation
-        if let Some(operation) = params.get("operation").and_then(|v| v.as_str()) {
+        if let Some(operation) = extract_optional_string(params, "operation") {
             match operation {
                 "detect" | "metadata" | "resize" | "convert" | "crop" | "rotate" | "thumbnail" => {}
                 _ => {
@@ -383,7 +384,7 @@ impl ImageProcessorTool {
         }
 
         // Validate file paths
-        if let Some(file_path) = params.get("file_path").and_then(|v| v.as_str()) {
+        if let Some(file_path) = extract_optional_string(params, "file_path") {
             if file_path.is_empty() {
                 return Err(LLMSpellError::Validation {
                     message: "File path cannot be empty".to_string(),
@@ -393,7 +394,7 @@ impl ImageProcessorTool {
         }
 
         // Validate resize parameters
-        if params.get("operation").and_then(|v| v.as_str()) == Some("resize")
+        if extract_optional_string(params, "operation") == Some("resize")
             && params.get("width").is_none()
             && params.get("height").is_none()
         {
@@ -404,7 +405,7 @@ impl ImageProcessorTool {
         }
 
         // Validate crop parameters
-        if params.get("operation").and_then(|v| v.as_str()) == Some("crop") {
+        if extract_optional_string(params, "operation") == Some("crop") {
             for field in ["x", "y", "width", "height"] {
                 if params.get(field).is_none() {
                     return Err(LLMSpellError::Validation {
@@ -430,23 +431,16 @@ impl BaseAgent for ImageProcessorTool {
         input: AgentInput,
         _context: ExecutionContext,
     ) -> LLMResult<AgentOutput> {
-        self.validate_parameters(&input.parameters).await?;
+        // Get parameters using shared utility
+        let params = extract_parameters(&input)?;
 
-        let params = &input.parameters;
-        let operation = params
-            .get("operation")
-            .and_then(|v| v.as_str())
-            .unwrap_or("metadata");
+        self.validate_parameters(params).await?;
+
+        let operation = extract_optional_string(params, "operation").unwrap_or("metadata");
 
         match operation {
             "detect" => {
-                let file_path = params
-                    .get("file_path")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| LLMSpellError::Validation {
-                        message: "file_path is required".to_string(),
-                        field: Some("file_path".to_string()),
-                    })?;
+                let file_path = extract_required_string(params, "file_path")?;
 
                 let path = Path::new(file_path);
                 let format = self.detect_format(path).await?;
@@ -466,13 +460,7 @@ impl BaseAgent for ImageProcessorTool {
             }
 
             "metadata" => {
-                let file_path = params
-                    .get("file_path")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| LLMSpellError::Validation {
-                        message: "file_path is required".to_string(),
-                        field: Some("file_path".to_string()),
-                    })?;
+                let file_path = extract_required_string(params, "file_path")?;
 
                 let path = Path::new(file_path);
                 let metadata = self.extract_metadata(path).await?;
@@ -501,34 +489,12 @@ impl BaseAgent for ImageProcessorTool {
             }
 
             "resize" => {
-                let input_path = params
-                    .get("input_path")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| LLMSpellError::Validation {
-                        message: "input_path is required".to_string(),
-                        field: Some("input_path".to_string()),
-                    })?;
-
-                let output_path = params
-                    .get("output_path")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| LLMSpellError::Validation {
-                        message: "output_path is required".to_string(),
-                        field: Some("output_path".to_string()),
-                    })?;
-
-                let width = params
-                    .get("width")
-                    .and_then(|v| v.as_u64())
-                    .map(|w| w as u32);
-                let height = params
-                    .get("height")
-                    .and_then(|v| v.as_u64())
-                    .map(|h| h as u32);
-                let maintain_aspect_ratio = params
-                    .get("maintain_aspect_ratio")
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(true);
+                let input_path = extract_required_string(params, "input_path")?;
+                let output_path = extract_required_string(params, "output_path")?;
+                let width = extract_optional_u64(params, "width").map(|w| w as u32);
+                let height = extract_optional_u64(params, "height").map(|h| h as u32);
+                let maintain_aspect_ratio =
+                    extract_optional_bool(params, "maintain_aspect_ratio").unwrap_or(true);
 
                 self.resize_image(
                     Path::new(input_path),
@@ -557,25 +523,9 @@ impl BaseAgent for ImageProcessorTool {
             }
 
             "convert" => {
-                let input_path = params
-                    .get("input_path")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| LLMSpellError::Validation {
-                        message: "input_path is required".to_string(),
-                        field: Some("input_path".to_string()),
-                    })?;
-
-                let output_path = params
-                    .get("output_path")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| LLMSpellError::Validation {
-                        message: "output_path is required".to_string(),
-                        field: Some("output_path".to_string()),
-                    })?;
-
-                let target_format = params
-                    .get("target_format")
-                    .and_then(|v| v.as_str())
+                let input_path = extract_required_string(params, "input_path")?;
+                let output_path = extract_required_string(params, "output_path")?;
+                let target_format = extract_optional_string(params, "target_format")
                     .map(|s| match s.to_lowercase().as_str() {
                         "png" => ImageFormat::Png,
                         "jpeg" | "jpg" => ImageFormat::Jpeg,
@@ -608,21 +558,8 @@ impl BaseAgent for ImageProcessorTool {
             }
 
             "crop" => {
-                let input_path = params
-                    .get("input_path")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| LLMSpellError::Validation {
-                        message: "input_path is required".to_string(),
-                        field: Some("input_path".to_string()),
-                    })?;
-
-                let output_path = params
-                    .get("output_path")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| LLMSpellError::Validation {
-                        message: "output_path is required".to_string(),
-                        field: Some("output_path".to_string()),
-                    })?;
+                let input_path = extract_required_string(params, "input_path")?;
+                let output_path = extract_required_string(params, "output_path")?;
 
                 let x = params.get("x").and_then(|v| v.as_u64()).ok_or_else(|| {
                     LLMSpellError::Validation {
@@ -683,22 +620,8 @@ impl BaseAgent for ImageProcessorTool {
             }
 
             "rotate" => {
-                let input_path = params
-                    .get("input_path")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| LLMSpellError::Validation {
-                        message: "input_path is required".to_string(),
-                        field: Some("input_path".to_string()),
-                    })?;
-
-                let output_path = params
-                    .get("output_path")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| LLMSpellError::Validation {
-                        message: "output_path is required".to_string(),
-                        field: Some("output_path".to_string()),
-                    })?;
-
+                let input_path = extract_required_string(params, "input_path")?;
+                let output_path = extract_required_string(params, "output_path")?;
                 let degrees = params.get("degrees").and_then(|v| v.as_i64()).unwrap_or(90) as i32;
 
                 self.rotate_image(Path::new(input_path), Path::new(output_path), degrees)
@@ -720,31 +643,14 @@ impl BaseAgent for ImageProcessorTool {
             }
 
             "thumbnail" => {
-                let input_path = params
-                    .get("input_path")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| LLMSpellError::Validation {
-                        message: "input_path is required".to_string(),
-                        field: Some("input_path".to_string()),
-                    })?;
-
-                let output_path = params
-                    .get("output_path")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| LLMSpellError::Validation {
-                        message: "output_path is required".to_string(),
-                        field: Some("output_path".to_string()),
-                    })?;
-
-                let max_width = params
-                    .get("max_width")
-                    .and_then(|v| v.as_u64())
-                    .unwrap_or(200) as u32;
-
-                let max_height = params
-                    .get("max_height")
-                    .and_then(|v| v.as_u64())
-                    .unwrap_or(200) as u32;
+                let input_path = extract_required_string(params, "input_path")?;
+                let output_path = extract_required_string(params, "output_path")?;
+                let max_width = extract_optional_u64(params, "max_width")
+                    .map(|w| w as u32)
+                    .unwrap_or(200);
+                let max_height = extract_optional_u64(params, "max_height")
+                    .map(|h| h as u32)
+                    .unwrap_or(200);
 
                 self.generate_thumbnail(
                     Path::new(input_path),
@@ -907,12 +813,27 @@ impl Tool for ImageProcessorTool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
     use std::fs;
     use tempfile::TempDir;
 
     fn create_test_tool() -> ImageProcessorTool {
         let config = ImageProcessorConfig::default();
         ImageProcessorTool::new(config)
+    }
+
+    fn create_test_input(text: &str, params: serde_json::Value) -> AgentInput {
+        AgentInput {
+            text: text.to_string(),
+            media: vec![],
+            context: None,
+            parameters: {
+                let mut map = HashMap::new();
+                map.insert("parameters".to_string(), params);
+                map
+            },
+            output_modalities: vec![],
+        }
     }
 
     #[tokio::test]
@@ -983,9 +904,13 @@ mod tests {
 
         fs::write(&file_path, b"dummy png content").unwrap();
 
-        let input = AgentInput::text("Extract metadata")
-            .with_parameter("operation", "metadata")
-            .with_parameter("file_path", file_path.to_str().unwrap());
+        let input = create_test_input(
+            "Extract metadata",
+            json!({
+                "operation": "metadata",
+                "file_path": file_path.to_str().unwrap()
+            }),
+        );
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -1005,9 +930,13 @@ mod tests {
 
         fs::write(&file_path, b"dummy").unwrap();
 
-        let input = AgentInput::text("Detect format")
-            .with_parameter("operation", "detect")
-            .with_parameter("file_path", file_path.to_str().unwrap());
+        let input = create_test_input(
+            "Detect format",
+            json!({
+                "operation": "detect",
+                "file_path": file_path.to_str().unwrap()
+            }),
+        );
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -1029,9 +958,13 @@ mod tests {
         // Create a file larger than the limit
         fs::write(&file_path, vec![0u8; 100]).unwrap();
 
-        let input = AgentInput::text("Extract metadata")
-            .with_parameter("operation", "metadata")
-            .with_parameter("file_path", file_path.to_str().unwrap());
+        let input = create_test_input(
+            "Extract metadata",
+            json!({
+                "operation": "metadata",
+                "file_path": file_path.to_str().unwrap()
+            }),
+        );
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -1047,11 +980,15 @@ mod tests {
 
         fs::write(&input_path, b"dummy").unwrap();
 
-        let input = AgentInput::text("Resize image")
-            .with_parameter("operation", "resize")
-            .with_parameter("input_path", input_path.to_str().unwrap())
-            .with_parameter("output_path", output_path.to_str().unwrap())
-            .with_parameter("width", 100);
+        let input = create_test_input(
+            "Resize image",
+            json!({
+                "operation": "resize",
+                "input_path": input_path.to_str().unwrap(),
+                "output_path": output_path.to_str().unwrap(),
+                "width": 100
+            }),
+        );
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -1067,11 +1004,15 @@ mod tests {
 
         fs::write(&input_path, b"dummy").unwrap();
 
-        let input = AgentInput::text("Convert image")
-            .with_parameter("operation", "convert")
-            .with_parameter("input_path", input_path.to_str().unwrap())
-            .with_parameter("output_path", output_path.to_str().unwrap())
-            .with_parameter("target_format", "jpeg");
+        let input = create_test_input(
+            "Convert image",
+            json!({
+                "operation": "convert",
+                "input_path": input_path.to_str().unwrap(),
+                "output_path": output_path.to_str().unwrap(),
+                "target_format": "jpeg"
+            }),
+        );
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -1082,7 +1023,12 @@ mod tests {
     async fn test_invalid_operation() {
         let tool = create_test_tool();
 
-        let input = AgentInput::text("Invalid operation").with_parameter("operation", "invalid");
+        let input = create_test_input(
+            "Invalid operation",
+            json!({
+                "operation": "invalid"
+            }),
+        );
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -1097,20 +1043,29 @@ mod tests {
         let tool = create_test_tool();
 
         // Missing file_path for metadata operation
-        let input = AgentInput::text("Extract metadata").with_parameter("operation", "metadata");
+        let input = create_test_input(
+            "Extract metadata",
+            json!({
+                "operation": "metadata"
+            }),
+        );
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
         assert!(result
             .unwrap_err()
             .to_string()
-            .contains("file_path is required"));
+            .contains("Missing required parameter 'file_path'"));
 
         // Missing width and height for resize
-        let input = AgentInput::text("Resize image")
-            .with_parameter("operation", "resize")
-            .with_parameter("input_path", "/tmp/input.png")
-            .with_parameter("output_path", "/tmp/output.png");
+        let input = create_test_input(
+            "Resize image",
+            json!({
+                "operation": "resize",
+                "input_path": "/tmp/input.png",
+                "output_path": "/tmp/output.png"
+            }),
+        );
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -1125,14 +1080,18 @@ mod tests {
         let tool = create_test_tool();
 
         // Missing crop parameters
-        let input = AgentInput::text("Crop image")
-            .with_parameter("operation", "crop")
-            .with_parameter("input_path", "/tmp/input.png")
-            .with_parameter("output_path", "/tmp/output.png")
-            .with_parameter("x", 0)
-            .with_parameter("y", 0)
-            .with_parameter("width", 100);
-        // Missing height
+        let input = create_test_input(
+            "Crop image",
+            json!({
+                "operation": "crop",
+                "input_path": "/tmp/input.png",
+                "output_path": "/tmp/output.png",
+                "x": 0,
+                "y": 0,
+                "width": 100
+                // Missing height
+            }),
+        );
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -1173,8 +1132,12 @@ mod tests {
         fs::write(&file_path, b"dummy").unwrap();
 
         // No operation specified, should default to metadata
-        let input = AgentInput::text("Process image")
-            .with_parameter("file_path", file_path.to_str().unwrap());
+        let input = create_test_input(
+            "Process image",
+            json!({
+                "file_path": file_path.to_str().unwrap()
+            }),
+        );
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -1188,9 +1151,13 @@ mod tests {
     async fn test_empty_file_path() {
         let tool = create_test_tool();
 
-        let input = AgentInput::text("Detect format")
-            .with_parameter("operation", "detect")
-            .with_parameter("file_path", "");
+        let input = create_test_input(
+            "Detect format",
+            json!({
+                "operation": "detect",
+                "file_path": ""
+            }),
+        );
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());

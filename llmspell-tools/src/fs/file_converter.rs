@@ -12,9 +12,13 @@ use llmspell_core::{
     ComponentMetadata, LLMSpellError, Result as LLMResult,
 };
 use llmspell_security::sandbox::FileSandbox;
-use llmspell_utils::encoding::{
-    convert_line_endings, convert_text_encoding, detect_line_ending, detect_text_encoding,
-    remove_bom, spaces_to_tabs, tabs_to_spaces, LineEnding, TextEncoding,
+use llmspell_utils::{
+    encoding::{
+        convert_line_endings, convert_text_encoding, detect_line_ending, detect_text_encoding,
+        remove_bom, spaces_to_tabs, tabs_to_spaces, LineEnding, TextEncoding,
+    },
+    extract_optional_bool, extract_optional_string, extract_optional_u64, extract_parameters,
+    extract_required_string,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -204,17 +208,12 @@ impl FileConverterTool {
     }
 
     /// Validate parameters for file conversion operations
-    async fn validate_parameters(
-        &self,
-        params: &std::collections::HashMap<String, serde_json::Value>,
-    ) -> LLMResult<()> {
-        // Parameters are already a HashMap, no need to check if object
-
-        let operation = params.get("operation").and_then(|v| v.as_str());
-        if let Some(op) = operation {
-            if !matches!(op, "encoding" | "line_endings" | "indentation") {
+    async fn validate_parameters(&self, params: &serde_json::Value) -> LLMResult<()> {
+        // Validate operation
+        if let Some(operation) = params.get("operation").and_then(|v| v.as_str()) {
+            if !matches!(operation, "encoding" | "line_endings" | "indentation") {
                 return Err(LLMSpellError::Validation {
-                    message: format!("Invalid operation: {}", op),
+                    message: format!("Invalid operation: {}", operation),
                     field: Some("operation".to_string()),
                 });
             }
@@ -235,27 +234,16 @@ impl BaseAgent for FileConverterTool {
         input: AgentInput,
         _context: ExecutionContext,
     ) -> LLMResult<AgentOutput> {
-        self.validate_parameters(&input.parameters).await?;
+        // Get parameters using shared utility
+        let params = extract_parameters(&input)?;
 
-        let params = &input.parameters;
+        self.validate_parameters(params).await?;
 
         // Extract operation
-        let operation = params
-            .get("operation")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| LLMSpellError::Validation {
-                message: "Missing required parameter: operation".to_string(),
-                field: Some("operation".to_string()),
-            })?;
+        let operation = extract_required_string(params, "operation")?;
 
         // Extract input path
-        let input_path = params
-            .get("input_path")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| LLMSpellError::Validation {
-                message: "Missing required parameter: input_path".to_string(),
-                field: Some("input_path".to_string()),
-            })?;
+        let input_path = extract_required_string(params, "input_path")?;
         let input_path = PathBuf::from(input_path);
 
         // Validate input path
@@ -294,12 +282,12 @@ impl BaseAgent for FileConverterTool {
         }
 
         // Determine output path
-        let output_path =
-            if let Some(output_path) = params.get("output_path").and_then(|v| v.as_str()) {
-                PathBuf::from(output_path)
-            } else {
-                self.get_output_path(&input_path, operation)
-            };
+        let output_path = if let Some(output_path) = extract_optional_string(params, "output_path")
+        {
+            PathBuf::from(output_path)
+        } else {
+            self.get_output_path(&input_path, operation)
+        };
 
         // Validate output path
         self.sandbox
@@ -323,35 +311,33 @@ impl BaseAgent for FileConverterTool {
         // Execute conversion based on operation
         match operation {
             "encoding" => {
-                let from_encoding = params
-                    .get("from_encoding")
-                    .and_then(|v| v.as_str())
-                    .and_then(|s| match s.to_lowercase().as_str() {
-                        "utf8" | "utf-8" => Some(TextEncoding::Utf8),
-                        "utf16le" | "utf-16le" => Some(TextEncoding::Utf16Le),
-                        "utf16be" | "utf-16be" => Some(TextEncoding::Utf16Be),
-                        "windows1252" | "windows-1252" => Some(TextEncoding::Windows1252),
-                        "iso88591" | "iso-8859-1" => Some(TextEncoding::Iso88591),
-                        "ascii" => Some(TextEncoding::Ascii),
-                        _ => None,
+                let from_encoding =
+                    extract_optional_string(params, "from_encoding").and_then(|s| {
+                        match s.to_lowercase().as_str() {
+                            "utf8" | "utf-8" => Some(TextEncoding::Utf8),
+                            "utf16le" | "utf-16le" => Some(TextEncoding::Utf16Le),
+                            "utf16be" | "utf-16be" => Some(TextEncoding::Utf16Be),
+                            "windows1252" | "windows-1252" => Some(TextEncoding::Windows1252),
+                            "iso88591" | "iso-8859-1" => Some(TextEncoding::Iso88591),
+                            "ascii" => Some(TextEncoding::Ascii),
+                            _ => None,
+                        }
                     });
 
-                let to_encoding = params
-                    .get("to_encoding")
-                    .and_then(|v| v.as_str())
-                    .and_then(|s| match s.to_lowercase().as_str() {
-                        "utf8" | "utf-8" => Some(TextEncoding::Utf8),
-                        "utf16le" | "utf-16le" => Some(TextEncoding::Utf16Le),
-                        "utf16be" | "utf-16be" => Some(TextEncoding::Utf16Be),
-                        "windows1252" | "windows-1252" => Some(TextEncoding::Windows1252),
-                        "iso88591" | "iso-8859-1" => Some(TextEncoding::Iso88591),
-                        "ascii" => Some(TextEncoding::Ascii),
-                        _ => None,
-                    })
-                    .ok_or_else(|| LLMSpellError::Validation {
-                        message: "Invalid or missing to_encoding parameter".to_string(),
-                        field: Some("to_encoding".to_string()),
-                    })?;
+                let to_encoding = extract_required_string(params, "to_encoding").and_then(|s| {
+                    match s.to_lowercase().as_str() {
+                        "utf8" | "utf-8" => Ok(TextEncoding::Utf8),
+                        "utf16le" | "utf-16le" => Ok(TextEncoding::Utf16Le),
+                        "utf16be" | "utf-16be" => Ok(TextEncoding::Utf16Be),
+                        "windows1252" | "windows-1252" => Ok(TextEncoding::Windows1252),
+                        "iso88591" | "iso-8859-1" => Ok(TextEncoding::Iso88591),
+                        "ascii" => Ok(TextEncoding::Ascii),
+                        _ => Err(LLMSpellError::Validation {
+                            message: format!("Invalid encoding: {}", s),
+                            field: Some("to_encoding".to_string()),
+                        }),
+                    }
+                })?;
 
                 self.convert_encoding(&input_path, &output_path, from_encoding, to_encoding)
                     .await
@@ -363,19 +349,17 @@ impl BaseAgent for FileConverterTool {
             }
 
             "line_endings" => {
-                let line_ending = params
-                    .get("line_ending")
-                    .and_then(|v| v.as_str())
-                    .and_then(|s| match s.to_lowercase().as_str() {
-                        "lf" => Some(LineEnding::Lf),
-                        "crlf" => Some(LineEnding::Crlf),
-                        "cr" => Some(LineEnding::Cr),
-                        _ => None,
-                    })
-                    .ok_or_else(|| LLMSpellError::Validation {
-                        message: "Invalid or missing line_ending parameter".to_string(),
-                        field: Some("line_ending".to_string()),
-                    })?;
+                let line_ending = extract_required_string(params, "line_ending").and_then(|s| {
+                    match s.to_lowercase().as_str() {
+                        "lf" => Ok(LineEnding::Lf),
+                        "crlf" => Ok(LineEnding::Crlf),
+                        "cr" => Ok(LineEnding::Cr),
+                        _ => Err(LLMSpellError::Validation {
+                            message: format!("Invalid line ending: {}", s),
+                            field: Some("line_ending".to_string()),
+                        }),
+                    }
+                })?;
 
                 self.convert_line_endings(&input_path, &output_path, line_ending)
                     .await
@@ -387,13 +371,10 @@ impl BaseAgent for FileConverterTool {
             }
 
             "indentation" => {
-                let convert_to_spaces = params
-                    .get("convert_to_spaces")
-                    .and_then(|v| v.as_bool())
-                    .unwrap_or(true);
+                let convert_to_spaces =
+                    extract_optional_bool(params, "convert_to_spaces").unwrap_or(true);
 
-                let tab_size =
-                    params.get("tab_size").and_then(|v| v.as_u64()).unwrap_or(4) as usize;
+                let tab_size = extract_optional_u64(params, "tab_size").unwrap_or(4) as usize;
 
                 self.convert_indentation(&input_path, &output_path, convert_to_spaces, tab_size)
                     .await
@@ -570,6 +551,20 @@ mod tests {
         (tool, temp_dir)
     }
 
+    fn create_test_input(text: &str, params: serde_json::Value) -> AgentInput {
+        AgentInput {
+            text: text.to_string(),
+            media: vec![],
+            context: None,
+            parameters: {
+                let mut map = HashMap::new();
+                map.insert("parameters".to_string(), params);
+                map
+            },
+            output_modalities: vec![],
+        }
+    }
+
     #[tokio::test]
     async fn test_encoding_conversion() {
         let (tool, temp_dir) = create_test_tool();
@@ -578,10 +573,14 @@ mod tests {
         let test_file = temp_dir.path().join("test.txt");
         fs::write(&test_file, "Hello, World!").await.unwrap();
 
-        let input = AgentInput::text("Convert file encoding")
-            .with_parameter("operation", "encoding")
-            .with_parameter("input_path", test_file.to_string_lossy().to_string())
-            .with_parameter("to_encoding", "utf8");
+        let input = create_test_input(
+            "Convert file encoding",
+            json!({
+                "operation": "encoding",
+                "input_path": test_file.to_string_lossy(),
+                "to_encoding": "utf8"
+            }),
+        );
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -602,10 +601,14 @@ mod tests {
             .await
             .unwrap();
 
-        let input = AgentInput::text("Convert line endings")
-            .with_parameter("operation", "line_endings")
-            .with_parameter("input_path", test_file.to_string_lossy().to_string())
-            .with_parameter("line_ending", "lf");
+        let input = create_test_input(
+            "Convert line endings",
+            json!({
+                "operation": "line_endings",
+                "input_path": test_file.to_string_lossy(),
+                "line_ending": "lf"
+            }),
+        );
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -630,11 +633,15 @@ mod tests {
             .await
             .unwrap();
 
-        let input = AgentInput::text("Convert tabs to spaces")
-            .with_parameter("operation", "indentation")
-            .with_parameter("input_path", test_file.to_string_lossy().to_string())
-            .with_parameter("convert_to_spaces", true)
-            .with_parameter("tab_size", 4);
+        let input = create_test_input(
+            "Convert tabs to spaces",
+            json!({
+                "operation": "indentation",
+                "input_path": test_file.to_string_lossy(),
+                "convert_to_spaces": true,
+                "tab_size": 4
+            }),
+        );
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -656,9 +663,13 @@ mod tests {
         let test_file = temp_dir.path().join("test.txt");
         fs::write(&test_file, "test").await.unwrap();
 
-        let input = AgentInput::text("Invalid operation")
-            .with_parameter("operation", "invalid")
-            .with_parameter("input_path", test_file.to_string_lossy().to_string());
+        let input = create_test_input(
+            "Invalid operation",
+            json!({
+                "operation": "invalid",
+                "input_path": test_file.to_string_lossy()
+            }),
+        );
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -668,7 +679,13 @@ mod tests {
     async fn test_missing_parameters() {
         let (tool, _temp_dir) = create_test_tool();
 
-        let input = AgentInput::text("Missing params");
+        let input = AgentInput {
+            text: "Missing params".to_string(),
+            media: vec![],
+            context: None,
+            parameters: HashMap::new(),
+            output_modalities: vec![],
+        };
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -680,10 +697,14 @@ mod tests {
 
         let nonexistent_file = temp_dir.path().join("nonexistent.txt");
 
-        let input = AgentInput::text("Convert nonexistent file")
-            .with_parameter("operation", "encoding")
-            .with_parameter("input_path", nonexistent_file.to_string_lossy().to_string())
-            .with_parameter("to_encoding", "utf8");
+        let input = create_test_input(
+            "Convert nonexistent file",
+            json!({
+                "operation": "encoding",
+                "input_path": nonexistent_file.to_string_lossy(),
+                "to_encoding": "utf8"
+            }),
+        );
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());

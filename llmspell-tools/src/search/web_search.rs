@@ -13,6 +13,7 @@ use llmspell_core::{
     types::{AgentInput, AgentOutput, ExecutionContext},
     ComponentMetadata, LLMSpellError, Result,
 };
+use llmspell_utils::{extract_optional_string, extract_parameters, extract_required_string};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -261,27 +262,11 @@ impl WebSearchTool {
         &self,
         params: &serde_json::Value,
     ) -> Result<(String, Option<SearchProvider>)> {
-        let params_map = params
-            .as_object()
-            .ok_or_else(|| LLMSpellError::Validation {
-                message: "Parameters must be an object".to_string(),
-                field: Some("parameters".to_string()),
-            })?;
-
         // Get query
-        let query = params_map
-            .get("query")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| LLMSpellError::Validation {
-                message: "Missing required parameter: query".to_string(),
-                field: Some("query".to_string()),
-            })?
-            .to_string();
+        let query = extract_required_string(params, "query")?.to_string();
 
         // Get optional provider
-        let provider = params_map
-            .get("provider")
-            .and_then(|v| v.as_str())
+        let provider = extract_optional_string(params, "provider")
             .map(|s| s.parse::<SearchProvider>())
             .transpose()?;
 
@@ -296,15 +281,8 @@ impl BaseAgent for WebSearchTool {
     }
 
     async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
-        // Get parameters from input
-        let params =
-            input
-                .parameters
-                .get("parameters")
-                .ok_or_else(|| LLMSpellError::Validation {
-                    message: "Missing parameters".to_string(),
-                    field: Some("parameters".to_string()),
-                })?;
+        // Get parameters using shared utility
+        let params = extract_parameters(&input)?;
 
         // Parse parameters
         let (query, provider) = self.parse_parameters(params)?;
@@ -405,6 +383,20 @@ impl Tool for WebSearchTool {
 mod tests {
     use super::*;
 
+    fn create_test_input(text: &str, params: serde_json::Value) -> AgentInput {
+        AgentInput {
+            text: text.to_string(),
+            media: vec![],
+            context: None,
+            parameters: {
+                let mut map = HashMap::new();
+                map.insert("parameters".to_string(), params);
+                map
+            },
+            output_modalities: vec![],
+        }
+    }
+
     #[test]
     fn test_search_provider_parsing() {
         assert_eq!(
@@ -491,8 +483,8 @@ mod tests {
         let config = WebSearchConfig::default();
         let tool = WebSearchTool::new(config);
 
-        let input = AgentInput::text("search for rust").with_parameter(
-            "parameters".to_string(),
+        let input = create_test_input(
+            "search for rust",
             serde_json::json!({
                 "query": "rust programming language"
             }),
@@ -521,8 +513,8 @@ mod tests {
 
         // First two searches should work
         for i in 0..2 {
-            let input = AgentInput::text("search").with_parameter(
-                "parameters".to_string(),
+            let input = create_test_input(
+                "search",
                 serde_json::json!({
                     "query": format!("test {}", i)
                 }),
@@ -532,8 +524,8 @@ mod tests {
         }
 
         // Third search should fail with rate limit
-        let input = AgentInput::text("search").with_parameter(
-            "parameters".to_string(),
+        let input = create_test_input(
+            "search",
             serde_json::json!({
                 "query": "test 3"
             }),

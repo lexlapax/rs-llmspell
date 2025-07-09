@@ -5,6 +5,22 @@ use llmspell_core::traits::base_agent::BaseAgent;
 use llmspell_core::types::{AgentInput, ExecutionContext};
 use llmspell_tools::util::*;
 use serde_json::{json, Value};
+use std::collections::HashMap;
+
+/// Helper to create test input with wrapped parameters
+fn create_test_input(text: &str, params: serde_json::Value) -> AgentInput {
+    AgentInput {
+        text: text.to_string(),
+        media: vec![],
+        context: None,
+        parameters: {
+            let mut map = HashMap::new();
+            map.insert("parameters".to_string(), params);
+            map
+        },
+        output_modalities: vec![],
+    }
+}
 
 /// Helper to extract result from wrapped response
 fn extract_result(output: &str) -> Value {
@@ -18,8 +34,8 @@ async fn test_all_refactored_tools_response_format() {
 
     // HashCalculatorTool
     let tool = HashCalculatorTool::new(Default::default());
-    let input = AgentInput::text("test").with_parameter(
-        "parameters",
+    let input = create_test_input(
+        "test",
         json!({
             "operation": "hash",
             "algorithm": "md5",
@@ -37,8 +53,8 @@ async fn test_all_refactored_tools_response_format() {
 
     // Base64EncoderTool
     let tool = Base64EncoderTool::new();
-    let input = AgentInput::text("test").with_parameter(
-        "parameters",
+    let input = create_test_input(
+        "test",
         json!({
             "operation": "encode",
             "input": "test"
@@ -55,7 +71,7 @@ async fn test_all_refactored_tools_response_format() {
 
     // UuidGeneratorTool
     let tool = UuidGeneratorTool::new(Default::default());
-    let input = AgentInput::text("test").with_parameter("parameters", json!({}));
+    let input = create_test_input("test", json!({}));
     let result = tool
         .execute(input, ExecutionContext::default())
         .await
@@ -67,8 +83,8 @@ async fn test_all_refactored_tools_response_format() {
 
     // TextManipulatorTool
     let tool = TextManipulatorTool::new(Default::default());
-    let input = AgentInput::text("test").with_parameter(
-        "parameters",
+    let input = create_test_input(
+        "test",
         json!({
             "operation": "uppercase",
             "text": "test"
@@ -85,8 +101,8 @@ async fn test_all_refactored_tools_response_format() {
 
     // CalculatorTool
     let tool = CalculatorTool::new();
-    let input = AgentInput::text("test").with_parameter(
-        "parameters",
+    let input = create_test_input(
+        "test",
         json!({
             "operation": "evaluate",
             "expression": "2 + 2"
@@ -103,8 +119,8 @@ async fn test_all_refactored_tools_response_format() {
 
     // DateTimeHandlerTool
     let tool = DateTimeHandlerTool::new();
-    let input = AgentInput::text("test").with_parameter(
-        "parameters",
+    let input = create_test_input(
+        "test",
         json!({
             "operation": "now"
         }),
@@ -120,8 +136,8 @@ async fn test_all_refactored_tools_response_format() {
 
     // DiffCalculatorTool
     let tool = DiffCalculatorTool::new();
-    let input = AgentInput::text("test").with_parameter(
-        "parameters",
+    let input = create_test_input(
+        "test",
         json!({
             "old_text": "a",
             "new_text": "b",
@@ -139,8 +155,8 @@ async fn test_all_refactored_tools_response_format() {
 
     // DataValidationTool
     let tool = DataValidationTool::new();
-    let input = AgentInput::text("test").with_parameter(
-        "parameters",
+    let input = create_test_input(
+        "test",
         json!({
             "data": {"field1": "test@example.com"},
             "rules": {
@@ -164,8 +180,8 @@ async fn test_all_refactored_tools_response_format() {
 
     // TemplateEngineTool
     let tool = TemplateEngineTool::new();
-    let input = AgentInput::text("test").with_parameter(
-        "parameters",
+    let input = create_test_input(
+        "test",
         json!({
             "template": "Hello {{name}}",
             "context": {"name": "World"},
@@ -216,7 +232,7 @@ async fn test_refactored_tools_error_consistency() {
     ];
 
     for (i, (tool, params)) in test_cases.into_iter().enumerate() {
-        let input = AgentInput::text("test").with_parameter("parameters", params);
+        let input = create_test_input("test", params);
         let result = tool.execute(input, ExecutionContext::default()).await;
 
         // Should fail with missing parameters
@@ -248,8 +264,8 @@ async fn test_refactored_tools_functionality() {
 
     // HashCalculatorTool - verify hash values
     let tool = HashCalculatorTool::new(Default::default());
-    let input = AgentInput::text("test").with_parameter(
-        "parameters",
+    let input = create_test_input(
+        "test",
         json!({
             "operation": "hash",
             "algorithm": "md5",
@@ -265,8 +281,8 @@ async fn test_refactored_tools_functionality() {
 
     // Base64EncoderTool - verify encoding/decoding
     let tool = Base64EncoderTool::new();
-    let input = AgentInput::text("test").with_parameter(
-        "parameters",
+    let input = create_test_input(
+        "test",
         json!({
             "operation": "encode",
             "input": "Hello, Base64!"
@@ -281,7 +297,7 @@ async fn test_refactored_tools_functionality() {
 
     // UuidGeneratorTool - verify UUID format
     let tool = UuidGeneratorTool::new(Default::default());
-    let input = AgentInput::text("test").with_parameter("parameters", json!({}));
+    let input = create_test_input("test", json!({}));
     let result = tool
         .execute(input, ExecutionContext::default())
         .await
@@ -292,8 +308,8 @@ async fn test_refactored_tools_functionality() {
 
     // TextManipulatorTool - verify text operations
     let tool = TextManipulatorTool::new(Default::default());
-    let input = AgentInput::text("test").with_parameter(
-        "parameters",
+    let input = create_test_input(
+        "test",
         json!({
             "operation": "uppercase",
             "text": "hello world"
@@ -308,8 +324,8 @@ async fn test_refactored_tools_functionality() {
 
     // CalculatorTool - verify calculations
     let tool = CalculatorTool::new();
-    let input = AgentInput::text("test").with_parameter(
-        "parameters",
+    let input = create_test_input(
+        "test",
         json!({
             "operation": "evaluate",
             "expression": "2 + 3 * 4"
@@ -324,8 +340,8 @@ async fn test_refactored_tools_functionality() {
 
     // DateTimeHandlerTool - verify date operations
     let tool = DateTimeHandlerTool::new();
-    let input = AgentInput::text("test").with_parameter(
-        "parameters",
+    let input = create_test_input(
+        "test",
         json!({
             "operation": "parse",
             "input": "2023-12-25T10:30:00Z"
@@ -342,8 +358,8 @@ async fn test_refactored_tools_functionality() {
 
     // DiffCalculatorTool - verify diff detection
     let tool = DiffCalculatorTool::new();
-    let input = AgentInput::text("test").with_parameter(
-        "parameters",
+    let input = create_test_input(
+        "test",
         json!({
             "old_text": "Line 1\nLine 2",
             "new_text": "Line 1\nLine 2 modified",
@@ -359,8 +375,8 @@ async fn test_refactored_tools_functionality() {
 
     // DataValidationTool - verify validation
     let tool = DataValidationTool::new();
-    let input = AgentInput::text("test").with_parameter(
-        "parameters",
+    let input = create_test_input(
+        "test",
         json!({
             "data": {"email": "test@example.com"},
             "rules": {
@@ -382,8 +398,8 @@ async fn test_refactored_tools_functionality() {
 
     // TemplateEngineTool - verify template rendering
     let tool = TemplateEngineTool::new();
-    let input = AgentInput::text("test").with_parameter(
-        "parameters",
+    let input = create_test_input(
+        "test",
         json!({
             "template": "Hello, {{name}}!",
             "context": {"name": "World"},
@@ -404,7 +420,7 @@ async fn test_tool_chaining_integration() {
 
     // Step 1: Generate a UUID
     let uuid_tool = UuidGeneratorTool::new(Default::default());
-    let uuid_input = AgentInput::text("generate").with_parameter("parameters", json!({}));
+    let uuid_input = create_test_input("generate", json!({}));
     let uuid_result = uuid_tool
         .execute(uuid_input, ExecutionContext::default())
         .await
@@ -414,8 +430,8 @@ async fn test_tool_chaining_integration() {
 
     // Step 2: Hash the UUID
     let hash_tool = HashCalculatorTool::new(Default::default());
-    let hash_input = AgentInput::text("hash").with_parameter(
-        "parameters",
+    let hash_input = create_test_input(
+        "hash",
         json!({
             "operation": "hash",
             "algorithm": "sha256",
@@ -431,8 +447,8 @@ async fn test_tool_chaining_integration() {
 
     // Step 3: Encode the hash in base64
     let base64_tool = Base64EncoderTool::new();
-    let base64_input = AgentInput::text("encode").with_parameter(
-        "parameters",
+    let base64_input = create_test_input(
+        "encode",
         json!({
             "operation": "encode",
             "input": hash

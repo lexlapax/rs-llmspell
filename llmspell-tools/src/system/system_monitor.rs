@@ -11,7 +11,10 @@ use llmspell_core::{
     ComponentMetadata, LLMSpellError, Result as LLMResult,
 };
 use llmspell_security::sandbox::SandboxContext;
-use llmspell_utils::system_info::{format_bytes, get_cpu_count, get_system_info};
+use llmspell_utils::{
+    extract_optional_string, extract_parameters,
+    system_info::{format_bytes, get_cpu_count, get_system_info},
+};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
@@ -491,12 +494,9 @@ impl SystemMonitorTool {
     }
 
     /// Validate monitoring parameters
-    async fn validate_monitoring_parameters(
-        &self,
-        params: &HashMap<String, serde_json::Value>,
-    ) -> LLMResult<()> {
+    async fn validate_monitoring_parameters(&self, params: &serde_json::Value) -> LLMResult<()> {
         // Validate operation if provided
-        if let Some(operation) = params.get("operation").and_then(|v| v.as_str()) {
+        if let Some(operation) = extract_optional_string(params, "operation") {
             match operation {
                 "stats" | "cpu" | "memory" | "disk" | "all" => {}
                 _ => {
@@ -526,16 +526,13 @@ impl BaseAgent for SystemMonitorTool {
         input: AgentInput,
         _context: ExecutionContext,
     ) -> LLMResult<AgentOutput> {
-        self.validate_monitoring_parameters(&input.parameters)
-            .await?;
+        // Get parameters using shared utility
+        let params = extract_parameters(&input)?;
 
-        let params = &input.parameters;
+        self.validate_monitoring_parameters(params).await?;
 
         // Extract operation (default to "all")
-        let operation = params
-            .get("operation")
-            .and_then(|v| v.as_str())
-            .unwrap_or("all");
+        let operation = extract_optional_string(params, "operation").unwrap_or("all");
 
         // Collect system statistics
         let stats = self.collect_system_stats().await?;
@@ -682,11 +679,30 @@ mod tests {
         SystemMonitorTool::new(config)
     }
 
+    fn create_test_input(text: &str, params: serde_json::Value) -> AgentInput {
+        AgentInput {
+            text: text.to_string(),
+            media: vec![],
+            context: None,
+            parameters: {
+                let mut map = HashMap::new();
+                map.insert("parameters".to_string(), params);
+                map
+            },
+            output_modalities: vec![],
+        }
+    }
+
     #[tokio::test]
     async fn test_collect_all_stats() {
         let tool = create_test_tool();
 
-        let input = AgentInput::text("Get system statistics").with_parameter("operation", "all");
+        let input = create_test_input(
+            "Get system statistics",
+            json!({
+                "operation": "all"
+            }),
+        );
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -701,7 +717,12 @@ mod tests {
     async fn test_collect_cpu_stats() {
         let tool = create_test_tool();
 
-        let input = AgentInput::text("Get CPU statistics").with_parameter("operation", "cpu");
+        let input = create_test_input(
+            "Get CPU statistics",
+            json!({
+                "operation": "cpu"
+            }),
+        );
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -715,7 +736,12 @@ mod tests {
     async fn test_collect_memory_stats() {
         let tool = create_test_tool();
 
-        let input = AgentInput::text("Get memory statistics").with_parameter("operation", "memory");
+        let input = create_test_input(
+            "Get memory statistics",
+            json!({
+                "operation": "memory"
+            }),
+        );
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -729,7 +755,12 @@ mod tests {
     async fn test_collect_disk_stats() {
         let tool = create_test_tool();
 
-        let input = AgentInput::text("Get disk statistics").with_parameter("operation", "disk");
+        let input = create_test_input(
+            "Get disk statistics",
+            json!({
+                "operation": "disk"
+            }),
+        );
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -743,7 +774,12 @@ mod tests {
     async fn test_invalid_operation() {
         let tool = create_test_tool();
 
-        let input = AgentInput::text("Invalid operation").with_parameter("operation", "invalid");
+        let input = create_test_input(
+            "Invalid operation",
+            json!({
+                "operation": "invalid"
+            }),
+        );
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -758,7 +794,7 @@ mod tests {
         let tool = create_test_tool();
 
         // No operation parameter should default to "all"
-        let input = AgentInput::text("Get default statistics");
+        let input = create_test_input("Get default statistics", json!({}));
 
         let result = tool
             .execute(input, ExecutionContext::default())

@@ -12,7 +12,11 @@ use llmspell_core::{
     ComponentMetadata, LLMSpellError, Result as LLMResult,
 };
 use llmspell_security::sandbox::FileSandbox;
-use llmspell_utils::search::{search_in_directory, search_in_file, SearchOptions, SearchResult};
+use llmspell_utils::{
+    extract_optional_array, extract_optional_bool, extract_optional_string, extract_optional_u64,
+    extract_parameters, extract_required_string,
+    search::{search_in_directory, search_in_file, SearchOptions, SearchResult},
+};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::path::{Path, PathBuf};
@@ -197,71 +201,60 @@ impl FileSearchTool {
     }
 
     /// Build search options from parameters
-    fn build_search_options(
-        &self,
-        params: &std::collections::HashMap<String, serde_json::Value>,
-    ) -> LLMResult<SearchOptions> {
+    fn build_search_options(&self, params: &serde_json::Value) -> LLMResult<SearchOptions> {
         let mut options = SearchOptions::new();
 
         // Basic search options
-        if let Some(recursive) = params.get("recursive").and_then(|v| v.as_bool()) {
+        if let Some(recursive) = extract_optional_bool(params, "recursive") {
             options = options.with_recursive(recursive);
         }
 
-        if let Some(case_sensitive) = params.get("case_sensitive").and_then(|v| v.as_bool()) {
+        if let Some(case_sensitive) = extract_optional_bool(params, "case_sensitive") {
             options = options.with_case_sensitive(case_sensitive);
         }
 
-        if let Some(use_regex) = params.get("use_regex").and_then(|v| v.as_bool()) {
+        if let Some(use_regex) = extract_optional_bool(params, "use_regex") {
             options = options.with_regex(use_regex);
         }
 
         // Context lines
-        let context_lines = params
-            .get("context_lines")
-            .and_then(|v| v.as_u64())
+        let context_lines = extract_optional_u64(params, "context_lines")
             .unwrap_or(self.config.default_context_lines as u64)
             as usize;
         options = options.with_context_lines(context_lines);
 
         // File size limit
-        let max_file_size = params
-            .get("max_file_size")
-            .and_then(|v| v.as_u64())
-            .unwrap_or(self.config.max_file_size);
+        let max_file_size =
+            extract_optional_u64(params, "max_file_size").unwrap_or(self.config.max_file_size);
         options = options.with_max_file_size(max_file_size);
 
         // File extensions
-        if let Some(include_exts) = params.get("include_extensions") {
-            if let Some(exts_array) = include_exts.as_array() {
-                let extensions: Vec<String> = exts_array
-                    .iter()
-                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                    .collect();
-                options = options.with_include_extensions(extensions);
-            } else if let Some(ext_str) = include_exts.as_str() {
-                let extensions: Vec<String> =
-                    ext_str.split(',').map(|s| s.trim().to_string()).collect();
-                options = options.with_include_extensions(extensions);
-            }
+        if let Some(include_exts) = extract_optional_array(params, "include_extensions") {
+            let extensions: Vec<String> = include_exts
+                .iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect();
+            options = options.with_include_extensions(extensions);
+        } else if let Some(ext_str) = extract_optional_string(params, "include_extensions") {
+            let extensions: Vec<String> =
+                ext_str.split(',').map(|s| s.trim().to_string()).collect();
+            options = options.with_include_extensions(extensions);
         } else {
             // Use default include extensions
             options =
                 options.with_include_extensions(self.config.default_include_extensions.clone());
         }
 
-        if let Some(exclude_exts) = params.get("exclude_extensions") {
-            if let Some(exts_array) = exclude_exts.as_array() {
-                let extensions: Vec<String> = exts_array
-                    .iter()
-                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                    .collect();
-                options = options.with_exclude_extensions(extensions);
-            } else if let Some(ext_str) = exclude_exts.as_str() {
-                let extensions: Vec<String> =
-                    ext_str.split(',').map(|s| s.trim().to_string()).collect();
-                options = options.with_exclude_extensions(extensions);
-            }
+        if let Some(exclude_exts) = extract_optional_array(params, "exclude_extensions") {
+            let extensions: Vec<String> = exclude_exts
+                .iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect();
+            options = options.with_exclude_extensions(extensions);
+        } else if let Some(ext_str) = extract_optional_string(params, "exclude_extensions") {
+            let extensions: Vec<String> =
+                ext_str.split(',').map(|s| s.trim().to_string()).collect();
+            options = options.with_exclude_extensions(extensions);
         } else {
             // Use default exclude extensions
             options =
@@ -269,28 +262,24 @@ impl FileSearchTool {
         }
 
         // Directory exclusions
-        if let Some(exclude_dirs) = params.get("exclude_dirs") {
-            if let Some(dirs_array) = exclude_dirs.as_array() {
-                let directories: Vec<String> = dirs_array
-                    .iter()
-                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
-                    .collect();
-                options = options.with_exclude_dirs(directories);
-            } else if let Some(dirs_str) = exclude_dirs.as_str() {
-                let directories: Vec<String> =
-                    dirs_str.split(',').map(|s| s.trim().to_string()).collect();
-                options = options.with_exclude_dirs(directories);
-            }
+        if let Some(dirs_array) = extract_optional_array(params, "exclude_dirs") {
+            let directories: Vec<String> = dirs_array
+                .iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect();
+            options = options.with_exclude_dirs(directories);
+        } else if let Some(dirs_str) = extract_optional_string(params, "exclude_dirs") {
+            let directories: Vec<String> =
+                dirs_str.split(',').map(|s| s.trim().to_string()).collect();
+            options = options.with_exclude_dirs(directories);
         }
 
         // Search limits
-        if let Some(max_matches) = params.get("max_matches_per_file").and_then(|v| v.as_u64()) {
+        if let Some(max_matches) = extract_optional_u64(params, "max_matches_per_file") {
             options = options.with_max_matches_per_file(max_matches as usize);
         }
 
-        let max_depth = params
-            .get("max_depth")
-            .and_then(|v| v.as_u64())
+        let max_depth = extract_optional_u64(params, "max_depth")
             .unwrap_or(self.config.max_search_depth as u64) as usize;
         options = options.with_max_depth(max_depth);
 
@@ -339,27 +328,10 @@ impl FileSearchTool {
     }
 
     /// Validate search parameters
-    async fn validate_search_parameters(
-        &self,
-        params: &std::collections::HashMap<String, serde_json::Value>,
-    ) -> LLMResult<()> {
-        // Check required parameters
-        if !params.contains_key("pattern") {
-            return Err(LLMSpellError::Validation {
-                message: "Missing required parameter: pattern".to_string(),
-                field: Some("pattern".to_string()),
-            });
-        }
-
-        if !params.contains_key("path") {
-            return Err(LLMSpellError::Validation {
-                message: "Missing required parameter: path".to_string(),
-                field: Some("path".to_string()),
-            });
-        }
-
-        // Validate pattern is not empty
-        if let Some(pattern) = params.get("pattern").and_then(|v| v.as_str()) {
+    async fn validate_search_parameters(&self, params: &serde_json::Value) -> LLMResult<()> {
+        // Required parameters are already validated by extract_required_string
+        // Just validate pattern is not empty
+        if let Some(pattern) = extract_optional_string(params, "pattern") {
             if pattern.trim().is_empty() {
                 return Err(LLMSpellError::Validation {
                     message: "Pattern cannot be empty".to_string(),
@@ -369,33 +341,19 @@ impl FileSearchTool {
         }
 
         // Validate numeric parameters
-        if let Some(context_lines) = params.get("context_lines") {
-            if let Some(lines) = context_lines.as_u64() {
-                if lines > 50 {
-                    return Err(LLMSpellError::Validation {
-                        message: "Context lines cannot exceed 50".to_string(),
-                        field: Some("context_lines".to_string()),
-                    });
-                }
-            } else {
+        if let Some(lines) = extract_optional_u64(params, "context_lines") {
+            if lines > 50 {
                 return Err(LLMSpellError::Validation {
-                    message: "Context lines must be a number".to_string(),
+                    message: "Context lines cannot exceed 50".to_string(),
                     field: Some("context_lines".to_string()),
                 });
             }
         }
 
-        if let Some(max_depth) = params.get("max_depth") {
-            if let Some(depth) = max_depth.as_u64() {
-                if depth > 100 {
-                    return Err(LLMSpellError::Validation {
-                        message: "Max depth cannot exceed 100".to_string(),
-                        field: Some("max_depth".to_string()),
-                    });
-                }
-            } else {
+        if let Some(depth) = extract_optional_u64(params, "max_depth") {
+            if depth > 100 {
                 return Err(LLMSpellError::Validation {
-                    message: "Max depth must be a number".to_string(),
+                    message: "Max depth cannot exceed 100".to_string(),
                     field: Some("max_depth".to_string()),
                 });
             }
@@ -416,25 +374,14 @@ impl BaseAgent for FileSearchTool {
         input: AgentInput,
         _context: ExecutionContext,
     ) -> LLMResult<AgentOutput> {
-        self.validate_search_parameters(&input.parameters).await?;
+        // Get parameters using shared utility
+        let params = extract_parameters(&input)?;
 
-        let params = &input.parameters;
+        self.validate_search_parameters(params).await?;
 
         // Extract required parameters
-        let pattern = params
-            .get("pattern")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| LLMSpellError::Validation {
-                message: "Missing required parameter: pattern".to_string(),
-                field: Some("pattern".to_string()),
-            })?;
-
-        let path_str = params.get("path").and_then(|v| v.as_str()).ok_or_else(|| {
-            LLMSpellError::Validation {
-                message: "Missing required parameter: path".to_string(),
-                field: Some("path".to_string()),
-            }
-        })?;
+        let pattern = extract_required_string(params, "pattern")?;
+        let path_str = extract_required_string(params, "path")?;
 
         let search_path = PathBuf::from(path_str);
 
@@ -647,6 +594,20 @@ mod tests {
         (tool, temp_dir)
     }
 
+    fn create_test_input(text: &str, params: serde_json::Value) -> AgentInput {
+        AgentInput {
+            text: text.to_string(),
+            media: vec![],
+            context: None,
+            parameters: {
+                let mut map = HashMap::new();
+                map.insert("parameters".to_string(), params);
+                map
+            },
+            output_modalities: vec![],
+        }
+    }
+
     #[tokio::test]
     async fn test_search_single_file() {
         let (tool, temp_dir) = create_test_tool();
@@ -660,11 +621,15 @@ mod tests {
         .await
         .unwrap();
 
-        let input = AgentInput::text("Search for pattern in file")
-            .with_parameter("pattern", "pattern")
-            .with_parameter("path", test_file.to_string_lossy().to_string())
-            .with_parameter("case_sensitive", false)
-            .with_parameter("context_lines", 1);
+        let input = create_test_input(
+            "Search for pattern in file",
+            json!({
+                "pattern": "pattern",
+                "path": test_file.to_string_lossy(),
+                "case_sensitive": false,
+                "context_lines": 1
+            }),
+        );
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -694,12 +659,16 @@ mod tests {
             .await
             .unwrap();
 
-        let input = AgentInput::text("Search for TODO in directory")
-            .with_parameter("pattern", "TODO")
-            .with_parameter("path", temp_dir.path().to_string_lossy().to_string())
-            .with_parameter("recursive", true)
-            .with_parameter("include_extensions", vec!["txt"])
-            .with_parameter("context_lines", 0);
+        let input = create_test_input(
+            "Search for TODO in directory",
+            json!({
+                "pattern": "TODO",
+                "path": temp_dir.path().to_string_lossy(),
+                "recursive": true,
+                "include_extensions": ["txt"],
+                "context_lines": 0
+            }),
+        );
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -722,11 +691,15 @@ mod tests {
         .await
         .unwrap();
 
-        let input = AgentInput::text("Search for error patterns")
-            .with_parameter("pattern", r"(ERROR|WARNING):")
-            .with_parameter("path", test_file.to_string_lossy().to_string())
-            .with_parameter("use_regex", true)
-            .with_parameter("context_lines", 0);
+        let input = create_test_input(
+            "Search for error patterns",
+            json!({
+                "pattern": r"(ERROR|WARNING):",
+                "path": test_file.to_string_lossy(),
+                "use_regex": true,
+                "context_lines": 0
+            }),
+        );
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -749,11 +722,15 @@ mod tests {
         fs::write(&rs_file, "pattern in rust").await.unwrap();
         fs::write(&bin_file, "pattern in binary").await.unwrap();
 
-        let input = AgentInput::text("Search with extension filter")
-            .with_parameter("pattern", "pattern")
-            .with_parameter("path", temp_dir.path().to_string_lossy().to_string())
-            .with_parameter("include_extensions", vec!["txt", "rs"])
-            .with_parameter("recursive", false);
+        let input = create_test_input(
+            "Search with extension filter",
+            json!({
+                "pattern": "pattern",
+                "path": temp_dir.path().to_string_lossy(),
+                "include_extensions": ["txt", "rs"],
+                "recursive": false
+            }),
+        );
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -775,10 +752,14 @@ mod tests {
         .await
         .unwrap();
 
-        let input = AgentInput::text("Search with context")
-            .with_parameter("pattern", "MATCH")
-            .with_parameter("path", test_file.to_string_lossy().to_string())
-            .with_parameter("context_lines", 2);
+        let input = create_test_input(
+            "Search with context",
+            json!({
+                "pattern": "MATCH",
+                "path": test_file.to_string_lossy(),
+                "context_lines": 2
+            }),
+        );
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -796,9 +777,13 @@ mod tests {
 
         let nonexistent = temp_dir.path().join("nonexistent.txt");
 
-        let input = AgentInput::text("Search nonexistent file")
-            .with_parameter("pattern", "test")
-            .with_parameter("path", nonexistent.to_string_lossy().to_string());
+        let input = create_test_input(
+            "Search nonexistent file",
+            json!({
+                "pattern": "test",
+                "path": nonexistent.to_string_lossy()
+            }),
+        );
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -812,9 +797,13 @@ mod tests {
         let test_file = temp_dir.path().join("test.txt");
         fs::write(&test_file, "content").await.unwrap();
 
-        let input = AgentInput::text("Search with empty pattern")
-            .with_parameter("pattern", "")
-            .with_parameter("path", test_file.to_string_lossy().to_string());
+        let input = create_test_input(
+            "Search with empty pattern",
+            json!({
+                "pattern": "",
+                "path": test_file.to_string_lossy()
+            }),
+        );
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -831,10 +820,14 @@ mod tests {
         let test_file = temp_dir.path().join("test.txt");
         fs::write(&test_file, "content").await.unwrap();
 
-        let input = AgentInput::text("Search with invalid regex")
-            .with_parameter("pattern", "[invalid")
-            .with_parameter("path", test_file.to_string_lossy().to_string())
-            .with_parameter("use_regex", true);
+        let input = create_test_input(
+            "Search with invalid regex",
+            json!({
+                "pattern": "[invalid",
+                "path": test_file.to_string_lossy(),
+                "use_regex": true
+            }),
+        );
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -849,9 +842,13 @@ mod tests {
             .await
             .unwrap();
 
-        let input = AgentInput::text("Search for non-existent pattern")
-            .with_parameter("pattern", "NONEXISTENT")
-            .with_parameter("path", test_file.to_string_lossy().to_string());
+        let input = create_test_input(
+            "Search for non-existent pattern",
+            json!({
+                "pattern": "NONEXISTENT",
+                "path": test_file.to_string_lossy()
+            }),
+        );
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -888,28 +885,42 @@ mod tests {
         let (tool, _temp_dir) = create_test_tool();
 
         // Missing pattern
-        let input1 = AgentInput::text("Missing pattern").with_parameter("path", "/tmp/test.txt");
+        let input1 = create_test_input(
+            "Missing pattern",
+            json!({
+                "path": "/tmp/test.txt"
+            }),
+        );
         let result1 = tool.execute(input1, ExecutionContext::default()).await;
         assert!(result1.is_err());
         assert!(result1
             .unwrap_err()
             .to_string()
-            .contains("Missing required parameter: pattern"));
+            .contains("Missing required parameter"));
 
         // Missing path
-        let input2 = AgentInput::text("Missing path").with_parameter("pattern", "test");
+        let input2 = create_test_input(
+            "Missing path",
+            json!({
+                "pattern": "test"
+            }),
+        );
         let result2 = tool.execute(input2, ExecutionContext::default()).await;
         assert!(result2.is_err());
         assert!(result2
             .unwrap_err()
             .to_string()
-            .contains("Missing required parameter: path"));
+            .contains("Missing required parameter"));
 
         // Invalid context_lines
-        let input3 = AgentInput::text("Invalid context lines")
-            .with_parameter("pattern", "test")
-            .with_parameter("path", "/tmp/test.txt")
-            .with_parameter("context_lines", 100);
+        let input3 = create_test_input(
+            "Invalid context lines",
+            json!({
+                "pattern": "test",
+                "path": "/tmp/test.txt",
+                "context_lines": 100
+            }),
+        );
         let result3 = tool.execute(input3, ExecutionContext::default()).await;
         assert!(result3.is_err());
         assert!(result3

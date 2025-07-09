@@ -5,6 +5,7 @@ use llmspell_core::{
     types::{AgentInput, ExecutionContext},
 };
 use llmspell_tools::{search::web_search::WebSearchConfig, ToolRegistry, WebSearchTool};
+use std::collections::HashMap;
 
 #[tokio::test]
 async fn test_web_search_tool_registration() {
@@ -50,12 +51,22 @@ async fn test_web_search_tool_execution_through_registry() {
     let tool = registry.get_tool("web_search").await.unwrap();
 
     // Execute search
-    let input = AgentInput::text("search for rust").with_parameter(
-        "parameters".to_string(),
-        serde_json::json!({
-            "query": "rust programming"
-        }),
-    );
+    let input = AgentInput {
+        text: "search for rust".to_string(),
+        media: vec![],
+        context: None,
+        parameters: {
+            let mut map = HashMap::new();
+            map.insert(
+                "parameters".to_string(),
+                serde_json::json!({
+                    "query": "rust programming"
+                }),
+            );
+            map
+        },
+        output_modalities: vec![],
+    };
 
     let context = ExecutionContext::with_conversation("test".to_string());
     let result = tool.execute(input, context).await.unwrap();

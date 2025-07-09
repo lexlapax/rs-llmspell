@@ -11,7 +11,10 @@ use llmspell_core::{
     ComponentMetadata, LLMSpellError, Result as LLMResult,
 };
 use llmspell_security::sandbox::SandboxContext;
-use llmspell_utils::system_info::{get_all_env_vars, get_env_var, set_env_var_if_allowed};
+use llmspell_utils::{
+    extract_parameters, extract_required_string,
+    system_info::{get_all_env_vars, get_env_var, set_env_var_if_allowed},
+};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
@@ -321,62 +324,6 @@ impl EnvironmentReaderTool {
             }),
         }
     }
-
-    /// Validate operation parameters
-    async fn validate_operation_parameters(
-        &self,
-        params: &HashMap<String, serde_json::Value>,
-    ) -> LLMResult<()> {
-        if let Some(operation) = params.get("operation").and_then(|v| v.as_str()) {
-            match operation {
-                "get" => {
-                    if !params.contains_key("variable_name") {
-                        return Err(LLMSpellError::Validation {
-                            message: "Missing required parameter 'variable_name' for get operation"
-                                .to_string(),
-                            field: Some("variable_name".to_string()),
-                        });
-                    }
-                }
-                "list" => {
-                    // No additional parameters required for list
-                }
-                "pattern" => {
-                    if !params.contains_key("pattern") {
-                        return Err(LLMSpellError::Validation {
-                            message: "Missing required parameter 'pattern' for pattern operation"
-                                .to_string(),
-                            field: Some("pattern".to_string()),
-                        });
-                    }
-                }
-                "set" => {
-                    if !params.contains_key("variable_name") || !params.contains_key("value") {
-                        return Err(LLMSpellError::Validation {
-                            message: "Missing required parameters 'variable_name' and 'value' for set operation".to_string(),
-                            field: Some("parameters".to_string()),
-                        });
-                    }
-                }
-                _ => {
-                    return Err(LLMSpellError::Validation {
-                        message: format!(
-                            "Unknown operation: {}. Supported operations: get, list, pattern, set",
-                            operation
-                        ),
-                        field: Some("operation".to_string()),
-                    });
-                }
-            }
-        } else {
-            return Err(LLMSpellError::Validation {
-                message: "Missing required parameter: operation".to_string(),
-                field: Some("operation".to_string()),
-            });
-        }
-
-        Ok(())
-    }
 }
 
 #[async_trait]
@@ -390,22 +337,13 @@ impl BaseAgent for EnvironmentReaderTool {
         input: AgentInput,
         _context: ExecutionContext,
     ) -> LLMResult<AgentOutput> {
-        self.validate_operation_parameters(&input.parameters)
-            .await?;
-
-        let operation = input
-            .parameters
-            .get("operation")
-            .and_then(|v| v.as_str())
-            .unwrap(); // Safe due to validation
+        // Get parameters using shared utility
+        let params = extract_parameters(&input)?;
+        let operation = extract_required_string(params, "operation")?;
 
         let result = match operation {
             "get" => {
-                let var_name = input
-                    .parameters
-                    .get("variable_name")
-                    .and_then(|v| v.as_str())
-                    .unwrap(); // Safe due to validation
+                let var_name = extract_required_string(params, "variable_name")?;
 
                 match self.get_single_var(var_name).await? {
                     Some(value) => {
@@ -447,11 +385,7 @@ impl BaseAgent for EnvironmentReaderTool {
                 .with_metadata(serde_json::from_value(response).unwrap_or_default())
             }
             "pattern" => {
-                let pattern = input
-                    .parameters
-                    .get("pattern")
-                    .and_then(|v| v.as_str())
-                    .unwrap(); // Safe due to validation
+                let pattern = extract_required_string(params, "pattern")?;
 
                 let vars = self.get_vars_by_pattern(pattern).await?;
                 let response = json!({
@@ -468,16 +402,8 @@ impl BaseAgent for EnvironmentReaderTool {
                 .with_metadata(serde_json::from_value(response).unwrap_or_default())
             }
             "set" => {
-                let var_name = input
-                    .parameters
-                    .get("variable_name")
-                    .and_then(|v| v.as_str())
-                    .unwrap(); // Safe due to validation
-                let value = input
-                    .parameters
-                    .get("value")
-                    .and_then(|v| v.as_str())
-                    .unwrap(); // Safe due to validation
+                let var_name = extract_required_string(params, "variable_name")?;
+                let value = extract_required_string(params, "value")?;
 
                 self.set_var(var_name, value).await?;
                 let response = json!({
@@ -492,7 +418,15 @@ impl BaseAgent for EnvironmentReaderTool {
                 ))
                 .with_metadata(serde_json::from_value(response).unwrap_or_default())
             }
-            _ => unreachable!(), // Already validated above
+            _ => {
+                return Err(LLMSpellError::Validation {
+                    message: format!(
+                        "Unknown operation: '{}'. Supported operations: get, list, pattern, set",
+                        operation
+                    ),
+                    field: Some("operation".to_string()),
+                });
+            }
         };
 
         Ok(result)
@@ -575,6 +509,20 @@ mod tests {
         EnvironmentReaderTool::new(config)
     }
 
+    fn create_test_input(text: &str, params: serde_json::Value) -> AgentInput {
+        AgentInput {
+            text: text.to_string(),
+            media: vec![],
+            context: None,
+            parameters: {
+                let mut map = HashMap::new();
+                map.insert("parameters".to_string(), params);
+                map
+            },
+            output_modalities: vec![],
+        }
+    }
+
     fn create_test_tool_with_sandbox() -> EnvironmentReaderTool {
         let security_requirements = SecurityRequirements {
             level: SecurityLevel::Restricted,
@@ -599,9 +547,13 @@ mod tests {
         let tool = create_test_tool();
 
         // Test getting PATH variable (should be allowed by default)
-        let input = AgentInput::text("Get PATH environment variable")
-            .with_parameter("operation", "get")
-            .with_parameter("variable_name", "PATH");
+        let input = create_test_input(
+            "Get PATH environment variable",
+            json!({
+                "operation": "get",
+                "variable_name": "PATH"
+            }),
+        );
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -617,9 +569,13 @@ mod tests {
         config.allowed_patterns.push("NONEXISTENT*".to_string());
         let tool = EnvironmentReaderTool::new(config);
 
-        let input = AgentInput::text("Get nonexistent variable")
-            .with_parameter("operation", "get")
-            .with_parameter("variable_name", "NONEXISTENT_VAR_12345");
+        let input = create_test_input(
+            "Get nonexistent variable",
+            json!({
+                "operation": "get",
+                "variable_name": "NONEXISTENT_VAR_12345"
+            }),
+        );
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -632,9 +588,13 @@ mod tests {
     async fn test_get_blocked_variable() {
         let tool = create_test_tool();
 
-        let input = AgentInput::text("Get blocked variable")
-            .with_parameter("operation", "get")
-            .with_parameter("variable_name", "SECRET_PASSWORD");
+        let input = create_test_input(
+            "Get blocked variable",
+            json!({
+                "operation": "get",
+                "variable_name": "SECRET_PASSWORD"
+            }),
+        );
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -645,8 +605,12 @@ mod tests {
     async fn test_list_variables() {
         let tool = create_test_tool();
 
-        let input =
-            AgentInput::text("List environment variables").with_parameter("operation", "list");
+        let input = create_test_input(
+            "List environment variables",
+            json!({
+                "operation": "list"
+            }),
+        );
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -660,9 +624,13 @@ mod tests {
     async fn test_pattern_matching() {
         let tool = create_test_tool();
 
-        let input = AgentInput::text("Get PATH variables")
-            .with_parameter("operation", "pattern")
-            .with_parameter("pattern", "PATH*");
+        let input = create_test_input(
+            "Get PATH variables",
+            json!({
+                "operation": "pattern",
+                "pattern": "PATH*"
+            }),
+        );
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -675,10 +643,14 @@ mod tests {
     async fn test_set_variable_disabled() {
         let tool = create_test_tool();
 
-        let input = AgentInput::text("Set test variable")
-            .with_parameter("operation", "set")
-            .with_parameter("variable_name", "TEST_VAR")
-            .with_parameter("value", "test_value");
+        let input = create_test_input(
+            "Set test variable",
+            json!({
+                "operation": "set",
+                "variable_name": "TEST_VAR",
+                "value": "test_value"
+            }),
+        );
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -692,10 +664,14 @@ mod tests {
         config.allowed_patterns.push("TEST_*".to_string());
         let tool = EnvironmentReaderTool::new(config);
 
-        let input = AgentInput::text("Set test variable")
-            .with_parameter("operation", "set")
-            .with_parameter("variable_name", "TEST_VAR_12345")
-            .with_parameter("value", "test_value");
+        let input = create_test_input(
+            "Set test variable",
+            json!({
+                "operation": "set",
+                "variable_name": "TEST_VAR_12345",
+                "value": "test_value"
+            }),
+        );
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -708,7 +684,12 @@ mod tests {
     async fn test_invalid_operation() {
         let tool = create_test_tool();
 
-        let input = AgentInput::text("Invalid operation").with_parameter("operation", "invalid");
+        let input = create_test_input(
+            "Invalid operation",
+            json!({
+                "operation": "invalid"
+            }),
+        );
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -723,17 +704,27 @@ mod tests {
         let tool = create_test_tool();
 
         // Missing operation
-        let input1 = AgentInput::text("Missing operation");
+        let input1 = create_test_input("Missing operation", json!({}));
         let result1 = tool.execute(input1, ExecutionContext::default()).await;
         assert!(result1.is_err());
 
         // Missing variable_name for get operation
-        let input2 = AgentInput::text("Missing variable name").with_parameter("operation", "get");
+        let input2 = create_test_input(
+            "Missing variable name",
+            json!({
+                "operation": "get"
+            }),
+        );
         let result2 = tool.execute(input2, ExecutionContext::default()).await;
         assert!(result2.is_err());
 
         // Missing pattern for pattern operation
-        let input3 = AgentInput::text("Missing pattern").with_parameter("operation", "pattern");
+        let input3 = create_test_input(
+            "Missing pattern",
+            json!({
+                "operation": "pattern"
+            }),
+        );
         let result3 = tool.execute(input3, ExecutionContext::default()).await;
         assert!(result3.is_err());
     }
@@ -743,9 +734,13 @@ mod tests {
         let tool = create_test_tool_with_sandbox();
 
         // Should allow TEST_* variables due to sandbox permissions
-        let input1 = AgentInput::text("Get test variable")
-            .with_parameter("operation", "get")
-            .with_parameter("variable_name", "TEST_ALLOWED");
+        let input1 = create_test_input(
+            "Get test variable",
+            json!({
+                "operation": "get",
+                "variable_name": "TEST_ALLOWED"
+            }),
+        );
         let result1 = tool.execute(input1, ExecutionContext::default()).await;
         // Should succeed (even if variable doesn't exist)
         assert!(
@@ -754,16 +749,24 @@ mod tests {
         );
 
         // Should allow PATH due to sandbox permissions
-        let input2 = AgentInput::text("Get PATH")
-            .with_parameter("operation", "get")
-            .with_parameter("variable_name", "PATH");
+        let input2 = create_test_input(
+            "Get PATH",
+            json!({
+                "operation": "get",
+                "variable_name": "PATH"
+            }),
+        );
         let result2 = tool.execute(input2, ExecutionContext::default()).await;
         assert!(result2.is_ok(), "PATH should be allowed by sandbox");
 
         // Should deny HOME even though it's in default safe vars (sandbox overrides)
-        let input3 = AgentInput::text("Get HOME")
-            .with_parameter("operation", "get")
-            .with_parameter("variable_name", "HOME");
+        let input3 = create_test_input(
+            "Get HOME",
+            json!({
+                "operation": "get",
+                "variable_name": "HOME"
+            }),
+        );
         let result3 = tool.execute(input3, ExecutionContext::default()).await;
         assert!(
             result3.is_err(),

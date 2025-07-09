@@ -19,6 +19,7 @@ use llmspell_core::{
     types::{AgentInput, AgentOutput, ExecutionContext},
     ComponentMetadata, LLMSpellError, Result,
 };
+use llmspell_utils::{extract_optional_string, extract_parameters, extract_required_string};
 use parquet::arrow::ArrowWriter;
 use parquet::file::properties::WriterProperties;
 use serde::{Deserialize, Serialize};
@@ -304,20 +305,10 @@ impl CsvAnalyzerTool {
 
     /// Parse parameters from input
     fn parse_parameters(&self, params: &Value) -> Result<(CsvOperation, String, Option<Value>)> {
-        let operation_str = params
-            .get("operation")
-            .and_then(|v| v.as_str())
-            .unwrap_or("analyze");
+        let operation_str = extract_optional_string(params, "operation").unwrap_or("analyze");
         let operation: CsvOperation = operation_str.parse()?;
 
-        let content = params
-            .get("content")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| LLMSpellError::Validation {
-                message: "Missing 'content' parameter".to_string(),
-                field: Some("content".to_string()),
-            })?
-            .to_string();
+        let content = extract_required_string(params, "content")?.to_string();
 
         let options = params.get("options").cloned();
 
@@ -1247,14 +1238,8 @@ impl BaseAgent for CsvAnalyzerTool {
     }
 
     async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
-        let params =
-            input
-                .parameters
-                .get("parameters")
-                .ok_or_else(|| LLMSpellError::Validation {
-                    message: "Missing parameters".to_string(),
-                    field: Some("parameters".to_string()),
-                })?;
+        // Get parameters using shared utility
+        let params = extract_parameters(&input)?;
 
         let (operation, content, options) = self.parse_parameters(params)?;
 

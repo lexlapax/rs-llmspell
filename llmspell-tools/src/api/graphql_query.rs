@@ -14,6 +14,9 @@ use llmspell_core::{
     types::{AgentInput, AgentOutput, ExecutionContext},
     ComponentMetadata, LLMSpellError, Result,
 };
+use llmspell_utils::{
+    extract_optional_object, extract_optional_string, extract_parameters, extract_required_string,
+};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -394,53 +397,28 @@ impl GraphQLQueryTool {
 
     /// Parse parameters from input
     fn parse_parameters(&self, params: &Value) -> Result<GraphQLParameters> {
-        let operation_str = params
-            .get("operation")
-            .and_then(|v| v.as_str())
-            .unwrap_or("query");
+        let operation_str = extract_optional_string(params, "operation").unwrap_or("query");
         let operation: GraphQLOperation = operation_str.parse()?;
 
-        let endpoint = params
-            .get("endpoint")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| LLMSpellError::Validation {
-                message: "Missing required parameter 'endpoint'".to_string(),
-                field: Some("endpoint".to_string()),
-            })?
-            .to_string();
+        let endpoint = extract_required_string(params, "endpoint")?.to_string();
 
         let query = if operation == GraphQLOperation::Introspection {
             // For introspection, query is optional (we'll use built-in)
-            params
-                .get("query")
-                .and_then(|v| v.as_str())
+            extract_optional_string(params, "query")
                 .map(String::from)
                 .unwrap_or_default()
         } else {
-            params
-                .get("query")
-                .and_then(|v| v.as_str())
-                .ok_or_else(|| LLMSpellError::Validation {
-                    message: "Missing required parameter 'query'".to_string(),
-                    field: Some("query".to_string()),
-                })?
-                .to_string()
+            extract_required_string(params, "query")?.to_string()
         };
 
         let variables = params.get("variables").cloned();
-        let operation_name = params
-            .get("operation_name")
-            .and_then(|v| v.as_str())
-            .map(String::from);
+        let operation_name = extract_optional_string(params, "operation_name").map(String::from);
 
-        let headers = params
-            .get("headers")
-            .and_then(|v| v.as_object())
-            .map(|obj| {
-                obj.iter()
-                    .map(|(k, v)| (k.clone(), v.as_str().unwrap_or_default().to_string()))
-                    .collect()
-            });
+        let headers = extract_optional_object(params, "headers").map(|obj| {
+            obj.iter()
+                .map(|(k, v)| (k.clone(), v.as_str().unwrap_or_default().to_string()))
+                .collect()
+        });
 
         Ok(GraphQLParameters {
             operation,
@@ -476,14 +454,8 @@ impl BaseAgent for GraphQLQueryTool {
     }
 
     async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
-        let params =
-            input
-                .parameters
-                .get("parameters")
-                .ok_or_else(|| LLMSpellError::Validation {
-                    message: "Missing parameters".to_string(),
-                    field: Some("parameters".to_string()),
-                })?;
+        // Get parameters using shared utility
+        let params = extract_parameters(&input)?;
 
         let parameters = self.parse_parameters(params)?;
 

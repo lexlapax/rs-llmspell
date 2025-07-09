@@ -14,7 +14,10 @@ use llmspell_core::{
     ComponentMetadata, LLMSpellError, Result,
 };
 use llmspell_security::sandbox::{FileSandbox, SandboxContext};
-use llmspell_utils::file_utils;
+use llmspell_utils::{
+    extract_optional_bool, extract_optional_string, extract_parameters, extract_required_string,
+    file_utils,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
@@ -527,36 +530,14 @@ impl FileOperationsTool {
 
     /// Parse parameters from input
     fn parse_parameters(&self, params: &Value) -> Result<FileParameters> {
-        let operation_str = params
-            .get("operation")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| LLMSpellError::Validation {
-                message: "Missing required parameter 'operation'".to_string(),
-                field: Some("operation".to_string()),
-            })?;
+        let operation_str = extract_required_string(params, "operation")?;
         let operation: FileOperation = operation_str.parse()?;
 
-        let path = params
-            .get("path")
-            .and_then(|v| v.as_str())
-            .map(PathBuf::from);
-
-        let content = params
-            .get("content")
-            .and_then(|v| v.as_str())
-            .map(String::from);
-
-        let from_path = params
-            .get("from")
-            .and_then(|v| v.as_str())
-            .map(PathBuf::from);
-
-        let to_path = params.get("to").and_then(|v| v.as_str()).map(PathBuf::from);
-
-        let recursive = params
-            .get("recursive")
-            .and_then(|v| v.as_bool())
-            .unwrap_or(false);
+        let path = extract_optional_string(params, "path").map(PathBuf::from);
+        let content = extract_optional_string(params, "content").map(String::from);
+        let from_path = extract_optional_string(params, "from").map(PathBuf::from);
+        let to_path = extract_optional_string(params, "to").map(PathBuf::from);
+        let recursive = extract_optional_bool(params, "recursive").unwrap_or(false);
 
         Ok(FileParameters {
             operation,
@@ -592,15 +573,8 @@ impl BaseAgent for FileOperationsTool {
     }
 
     async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput> {
-        let params =
-            input
-                .parameters
-                .get("parameters")
-                .ok_or_else(|| LLMSpellError::Validation {
-                    message: "Missing parameters".to_string(),
-                    field: Some("parameters".to_string()),
-                })?;
-
+        // Get parameters using shared utility
+        let params = extract_parameters(&input)?;
         let parameters = self.parse_parameters(params)?;
 
         // Create sandbox

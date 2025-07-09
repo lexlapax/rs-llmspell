@@ -1,26 +1,28 @@
 -- tools-run-all.lua: Execute all tool examples and generate a summary report
 -- This script runs all tool example files and collects results
 
--- Load test helpers (assuming it's in the same directory)
-local TestHelpers = dofile("test-helpers.lua")
+-- Load test helpers
+local TestHelpers = dofile("examples/test-helpers.lua")
 
 -- List of example files to run (in order)
 local example_files = {
     -- Working reference
-    "tools-utility-reference.lua",
+    "examples/tools-utility-reference.lua",
     
     -- Core examples
-    "tools-showcase.lua",
-    "tools-utility.lua", 
-    "tools-filesystem.lua",
-    "tools-system.lua",
+    "examples/tools-showcase.lua",
+    "examples/tools-utility.lua", 
+    "examples/tools-filesystem.lua",
+    "examples/tools-system.lua",
     
     -- Category examples
-    "tools-data.lua",
-    "tools-media.lua",
-    "tools-security.lua",
-    -- "tools-workflow.lua",
-    -- "tools-performance.lua"
+    "examples/tools-data.lua",
+    "examples/tools-media.lua",
+    "examples/tools-security.lua",
+    
+    -- Integration examples
+    "examples/tools-workflow.lua",
+    "examples/tools-performance.lua"
 }
 
 -- Results storage

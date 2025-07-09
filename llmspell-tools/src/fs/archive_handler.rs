@@ -24,6 +24,7 @@ use llmspell_core::{
     ComponentMetadata, LLMSpellError, Result,
 };
 use llmspell_security::sandbox::FileSandbox;
+use llmspell_utils::{extract_parameters, extract_required_string};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs::{self, File};
@@ -553,6 +554,7 @@ impl ArchiveHandlerTool {
 
     /// Create archive
     async fn create_archive(&self, params: &Value) -> Result<Value> {
+        eprintln!("DEBUG create_archive: params = {:?}", params);
         let archive_path = params
             .get("archive_path")
             .and_then(|v| v.as_str())
@@ -1068,22 +1070,9 @@ impl BaseAgent for ArchiveHandlerTool {
         input: AgentInput,
         _context: ExecutionContext,
     ) -> llmspell_core::Result<AgentOutput> {
-        let params =
-            input
-                .parameters
-                .get("parameters")
-                .ok_or_else(|| LLMSpellError::Validation {
-                    message: "Missing parameters".to_string(),
-                    field: Some("parameters".to_string()),
-                })?;
-
-        let operation = params
-            .get("operation")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| LLMSpellError::Validation {
-                message: "Missing 'operation' parameter".to_string(),
-                field: Some("operation".to_string()),
-            })?;
+        // Get parameters using shared utility
+        let params = extract_parameters(&input)?;
+        let operation = extract_required_string(params, "operation")?;
 
         let result = match operation {
             "extract" => self.extract_archive(params).await?,
