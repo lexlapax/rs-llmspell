@@ -23,6 +23,7 @@
 **Success Criteria Summary:**
 - [x] ModelSpecifier parses `provider/model` syntax correctly ✅
 - [x] Base URL overrides work at agent creation time ✅
+- [ ] JSON API for parsing tool outputs in scripts
 - [ ] 25 self-contained tools fully implemented and tested (28/25 complete)
 - [x] Tool registry with discovery and validation ✅
 - [x] Security sandboxing prevents unauthorized access ✅
@@ -33,10 +34,11 @@
 - [ ] Performance: <10ms tool initialization
 - [ ] Complete documentation for all 25 tools
 
-**Progress Update (2025-07-08):**
+**Progress Update (2025-07-10):**
 - [x] Task 2.1.1: Implement ModelSpecifier 2025-06-27
 - [x] Task 2.1.2: Update ProviderManager 2025-06-27
 - [x] Task 2.1.3: Update Script APIs 2025-06-27
+- [ ] Task 2.1.4: Implement JSON API for Script Bridge (NEW)
 - [x] Task 2.2.1: Enhance Tool Trait 2025-06-27
 - [x] Task 2.2.2: Implement Tool Registry 2025-06-27
 - [x] Task 2.2.3: Security Sandbox Implementation 2025-06-27
@@ -175,6 +177,127 @@
 - [x] Integration tests pass
 - [x] Examples demonstrate both syntaxes
 - [x] Migration guide written
+
+### Task 2.1.4: Implement JSON API for Script Bridge
+**Priority**: CRITICAL  
+**Estimated Time**: 6 hours  
+**Assignee**: Bridge Team Lead
+**Dependencies**: Task 2.1.3 complete
+**Started**: TBD
+**Completed**: TBD
+
+**Description**: Implement language-agnostic JSON parsing/stringifying API in the bridge layer to enable scripts to properly handle tool outputs (which are JSON strings).
+
+**Background**: Tools return their output as JSON strings in the `output` field. Without JSON parsing capabilities, scripts (especially Lua) cannot access the structured data within these outputs, severely limiting tool usefulness.
+
+**Acceptance Criteria:**
+- [ ] `JsonApiDefinition` added to `ApiSurface` in engine/types.rs
+- [ ] `inject_json_api()` function implemented for Lua engine
+- [ ] `JSON.parse(string)` available in all Lua scripts
+- [ ] `JSON.stringify(table)` available in all Lua scripts
+- [ ] JSON parsing handles all valid JSON types (null, bool, number, string, array, object)
+- [ ] JSON stringifying handles all Lua types correctly
+- [ ] Error handling for invalid JSON strings
+- [ ] Consistent behavior across all script engines
+- [ ] Tool outputs can be parsed to access structured data
+- [ ] Performance: JSON operations < 1ms for typical tool outputs
+
+**Sub-tasks:**
+1. **Task 2.1.4.1**: Define JSON API in engine types
+   - [ ] Add `JsonApiDefinition` struct to `llmspell-bridge/src/engine/types.rs`
+   - [ ] Add `json_api` field to `ApiSurface` struct
+   - [ ] Implement `JsonApiDefinition::standard()` method
+   - [ ] Update `ApiSurface::standard()` to include JSON API
+
+2. **Task 2.1.4.2**: Implement JSON API module for Lua
+   - [ ] Create `llmspell-bridge/src/lua/api/json.rs`
+   - [ ] Implement `inject_json_api()` function
+   - [ ] Move `lua_value_to_json()` from tool.rs to json.rs
+   - [ ] Implement `json_value_to_lua()` for parsing
+   - [ ] Add to `llmspell-bridge/src/lua/api/mod.rs` exports
+
+3. **Task 2.1.4.3**: Create JSON parse function
+   - [ ] Implement `JSON.parse()` Lua function
+   - [ ] Use `serde_json::from_str()` for parsing
+   - [ ] Convert `serde_json::Value` to Lua values
+   - [ ] Handle all JSON types (null, bool, number, string, array, object)
+   - [ ] Return proper Lua error on invalid JSON
+
+4. **Task 2.1.4.4**: Create JSON stringify function
+   - [ ] Implement `JSON.stringify()` Lua function
+   - [ ] Reuse existing `lua_value_to_json()` logic
+   - [ ] Use `serde_json::to_string()` for output
+   - [ ] Handle Lua tables with numeric and string keys
+   - [ ] Detect and handle array vs object tables
+
+5. **Task 2.1.4.5**: Update engine to inject JSON API
+   - [ ] Update `LuaEngine::inject_apis()` in engine.rs
+   - [ ] Call `inject_json_api()` after other API injections
+   - [ ] Ensure JSON global is available in all scripts
+   - [ ] Update engine tests to verify JSON availability
+
+6. **Task 2.1.4.6**: Write comprehensive tests
+   - [ ] Unit tests for `lua_value_to_json()` conversions
+   - [ ] Unit tests for `json_value_to_lua()` conversions
+   - [ ] Integration tests for JSON.parse() with various inputs
+   - [ ] Integration tests for JSON.stringify() with various inputs
+   - [ ] Roundtrip tests (parse → stringify → parse)
+   - [ ] Error case tests (invalid JSON, unsupported types)
+   - [ ] Performance benchmarks for typical tool outputs
+
+7. **Task 2.1.4.7**: Update tool examples
+   - [ ] Update all tool examples to use JSON.parse() for outputs
+   - [ ] Fix examples that incorrectly access result.result.output
+   - [ ] Add JSON usage examples to test-helpers.lua
+   - [ ] Create dedicated JSON example demonstrating all features
+   - [ ] Update tools-utility.lua to properly parse base64 output
+
+8. **Task 2.1.4.8**: Prepare for JavaScript engine
+   - [ ] Create stub `llmspell-bridge/src/javascript/api/json.rs`
+   - [ ] Document that JS has native JSON support
+   - [ ] Ensure API consistency plan for future JS implementation
+   - [ ] Add TODO comments for Phase 12 implementation
+
+**Implementation Plan:**
+1. **Hour 1**: Define JSON API types and update ApiSurface
+2. **Hour 2**: Implement core JSON module with conversion functions
+3. **Hour 3**: Implement JSON.parse() and JSON.stringify() functions
+4. **Hour 4**: Integrate with LuaEngine and test basic functionality
+5. **Hour 5**: Write comprehensive tests and fix issues
+6. **Hour 6**: Update examples and documentation
+
+**Definition of Done:**
+- [ ] JSON API available in all Lua scripts
+- [ ] All tool outputs can be parsed to access structured data
+- [ ] Examples updated and working correctly
+- [ ] All tests passing (unit, integration, performance)
+- [ ] Documentation updated in phase-02-design-doc.md
+- [ ] No memory leaks in JSON operations
+- [ ] Performance meets requirements (<1ms for typical operations)
+- [ ] Error messages are clear and helpful
+- [ ] Code follows project style guidelines
+- [ ] PR approved by at least one team member
+
+**Testing Strategy:**
+1. **Unit Tests**: Test each conversion function in isolation
+2. **Integration Tests**: Test JSON API from Lua scripts
+3. **Tool Integration**: Verify all tools work with JSON parsing
+4. **Performance Tests**: Benchmark parsing/stringifying operations
+5. **Error Tests**: Verify proper error handling for edge cases
+6. **Memory Tests**: Check for leaks in conversion operations
+
+**Risk Mitigation:**
+- **Risk**: Performance overhead of JSON conversions
+  - **Mitigation**: Use serde_json's efficient parsing, benchmark early
+- **Risk**: Memory leaks in Lua/Rust boundary
+  - **Mitigation**: Careful lifetime management, use mlua's safety features
+- **Risk**: Inconsistent behavior across future script engines
+  - **Mitigation**: Document expected behavior clearly, create conformance tests
+
+**Dependencies:**
+- Requires `serde_json` (already in dependencies)
+- Requires `mlua` Lua value conversion (already implemented)
+- Must maintain compatibility with existing tool output format
 
 ---
 
@@ -1246,36 +1369,103 @@
 
 ### Task 2.10.1: Script Integration Tests
 **Priority**: CRITICAL  
-**Estimated Time**: 5 hours  
+**Estimated Time**: 8 hours (revised)  
 **Assignee**: Full Team
 **Dependencies**: All tools implemented
+**Status**: IN PROGRESS
 
-**Description**: Comprehensive integration testing with scripts.
+**Description**: Comprehensive integration testing with scripts, ensuring all 26 tools work correctly from Lua.
+
+**Current Issues Found:**
+- Tool output format: Returns `{success: bool, output: "JSON string"}` but no JSON parser available
+- Only 9/26 tools have integration tests (lua_tool_integration.lua)
+- Examples have bugs checking non-existent `result.result.output`
+- Tool.executeAsync exists but not fully utilized
+- Performance benchmarking missing
+
+**Subtasks:**
+
+#### Task 2.10.1.1: Fix Tool Output Format Handling
+- [ ] Investigate why examples show parsed JSON but actual output is string
+- [ ] Determine if bridge should auto-parse JSON or if we need JSON library
+- [ ] Update test helpers to handle current output format correctly
+- [ ] Fix examples that incorrectly access `result.result.output`
+
+#### Task 2.10.1.2: Complete Tool Test Coverage (26 tools)
+- [x] Utility Tools (9): base64_encoder, calculator, data_validation, date_time_handler, 
+      diff_calculator, hash_calculator, template_engine, text_manipulator, uuid_generator
+- [ ] File System Tools (5): file_operations, archive_handler, file_watcher, 
+      file_converter, file_search
+- [ ] System Integration Tools (4): environment_reader, process_executor, 
+      service_checker, system_monitor
+- [ ] Data Processing Tools (4): json_processor, csv_analyzer, http_request, graphql_query
+- [ ] Media Processing Tools (3): audio_processor, video_processor, image_processor
+- [ ] Search Tools (1): web_search
+
+#### Task 2.10.1.3: Test Tool Chaining Across Categories
+- [ ] Utility → Utility → Utility (e.g., UUID → Hash → Base64)
+- [ ] System → Data → Utility (e.g., Env → JSON → Template)
+- [ ] File → Data → File (e.g., Read → CSV → Write)
+- [ ] Data → System → File (e.g., HTTP → Process → Save)
+- [ ] Test error propagation through chains
+
+#### Task 2.10.1.4: Verify DRY Principle (llmspell-utils usage)
+- [ ] Test that similar operations produce consistent results across tools
+- [ ] Verify hash functions use same algorithms/formats
+- [ ] Check UUID generation consistency
+- [ ] Verify encoding/decoding standards
+- [ ] Test file operations consistency
+- [ ] Check error message formats
+
+#### Task 2.10.1.5: Performance Benchmarking
+- [ ] Measure tool initialization time (<10ms target)
+- [ ] Benchmark simple operations per tool category
+- [ ] Test performance under load (100 iterations)
+- [ ] Measure memory usage per tool
+- [ ] Create performance regression tests
+- [ ] Document performance characteristics
+
+#### Task 2.10.1.6: Test Provider Enhancement
+- [ ] Test Agent.create with "provider/model" syntax
+- [ ] Verify base_url override functionality
+- [ ] Test fallback to default provider
+- [ ] Verify backward compatibility with old syntax
+- [ ] Test error handling for invalid providers
+
+#### Task 2.10.1.7: Test Async Tool Execution
+- [ ] Verify Tool.executeAsync works for all async tools
+- [ ] Test HTTP tool with real requests
+- [ ] Test GraphQL tool functionality
+- [ ] Verify coroutine handling
+- [ ] Test timeout behavior
+- [ ] Check error propagation in async context
+
+#### Task 2.10.1.8: Document Integration Patterns
+- [ ] Document correct tool output access pattern
+- [ ] Create tool chaining examples
+- [ ] Document async vs sync tool usage
+- [ ] Write error handling guide
+- [ ] Create performance optimization guide
+- [ ] Update examples to use correct patterns
 
 **Acceptance Criteria:**
-- [ ] All 25 tools callable from Lua
-- [ ] Provider enhancement works in scripts
-- [ ] Tool chaining tested across categories
-- [ ] DRY principle verified (llmspell-utils usage)
-- [ ] Error propagation correct
-- [ ] Performance acceptable for all tools
-
-**Implementation Steps:**
-1. Create integration test framework in tests/integration/
-2. Write Lua test scripts for each tool category
-3. Test tool combinations and chaining scenarios
-4. Verify error propagation from tools to scripts
-5. Benchmark script execution performance
-6. Test streaming operations where applicable
-7. Document common usage patterns
-8. Create example scripts for documentation
+- [ ] All 26 tools callable from Lua and return expected results
+- [ ] Provider enhancement (model syntax) works in scripts
+- [ ] Tool chaining tested across all category combinations
+- [ ] DRY principle verified with consistent utilities usage
+- [ ] Error propagation works correctly through all paths
+- [ ] Performance meets <10ms initialization target
+- [ ] All async tools work without coroutine errors
+- [ ] Documentation reflects actual implementation
 
 **Definition of Done:**
-- [ ] All 25 tools tested from scripts
-- [ ] Common patterns documented
-- [ ] Performance benchmarked
-- [ ] No integration issues
-- [ ] Examples ready for users
+- [ ] All 26 tools have comprehensive integration tests
+- [ ] Tool output format issue resolved and documented
+- [ ] Performance benchmarks automated and passing
+- [ ] All examples updated and working correctly
+- [ ] Integration patterns documented with examples
+- [ ] No integration issues or test failures
+- [ ] CI can run integration test suite
 
 ### Task 2.10.2: Security Validation
 **Priority**: CRITICAL  

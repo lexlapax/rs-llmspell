@@ -137,6 +137,12 @@ Rs-LLMSpell follows a carefully structured 17-phase implementation approach that
   - Base URL overrides in agent configuration for custom endpoints
   - CLI support for new model specification syntax
   - Built-in tools examples using convenience syntax
+- **JSON API for Script Bridge**:
+  - Language-agnostic JSON parsing/stringifying in bridge layer
+  - `JsonApiDefinition` added to `ApiSurface` in engine types
+  - `inject_json_api()` function for each script engine
+  - `JSON.parse()` and `JSON.stringify()` available in all scripts
+  - Enables proper handling of tool outputs (which return JSON strings)
 
 **Success Criteria**:
 - [ ] 26+ self-contained tools functional across all categories
@@ -150,6 +156,9 @@ Rs-LLMSpell follows a carefully structured 17-phase implementation approach that
 - [ ] ModelSpecifier parsing works for all supported providers
 - [ ] CLI accepts both full configuration and "provider/model" syntax
 - [ ] Base URL overrides function correctly for custom endpoints
+- [ ] JSON API available in all script environments (JSON.parse/stringify)
+- [ ] Tool outputs (JSON strings) can be parsed to native objects
+- [ ] Scripts can work with structured data from tool results
 
 **Testing Requirements**:
 - Individual tool unit tests
@@ -157,6 +166,9 @@ Rs-LLMSpell follows a carefully structured 17-phase implementation approach that
 - Security sandbox validation
 - Timeout enforcement tests
 - Cross-tool compatibility tests
+- JSON API functionality tests (parse/stringify roundtrip)
+- Tool output parsing validation
+- Cross-language JSON consistency tests (same behavior in all engines)
 
 ---
 

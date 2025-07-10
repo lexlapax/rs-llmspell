@@ -603,6 +603,170 @@ Benchmarking shows minimal overhead:
 3. **For existing scripts**: No changes needed if using agent-based approach
 4. **For new scripts**: Prefer Tool.executeAsync() for all tool execution
 
+### 1.7 JSON API for Script Bridge
+
+**Problem**: Tool outputs are returned as JSON strings, but Lua lacks built-in JSON parsing capabilities. This forces scripts to work with raw JSON strings rather than structured data, limiting the usefulness of tool outputs.
+
+**Solution**: Implement a language-agnostic JSON API at the bridge level that provides consistent JSON parsing/stringifying across all scripting languages.
+
+**Architecture:**
+
+```rust
+// llmspell-bridge/src/engine/types.rs
+// Add to ApiSurface struct
+pub struct ApiSurface {
+    pub agent_api: AgentApiDefinition,
+    pub tool_api: ToolApiDefinition,
+    pub workflow_api: WorkflowApiDefinition,
+    pub streaming_api: StreamingApiDefinition,
+    pub json_api: JsonApiDefinition,  // NEW
+}
+
+// JSON API definition
+#[derive(Debug, Clone)]
+pub struct JsonApiDefinition {
+    /// Global object name (e.g., "JSON" in Lua/JS)
+    pub global_name: String,
+    /// Function to parse JSON string to native value
+    pub parse_function: String,
+    /// Function to stringify native value to JSON
+    pub stringify_function: String,
+}
+
+impl JsonApiDefinition {
+    pub fn standard() -> Self {
+        Self {
+            global_name: "JSON".to_string(),
+            parse_function: "parse".to_string(),
+            stringify_function: "stringify".to_string(),
+        }
+    }
+}
+```
+
+**Lua Implementation:**
+
+```rust
+// llmspell-bridge/src/lua/api/json.rs
+pub fn inject_json_api(
+    lua: &mlua::Lua,
+    api_def: &JsonApiDefinition,
+) -> Result<(), LLMSpellError> {
+    let json_table = lua.create_table()?;
+    
+    // JSON.parse(string) -> table/value
+    let parse_fn = lua.create_function(|lua, json_str: String| {
+        let json_value = serde_json::from_str::<serde_json::Value>(&json_str)
+            .map_err(|e| mlua::Error::RuntimeError(format!("JSON parse error: {}", e)))?;
+        json_value_to_lua(lua, json_value)
+    })?;
+    
+    // JSON.stringify(value) -> string
+    let stringify_fn = lua.create_function(|lua, value: mlua::Value| {
+        let json_value = lua_value_to_json(value)?;
+        serde_json::to_string(&json_value)
+            .map_err(|e| mlua::Error::RuntimeError(format!("JSON stringify error: {}", e)))
+    })?;
+    
+    json_table.set(api_def.parse_function.as_str(), parse_fn)?;
+    json_table.set(api_def.stringify_function.as_str(), stringify_fn)?;
+    
+    lua.globals().set(api_def.global_name.as_str(), json_table)?;
+    Ok(())
+}
+
+// Reuse existing conversion functions from tool.rs
+fn json_value_to_lua(lua: &mlua::Lua, value: serde_json::Value) -> mlua::Result<mlua::Value> {
+    match value {
+        serde_json::Value::Null => Ok(mlua::Value::Nil),
+        serde_json::Value::Bool(b) => Ok(mlua::Value::Boolean(b)),
+        serde_json::Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                Ok(mlua::Value::Integer(i))
+            } else if let Some(f) = n.as_f64() {
+                Ok(mlua::Value::Number(f))
+            } else {
+                Ok(mlua::Value::Nil)
+            }
+        }
+        serde_json::Value::String(s) => Ok(mlua::Value::String(lua.create_string(&s)?)),
+        serde_json::Value::Array(arr) => {
+            let table = lua.create_table()?;
+            for (i, val) in arr.into_iter().enumerate() {
+                table.set(i + 1, json_value_to_lua(lua, val)?)?;
+            }
+            Ok(mlua::Value::Table(table))
+        }
+        serde_json::Value::Object(map) => {
+            let table = lua.create_table()?;
+            for (k, v) in map {
+                table.set(k, json_value_to_lua(lua, v)?)?;
+            }
+            Ok(mlua::Value::Table(table))
+        }
+    }
+}
+```
+
+**Usage Pattern:**
+
+```lua
+-- Parse tool output
+local tool_result = Tool.executeAsync("uuid_generator", {operation = "generate"})
+if tool_result.success and tool_result.output then
+    -- Parse JSON string to Lua table
+    local parsed = JSON.parse(tool_result.output)
+    print("UUID:", parsed.result.uuid)
+    print("Version:", parsed.result.version)
+end
+
+-- Stringify data for tool input
+local data = {
+    items = {
+        {name = "item1", value = 42},
+        {name = "item2", value = 84}
+    }
+}
+local json_str = JSON.stringify(data)
+
+-- Use with json_processor tool
+local result = Tool.executeAsync("json_processor", {
+    data = json_str,
+    query = ".items[] | select(.value > 50)"
+})
+```
+
+**JavaScript Implementation (Future):**
+
+```javascript
+// llmspell-bridge/src/javascript/api/json.rs
+// JavaScript already has native JSON object, so we just ensure consistency
+pub fn inject_json_api(
+    ctx: &JavaScriptContext,
+    api_def: &JsonApiDefinition,
+) -> Result<(), LLMSpellError> {
+    // JavaScript's native JSON object already provides parse/stringify
+    // This ensures the API exists and matches our definition
+    ctx.ensure_global_object(&api_def.global_name)?;
+    Ok(())
+}
+```
+
+**Benefits:**
+
+1. **Language Agnostic**: Same API surface across Lua, JavaScript, Python
+2. **Performance**: Native Rust serde_json performance vs pure-script implementations
+3. **Type Safety**: Proper error handling and type conversions
+4. **Consistency**: Follows established bridge API patterns
+5. **Reusability**: Leverages existing conversion code in the bridge
+
+**Implementation Impact:**
+
+- All tool examples can properly parse structured output
+- Scripts can work with native data structures instead of strings
+- Enables complex data transformations between tools
+- No external dependencies or embedded parsers needed
+
 ---
 
 ## 2. Technical Design Details

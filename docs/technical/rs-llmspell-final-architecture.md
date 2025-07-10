@@ -4966,6 +4966,7 @@ Logger       -- Structured logging
 Config       -- Configuration access
 Security     -- Security context information
 Utils        -- Utility functions
+JSON         -- JSON parsing and stringifying
 ```
 
 #### Module Loading Behavior by Security Profile
@@ -6399,6 +6400,167 @@ ErrorHandler.set_logger(logger)
 -- All errors will be automatically logged with full context
 ```
 
+#### 8. **Lua JSON API**
+
+The JSON global provides native JSON parsing and stringifying capabilities, bridging the gap between Lua tables and JSON strings used by tools and external APIs:
+
+```lua
+-- Parse JSON string to Lua table
+local json_string = '{"name": "researcher", "model": "gpt-4", "temperature": 0.7}'
+local data = JSON.parse(json_string)
+print(data.name)        -- "researcher"
+print(data.model)       -- "gpt-4"
+print(data.temperature) -- 0.7
+
+-- Stringify Lua table to JSON
+local config = {
+    name = "assistant",
+    tools = {"web_search", "calculator"},
+    settings = {
+        temperature = 0.5,
+        max_tokens = 2000
+    }
+}
+local json_output = JSON.stringify(config)
+-- {"name":"assistant","tools":["web_search","calculator"],"settings":{"temperature":0.5,"max_tokens":2000}}
+
+-- Working with tool outputs
+local tool_result = Tool.executeAsync("uuid_generator", {
+    operation = "generate",
+    version = "v4"
+})
+
+if tool_result.success and tool_result.output then
+    -- Tool outputs are JSON strings, parse them for structured access
+    local parsed = JSON.parse(tool_result.output)
+    print("Generated UUID:", parsed.result.uuid)
+    print("UUID Version:", parsed.result.version)
+end
+
+-- Complex data transformations
+local analysis_data = {
+    results = {
+        {category = "positive", score = 0.85, count = 42},
+        {category = "neutral", score = 0.10, count = 8},
+        {category = "negative", score = 0.05, count = 2}
+    },
+    metadata = {
+        total_samples = 52,
+        analysis_time = os.time(),
+        confidence = 0.95
+    }
+}
+
+-- Convert to JSON for tool input
+local json_input = JSON.stringify(analysis_data)
+local processed = Tool.executeAsync("json_processor", {
+    data = json_input,
+    query = ".results[] | select(.score > 0.5)"
+})
+
+-- Chain multiple tools with JSON data
+local workflow_data = {
+    text = "Analyze this important business document...",
+    options = {
+        extract_entities = true,
+        summarize = true,
+        sentiment_analysis = true
+    }
+}
+
+-- Tool 1: Text analysis
+local text_result = Tool.executeAsync("text_analyzer", {
+    input = JSON.stringify(workflow_data)
+})
+local text_analysis = JSON.parse(text_result.output)
+
+-- Tool 2: Entity enrichment
+local enriched_result = Tool.executeAsync("entity_enricher", {
+    entities = JSON.stringify(text_analysis.result.entities)
+})
+local enriched_data = JSON.parse(enriched_result.output)
+
+-- Tool 3: Report generation
+local report = Tool.executeAsync("report_generator", {
+    analysis = JSON.stringify({
+        text_analysis = text_analysis.result,
+        enriched_entities = enriched_data.result
+    })
+})
+
+-- Error handling with JSON parsing
+local function safe_parse(json_str)
+    local success, result = pcall(JSON.parse, json_str)
+    if success then
+        return result
+    else
+        logger:error("JSON parse error", {
+            error = result,
+            input = json_str:sub(1, 100) -- Log first 100 chars
+        })
+        return nil
+    end
+end
+
+-- JSON with custom formatting (when pretty output needed)
+local debug_data = {
+    stage = "processing",
+    items_processed = 150,
+    errors = {},
+    performance = {
+        avg_time_ms = 23.5,
+        total_time_s = 3.525
+    }
+}
+
+-- Note: JSON.stringify produces compact output by default
+-- For pretty printing, use tool output which is already formatted
+local compact = JSON.stringify(debug_data)
+logger:debug("Processing stats", {data = compact})
+```
+
+**JSON API Design Principles:**
+
+1. **Language-Agnostic**: Same JSON.parse() and JSON.stringify() API across Lua, JavaScript, and Python
+2. **Performance**: Uses native Rust serde_json for optimal performance
+3. **Type Safety**: Proper conversion between script types and JSON types
+4. **Error Handling**: Clear error messages for invalid JSON
+5. **Tool Integration**: Seamlessly works with tool inputs and outputs
+
+**Common Patterns:**
+
+```lua
+-- 1. Tool Output Processing Pattern
+local function process_tool_output(tool_name, params)
+    local result = Tool.executeAsync(tool_name, params)
+    if result.success and result.output then
+        return JSON.parse(result.output)
+    else
+        return {error = result.error or "Unknown error"}
+    end
+end
+
+-- 2. Batch Processing Pattern
+local function process_batch(items)
+    local results = {}
+    for i, item in ipairs(items) do
+        local json_item = JSON.stringify(item)
+        local processed = Tool.executeAsync("processor", {data = json_item})
+        results[i] = JSON.parse(processed.output)
+    end
+    return results
+end
+
+-- 3. Configuration Loading Pattern
+local function load_config(config_str)
+    local config = JSON.parse(config_str)
+    -- Validate required fields
+    assert(config.name, "Config missing required field: name")
+    assert(config.model, "Config missing required field: model")
+    return config
+end
+```
+
 ---
 
 ## Code Organization Patterns Without Modules
@@ -7780,6 +7942,166 @@ secureLogger.info("User login", {
     apiKey: "key-123456"   // Will be redacted
 });
 ```
+
+#### 7. **JavaScript JSON API**
+
+JavaScript has native JSON support, but Rs-LLMSpell ensures consistent behavior across all scripting languages:
+
+```javascript
+// Native JavaScript JSON works as expected
+const data = {
+    name: "researcher",
+    model: "gpt-4",
+    temperature: 0.7
+};
+const jsonString = JSON.stringify(data);
+const parsed = JSON.parse(jsonString);
+
+// Working with tool outputs (same pattern as Lua)
+const toolResult = await Tool.executeAsync("uuid_generator", {
+    operation: "generate",
+    version: "v4"
+});
+
+if (toolResult.success && toolResult.output) {
+    // Tool outputs are JSON strings, parse them for structured access
+    const parsed = JSON.parse(toolResult.output);
+    console.log("Generated UUID:", parsed.result.uuid);
+    console.log("UUID Version:", parsed.result.version);
+}
+
+// Async tool chaining with JSON data
+async function processDataPipeline(inputData) {
+    // Step 1: Analyze data
+    const analysisResult = await Tool.executeAsync("data_analyzer", {
+        data: JSON.stringify(inputData),
+        analysisType: "comprehensive"
+    });
+    const analysisData = JSON.parse(analysisResult.output);
+    
+    // Step 2: Transform results
+    const transformResult = await Tool.executeAsync("data_transformer", {
+        input: JSON.stringify(analysisData.result),
+        transformations: ["normalize", "aggregate", "summarize"]
+    });
+    const transformedData = JSON.parse(transformResult.output);
+    
+    // Step 3: Generate report
+    const reportResult = await Tool.executeAsync("report_generator", {
+        data: JSON.stringify({
+            original: inputData,
+            analysis: analysisData.result,
+            transformed: transformedData.result
+        }),
+        format: "pdf",
+        template: "executive_summary"
+    });
+    
+    return JSON.parse(reportResult.output);
+}
+
+// Error handling with JSON parsing
+async function safeToolExecution(toolName, params) {
+    try {
+        const result = await Tool.executeAsync(toolName, params);
+        
+        if (result.success && result.output) {
+            try {
+                return {
+                    success: true,
+                    data: JSON.parse(result.output)
+                };
+            } catch (parseError) {
+                logger.error("JSON parse error", {
+                    tool: toolName,
+                    error: parseError.message,
+                    output: result.output.substring(0, 100)
+                });
+                return {
+                    success: false,
+                    error: "Invalid JSON output from tool"
+                };
+            }
+        } else {
+            return {
+                success: false,
+                error: result.error || "Tool execution failed"
+            };
+        }
+    } catch (error) {
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+}
+
+// Working with streaming JSON data
+async function* streamingJSONProcessor(dataStream) {
+    for await (const chunk of dataStream) {
+        try {
+            // Each chunk is a JSON string
+            const parsed = JSON.parse(chunk);
+            
+            // Process and yield transformed data
+            yield JSON.stringify({
+                ...parsed,
+                processed: true,
+                timestamp: Date.now()
+            });
+        } catch (error) {
+            yield JSON.stringify({
+                error: error.message,
+                chunk: chunk.substring(0, 50),
+                timestamp: Date.now()
+            });
+        }
+    }
+}
+
+// JSON Schema validation pattern
+function validateToolOutput(output, expectedSchema) {
+    try {
+        const parsed = JSON.parse(output);
+        
+        // Basic schema validation
+        for (const [key, type] of Object.entries(expectedSchema)) {
+            if (!(key in parsed)) {
+                throw new Error(`Missing required field: ${key}`);
+            }
+            if (typeof parsed[key] !== type) {
+                throw new Error(`Invalid type for ${key}: expected ${type}, got ${typeof parsed[key]}`);
+            }
+        }
+        
+        return { valid: true, data: parsed };
+    } catch (error) {
+        return { valid: false, error: error.message };
+    }
+}
+
+// Pretty printing for debugging
+function debugToolOutput(toolName, result) {
+    if (result.success && result.output) {
+        try {
+            const parsed = JSON.parse(result.output);
+            console.log(`=== ${toolName} Output ===`);
+            console.log(JSON.stringify(parsed, null, 2));
+            console.log("========================");
+        } catch (error) {
+            console.error(`Failed to parse ${toolName} output:`, error.message);
+        }
+    }
+}
+```
+
+**JavaScript JSON Best Practices:**
+
+1. **Always parse tool outputs**: Tools return JSON strings, not objects
+2. **Use try-catch for parsing**: Handle malformed JSON gracefully
+3. **Stringify complex inputs**: When passing objects to tools
+4. **Leverage native features**: Use JavaScript's built-in JSON capabilities
+5. **Type checking**: Validate parsed data structure before use
 
 # Part IV: Built-in Components Library
 
