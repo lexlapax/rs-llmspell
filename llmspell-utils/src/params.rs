@@ -333,12 +333,12 @@ mod tests {
         let params = json!({
             "int": 42,
             "uint": 42,
-            "float": 3.14
+            "float": 3.14159
         });
 
         assert_eq!(extract_required_i64(&params, "int").unwrap(), 42);
         assert_eq!(extract_required_u64(&params, "uint").unwrap(), 42);
-        assert!((extract_required_f64(&params, "float").unwrap() - 3.14).abs() < 0.001);
+        assert!((extract_required_f64(&params, "float").unwrap() - 3.14159).abs() < 0.00001);
     }
 
     #[test]

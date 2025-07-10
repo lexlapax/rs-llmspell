@@ -45,79 +45,93 @@ pub fn inject_tool_api(
             let tool_arc_for_execute = tool_arc.clone();
             tool_table.set(
                 "execute",
-                lua.create_async_function(move |lua, args: mlua::Table| {
-                    let tool_instance = tool_arc_for_execute.clone();
-                    async move {
-                        // Convert table to parameters
-                        let mut parameters = serde_json::Map::new();
+                lua.create_async_function(
+                    move |lua, (_self_table, args): (mlua::Table, mlua::Table)| {
+                        let tool_instance = tool_arc_for_execute.clone();
+                        async move {
+                            // Convert table to parameters
+                            let mut parameters = serde_json::Map::new();
 
-                        // If args has a "parameters" key, use its contents
-                        if let Ok(params_table) = args.get::<_, mlua::Table>("parameters") {
-                            for (key, value) in
-                                params_table.pairs::<mlua::Value, mlua::Value>().flatten()
-                            {
-                                if let mlua::Value::String(key_str) = key {
-                                    let key_string = key_str.to_str().unwrap_or("").to_string();
+                            // If args has a "parameters" key, use its contents
+                            if let Ok(params_table) = args.get::<_, mlua::Table>("parameters") {
+                                for (key, value) in
+                                    params_table.pairs::<mlua::Value, mlua::Value>().flatten()
+                                {
+                                    let key_string = match key {
+                                        mlua::Value::String(s) => {
+                                            s.to_str().unwrap_or("").to_string()
+                                        }
+                                        mlua::Value::Integer(i) => i.to_string(),
+                                        mlua::Value::Number(n) => n.to_string(),
+                                        _ => continue,
+                                    };
+                                    let json_value = lua_value_to_json(value)?;
+                                    parameters.insert(key_string, json_value);
+                                }
+                            } else {
+                                // Otherwise, use the whole table as parameters
+                                // Convert Lua table to JSON
+                                for (key, value) in
+                                    args.pairs::<mlua::Value, mlua::Value>().flatten()
+                                {
+                                    let key_string = match key {
+                                        mlua::Value::String(s) => {
+                                            s.to_str().unwrap_or("").to_string()
+                                        }
+                                        mlua::Value::Integer(i) => i.to_string(),
+                                        mlua::Value::Number(n) => n.to_string(),
+                                        _ => continue,
+                                    };
                                     let json_value = lua_value_to_json(value)?;
                                     parameters.insert(key_string, json_value);
                                 }
                             }
-                        } else {
-                            // Otherwise, use the whole table as parameters
-                            // Convert Lua table to JSON
-                            for (key, value) in args.pairs::<mlua::Value, mlua::Value>().flatten() {
-                                if let mlua::Value::String(key_str) = key {
-                                    let key_string = key_str.to_str().unwrap_or("").to_string();
-                                    let json_value = lua_value_to_json(value)?;
-                                    parameters.insert(key_string, json_value);
+
+                            // Create AgentInput
+                            let mut params_map = std::collections::HashMap::new();
+                            params_map.insert(
+                                "parameters".to_string(),
+                                serde_json::Value::Object(parameters),
+                            );
+
+                            let input = AgentInput {
+                                text: String::new(),
+                                media: vec![],
+                                context: None,
+                                parameters: params_map,
+                                output_modalities: vec![],
+                            };
+
+                            // Create ExecutionContext
+                            let context = ExecutionContext::default();
+
+                            // Execute tool
+                            let result = tool_instance.execute(input, context).await;
+
+                            match result {
+                                Ok(output) => {
+                                    let result_table = lua.create_table()?;
+                                    result_table.set("success", true)?;
+                                    result_table.set("output", output.text)?;
+                                    if !output.metadata.extra.is_empty() {
+                                        result_table
+                                            .set("metadata", format!("{:?}", output.metadata))?;
+                                    }
+                                    if !output.tool_calls.is_empty() {
+                                        result_table.set("tool_calls", output.tool_calls.len())?;
+                                    }
+                                    Ok(result_table)
+                                }
+                                Err(e) => {
+                                    let result_table = lua.create_table()?;
+                                    result_table.set("success", false)?;
+                                    result_table.set("error", e.to_string())?;
+                                    Ok(result_table)
                                 }
                             }
                         }
-
-                        // Create AgentInput
-                        let mut params_map = std::collections::HashMap::new();
-                        params_map.insert(
-                            "parameters".to_string(),
-                            serde_json::Value::Object(parameters),
-                        );
-
-                        let input = AgentInput {
-                            text: String::new(),
-                            media: vec![],
-                            context: None,
-                            parameters: params_map,
-                            output_modalities: vec![],
-                        };
-
-                        // Create ExecutionContext
-                        let context = ExecutionContext::default();
-
-                        // Execute tool
-                        let result = tool_instance.execute(input, context).await;
-
-                        match result {
-                            Ok(output) => {
-                                let result_table = lua.create_table()?;
-                                result_table.set("success", true)?;
-                                result_table.set("output", output.text)?;
-                                if !output.metadata.extra.is_empty() {
-                                    result_table
-                                        .set("metadata", format!("{:?}", output.metadata))?;
-                                }
-                                if !output.tool_calls.is_empty() {
-                                    result_table.set("tool_calls", output.tool_calls.len())?;
-                                }
-                                Ok(result_table)
-                            }
-                            Err(e) => {
-                                let result_table = lua.create_table()?;
-                                result_table.set("success", false)?;
-                                result_table.set("error", e.to_string())?;
-                                Ok(result_table)
-                            }
-                        }
-                    }
-                })?,
+                    },
+                )?,
             )?;
 
             // Add getSchema method (stub for now)

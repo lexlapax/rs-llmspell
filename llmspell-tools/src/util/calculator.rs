@@ -222,15 +222,8 @@ impl BaseAgent for CalculatorTool {
     }
 
     async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
-        // Debug logging
-        eprintln!(
-            "DEBUG calculator: input.parameters = {:?}",
-            input.parameters
-        );
-
         // Get parameters using shared utility
         let params = extract_parameters(&input)?;
-        eprintln!("DEBUG calculator: extracted params = {:?}", params);
 
         // Process the operation
         let result = self.process_operation(params).await?;
