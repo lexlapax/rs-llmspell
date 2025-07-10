@@ -6,7 +6,7 @@ print("🖥️ System Integration Tools Examples")
 print("====================================")
 
 -- Load test helpers
-local TestHelpers = dofile("examples/test-helpers.lua")
+local TestHelpers = dofile("test-helpers.lua")
 
 -- Helper function to execute tool
 local function use_tool(tool_name, params)

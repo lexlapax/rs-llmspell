@@ -863,3 +863,50 @@ local result = calculator:execute({
 2. Performance benchmarks
 3. Security audit results
 4. Phase 3 preparation notes
+
+### Cross-Platform Assumptions
+
+The Phase 2 tools implementation makes the following platform-specific assumptions:
+
+1. **File System Operations**
+   - Path separators handled by Rust's std::path
+   - UTF-8 encoding assumed for text files
+   - Symbolic links follow platform conventions
+   - File permissions respect platform security models
+
+2. **System Monitor Tool**
+   - CPU usage calculation differs between platforms:
+     - Linux: Uses /proc/stat for accurate CPU metrics
+     - macOS/Windows: Falls back to load average approximation
+   - Memory statistics use platform-specific APIs (libc::sysinfo)
+   - Disk space uses statvfs on Unix, GetDiskFreeSpaceEx on Windows
+
+3. **Process Executor Tool**
+   - Command execution uses platform shell:
+     - Unix: /bin/sh
+     - Windows: cmd.exe
+   - Signal handling is Unix-specific
+   - Process limits may not be enforced on Windows
+
+4. **Environment Reader Tool**
+   - Environment variable names are case-sensitive on Unix
+   - PATH separator is : on Unix, ; on Windows
+   - System info relies on sysinfo crate for cross-platform data
+
+5. **File Watcher Tool**
+   - Uses notify crate which has platform-specific backends:
+     - Linux: inotify
+     - macOS: FSEvents
+     - Windows: ReadDirectoryChangesW
+   - Event granularity varies by platform
+
+6. **Network Tools (HTTP, Service Checker)**
+   - Assumes standard TCP/IP stack
+   - DNS resolution uses platform resolver
+   - Certificate validation follows platform trust stores
+
+7. **Testing Assumptions**
+   - Examples assume Unix-style shell for test runner
+   - bc calculator optional (falls back to awk)
+   - Timeout command availability varies
+   - ANSI color codes may not work on all terminals

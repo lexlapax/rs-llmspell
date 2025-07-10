@@ -2,7 +2,7 @@
 -- Shows how to chain tools together for complex operations
 
 -- Load test helpers for consistent formatting
-local helpers = dofile("examples/test-helpers.lua")
+local helpers = dofile("test-helpers.lua")
 
 print("🔗 Multi-Tool Workflow Examples")
 print("=================================")

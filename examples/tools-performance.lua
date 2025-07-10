@@ -2,7 +2,7 @@
 -- Measures initialization time, execution time, and resource usage
 
 -- Load test helpers
-local helpers = dofile("examples/test-helpers.lua")
+local helpers = dofile("test-helpers.lua")
 
 print("⚡ Tool Performance Benchmarks")
 print("================================")

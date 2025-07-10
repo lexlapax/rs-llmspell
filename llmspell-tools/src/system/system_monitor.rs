@@ -321,8 +321,8 @@ impl SystemMonitorTool {
 
             if result == 0 {
                 let block_size = statvfs.f_bsize;
-                let total_blocks = statvfs.f_blocks as u64;
-                let available_blocks = statvfs.f_bavail as u64;
+                let total_blocks = statvfs.f_blocks;
+                let available_blocks = statvfs.f_bavail;
 
                 let total_bytes = total_blocks * block_size;
                 let available_bytes = available_blocks * block_size;
