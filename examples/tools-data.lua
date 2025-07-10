@@ -252,35 +252,58 @@ local graphql_result = use_tool("graphql_query", {
 })
 print_result("GraphQL query", graphql_result)
 
--- GraphQL query with more data (using SpaceX API)
-local spacex_query = [[
-query GetLaunches($limit: Int!) {
-    launchesPast(limit: $limit) {
-        mission_name
-        launch_date_local
-        launch_success
-        rocket {
-            rocket_name
+-- GraphQL query with more data (using GraphQLZero API)
+local posts_query = [[
+query GetPosts($limit: Int!) {
+    posts(options: { paginate: { limit: $limit } }) {
+        data {
+            id
+            title
+            body
+            user {
+                name
+                email
+                username
+            }
+            comments {
+                data {
+                    id
+                    name
+                    body
+                }
+            }
         }
     }
 }
 ]]
 
-local spacex_result = use_tool("graphql_query", {
-    endpoint = "https://spacex-production.up.railway.app/",
-    query = spacex_query,
+local posts_result = use_tool("graphql_query", {
+    endpoint = "https://graphqlzero.almansi.me/api",
+    query = posts_query,
     variables = {
         limit = 3
     }
 })
-print_result("SpaceX launches", spacex_result)
+print_result("Posts with comments", posts_result)
 
--- GraphQL introspection (on Countries API)
-local introspection = use_tool("graphql_query", {
+-- Simple query to demonstrate another GraphQL endpoint
+local simple_country_query = [[
+query {
+    countries(filter: { code: { in: ["US", "CA", "GB"] } }) {
+        code
+        name
+        emoji
+        capital
+        currency
+    }
+}
+]]
+
+local countries_result = use_tool("graphql_query", {
     endpoint = "https://countries.trevorblades.com/graphql",
-    operation = "introspection"
+    query = simple_country_query
 })
-print_result("Schema introspection", introspection)
+print_result("Multiple countries", countries_result)
 
 print("\n🔍 Advanced Data Processing Examples")
 print("====================================")

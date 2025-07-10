@@ -157,8 +157,8 @@ benchmarks.template = benchmark_tool("template_engine", {
 benchmarks.datetime = benchmark_tool("date_time_handler", {
     ["Current time"] = {operation = "now"},
     ["Parse date"] = {operation = "parse", input = "2025-01-01"},
-    ["Convert timezone"] = {operation = "convert_timezone", input = "2025-01-01T12:00:00Z", from_tz = "UTC", to_tz = "America/New_York"},
-    ["Add duration"] = {operation = "add", input = "2025-01-01", duration = "30 days"}
+    ["Convert timezone"] = {operation = "convert_timezone", input = "2025-01-01T12:00:00Z", target_timezone = "America/New_York"},
+    ["Add duration"] = {operation = "add", input = "2025-01-01", amount = 30, unit = "days"}
 })
 
 benchmarks.diff = benchmark_tool("diff_calculator", {
@@ -182,8 +182,8 @@ print()
 
 benchmarks.env = benchmark_tool("environment_reader", {
     ["Get single"] = {operation = "get", variable_name = "PATH"},
-    ["Get all"] = {operation = "get_all"},
-    ["Check exists"] = {operation = "has", variable_name = "HOME"}
+    ["List all"] = {operation = "list"},
+    ["Get HOME"] = {operation = "get", variable_name = "HOME"}
 })
 
 -- Performance Summary

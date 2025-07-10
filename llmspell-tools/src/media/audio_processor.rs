@@ -328,7 +328,7 @@ impl AudioProcessorTool {
                     None
                 };
 
-                let bit_rate = Some(byte_rate * 8);
+                let bit_rate = byte_rate.checked_mul(8);
 
                 return Ok(WavInfo {
                     sample_rate,

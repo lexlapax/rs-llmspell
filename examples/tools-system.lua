@@ -41,6 +41,29 @@ local function print_result(label, result)
     end
 end
 
+-- Helper for security tests
+local function print_security_test(label, result, should_fail)
+    if result.error then
+        if should_fail then
+            print("  ✅ " .. label .. ": Correctly blocked - " .. result.error)
+        else
+            print("  ❌ " .. label .. ": Unexpected error - " .. result.error)
+        end
+    elseif result.success == false then
+        if should_fail then
+            print("  ✅ " .. label .. ": Correctly blocked - " .. (result.message or "Access denied"))
+        else
+            print("  ❌ " .. label .. ": Unexpected failure - " .. (result.message or "Failed"))
+        end
+    else
+        if should_fail then
+            print("  ❌ " .. label .. ": Security failure - operation should have been blocked")
+        else
+            print("  ✅ " .. label .. ": Success")
+        end
+    end
+end
+
 TestHelpers.print_section("Environment Reader Tool")
 
 print("\nEnvironment operations:")
@@ -48,14 +71,14 @@ print("\nEnvironment operations:")
 -- Get specific environment variable
 local path_var = use_tool("environment_reader", {
     operation = "get",
-    variable = "PATH"
+    variable_name = "PATH"
 })
 print_result("PATH variable", path_var)
 
 -- Get home directory
 local home_var = use_tool("environment_reader", {
     operation = "get",
-    variable = "HOME"
+    variable_name = "HOME"
 })
 print_result("HOME variable", home_var)
 
@@ -66,11 +89,11 @@ local env_list = use_tool("environment_reader", {
 })
 print_result("Shell variables", env_list)
 
--- Get system information
-local system_info = use_tool("environment_reader", {
-    operation = "system_info"
+-- List all allowed environment variables
+local all_vars = use_tool("environment_reader", {
+    operation = "list"
 })
-print_result("System info", system_info)
+print_result("All allowed vars", all_vars)
 
 TestHelpers.print_section("Process Executor Tool")
 
@@ -78,29 +101,33 @@ print("\nProcess execution (sandboxed):")
 
 -- Execute simple command
 local simple_command = use_tool("process_executor", {
-    command = "echo Hello from LLMSpell!"
+    executable = "echo",
+    arguments = {"Hello", "from", "LLMSpell!"}
 })
 print_result("Echo command", simple_command)
 
 -- List files (if ls is whitelisted)
 local list_files = use_tool("process_executor", {
-    command = "ls -la /tmp",
+    executable = "ls",
+    arguments = {"-la", "/tmp"},
     timeout_ms = 5000
 })
 print_result("List files", list_files)
 
 -- Get current user (if whoami is whitelisted)
 local whoami = use_tool("process_executor", {
-    command = "whoami"
+    executable = "whoami"
 })
 print_result("Current user", whoami)
 
 -- Execute with timeout
 local timeout_command = use_tool("process_executor", {
-    command = "sleep 2",
+    executable = "sleep",
+    arguments = {"2"},
     timeout_ms = 1000
 })
-print_result("Timeout test", timeout_command)
+-- Note: sleep is not whitelisted so this tests security blocking, not timeout
+print_security_test("Sleep command blocked", timeout_command, true)
 
 TestHelpers.print_section("Service Checker Tool")
 
@@ -108,29 +135,33 @@ print("\nService availability checks:")
 
 -- Check TCP port
 local tcp_check = use_tool("service_checker", {
+    check_type = "tcp",
     target = "127.0.0.1:22",
-    timeout = 1
+    timeout_ms = 1000
 })
 print_result("SSH port (22)", tcp_check)
 
 -- Check common web port
 local http_check = use_tool("service_checker", {
+    check_type = "tcp",
     target = "127.0.0.1:80",
-    timeout = 1
+    timeout_ms = 1000
 })
 print_result("HTTP port (80)", http_check)
 
 -- Check HTTPS port
 local https_check = use_tool("service_checker", {
+    check_type = "tcp",
     target = "127.0.0.1:443",
-    timeout = 1
+    timeout_ms = 1000
 })
 print_result("HTTPS port (443)", https_check)
 
 -- Check custom service
 local custom_check = use_tool("service_checker", {
+    check_type = "tcp",
     target = "localhost:8080",
-    timeout = 1
+    timeout_ms = 1000
 })
 print_result("Custom port (8080)", custom_check)
 
@@ -140,29 +171,25 @@ print("\nSystem resource monitoring:")
 
 -- Get CPU information
 local cpu_info = use_tool("system_monitor", {
-    operation = "collect",
-    metrics = {"cpu"}
+    operation = "cpu"
 })
 print_result("CPU usage", cpu_info)
 
 -- Get memory information
 local memory_info = use_tool("system_monitor", {
-    operation = "collect",
-    metrics = {"memory"}
+    operation = "memory"
 })
 print_result("Memory usage", memory_info)
 
 -- Get disk information
 local disk_info = use_tool("system_monitor", {
-    operation = "collect",
-    metrics = {"disk"}
+    operation = "disk"
 })
 print_result("Disk usage", disk_info)
 
 -- Get all system stats
 local all_stats = use_tool("system_monitor", {
-    operation = "collect",
-    metrics = {"cpu", "memory", "disk"}
+    operation = "all"
 })
 if all_stats.success ~= false then
     print("  ✅ All stats: Collected successfully")
@@ -211,28 +238,30 @@ print("\n🚨 Error Handling Examples")
 print("==========================")
 
 -- Demonstrate error handling for various scenarios
-print("\nTesting error conditions:")
+print("\nTesting security controls (these should be blocked):")
 
 -- Invalid command (should be blocked)
 local invalid_cmd = use_tool("process_executor", {
-    command = "rm -rf /",  -- This dangerous command should be blocked
+    executable = "rm",
+    arguments = {"-rf", "/"},  -- This dangerous command should be blocked
     timeout_ms = 1000
 })
-print_result("Dangerous command", invalid_cmd)
+print_security_test("Dangerous command blocked", invalid_cmd, true)
 
 -- Invalid network target
 local invalid_network = use_tool("service_checker", {
+    check_type = "tcp",
     target = "999.999.999.999:80",
-    timeout = 1
+    timeout_ms = 1000
 })
-print_result("Invalid IP", invalid_network)
+print_result("Invalid IP", invalid_network)  -- This is an actual error, not security
 
 -- Restricted environment variable
 local restricted_var = use_tool("environment_reader", {
     operation = "get",
-    variable = "AWS_SECRET_ACCESS_KEY"  -- Should be filtered
+    variable_name = "AWS_SECRET_ACCESS_KEY"  -- Should be filtered
 })
-print_result("Sensitive var", restricted_var)
+print_security_test("Sensitive var blocked", restricted_var, true)
 
 print("\n✅ System Integration Tools Examples Complete!")
 print("All operations performed with appropriate security controls.")

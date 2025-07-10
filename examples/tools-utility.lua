@@ -88,7 +88,7 @@ end
 local url_safe = use_tool("base64_encoder", {
     operation = "encode",
     input = "special/chars+in=url",
-    variant = "url_safe"
+    variant = "url-safe"
 })
 print_result("URL-safe", url_safe)
 
@@ -164,8 +164,10 @@ print_result("Reversed", reversed)
 local replaced = use_tool("text_manipulator", {
     operation = "replace",
     text = "Hello World",
-    pattern = "World",
-    replacement = "LLMSpell"
+    options = {
+        from = "World",
+        to = "LLMSpell"
+    }
 })
 print_result("Replaced", replaced)
 
@@ -173,8 +175,10 @@ print_result("Replaced", replaced)
 local substring = use_tool("text_manipulator", {
     operation = "substring",
     text = "LLMSpell is awesome",
-    start = 0,
-    ["end"] = 8
+    options = {
+        start = 0,
+        ["end"] = 8  -- 'end' is a Lua keyword, so we use bracket notation
+    }
 })
 print_result("Substring", substring)
 
@@ -265,14 +269,14 @@ print_result("Current time", now)
 -- Parse date
 local parsed = use_tool("date_time_handler", {
     operation = "parse",
-    date_string = "2024-12-25T10:30:00Z"
+    input = "2024-12-25T10:30:00Z"
 })
 print_result("Parsed date", parsed)
 
 -- Date arithmetic
 local future_date = use_tool("date_time_handler", {
     operation = "add",
-    date_string = "2024-01-01T00:00:00Z",
+    input = "2024-01-01T00:00:00Z",
     amount = 30,
     unit = "days"
 })
@@ -311,9 +315,9 @@ local new_json = {
 
 print("\nJSON diff:")
 local json_diff = use_tool("diff_calculator", {
-    content_type = "json",
-    old_content = old_json,
-    new_content = new_json
+    type = "json",
+    old_json = old_json,
+    new_json = new_json
 })
 if json_diff.result and json_diff.result.output then
     print(json_diff.result.output)
@@ -332,9 +336,10 @@ local email_validation = use_tool("data_validation", {
         name = "John Doe"
     },
     rules = {
-        {field = "email", rule_type = "email"},
-        {field = "age", rule_type = "number", min = 18, max = 100},
-        {field = "name", rule_type = "string", min_length = 2}
+        rules = {
+            {type = "required"},
+            {type = "type", expected = "object"}
+        }
     }
 })
 print_result("Email validation", email_validation)
@@ -349,9 +354,10 @@ local complex_data = {
 local complex_validation = use_tool("data_validation", {
     data = complex_data,
     rules = {
-        {field = "username", rule_type = "string", min_length = 3},
-        {field = "email", rule_type = "email"},
-        {field = "notifications", rule_type = "boolean"}
+        rules = {
+            {type = "required"},
+            {type = "type", expected = "object"}
+        }
     }
 })
 print_result("Complex validation", complex_validation)

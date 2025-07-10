@@ -79,26 +79,7 @@ else
     print("  ❌ Web search tool not available")
 end
 
-print("\n3. File Reader Tool (if available)")
-print("----------------------------------")
-
-if table.concat(tools, ","):find("file_reader") then
-    -- Test reading a file that should exist
-    local file_result = use_tool("file_reader", {
-        path = "examples/hello.lua"
-    })
-    print_result("file_reader", "read file", file_result)
-    
-    -- Test reading a non-existent file
-    local file_error = use_tool("file_reader", {
-        path = "non_existent_file.txt"
-    })
-    print_result("file_reader", "read non-existent", file_error)
-else
-    print("  ❌ File reader tool not available")
-end
-
-print("\n4. Tool Schema Information")
+print("\n3. Tool Schema Information")
 print("-------------------------")
 
 for _, tool_name in ipairs(tools) do

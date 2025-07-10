@@ -38,7 +38,7 @@ All tool example files follow the pattern: `tools-{category}.lua`
   - Optimization recommendations
 
 #### Testing and Reference
-- **`tools-run-all.lua`** - Test runner for all examples
+- **`run-all-tools-examples.sh`** - Shell script test runner for all examples
 - **`tools-utility-reference.lua`** - Reference implementation showing correct Tool API usage
 - **`test-helpers.lua`** - Common testing utilities
 
@@ -75,7 +75,7 @@ llmspell run examples/tools-workflow.lua
 llmspell run examples/tools-performance.lua
 
 # Run all examples
-llmspell run examples/tools-run-all.lua
+./examples/run-all-tools-examples.sh
 ```
 
 ## 📋 Tools Covered

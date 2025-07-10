@@ -64,7 +64,7 @@ local hash_tool = Tool.get("hash_calculator")
 local checksum = hash_tool.execute({
     operation = "hash",
     algorithm = "sha256",
-    input = type(json_result.output) == "string" and json_result.output or tostring(json_result.output)
+    data = type(json_result.output) == "string" and json_result.output or tostring(json_result.output)
 })
 local hash_value = nil
 if checksum.success and checksum.output then
@@ -269,7 +269,7 @@ print("Testing error handling across tools:")
 local hash_error = hash_tool.execute({
     operation = "hash",
     algorithm = "invalid-algo",
-    input = "test"
+    data = "test"
 })
 print("\n1. Invalid hash algorithm:", hash_error.success and "Success" or "Failed")
 if hash_error.error then
@@ -278,8 +278,8 @@ end
 
 -- Invalid JSON
 local json_error = json_tool.execute({
-    operation = "parse",
-    input = "{invalid json"
+    operation = "validate",
+    input_json = "{invalid json"
 })
 print("\n2. Invalid JSON parsing:", json_error.success and "Success" or "Failed")
 if json_error.error then
@@ -290,7 +290,7 @@ end
 if not json_error.success then
     local fallback = json_tool.execute({
         operation = "format",
-        input = {error = "Invalid input", fallback = true},
+        input_json = {error = "Invalid input", fallback = true},
         pretty = true
     })
     print("\n3. Fallback recovery:", fallback.success and "Success" or "Failed")

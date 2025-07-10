@@ -7,20 +7,8 @@ print("====================================")
 
 -- Helper function to execute tool and handle errors
 local function use_tool(tool_name, params)
-    local tool = Tool.get(tool_name)
-    if not tool then
-        return {error = "Tool not found: " .. tool_name}
-    end
-    
-    local success, result = pcall(function()
-        return tool.execute(params)
-    end)
-    
-    if not success then
-        return {error = tostring(result)}
-    end
-    
-    return result
+    -- Use the async-aware helper that handles coroutines properly
+    return Tool.executeAsync(tool_name, params)
 end
 
 -- Helper to print tool results
@@ -30,33 +18,7 @@ local function print_result(name, result)
     elseif result.success == false then
         print("  ❌ Failed: " .. (result.message or "Unknown error"))
     else
-        -- Handle nested result structure
-        local r = result.result or result
-        
-        -- Print the relevant output field
-        if r.output then
-            print("  ✅ " .. name .. ": " .. tostring(r.output))
-        elseif r.uuid then
-            print("  ✅ " .. name .. ": " .. r.uuid)
-        elseif r.encoded then
-            print("  ✅ " .. name .. ": " .. r.encoded)
-        elseif r.decoded then
-            print("  ✅ " .. name .. ": " .. r.decoded)
-        elseif r.hash then
-            print("  ✅ " .. name .. ": " .. r.hash)
-        elseif r.result then
-            print("  ✅ " .. name .. ": " .. tostring(r.result))
-        elseif r.datetime then
-            print("  ✅ " .. name .. ": " .. r.datetime)
-        elseif r.formatted then
-            print("  ✅ " .. name .. ": " .. r.formatted)
-        elseif r.value then
-            print("  ✅ " .. name .. ": " .. tostring(r.value))
-        elseif result.message then
-            print("  ✅ " .. name .. ": " .. result.message)
-        else
-            print("  ✅ " .. name .. " completed successfully")
-        end
+        print("  ✅ " .. name .. ": Success")
     end
 end
 
@@ -135,7 +97,7 @@ print_result("Current Time", current_time)
 
 local parsed_date = use_tool("date_time_handler", {
     operation = "parse",
-    date_string = "2024-12-25T10:30:00Z"
+    input = "2024-12-25T10:30:00Z"
 })
 print_result("Parsed Date", parsed_date)
 
@@ -144,16 +106,13 @@ print("\n📝 Diff Calculator:")
 local old_text = "The quick brown fox\njumps over the lazy dog"
 local new_text = "The quick brown fox\njumps over the lazy cat\nAnd runs away"
 local diff_result = use_tool("diff_calculator", {
+    operation = "text_diff",
     old_text = old_text,
     new_text = new_text,
     format = "unified"
 })
 print("  Comparing texts...")
-if diff_result.output then
-    print("  Diff Output:\n" .. diff_result.output)
-else
-    print_result("Diff", diff_result)
-end
+print_result("Diff", diff_result)
 
 -- Data Validation Tool
 print("\n✅ Data Validation:")
@@ -164,9 +123,10 @@ local validation_result = use_tool("data_validation", {
         name = "John Doe"
     },
     rules = {
-        {field = "email", rule_type = "email"},
-        {field = "age", rule_type = "number", min = 18, max = 100},
-        {field = "name", rule_type = "string", min_length = 2}
+        rules = {
+            {type = "required"},
+            {type = "type", expected = "object"}
+        }
     }
 })
 print_result("Validation", validation_result)
@@ -280,11 +240,14 @@ local csv_analysis = use_tool("csv_analyzer", {
 })
 print_result("CSV Analysis", csv_analysis)
 
--- HTTP Request Tool (example - won't actually make request without valid URL)
+-- HTTP Request Tool
 print("\n🌐 HTTP Request:")
 local http_result = use_tool("http_request", {
     method = "GET",
-    url = "https://api.example.com/test"
+    url = "https://httpbin.org/get",
+    headers = {
+        ["User-Agent"] = "LLMSpell/1.0"
+    }
 })
 print_result("HTTP Request", http_result)
 
@@ -294,7 +257,7 @@ print("=============================")
 -- Audio Processor Tool
 print("\n🎵 Audio Processor:")
 local audio_info = use_tool("audio_processor", {
-    operation = "info",
+    operation = "metadata",
     file_path = "/tmp/sample.wav"
 })
 print_result("Audio Info", audio_info)
@@ -302,7 +265,7 @@ print_result("Audio Info", audio_info)
 -- Image Processor Tool
 print("\n🖼️ Image Processor:")
 local image_info = use_tool("image_processor", {
-    operation = "info",
+    operation = "metadata",
     file_path = "/tmp/sample.jpg"
 })
 print_result("Image Info", image_info)
@@ -310,7 +273,7 @@ print_result("Image Info", image_info)
 -- Video Processor Tool
 print("\n🎥 Video Processor:")
 local video_info = use_tool("video_processor", {
-    operation = "info",
+    operation = "metadata",
     file_path = "/tmp/sample.mp4"
 })
 print_result("Video Info", video_info)
