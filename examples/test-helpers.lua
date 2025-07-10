@@ -212,6 +212,40 @@ function TestHelpers.get_tools_by_category()
     return categories
 end
 
+-- Parse tool output JSON string
+function TestHelpers.parse_tool_output(result)
+    if not result or not result.success then
+        return nil, result and result.error or "Tool execution failed"
+    end
+    
+    if not result.output then
+        return nil, "Tool returned no output"
+    end
+    
+    -- Parse JSON string to Lua table
+    local success, parsed = pcall(function()
+        return JSON.parse(result.output)
+    end)
+    
+    if not success then
+        return nil, "Failed to parse JSON output: " .. tostring(parsed)
+    end
+    
+    return parsed, nil
+end
+
+-- Helper to safely get nested values from parsed output
+function TestHelpers.get_nested_value(table, ...)
+    local value = table
+    for _, key in ipairs({...}) do
+        if type(value) ~= "table" then
+            return nil
+        end
+        value = value[key]
+    end
+    return value
+end
+
 -- Create a test summary
 function TestHelpers.create_summary(results)
     local total = 0

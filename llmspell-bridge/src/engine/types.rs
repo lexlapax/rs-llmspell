@@ -10,6 +10,7 @@ pub struct ApiSurface {
     pub tool_api: ToolApiDefinition,
     pub workflow_api: WorkflowApiDefinition,
     pub streaming_api: StreamingApiDefinition,
+    pub json_api: JsonApiDefinition,
 }
 
 impl ApiSurface {
@@ -20,6 +21,7 @@ impl ApiSurface {
             tool_api: ToolApiDefinition::standard(),
             workflow_api: WorkflowApiDefinition::standard(),
             streaming_api: StreamingApiDefinition::standard(),
+            json_api: JsonApiDefinition::standard(),
         }
     }
 }
@@ -165,6 +167,27 @@ pub struct ChunkMethods {
     pub yield_chunk: String,
     pub next_chunk: String,
     pub is_done: String,
+}
+
+/// JSON API definition for script engines
+#[derive(Debug, Clone)]
+pub struct JsonApiDefinition {
+    /// Global object name (e.g., "JSON" in Lua/JS)
+    pub global_name: String,
+    /// Function to parse JSON string to native value
+    pub parse_function: String,
+    /// Function to stringify native value to JSON
+    pub stringify_function: String,
+}
+
+impl JsonApiDefinition {
+    pub fn standard() -> Self {
+        Self {
+            global_name: "JSON".to_string(),
+            parse_function: "parse".to_string(),
+            stringify_function: "stringify".to_string(),
+        }
+    }
 }
 
 /// Common error types for script engines

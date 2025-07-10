@@ -23,7 +23,7 @@
 **Success Criteria Summary:**
 - [x] ModelSpecifier parses `provider/model` syntax correctly ✅
 - [x] Base URL overrides work at agent creation time ✅
-- [ ] JSON API for parsing tool outputs in scripts
+- [x] JSON API for parsing tool outputs in scripts ✅
 - [ ] 25 self-contained tools fully implemented and tested (28/25 complete)
 - [x] Tool registry with discovery and validation ✅
 - [x] Security sandboxing prevents unauthorized access ✅
@@ -38,7 +38,7 @@
 - [x] Task 2.1.1: Implement ModelSpecifier 2025-06-27
 - [x] Task 2.1.2: Update ProviderManager 2025-06-27
 - [x] Task 2.1.3: Update Script APIs 2025-06-27
-- [ ] Task 2.1.4: Implement JSON API for Script Bridge (NEW)
+- [x] Task 2.1.4: Implement JSON API for Script Bridge 2025-07-10
 - [x] Task 2.2.1: Enhance Tool Trait 2025-06-27
 - [x] Task 2.2.2: Implement Tool Registry 2025-06-27
 - [x] Task 2.2.3: Security Sandbox Implementation 2025-06-27
@@ -183,80 +183,80 @@
 **Estimated Time**: 6 hours  
 **Assignee**: Bridge Team Lead
 **Dependencies**: Task 2.1.3 complete
-**Started**: TBD
-**Completed**: TBD
+**Started**: 2025-07-10
+**Completed**: 2025-07-10
 
 **Description**: Implement language-agnostic JSON parsing/stringifying API in the bridge layer to enable scripts to properly handle tool outputs (which are JSON strings).
 
 **Background**: Tools return their output as JSON strings in the `output` field. Without JSON parsing capabilities, scripts (especially Lua) cannot access the structured data within these outputs, severely limiting tool usefulness.
 
 **Acceptance Criteria:**
-- [ ] `JsonApiDefinition` added to `ApiSurface` in engine/types.rs
-- [ ] `inject_json_api()` function implemented for Lua engine
-- [ ] `JSON.parse(string)` available in all Lua scripts
-- [ ] `JSON.stringify(table)` available in all Lua scripts
-- [ ] JSON parsing handles all valid JSON types (null, bool, number, string, array, object)
-- [ ] JSON stringifying handles all Lua types correctly
-- [ ] Error handling for invalid JSON strings
-- [ ] Consistent behavior across all script engines
-- [ ] Tool outputs can be parsed to access structured data
-- [ ] Performance: JSON operations < 1ms for typical tool outputs
+- [x] `JsonApiDefinition` added to `ApiSurface` in engine/types.rs
+- [x] `inject_json_api()` function implemented for Lua engine
+- [x] `JSON.parse(string)` available in all Lua scripts
+- [x] `JSON.stringify(table)` available in all Lua scripts
+- [x] JSON parsing handles all valid JSON types (null, bool, number, string, array, object)
+- [x] JSON stringifying handles all Lua types correctly
+- [x] Error handling for invalid JSON strings
+- [x] Consistent behavior across all script engines
+- [x] Tool outputs can be parsed to access structured data
+- [x] Performance: JSON operations < 1ms for typical tool outputs
 
 **Sub-tasks:**
 1. **Task 2.1.4.1**: Define JSON API in engine types
-   - [ ] Add `JsonApiDefinition` struct to `llmspell-bridge/src/engine/types.rs`
-   - [ ] Add `json_api` field to `ApiSurface` struct
-   - [ ] Implement `JsonApiDefinition::standard()` method
-   - [ ] Update `ApiSurface::standard()` to include JSON API
+   - [x] Add `JsonApiDefinition` struct to `llmspell-bridge/src/engine/types.rs`
+   - [x] Add `json_api` field to `ApiSurface` struct
+   - [x] Implement `JsonApiDefinition::standard()` method
+   - [x] Update `ApiSurface::standard()` to include JSON API
 
 2. **Task 2.1.4.2**: Implement JSON API module for Lua
-   - [ ] Create `llmspell-bridge/src/lua/api/json.rs`
-   - [ ] Implement `inject_json_api()` function
-   - [ ] Move `lua_value_to_json()` from tool.rs to json.rs
-   - [ ] Implement `json_value_to_lua()` for parsing
-   - [ ] Add to `llmspell-bridge/src/lua/api/mod.rs` exports
+   - [x] Create `llmspell-bridge/src/lua/api/json.rs`
+   - [x] Implement `inject_json_api()` function
+   - [x] Move `lua_value_to_json()` from tool.rs to json.rs
+   - [x] Implement `json_value_to_lua()` for parsing
+   - [x] Add to `llmspell-bridge/src/lua/api/mod.rs` exports
 
 3. **Task 2.1.4.3**: Create JSON parse function
-   - [ ] Implement `JSON.parse()` Lua function
-   - [ ] Use `serde_json::from_str()` for parsing
-   - [ ] Convert `serde_json::Value` to Lua values
-   - [ ] Handle all JSON types (null, bool, number, string, array, object)
-   - [ ] Return proper Lua error on invalid JSON
+   - [x] Implement `JSON.parse()` Lua function
+   - [x] Use `serde_json::from_str()` for parsing
+   - [x] Convert `serde_json::Value` to Lua values
+   - [x] Handle all JSON types (null, bool, number, string, array, object)
+   - [x] Return proper Lua error on invalid JSON
 
 4. **Task 2.1.4.4**: Create JSON stringify function
-   - [ ] Implement `JSON.stringify()` Lua function
-   - [ ] Reuse existing `lua_value_to_json()` logic
-   - [ ] Use `serde_json::to_string()` for output
-   - [ ] Handle Lua tables with numeric and string keys
-   - [ ] Detect and handle array vs object tables
+   - [x] Implement `JSON.stringify()` Lua function
+   - [x] Reuse existing `lua_value_to_json()` logic
+   - [x] Use `serde_json::to_string()` for output
+   - [x] Handle Lua tables with numeric and string keys
+   - [x] Detect and handle array vs object tables
 
 5. **Task 2.1.4.5**: Update engine to inject JSON API
-   - [ ] Update `LuaEngine::inject_apis()` in engine.rs
-   - [ ] Call `inject_json_api()` after other API injections
-   - [ ] Ensure JSON global is available in all scripts
-   - [ ] Update engine tests to verify JSON availability
+   - [x] Update `LuaEngine::inject_apis()` in engine.rs
+   - [x] Call `inject_json_api()` after other API injections
+   - [x] Ensure JSON global is available in all scripts
+   - [x] Update engine tests to verify JSON availability
 
 6. **Task 2.1.4.6**: Write comprehensive tests
-   - [ ] Unit tests for `lua_value_to_json()` conversions
-   - [ ] Unit tests for `json_value_to_lua()` conversions
-   - [ ] Integration tests for JSON.parse() with various inputs
-   - [ ] Integration tests for JSON.stringify() with various inputs
-   - [ ] Roundtrip tests (parse → stringify → parse)
-   - [ ] Error case tests (invalid JSON, unsupported types)
-   - [ ] Performance benchmarks for typical tool outputs
+   - [x] Unit tests for `lua_value_to_json()` conversions
+   - [x] Unit tests for `json_value_to_lua()` conversions
+   - [x] Integration tests for JSON.parse() with various inputs
+   - [x] Integration tests for JSON.stringify() with various inputs
+   - [x] Roundtrip tests (parse → stringify → parse)
+   - [x] Error case tests (invalid JSON, unsupported types)
+   - [x] Performance benchmarks for typical tool outputs
 
 7. **Task 2.1.4.7**: Update tool examples
-   - [ ] Update all tool examples to use JSON.parse() for outputs
-   - [ ] Fix examples that incorrectly access result.result.output
-   - [ ] Add JSON usage examples to test-helpers.lua
-   - [ ] Create dedicated JSON example demonstrating all features
-   - [ ] Update tools-utility.lua to properly parse base64 output
+   - [x] Update all tool examples to use JSON.parse() for outputs
+   - [x] Fix examples that incorrectly access result.result.output
+   - [x] Add JSON usage examples to test-helpers.lua
+   - [x] Create dedicated JSON example demonstrating all features
+   - [x] Update tools-utility.lua to properly parse base64 output
 
 8. **Task 2.1.4.8**: Prepare for JavaScript engine
-   - [ ] Create stub `llmspell-bridge/src/javascript/api/json.rs`
-   - [ ] Document that JS has native JSON support
-   - [ ] Ensure API consistency plan for future JS implementation
-   - [ ] Add TODO comments for Phase 12 implementation
+   - [x] Create stub `llmspell-bridge/src/javascript/api/json.rs`
+   - [x] Document that JS has native JSON support
+   - [x] Ensure API consistency plan for future JS implementation
+   - [x] Add TODO comments for Phase 12 implementation
 
 **Implementation Plan:**
 1. **Hour 1**: Define JSON API types and update ApiSurface
@@ -267,16 +267,16 @@
 6. **Hour 6**: Update examples and documentation
 
 **Definition of Done:**
-- [ ] JSON API available in all Lua scripts
-- [ ] All tool outputs can be parsed to access structured data
-- [ ] Examples updated and working correctly
-- [ ] All tests passing (unit, integration, performance)
-- [ ] Documentation updated in phase-02-design-doc.md
-- [ ] No memory leaks in JSON operations
-- [ ] Performance meets requirements (<1ms for typical operations)
-- [ ] Error messages are clear and helpful
-- [ ] Code follows project style guidelines
-- [ ] PR approved by at least one team member
+- [x] JSON API available in all Lua scripts
+- [x] All tool outputs can be parsed to access structured data
+- [x] Examples updated and working correctly
+- [x] All tests passing (unit, integration, performance)
+- [x] Documentation updated in phase-02-design-doc.md
+- [x] No memory leaks in JSON operations
+- [x] Performance meets requirements (<1ms for typical operations)
+- [x] Error messages are clear and helpful
+- [x] Code follows project style guidelines
+- [x] PR approved by at least one team member
 
 **Testing Strategy:**
 1. **Unit Tests**: Test each conversion function in isolation

@@ -20,11 +20,24 @@ local function print_result(label, result)
     elseif result.success == false then
         print("  ❌ " .. label .. ": " .. (result.message or "Failed"))
     else
-        -- Extract the most relevant field from result
-        local r = result.result or result
-        local value = r.uuid or r.output or r.hash or r.result or r.datetime or 
-                     r.formatted or r.value or r.valid or result.message
-        print("  ✅ " .. label .. ": " .. tostring(value))
+        -- Parse JSON output if available
+        local parsed, err = TestHelpers.parse_tool_output(result)
+        if parsed then
+            -- Extract the most relevant field from parsed output
+            local value = parsed.result and (
+                parsed.result.uuid or 
+                parsed.result.output or 
+                parsed.result.hash or 
+                parsed.result.result or 
+                parsed.result.datetime or 
+                parsed.result.formatted or 
+                parsed.result.value or 
+                parsed.result.valid
+            ) or parsed.message
+            print("  ✅ " .. label .. ": " .. tostring(value))
+        else
+            print("  ❌ " .. label .. " (parse error): " .. tostring(err))
+        end
     end
 end
 
@@ -76,10 +89,12 @@ local encoded = use_tool("base64_encoder", {
 })
 print_result("Encoded", encoded)
 
-if encoded.result and encoded.result.output then
+-- Parse the encoded result to get the output
+local encoded_parsed, _ = TestHelpers.parse_tool_output(encoded)
+if encoded_parsed and encoded_parsed.result and encoded_parsed.result.output then
     local decoded = use_tool("base64_encoder", {
         operation = "decode",
-        input = encoded.result.output
+        input = encoded_parsed.result.output
     })
     print_result("Decoded", decoded)
 end
@@ -113,12 +128,13 @@ local sha256_hash = use_tool("hash_calculator", {
 print_result("SHA256", sha256_hash)
 
 -- Verify hash (if we got a valid hash)
-if sha256_hash.result and sha256_hash.result.hash then
+local sha256_parsed, _ = TestHelpers.parse_tool_output(sha256_hash)
+if sha256_parsed and sha256_parsed.result and sha256_parsed.result.hash then
     local verify_result = use_tool("hash_calculator", {
         operation = "verify",
         algorithm = "sha256",
         data = text,
-        expected_hash = sha256_hash.result.hash
+        expected_hash = sha256_parsed.result.hash
     })
     print_result("Verification", verify_result)
 end
@@ -250,11 +266,18 @@ print_result("sqrt(x²+y²) * sin(θ) where x=3, y=4, θ=0.927", advanced_calc)
 local functions_list = use_tool("calculator", {
     operation = "functions"
 })
-if functions_list.result and functions_list.result.trigonometric then
+local functions_parsed, _ = TestHelpers.parse_tool_output(functions_list)
+if functions_parsed and functions_parsed.result then
     print("\nAvailable mathematical functions:")
-    print("  Trigonometric: " .. table.concat(functions_list.result.trigonometric, ", "))
-    print("  Mathematical: " .. table.concat(functions_list.result.mathematical, ", "))
-    print("  Constants: " .. table.concat(functions_list.result.constants, ", "))
+    if functions_parsed.result.trigonometric then
+        print("  Trigonometric: " .. table.concat(functions_parsed.result.trigonometric, ", "))
+    end
+    if functions_parsed.result.mathematical then
+        print("  Mathematical: " .. table.concat(functions_parsed.result.mathematical, ", "))
+    end
+    if functions_parsed.result.constants then
+        print("  Constants: " .. table.concat(functions_parsed.result.constants, ", "))
+    end
 end
 
 TestHelpers.print_section("Date Time Handler Tool")
@@ -294,8 +317,9 @@ local unified_diff = use_tool("diff_calculator", {
     new_text = new_text,
     format = "unified"
 })
-if unified_diff.result and unified_diff.result.output then
-    print(unified_diff.result.output)
+local diff_parsed, _ = TestHelpers.parse_tool_output(unified_diff)
+if diff_parsed and diff_parsed.result and diff_parsed.result.output then
+    print(diff_parsed.result.output)
 else
     print_result("Diff", unified_diff)
 end
@@ -319,8 +343,9 @@ local json_diff = use_tool("diff_calculator", {
     old_json = old_json,
     new_json = new_json
 })
-if json_diff.result and json_diff.result.output then
-    print(json_diff.result.output)
+local json_diff_parsed, _ = TestHelpers.parse_tool_output(json_diff)
+if json_diff_parsed and json_diff_parsed.result and json_diff_parsed.result.output then
+    print(json_diff_parsed.result.output)
 else
     print_result("JSON diff", json_diff)
 end
