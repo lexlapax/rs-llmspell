@@ -2,9 +2,9 @@
 
 **Scriptable LLM interactions** via Lua, JavaScript - Cast scripting spells to animate LLM golems 🧙‍♂️✨
 
-> ⚠️ **ALPHA SOFTWARE**: This is version 0.1.0-alpha.1, a development preview release.
-> Core features like agent execution are not yet implemented. This release is for
-> testing the architecture and providing feedback only. See [Current Status](#current-status) below.
+> 🎉 **v0.2.0 RELEASED**: Phase 2 complete with 25 self-contained tools implemented!
+> Breaking changes coming in v0.3.0 as we standardize all tool interfaces.
+> See [Current Status](#current-status) and [Release Notes](CHANGELOG.md) for details.
 
 Rs-LLMSpell is a **scriptable LLM interaction framework** that revolutionizes AI application development through multi-language orchestration, comprehensive built-in libraries, and made with a production-readiness mindset.
 
@@ -60,10 +60,11 @@ local result = research_spell:cast({
 - **Observability**: Comprehensive logging, metrics, and distributed tracing
 
 ### **📦 Comprehensive Built-in Library**
-- **40+ Tools**: File system, web APIs, data processing, AI capabilities
-- **Agent Templates**: Research, analysis, coding, customer service patterns
-- **Workflow Patterns**: Sequential, parallel, conditional, loop, fan-out, map-reduce
-- **Protocol Integration**: MCP (Model Control Protocol), Agent-to-Agent (A2A)
+- **25 Tools Available Now** (v0.2.0): File ops, data processing, system integration
+- **41+ Tools Coming** (v0.3.0): Adding web scraping, email, databases, API testing
+- **Agent Templates**: Research, analysis, coding patterns (coming soon)
+- **Workflow Patterns**: Sequential, parallel, conditional, loop (coming v0.3.0)
+- **Protocol Integration**: MCP, A2A (future phases)
 
 ### **⚡ Bridge-First Architecture**
 - **LLM Providers**: Unified access via `rig` crate (OpenAI, Anthropic, local models)
@@ -100,74 +101,74 @@ Workflow ← Sequential, Parallel, Conditional, Loop
 
 ## 🛠️ Current Status
 
-### **⚠️ Alpha Release 0.1.0-alpha.1**
+### **🚀 Version 0.2.0 - Phase 2 Complete**
 
-**Release Date**: June 27, 2025  
-**Status**: Development Preview - Architecture Testing Only
+**Release Date**: July 11, 2025  
+**Status**: Pre-1.0 Development - 25 Tools Implemented
 
 #### **✅ What's Working**
-- Lua script execution with ScriptEngineBridge abstraction
-- Provider listing (no actual LLM calls)
-- CLI with basic commands (`run`, `exec`, `info`, `providers`)
-- Streaming infrastructure (stub implementation)
-- Multimodal types (structure only)
-- Configuration system
-- Security sandboxing
+- **25 Self-Contained Tools** across 6 categories:
+  - **Data Processing** (4): JsonProcessor, CsvAnalyzer, HttpRequest, GraphQLQuery
+  - **File System** (8): FileOperations, ArchiveHandler, FileWatcher, FileConverter, FileSearch
+  - **System Integration** (4): EnvironmentReader, ProcessExecutor, ServiceChecker, SystemMonitor
+  - **Media Processing** (3): AudioProcessor, VideoProcessor, ImageProcessor
+  - **Utilities** (8): Calculator, TextManipulator, DateTimeHandler, UuidGenerator, HashCalculator, Base64Encoder, DiffCalculator
+  - **Search** (1): WebSearch (basic implementation)
+- **Lua script execution** with full tool access
+- **Provider enhancements**: ModelSpecifier, base URL overrides
+- **JSON API** for seamless script-tool communication
+- **CLI** with streaming output and progress indicators
+- **90%+ test coverage** with zero warnings
 
-#### **❌ What's NOT Working Yet**
-- **Agent execution** - `Agent.create()` returns mock data only
-- **Tool execution** - Tools cannot be called
-- **Workflow orchestration** - Not implemented
-- **Actual LLM calls** - Provider integration is listing only
-- **JavaScript/Python** - Only Lua is available
+#### **🔄 Coming in v0.3.0 (Breaking Changes)**
+- **Tool Standardization**: All 25 tools will use consistent parameter names
+- **ResponseBuilder Pattern**: Unified response format across all tools
+- **16 New External Tools**: WebSearchTool enhancement, email, database connectors
+- **Security Hardening**: DoS protection, path traversal prevention
+- **Workflow Orchestration**: Sequential, conditional, loop patterns
 
 #### **📋 Phase Completion Status**
 - ✅ Phase 0: Foundation Infrastructure (Complete)
 - ✅ Phase 1: Core Execution Runtime (Complete)
-- 🔄 Phase 2: Built-in Tools Library (In Progress)
-- 🔜 Phase 3: Workflow Orchestration (Next)
-- 🔜 Phase 4: Hook and Event System (Future)
+- ✅ Phase 2: Self-Contained Tools Library (Complete - v0.2.0)
+- 🚀 Phase 3: Tool Enhancement & Workflow Orchestration (Starting - 8 weeks)
+- 🔜 Phase 4: Vector Storage and Search (Future)
 
-### **🎯 Safe to Use For**
-- Testing the ScriptEngineBridge architecture
-- Evaluating Lua script execution performance
-- Reviewing API design and providing feedback
-- Understanding the project structure
-- Contributing to core infrastructure
+### **🎯 Ready For**
+- Building tool-based automation scripts
+- File system operations and data processing
+- System integration and monitoring
+- Basic media file processing
+- Testing the tool ecosystem
 
-### **⚠️ NOT Ready For**
-- Production use
-- Building actual LLM applications
-- Agent-based workflows
-- Tool integration
-- Real LLM API calls
+### **⚠️ Still In Development**
+- Agent execution with actual LLM calls
+- Workflow orchestration patterns
+- JavaScript/Python support
+- External API integrations (coming in v0.3.0)
+- Production deployment features
 
-## 🛠️ Project Status
+## 🛠️ Project Timeline
 
-### **🚀 Phase 2 In Progress - Built-in Tools Library**
+### **🎉 Phase 2 Complete - v0.2.0 Released**
 
-**Current Status**: Building comprehensive tools library and provider enhancements
-**Latest Update**: 2025-06-27
+**Release Date**: 2025-07-11
+**Achievement**: 25 self-contained tools implemented and tested
 
-#### **✅ Phase 0 & 1 Achievements**
-- ✅ **13-crate workspace** with zero warnings (including llmspell-utils)
-- ✅ **200+ comprehensive tests** passing across all crates
-- ✅ **Complete CI/CD pipeline** with quality gates enforced
-- ✅ **ScriptEngineBridge** abstraction for multi-language support
-- ✅ **Lua runtime** with basic agent/tool APIs implemented
-- ✅ **Streaming support** integrated throughout the architecture
-- ✅ **Multimodal types** (Image, Audio, Video, Binary content)
-- ✅ **CLI enhancement** with progress indicators and streaming output
+#### **✅ Completed Phases**
+- ✅ **Phase 0**: Foundation Infrastructure (13-crate workspace, CI/CD)
+- ✅ **Phase 1**: Core Execution Runtime (ScriptEngineBridge, Lua integration)
+- ✅ **Phase 2**: Self-Contained Tools Library (25 tools, 90%+ coverage)
 
-#### **🔄 Phase 2 Implementation (Current)**
-- **Goal**: Built-in tools library with provider enhancements
-- **Timeline**: 10 working days
-- **Key Features**:
-  - ModelSpecifier for "provider/model" syntax (e.g., "openai/gpt-4")
-  - 12+ core tools across 5 categories (file, web, data, system, multimodal)
-  - Tool registry with capability discovery
-  - Security sandboxing for safe execution
-  - Base URL overrides for custom endpoints
+#### **🚀 Phase 3 Starting - Tool Enhancement & Workflow**
+- **Timeline**: 8 weeks (Weeks 9-16)
+- **Sub-phases**:
+  - **3.0**: Critical Tool Fixes - Standardization & DRY (Weeks 9-10)
+  - **3.1**: External Integration Tools - 16 new tools (Weeks 11-12)
+  - **3.2**: Security & Performance - Hardening all 41 tools (Weeks 13-14)
+  - **3.3**: Workflow Orchestration - Patterns & engine (Weeks 15-16)
+- **Breaking Changes**: Clean break approach (no migration tools)
+- **Target**: 41+ production-ready tools with workflow support
 
 ### **🎯 Implementation Roadmap**
 
@@ -239,53 +240,114 @@ local agent = llmspell.Agent.new("DataAnalyst")
 local result = agent:execute(your_existing_data)
 ```
 
-## 🚀 Quick Start (Post-Implementation)
+## 📦 Available Tools (v0.2.0)
+
+### Data Processing
+- **JsonProcessor**: Query and transform JSON with JQ syntax
+- **CsvAnalyzer**: Parse, analyze, and transform CSV data
+- **HttpRequest**: Make HTTP requests with full control
+- **GraphQLQuery**: Execute GraphQL queries and mutations
+
+### File System  
+- **FileOperations**: Read, write, copy, move files
+- **ArchiveHandler**: Create and extract archives (zip, tar)
+- **FileWatcher**: Monitor file system changes
+- **FileConverter**: Convert between file formats
+- **FileSearch**: Search files with patterns
+
+### System Integration
+- **EnvironmentReader**: Access environment variables
+- **ProcessExecutor**: Run system commands safely
+- **ServiceChecker**: Check service availability
+- **SystemMonitor**: Get system resource info
+
+### Utilities
+- **Calculator**: Evaluate mathematical expressions
+- **TextManipulator**: Transform and analyze text
+- **DateTimeHandler**: Parse and format dates/times
+- **UuidGenerator**: Generate various UUID formats
+- **HashCalculator**: Compute cryptographic hashes
+- **Base64Encoder**: Encode/decode base64
+- **DiffCalculator**: Compute text differences
+
+## 🚀 Getting Started
+
+### Installation
 
 ```bash
-# Install rs-llmspell
-cargo install llmspell-cli
+# From source (recommended for now)
+git clone https://github.com/lexlapax/rs-llmspell
+cd rs-llmspell
+cargo build --release
 
-# Initialize new project
-llmspell init my-ai-project --language lua
+# Add to PATH
+export PATH="$PATH:$(pwd)/target/release"
+```
 
-# Run your first spell
-cd my-ai-project
-llmspell run examples/hello_world.lua
+### Quick Example
+
+```lua
+-- file_processor.lua
+local file_tool = Tool.load("file_operations")
+local json_tool = Tool.load("json_processor")
+
+-- Read a JSON file
+local content = file_tool:execute({
+    operation = "read",
+    path = "data.json"
+})
+
+-- Process the JSON
+local result = json_tool:execute({
+    operation = "query",
+    input = content.output,
+    query = ".users[] | select(.active)"
+})
+
+print("Active users:", result.output)
+```
+
+### Run Your Script
+
+```bash
+# Execute with the CLI
+llmspell run file_processor.lua
+
+# With streaming output
+llmspell exec -s "print(Tool.list())"
 ```
 
 ## 🏗️ Development
 
-### **Current Focus: Phase 2 Implementation**
-- **Built-in Tools Library**: 12+ core tools with streaming support
-- **Provider Enhancements**: ModelSpecifier and base URL overrides
-- **Security Sandboxing**: Safe tool execution environment
-- **Target**: 10 working days, 22 specific tasks with acceptance criteria
+### **Contributing**
 
-### **Contributing to Phase 2**
 ```bash
-# Get involved in tools development
+# Clone and build
 git clone https://github.com/lexlapax/rs-llmspell
 cd rs-llmspell
 
-# See current Phase 2 tasks
-cat TODO.md | grep -A5 "Phase 2"
+# Run quality checks
+./scripts/quality-check-minimal.sh  # Quick checks
+./scripts/quality-check-fast.sh     # With unit tests
+./scripts/quality-check.sh          # Full validation
 
-# Development workflow
-cargo check --workspace
-cargo test --workspace  
-cargo clippy -- -D warnings
-cargo fmt
-
-# Test specific Phase 2 components
-cargo test -p llmspell-tools
-cargo test -p llmspell-providers
+# Current development focus
+cat docs/in-progress/PHASE03-TODO.md  # Phase 3 tasks
 ```
+
+### **Phase 3 Development (v0.3.0)**
+- **Breaking Changes**: Tool parameter standardization
+- **16 New Tools**: External integrations (web, email, databases)
+- **Security Hardening**: DoS protection, resource limits
+- **Workflow Engine**: Orchestration patterns
+- **Clean Break**: No migration tools (pre-1.0 freedom)
 
 ### **Architecture Documentation**
 - **Complete Architecture**: [`docs/technical/rs-llmspell-final-architecture.md`](docs/technical/rs-llmspell-final-architecture.md) (15,034+ lines)
 - **Implementation Phases**: [`docs/in-progress/implementation-phases.md`](docs/in-progress/implementation-phases.md) (16-phase roadmap)
-- **Phase 2 Design**: [`docs/in-progress/phase-02-design-doc.md`](docs/in-progress/phase-02-design-doc.md) (Current focus)
-- **Phase 2 Tasks**: [`docs/in-progress/PHASE02-TODO.md`](docs/in-progress/PHASE02-TODO.md) (22 implementation tasks)
+- **Phase 3 Design**: [`docs/in-progress/phase-03-design-doc.md`](docs/in-progress/phase-03-design-doc.md) (Current focus)
+- **Phase 3 Tasks**: [`docs/in-progress/PHASE03-TODO.md`](docs/in-progress/PHASE03-TODO.md) (40 tasks over 8 weeks)
+- **Breaking Changes**: Clean break approach for v0.3.0
 
 ## 📦 Core Technology Stack
 
