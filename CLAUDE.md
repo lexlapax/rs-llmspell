@@ -8,21 +8,28 @@ rs-llmspell: **Scriptable LLM interactions** via Lua, JavaScript - Cast scriptin
 
 🚀 **Phase 2 - Built-in Tools Library**: IN PROGRESS (Started 2025-06-27)
 - **Completed**: Phases 0, 1, and 25/25 Phase 2 tools ✅
-- **Current**: Working on task 2.10.4 (Performance Benchmarking), then returning to 2.10.1 (Script Integration Tests)
-- **Progress**: All 25 tools implemented, refactoring complete (Task 2.9.3 ✅)
+- **Current**: Task 2.10.1 Script Integration Tests (8/9 subtasks complete)
+- **Progress**: All 25 tools implemented, JSON API added, provider enhancements tested
+- **Next**: Complete integration documentation (2.10.1.9), then proceed to 2.10.2 Security Validation
 
 ## Key Commands
 
 ```bash
 # Quality Checks (MANDATORY before commits)
-cargo clippy -- -D warnings      # Zero warnings policy
-cargo fmt                       # Apply formatting
-cargo test --workspace          # Run all tests
-./scripts/quality-check.sh      # Run all quality checks locally
+cargo clippy -- -D warnings            # Zero warnings policy
+cargo fmt --all                        # Apply formatting
+./scripts/quality-check-minimal.sh     # Quick check (seconds) - formatting, clippy, compilation
+./scripts/quality-check-fast.sh        # Fast check (~1 min) - adds unit tests & docs
+./scripts/quality-check.sh             # Full check (5+ min) - all tests & coverage
+
+# Individual Checks
+cargo test --workspace                 # Run all tests (can be slow)
+cargo test --lib --all                 # Run only unit tests (faster)
+cargo check --workspace                # Quick compilation check
 
 # Phase 2 Specific
-cargo test -p llmspell-tools    # Test tools crate
-cargo bench -p llmspell-tools   # Benchmark tool performance
+cargo test -p llmspell-tools          # Test tools crate
+cargo bench -p llmspell-tools         # Benchmark tool performance
 ```
 
 ## Architecture Overview
@@ -39,6 +46,28 @@ cargo bench -p llmspell-tools   # Benchmark tool performance
 - **Test Coverage**: >90% coverage enforced in CI
 - **Documentation**: >95% coverage requirement
 - **CI/CD**: All quality gates implemented and enforced
+
+### Quality Check Scripts
+
+Three levels of quality validation are available:
+
+1. **Minimal Check** (`quality-check-minimal.sh`) - Runs in seconds
+   - Code formatting verification
+   - Clippy lints with zero warnings
+   - Compilation check
+   
+2. **Fast Check** (`quality-check-fast.sh`) - Runs in ~1 minute
+   - All minimal checks
+   - Unit tests only
+   - Documentation build verification
+   
+3. **Full Check** (`quality-check.sh`) - Runs in 5+ minutes
+   - All fast checks
+   - Full integration test suite
+   - Optional coverage analysis (if cargo-tarpaulin installed)
+   - Security audit (if cargo-audit installed)
+
+**Recommendation**: Use minimal check before commits, fast check before pushing, and full check before PRs.
 
 ## Critical Implementation Principles
 

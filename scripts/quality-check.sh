@@ -75,10 +75,16 @@ fi
 # 4. Run tests
 echo ""
 echo "4. Running test suite..."
-if cargo test --workspace > /dev/null 2>&1; then
+print_info "This may take a few minutes..."
+if timeout 300s cargo test --workspace > /dev/null 2>&1; then
     print_status 0 "Test suite passed"
 else
-    print_status 1 "Test suite failed"
+    if [ $? -eq 124 ]; then
+        print_status 1 "Test suite timed out (>5 minutes)"
+        print_warning "Consider running tests in smaller batches or use ./scripts/quality-check-fast.sh"
+    else
+        print_status 1 "Test suite failed"
+    fi
     OVERALL_SUCCESS=1
 fi
 
@@ -97,7 +103,7 @@ echo ""
 echo "6. Checking test coverage (optional)..."
 if command -v cargo-tarpaulin >/dev/null 2>&1; then
     echo "   Running coverage analysis..."
-    COVERAGE_OUTPUT=$(cargo tarpaulin --workspace --out Json --timeout 120 2>/dev/null || echo "failed")
+    COVERAGE_OUTPUT=$(timeout 180s cargo tarpaulin --workspace --out Json --timeout 120 2>/dev/null || echo "failed")
     
     if [ "$COVERAGE_OUTPUT" != "failed" ]; then
         # Try to extract coverage percentage (simplified)
