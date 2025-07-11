@@ -260,6 +260,213 @@ pub fn validate_email(email: &str, field_name: &str) -> LLMResult<()> {
     validate_pattern(email, email_regex, field_name)
 }
 
+/// Validate JSON data against a JSON schema
+///
+/// # Errors
+///
+/// Returns `LLMSpellError::Validation` if the schema is invalid or the data doesn't match
+pub fn validate_json_schema(data: &serde_json::Value, schema: &serde_json::Value) -> LLMResult<()> {
+    use jsonschema::{Draft, JSONSchema};
+
+    let compiled = JSONSchema::options()
+        .with_draft(Draft::Draft7)
+        .compile(schema)
+        .map_err(|e| LLMSpellError::Validation {
+            message: format!("Invalid JSON schema: {e}"),
+            field: Some("schema".to_string()),
+        })?;
+
+    let result = compiled.validate(data);
+    if let Err(errors) = result {
+        let error_messages: Vec<String> = errors
+            .into_iter()
+            .map(|e| format!("- {}: {e}", e.instance_path))
+            .collect();
+        return Err(LLMSpellError::Validation {
+            message: format!("Schema validation failed:\n{}", error_messages.join("\n")),
+            field: Some("data".to_string()),
+        });
+    }
+
+    Ok(())
+}
+
+/// Validate that a regex pattern is valid
+///
+/// # Errors
+///
+/// Returns `LLMSpellError::Validation` if the regex pattern is invalid
+pub fn validate_regex_pattern(pattern: &str) -> LLMResult<()> {
+    regex::Regex::new(pattern).map_err(|e| LLMSpellError::Validation {
+        message: format!("Invalid regex pattern: {e}"),
+        field: Some("pattern".to_string()),
+    })?;
+    Ok(())
+}
+
+/// Validate that a date string matches a specific format
+///
+/// # Errors
+///
+/// Returns `LLMSpellError::Validation` if the date doesn't match the format
+pub fn validate_date_format(date: &str, format: &str) -> LLMResult<()> {
+    use chrono::{NaiveDate, NaiveDateTime};
+
+    // Try parsing as datetime first
+    if NaiveDateTime::parse_from_str(date, format).is_ok() {
+        return Ok(());
+    }
+
+    // Try parsing as date only
+    if NaiveDate::parse_from_str(date, format).is_ok() {
+        return Ok(());
+    }
+
+    Err(LLMSpellError::Validation {
+        message: format!("Invalid date format. Expected: {format}"),
+        field: Some("date".to_string()),
+    })
+}
+
+/// Validate that a path is safe (no path traversal, symlink attacks, etc.)
+///
+/// # Errors
+///
+/// Returns `LLMSpellError::Validation` if the path contains dangerous patterns
+pub fn validate_safe_path(path: &Path, jail_dir: Option<&Path>) -> LLMResult<()> {
+    use crate::file_utils::normalize_path;
+
+    // Check for path traversal attempts
+    let path_str = path.to_string_lossy();
+    if path_str.contains("..") || path_str.contains('~') {
+        return Err(LLMSpellError::Validation {
+            message: "Path contains potentially dangerous patterns (.. or ~)".to_string(),
+            field: Some("path".to_string()),
+        });
+    }
+
+    // Normalize the path to resolve any relative components
+    let normalized = normalize_path(path);
+
+    // If a jail directory is specified, ensure the path is within it
+    if let Some(jail) = jail_dir {
+        let jail_normalized = normalize_path(jail);
+        if !normalized.starts_with(&jail_normalized) {
+            return Err(LLMSpellError::Validation {
+                message: format!(
+                    "Path '{}' is outside the allowed directory '{}'",
+                    path.display(),
+                    jail.display()
+                ),
+                field: Some("path".to_string()),
+            });
+        }
+    }
+
+    // Check if path is a symlink (potential security risk)
+    if path.exists() && path.read_link().is_ok() {
+        return Err(LLMSpellError::Validation {
+            message: "Symlinks are not allowed for security reasons".to_string(),
+            field: Some("path".to_string()),
+        });
+    }
+
+    Ok(())
+}
+
+/// Sanitize a string for safe usage (remove control characters, etc.)
+///
+/// This function removes or replaces potentially dangerous characters
+#[must_use]
+pub fn sanitize_string(input: &str, allow_newlines: bool) -> String {
+    input
+        .chars()
+        .filter(|&c| {
+            if c.is_control() {
+                allow_newlines && (c == '\n' || c == '\r' || c == '\t')
+            } else {
+                true
+            }
+        })
+        .collect()
+}
+
+/// Validate resource limits (memory, file size, etc.)
+///
+/// # Errors
+///
+/// Returns `LLMSpellError::Validation` if the value exceeds the limit
+pub fn validate_resource_limit(
+    value: u64,
+    limit: u64,
+    resource_name: &str,
+    unit: &str,
+) -> LLMResult<()> {
+    if value > limit {
+        return Err(LLMSpellError::Validation {
+            message: format!(
+                "{resource_name} ({value} {unit}) exceeds maximum allowed limit ({limit} {unit})"
+            ),
+            field: Some(resource_name.to_string()),
+        });
+    }
+    Ok(())
+}
+
+/// Validate that a string doesn't contain dangerous shell characters
+///
+/// # Errors
+///
+/// Returns `LLMSpellError::Validation` if dangerous characters are found
+pub fn validate_no_shell_injection(input: &str, field_name: &str) -> LLMResult<()> {
+    const DANGEROUS_CHARS: &[char] = &['$', '`', '\\', ';', '|', '&', '>', '<', '(', ')', '{', '}'];
+
+    for c in DANGEROUS_CHARS {
+        if input.contains(*c) {
+            return Err(LLMSpellError::Validation {
+                message: format!(
+                    "{field_name} contains potentially dangerous character '{c}' that could be used for shell injection"
+                ),
+                field: Some(field_name.to_string()),
+            });
+        }
+    }
+    Ok(())
+}
+
+/// Validate file permissions (Unix-specific)
+///
+/// # Errors
+///
+/// Returns `LLMSpellError::Storage` if unable to get file metadata
+/// Returns `LLMSpellError::Validation` if permissions don't match required mode
+#[cfg(unix)]
+pub fn validate_file_permissions(path: &Path, required_mode: u32) -> LLMResult<()> {
+    use std::os::unix::fs::PermissionsExt;
+
+    let metadata = path.metadata().map_err(|e| LLMSpellError::Storage {
+        message: format!("Failed to get file metadata: {e}"),
+        operation: Some("validate_permissions".to_string()),
+        source: Some(Box::new(e)),
+    })?;
+
+    let permissions = metadata.permissions();
+    let mode = permissions.mode();
+
+    if (mode & 0o777) != required_mode {
+        return Err(LLMSpellError::Validation {
+            message: format!(
+                "File permissions ({:o}) do not match required permissions ({:o})",
+                mode & 0o777,
+                required_mode
+            ),
+            field: Some("permissions".to_string()),
+        });
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -362,5 +569,106 @@ mod tests {
         assert!(validate_email("user.name+tag@example.co.uk", "email").is_ok());
         assert!(validate_email("invalid", "email").is_err());
         assert!(validate_email("@example.com", "email").is_err());
+    }
+
+    #[test]
+    fn test_validate_json_schema() {
+        use serde_json::json;
+
+        let schema = json!({
+            "type": "object",
+            "properties": {
+                "name": {"type": "string"},
+                "age": {"type": "number", "minimum": 0}
+            },
+            "required": ["name"]
+        });
+
+        let valid_data = json!({"name": "Alice", "age": 30});
+        let invalid_data = json!({"age": -5});
+
+        assert!(validate_json_schema(&valid_data, &schema).is_ok());
+        assert!(validate_json_schema(&invalid_data, &schema).is_err());
+    }
+
+    #[test]
+    fn test_validate_regex_pattern() {
+        assert!(validate_regex_pattern(r"\d+").is_ok());
+        assert!(validate_regex_pattern(r"[a-z]+").is_ok());
+        assert!(validate_regex_pattern(r"(unclosed").is_err());
+        assert!(validate_regex_pattern(r"(?P<invalid)").is_err());
+    }
+
+    #[test]
+    fn test_validate_date_format() {
+        assert!(validate_date_format("2024-01-15 14:30:00", "%Y-%m-%d %H:%M:%S").is_ok());
+        assert!(validate_date_format("15/01/2024", "%d/%m/%Y").is_ok());
+        assert!(validate_date_format("invalid date", "%Y-%m-%d").is_err());
+        assert!(validate_date_format("2024-01-15", "%d/%m/%Y").is_err());
+    }
+
+    #[test]
+    fn test_validate_safe_path() {
+        let temp_dir = TempDir::new().unwrap();
+        let safe_path = temp_dir.path().join("safe_file.txt");
+        let jail_dir = temp_dir.path();
+
+        // Safe paths should pass
+        assert!(validate_safe_path(&safe_path, Some(jail_dir)).is_ok());
+
+        // Paths with .. should fail
+        let dangerous_path = temp_dir.path().join("../escape.txt");
+        assert!(validate_safe_path(&dangerous_path, None).is_err());
+
+        // Paths with ~ should fail
+        let home_path = Path::new("~/file.txt");
+        assert!(validate_safe_path(home_path, None).is_err());
+    }
+
+    #[test]
+    fn test_sanitize_string() {
+        // Test removing control characters
+        assert_eq!(sanitize_string("Hello\x00World", false), "HelloWorld");
+        assert_eq!(sanitize_string("Hello\nWorld", false), "HelloWorld");
+        assert_eq!(sanitize_string("Hello\nWorld", true), "Hello\nWorld");
+        assert_eq!(sanitize_string("Tab\there", true), "Tab\there");
+        assert_eq!(sanitize_string("Normal text!", true), "Normal text!");
+    }
+
+    #[test]
+    fn test_validate_resource_limit() {
+        assert!(validate_resource_limit(100, 1000, "memory", "MB").is_ok());
+        assert!(validate_resource_limit(2000, 1000, "memory", "MB").is_err());
+        assert!(validate_resource_limit(1000, 1000, "file_size", "bytes").is_ok());
+    }
+
+    #[test]
+    fn test_validate_no_shell_injection() {
+        assert!(validate_no_shell_injection("safe_command", "command").is_ok());
+        assert!(validate_no_shell_injection("hello world", "input").is_ok());
+        assert!(validate_no_shell_injection("rm -rf $HOME", "command").is_err());
+        assert!(validate_no_shell_injection("echo `date`", "command").is_err());
+        assert!(validate_no_shell_injection("cmd1; cmd2", "command").is_err());
+        assert!(validate_no_shell_injection("cmd1 | cmd2", "command").is_err());
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn test_validate_file_permissions() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("test.txt");
+        fs::write(&file_path, "test").unwrap();
+
+        // Set specific permissions
+        let mut perms = fs::metadata(&file_path).unwrap().permissions();
+        perms.set_mode(0o644);
+        fs::set_permissions(&file_path, perms).unwrap();
+
+        // Validate correct permissions
+        assert!(validate_file_permissions(&file_path, 0o644).is_ok());
+        // Validate incorrect permissions
+        assert!(validate_file_permissions(&file_path, 0o755).is_err());
     }
 }

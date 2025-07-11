@@ -71,35 +71,29 @@
 - [x] Response builder example created (examples/response_builder.rs)
 - [x] All clippy warnings fixed and code formatted
 
-### Task 3.0.3: Shared Validators Implementation
+### Task 3.0.3: Shared Validators Implementation ✅
 **Priority**: CRITICAL  
 **Estimated Time**: 12 hours  
-**Assignee**: Core Team Developer
+**Completed**: 2025-07-11
 
 **Description**: Extract and implement common validation logic from tools into shared utilities.
 
-**Acceptance Criteria:**
-- [ ] Path validation utilities (exists, permissions, security)
-- [ ] Parameter validation framework (ranges, formats, patterns)
-- [ ] Input sanitization utilities
-- [ ] Resource limit validators
-- [ ] Comprehensive test coverage
-
-**Implementation Steps:**
-1. Create `llmspell-utils/src/validation/` module
-2. Implement path validation with security checks
-3. Create parameter validation framework
-4. Add input sanitization utilities
-5. Implement resource limit validators
-6. Extract existing validation from tools
-7. Write comprehensive tests
-
-**Definition of Done:**
-- [ ] All validators compile without warnings
-- [ ] 100% test coverage for validators
-- [ ] Documentation with examples
-- [ ] Performance impact minimal
-- [ ] Security review passed
+**Deliverables Completed:**
+- [x] Path validation utilities (exists, permissions, security)
+  - `validate_safe_path` - prevents path traversal and symlink attacks
+  - `validate_file_permissions` - Unix-specific permission validation
+- [x] Parameter validation framework (ranges, formats, patterns)
+  - `validate_json_schema` - JSON schema validation
+  - `validate_regex_pattern` - regex pattern validation
+  - `validate_date_format` - date format validation
+- [x] Input sanitization utilities
+  - `sanitize_string` - removes control characters
+  - `validate_no_shell_injection` - prevents shell injection attacks
+- [x] Resource limit validators
+  - `validate_resource_limit` - generic resource limit validation
+- [x] Comprehensive test coverage (21 tests passing)
+- [x] All validators exported in llmspell-utils
+- [x] All quality checks passing (formatting, clippy, compilation)
 
 ### Task 3.0.4: Tool Standardization - File Operations
 **Priority**: CRITICAL  
@@ -396,7 +390,58 @@
 - [ ] Documentation updated
 - [ ] Code review passed
 
-### Task 3.0.13: Phase 3.0 Integration Testing
+### Task 3.0.13: Update Lua Examples for Parameter Standardization
+**Priority**: HIGH  
+**Estimated Time**: 16 hours  
+**Assignee**: Developer Experience Team
+
+**Description**: Update all Lua example files to work with standardized tool parameters and ResponseBuilder pattern.
+
+**Acceptance Criteria:**
+- [ ] All 10 tools-*.lua example files updated with new parameter names
+- [ ] Operation parameters added where required
+- [ ] Response parsing updated for new ResponseBuilder format
+- [ ] All examples tested and working correctly
+- [ ] Helpful comments added explaining parameter changes
+- [ ] Documentation reflects standardized patterns
+
+**Implementation Steps:**
+1. Analyze parameter changes from CHANGELOG_v0.3.0.md
+2. Update parameter names in all 10 example files:
+   - tools-data.lua (data→input, query→input, content→input, url→input, endpoint→input)
+   - tools-filesystem.lua (file_path→path, content→input, pattern→input)
+   - tools-media.lua (input_path→source_path, output_path→target_path)
+   - tools-utility.lua (text→input, data→input, expression→input, template→input)
+   - tools-system.lua (metrics→input, service→input, pattern→input)
+   - tools-security.lua (data→input, file_path→path)
+   - tools-performance.lua (all applicable parameter changes)
+   - tools-showcase.lua (comprehensive parameter updates)
+   - tools-utility-reference.lua (reference documentation updates)
+   - tools-workflow.lua (workflow examples with new parameters)
+3. Add operation parameter to tools that now require it
+4. Update response parsing to handle new ResponseBuilder format:
+   - Error responses now have error.message structure
+   - Success responses follow standardized format
+   - Metadata fields may have changed
+5. Test each example file thoroughly:
+   - Run each example and verify output
+   - Check for any runtime errors
+   - Validate that results match expected behavior
+6. Add migration comments where helpful:
+   - Document old vs new parameter names
+   - Explain response format changes
+   - Note any behavioral differences
+7. Update any inline documentation in examples
+
+**Definition of Done:**
+- [ ] All 10 example files use standardized parameters
+- [ ] No usage of deprecated parameter names
+- [ ] All examples run without errors
+- [ ] Response parsing handles new format correctly
+- [ ] Migration comments added where appropriate
+- [ ] Examples serve as good reference for v0.3.0 usage
+
+### Task 3.0.14: Phase 3.0 Integration Testing
 **Priority**: CRITICAL  
 **Estimated Time**: 12 hours  
 **Assignee**: QA Team

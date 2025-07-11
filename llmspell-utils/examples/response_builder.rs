@@ -91,7 +91,10 @@ fn main() {
         .with_result(json!({"result": 42}))
         .build_for_output();
     println!("Text output: {}", text);
-    println!("JSON response: {}\n", serde_json::to_string_pretty(&response).unwrap());
+    println!(
+        "JSON response: {}\n",
+        serde_json::to_string_pretty(&response).unwrap()
+    );
 
     // Example 9: Validation success
     println!("9. Validation Success:");

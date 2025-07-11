@@ -133,8 +133,13 @@ pub use time::{
     subtract_duration, weekday_name, TimeError, TimeResult, DATE_FORMATS,
 };
 pub use validators::{
-    validate_email, validate_enum, validate_file_size, validate_identifier, validate_is_directory,
-    validate_is_file, validate_not_empty, validate_not_empty_collection, validate_path_exists,
-    validate_pattern, validate_range, validate_required_field, validate_string_length,
+    sanitize_string, validate_date_format, validate_email, validate_enum, validate_file_size,
+    validate_identifier, validate_is_directory, validate_is_file, validate_json_schema,
+    validate_no_shell_injection, validate_not_empty, validate_not_empty_collection,
+    validate_path_exists, validate_pattern, validate_range, validate_regex_pattern,
+    validate_required_field, validate_resource_limit, validate_safe_path, validate_string_length,
     validate_url,
 };
+
+#[cfg(unix)]
+pub use validators::validate_file_permissions;
