@@ -14,7 +14,7 @@
 ## Phase Overview
 
 ### Goal
-Transform the existing 25 self-contained tools into a standardized, secure, and extensible library of 41+ tools, then implement comprehensive workflow orchestration patterns that leverage the full tool ecosystem.
+Transform the existing 26 self-contained tools into a standardized, secure, and extensible library of 41+ tools, then implement comprehensive workflow orchestration patterns that leverage the full tool ecosystem.
 
 ### Core Principles
 - **Standardization First**: Fix existing tools before adding new ones
@@ -62,7 +62,7 @@ Phase 3 is divided into four 2-week sub-phases:
 ## Phase 3.0: Critical Tool Fixes (Weeks 9-10)
 
 ### Goal
-Standardize all 25 existing tools to use consistent interfaces, parameter names, and response formats, while implementing critical security fixes.
+Standardize all 26 existing tools to use consistent interfaces, parameter names, and response formats, while implementing critical security fixes.
 
 ### 1. Tool Signature Standardization
 
@@ -107,7 +107,61 @@ Standardize all 25 existing tools to use consistent interfaces, parameter names,
 - operation: String  // Required for tools with multiple operations
 ```
 
-#### 1.2 ResponseBuilder Pattern
+#### 1.2 Detailed Parameter Mapping (26 Tools)
+
+##### File Operations Tools (5 tools)
+| Tool | Old Parameters | New Parameters | Notes |
+|------|---------------|----------------|-------|
+| **FileOperationsTool** | `operation: String`<br>`path: String`<br>`content: Option<String>` | `operation: String`<br>`path: PathBuf`<br>`input: Option<String>` | `content` → `input`<br>String → PathBuf |
+| **FileSearchTool** | `pattern: String`<br>`path: String`<br>`search_type: String` | `operation: String`<br>`input: String`<br>`path: PathBuf`<br>`search_type: String` | Add `operation`<br>`pattern` → `input` |
+| **FileConverterTool** | `input_path: String`<br>`output_path: String`<br>`format: String` | `operation: String`<br>`source_path: PathBuf`<br>`target_path: PathBuf`<br>`format: String` | Add `operation`<br>Rename paths |
+| **FileWatcherTool** | `path: String`<br>`pattern: String`<br>`events: Vec<String>` | `operation: String`<br>`path: PathBuf`<br>`input: String`<br>`events: Vec<String>` | Add `operation`<br>`pattern` → `input` |
+| **ArchiveHandlerTool** | `operation: String`<br>`archive_path: String`<br>`files: Vec<String>` | `operation: String`<br>`path: PathBuf`<br>`files: Vec<PathBuf>` | `archive_path` → `path` |
+
+##### Data Processing Tools (2 tools)
+| Tool | Old Parameters | New Parameters | Notes |
+|------|---------------|----------------|-------|
+| **CsvAnalyzerTool** | `operation: String`<br>`file_path: Option<String>`<br>`content: Option<String>` | `operation: String`<br>`input: String`<br>`path: Option<PathBuf>` | Consolidate to `input`<br>`file_path` → `path` |
+| **JsonProcessorTool** | `operation: String`<br>`input: Option<Value>`<br>`query: Option<String>`<br>`content: Option<String>` | `operation: String`<br>`input: Value`<br>`query: Option<String>` | Remove duplicate `content` |
+
+##### Media Processing Tools (3 tools)
+| Tool | Old Parameters | New Parameters | Notes |
+|------|---------------|----------------|-------|
+| **ImageProcessorTool** | `operation: String`<br>`file_path: Option<String>`<br>`input_path: Option<String>`<br>`output_path: Option<String>` | `operation: String`<br>`source_path: PathBuf`<br>`target_path: Option<PathBuf>` | Consolidate path params |
+| **AudioProcessorTool** | `operation: String`<br>`file_path: Option<String>`<br>`input_path: Option<String>`<br>`output_path: Option<String>` | `operation: String`<br>`source_path: PathBuf`<br>`target_path: Option<PathBuf>` | Consolidate path params |
+| **VideoProcessorTool** | `operation: String`<br>`file_path: String`<br>`output_path: Option<String>` | `operation: String`<br>`source_path: PathBuf`<br>`target_path: Option<PathBuf>` | Standardize paths |
+
+##### Utility Tools (9 tools)
+| Tool | Old Parameters | New Parameters | Notes |
+|------|---------------|----------------|-------|
+| **Base64EncoderTool** | `operation: String`<br>`input: String` | `operation: String`<br>`input: String` | Already compliant ✓ |
+| **CalculatorTool** | `expression: String`<br>`precision: Option<u8>` | `operation: String`<br>`input: String`<br>`precision: Option<u8>` | Add `operation`<br>`expression` → `input` |
+| **TextManipulatorTool** | `text: String`<br>`operation: String` | `operation: String`<br>`input: String` | `text` → `input`<br>Reorder params |
+| **HashCalculatorTool** | `algorithm: String`<br>`data: Option<String>`<br>`file_path: Option<String>` | `operation: String`<br>`input: Option<String>`<br>`path: Option<PathBuf>`<br>`algorithm: String` | Add `operation`<br>`data` → `input` |
+| **DateTimeHandlerTool** | `operation: String`<br>`input: Option<String>` | `operation: String`<br>`input: Option<String>` | Already compliant ✓ |
+| **UuidGeneratorTool** | `version: Option<u8>`<br>`namespace: Option<String>`<br>`name: Option<String>` | `operation: String`<br>`input: Option<String>`<br>`version: Option<u8>` | Add `operation`<br>Restructure |
+| **DiffCalculatorTool** | `source: String`<br>`target: String` | `operation: String`<br>`source_path: PathBuf`<br>`target_path: PathBuf` | Add `operation`<br>Use path pattern |
+| **TemplateEngineTool** | `template: String`<br>`context: Value` | `operation: String`<br>`input: String`<br>`context: Value` | Add `operation`<br>`template` → `input` |
+| **DataValidationTool** | `data: Value`<br>`schema: Option<Value>` | `operation: String`<br>`input: Value`<br>`schema: Option<Value>` | Add `operation`<br>`data` → `input` |
+
+##### System Integration Tools (4 tools)
+| Tool | Old Parameters | New Parameters | Notes |
+|------|---------------|----------------|-------|
+| **ProcessExecutorTool** | `executable: String`<br>`arguments: Vec<String>` | `operation: String`<br>`input: String`<br>`arguments: Vec<String>` | Add `operation`<br>`executable` → `input` |
+| **SystemMonitorTool** | `metrics: Vec<String>` | `operation: String`<br>`input: Vec<String>` | Add `operation`<br>`metrics` → `input` |
+| **ServiceCheckerTool** | `service: String`<br>`host: String`<br>`port: u16` | `operation: String`<br>`input: String`<br>`host: String`<br>`port: u16` | Add `operation`<br>`service` → `input` |
+| **EnvironmentReaderTool** | `operation: String`<br>`pattern: Option<String>` | `operation: String`<br>`input: Option<String>` | `pattern` → `input` |
+
+##### API/Web Tools (3 tools)
+| Tool | Old Parameters | New Parameters | Notes |
+|------|---------------|----------------|-------|
+| **HttpRequestTool** | `method: String`<br>`url: String` | `operation: String`<br>`input: String`<br>`method: String` | Add `operation`<br>`url` → `input` |
+| **GraphQLQueryTool** | `endpoint: String`<br>`query: String` | `operation: String`<br>`input: String`<br>`endpoint: String` | Add `operation`<br>`query` → `input` |
+| **WebSearchTool** | `query: String` | `operation: String`<br>`input: String` | Add `operation`<br>`query` → `input` |
+
+**Summary**: 26 tools total - Only 2 already compliant (Base64EncoderTool, DateTimeHandlerTool)
+
+#### 1.3 ResponseBuilder Pattern
 
 **Standard Response Format**:
 ```rust
@@ -1294,7 +1348,7 @@ let etl_workflow = StreamingWorkflow::builder("etl_pipeline")
 ## Handoff Criteria
 
 ### Phase 3.0 Handoff
-- [ ] All 25 tools use standard interfaces
+- [ ] All 26 tools use standard interfaces
 - [ ] Breaking changes documented
 - [ ] Security hardening implemented
 - [ ] All tests passing

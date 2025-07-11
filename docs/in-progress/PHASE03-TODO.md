@@ -16,7 +16,7 @@
 
 ## Overview
 
-**Goal**: Transform the existing 25 self-contained tools into a standardized, secure, and extensible library of 41+ tools, then implement comprehensive workflow orchestration patterns that leverage the full tool ecosystem.
+**Goal**: Transform the existing 26 self-contained tools into a standardized, secure, and extensible library of 41+ tools, then implement comprehensive workflow orchestration patterns that leverage the full tool ecosystem.
 
 **Clean Break Approach**: As a pre-1.0 project (v0.1.0), we're making breaking changes without migration tools to achieve the best architecture. This saves ~1 week of development time that we're investing in better security and features.
 
@@ -60,7 +60,7 @@
 6. Document breaking changes and mitigation strategies
 
 **Definition of Done:**
-- [ ] Analysis spreadsheet complete with all 25 tools
+- [ ] Analysis spreadsheet complete with all 26 tools
 - [ ] Standard parameter conventions documented
 - [ ] Change documentation template created
 - [ ] Breaking changes inventory complete
@@ -312,7 +312,7 @@
 
 **Acceptance Criteria:**
 - [ ] Complete CHANGELOG_v0.3.0.md with all changes
-- [ ] Parameter mapping table for all 25 tools
+- [ ] Parameter mapping table for all 26 tools
 - [ ] Before/after examples for each tool
 - [ ] Manual upgrade instructions
 - [ ] Example script conversions
@@ -371,7 +371,7 @@
 **Description**: Comprehensive testing of all standardized tools.
 
 **Acceptance Criteria:**
-- [ ] All 25 tools pass integration tests
+- [ ] All 26 tools pass integration tests
 - [ ] Parameter consistency validated
 - [ ] ResponseBuilder usage verified
 - [ ] Performance benchmarks met

@@ -16,7 +16,7 @@
 
 ## Overview
 
-**Goal**: Transform the existing 25 self-contained tools into a standardized, secure, and extensible library of 41+ tools, then implement comprehensive workflow orchestration patterns that leverage the full tool ecosystem.
+**Goal**: Transform the existing 26 self-contained tools into a standardized, secure, and extensible library of 41+ tools, then implement comprehensive workflow orchestration patterns that leverage the full tool ecosystem.
 
 **Clean Break Approach**: As a pre-1.0 project (v0.1.0), we're making breaking changes without migration tools to achieve the best architecture. This saves ~1 week of development time that we're investing in better security and features.
 
@@ -37,64 +37,39 @@
 
 ## Phase 3.0: Critical Tool Fixes (Weeks 9-10)
 
-### Task 3.0.1: Tool Signature Analysis and Planning
+### Task 3.0.1: Tool Signature Analysis and Planning ✅
 **Priority**: CRITICAL  
 **Estimated Time**: 8 hours  
-**Assignee**: Architecture Team Lead
+**Completed**: 2025-07-11
 
-**Description**: Analyze all 25 existing tools to identify parameter inconsistencies and create standardization plan.
+**Description**: Analyze all 26 existing tools to identify parameter inconsistencies and create standardization plan.
 
-**Acceptance Criteria:**
-- [ ] Complete analysis of all tool parameter names
-- [ ] Categorization of inconsistencies documented
-- [ ] Standardization approach defined for each tool
-- [ ] Breaking changes clearly identified
-- [ ] Priority order for tool updates established
+**Deliverables Completed:**
+- [x] Complete analysis of all tool parameter names
+- [x] Categorization of inconsistencies documented
+- [x] Standardization approach defined for each tool
+- [x] Breaking changes clearly identified
+- [x] Priority order for tool updates established
+- [x] Parameter mapping table added to phase-03-design-doc.md
+- [x] CHANGELOG_v0.3.0.md created with comprehensive breaking changes
 
-**Implementation Steps:**
-1. Create tool parameter analysis spreadsheet
-2. Document current parameter names for each tool
-3. Identify parameter naming patterns and inconsistencies
-4. Define standard parameter naming conventions
-5. Create update priority based on usage and dependencies
-6. Document breaking changes and mitigation strategies
-
-**Definition of Done:**
-- [ ] Analysis spreadsheet complete with all 25 tools
-- [ ] Standard parameter conventions documented
-- [ ] Change documentation template created
-- [ ] Breaking changes inventory complete
-- [ ] Review and approval by technical lead
-
-### Task 3.0.2: ResponseBuilder Pattern Implementation
+### Task 3.0.2: ResponseBuilder Pattern Implementation ✅
 **Priority**: CRITICAL  
 **Estimated Time**: 16 hours  
-**Assignee**: Core Team Lead
+**Completed**: 2025-07-11
 
 **Description**: Implement ResponseBuilder pattern in llmspell-utils for standardized tool responses.
 
-**Acceptance Criteria:**
-- [ ] `ResponseBuilder` struct implemented with fluent API
-- [ ] Standard response fields defined (operation, success, error, data, metadata)
-- [ ] Builder methods for all response scenarios
-- [ ] Integration with existing error types
-- [ ] Comprehensive unit tests with 100% coverage
-
-**Implementation Steps:**
-1. Create `llmspell-utils/src/response/builder.rs`
-2. Define `StandardResponse` struct with all fields
-3. Implement `ResponseBuilder` with fluent API
-4. Add convenience methods for common patterns
-5. Integrate with `LLMSpellError` for error responses
-6. Write comprehensive tests and documentation
-7. Create usage examples for standardized tools
-
-**Definition of Done:**
-- [ ] ResponseBuilder compiles without warnings
-- [ ] All builder methods implemented and tested
-- [ ] Documentation with usage examples
-- [ ] Performance benchmarks acceptable
-- [ ] Documentation for standardized tools created
+**Deliverables Completed:**
+- [x] `ResponseBuilder` struct implemented with fluent API
+- [x] Standard response fields defined (operation, success, error, data, metadata)
+- [x] Builder methods for all response scenarios
+- [x] `ErrorDetails` type for structured error responses
+- [x] `ValidationError` type and `validation_response` helper
+- [x] Integration with existing response patterns
+- [x] Comprehensive unit tests (10 tests passing)
+- [x] Response builder example created (examples/response_builder.rs)
+- [x] All clippy warnings fixed and code formatted
 
 ### Task 3.0.3: Shared Validators Implementation
 **Priority**: CRITICAL  
@@ -131,7 +106,7 @@
 **Estimated Time**: 16 hours  
 **Assignee**: Tools Team
 
-**Description**: Standardize all file system tools (8 tools) to use consistent parameters and ResponseBuilder.
+**Description**: Standardize all file system tools (5 tools) to use consistent parameters and ResponseBuilder.
 
 **Tools to Update:**
 - FileOperationsTool
@@ -139,7 +114,6 @@
 - FileWatcherTool
 - FileConverterTool
 - FileSearchTool
-- (and 3 others in category)
 
 **Acceptance Criteria:**
 - [ ] All file paths use `path: PathBuf` parameter
@@ -158,7 +132,7 @@
 7. Verify all tests pass with new interfaces
 
 **Definition of Done:**
-- [ ] All 8 tools compile with new signatures
+- [ ] All 5 tools compile with new signatures
 - [ ] Tests updated and passing
 - [ ] Documentation complete
 - [ ] Performance unchanged
@@ -169,13 +143,11 @@
 **Estimated Time**: 12 hours  
 **Assignee**: Tools Team
 
-**Description**: Standardize all data processing tools (4 tools) to use consistent parameters.
+**Description**: Standardize all data processing tools (2 tools) to use consistent parameters.
 
 **Tools to Update:**
 - JsonProcessorTool
 - CsvAnalyzerTool
-- DataValidationTool
-- TemplateEngineTool
 
 **Acceptance Criteria:**
 - [ ] Primary data parameter is `input: String | Value`
@@ -187,13 +159,11 @@
 **Implementation Steps:**
 1. Update JsonProcessorTool to use `input` parameter
 2. Migrate CsvAnalyzerTool to standard format
-3. Standardize DataValidationTool responses
-4. Update TemplateEngineTool parameters
-5. Extract common data validators
-6. Update all related tests
+3. Extract common data validators
+4. Update all related tests
 
 **Definition of Done:**
-- [ ] All 4 tools standardized
+- [ ] All 2 tools standardized
 - [ ] Tests passing with new signatures
 - [ ] Shared validators in use
 - [ ] Documentation complete
@@ -204,17 +174,18 @@
 **Estimated Time**: 16 hours  
 **Assignee**: Tools Team
 
-**Description**: Standardize all utility tools (8 tools) to consistent interfaces.
+**Description**: Standardize all utility tools (9 tools) to consistent interfaces.
 
 **Tools to Update:**
-- Calculator
-- TextManipulator
-- DateTimeHandler
-- UuidGenerator
-- HashCalculator
-- Base64Encoder
-- DiffCalculator
-- (and 1 other)
+- CalculatorTool
+- TextManipulatorTool
+- DateTimeHandlerTool
+- UuidGeneratorTool
+- HashCalculatorTool
+- Base64EncoderTool
+- DiffCalculatorTool
+- TemplateEngineTool
+- DataValidationTool
 
 **Acceptance Criteria:**
 - [ ] Consistent `input` parameter naming
@@ -232,7 +203,7 @@
 6. Document breaking changes
 
 **Definition of Done:**
-- [ ] All 8 utility tools standardized
+- [ ] All 9 utility tools standardized
 - [ ] No performance regressions
 - [ ] Tests updated and passing
 - [ ] Documentation complete
@@ -246,10 +217,10 @@
 **Description**: Standardize system integration tools (4 tools) to consistent interfaces.
 
 **Tools to Update:**
-- EnvironmentReader
-- ProcessExecutor
-- ServiceChecker
-- SystemMonitor
+- EnvironmentReaderTool
+- ProcessExecutorTool
+- ServiceCheckerTool
+- SystemMonitorTool
 
 **Acceptance Criteria:**
 - [ ] Consistent parameter naming
@@ -259,10 +230,10 @@
 - [ ] Change documentation
 
 **Implementation Steps:**
-1. Update EnvironmentReader parameters
-2. Standardize ProcessExecutor responses
-3. Update ServiceChecker interface
-4. Migrate SystemMonitor to standards
+1. Update EnvironmentReaderTool parameters
+2. Standardize ProcessExecutorTool responses
+3. Update ServiceCheckerTool interface
+4. Migrate SystemMonitorTool to standards
 5. Apply security validators
 6. Update integration tests
 
@@ -273,7 +244,69 @@
 - [ ] Performance acceptable
 - [ ] Updates complete
 
-### Task 3.0.8: DRY Compliance - Extract Common Patterns
+### Task 3.0.8: Tool Standardization - Media Processing
+**Priority**: HIGH  
+**Estimated Time**: 12 hours  
+**Assignee**: Tools Team
+
+**Description**: Standardize media processing tools (3 tools) to consistent interfaces.
+
+**Tools to Update:**
+- ImageProcessorTool
+- AudioProcessorTool
+- VideoProcessorTool
+
+**Acceptance Criteria:**
+- [ ] Consistent path parameters (`source_path`, `target_path`)
+- [ ] ResponseBuilder usage
+- [ ] Resource limits enforced
+- [ ] Change documentation
+
+**Implementation Steps:**
+1. Update ImageProcessorTool parameters
+2. Standardize AudioProcessorTool
+3. Update VideoProcessorTool
+4. Update all tests
+5. Document changes
+
+**Definition of Done:**
+- [ ] All 3 tools standardized
+- [ ] Tests passing
+- [ ] Documentation complete
+- [ ] Performance maintained
+
+### Task 3.0.9: Tool Standardization - API/Web
+**Priority**: HIGH  
+**Estimated Time**: 8 hours  
+**Assignee**: Tools Team
+
+**Description**: Standardize API/Web tools (3 tools) to consistent interfaces.
+
+**Tools to Update:**
+- HttpRequestTool
+- GraphQLQueryTool
+- WebSearchTool
+
+**Acceptance Criteria:**
+- [ ] Consistent `input` parameter for primary data
+- [ ] ResponseBuilder usage
+- [ ] Rate limiting preparation
+- [ ] Change documentation
+
+**Implementation Steps:**
+1. Update HttpRequestTool (`url` → `input`)
+2. Standardize GraphQLQueryTool (`query` → `input`)
+3. Update WebSearchTool (`query` → `input`)
+4. Update tests
+5. Document changes
+
+**Definition of Done:**
+- [ ] All 3 tools standardized
+- [ ] Tests passing
+- [ ] Documentation complete
+- [ ] Ready for Phase 3.1 enhancements
+
+### Task 3.0.10: DRY Compliance - Extract Common Patterns
 **Priority**: HIGH  
 **Estimated Time**: 20 hours  
 **Assignee**: Architecture Team
@@ -303,22 +336,22 @@
 - [ ] Documentation complete
 - [ ] Tools migrated to shared utils
 
-### Task 3.0.9: Breaking Changes Documentation
+### Task 3.0.11: Breaking Changes Documentation
 **Priority**: CRITICAL  
 **Estimated Time**: 8 hours  
 **Assignee**: Documentation Team
 
-**Description**: Create comprehensive documentation for all breaking changes in v0.3.0.
+**Description**: Complete comprehensive documentation for all breaking changes in v0.3.0.
 
 **Acceptance Criteria:**
 - [ ] Complete CHANGELOG_v0.3.0.md with all changes
-- [ ] Parameter mapping table for all 25 tools
+- [ ] Parameter mapping table for all 26 tools
 - [ ] Before/after examples for each tool
 - [ ] Manual upgrade instructions
 - [ ] Example script conversions
 
 **Implementation Steps:**
-1. Create CHANGELOG_v0.3.0.md
+1. Update CHANGELOG_v0.3.0.md with all standardization changes
 2. Document all parameter changes
 3. Write before/after code examples
 4. Create upgrade instruction guide
@@ -333,7 +366,7 @@
 - [ ] Instructions clear and tested
 - [ ] Documentation reviewed
 
-### Task 3.0.10: Critical Security Hardening
+### Task 3.0.12: Critical Security Hardening
 **Priority**: CRITICAL  
 **Estimated Time**: 8 hours  
 **Assignee**: Security Team
@@ -363,7 +396,7 @@
 - [ ] Documentation updated
 - [ ] Code review passed
 
-### Task 3.0.11: Phase 3.0 Integration Testing
+### Task 3.0.13: Phase 3.0 Integration Testing
 **Priority**: CRITICAL  
 **Estimated Time**: 12 hours  
 **Assignee**: QA Team
@@ -371,7 +404,7 @@
 **Description**: Comprehensive testing of all standardized tools.
 
 **Acceptance Criteria:**
-- [ ] All 25 tools pass integration tests
+- [ ] All 26 tools pass integration tests
 - [ ] Parameter consistency validated
 - [ ] ResponseBuilder usage verified
 - [ ] Performance benchmarks met
@@ -499,7 +532,74 @@
 - [ ] Tests complete
 - [ ] Documentation ready
 
-### Task 3.1.4: External Tool Dependencies
+### Task 3.1.4: Data Processing Tools Extension
+**Priority**: MEDIUM  
+**Estimated Time**: 20 hours  
+**Assignee**: Data Tools Team
+
+**Description**: Implement additional data processing tools.
+
+**Tools to Implement:**
+- XmlProcessorTool (XML parsing and transformation)
+- YamlProcessorTool (YAML parsing and validation)
+- DataTransformerTool (format conversions, ETL)
+- StatisticalAnalyzerTool (statistical computations)
+- TextAnalyzerTool (text analysis and NLP)
+
+**Acceptance Criteria:**
+- [ ] All tools follow Phase 3.0 standards
+- [ ] Consistent with existing data tools
+- [ ] Performance optimized
+- [ ] Comprehensive tests
+
+**Implementation Steps:**
+1. Implement XmlProcessorTool
+2. Create YamlProcessorTool
+3. Build DataTransformerTool
+4. Implement StatisticalAnalyzerTool
+5. Create TextAnalyzerTool
+6. Add tests for all tools
+7. Document usage
+
+**Definition of Done:**
+- [ ] All 5 tools implemented
+- [ ] Tests passing
+- [ ] Documentation complete
+- [ ] Performance verified
+
+### Task 3.1.5: System Integration Tools Extension
+**Priority**: MEDIUM  
+**Estimated Time**: 12 hours  
+**Assignee**: System Tools Team
+
+**Description**: Implement additional system integration tools.
+
+**Tools to Implement:**
+- SlackIntegrationTool (Slack messaging)
+- GitHubIntegrationTool (GitHub API integration)
+- CronSchedulerTool (Cron job management)
+
+**Acceptance Criteria:**
+- [ ] API integrations functional
+- [ ] Secure credential handling
+- [ ] Rate limiting implemented
+- [ ] ResponseBuilder pattern
+
+**Implementation Steps:**
+1. Implement SlackIntegrationTool
+2. Create GitHubIntegrationTool
+3. Build CronSchedulerTool
+4. Add authentication handling
+5. Implement rate limiting
+6. Add comprehensive tests
+
+**Definition of Done:**
+- [ ] All 3 tools implemented
+- [ ] Authentication working
+- [ ] Tests complete
+- [ ] Documentation ready
+
+### Task 3.1.6: External Tool Dependencies
 **Priority**: CRITICAL  
 **Estimated Time**: 8 hours  
 **Assignee**: Infrastructure Team
@@ -529,7 +629,7 @@
 - [ ] Build times acceptable
 - [ ] Documentation complete
 
-### Task 3.1.5: API Key Management System
+### Task 3.1.7: API Key Management System
 **Priority**: CRITICAL  
 **Estimated Time**: 12 hours  
 **Assignee**: Security Team
@@ -559,7 +659,7 @@
 - [ ] Audit logs working
 - [ ] Security review passed
 
-### Task 3.1.6: Rate Limiting Framework
+### Task 3.1.8: Rate Limiting Framework
 **Priority**: HIGH  
 **Estimated Time**: 16 hours  
 **Assignee**: Infrastructure Team
@@ -589,7 +689,7 @@
 - [ ] Metrics available
 - [ ] Documentation complete
 
-### Task 3.1.7: Circuit Breaker Implementation
+### Task 3.1.9: Circuit Breaker Implementation
 **Priority**: MEDIUM  
 **Estimated Time**: 12 hours  
 **Assignee**: Reliability Team
@@ -619,7 +719,7 @@
 - [ ] Metrics implemented
 - [ ] Tests comprehensive
 
-### Task 3.1.8: Integration Testing Suite
+### Task 3.1.10: Integration Testing Suite
 **Priority**: CRITICAL  
 **Estimated Time**: 16 hours  
 **Assignee**: QA Team
@@ -649,7 +749,7 @@
 - [ ] Performance acceptable
 - [ ] Security validated
 
-### Task 3.1.9: External Tools Documentation
+### Task 3.1.11: External Tools Documentation
 **Priority**: HIGH  
 **Estimated Time**: 12 hours  
 **Assignee**: Documentation Team
@@ -679,7 +779,7 @@
 - [ ] Review completed
 - [ ] Published to docs
 
-### Task 3.1.10: Phase 3.1 Validation
+### Task 3.1.12: Phase 3.1 Validation
 **Priority**: CRITICAL  
 **Estimated Time**: 8 hours  
 **Assignee**: Integration Lead
@@ -743,65 +843,65 @@
 - [ ] Test suite ready
 - [ ] Plan approved
 
-### Task 3.2.2: Calculator DoS Protection
+### Task 3.2.2: Calculator DoS Protection (Enhanced)
 **Priority**: CRITICAL  
 **Estimated Time**: 8 hours  
 **Assignee**: Security Developer
 
-**Description**: Implement DoS protection for Calculator tool.
+**Description**: Enhance DoS protection for Calculator tool beyond Phase 3.0 implementation.
 
 **Acceptance Criteria:**
-- [ ] Expression complexity limits
-- [ ] Evaluation timeout
-- [ ] Memory usage limits
-- [ ] Recursive depth limits
-- [ ] Comprehensive tests
+- [ ] Expression complexity analyzer enhanced
+- [ ] Evaluation timeout optimized
+- [ ] Memory usage tracking improved
+- [ ] Recursive depth limits refined
+- [ ] Comprehensive attack tests
 
 **Implementation Steps:**
-1. Analyze current vulnerabilities
-2. Implement complexity analyzer
-3. Add evaluation timeout
-4. Set memory limits
-5. Limit recursion depth
-6. Create attack tests
-7. Verify protection
+1. Review Phase 3.0 implementation
+2. Enhance complexity analyzer
+3. Optimize timeout handling
+4. Improve memory tracking
+5. Add more attack vectors
+6. Performance test protection
+7. Document security measures
 
 **Definition of Done:**
-- [ ] Protection implemented
-- [ ] Limits enforced
+- [ ] Protection enhanced
+- [ ] All attacks blocked
+- [ ] Performance maintained
 - [ ] Tests comprehensive
-- [ ] Performance acceptable
 - [ ] Documentation updated
 
-### Task 3.2.3: Path Security Hardening
+### Task 3.2.3: Path Security Hardening (Enhanced)
 **Priority**: CRITICAL  
 **Estimated Time**: 12 hours  
 **Assignee**: Security Developer
 
-**Description**: Prevent symlink attacks and path traversal in all file tools.
+**Description**: Enhanced path security beyond Phase 3.0 implementation.
 
 **Acceptance Criteria:**
-- [ ] Symlink resolution prevention
-- [ ] Path traversal blocking
-- [ ] Jail directory enforcement
-- [ ] Permission validation
-- [ ] Security tests passing
+- [ ] Advanced symlink detection
+- [ ] Chroot jail implementation
+- [ ] Permission inheritance checks
+- [ ] Cross-platform path validation
+- [ ] Security audit passed
 
 **Implementation Steps:**
-1. Implement secure path resolver
-2. Add symlink detection
-3. Block path traversal attempts
-4. Enforce jail directories
-5. Validate permissions
-6. Create security tests
-7. Update all file tools
+1. Review Phase 3.0 implementation
+2. Add advanced symlink detection
+3. Implement chroot jail support
+4. Add permission inheritance
+5. Test cross-platform scenarios
+6. Create penetration tests
+7. Document security model
 
 **Definition of Done:**
-- [ ] Protection active
-- [ ] All attacks blocked
+- [ ] All attacks prevented
+- [ ] Cross-platform working
 - [ ] Tests comprehensive
-- [ ] No false positives
-- [ ] Performance good
+- [ ] Audit passed
+- [ ] Documentation complete
 
 ### Task 3.2.4: Resource Limit Enforcement
 **Priority**: HIGH  

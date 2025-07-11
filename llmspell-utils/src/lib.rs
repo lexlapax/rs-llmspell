@@ -107,7 +107,8 @@ pub use params::{
     extract_string_with_default, require_all_of, require_one_of,
 };
 pub use response::{
-    error_response, file_operation_response, list_response, success_response, ResponseBuilder,
+    error_response, file_operation_response, list_response, success_response, validation_response,
+    ErrorDetails, ResponseBuilder, ValidationError,
 };
 pub use search::{
     search_in_directory, search_in_file, should_search_file, SearchMatch, SearchOptions,
