@@ -56,29 +56,84 @@ pub mod id_generator;
 /// Serialization and deserialization helpers
 pub mod serialization;
 
+/// Encoding and hashing utilities
+pub mod encoding;
+
+/// Time and date utilities
+pub mod time;
+
+/// File system monitoring utilities
+pub mod file_monitor;
+
+/// File and content search utilities
+pub mod search;
+
+/// Parameter extraction and validation utilities
+pub mod params;
+
+/// Common validation functions
+pub mod validators;
+
+/// Response building utilities
+pub mod response;
+
 // Re-export commonly used types and functions
 pub use async_utils::{
     concurrent_map, race_to_success, retry_async, timeout, timeout_with_default, AsyncError,
     AsyncResult, BoxedResultFuture, Cancellable, RetryConfig,
 };
+pub use encoding::{
+    base64_decode, base64_decode_url_safe, base64_encode, base64_encode_url_safe, from_hex_string,
+    hash_data, hash_file, hash_string, to_hex_string, verify_hash, HashAlgorithm,
+};
 pub use error_builders::{templates, BuiltError, ErrorBuilder, WithContext};
+pub use file_monitor::{debounce_events, should_watch_path, FileEvent, FileEventType, WatchConfig};
 pub use file_utils::{
-    copy_file, ensure_dir, expand_path, is_absolute_path, join_paths, normalize_path, parent_dir,
-    read_file, remove_dir_all_if_exists, remove_file_if_exists, write_file, write_file_atomic,
+    append_file, copy_file, ensure_dir, expand_path, file_exists, get_metadata, is_absolute_path,
+    join_paths, list_dir, move_file, normalize_path, parent_dir, read_file,
+    remove_dir_all_if_exists, remove_file_if_exists, write_file, write_file_atomic, DirEntry,
+    FileMetadata,
 };
 pub use id_generator::{
     generate_component_id, generate_deterministic_id, generate_short_id, validate_component_id,
     ComponentId, ComponentIdBuilder, NAMESPACE_AGENT, NAMESPACE_TOOL, NAMESPACE_WORKFLOW,
+};
+pub use params::{
+    extract_bool_with_default, extract_direct_parameters, extract_optional_array,
+    extract_optional_bool, extract_optional_f64, extract_optional_i64, extract_optional_object,
+    extract_optional_string, extract_optional_typed, extract_optional_u64, extract_parameters,
+    extract_required_array, extract_required_bool, extract_required_f64, extract_required_i64,
+    extract_required_object, extract_required_string, extract_required_typed, extract_required_u64,
+    extract_string_with_default, require_all_of, require_one_of,
+};
+pub use response::{
+    error_response, file_operation_response, list_response, success_response, ResponseBuilder,
+};
+pub use search::{
+    search_in_directory, search_in_file, should_search_file, SearchMatch, SearchOptions,
+    SearchResult,
 };
 pub use serialization::{
     convert_format, from_json, from_toml, from_yaml, json, merge_json, to_json, to_json_pretty,
     to_toml, to_yaml, Format,
 };
 pub use string_utils::{
-    dedent, indent, is_valid_identifier, normalize_whitespace, sanitize, to_camel_case,
-    to_pascal_case, to_snake_case, truncate, word_wrap,
+    dedent, indent, is_valid_identifier, join_with, normalize_whitespace, replace_all, reverse,
+    sanitize, split_by, substring, to_camel_case, to_lowercase, to_pascal_case, to_snake_case,
+    to_uppercase, trim, truncate, word_wrap,
 };
 pub use system_info::{
     find_executable, format_bytes, get_cpu_count, get_home_directory, get_hostname,
     get_system_info, get_username, OperatingSystem, SystemInfo,
+};
+pub use time::{
+    add_duration, convert_timezone, days_in_month, duration_between, end_of_day, format_datetime,
+    format_duration, is_leap_year, now_local, now_utc, parse_datetime, start_of_day,
+    subtract_duration, weekday_name, TimeError, TimeResult, DATE_FORMATS,
+};
+pub use validators::{
+    validate_email, validate_enum, validate_file_size, validate_identifier, validate_is_directory,
+    validate_is_file, validate_not_empty, validate_not_empty_collection, validate_path_exists,
+    validate_pattern, validate_range, validate_required_field, validate_string_length,
+    validate_url,
 };

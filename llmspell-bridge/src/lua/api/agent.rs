@@ -13,7 +13,7 @@ use llmspell_core::{
     types::{AgentInput, AgentOutput, ExecutionContext},
     ComponentMetadata, Result,
 };
-use llmspell_providers::ProviderInstance;
+use llmspell_providers::{ModelSpecifier, ProviderInstance};
 use mlua::{Lua, Table, UserData, UserDataMethods};
 use std::sync::Arc;
 
@@ -45,26 +45,72 @@ pub fn inject_agent_api(
                 let system_prompt: Option<String> = args.get("system_prompt").ok();
                 let temperature: Option<f32> = args.get("temperature").ok();
                 let max_tokens: Option<usize> = args.get("max_tokens").ok();
-                let provider_name: Option<String> = args.get("provider").ok();
-                let model: Option<String> = args.get("model").ok();
+                let max_conversation_length: Option<usize> =
+                    args.get("max_conversation_length").ok();
+                let base_url: Option<String> = args.get("base_url").ok();
+                let api_key: Option<String> = args.get("api_key").ok();
 
                 // Create a basic agent configuration
                 let agent_config = AgentConfig {
                     system_prompt,
                     temperature,
                     max_tokens,
-                    max_conversation_length: args.get("max_conversation_length").ok(),
+                    max_conversation_length,
                 };
 
-                // Get the provider
-                let provider = if let Some(name) = provider_name {
-                    providers.get_provider(Some(&name)).await.map_err(|e| {
+                // Handle model specification with new syntax support
+                let provider = if let Some(model_str) =
+                    args.get::<_, Option<String>>("model").ok().flatten()
+                {
+                    // New syntax: "provider/model" or "model"
+                    let model_spec = ModelSpecifier::parse(&model_str).map_err(|e| {
                         mlua::Error::RuntimeError(format!(
-                            "Failed to get provider '{}': {}",
-                            name, e
+                            "Invalid model specification '{}': {}",
+                            model_str, e
                         ))
-                    })?
+                    })?;
+
+                    providers
+                        .as_ref()
+                        .create_agent_from_spec(model_spec, base_url.as_deref(), api_key.as_deref())
+                        .await
+                        .map_err(|e| {
+                            mlua::Error::RuntimeError(format!(
+                                "Failed to create agent from spec: {}",
+                                e
+                            ))
+                        })?
+                } else if let (Some(provider_name), Some(model_name)) = (
+                    args.get::<_, Option<String>>("provider").ok().flatten(),
+                    args.get::<_, Option<String>>("model_name").ok().flatten(),
+                ) {
+                    // Legacy syntax: separate provider and model_name fields
+                    let model_spec = ModelSpecifier::with_provider(provider_name, model_name);
+                    providers
+                        .as_ref()
+                        .create_agent_from_spec(model_spec, base_url.as_deref(), api_key.as_deref())
+                        .await
+                        .map_err(|e| {
+                            mlua::Error::RuntimeError(format!(
+                                "Failed to create agent from legacy spec: {}",
+                                e
+                            ))
+                        })?
+                } else if let Some(provider_name) =
+                    args.get::<_, Option<String>>("provider").ok().flatten()
+                {
+                    // Legacy syntax with just provider (use default model)
+                    providers
+                        .get_provider(Some(&provider_name))
+                        .await
+                        .map_err(|e| {
+                            mlua::Error::RuntimeError(format!(
+                                "Failed to get provider '{}': {}",
+                                provider_name, e
+                            ))
+                        })?
                 } else {
+                    // No provider specified, use default
                     providers.get_default_provider().await.map_err(|e| {
                         mlua::Error::RuntimeError(format!("Failed to get default provider: {}", e))
                     })?
@@ -74,7 +120,7 @@ pub fn inject_agent_api(
                 let agent: Box<dyn Agent> = Box::new(SimpleProviderAgent::new(
                     agent_config,
                     provider,
-                    model.unwrap_or_else(|| "default".to_string()),
+                    "default".to_string(), // This will be overridden by the provider's model
                 ));
 
                 // Create the Lua wrapper

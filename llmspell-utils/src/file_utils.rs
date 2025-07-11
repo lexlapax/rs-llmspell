@@ -575,6 +575,318 @@ pub fn remove_dir_all_if_exists(path: &Path) -> Result<()> {
     }
 }
 
+/// Append data to a file
+///
+/// This function appends data to an existing file or creates it if it doesn't exist.
+/// The parent directory is created if necessary.
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// use llmspell_utils::file_utils::append_file;
+/// use std::path::Path;
+///
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// append_file(Path::new("/tmp/log.txt"), b"\nNew log entry")?;
+/// # Ok(())
+/// # }
+/// ```
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Parent directory cannot be created
+/// - Write permissions are denied
+/// - I/O error occurs
+pub fn append_file(path: &Path, data: &[u8]) -> Result<()> {
+    // Ensure parent directory exists
+    if let Some(parent) = path.parent() {
+        ensure_dir(parent).with_context(|| {
+            format!("Failed to create parent directory for: {}", path.display())
+        })?;
+    }
+
+    let mut file = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+        .with_context(|| format!("Failed to open file for appending: {}", path.display()))?;
+
+    file.write_all(data)
+        .with_context(|| format!("Failed to append to file: {}", path.display()))?;
+
+    file.sync_all()
+        .with_context(|| format!("Failed to sync file to disk: {}", path.display()))?;
+
+    Ok(())
+}
+
+/// Move or rename a file
+///
+/// This function moves a file from one location to another, creating parent
+/// directories as needed. It's equivalent to rename on the same filesystem.
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// use llmspell_utils::file_utils::move_file;
+/// use std::path::Path;
+///
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// move_file(Path::new("/tmp/old.txt"), Path::new("/tmp/new.txt"))?;
+/// # Ok(())
+/// # }
+/// ```
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Source file does not exist
+/// - Destination directory cannot be created
+/// - Insufficient permissions
+/// - Files are on different filesystems and copy fails
+pub fn move_file(from: &Path, to: &Path) -> Result<()> {
+    // Ensure destination directory exists
+    if let Some(parent) = to.parent() {
+        ensure_dir(parent).with_context(|| {
+            format!(
+                "Failed to create destination directory for: {}",
+                to.display()
+            )
+        })?;
+    }
+
+    // Try to rename first (most efficient)
+    match fs::rename(from, to) {
+        Ok(()) => Ok(()),
+        Err(e) if e.raw_os_error() == Some(18) => {
+            // Cross-device link error (EXDEV on Unix) - need to copy and delete
+            copy_file(from, to)?;
+            remove_file_if_exists(from)?;
+            Ok(())
+        }
+        Err(e) => Err(e).with_context(|| {
+            format!(
+                "Failed to move file from {} to {}",
+                from.display(),
+                to.display()
+            )
+        }),
+    }
+}
+
+/// Get file or directory metadata
+///
+/// Returns detailed metadata about a file or directory including size,
+/// timestamps, and permissions.
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// use llmspell_utils::file_utils::get_metadata;
+/// use std::path::Path;
+///
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// let metadata = get_metadata(Path::new("/tmp/file.txt"))?;
+/// println!("File size: {} bytes", metadata.size);
+/// println!("Is directory: {}", metadata.is_dir);
+/// # Ok(())
+/// # }
+/// ```
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Path does not exist
+/// - Insufficient permissions to read metadata
+/// - I/O error occurs
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[allow(clippy::struct_excessive_bools)] // These are all essential metadata fields
+pub struct FileMetadata {
+    /// File or directory size in bytes
+    pub size: u64,
+    /// Whether this is a directory
+    pub is_dir: bool,
+    /// Whether this is a regular file
+    pub is_file: bool,
+    /// Whether this is a symbolic link
+    pub is_symlink: bool,
+    /// Whether the file is read-only
+    pub readonly: bool,
+    /// Creation time (platform-dependent, may not be available)
+    pub created: Option<std::time::SystemTime>,
+    /// Last modification time
+    pub modified: Option<std::time::SystemTime>,
+    /// Last access time (may not be reliable on all systems)
+    pub accessed: Option<std::time::SystemTime>,
+}
+
+/// Get file or directory metadata
+///
+/// Returns detailed metadata about a file or directory.
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// use llmspell_utils::file_utils::get_metadata;
+/// use std::path::Path;
+///
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// let metadata = get_metadata(Path::new("/tmp/file.txt"))?;
+/// println!("File size: {} bytes", metadata.size);
+/// # Ok(())
+/// # }
+/// ```
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Path does not exist
+/// - Insufficient permissions
+/// - I/O error occurs
+pub fn get_metadata(path: &Path) -> Result<FileMetadata> {
+    let metadata = fs::metadata(path)
+        .with_context(|| format!("Failed to get metadata for: {}", path.display()))?;
+
+    Ok(FileMetadata {
+        size: metadata.len(),
+        is_dir: metadata.is_dir(),
+        is_file: metadata.is_file(),
+        is_symlink: metadata.is_symlink(),
+        readonly: metadata.permissions().readonly(),
+        created: metadata.created().ok(),
+        modified: metadata.modified().ok(),
+        accessed: metadata.accessed().ok(),
+    })
+}
+
+/// Check if a file or directory exists
+///
+/// # Examples
+///
+/// ```rust
+/// use llmspell_utils::file_utils::file_exists;
+/// use std::path::Path;
+///
+/// assert!(!file_exists(Path::new("/tmp/nonexistent.txt")));
+/// ```
+#[must_use]
+pub fn file_exists(path: &Path) -> bool {
+    path.exists()
+}
+
+/// List directory contents with metadata
+///
+/// Returns a vector of directory entries with basic metadata.
+/// Entries are sorted alphabetically by name.
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// use llmspell_utils::file_utils::list_dir;
+/// use std::path::Path;
+///
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// let entries = list_dir(Path::new("/tmp"))?;
+/// for entry in entries {
+///     println!("{}: {} bytes", entry.name, entry.size);
+/// }
+/// # Ok(())
+/// # }
+/// ```
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Path is not a directory
+/// - Insufficient permissions
+/// - I/O error occurs
+#[derive(Debug, Clone)]
+pub struct DirEntry {
+    /// File or directory name (not full path)
+    pub name: String,
+    /// Full path to the entry
+    pub path: PathBuf,
+    /// File size in bytes
+    pub size: u64,
+    /// Whether this is a directory
+    pub is_dir: bool,
+    /// Whether this is a regular file
+    pub is_file: bool,
+    /// Whether this is a symbolic link
+    pub is_symlink: bool,
+    /// Last modification time
+    pub modified: Option<std::time::SystemTime>,
+}
+
+/// List directory contents with metadata
+///
+/// Returns a vector of directory entries sorted alphabetically.
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// use llmspell_utils::file_utils::list_dir;
+/// use std::path::Path;
+///
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// let entries = list_dir(Path::new("/tmp"))?;
+/// for entry in entries {
+///     println!("{}: {} bytes", entry.name, entry.size);
+/// }
+/// # Ok(())
+/// # }
+/// ```
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Path is not a directory
+/// - Insufficient permissions
+/// - I/O error occurs
+pub fn list_dir(path: &Path) -> Result<Vec<DirEntry>> {
+    let mut entries = Vec::new();
+
+    let dir = fs::read_dir(path)
+        .with_context(|| format!("Failed to read directory: {}", path.display()))?;
+
+    for entry in dir {
+        let entry = entry
+            .with_context(|| format!("Failed to read directory entry in: {}", path.display()))?;
+
+        let file_name = entry.file_name();
+        let file_name_str = file_name.to_string_lossy().to_string();
+        let entry_path = entry.path();
+
+        // Get metadata - if it fails, create minimal entry
+        let (size, is_dir, is_file, is_symlink, modified) = match entry.metadata() {
+            Ok(metadata) => (
+                metadata.len(),
+                metadata.is_dir(),
+                metadata.is_file(),
+                metadata.is_symlink(),
+                metadata.modified().ok(),
+            ),
+            Err(_) => (0, false, false, false, None),
+        };
+
+        entries.push(DirEntry {
+            name: file_name_str,
+            path: entry_path,
+            size,
+            is_dir,
+            is_file,
+            is_symlink,
+            modified,
+        });
+    }
+
+    // Sort entries by name
+    entries.sort_by(|a, b| a.name.cmp(&b.name));
+
+    Ok(entries)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -853,6 +1165,209 @@ mod tests {
 
         // Remove again (should still succeed)
         assert!(remove_dir_all_if_exists(&test_dir).is_ok());
+    }
+
+    #[test]
+    fn test_append_file() {
+        let temp_dir = std::env::temp_dir();
+        let test_file = temp_dir.join(format!("llmspell_test_append_{}", uuid::Uuid::new_v4()));
+
+        // Append to non-existent file (should create it)
+        assert!(append_file(&test_file, b"Hello").is_ok());
+        assert_eq!(read_file(&test_file).unwrap(), b"Hello");
+
+        // Append to existing file
+        assert!(append_file(&test_file, b" World").is_ok());
+        assert_eq!(read_file(&test_file).unwrap(), b"Hello World");
+
+        // Append with newline
+        assert!(append_file(&test_file, b"\nNew line").is_ok());
+        assert_eq!(read_file(&test_file).unwrap(), b"Hello World\nNew line");
+
+        // Cleanup
+        let _ = fs::remove_file(&test_file);
+    }
+
+    #[test]
+    fn test_append_file_creates_parent_dirs() {
+        let temp_dir = std::env::temp_dir();
+        let test_file = temp_dir.join(format!(
+            "llmspell_test_{}/nested/append.txt",
+            uuid::Uuid::new_v4()
+        ));
+
+        // Parent directories don't exist yet
+        assert!(!test_file.parent().unwrap().exists());
+
+        // Append should create parent directories
+        assert!(append_file(&test_file, b"Test").is_ok());
+        assert!(test_file.exists());
+        assert_eq!(read_file(&test_file).unwrap(), b"Test");
+
+        // Cleanup
+        let _ = fs::remove_dir_all(test_file.parent().unwrap().parent().unwrap());
+    }
+
+    #[test]
+    fn test_move_file() {
+        let temp_dir = std::env::temp_dir();
+        let source = temp_dir.join(format!("llmspell_test_src_{}", uuid::Uuid::new_v4()));
+        let dest = temp_dir.join(format!("llmspell_test_dst_{}", uuid::Uuid::new_v4()));
+
+        let data = b"Test data for move";
+
+        // Create source file
+        write_file(&source, data).unwrap();
+        assert!(source.exists());
+
+        // Move file
+        assert!(move_file(&source, &dest).is_ok());
+
+        // Verify move
+        assert!(!source.exists(), "Source file should not exist after move");
+        assert!(dest.exists(), "Destination file should exist after move");
+        assert_eq!(read_file(&dest).unwrap(), data);
+
+        // Cleanup
+        let _ = fs::remove_file(&dest);
+    }
+
+    #[test]
+    fn test_move_file_creates_parent_dirs() {
+        let temp_dir = std::env::temp_dir();
+        let source = temp_dir.join(format!("llmspell_test_src_{}", uuid::Uuid::new_v4()));
+        let dest = temp_dir.join(format!(
+            "llmspell_test_{}/nested/moved.txt",
+            uuid::Uuid::new_v4()
+        ));
+
+        // Create source file
+        write_file(&source, b"test").unwrap();
+
+        // Parent directories don't exist yet
+        assert!(!dest.parent().unwrap().exists());
+
+        // Move should create parent directories
+        assert!(move_file(&source, &dest).is_ok());
+        assert!(!source.exists());
+        assert!(dest.exists());
+
+        // Cleanup
+        let _ = fs::remove_dir_all(dest.parent().unwrap().parent().unwrap());
+    }
+
+    #[test]
+    fn test_get_metadata() {
+        let temp_dir = std::env::temp_dir();
+        let test_file = temp_dir.join(format!("llmspell_test_meta_{}", uuid::Uuid::new_v4()));
+        let test_dir = temp_dir.join(format!("llmspell_test_metadir_{}", uuid::Uuid::new_v4()));
+
+        // Test file metadata
+        let data = b"Test content";
+        write_file(&test_file, data).unwrap();
+
+        let metadata = get_metadata(&test_file).unwrap();
+        assert_eq!(metadata.size, data.len() as u64);
+        assert!(metadata.is_file);
+        assert!(!metadata.is_dir);
+        assert!(!metadata.is_symlink);
+        assert!(metadata.modified.is_some());
+
+        // Test directory metadata
+        ensure_dir(&test_dir).unwrap();
+        let dir_metadata = get_metadata(&test_dir).unwrap();
+        assert!(dir_metadata.is_dir);
+        assert!(!dir_metadata.is_file);
+
+        // Cleanup
+        let _ = fs::remove_file(&test_file);
+        let _ = fs::remove_dir(&test_dir);
+    }
+
+    #[test]
+    fn test_file_exists() {
+        let temp_dir = std::env::temp_dir();
+        let test_file = temp_dir.join(format!("llmspell_test_exists_{}", uuid::Uuid::new_v4()));
+
+        // File doesn't exist
+        assert!(!file_exists(&test_file));
+
+        // Create file
+        write_file(&test_file, b"test").unwrap();
+        assert!(file_exists(&test_file));
+
+        // Remove file
+        fs::remove_file(&test_file).unwrap();
+        assert!(!file_exists(&test_file));
+    }
+
+    #[test]
+    fn test_list_dir() {
+        let temp_dir = std::env::temp_dir();
+        let test_dir = temp_dir.join(format!("llmspell_test_list_{}", uuid::Uuid::new_v4()));
+
+        // Create test directory structure
+        ensure_dir(&test_dir).unwrap();
+        write_file(&test_dir.join("file1.txt"), b"content1").unwrap();
+        write_file(&test_dir.join("file2.txt"), b"content22").unwrap();
+        ensure_dir(&test_dir.join("subdir")).unwrap();
+        write_file(&test_dir.join("subdir/nested.txt"), b"nested").unwrap();
+
+        // List directory
+        let entries = list_dir(&test_dir).unwrap();
+
+        // Verify entries (should be sorted alphabetically)
+        assert_eq!(entries.len(), 3);
+
+        assert_eq!(entries[0].name, "file1.txt");
+        assert!(entries[0].is_file);
+        assert!(!entries[0].is_dir);
+        assert_eq!(entries[0].size, 8); // "content1"
+
+        assert_eq!(entries[1].name, "file2.txt");
+        assert!(entries[1].is_file);
+        assert_eq!(entries[1].size, 9); // "content22"
+
+        assert_eq!(entries[2].name, "subdir");
+        assert!(entries[2].is_dir);
+        assert!(!entries[2].is_file);
+
+        // All entries should have modification times
+        for entry in &entries {
+            assert!(entry.modified.is_some());
+        }
+
+        // Cleanup
+        let _ = fs::remove_dir_all(&test_dir);
+    }
+
+    #[test]
+    fn test_list_empty_dir() {
+        let temp_dir = std::env::temp_dir();
+        let test_dir = temp_dir.join(format!("llmspell_test_empty_{}", uuid::Uuid::new_v4()));
+
+        ensure_dir(&test_dir).unwrap();
+        let entries = list_dir(&test_dir).unwrap();
+        assert!(entries.is_empty());
+
+        // Cleanup
+        let _ = fs::remove_dir(&test_dir);
+    }
+
+    #[test]
+    fn test_list_dir_error() {
+        let temp_dir = std::env::temp_dir();
+        let test_file = temp_dir.join(format!("llmspell_test_notdir_{}", uuid::Uuid::new_v4()));
+
+        // Create a file, not a directory
+        write_file(&test_file, b"test").unwrap();
+
+        // Trying to list a file should fail
+        let result = list_dir(&test_file);
+        assert!(result.is_err());
+
+        // Cleanup
+        let _ = fs::remove_file(&test_file);
     }
 
     #[cfg(unix)]

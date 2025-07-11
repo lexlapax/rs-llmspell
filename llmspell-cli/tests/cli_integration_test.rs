@@ -57,7 +57,9 @@ fn test_javascript_not_implemented() {
         .arg("test.js")
         .assert()
         .failure()
-        .stderr(predicate::str::contains("JavaScript engine not available"));
+        .stderr(predicate::str::contains(
+            "Script engine 'javascript' is not available yet",
+        ));
 }
 
 #[test]
@@ -69,7 +71,9 @@ fn test_python_not_implemented() {
         .arg("test.py")
         .assert()
         .failure()
-        .stderr(predicate::str::contains("Python engine not available"));
+        .stderr(predicate::str::contains(
+            "Script engine 'python' is not available yet",
+        ));
 }
 
 #[test]
@@ -115,7 +119,7 @@ fn test_output_format_json() {
         .arg("return {result = 42}")
         .assert()
         .success()
-        .stdout(predicate::str::is_match(r#"\{.*"result".*42.*\}"#).unwrap());
+        .stdout(predicate::str::contains("\"result\": 42"));
 }
 
 #[test]
@@ -133,7 +137,7 @@ fn test_info_command() {
     cmd.arg("info")
         .assert()
         .success()
-        .stdout(predicate::str::contains("Lua engine"));
+        .stdout(predicate::str::contains("lua - Available"));
 }
 
 #[test]

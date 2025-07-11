@@ -2065,6 +2065,7 @@ llmspell-bridge:
 llmspell-agents: AgentRuntime, Agent implementations
 llmspell-tools: ToolRegistry, Tool implementations  
 llmspell-workflows: WorkflowEngine, Workflow implementations
+llmspell-rag: RAG patterns, retrieval strategies (Phase 3.5)
     ↓
 llmspell-cli: CLI entry point, command handling
 llmspell-repl: REPL implementation, interactive mode
@@ -3344,6 +3345,70 @@ pub trait Agent: BaseAgent {
     // Learning and Adaptation  
     async fn learn_from_feedback(&mut self, feedback: Feedback) -> Result<()>;
     fn learning_config(&self) -> &LearningConfig;
+}
+```
+
+#### Agent Memory System
+
+Agents in rs-llmspell leverage a multi-tiered memory architecture that combines different storage backends for optimal performance and capability:
+
+```rust
+pub struct AgentMemorySystem {
+    // Short-term memory: Fast key-value access for recent interactions
+    short_term: Box<dyn StorageBackend>,
+    
+    // Long-term memory: Vector storage for semantic retrieval (Phase 3.5)
+    long_term: Option<Box<dyn VectorStorageBackend>>,
+    
+    // Episodic memory: Time-indexed combination of both
+    episodic: EpisodicMemory,
+    
+    // Working memory: In-process state for current task
+    working: WorkingMemory,
+}
+
+impl AgentMemorySystem {
+    /// Store recent interaction in short-term memory
+    pub async fn store_interaction(&mut self, interaction: Interaction) -> Result<()> {
+        let key = format!("interaction:{}", interaction.id);
+        let value = serde_json::to_vec(&interaction)?;
+        self.short_term.set(&key, value).await
+    }
+    
+    /// Semantic search across long-term memory (Phase 3.5)
+    pub async fn semantic_recall(&self, query: &str, k: usize) -> Result<Vec<MemoryItem>> {
+        if let Some(vector_store) = &self.long_term {
+            let embedding = self.generate_embedding(query).await?;
+            let results = vector_store.search_similar(&embedding, k, None).await?;
+            self.hydrate_memory_items(results).await
+        } else {
+            // Fallback to keyword search in short-term memory
+            self.keyword_search(query).await
+        }
+    }
+    
+    /// Combine memories for context-aware responses
+    pub async fn build_context(&self, query: &str) -> Result<Context> {
+        let recent = self.get_recent_interactions(5).await?;
+        let relevant = self.semantic_recall(query, 10).await?;
+        let working_state = self.working.get_state();
+        
+        Ok(Context {
+            recent_interactions: recent,
+            relevant_memories: relevant,
+            working_memory: working_state,
+            timestamp: SystemTime::now(),
+        })
+    }
+}
+
+// Memory types for different retention and access patterns
+pub enum MemoryType {
+    ShortTerm,      // Recent interactions, fast access
+    LongTerm,       // Semantic knowledge, vector search
+    Episodic,       // Time-based sequences of events
+    Working,        // Current task state
+    Procedural,     // Learned patterns and behaviors
 }
 ```
 
@@ -4901,6 +4966,7 @@ Logger       -- Structured logging
 Config       -- Configuration access
 Security     -- Security context information
 Utils        -- Utility functions
+JSON         -- JSON parsing and stringifying
 ```
 
 #### Module Loading Behavior by Security Profile
@@ -6334,6 +6400,167 @@ ErrorHandler.set_logger(logger)
 -- All errors will be automatically logged with full context
 ```
 
+#### 8. **Lua JSON API**
+
+The JSON global provides native JSON parsing and stringifying capabilities, bridging the gap between Lua tables and JSON strings used by tools and external APIs:
+
+```lua
+-- Parse JSON string to Lua table
+local json_string = '{"name": "researcher", "model": "gpt-4", "temperature": 0.7}'
+local data = JSON.parse(json_string)
+print(data.name)        -- "researcher"
+print(data.model)       -- "gpt-4"
+print(data.temperature) -- 0.7
+
+-- Stringify Lua table to JSON
+local config = {
+    name = "assistant",
+    tools = {"web_search", "calculator"},
+    settings = {
+        temperature = 0.5,
+        max_tokens = 2000
+    }
+}
+local json_output = JSON.stringify(config)
+-- {"name":"assistant","tools":["web_search","calculator"],"settings":{"temperature":0.5,"max_tokens":2000}}
+
+-- Working with tool outputs
+local tool_result = Tool.executeAsync("uuid_generator", {
+    operation = "generate",
+    version = "v4"
+})
+
+if tool_result.success and tool_result.output then
+    -- Tool outputs are JSON strings, parse them for structured access
+    local parsed = JSON.parse(tool_result.output)
+    print("Generated UUID:", parsed.result.uuid)
+    print("UUID Version:", parsed.result.version)
+end
+
+-- Complex data transformations
+local analysis_data = {
+    results = {
+        {category = "positive", score = 0.85, count = 42},
+        {category = "neutral", score = 0.10, count = 8},
+        {category = "negative", score = 0.05, count = 2}
+    },
+    metadata = {
+        total_samples = 52,
+        analysis_time = os.time(),
+        confidence = 0.95
+    }
+}
+
+-- Convert to JSON for tool input
+local json_input = JSON.stringify(analysis_data)
+local processed = Tool.executeAsync("json_processor", {
+    data = json_input,
+    query = ".results[] | select(.score > 0.5)"
+})
+
+-- Chain multiple tools with JSON data
+local workflow_data = {
+    text = "Analyze this important business document...",
+    options = {
+        extract_entities = true,
+        summarize = true,
+        sentiment_analysis = true
+    }
+}
+
+-- Tool 1: Text analysis
+local text_result = Tool.executeAsync("text_analyzer", {
+    input = JSON.stringify(workflow_data)
+})
+local text_analysis = JSON.parse(text_result.output)
+
+-- Tool 2: Entity enrichment
+local enriched_result = Tool.executeAsync("entity_enricher", {
+    entities = JSON.stringify(text_analysis.result.entities)
+})
+local enriched_data = JSON.parse(enriched_result.output)
+
+-- Tool 3: Report generation
+local report = Tool.executeAsync("report_generator", {
+    analysis = JSON.stringify({
+        text_analysis = text_analysis.result,
+        enriched_entities = enriched_data.result
+    })
+})
+
+-- Error handling with JSON parsing
+local function safe_parse(json_str)
+    local success, result = pcall(JSON.parse, json_str)
+    if success then
+        return result
+    else
+        logger:error("JSON parse error", {
+            error = result,
+            input = json_str:sub(1, 100) -- Log first 100 chars
+        })
+        return nil
+    end
+end
+
+-- JSON with custom formatting (when pretty output needed)
+local debug_data = {
+    stage = "processing",
+    items_processed = 150,
+    errors = {},
+    performance = {
+        avg_time_ms = 23.5,
+        total_time_s = 3.525
+    }
+}
+
+-- Note: JSON.stringify produces compact output by default
+-- For pretty printing, use tool output which is already formatted
+local compact = JSON.stringify(debug_data)
+logger:debug("Processing stats", {data = compact})
+```
+
+**JSON API Design Principles:**
+
+1. **Language-Agnostic**: Same JSON.parse() and JSON.stringify() API across Lua, JavaScript, and Python
+2. **Performance**: Uses native Rust serde_json for optimal performance
+3. **Type Safety**: Proper conversion between script types and JSON types
+4. **Error Handling**: Clear error messages for invalid JSON
+5. **Tool Integration**: Seamlessly works with tool inputs and outputs
+
+**Common Patterns:**
+
+```lua
+-- 1. Tool Output Processing Pattern
+local function process_tool_output(tool_name, params)
+    local result = Tool.executeAsync(tool_name, params)
+    if result.success and result.output then
+        return JSON.parse(result.output)
+    else
+        return {error = result.error or "Unknown error"}
+    end
+end
+
+-- 2. Batch Processing Pattern
+local function process_batch(items)
+    local results = {}
+    for i, item in ipairs(items) do
+        local json_item = JSON.stringify(item)
+        local processed = Tool.executeAsync("processor", {data = json_item})
+        results[i] = JSON.parse(processed.output)
+    end
+    return results
+end
+
+-- 3. Configuration Loading Pattern
+local function load_config(config_str)
+    local config = JSON.parse(config_str)
+    -- Validate required fields
+    assert(config.name, "Config missing required field: name")
+    assert(config.model, "Config missing required field: model")
+    return config
+end
+```
+
 ---
 
 ## Code Organization Patterns Without Modules
@@ -7716,11 +7943,171 @@ secureLogger.info("User login", {
 });
 ```
 
+#### 7. **JavaScript JSON API**
+
+JavaScript has native JSON support, but Rs-LLMSpell ensures consistent behavior across all scripting languages:
+
+```javascript
+// Native JavaScript JSON works as expected
+const data = {
+    name: "researcher",
+    model: "gpt-4",
+    temperature: 0.7
+};
+const jsonString = JSON.stringify(data);
+const parsed = JSON.parse(jsonString);
+
+// Working with tool outputs (same pattern as Lua)
+const toolResult = await Tool.executeAsync("uuid_generator", {
+    operation: "generate",
+    version: "v4"
+});
+
+if (toolResult.success && toolResult.output) {
+    // Tool outputs are JSON strings, parse them for structured access
+    const parsed = JSON.parse(toolResult.output);
+    console.log("Generated UUID:", parsed.result.uuid);
+    console.log("UUID Version:", parsed.result.version);
+}
+
+// Async tool chaining with JSON data
+async function processDataPipeline(inputData) {
+    // Step 1: Analyze data
+    const analysisResult = await Tool.executeAsync("data_analyzer", {
+        data: JSON.stringify(inputData),
+        analysisType: "comprehensive"
+    });
+    const analysisData = JSON.parse(analysisResult.output);
+    
+    // Step 2: Transform results
+    const transformResult = await Tool.executeAsync("data_transformer", {
+        input: JSON.stringify(analysisData.result),
+        transformations: ["normalize", "aggregate", "summarize"]
+    });
+    const transformedData = JSON.parse(transformResult.output);
+    
+    // Step 3: Generate report
+    const reportResult = await Tool.executeAsync("report_generator", {
+        data: JSON.stringify({
+            original: inputData,
+            analysis: analysisData.result,
+            transformed: transformedData.result
+        }),
+        format: "pdf",
+        template: "executive_summary"
+    });
+    
+    return JSON.parse(reportResult.output);
+}
+
+// Error handling with JSON parsing
+async function safeToolExecution(toolName, params) {
+    try {
+        const result = await Tool.executeAsync(toolName, params);
+        
+        if (result.success && result.output) {
+            try {
+                return {
+                    success: true,
+                    data: JSON.parse(result.output)
+                };
+            } catch (parseError) {
+                logger.error("JSON parse error", {
+                    tool: toolName,
+                    error: parseError.message,
+                    output: result.output.substring(0, 100)
+                });
+                return {
+                    success: false,
+                    error: "Invalid JSON output from tool"
+                };
+            }
+        } else {
+            return {
+                success: false,
+                error: result.error || "Tool execution failed"
+            };
+        }
+    } catch (error) {
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+}
+
+// Working with streaming JSON data
+async function* streamingJSONProcessor(dataStream) {
+    for await (const chunk of dataStream) {
+        try {
+            // Each chunk is a JSON string
+            const parsed = JSON.parse(chunk);
+            
+            // Process and yield transformed data
+            yield JSON.stringify({
+                ...parsed,
+                processed: true,
+                timestamp: Date.now()
+            });
+        } catch (error) {
+            yield JSON.stringify({
+                error: error.message,
+                chunk: chunk.substring(0, 50),
+                timestamp: Date.now()
+            });
+        }
+    }
+}
+
+// JSON Schema validation pattern
+function validateToolOutput(output, expectedSchema) {
+    try {
+        const parsed = JSON.parse(output);
+        
+        // Basic schema validation
+        for (const [key, type] of Object.entries(expectedSchema)) {
+            if (!(key in parsed)) {
+                throw new Error(`Missing required field: ${key}`);
+            }
+            if (typeof parsed[key] !== type) {
+                throw new Error(`Invalid type for ${key}: expected ${type}, got ${typeof parsed[key]}`);
+            }
+        }
+        
+        return { valid: true, data: parsed };
+    } catch (error) {
+        return { valid: false, error: error.message };
+    }
+}
+
+// Pretty printing for debugging
+function debugToolOutput(toolName, result) {
+    if (result.success && result.output) {
+        try {
+            const parsed = JSON.parse(result.output);
+            console.log(`=== ${toolName} Output ===`);
+            console.log(JSON.stringify(parsed, null, 2));
+            console.log("========================");
+        } catch (error) {
+            console.error(`Failed to parse ${toolName} output:`, error.message);
+        }
+    }
+}
+```
+
+**JavaScript JSON Best Practices:**
+
+1. **Always parse tool outputs**: Tools return JSON strings, not objects
+2. **Use try-catch for parsing**: Handle malformed JSON gracefully
+3. **Stringify complex inputs**: When passing objects to tools
+4. **Leverage native features**: Use JavaScript's built-in JSON capabilities
+5. **Type checking**: Validate parsed data structure before use
+
 # Part IV: Built-in Components Library
 
 ## Complete Built-in Tools Catalog
 
-Rs-LLMSpell provides a comprehensive library of **40+ production-ready tools** organized into 8 categories. These tools are immediately available in all scripting environments and provide essential functionality for AI workflows.
+Rs-LLMSpell provides a comprehensive library of **42+ production-ready tools** organized into 8 categories. These tools are immediately available in all scripting environments and provide essential functionality for AI workflows.
 
 ### Tool Organization by Category
 
@@ -8049,13 +8436,15 @@ Tools.get("slack_integration"):execute({
 })
 ```
 
-#### 8. **Specialized Domain Tools** (3 tools)
+#### 8. **Specialized Domain Tools** (5 tools)
 Domain-specific tools for specialized use cases.
 
 | Tool Name | Description | Domain | Capabilities |
 |-----------|-------------|---------|--------------|
 | `pdf_processor` | PDF operations | Documents | Extract text, metadata, split/merge |
 | `image_processor` | Image manipulation | Media | Resize, format conversion, metadata |
+| `audio_processor` | Audio file operations | Media | Format conversion, metadata extraction, waveform analysis |
+| `video_processor` | Video file operations | Media | Format conversion, frame extraction, metadata analysis |
 | `academic_searcher` | Academic paper search | Research | arXiv, PubMed, Google Scholar |
 
 ```javascript
@@ -8172,6 +8561,10 @@ for await (const progressImage of imageStream) {
     updatePreview(progressImage);
 }
 ```
+
+> **Note on Search Tools**: Two advanced search tools (`SemanticSearchTool` and `CodeSearchTool`) have been deferred to Phase 3.5 to be implemented alongside the vector storage infrastructure and llmspell-rag crate. These tools will provide:
+> - **SemanticSearchTool**: Vector-based similarity search using embeddings for natural language queries across documents
+> - **CodeSearchTool**: AST-based code search with tree-sitter integration for symbol extraction and intelligent code navigation
 
 ### Tool Discovery and Management
 
@@ -8703,6 +9096,14 @@ SpecializedTool (category-specific behavior)
 - **Output Filtering**: Sensitive data redaction
 - **Audit Logging**: All tool executions logged with context
 - **Rate Limiting**: Per-tool and per-user rate limits
+
+**Media Processing Security:**
+- **File Validation**: Verify file headers match claimed format
+- **Size Limits**: Enforce maximum file sizes for audio/video processing
+- **Process Isolation**: Run FFmpeg/media libraries in separate process
+- **Resource Quotas**: CPU/memory limits for transcoding operations
+- **Timeout Enforcement**: Maximum processing time per media file
+- **Output Sanitization**: Strip potentially malicious metadata
 
 ### Tool Testing Architecture
 
@@ -9797,6 +10198,9 @@ local-models = ["candle"]
 mcp-support = ["tokio-tungstenite", "serde_json"]
 a2a-protocol = ["tokio-tungstenite", "bincode"]
 distributed = ["tokio-tungstenite"]
+vector-storage = ["hnsw", "tantivy"] # Phase 3.5
+media-tools = ["symphonia", "image"] # Audio/video processing
+rag-patterns = ["vector-storage"] # Phase 3.5
 
 # Development Tools
 benchmarks = ["criterion"]
@@ -10543,6 +10947,65 @@ pub trait StorageTransaction: Send + Sync {
     async fn commit(self: Box<Self>) -> Result<()>;
     async fn rollback(self: Box<Self>) -> Result<()>;
 }
+```
+
+#### Vector Storage Backend
+
+In addition to key-value storage, rs-llmspell supports vector storage for semantic search, RAG patterns, and agent memory. This will be implemented in Phase 3.5.
+
+```rust
+use serde_json::Value;
+
+#[async_trait]
+pub trait VectorStorageBackend: Send + Sync {
+    // Core Vector Operations
+    async fn insert_vector(
+        &self, 
+        id: &str, 
+        vector: &[f32], 
+        metadata: Option<Value>
+    ) -> Result<()>;
+    
+    async fn search_similar(
+        &self, 
+        query: &[f32], 
+        k: usize, 
+        threshold: Option<f32>
+    ) -> Result<Vec<(String, f32, Option<Value>)>>;
+    
+    async fn update_vector(&self, id: &str, vector: &[f32]) -> Result<()>;
+    
+    async fn delete_vector(&self, id: &str) -> Result<()>;
+    
+    async fn get_vector(&self, id: &str) -> Result<Option<(Vec<f32>, Option<Value>)>>;
+    
+    // Batch Operations
+    async fn insert_vectors_batch(
+        &self,
+        items: &[(String, Vec<f32>, Option<Value>)]
+    ) -> Result<()>;
+    
+    // Index Management
+    async fn create_index(&self, config: IndexConfig) -> Result<()>;
+    async fn optimize_index(&self) -> Result<()>;
+    
+    // Metadata and Stats
+    fn vector_dimensions(&self) -> usize;
+    fn index_size(&self) -> Result<usize>;
+    fn similarity_metric(&self) -> SimilarityMetric;
+}
+
+#[derive(Debug, Clone)]
+pub enum SimilarityMetric {
+    Cosine,
+    Euclidean,
+    DotProduct,
+}
+
+// Planned implementations for Phase 3.5:
+// - InMemoryVectorBackend: Simple in-memory implementation
+// - DiskVectorBackend: Persistent vector storage using HNSW
+// - ExternalVectorBackend: Adapters for Qdrant, Weaviate, Pinecone
 ```
 
 #### Sled Backend Implementation
@@ -23538,7 +24001,56 @@ const report = await workflow.run({ topic: "Rust async patterns" });
 - Protocol integration
 - Performance benchmarks
 
-**Phase 4: Production Readiness (Weeks 13-16)**
+**Phase 3.5: Vector Storage and Search Infrastructure (Weeks 13-14)**
+```rust
+// Vector storage implementation
+impl VectorStorageBackend for InMemoryVectorBackend {
+    async fn search_similar(
+        &self, 
+        query: &[f32], 
+        k: usize, 
+        threshold: Option<f32>
+    ) -> Result<Vec<(String, f32, Option<Value>)>> {
+        // HNSW-based similarity search
+        self.index.search(query, k, threshold)
+    }
+}
+
+// llmspell-rag crate patterns
+pub struct RAGPipeline {
+    chunker: Box<dyn DocumentChunker>,
+    embedder: Box<dyn Embedder>,
+    vector_store: Box<dyn VectorStorageBackend>,
+    retriever: Box<dyn Retriever>,
+}
+
+// Tool implementations using infrastructure
+pub struct SemanticSearchTool {
+    vector_store: Arc<dyn VectorStorageBackend>,
+    embedder: Arc<dyn Embedder>,
+}
+
+pub struct CodeSearchTool {
+    parser: TreeSitterParser,
+    index: TantivyIndex,
+    symbol_extractor: SymbolExtractor,
+}
+```
+
+**Implementation Priorities:**
+1. VectorStorageBackend implementations
+2. llmspell-rag crate with RAG patterns
+3. SemanticSearchTool using vector storage
+4. CodeSearchTool with tree-sitter integration
+5. Agent memory integration
+
+**Deliverables:**
+- Vector storage backends (memory, disk, external)
+- RAG pipeline abstractions
+- Working semantic and code search tools
+- Agent memory system prototype
+
+**Phase 4: Production Readiness (Weeks 15-18)**
 ```toml
 # Production configuration by Phase 4
 [server]

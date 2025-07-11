@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2025-07-11
+
+### Added
+- Complete Phase 2: Self-Contained Tools Library (25 tools)
+- Data Processing: JsonProcessor, CsvAnalyzer, HttpRequest, GraphQLQuery
+- File System: FileOperations, ArchiveHandler, FileWatcher, FileConverter, FileSearch
+- System Integration: EnvironmentReader, ProcessExecutor, ServiceChecker, SystemMonitor
+- Media Processing: AudioProcessor, VideoProcessor, ImageProcessor
+- Utilities: Calculator, TextManipulator, DateTimeHandler, UuidGenerator, HashCalculator, Base64Encoder, DiffCalculator, TemplateEngine, DataValidation
+- Search: WebSearch
+- Provider enhancements: ModelSpecifier, base URL overrides
+- JSON API for script bridge
+
+### Technical
+- 90%+ test coverage
+- Zero warnings policy enforced
+- All tools follow BaseAgent/Tool trait hierarchy
+
 ## [0.1.0-alpha.1] - 2025-06-27
 
 ### Alpha Release - Architecture Testing Preview

@@ -11,6 +11,8 @@ license.workspace = true
 llmspell-core = { path = "../llmspell-core" }
 llmspell-providers = { path = "../llmspell-providers" }
 llmspell-utils = { path = "../llmspell-utils" }
+llmspell-tools = { path = "../llmspell-tools" }
+llmspell-security = { path = "../llmspell-security" }
 tokio.workspace = true
 tokio-stream.workspace = true
 async-trait.workspace = true

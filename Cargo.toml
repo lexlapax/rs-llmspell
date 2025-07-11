@@ -18,7 +18,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.1.0-alpha.1"
+version = "0.2.0"
 edition = "2021"
 authors = ["Lex Lapax<lexlapax@gmail.com>"]
 repository = "https://github.com/lexlapax/rs-llmspell"
@@ -59,6 +59,7 @@ config = "0.15"
 mockall = "0.13"
 proptest = "1.4"
 criterion = { version = "0.5", features = ["html_reports"] }
+serial_test = "3.1"
 
 # Storage backends
 sled = "0.34"
@@ -66,7 +67,7 @@ rocksdb = "0.22"
 
 # Scripting engines
 mlua = { version = "0.9", features = ["lua54", "async", "serialize", "send", "parking_lot"] }
-boa_engine = "0.18"
+boa_engine = "0.20"
 quickjs_runtime = "0.12"
 
 # LLM providers and AI

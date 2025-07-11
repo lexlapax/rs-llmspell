@@ -3,8 +3,8 @@
 
 use llmspell_core::error::LLMSpellError;
 use llmspell_providers::{
-    ProviderCapabilities, ProviderConfig as ProviderInstanceConfig, ProviderInstance,
-    ProviderManager as CoreProviderManager,
+    ModelSpecifier, ProviderCapabilities, ProviderConfig as ProviderInstanceConfig,
+    ProviderInstance, ProviderManager as CoreProviderManager,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -141,6 +141,21 @@ impl ProviderManager {
     /// Set the default provider
     pub async fn set_default_provider(&self, name: String) -> Result<(), LLMSpellError> {
         self.core_manager.set_default_provider(name).await
+    }
+
+    /// Create and initialize a provider from a ModelSpecifier
+    ///
+    /// This is a bridge method that delegates to the core provider manager's
+    /// create_agent_from_spec method. It supports the new "provider/model" syntax.
+    pub async fn create_agent_from_spec(
+        &self,
+        spec: ModelSpecifier,
+        base_url_override: Option<&str>,
+        api_key: Option<&str>,
+    ) -> Result<Arc<Box<dyn ProviderInstance>>, LLMSpellError> {
+        self.core_manager
+            .create_agent_from_spec(spec, base_url_override, api_key)
+            .await
     }
 
     /// List all registered providers

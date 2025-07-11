@@ -36,6 +36,8 @@ impl LuaEngine {
         #[cfg(feature = "lua")]
         {
             use mlua::Lua;
+
+            // Create Lua instance (async is enabled via feature flag)
             let lua = match config.stdlib {
                 StdlibLevel::None => Lua::new(),
                 StdlibLevel::Safe => Lua::new(), // TODO: restrict stdlib
@@ -86,6 +88,9 @@ impl ScriptEngineBridge for LuaEngine {
             }
 
             let start_time = Instant::now();
+
+            // For now, keep synchronous execution but prepare for async tool calls
+            // The async execution will happen within tool calls, not at the script level
             let lua = self.lua.lock();
 
             // Execute the script
@@ -228,6 +233,9 @@ impl ScriptEngineBridge for LuaEngine {
 
             // Inject Streaming API
             super::api::inject_streaming_api(&lua, &api_surface.streaming_api)?;
+
+            // Inject JSON API
+            super::api::inject_json_api(&lua, &api_surface.json_api)?;
 
             self.api_injected = true;
         }

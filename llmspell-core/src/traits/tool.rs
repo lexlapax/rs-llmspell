@@ -2,9 +2,13 @@
 //! ABOUTME: Extends BaseAgent with parameter validation and tool categorization
 
 use super::base_agent::BaseAgent;
-use crate::Result;
+use crate::{
+    types::{AgentInput, AgentStream},
+    Result,
+};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Tool category for organization and discovery.
 ///
@@ -23,13 +27,15 @@ use serde::{Deserialize, Serialize};
 /// let custom = ToolCategory::Custom("ai-tools".to_string());
 /// assert_eq!(custom.to_string(), "ai-tools");
 /// ```
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
 pub enum ToolCategory {
     Filesystem,
     Web,
+    Api,
     Analysis,
     Data,
     System,
+    Media,
     Utility,
     Custom(String),
 }
@@ -39,9 +45,11 @@ impl std::fmt::Display for ToolCategory {
         match self {
             ToolCategory::Filesystem => write!(f, "filesystem"),
             ToolCategory::Web => write!(f, "web"),
+            ToolCategory::Api => write!(f, "api"),
             ToolCategory::Analysis => write!(f, "analysis"),
             ToolCategory::Data => write!(f, "data"),
             ToolCategory::System => write!(f, "system"),
+            ToolCategory::Media => write!(f, "media"),
             ToolCategory::Utility => write!(f, "utility"),
             ToolCategory::Custom(name) => write!(f, "{}", name),
         }
@@ -67,7 +75,7 @@ impl std::fmt::Display for ToolCategory {
 /// // But Safe user cannot run Restricted tools
 /// assert!(!SecurityLevel::Safe.allows(&SecurityLevel::Restricted));
 /// ```
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum SecurityLevel {
     Safe,
     Restricted,
@@ -78,6 +86,146 @@ impl SecurityLevel {
     /// Check if this security level allows execution at the given level
     pub fn allows(&self, required: &SecurityLevel) -> bool {
         self >= required
+    }
+}
+
+/// Security requirements for tool execution
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct SecurityRequirements {
+    /// Required security level
+    pub level: SecurityLevel,
+    /// File system permissions (paths that can be accessed)
+    pub file_permissions: Vec<String>,
+    /// Network permissions (domains that can be accessed)
+    pub network_permissions: Vec<String>,
+    /// Environment variables that can be accessed
+    pub env_permissions: Vec<String>,
+    /// Custom security requirements
+    pub custom_requirements: HashMap<String, serde_json::Value>,
+}
+
+impl Default for SecurityRequirements {
+    fn default() -> Self {
+        Self {
+            level: SecurityLevel::Safe,
+            file_permissions: Vec::new(),
+            network_permissions: Vec::new(),
+            env_permissions: Vec::new(),
+            custom_requirements: HashMap::new(),
+        }
+    }
+}
+
+impl SecurityRequirements {
+    /// Create safe security requirements (no file/network access)
+    pub fn safe() -> Self {
+        Self::default()
+    }
+
+    /// Create restricted security requirements with limited access
+    pub fn restricted() -> Self {
+        Self {
+            level: SecurityLevel::Restricted,
+            ..Default::default()
+        }
+    }
+
+    /// Create privileged security requirements with full access
+    pub fn privileged() -> Self {
+        Self {
+            level: SecurityLevel::Privileged,
+            file_permissions: vec!["*".to_string()],
+            network_permissions: vec!["*".to_string()],
+            env_permissions: vec!["*".to_string()],
+            custom_requirements: HashMap::new(),
+        }
+    }
+
+    /// Add file permission
+    pub fn with_file_access(mut self, path: impl Into<String>) -> Self {
+        self.file_permissions.push(path.into());
+        self
+    }
+
+    /// Add network permission
+    pub fn with_network_access(mut self, domain: impl Into<String>) -> Self {
+        self.network_permissions.push(domain.into());
+        self
+    }
+
+    /// Add environment variable permission
+    pub fn with_env_access(mut self, var: impl Into<String>) -> Self {
+        self.env_permissions.push(var.into());
+        self
+    }
+}
+
+/// Resource limits for tool execution
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ResourceLimits {
+    /// Maximum memory usage in bytes
+    pub max_memory_bytes: Option<u64>,
+    /// Maximum CPU time in milliseconds
+    pub max_cpu_time_ms: Option<u64>,
+    /// Maximum network bandwidth in bytes per second
+    pub max_network_bps: Option<u64>,
+    /// Maximum file operations per second
+    pub max_file_ops_per_sec: Option<u32>,
+    /// Custom resource limits
+    pub custom_limits: HashMap<String, u64>,
+}
+
+impl Default for ResourceLimits {
+    fn default() -> Self {
+        Self {
+            max_memory_bytes: Some(100 * 1024 * 1024), // 100MB default
+            max_cpu_time_ms: Some(30_000),             // 30 seconds default
+            max_network_bps: Some(10 * 1024 * 1024),   // 10MB/s default
+            max_file_ops_per_sec: Some(100),           // 100 ops/sec default
+            custom_limits: HashMap::new(),
+        }
+    }
+}
+
+impl ResourceLimits {
+    /// Create unlimited resource limits (for privileged tools)
+    pub fn unlimited() -> Self {
+        Self {
+            max_memory_bytes: None,
+            max_cpu_time_ms: None,
+            max_network_bps: None,
+            max_file_ops_per_sec: None,
+            custom_limits: HashMap::new(),
+        }
+    }
+
+    /// Create strict resource limits (for safe tools)
+    pub fn strict() -> Self {
+        Self {
+            max_memory_bytes: Some(10 * 1024 * 1024), // 10MB
+            max_cpu_time_ms: Some(5_000),             // 5 seconds
+            max_network_bps: Some(1024 * 1024),       // 1MB/s
+            max_file_ops_per_sec: Some(10),           // 10 ops/sec
+            custom_limits: HashMap::new(),
+        }
+    }
+
+    /// Set memory limit
+    pub fn with_memory_limit(mut self, bytes: u64) -> Self {
+        self.max_memory_bytes = Some(bytes);
+        self
+    }
+
+    /// Set CPU time limit
+    pub fn with_cpu_limit(mut self, milliseconds: u64) -> Self {
+        self.max_cpu_time_ms = Some(milliseconds);
+        self
+    }
+
+    /// Set network bandwidth limit
+    pub fn with_network_limit(mut self, bytes_per_second: u64) -> Self {
+        self.max_network_bps = Some(bytes_per_second);
+        self
     }
 }
 
@@ -324,6 +472,52 @@ pub trait Tool: BaseAgent {
 
     /// Get parameter schema
     fn schema(&self) -> ToolSchema;
+
+    /// Get security requirements for this tool
+    fn security_requirements(&self) -> SecurityRequirements {
+        SecurityRequirements {
+            level: self.security_level(),
+            ..Default::default()
+        }
+    }
+
+    /// Get resource limits for this tool
+    fn resource_limits(&self) -> ResourceLimits {
+        match self.security_level() {
+            SecurityLevel::Safe => ResourceLimits::strict(),
+            SecurityLevel::Restricted => ResourceLimits::default(),
+            SecurityLevel::Privileged => ResourceLimits::unlimited(),
+        }
+    }
+
+    /// Execute tool with streaming output
+    async fn stream_execute(
+        &self,
+        input: AgentInput,
+        context: crate::types::ExecutionContext,
+    ) -> Result<AgentStream> {
+        // Default implementation: execute normally and convert to a single chunk stream
+        let output = self.execute(input, context).await?;
+
+        // Convert AgentOutput to AgentChunk
+        let chunk = crate::types::AgentChunk {
+            stream_id: format!("tool-{}", uuid::Uuid::new_v4()),
+            chunk_index: 0,
+            content: crate::types::ChunkContent::Text(output.text),
+            metadata: crate::types::ChunkMetadata {
+                is_final: true,
+                token_count: None,
+                model: None,
+                reasoning_step: None,
+            },
+            timestamp: chrono::Utc::now(),
+        };
+
+        // Create a simple stream with just the final chunk
+        use futures::stream;
+        let stream = stream::once(async move { Ok(chunk) });
+        Ok(Box::pin(stream))
+    }
 
     /// Validate tool parameters
     async fn validate_parameters(&self, params: &serde_json::Value) -> Result<()> {

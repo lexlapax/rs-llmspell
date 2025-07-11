@@ -3,241 +3,146 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 rs-llmspell: **Scriptable LLM interactions** via Lua, JavaScript - Cast scripting spells to animate LLM golems
+## Phase Status
+- ✅ Phase 0: Foundation Infrastructure (COMPLETE)
+- ✅ Phase 1: Core Execution Runtime (COMPLETE)
+- ✅ Phase 2: Self-Contained Tools Library (COMPLETE - 25 tools)
+- 🚀 **Phase 3: Tool Enhancement & Workflow Orchestration** (ACTIVE - Weeks 9-16)
+  - Phase 3.0: Critical Tool Fixes (Weeks 9-10)
+  - Phase 3.1: External Integration Tools (Weeks 11-12)
+  - Phase 3.2: Security & Performance (Weeks 13-14)
+  - Phase 3.3: Workflow Orchestration (Weeks 15-16)
+- ⏳ Phase 4: Vector Storage and Search (Weeks 17-18)
+- ⏳ Phase 5+: Future phases...
 
 ## Current Status
 
-🚀 **Phase 1 - Core Execution Runtime**: IN PROGRESS (Started 2025-06-26)
-- **Completed**: All architectural research phases (1-13) ✅
-- **Completed**: Phase 0 implementation - All 37 tasks ✅
-- **Completed**: Architecture updates for streaming/multimodal ✅
-- **Current**: Phase 1 implementation - Core runtime with Lua 🔄
-- **Next**: Working Lua scripts calling LLM agents
+🚀 **Phase 3 - Tool Enhancement & Workflow Orchestration**: STARTING (Phase 2 Complete 2025-07-11)
+- **Completed**: Phases 0, 1, 2 ✅ (25 self-contained tools fully implemented)
+- **Current**: Phase 3.0 - Critical Tool Fixes (Standardization, DRY, Initial Security)
+- **Approach**: Clean break strategy - no migration tools (pre-1.0 freedom)
+- **Timeline**: 8 weeks (Weeks 9-16) divided into 4 sub-phases
 
-### Phase 0 Achievements
-- ✅ **12-crate workspace** with zero compiler warnings
-- ✅ **165 comprehensive tests** (unit, integration, property, doc tests)
-- ✅ **Complete CI/CD pipeline** with 7 jobs and quality gates
-- ✅ **Professional documentation** (>95% coverage, GitHub Pages ready)
-- ✅ **Architecture enhanced** with streaming and multimodal support
-
-### Phase 1 Implementation Focus
-- 🔄 **13th crate**: `llmspell-utils` for shared utilities
-- 🔄 **Streaming support**: BaseAgent and Tool traits extended
-- 🔄 **Multimodal types**: MediaContent (Image, Audio, Video, Binary)
-- 🔄 **Lua runtime**: Basic script execution with agent APIs
-- 🔄 **CLI enhancement**: Streaming output with progress indicators
-
-## Phase 1 Development Commands
-
-**Current Focus**: Core Execution Runtime (10 working days)
+## Key Commands
 
 ```bash
-# Phase 1 Development Commands
-cargo check --workspace          # Verify workspace compilation
-cargo build --workspace          # Build all foundation crates
-cargo test --workspace           # Run foundation tests
-cargo doc --workspace --no-deps  # Generate documentation
+# Quality Checks (MANDATORY before commits)
+cargo clippy -- -D warnings            # Zero warnings policy
+cargo fmt --all                        # Apply formatting
+./scripts/quality-check-minimal.sh     # Quick check (seconds) - formatting, clippy, compilation
+./scripts/quality-check-fast.sh        # Fast check (~1 min) - adds unit tests & docs
+./scripts/quality-check.sh             # Full check (5+ min) - all tests & coverage
 
-# Quality Assurance (MANDATORY before commits)
-cargo clippy -- -D warnings      # Zero warnings policy
-cargo fmt --check               # Formatting validation
-cargo fmt                       # Apply formatting
-cargo test --workspace          # Run all tests
+# Individual Checks
+cargo test --workspace                 # Run all tests (can be slow)
+cargo test --lib --all                 # Run only unit tests (faster)
+cargo check --workspace                # Quick compilation check
 
-# Local Quality Check Script (RECOMMENDED)
-./scripts/quality-check.sh       # Run all quality checks locally (matches CI)
-
-# Documentation Validation Tools
-cargo install cargo-deadlinks    # Install documentation link checker
-npm install -g markdown-link-check # Install markdown link validator (npm package)
-cargo deadlinks --dir target/doc # Check internal documentation links
-markdown-link-check README.md    # Validate README links
-
-# Phase 0 Specific Tasks
-cargo metadata                   # Verify workspace structure
-cargo tree                      # Check dependency graph
-
-# CI/CD Pipeline (IMPLEMENTED - Phase 0 Complete)
-.github/workflows/ci.yml         # Automated quality checks
-.github/QUALITY_GATES.md         # Branch protection and quality standards
-.github/CI_VALIDATION_REPORT.md  # CI/CD pipeline validation results
-.github/PHASE0_COMPLETION_REPORT.md # Phase 0 completion validation
-.markdown-link-check.json        # Link validation configuration
-
-# Clean workspace
-cargo clean
+# Phase 3 Specific
+cargo test -p llmspell-tools          # Test tools crate
+cargo test -p llmspell-utils          # Test shared utilities
+cargo bench -p llmspell-tools         # Benchmark tool performance
+cargo test --all-features             # Test with all external integrations
 ```
 
 ## Architecture Overview
 
-Rs-LLMSpell is a **production-ready scriptable LLM interaction framework** that revolutionizes AI application development through a unique Core-Bridge-Script architecture.
+**Core-Bridge-Script Architecture**: BaseAgent → Tool → Workflow hierarchy with scriptable interfaces.
 
-### Component Hierarchy
+**Tech Stack**: `rig` (LLM providers), `mlua` (scripting), `sled`/`rocksdb` (storage), comprehensive testing.
 
-```
-BaseAgent ← Agent ← SpecializedAgent (Research, Analysis, etc.)
-    ↑
-  Tool ← ToolWrappedAgent (Agents as Tools)
-    ↑  
-Workflow ← SequentialWorkflow, ParallelWorkflow, ConditionalWorkflow
-```
+**Phase 3 Focus**: Standardize 25 existing tools, add 16 external integration tools, security hardening, workflow orchestration.
 
-### Key Design Elements
+## Quality Requirements
 
-1. **BaseAgent**: Foundation trait providing tool-handling capabilities, state management, and hook integration
-2. **Agent**: LLM wrapper extending BaseAgent with specialized prompts and provider integration
-3. **Tool**: LLM-callable functions that can wrap agents for composition
-4. **Workflow**: Deterministic orchestration patterns (sequential, parallel, conditional, loop)
-5. **Built-in Library**: 40+ tools across 8 categories, 6 agent templates, 6 workflow types
-6. **Hook System**: 20+ hook points for logging, metrics, security, and custom behavior
-7. **Event Bus**: Async event emission/subscription for real-time coordination
+- **Zero Warnings**: All code must compile without warnings
+- **Test Coverage**: >90% coverage enforced in CI
+- **Documentation**: >95% coverage requirement
+- **CI/CD**: All quality gates implemented and enforced
 
-### Technology Stack
+### Quality Check Scripts
 
-- **LLM Providers**: `rig` (multi-provider) + `candle` (local models)
-- **Scripting**: `mlua` (Lua 5.4), `boa`/`quickjs` (JavaScript), `pyo3` (Python - future)
-- **Storage**: `sled` (development) / `rocksdb` (production) behind trait abstractions
-- **Events**: `tokio-stream` + `crossbeam` hybrid for async/sync patterns
-- **Testing**: `mockall` + `proptest` + `criterion` comprehensive stack
-- **Observability**: `tracing` + `metrics-rs` + optional `opentelemetry`
+Three levels of quality validation are available:
 
-### Async Patterns
+1. **Minimal Check** (`quality-check-minimal.sh`) - Runs in seconds
+   - Code formatting verification
+   - Clippy lints with zero warnings
+   - Compilation check
+   
+2. **Fast Check** (`quality-check-fast.sh`) - Runs in ~1 minute
+   - All minimal checks
+   - Unit tests only
+   - Documentation build verification
+   
+3. **Full Check** (`quality-check.sh`) - Runs in 5+ minutes
+   - All fast checks
+   - Full integration test suite
+   - Optional coverage analysis (if cargo-tarpaulin installed)
+   - Security audit (if cargo-audit installed)
 
-- **Lua**: Coroutine-based cooperative scheduling with Promise-like abstractions
-- **JavaScript**: Native Promises with controlled concurrency and backpressure
-- **Unified Interface**: Consistent async patterns across all scripting languages
-- **Cooperative Yielding**: Non-blocking execution for long-running operations
-
-## Phase 0 Implementation Workflow
-
-### CRITICAL Phase 0 Requirements
-1. **Zero Warnings Policy**: All code must compile without warnings
-2. **Documentation First**: Every trait/type documented before implementation
-3. **TDD Foundation**: Core traits tested before implementation begins
-4. **CI/CD Ready**: Pipeline validates every commit from day one
-5. **Track Progress**: Update TODO.md with task completion timestamps
-
-### Development Process
-1. **Workspace First**: Set up complete 12-crate workspace structure
-2. **Core Traits**: Implement BaseAgent/Agent/Tool/Workflow trait hierarchy
-3. **Error Handling**: Comprehensive error system with categorization
-4. **Testing Infrastructure**: mockall + proptest + criterion setup
-5. **CI/CD Pipeline**: GitHub Actions with quality gates
-6. **Documentation**: >95% coverage requirement
-
-### Quality Gates (MANDATORY - All Implemented in CI)
-- `cargo check --workspace` - Zero errors/warnings ✅
-- `cargo test --workspace` - >90% test coverage (enforced in CI) ✅
-- `cargo clippy -- -D warnings` - Zero clippy warnings ✅
-- `cargo fmt --check` - Consistent formatting ✅
-- `cargo doc --workspace` - Documentation builds successfully (>95% coverage) ✅
-- `./scripts/quality-check.sh` - Local validation matching CI requirements ✅
-- `cargo deadlinks --dir target/doc` - Internal documentation links valid ✅
-- `markdown-link-check` - External documentation links valid ✅
+**Recommendation**: Use minimal check before commits, fast check before pushing, and full check before PRs.
 
 ## Critical Implementation Principles
 
-### State-First Architecture
-- Agents communicate through shared state, not direct message passing
-- State preservation across agent handoffs
-- Debugging and observability through state inspection
-
-### Tool-Wrapped Agents Pattern
-```rust
-// Any agent can be wrapped as a tool
-let research_tool = AgentAsTool::new(research_agent);
-workflow.add_tool(research_tool);
-```
-
-### Hook Integration
-```rust
-// Hooks at every execution point
-self.hooks.execute(HookPoint::BeforeExecution, &input).await?;
-// ... execution ...
-self.hooks.execute(HookPoint::AfterExecution, &result).await?;
-```
-
-### Production-First Design
-- Circuit breakers on every agent
-- Resource limits enforced
-- Comprehensive error handling
-- Security sandboxing built-in
+- **State-First**: Agents communicate through shared state
+- **Tool Composition**: Agents can be wrapped as tools
+- **Security First**: Sandboxing and resource limits enforced
+- **DRY Principle**: Use llmspell-utils for shared functionality
 
 ## Key Development Reminders
 
-- **Complete Tasks Fully**: No lazy implementations or deferrals
-- **No Shortcuts or simplification**: Web Research or ask user if complex coding issue
-- **Do not jump ahead** Stick to task hierarchy in TODO.md, re-read it after tasks again to make sure you didn't miss steps.
-- **Maintain Bridge Philosophy**: Use existing crates, don't reinvent
-- **State Over Messages**: Agent handoff via shared state
-- **Tool Composition**: Agents as composable tools
-- **No Backward Compatibility**: Breaking changes encouraged until v1.0.0
-- **Update Documentation**: Keep TODO.md current with timestamps as tasks progress
+- **Complete Tasks Fully**: No lazy implementations, check Definition of Done
+- **DRY**: Use llmspell-utils for common functionality
+- **Follow TODO.md**: Stick to task hierarchy, don't jump ahead
+- **Zero Warnings**: Maintain compilation without warnings
+- **Update Progress**: Keep TODO.md timestamps current
 
 ## Primary Documentation
 
-**🎯 Complete Architecture**: `/docs/technical/rs-llmspell-final-architecture.md`
-- Standalone 15,034+ line comprehensive guide
-- All architectural decisions and implementation details
-- Production-ready specifications with examples
-- No external references required
+- **Architecture**: `/docs/technical/rs-llmspell-final-architecture.md`
+- **Current Progress**: `/docs/in-progress/PHASE03-TODO.md` - Phase 3 task tracking
+- **Phase 3 Design**: `/docs/in-progress/phase-03-design-doc.md`
+- **Breaking Changes**: Clean break approach with comprehensive documentation
 
-**Phase 0 Implementation Documents**:
-- `/docs/in-progress/phase-00-design-doc.md` - Detailed Phase 0 specifications
-- `/docs/in-progress/PHASE00-TODO.md` - 37 specific implementation tasks
-- `/docs/in-progress/implementation-phases.md` - Complete 16-phase roadmap
-- `/TODO.md` - Current Phase 0 task tracking
+## Phase 3 Plan (41+ Tools Target)
 
-**Research Archive**: `/docs/technical/`
-- 30+ research documents from architectural phases
-- Deep dives into specific technical decisions
-- Historical context for architectural choices
+**Phase 3.0 (Weeks 9-10)**: Critical Tool Fixes
+- Standardize all 25 tools to consistent interfaces
+- Extract shared utilities (DRY compliance 95%)
+- Implement critical security fixes (Calculator DoS, path traversal)
+- Create breaking changes documentation
 
-## Phase 1 Specific Tasks
+**Phase 3.1 (Weeks 11-12)**: External Integration Tools (16 new)
+- Web & Network: WebSearchTool enhancement, web_scraper, url_analyzer, api_tester, webhook_caller, webpage_monitor, sitemap_crawler
+- Communication: email_sender, database_connector
+- Rate limiting and circuit breaker patterns
 
-### Task 1.0: Create llmspell-utils Crate
-1. Create new crate directory with Cargo.toml
-2. Add to workspace members in root Cargo.toml
-3. Implement utility modules (async_utils, file_utils, etc.)
-4. **Acceptance**: All utilities tested with >90% coverage
+**Phase 3.2 (Weeks 13-14)**: Advanced Security & Performance
+- Comprehensive security hardening for all 41 tools
+- Performance optimization (maintain 52,600x target)
+- Resource limit enforcement
 
-### Task 1.1: Enhanced Core Types
-1. Add streaming types (AgentStream, AgentChunk, ChunkContent)
-2. Add multimodal types (MediaContent, ImageFormat, etc.)
-3. Update AgentInput/AgentOutput with media support
-4. **Acceptance**: All types serialize/deserialize correctly
+**Phase 3.3 (Weeks 15-16)**: Workflow Orchestration
+- Sequential, Conditional, Loop, Streaming workflows
+- State management and error handling
+- Integration with full tool library
 
-### Task 1.2: Script Runtime Foundation
-1. Create ScriptRuntime struct with Lua integration
-2. Inject Agent API into Lua environment
-3. Implement coroutine-based streaming support
-4. **Acceptance**: Can execute Lua scripts with agents
+## Phase 3 Breaking Changes
 
-### Task 1.3: Provider Integration
-1. Create provider abstraction layer
-2. Implement rig provider wrapper
-3. Add capability detection for streaming/multimodal
-4. **Acceptance**: LLM calls work from scripts
+**Clean Break Approach**: As a pre-1.0 project (v0.1.0 → v0.3.0), we're making breaking changes without migration tools.
 
-### Task 1.4: CLI Implementation
-1. Create basic CLI structure with clap
-2. Add streaming output support with progress
-3. Implement configuration loading
-4. **Acceptance**: CLI executes scripts with streaming output
+**Key Changes**:
+- **Parameter Standardization**: `input` as universal primary data parameter
+- **Path Parameters**: `path: PathBuf` for single files, `source_path`/`target_path` for transforms
+- **ResponseBuilder Pattern**: All tools use standardized response format
+- **No Migration Tools**: Clear documentation and examples instead
+
+**Documentation**: See `/docs/in-progress/CHANGELOG_v0.3.0.md` for complete breaking changes.
 
 ## Testing Strategy
 
-- **Unit Tests**: Test individual components in isolation
-- **Integration Tests**: Test component interactions
-- **Script Tests**: Test Lua/JavaScript API functionality
-- **Property Tests**: Use proptest for invariant testing
-- **Benchmarks**: Track performance with criterion
-
-Run tests with increasing scope:
-```bash
-cargo test --lib                    # Unit tests only
-cargo test --test '*'               # Integration tests
-cargo test --all-features           # All features enabled
-cargo test --workspace              # Entire workspace
-cargo clippy -- -D warnings         # Zero warnings policy 
-```
+- **Unit Tests**: Individual components
+- **Integration Tests**: Tool interactions and script APIs  
+- **Security Tests**: DoS protection, path traversal, resource limits
+- **Performance**: <10ms tool initialization requirement
+- **Coverage**: >90% enforced in CI

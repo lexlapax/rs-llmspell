@@ -4,10 +4,11 @@
 use clap::{Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
 
-/// LLMSpell - Scriptable LLM interactions
+/// Command-line interface for LLMSpell
 #[derive(Parser, Debug)]
 #[command(name = "llmspell")]
-#[command(version, about, long_about = None)]
+#[command(version)]
+#[command(about = "LLMSpell - Scriptable LLM interactions")]
 #[command(propagate_version = true)]
 pub struct Cli {
     /// Script engine to use
@@ -82,7 +83,7 @@ pub enum OutputFormat {
 /// Available subcommands
 #[derive(Subcommand, Debug)]
 pub enum Commands {
-    /// Run a script file
+    /// Execute a script file
     Run {
         /// Script file to execute
         script: PathBuf,
@@ -114,7 +115,7 @@ pub enum Commands {
         history: Option<PathBuf>,
     },
 
-    /// List available providers
+    /// Available Providers
     Providers {
         /// Show detailed information
         #[arg(long)]

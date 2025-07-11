@@ -24,3 +24,5 @@ Thumbs.db
 # Build artifacts
 /dist/
 /build/
+tarpaulin-report.json
+build_rs_cov.profraw

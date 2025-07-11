@@ -2,15 +2,27 @@
 //! ABOUTME: Verifies configuration discovery, parsing, and environment overrides
 
 use llmspell_cli::config::{create_default_config, load_runtime_config, validate_config};
+use serial_test::serial;
 use std::env;
 use std::fs;
 use tempfile::tempdir;
 
-#[tokio::test]
-async fn test_default_config() {
-    // Save and clear any existing env vars that might interfere
-    let saved_engine = env::var("LLMSPELL_DEFAULT_ENGINE").ok();
+// Helper function to clean all LLMSPELL env vars
+fn clean_env_vars() {
     env::remove_var("LLMSPELL_DEFAULT_ENGINE");
+    env::remove_var("LLMSPELL_SCRIPT_TIMEOUT");
+    env::remove_var("LLMSPELL_ENABLE_STREAMING");
+    env::remove_var("LLMSPELL_ALLOW_FILE_ACCESS");
+    env::remove_var("LLMSPELL_MAX_MEMORY_MB");
+    env::remove_var("LLMSPELL_DEFAULT_PROVIDER");
+    env::remove_var("LLMSPELL_ALLOW_NETWORK_ACCESS");
+}
+
+#[tokio::test]
+#[serial]
+async fn test_default_config() {
+    // Clean all env vars first
+    clean_env_vars();
 
     // Load default configuration
     let config = load_runtime_config(None).await.unwrap();
@@ -19,11 +31,6 @@ async fn test_default_config() {
     assert!(config.runtime.enable_streaming);
     assert_eq!(config.runtime.script_timeout_seconds, 300);
     assert_eq!(config.runtime.security.max_memory_bytes, Some(50_000_000));
-
-    // Restore env var if it existed
-    if let Some(val) = saved_engine {
-        env::set_var("LLMSPELL_DEFAULT_ENGINE", val);
-    }
 }
 
 #[tokio::test]
@@ -46,7 +53,11 @@ async fn test_create_config_file() {
 }
 
 #[tokio::test]
+#[serial]
 async fn test_environment_overrides() {
+    // Clean first to ensure clean state
+    clean_env_vars();
+
     // Set environment variables
     env::set_var("LLMSPELL_DEFAULT_ENGINE", "javascript");
     env::set_var("LLMSPELL_SCRIPT_TIMEOUT", "600");
@@ -66,16 +77,14 @@ async fn test_environment_overrides() {
         Some(100 * 1024 * 1024)
     );
 
-    // Clean up
-    env::remove_var("LLMSPELL_DEFAULT_ENGINE");
-    env::remove_var("LLMSPELL_SCRIPT_TIMEOUT");
-    env::remove_var("LLMSPELL_ENABLE_STREAMING");
-    env::remove_var("LLMSPELL_ALLOW_FILE_ACCESS");
-    env::remove_var("LLMSPELL_MAX_MEMORY_MB");
+    // Clean up - use helper
+    clean_env_vars();
 }
 
 #[tokio::test]
+#[serial]
 async fn test_config_discovery() {
+    clean_env_vars();
     let dir = tempdir().unwrap();
     let original_dir = env::current_dir().unwrap();
 
