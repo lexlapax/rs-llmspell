@@ -12,8 +12,15 @@ use llmspell_core::{
 };
 use llmspell_security::sandbox::SandboxContext;
 use llmspell_utils::{
-    extract_optional_array, extract_optional_object, extract_optional_string, extract_parameters,
-    extract_required_string, system_info::find_executable,
+    extract_optional_array,
+    extract_optional_object,
+    extract_optional_string,
+    extract_parameters,
+    extract_required_string,
+    response::ResponseBuilder,
+    system_info::find_executable,
+    // NEW: Using shared timeout utility
+    timeout::TimeoutBuilder,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -23,7 +30,6 @@ use std::process::Stdio;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::process::Command;
-use tokio::time::timeout;
 use tracing::{debug, info, warn};
 
 /// Process execution result
@@ -302,10 +308,20 @@ impl ProcessExecutorTool {
             }
         }
 
-        // Execute with timeout
+        // Execute with timeout using shared utility
         let timeout_duration = Duration::from_secs(self.config.max_execution_time_seconds);
+        let process_name = format!("{} {:?}", exe_path.display(), args);
 
-        let result = match timeout(timeout_duration, cmd.output()).await {
+        let timeout_result = TimeoutBuilder::default()
+            .duration(timeout_duration)
+            .name(process_name.clone())
+            .warn_after(Duration::from_secs(
+                self.config.max_execution_time_seconds / 2,
+            ))
+            .execute(cmd.output())
+            .await;
+
+        let process_result = match timeout_result {
             Ok(Ok(output)) => {
                 let execution_time = start_time.elapsed();
 
@@ -344,6 +360,10 @@ impl ProcessExecutorTool {
             }
             Err(_) => {
                 // Timeout occurred
+                warn!(
+                    "Process '{}' timed out after {:?}",
+                    process_name, timeout_duration
+                );
                 ProcessResult {
                     exit_code: None,
                     stdout: String::new(),
@@ -357,10 +377,10 @@ impl ProcessExecutorTool {
 
         info!(
             "Process execution completed: exit_code={:?}, success={}, time={}ms",
-            result.exit_code, result.success, result.execution_time_ms
+            process_result.exit_code, process_result.success, process_result.execution_time_ms
         );
 
-        Ok(result)
+        Ok(process_result)
     }
 
     /// Validate execution parameters
@@ -467,19 +487,6 @@ impl BaseAgent for ProcessExecutorTool {
             .await?;
 
         // Format response
-        let response = json!({
-            "executable": executable,
-            "arguments": args,
-            "result": {
-                "exit_code": result.exit_code,
-                "success": result.success,
-                "stdout": result.stdout,
-                "stderr": result.stderr,
-                "execution_time_ms": result.execution_time_ms,
-                "timed_out": result.timed_out
-            }
-        });
-
         let message = if result.success {
             format!(
                 "Process '{}' executed successfully in {}ms",
@@ -497,8 +504,21 @@ impl BaseAgent for ProcessExecutorTool {
             )
         };
 
-        Ok(AgentOutput::text(message)
-            .with_metadata(serde_json::from_value(response).unwrap_or_default()))
+        let response = ResponseBuilder::success("execute")
+            .with_message(message)
+            .with_result(json!({
+                "executable": executable,
+                "arguments": args,
+                "exit_code": result.exit_code,
+                "success": result.success,
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+                "execution_time_ms": result.execution_time_ms,
+                "timed_out": result.timed_out
+            }))
+            .build();
+
+        Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
     }
 
     async fn validate_input(&self, input: &AgentInput) -> LLMResult<()> {

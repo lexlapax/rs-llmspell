@@ -116,7 +116,7 @@ pub fn register_all_tools(
     })?;
 
     // Search tools
-    register_tool(registry.clone(), "web_search", || {
+    register_tool_result(registry.clone(), "web_search", || {
         WebSearchTool::new(Default::default())
     })?;
 

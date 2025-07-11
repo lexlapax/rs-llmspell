@@ -19,7 +19,9 @@ use llmspell_core::{
     types::{AgentInput, AgentOutput, ExecutionContext},
     ComponentMetadata, LLMSpellError, Result,
 };
-use llmspell_utils::{extract_optional_string, extract_parameters, extract_required_string};
+use llmspell_utils::{
+    extract_optional_string, extract_parameters, extract_required_string, response::ResponseBuilder,
+};
 use parquet::arrow::ArrowWriter;
 use parquet::file::properties::WriterProperties;
 use serde::{Deserialize, Serialize};
@@ -308,7 +310,7 @@ impl CsvAnalyzerTool {
         let operation_str = extract_optional_string(params, "operation").unwrap_or("analyze");
         let operation: CsvOperation = operation_str.parse()?;
 
-        let content = extract_required_string(params, "content")?.to_string();
+        let content = extract_required_string(params, "input")?.to_string();
 
         let options = params.get("options").cloned();
 
@@ -1345,12 +1347,27 @@ impl BaseAgent for CsvAnalyzerTool {
             }
         };
 
-        // Create metadata
+        // Use ResponseBuilder for metadata
+        let message = match operation {
+            CsvOperation::Analyze => "CSV analysis completed",
+            CsvOperation::Convert => "CSV conversion completed",
+            CsvOperation::Filter => "CSV filtering completed",
+            CsvOperation::Transform => "CSV transformation completed",
+            CsvOperation::Validate => "CSV validation completed",
+            CsvOperation::Sample => "CSV sampling completed",
+        };
+
+        let response = ResponseBuilder::success(operation.to_string())
+            .with_message(message.to_string())
+            .with_result(result.clone())
+            .build();
+
         let mut metadata = llmspell_core::types::OutputMetadata::default();
         metadata.extra.insert(
             "operation".to_string(),
             Value::String(operation.to_string()),
         );
+        metadata.extra.insert("response".to_string(), response);
 
         // Add the result to metadata for Analyze and Validate operations
         if matches!(operation, CsvOperation::Analyze) {
@@ -1363,6 +1380,7 @@ impl BaseAgent for CsvAnalyzerTool {
                 .insert("validation_result".to_string(), result.clone());
         }
 
+        // For data processing tools, return the actual result as text
         let output_text = match &result {
             Value::String(s) => s.clone(),
             _ => serde_json::to_string_pretty(&result)?,
@@ -1381,7 +1399,7 @@ impl BaseAgent for CsvAnalyzerTool {
 
         // Check size limit
         if let Some(params) = input.parameters.get("parameters") {
-            if let Some(content) = params.get("content").and_then(|c| c.as_str()) {
+            if let Some(content) = params.get("input").and_then(|c| c.as_str()) {
                 if content.len() > self.config.max_file_size {
                     return Err(LLMSpellError::Validation {
                         message: format!(
@@ -1389,7 +1407,7 @@ impl BaseAgent for CsvAnalyzerTool {
                             content.len(),
                             self.config.max_file_size
                         ),
-                        field: Some("content".to_string()),
+                        field: Some("input".to_string()),
                     });
                 }
             }
@@ -1430,7 +1448,7 @@ impl Tool for CsvAnalyzerTool {
                     default: Some(serde_json::json!("analyze")),
                 },
                 ParameterDef {
-                    name: "content".to_string(),
+                    name: "input".to_string(),
                     description: "CSV content to process".to_string(),
                     param_type: ParameterType::String,
                     required: true,

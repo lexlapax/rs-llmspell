@@ -19,6 +19,7 @@ use llmspell_utils::{
     },
     extract_optional_bool, extract_optional_string, extract_optional_u64, extract_parameters,
     extract_required_string,
+    response::ResponseBuilder,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -243,26 +244,26 @@ impl BaseAgent for FileConverterTool {
         let operation = extract_required_string(params, "operation")?;
 
         // Extract input path
-        let input_path = extract_required_string(params, "input_path")?;
-        let input_path = PathBuf::from(input_path);
+        let path = extract_required_string(params, "path")?;
+        let path = PathBuf::from(path);
 
         // Validate input path
         self.sandbox
-            .validate_path(&input_path)
+            .validate_path(&path)
             .map_err(|e| LLMSpellError::Security {
                 message: format!("Path validation failed: {}", e),
                 violation_type: Some("path_validation".to_string()),
             })?;
 
-        if !input_path.exists() {
+        if !path.exists() {
             return Err(LLMSpellError::Validation {
-                message: format!("Input file does not exist: {}", input_path.display()),
-                field: Some("input_path".to_string()),
+                message: format!("Input file does not exist: {}", path.display()),
+                field: Some("path".to_string()),
             });
         }
 
         // Check file size
-        let metadata = fs::metadata(&input_path)
+        let metadata = fs::metadata(&path)
             .await
             .map_err(|e| LLMSpellError::Storage {
                 message: format!("Failed to read file metadata: {}", e),
@@ -282,24 +283,24 @@ impl BaseAgent for FileConverterTool {
         }
 
         // Determine output path
-        let output_path = if let Some(output_path) = extract_optional_string(params, "output_path")
+        let target_path = if let Some(target_path) = extract_optional_string(params, "target_path")
         {
-            PathBuf::from(output_path)
+            PathBuf::from(target_path)
         } else {
-            self.get_output_path(&input_path, operation)
+            self.get_output_path(&path, operation)
         };
 
         // Validate output path
         self.sandbox
-            .validate_path(&output_path)
+            .validate_path(&target_path)
             .map_err(|e| LLMSpellError::Security {
                 message: format!("Output path validation failed: {}", e),
                 violation_type: Some("path_validation".to_string()),
             })?;
 
         // Create backup if enabled
-        if self.config.create_backups && input_path == output_path {
-            self.create_backup(&input_path)
+        if self.config.create_backups && path == target_path {
+            self.create_backup(&path)
                 .await
                 .map_err(|e| LLMSpellError::Storage {
                     message: format!("Failed to create backup: {}", e),
@@ -339,7 +340,7 @@ impl BaseAgent for FileConverterTool {
                     }
                 })?;
 
-                self.convert_encoding(&input_path, &output_path, from_encoding, to_encoding)
+                self.convert_encoding(&path, &target_path, from_encoding, to_encoding)
                     .await
                     .map_err(|e| LLMSpellError::Tool {
                         message: format!("Encoding conversion failed: {}", e),
@@ -361,7 +362,7 @@ impl BaseAgent for FileConverterTool {
                     }
                 })?;
 
-                self.convert_line_endings(&input_path, &output_path, line_ending)
+                self.convert_line_endings(&path, &target_path, line_ending)
                     .await
                     .map_err(|e| LLMSpellError::Tool {
                         message: format!("Line ending conversion failed: {}", e),
@@ -376,7 +377,7 @@ impl BaseAgent for FileConverterTool {
 
                 let tab_size = extract_optional_u64(params, "tab_size").unwrap_or(4) as usize;
 
-                self.convert_indentation(&input_path, &output_path, convert_to_spaces, tab_size)
+                self.convert_indentation(&path, &target_path, convert_to_spaces, tab_size)
                     .await
                     .map_err(|e| LLMSpellError::Tool {
                         message: format!("Indentation conversion failed: {}", e),
@@ -396,7 +397,7 @@ impl BaseAgent for FileConverterTool {
         // Preserve timestamps if enabled
         if self.config.preserve_timestamps {
             let original_metadata =
-                fs::metadata(&input_path)
+                fs::metadata(&path)
                     .await
                     .map_err(|e| LLMSpellError::Storage {
                         message: format!("Failed to read original metadata: {}", e),
@@ -406,22 +407,27 @@ impl BaseAgent for FileConverterTool {
             if let (Ok(_accessed), Ok(_modified)) =
                 (original_metadata.accessed(), original_metadata.modified())
             {
-                debug!("Would preserve timestamps for {}", output_path.display());
+                debug!("Would preserve timestamps for {}", target_path.display());
             }
         }
 
-        // Return results
-        let result = json!({
-            "success": true,
-            "input_path": input_path.to_string_lossy(),
-            "output_path": output_path.to_string_lossy(),
-            "operation": operation
-        });
+        // Return results using ResponseBuilder
+        let (output_text, response) = ResponseBuilder::success(operation)
+            .with_message("File conversion completed successfully".to_string())
+            .with_result(json!({
+                "input_path": path.to_string_lossy(),
+                "output_path": target_path.to_string_lossy(),
+                "operation": operation
+            }))
+            .build_for_output();
 
-        Ok(
-            AgentOutput::text("File conversion completed successfully".to_string())
-                .with_metadata(serde_json::from_value(result).unwrap_or_default()),
-        )
+        let mut metadata = llmspell_core::types::OutputMetadata::default();
+        metadata
+            .extra
+            .insert("operation".to_string(), operation.into());
+        metadata.extra.insert("response".to_string(), response);
+
+        Ok(AgentOutput::text(output_text).with_metadata(metadata))
     }
 
     async fn validate_input(&self, input: &AgentInput) -> LLMResult<()> {
@@ -465,14 +471,14 @@ impl Tool for FileConverterTool {
             default: None,
         })
         .with_parameter(ParameterDef {
-            name: "input_path".to_string(),
+            name: "path".to_string(),
             param_type: ParameterType::String,
             description: "Path to input file".to_string(),
             required: true,
             default: None,
         })
         .with_parameter(ParameterDef {
-            name: "output_path".to_string(),
+            name: "target_path".to_string(),
             param_type: ParameterType::String,
             description: "Path to output file (optional)".to_string(),
             required: false,
@@ -577,7 +583,7 @@ mod tests {
             "Convert file encoding",
             json!({
                 "operation": "encoding",
-                "input_path": test_file.to_string_lossy(),
+                "path": test_file.to_string_lossy(),
                 "to_encoding": "utf8"
             }),
         );
@@ -605,7 +611,7 @@ mod tests {
             "Convert line endings",
             json!({
                 "operation": "line_endings",
-                "input_path": test_file.to_string_lossy(),
+                "path": test_file.to_string_lossy(),
                 "line_ending": "lf"
             }),
         );
@@ -637,7 +643,7 @@ mod tests {
             "Convert tabs to spaces",
             json!({
                 "operation": "indentation",
-                "input_path": test_file.to_string_lossy(),
+                "path": test_file.to_string_lossy(),
                 "convert_to_spaces": true,
                 "tab_size": 4
             }),
@@ -667,7 +673,7 @@ mod tests {
             "Invalid operation",
             json!({
                 "operation": "invalid",
-                "input_path": test_file.to_string_lossy()
+                "path": test_file.to_string_lossy()
             }),
         );
 
@@ -701,7 +707,7 @@ mod tests {
             "Convert nonexistent file",
             json!({
                 "operation": "encoding",
-                "input_path": nonexistent_file.to_string_lossy(),
+                "path": nonexistent_file.to_string_lossy(),
                 "to_encoding": "utf8"
             }),
         );

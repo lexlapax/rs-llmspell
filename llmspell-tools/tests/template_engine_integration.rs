@@ -20,7 +20,7 @@ async fn test_tera_simple_variable_substitution() {
     let tool = TemplateEngineTool::new();
 
     let params = json!({
-        "template": "Hello {{ name }}, welcome to {{ city }}!",
+        "input": "Hello {{ name }}, welcome to {{ city }}!",
         "context": {
             "name": "Alice",
             "city": "Wonderland"
@@ -44,7 +44,7 @@ async fn test_tera_loops_and_conditions() {
     let tool = TemplateEngineTool::new();
 
     let params = json!({
-        "template": r#"
+        "input": r#"
 {% if users %}
 Users:
 {% for user in users %}
@@ -78,7 +78,7 @@ async fn test_handlebars_block_helpers() {
     let tool = TemplateEngineTool::new();
 
     let params = json!({
-        "template": r#"
+        "input": r#"
 {{#if showGreeting}}
 Hello {{name}}!
 {{#each items}}
@@ -113,7 +113,7 @@ async fn test_handlebars_custom_helpers() {
     let tool = TemplateEngineTool::new();
 
     let params = json!({
-        "template": "{{uppercase name}} - {{lowercase city}}",
+        "input": "{{uppercase name}} - {{lowercase city}}",
         "context": {
             "name": "alice",
             "city": "WONDERLAND"
@@ -137,7 +137,7 @@ async fn test_auto_detection() {
 
     // Test Handlebars detection
     let hbs_params = json!({
-        "template": "{{#if condition}}Yes{{/if}}",
+        "input": "{{#if condition}}Yes{{/if}}",
         "context": {"condition": true},
         "auto_detect": true
     });
@@ -153,7 +153,7 @@ async fn test_auto_detection() {
 
     // Test Tera detection
     let tera_params = json!({
-        "template": "{% if condition %}Yes{% endif %}",
+        "input": "{% if condition %}Yes{% endif %}",
         "context": {"condition": true},
         "auto_detect": true
     });
@@ -174,7 +174,7 @@ async fn test_html_escaping() {
 
     // Test with auto-escape enabled (default)
     let params = json!({
-        "template": "<div>{{ content }}</div>",
+        "input": "<div>{{ content }}</div>",
         "context": {
             "content": "<script>alert('XSS')</script>"
         },
@@ -197,7 +197,7 @@ async fn test_complex_data_structures() {
     let tool = TemplateEngineTool::new();
 
     let params = json!({
-        "template": r#"
+        "input": r#"
 Company: {{ company.name }}
 Employees:
 {% for dept, employees in departments %}
@@ -243,7 +243,7 @@ async fn test_error_handling() {
 
     // Test invalid template syntax
     let params = json!({
-        "template": "{{ name",  // Unclosed variable
+        "input": "{{ name",  // Unclosed variable
         "context": {"name": "Test"},
         "engine": "tera"
     });
@@ -312,7 +312,7 @@ async fn test_metadata_in_output() {
 
     let template = "Hello {{ name }}!";
     let params = json!({
-        "template": template,
+        "input": template,
         "context": {"name": "World"},
         "engine": "tera"
     });

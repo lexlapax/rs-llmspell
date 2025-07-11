@@ -15,6 +15,7 @@ use llmspell_security::sandbox::FileSandbox;
 use llmspell_utils::{
     extract_optional_array, extract_optional_bool, extract_optional_string, extract_optional_u64,
     extract_parameters, extract_required_string,
+    response::ResponseBuilder,
     search::{search_in_directory, search_in_file, SearchOptions, SearchResult},
 };
 use serde::{Deserialize, Serialize};
@@ -427,7 +428,7 @@ impl BaseAgent for FileSearchTool {
         let formatted_results = self.format_search_results(&result);
 
         // Create response message
-        let response_message = if result.has_matches() {
+        let message = if result.has_matches() {
             format!(
                 "Found {} matches across {} files. Search pattern: '{}'",
                 result.total_matches, result.files_searched, pattern
@@ -439,8 +440,18 @@ impl BaseAgent for FileSearchTool {
             )
         };
 
-        Ok(AgentOutput::text(response_message)
-            .with_metadata(serde_json::from_value(formatted_results).unwrap_or_default()))
+        let (output_text, response) = ResponseBuilder::success("search")
+            .with_message(message)
+            .with_result(formatted_results)
+            .build_for_output();
+
+        let mut metadata = llmspell_core::types::OutputMetadata::default();
+        metadata
+            .extra
+            .insert("operation".to_string(), "search".into());
+        metadata.extra.insert("response".to_string(), response);
+
+        Ok(AgentOutput::text(output_text).with_metadata(metadata))
     }
 
     async fn validate_input(&self, input: &AgentInput) -> LLMResult<()> {

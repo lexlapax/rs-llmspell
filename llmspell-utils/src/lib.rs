@@ -77,6 +77,21 @@ pub mod validators;
 /// Response building utilities
 pub mod response;
 
+/// Retry logic with exponential backoff
+pub mod retry;
+
+/// Rate limiting utilities
+pub mod rate_limiter;
+
+/// Timeout management utilities
+pub mod timeout;
+
+/// Connection pooling abstraction
+pub mod connection_pool;
+
+/// Progress reporting framework
+pub mod progress;
+
 // Re-export commonly used types and functions
 pub use async_utils::{
     concurrent_map, race_to_success, retry_async, timeout, timeout_with_default, AsyncError,
@@ -143,3 +158,31 @@ pub use validators::{
 
 #[cfg(unix)]
 pub use validators::validate_file_permissions;
+
+// Re-export retry utilities
+pub use retry::{
+    retry, retry_default, AlwaysRetry, HttpStatusRetryPolicy, RetryBuilder, RetryError, RetryPolicy,
+};
+
+// Re-export rate limiter utilities
+pub use rate_limiter::{
+    RateLimitAlgorithm, RateLimitError, RateLimiter, RateLimiterBuilder, RateLimiterConfig,
+};
+
+// Re-export timeout utilities
+pub use timeout::{
+    with_timeout, with_timeout_config, CancellableTimeout, TimeoutBuilder, TimeoutConfig,
+    TimeoutError, TimeoutExt, TimeoutManager,
+};
+
+// Re-export connection pool utilities
+pub use connection_pool::{
+    ConnectionFactory, ConnectionPool, PoolBuilder, PoolConfig, PoolError, PoolGuard, PoolStats,
+    PoolableConnection,
+};
+
+// Re-export progress utilities
+pub use progress::{
+    ProgressBuilder, ProgressError, ProgressEvent, ProgressIteratorExt, ProgressReporter,
+    ProgressTracker,
+};

@@ -83,7 +83,7 @@ async fn test_simple_tool_integration() {
     let calc_test = r#"
         local result = Tool.get("calculator"):execute({
             operation = "evaluate",
-            expression = "2 + 3 * 4"
+            input = "2 + 3 * 4"
         })
         
         if not result.success then
@@ -125,7 +125,7 @@ async fn test_simple_tool_integration() {
         local hash_result = Tool.get("hash_calculator"):execute({
             operation = "hash",
             algorithm = "md5",
-            data = uuid
+            input = uuid
         })
         
         if not hash_result.success then
@@ -230,7 +230,7 @@ async fn test_simple_tool_integration() {
         
         -- Step 3: Use the result in a template
         local template_result = Tool.get("template_engine"):execute({
-            template = "Found {{count}} users in the system",
+            input = "Found {{count}} users in the system",
             context = {
                 count = user_count
             },
@@ -277,7 +277,7 @@ async fn test_simple_tool_integration() {
         local write_result = Tool.get("file_operations"):execute({
             operation = "write",
             path = "/tmp/llmspell_test_data.csv",
-            content = test_data
+            input = test_data
         })
         
         if not write_result.success then
@@ -287,7 +287,7 @@ async fn test_simple_tool_integration() {
         -- Step 2: Analyze the CSV data
         local csv_result = Tool.get("csv_analyzer"):execute({
             operation = "analyze",
-            content = test_data
+            input = test_data
         })
         
         if not csv_result.success then
@@ -330,7 +330,7 @@ async fn test_simple_tool_integration() {
         local write_analysis = Tool.get("file_operations"):execute({
             operation = "write",
             path = "/tmp/llmspell_analysis.txt",
-            content = analysis_content
+            input = analysis_content
         })
         
         if not write_analysis.success then
@@ -419,7 +419,7 @@ async fn test_simple_tool_integration() {
         local save_result = Tool.get("file_operations"):execute({
             operation = "write",
             path = "/tmp/llmspell_data_chain.txt",
-            content = string.format("Data Chain Results:\nUser count: %d\nEnvironment checked: true\nTimestamp: %s", 
+            input = string.format("Data Chain Results:\nUser count: %d\nEnvironment checked: true\nTimestamp: %s", 
                 user_count, os.date())
         })
         
@@ -487,7 +487,7 @@ async fn test_simple_tool_integration() {
             local hash_result = Tool.get("hash_calculator"):execute({
                 operation = "hash",
                 algorithm = "md5"
-                -- Missing required 'data' parameter
+                -- Missing required 'input' parameter
             })
             
             if not hash_result.success then
@@ -568,11 +568,11 @@ async fn test_tool_performance() {
         ),
         (
             "hash_calculator",
-            r#"Tool.get("hash_calculator"):execute({operation = "hash", algorithm = "md5", data = "test"})"#,
+            r#"Tool.get("hash_calculator"):execute({operation = "hash", algorithm = "md5", input = "test"})"#,
         ),
         (
             "calculator",
-            r#"Tool.get("calculator"):execute({operation = "evaluate", expression = "1+1"})"#,
+            r#"Tool.get("calculator"):execute({operation = "evaluate", input = "1+1"})"#,
         ),
     ];
 

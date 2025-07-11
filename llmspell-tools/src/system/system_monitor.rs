@@ -13,6 +13,7 @@ use llmspell_core::{
 use llmspell_security::sandbox::SandboxContext;
 use llmspell_utils::{
     extract_optional_string, extract_parameters,
+    response::ResponseBuilder,
     system_info::{format_bytes, get_cpu_count, get_system_info},
 };
 use serde::{Deserialize, Serialize};
@@ -538,69 +539,54 @@ impl BaseAgent for SystemMonitorTool {
         let stats = self.collect_system_stats().await?;
 
         // Format response based on operation
-        let (response, message) = match operation {
+        let response = match operation {
             "cpu" => {
-                let response = json!({
-                    "operation": "cpu",
-                    "cpu_usage_percent": stats.cpu_usage_percent,
-                    "cpu_count": stats.cpu_count,
-                    "load_average": stats.load_average
-                });
                 let message = format!(
                     "CPU usage: {:.1}% ({} cores)",
                     stats.cpu_usage_percent, stats.cpu_count
                 );
-                (response, message)
+                ResponseBuilder::success("cpu")
+                    .with_message(message)
+                    .with_result(json!({
+                        "cpu_usage_percent": stats.cpu_usage_percent,
+                        "cpu_count": stats.cpu_count,
+                        "load_average": stats.load_average
+                    }))
+                    .build()
             }
             "memory" => {
-                let response = json!({
-                    "operation": "memory",
-                    "total_memory_bytes": stats.total_memory_bytes,
-                    "used_memory_bytes": stats.used_memory_bytes,
-                    "available_memory_bytes": stats.available_memory_bytes,
-                    "memory_usage_percent": stats.memory_usage_percent,
-                    "total_memory_formatted": format_bytes(stats.total_memory_bytes),
-                    "used_memory_formatted": format_bytes(stats.used_memory_bytes),
-                    "available_memory_formatted": format_bytes(stats.available_memory_bytes)
-                });
                 let message = format!(
                     "Memory usage: {:.1}% ({} / {} used)",
                     stats.memory_usage_percent,
                     format_bytes(stats.used_memory_bytes),
                     format_bytes(stats.total_memory_bytes)
                 );
-                (response, message)
+                ResponseBuilder::success("memory")
+                    .with_message(message)
+                    .with_result(json!({
+                        "total_memory_bytes": stats.total_memory_bytes,
+                        "used_memory_bytes": stats.used_memory_bytes,
+                        "available_memory_bytes": stats.available_memory_bytes,
+                        "memory_usage_percent": stats.memory_usage_percent,
+                        "total_memory_formatted": format_bytes(stats.total_memory_bytes),
+                        "used_memory_formatted": format_bytes(stats.used_memory_bytes),
+                        "available_memory_formatted": format_bytes(stats.available_memory_bytes)
+                    }))
+                    .build()
             }
             "disk" => {
-                let response = json!({
-                    "operation": "disk",
-                    "disk_usage": stats.disk_usage
-                });
                 let message = format!(
                     "Disk usage for {} mount points collected",
                     stats.disk_usage.len()
                 );
-                (response, message)
+                ResponseBuilder::success("disk")
+                    .with_message(message)
+                    .with_result(json!({
+                        "disk_usage": stats.disk_usage
+                    }))
+                    .build()
             }
             "stats" | "all" => {
-                let response = json!({
-                    "operation": "all",
-                    "cpu_usage_percent": stats.cpu_usage_percent,
-                    "cpu_count": stats.cpu_count,
-                    "total_memory_bytes": stats.total_memory_bytes,
-                    "used_memory_bytes": stats.used_memory_bytes,
-                    "available_memory_bytes": stats.available_memory_bytes,
-                    "memory_usage_percent": stats.memory_usage_percent,
-                    "disk_usage": stats.disk_usage,
-                    "uptime_seconds": stats.uptime_seconds,
-                    "load_average": stats.load_average,
-                    "process_count": stats.process_count,
-                    "formatted": {
-                        "total_memory": format_bytes(stats.total_memory_bytes),
-                        "used_memory": format_bytes(stats.used_memory_bytes),
-                        "available_memory": format_bytes(stats.available_memory_bytes)
-                    }
-                });
                 let message = format!(
                     "System stats: CPU {:.1}%, Memory {:.1}% ({}/{}), {} disks, {} processes",
                     stats.cpu_usage_percent,
@@ -610,13 +596,31 @@ impl BaseAgent for SystemMonitorTool {
                     stats.disk_usage.len(),
                     stats.process_count.unwrap_or(0)
                 );
-                (response, message)
+                ResponseBuilder::success("all")
+                    .with_message(message)
+                    .with_result(json!({
+                        "cpu_usage_percent": stats.cpu_usage_percent,
+                        "cpu_count": stats.cpu_count,
+                        "total_memory_bytes": stats.total_memory_bytes,
+                        "used_memory_bytes": stats.used_memory_bytes,
+                        "available_memory_bytes": stats.available_memory_bytes,
+                        "memory_usage_percent": stats.memory_usage_percent,
+                        "disk_usage": stats.disk_usage,
+                        "uptime_seconds": stats.uptime_seconds,
+                        "load_average": stats.load_average,
+                        "process_count": stats.process_count,
+                        "formatted": {
+                            "total_memory": format_bytes(stats.total_memory_bytes),
+                            "used_memory": format_bytes(stats.used_memory_bytes),
+                            "available_memory": format_bytes(stats.available_memory_bytes)
+                        }
+                    }))
+                    .build()
             }
             _ => unreachable!(), // Already validated above
         };
 
-        Ok(AgentOutput::text(message)
-            .with_metadata(serde_json::from_value(response).unwrap_or_default()))
+        Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
     }
 
     async fn validate_input(&self, input: &AgentInput) -> LLMResult<()> {

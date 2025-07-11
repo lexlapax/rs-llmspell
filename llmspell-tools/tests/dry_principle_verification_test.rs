@@ -27,7 +27,7 @@ mod dry_principle_tests {
             json!({
                 "operation": "hash",
                 "algorithm": "sha256",
-                "data": test_data
+                "input": test_data
             }),
         );
 

@@ -141,7 +141,7 @@ impl BaseAgent for HashCalculatorTool {
 
                 let hash = match input_type {
                     "string" => {
-                        let text = extract_required_string(params, "data")?;
+                        let text = extract_required_string(params, "input")?;
                         hash_string(text, algorithm)
                     }
                     "file" => {
@@ -206,7 +206,7 @@ impl BaseAgent for HashCalculatorTool {
 
                 let actual_hash = match input_type {
                     "string" => {
-                        let text = extract_required_string(params, "data")?;
+                        let text = extract_required_string(params, "input")?;
                         hash_string(text, algorithm)
                     }
                     "file" => {
@@ -310,7 +310,7 @@ impl Tool for HashCalculatorTool {
             default: Some(json!("string")),
         })
         .with_parameter(ParameterDef {
-            name: "data".to_string(),
+            name: "input".to_string(),
             param_type: ParameterType::String,
             description: "String data to hash (for input_type=string)".to_string(),
             required: false,
@@ -385,7 +385,7 @@ mod tests {
         let input = create_test_input(json!({
             "parameters": {
                 "operation": "hash",
-                "data": "hello world",
+                "input": "hello world",
                 "algorithm": "sha256",
                 "format": "hex"
             }
@@ -432,7 +432,7 @@ mod tests {
         let input = create_test_input(json!({
             "parameters": {
                 "operation": "verify",
-                "data": "test",
+                "input": "test",
                 "algorithm": "sha256",
                 "expected_hash": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
                 "expected_format": "hex"
@@ -454,7 +454,7 @@ mod tests {
         let input = create_test_input(json!({
             "parameters": {
                 "operation": "verify",
-                "data": "test",
+                "input": "test",
                 "algorithm": "sha256",
                 "expected_hash": "0000000000000000000000000000000000000000000000000000000000000000",
                 "expected_format": "hex"
@@ -494,7 +494,7 @@ mod tests {
         let input = create_test_input(json!({
             "parameters": {
                 "operation": "hash",
-                "data": "test",
+                "input": "test",
                 "algorithm": "invalid" // Should default to SHA-256
             }
         }));

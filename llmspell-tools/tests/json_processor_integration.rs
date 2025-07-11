@@ -401,7 +401,7 @@ async fn test_streaming_json_lines() {
         "parameters".to_string(),
         json!({
             "operation": "stream",
-            "content": log_lines,
+            "input": log_lines,
             "query": ".level"
         }),
     );
@@ -420,7 +420,7 @@ async fn test_streaming_json_lines() {
         "parameters".to_string(),
         json!({
             "operation": "stream",
-            "content": log_lines,
+            "input": log_lines,
             "query": ".level"
         }),
     );

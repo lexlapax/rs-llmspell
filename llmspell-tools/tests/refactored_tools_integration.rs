@@ -39,7 +39,7 @@ async fn test_all_refactored_tools_response_format() {
         json!({
             "operation": "hash",
             "algorithm": "md5",
-            "data": "test"
+            "input": "test"
         }),
     );
     let result = tool
@@ -87,7 +87,7 @@ async fn test_all_refactored_tools_response_format() {
         "test",
         json!({
             "operation": "uppercase",
-            "text": "test"
+            "input": "test"
         }),
     );
     let result = tool
@@ -105,7 +105,7 @@ async fn test_all_refactored_tools_response_format() {
         "test",
         json!({
             "operation": "evaluate",
-            "expression": "2 + 2"
+            "input": "2 + 2"
         }),
     );
     let result = tool
@@ -158,7 +158,7 @@ async fn test_all_refactored_tools_response_format() {
     let input = create_test_input(
         "test",
         json!({
-            "data": {"field1": "test@example.com"},
+            "input": {"field1": "test@example.com"},
             "rules": {
                 "rules": [
                     {
@@ -183,7 +183,7 @@ async fn test_all_refactored_tools_response_format() {
     let input = create_test_input(
         "test",
         json!({
-            "template": "Hello {{name}}",
+            "input": "Hello {{name}}",
             "context": {"name": "World"},
             "engine": "handlebars"
         }),
@@ -207,7 +207,7 @@ async fn test_refactored_tools_error_consistency() {
         (
             Box::new(HashCalculatorTool::new(Default::default())),
             json!({"operation": "hash", "algorithm": "md5"}),
-        ), // missing data
+        ), // missing input
         (
             Box::new(Base64EncoderTool::new()),
             json!({"operation": "encode"}),
@@ -219,16 +219,16 @@ async fn test_refactored_tools_error_consistency() {
         (
             Box::new(CalculatorTool::new()),
             json!({"operation": "evaluate"}),
-        ), // missing expression
+        ), // missing input
         (
             Box::new(DiffCalculatorTool::new()),
             json!({"format": "unified"}),
         ), // missing old_text/new_text
-        (Box::new(DataValidationTool::new()), json!({"data": {}})), // missing rules
+        (Box::new(DataValidationTool::new()), json!({"input": {}})), // missing rules
         (
             Box::new(TemplateEngineTool::new()),
             json!({"engine": "handlebars"}),
-        ), // missing template
+        ), // missing input
     ];
 
     for (i, (tool, params)) in test_cases.into_iter().enumerate() {
@@ -269,7 +269,7 @@ async fn test_refactored_tools_functionality() {
         json!({
             "operation": "hash",
             "algorithm": "md5",
-            "data": "Hello, World!"
+            "input": "Hello, World!"
         }),
     );
     let result = tool
@@ -312,7 +312,7 @@ async fn test_refactored_tools_functionality() {
         "test",
         json!({
             "operation": "uppercase",
-            "text": "hello world"
+            "input": "hello world"
         }),
     );
     let result = tool
@@ -328,7 +328,7 @@ async fn test_refactored_tools_functionality() {
         "test",
         json!({
             "operation": "evaluate",
-            "expression": "2 + 3 * 4"
+            "input": "2 + 3 * 4"
         }),
     );
     let result = tool
@@ -378,7 +378,7 @@ async fn test_refactored_tools_functionality() {
     let input = create_test_input(
         "test",
         json!({
-            "data": {"email": "test@example.com"},
+            "input": {"email": "test@example.com"},
             "rules": {
                 "rules": [
                     {
@@ -401,7 +401,7 @@ async fn test_refactored_tools_functionality() {
     let input = create_test_input(
         "test",
         json!({
-            "template": "Hello, {{name}}!",
+            "input": "Hello, {{name}}!",
             "context": {"name": "World"},
             "engine": "handlebars"
         }),
@@ -435,7 +435,7 @@ async fn test_tool_chaining_integration() {
         json!({
             "operation": "hash",
             "algorithm": "sha256",
-            "data": uuid
+            "input": uuid
         }),
     );
     let hash_result = hash_tool

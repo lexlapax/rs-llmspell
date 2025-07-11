@@ -41,39 +41,62 @@ All tools now return standardized responses:
 
 ### File Operations Tools
 
+**Detailed Migration Guide**: See [phase-3-file-tools-migration.md](docs/in-progress/phase-3-file-tools-migration.md)
+
 #### FileOperationsTool
 ```rust
-// OLD
-{"operation": "read", "path": "/tmp/file.txt", "content": "data"}
+// OLD - Write operation
+{"operation": "write", "path": "/tmp/file.txt", "content": "data"}
+// OLD - Copy operation
+{"operation": "copy", "from_path": "/src.txt", "to_path": "/dst.txt"}
 
-// NEW
-{"operation": "read", "path": "/tmp/file.txt", "input": "data"}
+// NEW - Write operation
+{"operation": "write", "path": "/tmp/file.txt", "input": "data"}
+// NEW - Copy operation  
+{"operation": "copy", "source_path": "/src.txt", "target_path": "/dst.txt"}
 ```
-- `content` → `input`
-- Path now validated as PathBuf
+- `content` → `input` for write/append operations
+- `from_path`/`to_path` → `source_path`/`target_path` for copy/move operations
+- All responses use ResponseBuilder pattern
 
-#### FileSearchTool
+#### ArchiveHandlerTool
 ```rust
 // OLD
-{"pattern": "*.rs", "path": "/src", "search_type": "glob"}
+{"operation": "create", "archive_path": "/tmp/archive.zip", "files": ["file1.txt"]}
+{"operation": "extract", "archive_path": "/tmp/archive.zip", "output_dir": "/tmp/out"}
 
 // NEW
-{"operation": "search", "input": "*.rs", "path": "/src", "search_type": "glob"}
+{"operation": "create", "path": "/tmp/archive.zip", "input": ["file1.txt"]}
+{"operation": "extract", "path": "/tmp/archive.zip", "target_path": "/tmp/out"}
 ```
-- Added required `operation` parameter
-- `pattern` → `input`
+- `archive_path` → `path`
+- `files` → `input` for create operation
+- `output_dir` → `target_path` for extract operation
+
+#### FileWatcherTool
+```rust
+// OLD
+{"operation": "watch", "paths": ["/tmp/dir1", "/tmp/dir2"]}
+
+// NEW
+{"operation": "watch", "input": ["/tmp/dir1", "/tmp/dir2"]}
+```
+- `paths` → `input`
 
 #### FileConverterTool
 ```rust
 // OLD
-{"input_path": "/doc.pdf", "output_path": "/doc.txt", "format": "text"}
+{"operation": "encoding", "input_path": "/doc.txt", "output_path": "/doc-utf8.txt"}
 
 // NEW
-{"operation": "convert", "source_path": "/doc.pdf", "target_path": "/doc.txt", "format": "text"}
+{"operation": "encoding", "path": "/doc.txt", "target_path": "/doc-utf8.txt"}
 ```
-- Added required `operation` parameter
-- `input_path` → `source_path`
+- `input_path` → `path`
 - `output_path` → `target_path`
+
+#### FileSearchTool
+- No parameter changes (already used standard `path` parameter)
+- Updated to use ResponseBuilder pattern
 
 ### Utility Tools
 

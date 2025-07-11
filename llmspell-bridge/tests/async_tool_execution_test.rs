@@ -21,7 +21,7 @@ async fn test_basic_async_tool_execution() {
         local result = hashTool:execute({
             operation = "hash",
             algorithm = "sha256",
-            data = "test data for async execution"
+            input = "test data for async execution"
         })
         
         -- Parse the result
@@ -60,7 +60,7 @@ async fn test_concurrent_tool_execution() {
         results.hash = hashTool:execute({
             operation = "hash",
             algorithm = "sha256",
-            data = "test data for async"
+            input = "test data for async"
         })
         
         -- Base64 encoding
@@ -180,7 +180,7 @@ async fn test_async_tool_error_handling() {
         results[1] = hashTool:execute({
             operation = "hash",
             algorithm = "sha256",
-            data = "async test 1"
+            input = "async test 1"
         })
         
         results[2] = base64Tool:execute({
@@ -191,7 +191,7 @@ async fn test_async_tool_error_handling() {
         results[3] = hashTool:execute({
             operation = "hash",
             algorithm = "md5",
-            data = "async test 3"
+            input = "async test 3"
         })
         
         -- All should complete successfully
@@ -227,16 +227,21 @@ async fn test_async_file_operations() {
         local fileTool = Tool.get("file_operations")
         assert(fileTool, "FileOperationsTool should be available")
         
-        -- Create a temporary file
+        -- Create a temporary file  
         local writeResult = fileTool:execute({
             operation = "write",
             path = "/tmp/llmspell_async_test.txt",
-            content = "Async file test content",
+            input = "Async file test content",
             mode = "overwrite"
         })
         
-        local writeResponse = JSON.parse(writeResult.output)
-        assert(writeResponse.success == true, "File write should succeed")
+        -- Check if write operation succeeded, if not show the error
+        if not writeResult.success then
+            error("File write failed: " .. tostring(writeResult.error))
+        end
+        
+        -- For write operations, just verify the tool reported success
+        -- No need to parse JSON output for write operations
         
         -- Read the file back
         local readResult = fileTool:execute({
@@ -244,9 +249,10 @@ async fn test_async_file_operations() {
             path = "/tmp/llmspell_async_test.txt"
         })
         
-        local readResponse = JSON.parse(readResult.output)
-        -- File read returns content directly in the response
-        assert(readResponse.content == "Async file test content", "Content should match, got: " .. tostring(readResponse.content))
+        -- Check if read operation succeeded
+        assert(readResult.success == true, "File read should succeed, got: " .. tostring(readResult.success))
+        -- File read returns content directly as text, not JSON
+        assert(readResult.output == "Async file test content", "Content should match, got: " .. tostring(readResult.output))
         
         -- Delete the file
         local deleteResult = fileTool:execute({
@@ -254,8 +260,11 @@ async fn test_async_file_operations() {
             path = "/tmp/llmspell_async_test.txt"
         })
         
-        local deleteResponse = JSON.parse(deleteResult.output)
-        assert(deleteResponse.success == true, "File delete should succeed")
+        -- Check if delete operation succeeded  
+        assert(deleteResult.success == true, "File delete should succeed, got: " .. tostring(deleteResult.success))
+        
+        -- For delete operations, just verify the tool reported success  
+        -- No need to parse JSON output for delete operations
         
         return true
     "#;
@@ -302,7 +311,7 @@ async fn test_tool_execution_timing() {
                 result = tools[2]:execute({
                     operation = "hash",
                     algorithm = "sha256",
-                    data = "test data " .. i
+                    input = "test data " .. i
                 })
             else
                 result = tools[3]:execute({
@@ -364,7 +373,7 @@ async fn test_tool_execute_async_method() {
         local result = tool:execute({
             operation = "hash",
             algorithm = "md5",
-            data = "async test"
+            input = "async test"
         })
         
         local parsed = JSON.parse(result.output)

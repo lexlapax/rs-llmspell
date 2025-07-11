@@ -207,7 +207,7 @@ async fn test_streaming_json_lines() {
         "parameters".to_string(),
         json!({
             "operation": "stream",
-            "content": json_lines,
+            "input": json_lines,
             "query": "select(.value > 120)"
         }),
     );

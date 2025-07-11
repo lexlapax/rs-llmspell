@@ -196,7 +196,7 @@ impl TextManipulatorTool {
 
     async fn validate_parameters(&self, params: &Value) -> Result<()> {
         // Required parameters
-        extract_required_string(params, "text")?;
+        extract_required_string(params, "input")?;
         let operation_str = extract_required_string(params, "operation")?;
 
         // Validate operation is valid
@@ -301,7 +301,7 @@ impl BaseAgent for TextManipulatorTool {
         self.validate_parameters(params).await?;
 
         // Extract parameters using utilities
-        let text = extract_required_string(params, "text")?;
+        let text = extract_required_string(params, "input")?;
         let operation_str = extract_required_string(params, "operation")?;
 
         let operation: TextOperation =
@@ -366,7 +366,7 @@ impl Tool for TextManipulatorTool {
             "Manipulate and transform text with various string operations".to_string(),
         )
         .with_parameter(ParameterDef {
-            name: "text".to_string(),
+            name: "input".to_string(),
             param_type: ParameterType::String,
             description: "The text to manipulate".to_string(),
             required: true,
@@ -410,7 +410,7 @@ mod tests {
         let input = AgentInput::text("replace text".to_string()).with_parameter(
             "parameters".to_string(),
             json!({
-                "text": "hello",
+                "input": "hello",
                 "operation": "replace"
                 // Missing required 'from' and 'to' options
             }),
@@ -437,7 +437,7 @@ mod tests {
         let schema = tool.schema();
         assert_eq!(schema.name, "text_manipulator");
         assert_eq!(schema.parameters.len(), 3);
-        assert_eq!(schema.required_parameters(), vec!["text", "operation"]);
+        assert_eq!(schema.required_parameters(), vec!["input", "operation"]);
     }
 
     #[tokio::test]
@@ -476,7 +476,7 @@ mod tests {
 
         for (operation, input_text, options, expected) in test_cases {
             let mut params = json!({
-                "text": input_text,
+                "input": input_text,
                 "operation": operation,
             });
 

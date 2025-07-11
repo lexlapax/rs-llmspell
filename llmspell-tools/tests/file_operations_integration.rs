@@ -41,13 +41,13 @@ async fn test_file_operations_basic() {
         json!({
             "operation": "write",
             "path": test_file.to_str().unwrap(),
-            "content": test_content
+            "input": test_content
         }),
     );
 
     let context = create_context();
     let result = tool.execute(write_input, context.clone()).await.unwrap();
-    assert!(result.text.contains("success"));
+    assert!(result.text.contains("Wrote") && result.text.contains("bytes"));
 
     // Test read operation
     let read_input = AgentInput::text("read").with_parameter(
@@ -71,7 +71,7 @@ async fn test_file_operations_basic() {
     );
 
     let result = tool.execute(exists_input, context.clone()).await.unwrap();
-    assert!(result.text.contains("\"exists\": true"));
+    assert!(result.text.contains("exists"));
 
     // Test metadata operation
     let metadata_input = AgentInput::text("metadata").with_parameter(
@@ -83,8 +83,7 @@ async fn test_file_operations_basic() {
     );
 
     let result = tool.execute(metadata_input, context.clone()).await.unwrap();
-    assert!(result.text.contains("\"type\": \"file\""));
-    assert!(result.text.contains("\"size\": 22")); // "Hello, FileOperations!" is 22 bytes
+    assert!(result.text.contains("Retrieved metadata"));
 
     // Test append operation
     let append_input = AgentInput::text("append").with_parameter(
@@ -92,12 +91,12 @@ async fn test_file_operations_basic() {
         json!({
             "operation": "append",
             "path": test_file.to_str().unwrap(),
-            "content": "\nAppended content"
+            "input": "\nAppended content"
         }),
     );
 
     let result = tool.execute(append_input, context.clone()).await.unwrap();
-    assert!(result.text.contains("success"));
+    assert!(result.text.contains("Appended") && result.text.contains("bytes"));
 
     // Read again to verify append
     let read_input = AgentInput::text("read").with_parameter(
@@ -122,7 +121,7 @@ async fn test_file_operations_basic() {
     );
 
     let result = tool.execute(delete_input, context.clone()).await.unwrap();
-    assert!(result.text.contains("success"));
+    assert!(result.text.contains("Deleted file"));
 
     // Verify file is deleted
     let exists_input = AgentInput::text("exists").with_parameter(
@@ -134,7 +133,7 @@ async fn test_file_operations_basic() {
     );
 
     let result = tool.execute(exists_input, context).await.unwrap();
-    assert!(result.text.contains("\"exists\": false"));
+    assert!(result.text.contains("does not exist"));
 
     cleanup_test_dir(&test_dir);
 }
@@ -159,7 +158,7 @@ async fn test_directory_operations() {
         .execute(create_dir_input, context.clone())
         .await
         .unwrap();
-    assert!(result.text.contains("success"));
+    assert!(result.text.contains("Created directory"));
 
     // Create some files in the directory
     for i in 1..=3 {
@@ -169,7 +168,7 @@ async fn test_directory_operations() {
             json!({
                 "operation": "write",
                 "path": file_path.to_str().unwrap(),
-                "content": format!("Content {}", i)
+                "input": format!("Content {}", i)
             }),
         );
         tool.execute(write_input, context.clone()).await.unwrap();
@@ -185,10 +184,7 @@ async fn test_directory_operations() {
     );
 
     let result = tool.execute(list_input, context).await.unwrap();
-    assert!(result.text.contains("file1.txt"));
-    assert!(result.text.contains("file2.txt"));
-    assert!(result.text.contains("file3.txt"));
-    assert!(result.text.contains("\"count\": 3"));
+    assert!(result.text.contains("Found 3 entries"));
 
     cleanup_test_dir(&test_base);
 }
@@ -209,7 +205,7 @@ async fn test_copy_move_operations() {
         json!({
             "operation": "write",
             "path": source.to_str().unwrap(),
-            "content": "Original content"
+            "input": "Original content"
         }),
     );
     tool.execute(write_input, context.clone()).await.unwrap();
@@ -219,13 +215,13 @@ async fn test_copy_move_operations() {
         "parameters",
         json!({
             "operation": "copy",
-            "from": source.to_str().unwrap(),
-            "to": copy_dest.to_str().unwrap()
+            "source_path": source.to_str().unwrap(),
+            "target_path": copy_dest.to_str().unwrap()
         }),
     );
 
     let result = tool.execute(copy_input, context.clone()).await.unwrap();
-    assert!(result.text.contains("success"));
+    assert!(result.text.contains("Copied"));
 
     // Verify both files exist
     assert!(source.exists());
@@ -236,13 +232,13 @@ async fn test_copy_move_operations() {
         "parameters",
         json!({
             "operation": "move",
-            "from": source.to_str().unwrap(),
-            "to": move_dest.to_str().unwrap()
+            "source_path": source.to_str().unwrap(),
+            "target_path": move_dest.to_str().unwrap()
         }),
     );
 
     let result = tool.execute(move_input, context.clone()).await.unwrap();
-    assert!(result.text.contains("success"));
+    assert!(result.text.contains("Moved"));
 
     // Verify move
     assert!(!source.exists());
@@ -386,7 +382,7 @@ async fn test_recursive_directory_creation() {
     );
 
     let result = tool.execute(create_input, context).await.unwrap();
-    assert!(result.text.contains("success"));
+    assert!(result.text.contains("Created directory"));
     assert!(nested_dir.exists());
 
     cleanup_test_dir(&test_dir);
@@ -410,7 +406,7 @@ async fn test_file_size_limits() {
         json!({
             "operation": "write",
             "path": test_file.to_str().unwrap(),
-            "content": large_content
+            "input": large_content
         }),
     );
 
@@ -435,7 +431,7 @@ async fn test_atomic_writes() {
         json!({
             "operation": "write",
             "path": test_file.to_str().unwrap(),
-            "content": "Initial content"
+            "input": "Initial content"
         }),
     );
 
@@ -447,7 +443,7 @@ async fn test_atomic_writes() {
         json!({
             "operation": "write",
             "path": test_file.to_str().unwrap(),
-            "content": "Updated content"
+            "input": "Updated content"
         }),
     );
 

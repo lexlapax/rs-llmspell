@@ -19,7 +19,7 @@ async fn evaluate_expression(
 
     let mut params = json!({
         "operation": "evaluate",
-        "expression": expression
+        "input": expression
     });
 
     if let Some(vars) = variables {
@@ -160,7 +160,7 @@ async fn test_validation_operation() {
         "parameters",
         json!({
             "operation": "validate",
-            "expression": "2^2 + 3^2"
+            "input": "2^2 + 3^2"
         }),
     );
 
@@ -176,7 +176,7 @@ async fn test_validation_operation() {
         "parameters",
         json!({
             "operation": "validate",
-            "expression": "((x + y) * z"
+            "input": "((x + y) * z"
         }),
     );
 

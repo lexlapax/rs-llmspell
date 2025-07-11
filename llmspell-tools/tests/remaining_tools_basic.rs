@@ -104,7 +104,7 @@ fn test_media_processing_tools_creation() {
 
 #[test]
 fn test_search_tool_creation() {
-    let tool = WebSearchTool::new(Default::default());
+    let tool = WebSearchTool::new(Default::default()).unwrap();
     let schema = tool.schema();
     assert_eq!(schema.name, "web_search");
     assert!(!schema.description.is_empty());
@@ -149,7 +149,7 @@ fn test_tool_schemas_have_required_fields() {
         Box::new(AudioProcessorTool::new(Default::default())),
         Box::new(VideoProcessorTool::new(Default::default())),
         Box::new(ImageProcessorTool::new(Default::default())),
-        Box::new(WebSearchTool::new(Default::default())),
+        Box::new(WebSearchTool::new(Default::default()).unwrap()),
         Box::new(HashCalculatorTool::new(Default::default())),
         Box::new(TextManipulatorTool::new(Default::default())),
         Box::new(UuidGeneratorTool::new(Default::default())),
@@ -185,7 +185,7 @@ async fn test_hash_calculator_basic() {
         json!({
             "operation": "hash",
             "algorithm": "sha256",
-            "data": "test"
+            "input": "test"
         }),
     );
 
@@ -220,7 +220,7 @@ async fn test_uuid_generator_basic() {
 
 #[tokio::test]
 async fn test_web_search_basic() {
-    let tool = WebSearchTool::new(Default::default());
+    let tool = WebSearchTool::new(Default::default()).unwrap();
 
     // Get schema to understand parameters
     let schema = tool.schema();
@@ -230,7 +230,7 @@ async fn test_web_search_basic() {
     let input = AgentInput::text("search test").with_parameter(
         "parameters",
         json!({
-            "query": "test",
+            "input": "test",
             "max_results": 5
         }),
     );
@@ -241,9 +241,11 @@ async fn test_web_search_basic() {
     let response = result.unwrap();
     println!("WebSearchTool response: {}", response.text);
 
-    // WebSearchTool returns a direct result, not wrapped in success/output format
-    // Skip the JSON parsing since it's likely a plain text response for mock searches
-    assert!(!response.text.is_empty());
+    // Parse response with new ResponseBuilder format
+    let output: Value = serde_json::from_str(&response.text).unwrap();
+    assert!(output["success"].as_bool().unwrap());
+    assert!(output["message"].as_str().unwrap().contains("Found"));
+    assert!(output["result"]["query"].as_str().unwrap() == "test");
 }
 
 // ===== Performance Test =====
@@ -267,7 +269,7 @@ fn test_tool_creation_performance() {
         let _ = AudioProcessorTool::new(Default::default());
         let _ = VideoProcessorTool::new(Default::default());
         let _ = ImageProcessorTool::new(Default::default());
-        let _ = WebSearchTool::new(Default::default());
+        let _ = WebSearchTool::new(Default::default()).unwrap();
         let _ = HashCalculatorTool::new(Default::default());
         let _ = TextManipulatorTool::new(Default::default());
         let _ = UuidGeneratorTool::new(Default::default());

@@ -20,7 +20,7 @@ async fn test_http_timeout_with_short_timeout() {
         "parameters".to_string(),
         json!({
             "method": "GET",
-            "url": "https://httpbin.org/delay/3"
+            "input": "https://httpbin.org/delay/3"
         }),
     );
 
@@ -54,7 +54,7 @@ async fn test_http_no_timeout_with_long_timeout() {
         "parameters".to_string(),
         json!({
             "method": "GET",
-            "url": "https://httpbin.org/delay/2"
+            "input": "https://httpbin.org/delay/2"
         }),
     );
 

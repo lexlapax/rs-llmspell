@@ -118,7 +118,7 @@ impl CalculatorTool {
 
         match operation {
             "evaluate" => {
-                let expression = extract_required_string(params, "expression")?;
+                let expression = extract_required_string(params, "input")?;
 
                 // Get variables if provided
                 let variables = extract_optional_object(params, "variables")
@@ -144,7 +144,7 @@ impl CalculatorTool {
                 let response = ResponseBuilder::success("evaluate")
                     .with_message("Expression evaluated successfully")
                     .with_result(json!({
-                        "expression": expression,
+                        "input": expression,
                         "result": result_value,
                         "result_type": if result.is_finite() { "float" } else { "special" },
                         "variables": variables,
@@ -153,7 +153,7 @@ impl CalculatorTool {
                 Ok(response)
             }
             "validate" => {
-                let expression = extract_required_string(params, "expression")?;
+                let expression = extract_required_string(params, "input")?;
 
                 // Try to evaluate the expression with empty variables to validate syntax
                 let empty_vars = serde_json::Map::new();
@@ -162,7 +162,7 @@ impl CalculatorTool {
                         let response = ResponseBuilder::success("validate")
                             .with_message("Expression is valid")
                             .with_result(json!({
-                                "expression": expression,
+                                "input": expression,
                                 "valid": true,
                             }))
                             .build();
@@ -172,7 +172,7 @@ impl CalculatorTool {
                         let response = ResponseBuilder::success("validate")
                             .with_message("Expression validation failed")
                             .with_result(json!({
-                                "expression": expression,
+                                "input": expression,
                                 "valid": false,
                                 "error": e.to_string()
                             }))
@@ -273,7 +273,7 @@ impl Tool for CalculatorTool {
             default: Some(json!("evaluate")),
         })
         .with_parameter(ParameterDef {
-            name: "expression".to_string(),
+            name: "input".to_string(),
             param_type: ParameterType::String,
             description: "Mathematical expression to evaluate or validate".to_string(),
             required: false,
@@ -313,7 +313,7 @@ mod tests {
             "parameters",
             json!({
                 "operation": "evaluate",
-                "expression": "2 + 3 * 4"
+                "input": "2 + 3 * 4"
             }),
         );
 
@@ -336,7 +336,7 @@ mod tests {
             "parameters",
             json!({
                 "operation": "evaluate",
-                "expression": "x^2 + y^2",
+                "input": "x^2 + y^2",
                 "variables": {
                     "x": 3,
                     "y": 4
@@ -365,7 +365,7 @@ mod tests {
             "parameters",
             json!({
                 "operation": "evaluate",
-                "expression": "2^3"
+                "input": "2^3"
             }),
         );
 
@@ -384,7 +384,7 @@ mod tests {
             "parameters",
             json!({
                 "operation": "evaluate",
-                "expression": "17 % 5"
+                "input": "17 % 5"
             }),
         );
 
@@ -408,7 +408,7 @@ mod tests {
             "parameters",
             json!({
                 "operation": "validate",
-                "expression": "2 + 3 * 4"
+                "input": "2 + 3 * 4"
             }),
         );
 
@@ -426,7 +426,7 @@ mod tests {
             "parameters",
             json!({
                 "operation": "validate",
-                "expression": "(2 + 3"
+                "input": "(2 + 3"
             }),
         );
 
@@ -450,7 +450,7 @@ mod tests {
             "parameters",
             json!({
                 "operation": "evaluate",
-                "expression": "1 / 0"
+                "input": "1 / 0"
             }),
         );
 
@@ -511,7 +511,7 @@ mod tests {
             "parameters",
             json!({
                 "operation": "evaluate",
-                "expression": "sin(pi()/2)"
+                "input": "sin(pi()/2)"
             }),
         );
 
@@ -529,7 +529,7 @@ mod tests {
             "parameters",
             json!({
                 "operation": "evaluate",
-                "expression": "sqrt(16)"
+                "input": "sqrt(16)"
             }),
         );
 
@@ -547,7 +547,7 @@ mod tests {
             "parameters",
             json!({
                 "operation": "evaluate",
-                "expression": "log(10, 100)"
+                "input": "log(10, 100)"
             }),
         );
 

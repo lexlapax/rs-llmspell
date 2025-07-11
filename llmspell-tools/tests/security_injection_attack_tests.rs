@@ -42,7 +42,7 @@ async fn test_template_engine_code_injection() {
             "parameters",
             json!({
                 "operation": "render",
-                "template": template,
+                "input": template,
                 "data": data
             }),
         );
@@ -274,7 +274,7 @@ async fn test_data_validation_regex_dos() {
             "parameters",
             json!({
                 "operation": "validate",
-                "data": input_data,
+                "input": input_data,
                 "rules": {
                     "type": validation_type
                 }

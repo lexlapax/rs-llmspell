@@ -15,7 +15,7 @@ use llmspell_core::{
     types::{AgentInput, AgentOutput, ExecutionContext},
     ComponentMetadata, LLMSpellError, Result,
 };
-use llmspell_utils::extract_parameters;
+use llmspell_utils::{extract_parameters, response::ResponseBuilder};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader};
@@ -282,7 +282,7 @@ impl JsonProcessorTool {
             let value: Value =
                 serde_json::from_str(trimmed).map_err(|e| LLMSpellError::Validation {
                     message: format!("Invalid JSON: {}", e),
-                    field: Some("content".to_string()),
+                    field: Some("input".to_string()),
                 })?;
 
             // Apply jq query
@@ -401,17 +401,27 @@ impl BaseAgent for JsonProcessorTool {
                 serde_json::to_value(validation)?
             }
             JsonOperation::Stream => {
-                let content = params
-                    .get("content")
-                    .and_then(|v| v.as_str())
-                    .ok_or_else(|| LLMSpellError::Validation {
-                        message: "Stream operation requires 'content' parameter".to_string(),
-                        field: Some("content".to_string()),
-                    })?;
+                // For stream operation, input should contain the JSON lines content
+                let stream_content = if let Some(input_val) = &input_json {
+                    // If input is a string, use it directly
+                    if let Some(content_str) = input_val.as_str() {
+                        content_str.to_string()
+                    } else {
+                        // Otherwise convert to string
+                        serde_json::to_string(input_val)?
+                    }
+                } else {
+                    return Err(LLMSpellError::Validation {
+                        message:
+                            "Stream operation requires 'input' parameter with JSON lines content"
+                                .to_string(),
+                        field: Some("input".to_string()),
+                    });
+                };
                 let query_str = query.unwrap_or_else(|| ".".to_string());
 
                 // Process JSON lines
-                let reader = content.as_bytes();
+                let reader = stream_content.as_bytes();
                 let results = self.process_json_stream(reader, &query_str).await?;
 
                 // Return as array
@@ -419,13 +429,26 @@ impl BaseAgent for JsonProcessorTool {
             }
         };
 
-        // Create metadata
+        // Use ResponseBuilder for metadata, but return actual result as text
+        let message = match operation {
+            JsonOperation::Query => "JSON query executed successfully",
+            JsonOperation::Validate => "JSON validation completed",
+            JsonOperation::Stream => "JSON stream processing completed",
+        };
+
+        let response = ResponseBuilder::success(operation.to_string())
+            .with_message(message.to_string())
+            .with_result(result.clone())
+            .build();
+
         let mut metadata = llmspell_core::types::OutputMetadata::default();
         metadata.extra.insert(
             "operation".to_string(),
             Value::String(operation.to_string()),
         );
+        metadata.extra.insert("response".to_string(), response);
 
+        // For data processing tools, return the actual result as text
         let output_text = serde_json::to_string_pretty(&result)?;
         Ok(AgentOutput::text(output_text).with_metadata(metadata))
     }
@@ -487,7 +510,9 @@ impl Tool for JsonProcessorTool {
                 },
                 ParameterDef {
                     name: "input".to_string(),
-                    description: "Input JSON data".to_string(),
+                    description:
+                        "Input JSON data (for stream operation, provide JSON lines as string)"
+                            .to_string(),
                     param_type: ParameterType::Object,
                     required: false,
                     default: None,
@@ -503,13 +528,6 @@ impl Tool for JsonProcessorTool {
                     name: "schema".to_string(),
                     description: "JSON Schema for validation".to_string(),
                     param_type: ParameterType::Object,
-                    required: false,
-                    default: None,
-                },
-                ParameterDef {
-                    name: "content".to_string(),
-                    description: "JSON lines content for streaming".to_string(),
-                    param_type: ParameterType::String,
                     required: false,
                     default: None,
                 },

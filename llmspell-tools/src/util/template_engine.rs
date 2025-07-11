@@ -322,7 +322,7 @@ impl BaseAgent for TemplateEngineTool {
         let params = extract_parameters(&input)?;
 
         // Extract parameters
-        let template = extract_required_string(params, "template")?;
+        let template = extract_required_string(params, "input")?;
         let context = extract_optional_object(params, "context")
             .map(|obj| Value::Object(obj.clone()))
             .unwrap_or_else(|| Value::Object(serde_json::Map::new()));
@@ -403,7 +403,7 @@ impl Tool for TemplateEngineTool {
             description: "Render templates using Tera or Handlebars engines".to_string(),
             parameters: vec![
                 ParameterDef {
-                    name: "template".to_string(),
+                    name: "input".to_string(),
                     description: "Template string to render".to_string(),
                     param_type: ParameterType::String,
                     required: true,
@@ -474,7 +474,7 @@ mod tests {
         let tool = TemplateEngineTool::new();
 
         let params = serde_json::json!({
-            "template": "Hello {{ name }}!",
+            "input": "Hello {{ name }}!",
             "context": {
                 "name": "World"
             },
@@ -497,7 +497,7 @@ mod tests {
         let tool = TemplateEngineTool::new();
 
         let params = serde_json::json!({
-            "template": "{{#if show}}Hello {{name}}!{{/if}}",
+            "input": "{{#if show}}Hello {{name}}!{{/if}}",
             "context": {
                 "name": "Alice",
                 "show": true
@@ -521,7 +521,7 @@ mod tests {
         let tool = TemplateEngineTool::new();
 
         let params = serde_json::json!({
-            "template": "{{ system('rm -rf /') }}",
+            "input": "{{ system('rm -rf /') }}",
             "context": {},
             "engine": "tera"
         });
@@ -543,7 +543,7 @@ mod tests {
         let tool = TemplateEngineTool::with_config(config);
 
         let params = serde_json::json!({
-            "template": "a".repeat(200), // Exceeds limit
+            "input": "a".repeat(200), // Exceeds limit
             "context": {},
         });
 

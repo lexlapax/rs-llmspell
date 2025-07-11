@@ -30,8 +30,8 @@ async fn test_zip_create_and_extract() -> Result<()> {
     let archive_path = temp_dir.path().join("test.zip");
     let create_params = json!({
         "operation": "create",
-        "archive_path": archive_path.to_str().unwrap(),
-        "files": [
+        "path": archive_path.to_str().unwrap(),
+        "input": [
             file1_path.to_str().unwrap(),
             file2_path.to_str().unwrap()
         ]
@@ -42,39 +42,31 @@ async fn test_zip_create_and_extract() -> Result<()> {
     assert!(archive_path.exists());
 
     // Verify creation result
-    let result: serde_json::Value = serde_json::from_str(&result.text)?;
-    let archived_files = result.get("archived_files").unwrap().as_array().unwrap();
-    assert_eq!(archived_files.len(), 2);
+    assert!(result.text.contains("Created archive with 2 files"));
 
     // List archive contents
     let list_params = json!({
         "operation": "list",
-        "archive_path": archive_path.to_str().unwrap()
+        "path": archive_path.to_str().unwrap()
     });
 
     let input = AgentInput::text("").with_parameter("parameters", list_params);
     let list_result = tool.execute(input, ExecutionContext::default()).await?;
-    let list_result: serde_json::Value = serde_json::from_str(&list_result.text)?;
-    let format = list_result.get("format").unwrap().as_str().unwrap();
-    assert_eq!(format, "ZIP");
+    assert!(list_result.text.contains("Listed 2 files in ZIP archive"));
 
     // Extract archive
     let extract_dir = temp_dir.path().join("extracted");
     let extract_params = json!({
         "operation": "extract",
-        "archive_path": archive_path.to_str().unwrap(),
-        "output_dir": extract_dir.to_str().unwrap()
+        "path": archive_path.to_str().unwrap(),
+        "target_path": extract_dir.to_str().unwrap()
     });
 
     let input = AgentInput::text("").with_parameter("parameters", extract_params);
     let extract_result = tool.execute(input, ExecutionContext::default()).await?;
-    let extract_result: serde_json::Value = serde_json::from_str(&extract_result.text)?;
-    let extracted_files = extract_result
-        .get("extracted_files")
-        .unwrap()
-        .as_array()
-        .unwrap();
-    assert_eq!(extracted_files.len(), 2);
+    println!("Extract result text: {}", extract_result.text);
+    println!("Extract result metadata: {:?}", extract_result.metadata);
+    assert!(extract_result.text.contains("Extracted 2 files"));
 
     // Verify extracted content
     assert!(extract_dir.join("test1.txt").exists());
@@ -101,8 +93,8 @@ async fn test_tar_gz_operations() -> Result<()> {
     let archive_path = temp_dir.path().join("data.tar.gz");
     let create_params = json!({
         "operation": "create",
-        "archive_path": archive_path.to_str().unwrap(),
-        "files": [
+        "path": archive_path.to_str().unwrap(),
+        "input": [
             file1_path.to_str().unwrap(),
             file2_path.to_str().unwrap()
         ]
@@ -110,15 +102,15 @@ async fn test_tar_gz_operations() -> Result<()> {
 
     let input = AgentInput::text("").with_parameter("parameters", create_params);
     let result = tool.execute(input, ExecutionContext::default()).await?;
-    let _result: serde_json::Value = serde_json::from_str(&result.text)?;
+    assert!(result.text.contains("Created archive"));
     assert!(archive_path.exists());
 
     // Extract and verify
     let extract_dir = temp_dir.path().join("extracted_tar");
     let extract_params = json!({
         "operation": "extract",
-        "archive_path": archive_path.to_str().unwrap(),
-        "output_dir": extract_dir.to_str().unwrap()
+        "path": archive_path.to_str().unwrap(),
+        "target_path": extract_dir.to_str().unwrap()
     });
 
     let input = AgentInput::text("").with_parameter("parameters", extract_params);
@@ -144,8 +136,8 @@ async fn test_single_file_gz() -> Result<()> {
     let archive_path = temp_dir.path().join("large_data.txt.gz");
     let create_params = json!({
         "operation": "create",
-        "archive_path": archive_path.to_str().unwrap(),
-        "files": [file_path.to_str().unwrap()]
+        "path": archive_path.to_str().unwrap(),
+        "input": [file_path.to_str().unwrap()]
     });
 
     let input = AgentInput::text("").with_parameter("parameters", create_params);
@@ -160,8 +152,8 @@ async fn test_single_file_gz() -> Result<()> {
     let extract_dir = temp_dir.path().join("extracted_gz");
     let extract_params = json!({
         "operation": "extract",
-        "archive_path": archive_path.to_str().unwrap(),
-        "output_dir": extract_dir.to_str().unwrap()
+        "path": archive_path.to_str().unwrap(),
+        "target_path": extract_dir.to_str().unwrap()
     });
 
     let input = AgentInput::text("").with_parameter("parameters", extract_params);
@@ -190,18 +182,16 @@ async fn test_archive_size_limits() -> Result<()> {
     let archive_path = temp_dir.path().join("test_limits.zip");
     let create_params = json!({
         "operation": "create",
-        "archive_path": archive_path.to_str().unwrap(),
-        "files": [large_file.to_str().unwrap()]
+        "path": archive_path.to_str().unwrap(),
+        "input": [large_file.to_str().unwrap()]
     });
 
     let input = AgentInput::text("").with_parameter("parameters", create_params);
     let result = tool.execute(input, ExecutionContext::default()).await?;
-    let result: serde_json::Value = serde_json::from_str(&result.text)?;
 
     // Archive should be created but with no files
     assert!(archive_path.exists());
-    let archived_files = result.get("archived_files").unwrap().as_array().unwrap();
-    assert_eq!(archived_files.len(), 0); // File was skipped due to size
+    assert!(result.text.contains("Created archive with 0 files")); // File was skipped due to size
 
     Ok(())
 }
@@ -222,8 +212,8 @@ async fn test_path_traversal_protection() -> Result<()> {
     let archive_path = temp_dir.path().join("safe.zip");
     let create_params = json!({
         "operation": "create",
-        "archive_path": archive_path.to_str().unwrap(),
-        "files": [safe_file.to_str().unwrap()]
+        "path": archive_path.to_str().unwrap(),
+        "input": [safe_file.to_str().unwrap()]
     });
 
     let input = AgentInput::text("").with_parameter("parameters", create_params);
@@ -233,8 +223,8 @@ async fn test_path_traversal_protection() -> Result<()> {
     let extract_dir = temp_dir.path().join("safe_extract");
     let extract_params = json!({
         "operation": "extract",
-        "archive_path": archive_path.to_str().unwrap(),
-        "output_dir": extract_dir.to_str().unwrap()
+        "path": archive_path.to_str().unwrap(),
+        "target_path": extract_dir.to_str().unwrap()
     });
 
     let input = AgentInput::text("").with_parameter("parameters", extract_params);
@@ -276,8 +266,8 @@ async fn test_with_file_sandbox() -> Result<()> {
     let archive_path = sandbox_dir.join("sandboxed.zip");
     let create_params = json!({
         "operation": "create",
-        "archive_path": archive_path.to_str().unwrap(),
-        "files": [allowed_file.to_str().unwrap()]
+        "path": archive_path.to_str().unwrap(),
+        "input": [allowed_file.to_str().unwrap()]
     });
 
     // This should succeed
@@ -289,8 +279,8 @@ async fn test_with_file_sandbox() -> Result<()> {
     let outside_archive = temp_dir.path().join("outside.zip");
     let create_outside_params = json!({
         "operation": "create",
-        "archive_path": outside_archive.to_str().unwrap(),
-        "files": [allowed_file.to_str().unwrap()]
+        "path": outside_archive.to_str().unwrap(),
+        "input": [allowed_file.to_str().unwrap()]
     });
 
     // This should fail due to sandbox
@@ -330,8 +320,8 @@ async fn test_archive_formats() -> Result<()> {
 
         let create_params = json!({
             "operation": "create",
-            "archive_path": archive_path.to_str().unwrap(),
-            "files": files
+            "path": archive_path.to_str().unwrap(),
+            "input": files
         });
 
         let input = AgentInput::text("").with_parameter("parameters", create_params);
@@ -341,14 +331,12 @@ async fn test_archive_formats() -> Result<()> {
         // List to verify format detection
         let list_params = json!({
             "operation": "list",
-            "archive_path": archive_path.to_str().unwrap()
+            "path": archive_path.to_str().unwrap()
         });
 
         let input = AgentInput::text("").with_parameter("parameters", list_params);
         let list_result = tool.execute(input, ExecutionContext::default()).await?;
-        let list_result: serde_json::Value = serde_json::from_str(&list_result.text)?;
-        let detected_format = list_result.get("format").unwrap().as_str().unwrap();
-        assert_eq!(detected_format, expected_format);
+        assert!(list_result.text.contains(expected_format));
     }
 
     Ok(())
@@ -375,8 +363,8 @@ async fn test_compression_levels() -> Result<()> {
         let archive_path = temp_dir.path().join(format!("test_level_{}.zip", level));
         let create_params = json!({
             "operation": "create",
-            "archive_path": archive_path.to_str().unwrap(),
-            "files": [test_file.to_str().unwrap()]
+            "path": archive_path.to_str().unwrap(),
+            "input": [test_file.to_str().unwrap()]
         });
 
         let input = AgentInput::text("").with_parameter("parameters", create_params);

@@ -24,9 +24,9 @@ use llmspell_core::{
     ComponentMetadata, LLMSpellError, Result,
 };
 use llmspell_security::sandbox::FileSandbox;
-use llmspell_utils::{extract_parameters, extract_required_string};
+use llmspell_utils::{extract_parameters, extract_required_string, response::ResponseBuilder};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::fs::{self, File};
 use std::io;
 use std::path::{Path, PathBuf};
@@ -140,7 +140,7 @@ impl ArchiveHandlerTool {
                 .and_then(|e| e.to_str())
                 .ok_or_else(|| LLMSpellError::Validation {
                     message: "Cannot determine archive format from path".to_string(),
-                    field: Some("archive_path".to_string()),
+                    field: Some("path".to_string()),
                 })?;
 
         match ext.to_lowercase().as_str() {
@@ -179,20 +179,19 @@ impl ArchiveHandlerTool {
 
     /// Extract archive
     async fn extract_archive(&self, params: &Value) -> Result<Value> {
-        let archive_path = params
-            .get("archive_path")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| LLMSpellError::Validation {
-                message: "Missing 'archive_path' parameter".to_string(),
-                field: Some("archive_path".to_string()),
-            })?;
+        let archive_path = params.get("path").and_then(|v| v.as_str()).ok_or_else(|| {
+            LLMSpellError::Validation {
+                message: "Missing 'path' parameter".to_string(),
+                field: Some("path".to_string()),
+            }
+        })?;
 
         let output_dir = params
-            .get("output_dir")
+            .get("target_path")
             .and_then(|v| v.as_str())
             .ok_or_else(|| LLMSpellError::Validation {
-                message: "Missing 'output_dir' parameter".to_string(),
-                field: Some("output_dir".to_string()),
+                message: "Missing 'target_path' parameter".to_string(),
+                field: Some("target_path".to_string()),
             })?;
 
         let archive_path = PathBuf::from(archive_path);
@@ -264,11 +263,19 @@ impl ArchiveHandlerTool {
             }
         }
 
-        Ok(serde_json::json!({
-            "extracted_files": extracted_files,
-            "total_size": total_size,
-            "output_dir": output_dir.to_string_lossy().to_string()
-        }))
+        Ok(ResponseBuilder::success("extract")
+            .with_message(format!(
+                "Extracted {} files ({} bytes) to {}",
+                extracted_files.len(),
+                total_size,
+                output_dir.display()
+            ))
+            .with_result(json!({
+                "extracted_files": extracted_files,
+                "total_size": total_size,
+                "output_dir": output_dir.to_string_lossy().to_string()
+            }))
+            .build())
     }
 
     /// Extract ZIP archive
@@ -555,20 +562,19 @@ impl ArchiveHandlerTool {
     /// Create archive
     async fn create_archive(&self, params: &Value) -> Result<Value> {
         eprintln!("DEBUG create_archive: params = {:?}", params);
-        let archive_path = params
-            .get("archive_path")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| LLMSpellError::Validation {
-                message: "Missing 'archive_path' parameter".to_string(),
-                field: Some("archive_path".to_string()),
-            })?;
+        let archive_path = params.get("path").and_then(|v| v.as_str()).ok_or_else(|| {
+            LLMSpellError::Validation {
+                message: "Missing 'path' parameter".to_string(),
+                field: Some("path".to_string()),
+            }
+        })?;
 
         let files = params
-            .get("files")
+            .get("input")
             .and_then(|v| v.as_array())
             .ok_or_else(|| LLMSpellError::Validation {
-                message: "Missing 'files' parameter".to_string(),
-                field: Some("files".to_string()),
+                message: "Missing 'input' parameter".to_string(),
+                field: Some("input".to_string()),
             })?;
 
         let archive_path = PathBuf::from(archive_path);
@@ -618,12 +624,19 @@ impl ArchiveHandlerTool {
             }
         }
 
-        Ok(serde_json::json!({
-            "archive_path": archive_path.to_string_lossy().to_string(),
-            "archived_files": archived_files,
-            "total_size": total_size,
-            "compression_level": self.config.compression_level
-        }))
+        Ok(ResponseBuilder::success("create")
+            .with_message(format!(
+                "Created archive with {} files ({} bytes)",
+                archived_files.len(),
+                total_size
+            ))
+            .with_result(json!({
+                "archive_path": archive_path.to_string_lossy().to_string(),
+                "archived_files": archived_files,
+                "total_size": total_size,
+                "compression_level": self.config.compression_level
+            }))
+            .build())
     }
 
     /// Create ZIP archive
@@ -896,13 +909,12 @@ impl ArchiveHandlerTool {
 
     /// List archive contents
     async fn list_archive(&self, params: &Value) -> Result<Value> {
-        let archive_path = params
-            .get("archive_path")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| LLMSpellError::Validation {
-                message: "Missing 'archive_path' parameter".to_string(),
-                field: Some("archive_path".to_string()),
-            })?;
+        let archive_path = params.get("path").and_then(|v| v.as_str()).ok_or_else(|| {
+            LLMSpellError::Validation {
+                message: "Missing 'path' parameter".to_string(),
+                field: Some("path".to_string()),
+            }
+        })?;
 
         let archive_path = PathBuf::from(archive_path);
 
@@ -927,7 +939,7 @@ impl ArchiveHandlerTool {
                 )?;
                 let mut archive = ZipArchive::new(file).map_err(|e| LLMSpellError::Validation {
                     message: format!("Invalid ZIP archive: {}", e),
-                    field: Some("archive_path".to_string()),
+                    field: Some("path".to_string()),
                 })?;
 
                 for i in 0..archive.len() {
@@ -1031,11 +1043,18 @@ impl ArchiveHandlerTool {
             }
         }
 
-        Ok(serde_json::json!({
-            "format": format.to_string(),
-            "files": files,
-            "file_count": files.len()
-        }))
+        Ok(ResponseBuilder::success("list")
+            .with_message(format!(
+                "Listed {} files in {} archive",
+                files.len(),
+                format
+            ))
+            .with_result(json!({
+                "format": format.to_string(),
+                "files": files,
+                "file_count": files.len()
+            }))
+            .build())
     }
 }
 
@@ -1074,7 +1093,7 @@ impl BaseAgent for ArchiveHandlerTool {
         let params = extract_parameters(&input)?;
         let operation = extract_required_string(params, "operation")?;
 
-        let result = match operation {
+        let response = match operation {
             "extract" => self.extract_archive(params).await?,
             "create" => self.create_archive(params).await?,
             "list" => self.list_archive(params).await?,
@@ -1086,12 +1105,21 @@ impl BaseAgent for ArchiveHandlerTool {
             }
         };
 
-        let output_text =
-            serde_json::to_string_pretty(&result).map_err(|e| LLMSpellError::Internal {
-                message: format!("Failed to serialize result: {}", e),
-                source: Some(Box::new(e)),
-            })?;
-        Ok(AgentOutput::text(output_text))
+        // Extract the message for text output
+        let output_text = response
+            .get("message")
+            .and_then(|m| m.as_str())
+            .unwrap_or("Operation completed")
+            .to_string();
+
+        // Create metadata
+        let mut metadata = llmspell_core::types::OutputMetadata::default();
+        metadata
+            .extra
+            .insert("operation".to_string(), operation.into());
+        metadata.extra.insert("response".to_string(), response);
+
+        Ok(AgentOutput::text(output_text).with_metadata(metadata))
     }
 
     async fn validate_input(&self, input: &AgentInput) -> llmspell_core::Result<()> {
@@ -1135,21 +1163,21 @@ impl Tool for ArchiveHandlerTool {
                     default: None,
                 },
                 ParameterDef {
-                    name: "archive_path".to_string(),
+                    name: "path".to_string(),
                     description: "Path to archive file".to_string(),
                     param_type: ParameterType::String,
                     required: true,
                     default: None,
                 },
                 ParameterDef {
-                    name: "output_dir".to_string(),
+                    name: "target_path".to_string(),
                     description: "Directory to extract to (for extract operation)".to_string(),
                     param_type: ParameterType::String,
                     required: false,
                     default: None,
                 },
                 ParameterDef {
-                    name: "files".to_string(),
+                    name: "input".to_string(),
                     description: "Files to add to archive (for create operation)".to_string(),
                     param_type: ParameterType::Array,
                     required: false,
@@ -1217,8 +1245,8 @@ mod tests {
         let archive_path = temp_dir.path().join("test.zip");
         let create_params = serde_json::json!({
             "operation": "create",
-            "archive_path": archive_path.to_str().unwrap(),
-            "files": [file1.to_str().unwrap(), file2.to_str().unwrap()]
+            "path": archive_path.to_str().unwrap(),
+            "input": [file1.to_str().unwrap(), file2.to_str().unwrap()]
         });
 
         let input = AgentInput::text("").with_parameter("parameters", create_params);
@@ -1232,8 +1260,8 @@ mod tests {
         let extract_dir = temp_dir.path().join("extracted");
         let extract_params = serde_json::json!({
             "operation": "extract",
-            "archive_path": archive_path.to_str().unwrap(),
-            "output_dir": extract_dir.to_str().unwrap()
+            "path": archive_path.to_str().unwrap(),
+            "target_path": extract_dir.to_str().unwrap()
         });
 
         let input = AgentInput::text("").with_parameter("parameters", extract_params);
