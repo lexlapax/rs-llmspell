@@ -195,8 +195,8 @@ pub fn inject_tool_api(
             
             -- Create coroutine for async execution
             local co = coroutine.create(function()
-                -- Use dot notation to call execute as a function, not a method
-                return tool.execute(params or {})
+                -- Use colon notation to match how execute expects to be called
+                return tool:execute(params or {})
             end)
             
             -- Execute the coroutine
