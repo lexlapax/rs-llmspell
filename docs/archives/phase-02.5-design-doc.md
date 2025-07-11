@@ -17,7 +17,6 @@ Phase 2.5 implements tools that require external dependencies, APIs, or complex 
 
 ### Tool Categories
 - **Web & Network Tools**: Including WebSearchTool and other web interaction tools
-- **Advanced Search Tools**: CodeSearchTool with tree-sitter, SemanticSearchTool with vectors
 - **Communication & API Integration**: Email, Slack, GitHub, database connectors
 - **Complex Data Processing**: Tools requiring external services or heavy dependencies
 
@@ -73,42 +72,6 @@ impl Tool for WebSearchTool {
 - Rate limiting and retry logic
 - Response parsing and normalization
 
-### 1.2 CodeSearchTool
-
-```rust
-// llmspell-tools/src/search/code_search.rs
-pub struct CodeSearchTool {
-    index_path: PathBuf,
-    language_parsers: HashMap<String, Box<dyn LanguageParser>>,
-}
-```
-
-**Implementation Details:**
-- Tree-sitter integration for syntax-aware parsing
-- Support for Rust, Python, JavaScript/TypeScript
-- Symbol extraction (functions, classes, variables)
-- Full-text search with ranking
-- Git integration for repository search
-- Incremental indexing support
-
-### 1.3 SemanticSearchTool
-
-```rust
-// llmspell-tools/src/search/semantic_search.rs
-pub struct SemanticSearchTool {
-    embedding_model: Box<dyn EmbeddingModel>,
-    vector_store: Box<dyn VectorStore>,
-}
-```
-
-**Implementation Details:**
-- Embedding model abstraction (local or API-based)
-- Vector store trait with multiple backends
-- In-memory vector store implementation
-- Similarity search algorithms (cosine, k-NN)
-- Metadata filtering support
-- Optional integration with external vector databases
-
 ---
 
 ## 2. Additional External Integration Tools
@@ -123,17 +86,17 @@ pub struct SemanticSearchTool {
 
 ### 2.2 Communication & API Tools
 - **EmailSenderTool**: SMTP, SendGrid, SES integration
-- **SlackIntegrationTool**: Slack API, webhooks
-- **GitHubIntegrationTool**: GitHub API, issue/PR management
+- **SlackIntegrationTool**: Slack API, webhooks (**defer**)
+- **GitHubIntegrationTool**: GitHub API, issue/PR management (**defer**)
 - **DatabaseConnectorTool**: PostgreSQL, MySQL, SQLite
 
 ### 2.3 Data Processing Tools
-- **XmlProcessorTool**: XML parsing, XSLT transformation
-- **YamlProcessorTool**: YAML parsing, validation
-- **DataTransformerTool**: Format conversion, mapping
-- **StatisticalAnalyzerTool**: Statistical computations
-- **TextAnalyzerTool**: NLP operations, sentiment analysis
-- **DataVisualizerTool**: Chart generation, data visualization
+- **XmlProcessorTool**: XML parsing, XSLT transformation (**defer**)
+- **YamlProcessorTool**: YAML parsing, validation (**defer**)
+- **DataTransformerTool**: Format conversion, mapping(**defer**)
+- **StatisticalAnalyzerTool**: Statistical computations(**defer**)
+- **TextAnalyzerTool**: NLP operations, sentiment analysis(**defer**)
+- **DataVisualizerTool**: Chart generation, data visualization(**defer**)
 
 ---
 
@@ -141,9 +104,6 @@ pub struct SemanticSearchTool {
 
 ### External Dependencies
 - `reqwest`: HTTP client
-- `tree-sitter`: Code parsing
-- `tantivy`: Full-text search
-- `git2`: Git integration
 - `lettre`: Email sending
 - `slack-api`: Slack integration
 - `octocrab`: GitHub API

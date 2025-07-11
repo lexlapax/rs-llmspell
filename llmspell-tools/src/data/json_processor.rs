@@ -97,9 +97,59 @@ impl JsonProcessorTool {
         }
     }
 
+    /// Validate JQ query for security issues
+    fn validate_jq_query(&self, query: &str) -> Result<()> {
+        // List of dangerous JQ functions and patterns
+        let dangerous_patterns = [
+            "env",        // Access environment variables
+            "__inputs",   // Access inputs beyond the provided data
+            "input",      // Read additional inputs
+            "inputs",     // Read all inputs
+            "debug",      // Debug output that might leak info
+            "modulemeta", // Module metadata access
+            "builtins",   // List all builtins
+            "$__loc__",   // Location metadata
+            "$ENV",       // Environment access
+            "include",    // Include external files
+            "import",     // Import modules
+        ];
+
+        let query_lower = query.to_lowercase();
+
+        for pattern in &dangerous_patterns {
+            if query_lower.contains(pattern) {
+                return Err(LLMSpellError::Validation {
+                    message: format!(
+                        "Security: JQ query contains potentially dangerous function: {}",
+                        pattern
+                    ),
+                    field: Some("query".to_string()),
+                });
+            }
+        }
+
+        // Check for suspicious patterns that might indicate attempts to access system info
+        if query_lower.contains("/etc/")
+            || query_lower.contains("/proc/")
+            || query_lower.contains("passwd")
+            || query_lower.contains("shadow")
+        {
+            return Err(LLMSpellError::Validation {
+                message: "Security: JQ query contains suspicious system path references"
+                    .to_string(),
+                field: Some("query".to_string()),
+            });
+        }
+
+        Ok(())
+    }
+
     /// Execute a jq query on JSON data
     fn execute_jq_query(&self, input: &Value, query: &str) -> Result<Vec<Value>> {
         debug!("Executing jq query: {}", query);
+
+        // Validate query for security
+        self.validate_jq_query(query)?;
 
         // Create parse context with core and std library
         let mut parse_ctx = jaq_interpret::ParseCtx::new(Vec::new());
@@ -214,6 +264,9 @@ impl JsonProcessorTool {
         reader: R,
         query: &str,
     ) -> Result<Vec<Value>> {
+        // Validate query for security before processing
+        self.validate_jq_query(query)?;
+
         let mut buffer = BufReader::new(reader);
         let mut line = String::new();
         let mut results = Vec::new();

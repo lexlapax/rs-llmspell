@@ -3,14 +3,25 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 rs-llmspell: **Scriptable LLM interactions** via Lua, JavaScript - Cast scripting spells to animate LLM golems
+## Phase Status
+- ✅ Phase 0: Foundation Infrastructure (COMPLETE)
+- ✅ Phase 1: Core Execution Runtime (COMPLETE)
+- ✅ Phase 2: Self-Contained Tools Library (COMPLETE - 25 tools)
+- 🚀 **Phase 3: Tool Enhancement & Workflow Orchestration** (ACTIVE - Weeks 9-16)
+  - Phase 3.0: Critical Tool Fixes (Weeks 9-10)
+  - Phase 3.1: External Integration Tools (Weeks 11-12)
+  - Phase 3.2: Security & Performance (Weeks 13-14)
+  - Phase 3.3: Workflow Orchestration (Weeks 15-16)
+- ⏳ Phase 4: Vector Storage and Search (Weeks 17-18)
+- ⏳ Phase 5+: Future phases...
 
 ## Current Status
 
-🚀 **Phase 2 - Built-in Tools Library**: IN PROGRESS (Started 2025-06-27)
-- **Completed**: Phases 0, 1, and 25/25 Phase 2 tools ✅
-- **Current**: Task 2.10.1 Script Integration Tests (8/9 subtasks complete)
-- **Progress**: All 25 tools implemented, JSON API added, provider enhancements tested
-- **Next**: Complete integration documentation (2.10.1.9), then proceed to 2.10.2 Security Validation
+🚀 **Phase 3 - Tool Enhancement & Workflow Orchestration**: STARTING (Phase 2 Complete 2025-07-11)
+- **Completed**: Phases 0, 1, 2 ✅ (25 self-contained tools fully implemented)
+- **Current**: Phase 3.0 - Critical Tool Fixes (Standardization, DRY, Initial Security)
+- **Approach**: Clean break strategy - no migration tools (pre-1.0 freedom)
+- **Timeline**: 8 weeks (Weeks 9-16) divided into 4 sub-phases
 
 ## Key Commands
 
@@ -27,9 +38,11 @@ cargo test --workspace                 # Run all tests (can be slow)
 cargo test --lib --all                 # Run only unit tests (faster)
 cargo check --workspace                # Quick compilation check
 
-# Phase 2 Specific
+# Phase 3 Specific
 cargo test -p llmspell-tools          # Test tools crate
+cargo test -p llmspell-utils          # Test shared utilities
 cargo bench -p llmspell-tools         # Benchmark tool performance
+cargo test --all-features             # Test with all external integrations
 ```
 
 ## Architecture Overview
@@ -38,7 +51,7 @@ cargo bench -p llmspell-tools         # Benchmark tool performance
 
 **Tech Stack**: `rig` (LLM providers), `mlua` (scripting), `sled`/`rocksdb` (storage), comprehensive testing.
 
-**Phase 2 Focus**: 25 self-contained tools with provider enhancements (ModelSpecifier, base URL overrides).
+**Phase 3 Focus**: Standardize 25 existing tools, add 16 external integration tools, security hardening, workflow orchestration.
 
 ## Quality Requirements
 
@@ -87,27 +100,49 @@ Three levels of quality validation are available:
 ## Primary Documentation
 
 - **Architecture**: `/docs/technical/rs-llmspell-final-architecture.md`
-- **Current Progress**: `/TODO.md` - Phase 2 task tracking (25/25 tools complete)
-- **Phase 2 Design**: `/docs/in-progress/phase-02-design-doc.md`
+- **Current Progress**: `/docs/in-progress/PHASE03-TODO.md` - Phase 3 task tracking
+- **Phase 3 Design**: `/docs/in-progress/phase-03-design-doc.md`
+- **Breaking Changes**: Clean break approach with comprehensive documentation
 
-## Phase 2 Progress (25/25 Tools Complete) ✅
+## Phase 3 Plan (41+ Tools Target)
 
-**All Tools Implemented and Refactored**:
-- ✅ Data Processing: JsonProcessor, CsvAnalyzer, HttpRequest, GraphQLQuery
-- ✅ File System: FileOperations, ArchiveHandler, FileWatcher, FileConverter, FileSearch
-- ✅ System Integration: EnvironmentReader, ProcessExecutor, ServiceChecker, SystemMonitor
-- ✅ Media Processing: AudioProcessor, VideoProcessor, ImageProcessor
-- ✅ Utilities: TemplateEngine, DataValidation, TextManipulator, UuidGenerator, HashCalculator, Base64Encoder, DiffCalculator, DateTimeHandler, Calculator
-- ✅ Search: WebSearch
+**Phase 3.0 (Weeks 9-10)**: Critical Tool Fixes
+- Standardize all 25 tools to consistent interfaces
+- Extract shared utilities (DRY compliance 95%)
+- Implement critical security fixes (Calculator DoS, path traversal)
+- Create breaking changes documentation
 
-**Current Tasks**:
-- Task 2.10.4: Documentation and Examples (IN PROGRESS - Phase 5: Testing examples)
-- Task 2.10.1: Script Integration Tests (AFTER 2.10.4)
+**Phase 3.1 (Weeks 11-12)**: External Integration Tools (16 new)
+- Web & Network: WebSearchTool enhancement, web_scraper, url_analyzer, api_tester, webhook_caller, webpage_monitor, sitemap_crawler
+- Communication: email_sender, database_connector
+- Rate limiting and circuit breaker patterns
+
+**Phase 3.2 (Weeks 13-14)**: Advanced Security & Performance
+- Comprehensive security hardening for all 41 tools
+- Performance optimization (maintain 52,600x target)
+- Resource limit enforcement
+
+**Phase 3.3 (Weeks 15-16)**: Workflow Orchestration
+- Sequential, Conditional, Loop, Streaming workflows
+- State management and error handling
+- Integration with full tool library
+
+## Phase 3 Breaking Changes
+
+**Clean Break Approach**: As a pre-1.0 project (v0.1.0 → v0.3.0), we're making breaking changes without migration tools.
+
+**Key Changes**:
+- **Parameter Standardization**: `input` as universal primary data parameter
+- **Path Parameters**: `path: PathBuf` for single files, `source_path`/`target_path` for transforms
+- **ResponseBuilder Pattern**: All tools use standardized response format
+- **No Migration Tools**: Clear documentation and examples instead
+
+**Documentation**: See `/docs/in-progress/CHANGELOG_v0.3.0.md` for complete breaking changes.
 
 ## Testing Strategy
 
 - **Unit Tests**: Individual components
-- **Integration Tests**: Tool interactions and script APIs
-- **Security Tests**: Sandbox escape prevention
+- **Integration Tests**: Tool interactions and script APIs  
+- **Security Tests**: DoS protection, path traversal, resource limits
 - **Performance**: <10ms tool initialization requirement
 - **Coverage**: >90% enforced in CI

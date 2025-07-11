@@ -113,10 +113,11 @@ Rs-LLMSpell follows a carefully structured 17-phase implementation approach that
 
 ---
 
-### **Phase 2: Self-Contained Tools Library (Weeks 5-8)**
+### **Phase 2: Self-Contained Tools Library (Weeks 5-8)** ✅ COMPLETE
 
 **Goal**: Implement all self-contained tools without external dependencies
 **Priority**: CRITICAL (MVP Essential)
+**Status**: COMPLETE - All 25 self-contained tools implemented, including basic WebSearchTool
 
 **Expanded Scope** (All Self-Contained Tools):
 - **File System** (8 tools): `FileOperationsTool`, `ArchiveHandlerTool`, `file_watcher`, `file_converter`, `file_search`
@@ -172,85 +173,91 @@ Rs-LLMSpell follows a carefully structured 17-phase implementation approach that
 
 ---
 
-### **Phase 2.5: External Integration Tools (Weeks 9-10)**
+### **Phase 3: Tool Enhancement & Workflow Orchestration (Weeks 9-16)**
 
-**Goal**: Implement non-AI dependent tools with moderate complexity
-**Priority**: HIGH (MVP Enhancement)
+**Goal**: Standardize tools, add external integrations, and implement workflow orchestration  
+**Priority**: HIGH (MVP Completion)
+**Duration**: 8 weeks (expanded from original 2 weeks)
 
-**Scope** (External Integration Tools):
-- **Web & Network** (6 tools): `WebSearchTool`, `web_scraper`, `url_analyzer`, `api_tester`, `webhook_caller`, `webpage_monitor`, `sitemap_crawler`
-- **Communication & APIs** (4 tools): `email_sender`, `slack_integration`, `github_integration`, `database_connector`
-- **Data Processing** (6 tools): `xml_processor`, `yaml_processor`, `data_transformer`, `statistical_analyzer`, `text_analyzer`, `data_visualizer`
+#### **Phase 3.0: Critical Tool Fixes (Weeks 9-10)**
+**Goal**: Standardize existing 25 tools before adding new ones
 
-**Essential Components**:
-- HTTP client configuration and rate limiting
-- Authentication handling (OAuth, API keys, tokens)
-- External service integration patterns
-- Data transformation pipelines
-- Error handling for external dependencies
+**Scope**:
+- Tool signature standardization (ResponseBuilder pattern)
+- Consistent parameter naming across all tools
+- DRY principle enforcement (use shared validators, retry logic)
+- Breaking changes documentation and migration tools
 
 **Success Criteria**:
-- [ ] 16+ external integration tools functional
-- [ ] WebSearchTool with real API implementations (DuckDuckGo, Google, Bing)
-- [ ] Web scraping with JavaScript rendering support
-- [ ] Email sending with multiple providers (SMTP, SendGrid, SES)
-- [ ] Database connections (PostgreSQL, MySQL, SQLite)
-- [ ] Statistical analysis and data visualization working
-- [ ] XML/YAML processing comprehensive
-- [ ] All external tools properly rate limited and authenticated
+- [ ] 95% parameter consistency (from 60%)
+- [ ] ResponseBuilder pattern adopted by all tools
+- [ ] Migration guide and tools complete
+- [ ] All shared utilities extracted to llmspell-utils
 
-**Testing Requirements**:
-- External API integration tests (with mocks and real APIs)
-- Rate limiting validation
-- Authentication flow testing
-- Error scenario handling
-- Performance benchmarks for external calls
+#### **Phase 3.1: External Integration Tools (Weeks 11-12)**
+**Goal**: Add external integration tools following new standards
 
----
+**Scope** (16 External Integration Tools):
+- **Web & Network** (7 tools): 
+  - `WebSearchTool` enhancement (add Google, Bing, DuckDuckGo APIs)
+  - `web_scraper`, `url_analyzer`, `api_tester`, `webhook_caller`, `webpage_monitor`, `sitemap_crawler`
+- **Communication & APIs** (4 tools): `email_sender`, `slack_integration`, `github_integration`, `database_connector`
+- **Data Processing** (5 tools): `xml_processor`, `yaml_processor`, `data_transformer`, `statistical_analyzer`, `text_analyzer`
 
-### **Phase 3: Workflow Orchestration (Weeks 11-12)**
+**Success Criteria**:
+- [ ] WebSearchTool enhanced with real API implementations
+- [ ] 15 new external tools functional
+- [ ] All tools follow Phase 3.0 standards from day one
+- [ ] Rate limiting and authentication working
 
-**Goal**: Implement workflow orchestration patterns  
-**Priority**: HIGH (MVP Important)
+#### **Phase 3.2: Security & Performance (Weeks 13-14)**
+**Goal**: Harden security and optimize performance for all 41 tools
 
-**MVP Scope**:
+**Scope**:
+- Security hardening (calculator DoS protection, symlink prevention)
+- Resource limit enforcement across all tools
+- Performance optimization (shared resource pools, caching)
+- Comprehensive security test suite
+
+**Success Criteria**:
+- [ ] All security vulnerabilities addressed
+- [ ] Resource limits enforced (memory, CPU, file sizes)
+- [ ] Performance maintained at 52,600x target
+- [ ] Security test coverage >95%
+
+#### **Phase 3.3: Workflow Orchestration (Weeks 15-16)**
+**Goal**: Implement workflow patterns with full standardized tool library
+
+**Scope**:
 - `SequentialWorkflow` for step-by-step execution
 - `ConditionalWorkflow` for branching logic
 - `LoopWorkflow` for iterative processes
 - `StreamingWorkflow` for real-time data processing
-- Basic workflow state management
-- Multimodal workflow examples
-
-**Essential Components**:
-- `Workflow` trait implementation
-- Workflow execution engine with streaming support
-- State passing between workflow steps
-- Backpressure handling for streaming workflows
-- Error handling and recovery in workflows
+- Workflow state management
+- Examples using all 41+ tools
 
 **Success Criteria**:
-- [x] Sequential workflows execute correctly
-- [x] Conditional workflows handle branching logic
-- [x] Loop workflows with proper termination conditions
-- [x] Streaming workflows handle backpressure properly
-- [x] Multimodal data flows through workflows correctly
-- [x] Workflow state is preserved between steps
-- [x] Workflow errors don't crash the runtime
+- [ ] All workflow patterns functional
+- [ ] State passing between steps working
+- [ ] Error recovery mechanisms in place
+- [ ] Integration with full tool library verified
+- [ ] Performance benchmarks met
 
 **Testing Requirements**:
-- Workflow pattern unit tests
-- State management validation
-- Error recovery testing
-- Performance benchmarks
-- Complex workflow integration tests
+- Tool standardization validation tests
+- Migration tool testing
+- External API integration tests
+- Security vulnerability tests
+- Workflow integration tests with all tools
 
 ---
 ## Production Features Phases
 
-### **Phase 4: Vector Storage and Search Infrastructure (Weeks 13-14)**
+### **Phase 4: Vector Storage and Search Infrastructure (Weeks 17-18)**
 
 **Goal**: Implement vector storage backends and advanced search capabilities
 **Priority**: MEDIUM (Post-MVP Enhancement)
+**Dependencies**: Requires standardized tool interfaces from Phase 3.0
 
 **Components**:
 - `VectorStorageBackend` trait implementations (memory, disk, external)
@@ -283,7 +290,7 @@ Rs-LLMSpell follows a carefully structured 17-phase implementation approach that
 
 ---
 
-### **Phase 5: Hook and Event System (Weeks 15-16)**
+### **Phase 5: Hook and Event System (Weeks 19-20)**
 
 **Goal**: Implement comprehensive hooks and events system  
 **Priority**: HIGH (Production Essential)
@@ -311,7 +318,7 @@ Rs-LLMSpell follows a carefully structured 17-phase implementation approach that
 ---
 
 
-### **Phase 6: Multimodal Tools Implementation (Weeks 19-20)**
+### **Phase 6: Multimodal Tools Implementation (Weeks 21-22)**
 
 **Goal**: Implement comprehensive multimodal processing tools  
 **Priority**: MEDIUM (Feature Enhancement)
@@ -341,7 +348,7 @@ Rs-LLMSpell follows a carefully structured 17-phase implementation approach that
 
 ---
 
-### **Phase 6: REPL Interactive Mode (Weeks 14-15)**
+### **Phase 7: REPL Interactive Mode (Weeks 23-24)**
 
 **Goal**: Implement interactive REPL for development and debugging  
 **Priority**: MEDIUM (Developer Experience)
@@ -375,7 +382,7 @@ Rs-LLMSpell follows a carefully structured 17-phase implementation approach that
 
 ---
 
-### **Phase 7: Persistent State Management (Weeks 15-16)**
+### **Phase 8: Persistent State Management (Weeks 25-26)**
 
 **Goal**: Implement persistent state storage with sled/rocksdb  
 **Priority**: MEDIUM (Production Important)
@@ -404,7 +411,7 @@ Rs-LLMSpell follows a carefully structured 17-phase implementation approach that
 
 ## Advanced Integration Phases
 
-### **Phase 8: Daemon and Service Mode (Weeks 17-18)**
+### **Phase 9: Daemon and Service Mode (Weeks 27-28)**
 
 **Goal**: Implement long-running daemon mode with scheduler  
 **Priority**: LOW (Advanced Feature)
@@ -441,7 +448,7 @@ Rs-LLMSpell follows a carefully structured 17-phase implementation approach that
 
 ---
 
-### **Phase 9: MCP Tool Integration (Weeks 19-20)**
+### **Phase 10: MCP Tool Integration (Weeks 29-30)**
 
 **Goal**: Support Model Control Protocol for external tools  
 **Priority**: LOW (Advanced Integration)
@@ -468,7 +475,7 @@ Rs-LLMSpell follows a carefully structured 17-phase implementation approach that
 
 ---
 
-### **Phase 10: MCP Server Mode (Weeks 21-22)**
+### **Phase 11: MCP Server Mode (Weeks 31-32)**
 
 **Goal**: Expose rs-llmspell tools and agents via MCP protocol  
 **Priority**: LOW (Advanced Integration)
@@ -495,7 +502,7 @@ Rs-LLMSpell follows a carefully structured 17-phase implementation approach that
 
 ---
 
-### **Phase 11: AI/ML Complex Tools (Weeks 29-30)**
+### **Phase 12: AI/ML Complex Tools (Weeks 33-34)**
 
 **Goal**: Implement AI and ML dependent complex tools  
 **Priority**: MEDIUM (Advanced AI Features)
@@ -522,7 +529,7 @@ Rs-LLMSpell follows a carefully structured 17-phase implementation approach that
 
 ---
 
-### **Phase 12: JavaScript Engine Support (Weeks 31-32)**
+### **Phase 13: JavaScript Engine Support (Weeks 35-36)**
 
 **Goal**: Add JavaScript as second script engine using existing ScriptEngineBridge infrastructure  
 **Priority**: MEDIUM (Enhancement)
@@ -567,7 +574,7 @@ Rs-LLMSpell follows a carefully structured 17-phase implementation approach that
 
 ---
 
-### **Phase 13: A2A Client Support (Weeks 33-34)**
+### **Phase 14: A2A Client Support (Weeks 37-38)**
 
 **Goal**: Agent-to-Agent communication as client  
 **Priority**: LOW (Advanced Networking)
@@ -594,7 +601,7 @@ Rs-LLMSpell follows a carefully structured 17-phase implementation approach that
 
 ---
 
-### **Phase 14: A2A Server Support (Weeks 35-36)**
+### **Phase 15: A2A Server Support (Weeks 39-40)**
 
 **Goal**: Expose local agents via A2A protocol  
 **Priority**: LOW (Advanced Networking)
@@ -623,7 +630,7 @@ Rs-LLMSpell follows a carefully structured 17-phase implementation approach that
 
 ## Platform Support Phases
 
-### **Phase 15: Library Mode Support (Weeks 37-38)**
+### **Phase 16: Library Mode Support (Weeks 41-42)**
 
 **Goal**: Support usage as native module in external runtimes  
 **Priority**: MEDIUM (Alternative Usage Mode)
@@ -650,7 +657,7 @@ Rs-LLMSpell follows a carefully structured 17-phase implementation approach that
 
 ---
 
-### **Phase 16: Cross-Platform Support (Weeks 39-40)**
+### **Phase 17: Cross-Platform Support (Weeks 43-44)**
 
 **Goal**: Full Windows support and cross-platform compatibility  
 **Priority**: MEDIUM (Platform Coverage)
@@ -679,7 +686,7 @@ Rs-LLMSpell follows a carefully structured 17-phase implementation approach that
 
 ## Production Optimization Phase
 
-### **Phase 17: Production Optimization (Weeks 41-42)**
+### **Phase 18: Production Optimization (Weeks 45-46)**
 
 **Goal**: Performance optimization and production hardening  
 **Priority**: HIGH (Production Readiness)
@@ -710,7 +717,7 @@ Rs-LLMSpell follows a carefully structured 17-phase implementation approach that
 
 ### Minimal Viable Product (MVP)
 
-**MVP includes Phases 0-3** (Foundation phases)
+**MVP includes Phases 0-3** (Foundation through Workflow Orchestration)
 
 **Essential Traits**:
 - `BaseAgent` - Foundation trait with tool-handling capabilities
@@ -724,8 +731,10 @@ Rs-LLMSpell follows a carefully structured 17-phase implementation approach that
 - `ScriptEngineBridge` - Language abstraction layer
 - `LuaEngine` - First concrete engine implementation
 - Engine factory pattern - Runtime creation with different engines
-- Comprehensive built-in tools - 42+ tools across categories (Phases 2 and 2.5)
-- Basic workflow patterns - Sequential, conditional, loop
+- Comprehensive built-in tools - 41+ tools across categories (25 from Phase 2, 16 from Phase 3.1)
+- Standardized tool interfaces - ResponseBuilder pattern and consistent parameters
+- Security hardening - DoS protection, resource limits
+- Workflow patterns - Sequential, conditional, loop, streaming
 
 **Essential Features**:
 - Lua scripting with Agent/Tool APIs
@@ -736,10 +745,14 @@ Rs-LLMSpell follows a carefully structured 17-phase implementation approach that
 
 ### MVP Success Criteria
 
-- [x] Can run Lua scripts that use agents and tools
-- [x] Can call LLM providers from scripts
-- [x] Has 42+ essential built-in tools across all categories
-- [x] Supports basic workflow patterns
+- [ ] Can run Lua scripts that use agents and tools
+- [ ] Can call LLM providers from scripts
+- [ ] Has 41+ essential built-in tools across all categories
+- [ ] All tools follow standardized interfaces (95% consistency)
+- [ ] Security vulnerabilities addressed
+- [ ] Supports workflow orchestration patterns
+- [ ] External integration tools functional
+- [ ] Migration guide for breaking changes complete
 - [x] Runs on Linux with stable performance
 - [x] Memory usage under 50MB for simple scripts
 - [x] Complete test coverage for all MVP components
@@ -800,10 +813,11 @@ Each phase must pass:
 
 ### Estimated Timeline
 
-- **MVP with Comprehensive Tools**: ✅ COMPLETE (Phases 0-2.5, delivered in 6 weeks)
-- **Multi-Language Ready**: 32 weeks (Phases 0-12, bridge foundation makes Phase 12 faster)
-- **Production Ready**: 18 weeks (Phases 0-7, 17)
-- **Full Feature Set**: 42 weeks (All phases, Phase 12 simplified by bridge foundation)
+- **MVP Foundation**: ✅ COMPLETE (Phases 0-2, delivered in 8 weeks)
+- **MVP with External Tools & Workflows**: 16 weeks (Phases 0-3)
+- **Production Ready**: 26 weeks (Phases 0-8, includes state management)
+- **Multi-Language Ready**: 36 weeks (Phases 0-13, JavaScript support)
+- **Full Feature Set**: 46 weeks (All phases)
 
 ### Resource Requirements
 
