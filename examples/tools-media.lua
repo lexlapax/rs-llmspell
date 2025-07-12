@@ -55,7 +55,7 @@ print("\nAudio processing operations:")
 local test_file = use_tool("file_operations", {
     operation = "write",
     path = "/tmp/test_audio.txt",
-    content = "Mock audio file for testing (real audio processing in Phase 3+)"
+    input = "Mock audio file for testing (real audio processing in Phase 3+)"
 })
 
 -- Get audio metadata
@@ -68,8 +68,8 @@ print_result("Audio metadata", audio_metadata)
 -- Convert audio format (limited in Phase 2)
 local audio_convert = use_tool("audio_processor", {
     operation = "convert",
-    input_path = "/tmp/test_audio.wav",
-    output_path = "/tmp/test_audio_converted.mp3",
+    source_path = "/tmp/test_audio.wav",
+    target_path = "/tmp/test_audio_converted.mp3",
     format = "mp3"
 })
 print_result("Convert to MP3 (Phase 3+)", audio_convert)
@@ -89,7 +89,7 @@ print("\nVideo processing operations:")
 local test_video = use_tool("file_operations", {
     operation = "write",
     path = "/tmp/test_video.txt",
-    content = "Mock video file for testing (real video processing in Phase 3+)"
+    input = "Mock video file for testing (real video processing in Phase 3+)"
 })
 
 -- Get video metadata
@@ -103,7 +103,7 @@ print_result("Video metadata", video_metadata_first)
 local extract_frame = use_tool("video_processor", {
     operation = "extract_frame",
     file_path = "/tmp/test_video.mp4",
-    output_path = "/tmp/frame_10s.jpg",
+    target_path = "/tmp/frame_10s.jpg",
     timestamp = 10.0
 })
 print_result("Extract frame at 10s (Phase 3+)", extract_frame)
@@ -112,7 +112,7 @@ print_result("Extract frame at 10s (Phase 3+)", extract_frame)
 local thumbnail = use_tool("video_processor", {
     operation = "thumbnail",
     file_path = "/tmp/test_video.mp4",
-    output_path = "/tmp/video_thumbnail.jpg",
+    target_path = "/tmp/video_thumbnail.jpg",
     width = 320,
     height = 180,
     timestamp = 5.0
@@ -176,8 +176,8 @@ print_result("Convert to PNG", image_convert)
 -- Rotate image
 local rotate_image = use_tool("image_processor", {
     operation = "rotate",
-    input_path = "/tmp/sample_image.jpg",
-    output_path = "/tmp/rotated_image.jpg",
+    source_path = "/tmp/sample_image.jpg",
+    target_path = "/tmp/rotated_image.jpg",
     degrees = 90
 })
 print_result("Rotate 90 degrees", rotate_image)
@@ -185,8 +185,8 @@ print_result("Rotate 90 degrees", rotate_image)
 -- Crop image
 local crop_image = use_tool("image_processor", {
     operation = "crop",
-    input_path = "/tmp/sample_image.jpg",
-    output_path = "/tmp/cropped_image.jpg",
+    source_path = "/tmp/sample_image.jpg",
+    target_path = "/tmp/cropped_image.jpg",
     x = 100,
     y = 100,
     width = 400,

@@ -1,6 +1,12 @@
 -- tools-utility.lua
 -- Examples for utility tools (refactored with llmspell-utils)
 -- Using direct Tool API
+-- NOTE: All utility tools have been migrated to use 'input' parameter in v0.3.0:
+-- ✅ HashCalculatorTool: 'data' → 'input'
+-- ✅ TextManipulatorTool: 'text' → 'input'
+-- ✅ CalculatorTool: 'expression' → 'input'
+-- ✅ TemplateEngineTool: 'template' → 'input'
+-- ✅ DataValidationTool: 'data' → 'input'
 
 print("🔧 Utility Tools Examples")
 print("=========================")
@@ -116,14 +122,14 @@ print("\nCalculating hashes for: " .. text)
 local md5_hash = use_tool("hash_calculator", {
     operation = "hash",
     algorithm = "md5",
-    data = text
+    input = text  -- Changed from 'data' to 'input'
 })
 print_result("MD5", md5_hash)
 
 local sha256_hash = use_tool("hash_calculator", {
     operation = "hash",
     algorithm = "sha256",
-    data = text
+    input = text  -- Changed from 'data' to 'input'
 })
 print_result("SHA256", sha256_hash)
 
@@ -133,7 +139,7 @@ if sha256_parsed and sha256_parsed.result and sha256_parsed.result.hash then
     local verify_result = use_tool("hash_calculator", {
         operation = "verify",
         algorithm = "sha256",
-        data = text,
+        input = text,  -- Changed from 'data' to 'input'
         expected_hash = sha256_parsed.result.hash
     })
     print_result("Verification", verify_result)
@@ -147,39 +153,39 @@ print("\nText operations on: " .. sample_text)
 -- Case operations
 local uppercase = use_tool("text_manipulator", {
     operation = "uppercase",
-    text = sample_text
+    input = sample_text  -- Changed from 'text' to 'input'
 })
 print_result("Uppercase", uppercase)
 
 local lowercase = use_tool("text_manipulator", {
     operation = "lowercase",
-    text = "HELLO WORLD"
+    input = "HELLO WORLD"  -- Changed from 'text' to 'input'
 })
 print_result("Lowercase", lowercase)
 
 -- Case conversion
 local snake_case = use_tool("text_manipulator", {
     operation = "snake_case",
-    text = "HelloWorldFromLLMSpell"
+    input = "HelloWorldFromLLMSpell"  -- Changed from 'text' to 'input'
 })
 print_result("Snake case", snake_case)
 
 local camel_case = use_tool("text_manipulator", {
     operation = "camel_case",
-    text = "hello_world_from_llmspell"
+    input = "hello_world_from_llmspell"  -- Changed from 'text' to 'input'
 })
 print_result("Camel case", camel_case)
 
 -- Text operations
 local reversed = use_tool("text_manipulator", {
     operation = "reverse",
-    text = "LLMSpell"
+    input = "LLMSpell"
 })
 print_result("Reversed", reversed)
 
 local replaced = use_tool("text_manipulator", {
     operation = "replace",
-    text = "Hello World",
+    input = "Hello World",
     options = {
         from = "World",
         to = "LLMSpell"
@@ -190,7 +196,7 @@ print_result("Replaced", replaced)
 -- Substring extraction
 local substring = use_tool("text_manipulator", {
     operation = "substring",
-    text = "LLMSpell is awesome",
+    input = "LLMSpell is awesome",
     options = {
         start = 0,
         ["end"] = 8  -- 'end' is a Lua keyword, so we use bracket notation
@@ -204,14 +210,14 @@ TestHelpers.print_section("Calculator Tool")
 print("\nCalculations:")
 local basic_calc = use_tool("calculator", {
     operation = "evaluate",
-    expression = "2 + 3 * 4 - 1"
+    input = "2 + 3 * 4 - 1"  -- Changed from 'expression' to 'input'
 })
 print_result("2 + 3 * 4 - 1", basic_calc)
 
 -- With variables
 local var_calc = use_tool("calculator", {
     operation = "evaluate",
-    expression = "x^2 + y^2",
+    input = "x^2 + y^2",  -- Changed from 'expression' to 'input'
     variables = {
         x = 3,
         y = 4
@@ -222,7 +228,7 @@ print_result("x^2 + y^2 (x=3, y=4)", var_calc)
 -- Complex expression
 local complex_calc = use_tool("calculator", {
     operation = "evaluate",
-    expression = "(10 + 20) * 3 / 2"
+    input = "(10 + 20) * 3 / 2"  -- Changed from 'expression' to 'input'
 })
 print_result("(10 + 20) * 3 / 2", complex_calc)
 
@@ -232,28 +238,28 @@ print("\nMathematical functions:")
 -- Trigonometry
 local trig_calc = use_tool("calculator", {
     operation = "evaluate",
-    expression = "sin(pi()/2) + cos(0) + tan(pi()/4)"
+    input = "sin(pi()/2) + cos(0) + tan(pi()/4)"  -- Changed from 'expression' to 'input'
 })
 print_result("sin(π/2) + cos(0) + tan(π/4)", trig_calc)
 
 -- Square root and power
 local sqrt_calc = use_tool("calculator", {
     operation = "evaluate",
-    expression = "sqrt(25) + sqrt(16) + 2^3"
+    input = "sqrt(25) + sqrt(16) + 2^3"  -- Changed from 'expression' to 'input'
 })
 print_result("sqrt(25) + sqrt(16) + 2^3", sqrt_calc)
 
 -- Exponential and logarithm
 local exp_calc = use_tool("calculator", {
     operation = "evaluate",
-    expression = "exp(1) + ln(e()) + log(10, 100)"
+    input = "exp(1) + ln(e()) + log(10, 100)"  -- Changed from 'expression' to 'input'
 })
 print_result("exp(1) + ln(e) + log₁₀(100)", exp_calc)
 
 -- Combined with variables
 local advanced_calc = use_tool("calculator", {
     operation = "evaluate",
-    expression = "sqrt(x^2 + y^2) * sin(theta)",
+    input = "sqrt(x^2 + y^2) * sin(theta)",  -- Changed from 'expression' to 'input'
     variables = {
         x = 3,
         y = 4,
@@ -355,7 +361,7 @@ TestHelpers.print_section("Data Validation Tool")
 -- Email validation
 print("\nValidating data:")
 local email_validation = use_tool("data_validation", {
-    data = {
+    input = {  -- Changed from 'data' to 'input'
         email = "user@example.com",
         age = 25,
         name = "John Doe"
@@ -377,7 +383,7 @@ local complex_data = {
     theme = "dark"
 }
 local complex_validation = use_tool("data_validation", {
-    data = complex_data,
+    input = complex_data,  -- Changed from 'data' to 'input'
     rules = {
         rules = {
             {type = "required"},
@@ -392,7 +398,7 @@ TestHelpers.print_section("Template Engine Tool")
 -- Handlebars template
 print("\nTemplate rendering:")
 local handlebars_result = use_tool("template_engine", {
-    template = "Hello, {{name}}! You have {{count}} new messages.",
+    input = "Hello, {{name}}! You have {{count}} new messages.",  -- Changed from 'template' to 'input'
     context = {
         name = "Alice",
         count = 5
@@ -403,7 +409,7 @@ print_result("Handlebars", handlebars_result)
 
 -- Tera template  
 local tera_result = use_tool("template_engine", {
-    template = "Welcome, {{ name }}! Your score is {{ score }}.",
+    input = "Welcome, {{ name }}! Your score is {{ score }}.",  -- Changed from 'template' to 'input'
     context = {
         name = "bob",
         score = 85.67

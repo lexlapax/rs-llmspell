@@ -59,7 +59,7 @@ print_security_result("Access /etc directory", restricted_dir, true)
 local create_safe = use_tool("file_operations", {
     operation = "write",
     path = "/tmp/safe_file.txt",
-    content = "This is a safe test file"
+    input = "This is a safe test file"
 })
 -- Then read it
 local safe_read = use_tool("file_operations", {
@@ -72,7 +72,7 @@ print_security_result("Read from /tmp", safe_read, false)
 local system_write = use_tool("file_operations", {
     operation = "write",
     path = "/usr/bin/malicious",
-    content = "bad content"
+    input = "bad content"
 })
 print_security_result("Write to system dir", system_write, true)
 
@@ -135,7 +135,7 @@ print_security_result("Localhost access", localhost, false)
 -- Access public internet (if allowed)
 local public_net = use_tool("http_request", {
     method = "GET",
-    url = "https://example.com",
+    input = "https://example.com",
     timeout_ms = 5000
 })
 print_security_result("Public internet access", public_net, false)
@@ -145,7 +145,7 @@ print_security_result("Public internet access", public_net, false)
 -- and causes test timeouts. In production, this would be blocked.
 -- local ssrf_attempt = use_tool("http_request", {
 --     method = "GET",
---     url = "http://169.254.169.254/latest/meta-data/",
+--     input = "http://169.254.169.254/latest/meta-data/",
 --     timeout_ms = 500  -- Reduced timeout
 -- })
 -- print_security_result("SSRF attempt (metadata)", ssrf_attempt, true)

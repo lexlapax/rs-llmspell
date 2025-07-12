@@ -144,21 +144,21 @@ Eve Adams,32,Boston,88000]]
 -- Analyze CSV
 local csv_analysis = use_tool("csv_analyzer", {
     operation = "analyze",
-    content = csv_data
+    input = csv_data
 })
 print_result("CSV analysis", csv_analysis)
 
 -- Get statistics (part of analyze operation)
 local csv_stats = use_tool("csv_analyzer", {
     operation = "analyze",
-    content = csv_data
+    input = csv_data
 })
 print_result("Column statistics", csv_stats)
 
 -- Filter CSV data
 local csv_filter = use_tool("csv_analyzer", {
     operation = "filter",
-    content = csv_data,
+    input = csv_data,
     options = {
         filter = "age > 30"  -- Simple filter expression
     }
@@ -168,7 +168,7 @@ print_result("Filter (age > 30)", csv_filter)
 -- Convert CSV to JSON
 local csv_to_json = use_tool("csv_analyzer", {
     operation = "convert",
-    content = csv_data,
+    input = csv_data,
     options = {
         format = "json"
     }
@@ -182,7 +182,7 @@ print("\nHTTP request operations:")
 -- GET request example
 local get_request = use_tool("http_request", {
     method = "GET",
-    url = "https://api.github.com/repos/anthropics/llmspell",
+    input = "https://api.github.com/repos/anthropics/llmspell",
     headers = {
         ["User-Agent"] = "LLMSpell-Example/1.0"
     }
@@ -197,7 +197,7 @@ local post_data = {
 }
 local post_request = use_tool("http_request", {
     method = "POST",
-    url = "https://jsonplaceholder.typicode.com/posts",
+    input = "https://jsonplaceholder.typicode.com/posts",
     body = post_data,
     headers = {
         ["Content-Type"] = "application/json"
@@ -208,7 +208,7 @@ print_result("POST request", post_request)
 -- Request with query parameters (manual URL encoding since query_params not supported)
 local query_request = use_tool("http_request", {
     method = "GET",
-    url = "https://httpbin.org/get?q=llmspell&limit=10&offset=0",
+    input = "https://httpbin.org/get?q=llmspell&limit=10&offset=0",
     headers = {
         ["User-Agent"] = "LLMSpell-Example/1.0"
     }
@@ -218,7 +218,7 @@ print_result("Query params", query_request)
 -- Request with timeout
 local timeout_request = use_tool("http_request", {
     method = "GET",
-    url = "https://httpbin.org/delay/5",
+    input = "https://httpbin.org/delay/5",
     timeout_ms = 2000
 })
 print_result("Timeout test", timeout_request)
@@ -245,7 +245,7 @@ query GetCountry($code: ID!) {
 
 local graphql_result = use_tool("graphql_query", {
     endpoint = "https://countries.trevorblades.com/graphql",
-    query = simple_query,
+    input = simple_query,
     variables = {
         code = "US"
     }
@@ -279,7 +279,7 @@ query GetPosts($limit: Int!) {
 
 local posts_result = use_tool("graphql_query", {
     endpoint = "https://graphqlzero.almansi.me/api",
-    query = posts_query,
+    input = posts_query,
     variables = {
         limit = 3
     }
@@ -301,7 +301,7 @@ query {
 
 local countries_result = use_tool("graphql_query", {
     endpoint = "https://countries.trevorblades.com/graphql",
-    query = simple_country_query
+    input = simple_country_query
 })
 print_result("Multiple countries", countries_result)
 
@@ -339,7 +339,7 @@ Widget C,150,7.99]]
 -- Calculate revenue and add to CSV (transform not fully implemented, use analyze)
 local enriched = use_tool("csv_analyzer", {
     operation = "analyze",
-    content = sales_csv  -- Changed from csv_data to content
+    input = sales_csv  -- Changed from csv_data to input
 })
 print_result("CSV analysis (transform not implemented)", enriched)
 

@@ -58,7 +58,7 @@ local text_to_hash = "LLMSpell Security Test"
 local hash_result = use_tool("hash_calculator", {
     operation = "hash",
     algorithm = "sha256",
-    data = text_to_hash
+    input = text_to_hash
 })
 print("  Text: " .. text_to_hash)
 print_result("SHA256 Hash", hash_result)
@@ -68,14 +68,14 @@ print("\n✨ Text Manipulator:")
 local sample_text = "hello world from llmspell"
 local uppercase = use_tool("text_manipulator", {
     operation = "uppercase",
-    text = sample_text
+    input = sample_text
 })
 print("  Original: " .. sample_text)
 print_result("Uppercase", uppercase)
 
 local snake_case = use_tool("text_manipulator", {
     operation = "snake_case",
-    text = "HelloWorldFromLLMSpell"
+    input = "HelloWorldFromLLMSpell"
 })
 print_result("Snake Case", snake_case)
 
@@ -83,7 +83,7 @@ print_result("Snake Case", snake_case)
 print("\n🧮 Calculator:")
 local calc_result = use_tool("calculator", {
     operation = "evaluate",
-    expression = "2 + 3 * 4 + 16^0.5"  -- Using ^ for power instead of sqrt function
+    input = "2 + 3 * 4 + 16^0.5"  -- Using ^ for power instead of sqrt function
 })
 print("  Expression: 2 + 3 * 4 + 16^0.5")
 print_result("Result", calc_result)
@@ -117,7 +117,7 @@ print_result("Diff", diff_result)
 -- Data Validation Tool
 print("\n✅ Data Validation:")
 local validation_result = use_tool("data_validation", {
-    data = {
+    input = {
         email = "user@example.com",
         age = 25,
         name = "John Doe"
@@ -134,7 +134,7 @@ print_result("Validation", validation_result)
 -- Template Engine Tool
 print("\n🎨 Template Engine:")
 local template_result = use_tool("template_engine", {
-    template = "Hello, {{name}}! You have {{count}} new messages.",
+    input = "Hello, {{name}}! You have {{count}} new messages.",
     context = {
         name = "Alice",
         count = 5
@@ -153,7 +153,7 @@ local file_content = "# LLMSpell Test File\nThis is a test file created by LLMSp
 local file_write_result = use_tool("file_operations", {
     operation = "write",
     path = test_file_path,
-    content = file_content
+    input = file_content
 })
 print_result("File Write", file_write_result)
 
@@ -236,7 +236,7 @@ print("\n📈 CSV Analyzer:")
 local csv_data = "name,age,city\nAlice,30,New York\nBob,25,San Francisco\nCharlie,35,Chicago"
 local csv_analysis = use_tool("csv_analyzer", {
     operation = "analyze",
-    content = csv_data
+    input = csv_data
 })
 print_result("CSV Analysis", csv_analysis)
 
@@ -244,7 +244,7 @@ print_result("CSV Analysis", csv_analysis)
 print("\n🌐 HTTP Request:")
 local http_result = use_tool("http_request", {
     method = "GET",
-    url = "https://httpbin.org/get",
+    input = "https://httpbin.org/get",
     headers = {
         ["User-Agent"] = "LLMSpell/1.0"
     }

@@ -19,8 +19,7 @@ end
 show_workflow("Data Processing Pipeline", "Fetch data → Process → Validate → Transform")
 
 -- Step 1: Generate test data
-local uuid_gen = Tool.get("uuid_generator")
-local test_id = uuid_gen.execute({format = "standard"})
+local test_id = Tool.executeAsync("uuid_generator", {operation = "generate", format = "standard"})
 local uuid_value = nil
 if test_id.success and test_id.output then
     -- Parse JSON output to get UUID
@@ -37,7 +36,6 @@ local json_data = {
 }
 
 -- Step 3: Process with JSON tool
-local json_tool = Tool.get("json_processor")
 -- First convert Lua table to JSON string
 local json_string = string.format(
     '{"id":"%s","name":"%s","timestamp":"%s","values":[%s]}',
@@ -47,7 +45,7 @@ local json_string = string.format(
     table.concat(json_data.values, ",")
 )
 -- Parse and pretty-print using jq
-local json_result = json_tool.execute({
+local json_result = Tool.executeAsync("json_processor", {
     operation = "query",
     input = json_string,
     query = "."  -- Identity query to pretty-print
@@ -60,11 +58,10 @@ else
 end
 
 -- Step 4: Calculate checksum
-local hash_tool = Tool.get("hash_calculator")
-local checksum = hash_tool.execute({
+local checksum = Tool.executeAsync("hash_calculator", {
     operation = "hash",
     algorithm = "sha256",
-    data = type(json_result.output) == "string" and json_result.output or tostring(json_result.output)
+    input = type(json_result.output) == "string" and json_result.output or tostring(json_result.output)  -- Already using 'input' parameter
 })
 local hash_value = nil
 if checksum.success and checksum.output then
@@ -73,9 +70,8 @@ end
 print("\nStep 3 - Data checksum:", hash_value or "failed")
 
 -- Step 5: Encode for transmission
-local base64_tool = Tool.get("base64_encoder")
 local to_encode = json_result.success and json_result.output or json_string
-local encoded = base64_tool.execute({
+local encoded = Tool.executeAsync("base64_encoder", {
     operation = "encode",
     input = to_encode
 })
@@ -97,10 +93,9 @@ print("\n✅ Data processing pipeline complete!")
 show_workflow("File Analysis Workflow", "Create file → Analyze → Transform → Archive")
 
 -- Step 1: Create test file content
-local template_tool = Tool.get("template_engine")
-local file_content = template_tool.execute({
+local file_content = Tool.executeAsync("template_engine", {
     engine = "handlebars",
-    template = [[
+    input = [[  -- Already using 'input' parameter
 # Analysis Report {{report_id}}
 Generated: {{timestamp}}
 
@@ -124,17 +119,15 @@ Average Value: {{average}}
 print("Step 1 - Generated report content")
 
 -- Step 2: Convert to different formats
-local text_tool = Tool.get("text_manipulator")
-local uppercase_report = text_tool.execute({
+local uppercase_report = Tool.executeAsync("text_manipulator", {
     operation = "uppercase",
-    text = file_content.output
+    input = file_content.output  -- Already using 'input' parameter
 })
 print("\nStep 2 - Converted to uppercase (first line):")
 print(uppercase_report.output:match("^[^\n]+"))
 
 -- Step 3: Calculate diff between versions
-local diff_tool = Tool.get("diff_calculator")
-local diff_result = diff_tool.execute({
+local diff_result = Tool.executeAsync("diff_calculator", {
     operation = "text_diff",
     old_text = file_content.output,
     new_text = uppercase_report.output,
@@ -149,24 +142,22 @@ print("\n✅ File analysis workflow complete!")
 show_workflow("System Monitoring Workflow", "Read env → Check system → Process data → Report")
 
 -- Step 1: Read environment
-local env_tool = Tool.get("environment_reader")
-local env_data = env_tool.execute({
+local env_data = Tool.executeAsync("environment_reader", {
     operation = "get_all",
     filter = "PATH|HOME|USER"
 })
 print("Step 1 - Read environment variables")
 
 -- Step 2: Get system info
-local system_tool = Tool.get("system_monitor")
-local system_info = system_tool.execute({
+local system_info = Tool.executeAsync("system_monitor", {
     operation = "info"
 })
 print("\nStep 2 - Retrieved system information")
 
 -- Step 3: Create monitoring report
-local calc_tool = Tool.get("calculator")
-local memory_percent = calc_tool.execute({
-    expression = "100 * 0.75"  -- Example: 75% memory usage
+local memory_percent = Tool.executeAsync("calculator", {
+    operation = "evaluate",  -- Added operation parameter
+    input = "100 * 0.75"  -- Already using 'input' parameter
 })
 local calc_result = nil
 if memory_percent.success and memory_percent.output then
@@ -175,8 +166,7 @@ end
 print("\nStep 3 - Calculated metrics:", (calc_result or "N/A") .. "% memory usage")
 
 -- Step 4: Generate timestamp
-local datetime_tool = Tool.get("date_time_handler")
-local timestamp = datetime_tool.execute({
+local timestamp = Tool.executeAsync("date_time_handler", {
     operation = "now",
     format = "%Y-%m-%d %H:%M:%S"
 })
@@ -194,7 +184,7 @@ show_workflow("Data Validation Workflow", "Generate → Validate → Transform �
 -- Step 1: Generate test data
 local uuid_data = {}
 for i = 1, 3 do
-    local id = uuid_gen.execute({format = "standard"})
+    local id = Tool.executeAsync("uuid_generator", {operation = "generate", format = "standard"})
     if id.success and id.output then
         local uuid = id.output:match('"uuid"%s*:%s*"([^"]+)"')
         if uuid then
@@ -211,18 +201,17 @@ for i, uuid in ipairs(uuid_data) do
 end
 
 -- Step 3: Analyze CSV
-local csv_tool = Tool.get("csv_analyzer")
-local csv_analysis = csv_tool.execute({
+local csv_analysis = Tool.executeAsync("csv_analyzer", {
     operation = "analyze",
     input = csv_content
 })
 print("\nStep 2 - CSV analysis complete")
 
 -- Step 4: Transform data
-local hash_result = hash_tool.execute({
+local hash_result = Tool.executeAsync("hash_calculator", {
     operation = "hash",
     algorithm = "md5",
-    input = csv_content
+    input = csv_content  -- Already using 'input' parameter
 })
 local data_hash = nil
 if hash_result.success and hash_result.output then
@@ -245,7 +234,7 @@ local meta_json = string.format(
     transform_data.records,
     transform_data.data_hash
 )
-local final_json = json_tool.execute({
+local final_json = Tool.executeAsync("json_processor", {
     operation = "query",
     input = meta_json,
     query = "."  -- Pretty print
@@ -266,10 +255,10 @@ show_workflow("Error Handling Workflow", "Demonstrate error propagation and reco
 print("Testing error handling across tools:")
 
 -- Invalid hash algorithm
-local hash_error = hash_tool.execute({
+local hash_error = Tool.executeAsync("hash_calculator", {
     operation = "hash",
     algorithm = "invalid-algo",
-    data = "test"
+    input = "test"  -- Already using 'input' parameter
 })
 print("\n1. Invalid hash algorithm:", hash_error.success and "Success" or "Failed")
 if hash_error.error then
@@ -277,7 +266,7 @@ if hash_error.error then
 end
 
 -- Invalid JSON
-local json_error = json_tool.execute({
+local json_error = Tool.executeAsync("json_processor", {
     operation = "validate",
     input_json = "{invalid json"
 })
@@ -288,7 +277,7 @@ end
 
 -- Recovery: Use fallback
 if not json_error.success then
-    local fallback = json_tool.execute({
+    local fallback = Tool.executeAsync("json_processor", {
         operation = "format",
         input_json = {error = "Invalid input", fallback = true},
         pretty = true

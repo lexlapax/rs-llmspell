@@ -48,13 +48,13 @@ print("------------------")
 
 -- Test basic arithmetic
 local calc_result = use_tool("calculator", {
-    expression = "2 + 3 * 4"
+    input = "2 + 3 * 4"
 })
 print_result("calculator", "basic arithmetic", calc_result)
 
 -- Test with variables
 local calc_vars = use_tool("calculator", {
-    expression = "x^2 + y^2",
+    input = "x^2 + y^2",
     variables = {x = 3, y = 4}
 })
 print_result("calculator", "with variables", calc_vars)
@@ -62,7 +62,7 @@ print_result("calculator", "with variables", calc_vars)
 -- Test expression validation
 local calc_validate = use_tool("calculator", {
     operation = "validate",
-    expression = "2 + 3 * (4 + 5)"
+    input = "2 + 3 * (4 + 5)"
 })
 print_result("calculator", "validation", calc_validate)
 
@@ -71,7 +71,7 @@ print("----------------------------------")
 
 if table.concat(tools, ","):find("web_search") then
     local search_result = use_tool("web_search", {
-        query = "LLMSpell documentation",
+        input = "LLMSpell documentation",
         max_results = 3
     })
     print_result("web_search", "search query", search_result)
@@ -115,17 +115,17 @@ print("-------------------------")
 local test_cases = {
     {
         tool = "calculator",
-        params = {expression = "sqrt(16)"},
+        params = {input = "sqrt(16)"},
         description = "square root"
     },
     {
         tool = "calculator", 
-        params = {expression = "2^10"},
+        params = {input = "2^10"},
         description = "power operation"
     },
     {
         tool = "calculator",
-        params = {expression = "sin(0)"},
+        params = {input = "sin(0)"},
         description = "trigonometric function"
     }
 }

@@ -29,17 +29,23 @@ end
 local function benchmark_tool(name, operations)
     print(string.format("[1m[36m=== %s Performance ===[0m", name))
     
-    -- Measure tool initialization
-    local init_time, tool = measure_time(function()
-        return Tool.get(name)
+    -- Measure tool initialization/availability check
+    local init_time, tool_exists = measure_time(function()
+        local tools = Tool.list()
+        for _, tool_name in ipairs(tools) do
+            if tool_name == name then
+                return true
+            end
+        end
+        return false
     end)
     
-    if not tool then
+    if not tool_exists then
         print("  ❌ Tool not found:", name)
         return nil
     end
     
-    print(string.format("  Initialization: %s", format_time(init_time)))
+    print(string.format("  Initialization check: %s", format_time(init_time)))
     
     -- Run operations
     local total_time = 0
@@ -47,7 +53,7 @@ local function benchmark_tool(name, operations)
     
     for op_name, op_params in pairs(operations) do
         local exec_time, result = measure_time(function()
-            return tool.execute(op_params)
+            return Tool.executeAsync(name, op_params)
         end)
         
         total_time = total_time + exec_time
@@ -83,28 +89,28 @@ print("[1m[35m🏃 Lightweight Tools (Target: <10ms init, <50ms ops)[0m")
 print()
 
 benchmarks.uuid = benchmark_tool("uuid_generator", {
-    ["Generate v4"] = {format = "standard"},
-    ["Generate v5"] = {version = "v5", namespace = "dns", name = "example.com"},
-    ["Generate simple"] = {format = "simple"},
-    ["Batch (10)"] = {format = "standard", count = 10}
+    ["Generate v4"] = {operation = "generate", format = "standard"},
+    ["Generate v5"] = {operation = "generate", version = "v5", namespace = "dns", name = "example.com"},
+    ["Generate simple"] = {operation = "generate", format = "simple"},
+    ["Component ID"] = {operation = "component_id", prefix = "test"}
 })
 
 benchmarks.calculator = benchmark_tool("calculator", {
-    ["Simple math"] = {expression = "2 + 2"},
-    ["Complex expr"] = {expression = "16 + 2^8 - 10 * 5"},
-    ["With variables"] = {expression = "a * b + c", variables = {a = 10, b = 20, c = 30}},
-    ["Arithmetic"] = {expression = "100 / 4 + 3 * 7 - 15"},
-    ["Trigonometry"] = {expression = "sin(pi()/2) + cos(0)"},
-    ["Square root"] = {expression = "sqrt(16) + sqrt(25)"},
-    ["Exponential"] = {expression = "exp(1) + exp(0)"},
-    ["Logarithm"] = {expression = "ln(e()) + log(10, 100)"}
+    ["Simple math"] = {operation = "evaluate", input = "2 + 2"},
+    ["Complex expr"] = {operation = "evaluate", input = "16 + 2^8 - 10 * 5"},
+    ["With variables"] = {operation = "evaluate", input = "a * b + c", variables = {a = 10, b = 20, c = 30}},
+    ["Arithmetic"] = {operation = "evaluate", input = "100 / 4 + 3 * 7 - 15"},
+    ["Trigonometry"] = {operation = "evaluate", input = "sin(pi()/2) + cos(0)"},
+    ["Square root"] = {operation = "evaluate", input = "sqrt(16) + sqrt(25)"},
+    ["Exponential"] = {operation = "evaluate", input = "exp(1) + exp(0)"},
+    ["Logarithm"] = {operation = "evaluate", input = "ln(e()) + log(10, 100)"}
 })
 
 benchmarks.text = benchmark_tool("text_manipulator", {
-    ["Uppercase"] = {operation = "uppercase", text = "hello world"},
-    ["Snake case"] = {operation = "snake_case", text = "Hello World From LLMSpell"},
-    ["Reverse"] = {operation = "reverse", text = "abcdefghijklmnopqrstuvwxyz"},
-    ["Replace"] = {operation = "replace", text = "hello world", options = {from = "world", to = "llmspell"}}
+    ["Uppercase"] = {operation = "uppercase", input = "hello world"},
+    ["Snake case"] = {operation = "snake_case", input = "Hello World From LLMSpell"},
+    ["Reverse"] = {operation = "reverse", input = "abcdefghijklmnopqrstuvwxyz"},
+    ["Replace"] = {operation = "replace", input = "hello world", options = {from = "world", to = "llmspell"}}
 })
 
 -- 2. Medium Weight Tools
@@ -119,10 +125,10 @@ benchmarks.base64 = benchmark_tool("base64_encoder", {
 })
 
 benchmarks.hash = benchmark_tool("hash_calculator", {
-    ["MD5 small"] = {operation = "hash", algorithm = "md5", data = "test"},
-    ["SHA256 small"] = {operation = "hash", algorithm = "sha256", data = "test"},
-    ["SHA512 medium"] = {operation = "hash", algorithm = "sha512", data = string.rep("X", 1000)},
-    ["Multiple"] = {operation = "hash", algorithm = "sha256", data = "benchmark", format = "hex"}
+    ["MD5 small"] = {operation = "hash", algorithm = "md5", input = "test"},
+    ["SHA256 small"] = {operation = "hash", algorithm = "sha256", input = "test"},
+    ["SHA512 medium"] = {operation = "hash", algorithm = "sha512", input = string.rep("X", 1000)},
+    ["Multiple"] = {operation = "hash", algorithm = "sha256", input = "benchmark", format = "hex"}
 })
 
 benchmarks.json = benchmark_tool("json_processor", {
@@ -139,17 +145,17 @@ print()
 benchmarks.template = benchmark_tool("template_engine", {
     ["Handlebars simple"] = {
         engine = "handlebars",
-        template = "Hello {{name}}!",
+        input = "Hello {{name}}!",
         context = {name = "Benchmark"}
     },
     ["Handlebars loop"] = {
         engine = "handlebars",
-        template = "{{#each items}}Item {{@index}}: {{this}}\n{{/each}}",
+        input = "{{#each items}}Item {{@index}}: {{this}}\n{{/each}}",
         context = {items = {1, 2, 3, 4, 5}}
     },
     ["Tera simple"] = {
         engine = "tera",
-        template = "Hello {{ name }}!",
+        input = "Hello {{ name }}!",
         context = {name = "Benchmark"}
     }
 })

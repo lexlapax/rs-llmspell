@@ -59,7 +59,7 @@ print("\nBasic file operations:")
 local write_result = use_tool("file_operations", {
     operation = "write",
     path = "/tmp/llmspell_test.md",
-    content = file_content
+    input = file_content
 })
 print_result("Write file", write_result)
 
@@ -80,16 +80,16 @@ print_result("File info", info_result)
 -- Move file instead of list (list not supported)
 local move_result = use_tool("file_operations", {
     operation = "move",
-    from = "/tmp/llmspell_test.md",
-    to = "/tmp/llmspell_test_moved.md"
+    source_path = "/tmp/llmspell_test.md",
+    target_path = "/tmp/llmspell_test_moved.md"
 })
 print_result("Move file", move_result)
 
 -- Move it back
 local move_back = use_tool("file_operations", {
     operation = "move",
-    from = "/tmp/llmspell_test_moved.md",
-    to = "/tmp/llmspell_test.md"
+    source_path = "/tmp/llmspell_test_moved.md",
+    target_path = "/tmp/llmspell_test.md"
 })
 print_result("Move back", move_back)
 
@@ -103,8 +103,8 @@ print_result("Create directory", mkdir_result)
 -- Copy file (need 'from' not 'source')
 local copy_result = use_tool("file_operations", {
     operation = "copy",
-    from = "/tmp/llmspell_test.md",
-    to = "/tmp/llmspell_test_dir/copied.md"
+    source_path = "/tmp/llmspell_test.md",
+    target_path = "/tmp/llmspell_test_dir/copied.md"
 })
 print_result("Copy file", copy_result)
 
@@ -115,8 +115,8 @@ print("\nArchive operations:")
 -- Create ZIP archive
 local create_zip = use_tool("archive_handler", {
     operation = "create",
-    archive_path = "/tmp/llmspell_docs.zip",
-    files = {"/tmp/llmspell_test.md"},
+    path = "/tmp/llmspell_docs.zip",
+    input = {"/tmp/llmspell_test.md"},
     format = "zip"
 })
 print_result("Create ZIP", create_zip)
@@ -124,15 +124,15 @@ print_result("Create ZIP", create_zip)
 -- List archive contents
 local list_archive = use_tool("archive_handler", {
     operation = "list",
-    archive_path = "/tmp/llmspell_docs.zip"
+    path = "/tmp/llmspell_docs.zip"
 })
 print_result("List archive", list_archive)
 
 -- Extract archive (need 'output_dir' not 'destination')
 local extract_result = use_tool("archive_handler", {
     operation = "extract",
-    archive_path = "/tmp/llmspell_docs.zip",
-    output_dir = "/tmp/extracted"
+    path = "/tmp/llmspell_docs.zip",
+    target_path = "/tmp/extracted"
 })
 print_result("Extract archive", extract_result)
 
@@ -143,7 +143,7 @@ print("\nFile monitoring:")
 -- Watch a directory for changes (needs 'paths' array)
 local watch_result = use_tool("file_watcher", {
     operation = "watch",
-    paths = {"/tmp/llmspell_test_dir"},  -- paths must be an array
+    input = {"/tmp/llmspell_test_dir"},  -- input must be an array
     events = {"create", "modify", "delete"},
     timeout_ms = 1000,  -- 1 second timeout (now supports timeout_ms!)
     pattern = "*.md"
@@ -169,8 +169,8 @@ print("\nFile conversions:")
 -- Convert line endings (operation is 'line_endings' not 'convert_line_endings')
 local convert_line_endings = use_tool("file_converter", {
     operation = "line_endings",
-    input_path = "/tmp/llmspell_test.md",
-    output_path = "/tmp/llmspell_test_crlf.md",
+    path = "/tmp/llmspell_test.md",
+    target_path = "/tmp/llmspell_test_crlf.md",
     line_ending = "crlf"
 })
 print_result("Convert to CRLF", convert_line_endings)
@@ -178,8 +178,8 @@ print_result("Convert to CRLF", convert_line_endings)
 -- Convert indentation (operation is 'indentation' not 'convert_indentation')
 local convert_indent = use_tool("file_converter", {
     operation = "indentation",
-    input_path = "/tmp/llmspell_test.md",
-    output_path = "/tmp/llmspell_test_tabs.md",
+    path = "/tmp/llmspell_test.md",
+    target_path = "/tmp/llmspell_test_tabs.md",
     to_tabs = true,
     tab_width = 4
 })
@@ -188,8 +188,8 @@ print_result("Convert to tabs", convert_indent)
 -- Convert file encoding (encoding operation requires to_encoding)
 local convert_encoding = use_tool("file_converter", {
     operation = "encoding",
-    input_path = "/tmp/llmspell_test.md",
-    output_path = "/tmp/llmspell_test_utf16.md",
+    path = "/tmp/llmspell_test.md",
+    target_path = "/tmp/llmspell_test_utf16.md",
     to_encoding = "utf-16le"  -- Convert to UTF-16 Little Endian
 })
 print_result("Convert to UTF-16", convert_encoding)

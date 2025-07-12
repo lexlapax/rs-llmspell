@@ -1,0 +1,14 @@
+# Minimal LLMSpell configuration for testing tools only
+default_engine = "lua"
+
+[engines.lua]
+stdlib_level = "full"
+sandbox_mode = false
+
+[runtime]
+enable_streaming = false
+
+[runtime.security]
+allow_file_access = true
+allow_network_access = false
+allow_process_spawn = false

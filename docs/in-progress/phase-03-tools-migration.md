@@ -443,6 +443,80 @@ This is a comprehensive breaking change affecting:
 2. **Performance Testing**: Validate performance characteristics
 3. **Integration Testing**: Test with external systems
 
+## Lua Examples Migration (Task 3.0.13)
+
+### Overview
+All Lua example files have been updated to use the new standardized parameters for tools that have been migrated to the v0.3.0 parameter format. This includes changing from direct tool execution to the `Tool.executeAsync` pattern and updating all parameter names.
+
+### Key Changes Applied
+
+#### Parameter Standardization
+All utility tool examples have been updated to use the standardized `input` parameter:
+
+1. **HashCalculatorTool**: `data` → `input`
+2. **TextManipulatorTool**: `text` → `input`
+3. **CalculatorTool**: `expression` → `input`
+4. **TemplateEngineTool**: `template` → `input`
+5. **DataValidationTool**: `data` → `input`
+
+#### Execution Pattern Changes
+Changed from direct tool execution to async pattern:
+```lua
+-- Old pattern
+local tool = Tool.get("calculator")
+local result = tool.execute({expression = "2 + 2"})
+
+-- New pattern
+local result = Tool.executeAsync("calculator", {
+    operation = "evaluate",
+    input = "2 + 2"
+})
+```
+
+### Files Updated
+
+#### tools-utility.lua
+- 22 parameter updates across all utility tools
+- Hash calculations, text manipulations, calculations, template rendering, and validation examples
+
+#### tools-workflow.lua
+- 25 updates total (6 parameter updates + 19 execution method changes)
+- Data processing pipeline, file analysis, system monitoring, validation, and error handling workflows
+
+#### tools-performance.lua
+- 10 updates (execution method changes + operation parameters)
+- Performance benchmarks for all tool categories
+
+#### Domain-Appropriate Parameters
+System tools retain their domain-specific parameter names as they don't deal with generic data input:
+- **EnvironmentReaderTool**: `operation`, `variable_name`, `pattern`
+- **ProcessExecutorTool**: `executable`, `arguments`, `timeout_ms`
+- **ServiceCheckerTool**: `check_type`, `target`, `timeout_ms`
+- **SystemMonitorTool**: `operation`
+
+### Testing Results
+- All 10 example files now pass successfully (100% success rate)
+- Performance benchmarks show all tools meeting their target metrics:
+  - Lightweight tools: <10ms initialization, <50ms operations
+  - Medium weight tools: <50ms initialization, <100ms operations
+  - Heavy tools: <100ms initialization, <500ms operations
+
+### Additional Updates During Testing
+
+#### Tool Execution Method
+The Lua bridge uses async execution for tool calls, requiring the pattern:
+```lua
+local result = Tool.executeAsync(tool_name, params)
+```
+
+#### Operation Parameters
+Added missing `operation` parameters where required:
+- UUID Generator: `operation = "generate"` or `operation = "component_id"`
+- Calculator: `operation = "evaluate"`
+- Hash Calculator: `operation = "hash"`, `operation = "verify"`, `operation = "hash_file"`
+- Template Engine: `operation = "render"`
+- Data Validation: `operation = "validate"`
+
 ## Support and Resources
 
 ### Documentation
