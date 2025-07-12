@@ -9,6 +9,7 @@ pub mod registry;
 pub mod search;
 pub mod system;
 pub mod util;
+pub mod web;
 
 // Re-export main types
 pub use registry::{CapabilityMatcher, RegistryStatistics, ToolInfo, ToolRegistry};
@@ -27,4 +28,8 @@ pub use system::{
 pub use util::{
     Base64EncoderTool, CalculatorTool, DataValidationTool, DateTimeHandlerTool, DiffCalculatorTool,
     HashCalculatorTool, TemplateEngineTool, TextManipulatorTool, UuidGeneratorTool,
+};
+pub use web::{
+    ApiTesterTool, SitemapCrawlerTool, UrlAnalyzerTool, WebScraperTool, WebhookCallerTool,
+    WebpageMonitorTool,
 };

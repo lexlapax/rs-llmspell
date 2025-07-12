@@ -89,8 +89,10 @@ impl WebSearchConfig {
             providers.insert("google".to_string(), google_config);
         }
 
-        // Brave configuration
-        if let Ok(api_key) = std::env::var("WEBSEARCH_BRAVE_API_KEY") {
+        // Brave configuration - check both prefixed and standard env var names
+        if let Ok(api_key) = std::env::var("WEBSEARCH_BRAVE_API_KEY")
+            .or_else(|_| std::env::var("BRAVE_API_KEY"))
+        {
             let brave_config = ProviderConfig {
                 api_key: Some(api_key),
                 ..Default::default()
@@ -98,8 +100,10 @@ impl WebSearchConfig {
             providers.insert("brave".to_string(), brave_config);
         }
 
-        // SerpApi configuration
-        if let Ok(api_key) = std::env::var("WEBSEARCH_SERPAPI_API_KEY") {
+        // SerpApi configuration - check both prefixed and standard env var names
+        if let Ok(api_key) = std::env::var("WEBSEARCH_SERPAPI_API_KEY")
+            .or_else(|_| std::env::var("SERPAPI_API_KEY"))
+        {
             let serpapi_config = ProviderConfig {
                 api_key: Some(api_key),
                 ..Default::default()
@@ -107,8 +111,10 @@ impl WebSearchConfig {
             providers.insert("serpapi".to_string(), serpapi_config);
         }
 
-        // SerperDev configuration
-        if let Ok(api_key) = std::env::var("WEBSEARCH_SERPERDEV_API_KEY") {
+        // SerperDev configuration - check both prefixed and standard env var names
+        if let Ok(api_key) = std::env::var("WEBSEARCH_SERPERDEV_API_KEY")
+            .or_else(|_| std::env::var("SERPERDEV_API_KEY"))
+        {
             let serperdev_config = ProviderConfig {
                 api_key: Some(api_key),
                 ..Default::default()
