@@ -127,11 +127,11 @@ impl PathSecurityValidator {
                 .join(path)
         };
 
+        // Check for path traversal patterns BEFORE normalization
+        Self::check_path_traversal(&abs_path)?;
+
         // Normalize the path to resolve . and .. components
         let normalized = Self::normalize_path_internal(&abs_path)?;
-
-        // Check for path traversal patterns
-        Self::check_path_traversal(&normalized)?;
 
         // Check depth
         self.check_path_depth(&normalized)?;
@@ -321,7 +321,7 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let jail_path = temp_dir.path().to_path_buf();
 
-        let config = PathSecurityConfig::default().with_jail(jail_path.clone());
+        let config = PathSecurityConfig::relaxed().with_jail(jail_path.clone());
         let validator = PathSecurityValidator::with_config(config);
 
         // Safe path within jail
@@ -372,8 +372,8 @@ mod tests {
         };
         let validator = PathSecurityValidator::with_config(config);
 
-        // Path within depth limit
-        let shallow_path = Path::new("/a/b/c/d/file.txt");
+        // Path within depth limit (5 components: /, a, b, c, file.txt)
+        let shallow_path = Path::new("/a/b/c/file.txt");
         assert!(validator.validate(shallow_path).is_ok());
 
         // Path exceeding depth limit

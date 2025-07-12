@@ -541,20 +541,24 @@
 - [ ] DuckDuckGo API integration (no key required)
 - [ ] Google Custom Search API support
 - [ ] Bing Search API implementation
+- [ ] Bing serpapi.com implementation
+- [ ] Bing serper.dev implementation
 - [ ] Rate limiting and retry logic
 - [ ] ResponseBuilder pattern used
 
 **Implementation Steps:**
 1. Refactor existing WebSearchTool structure
 2. Implement DuckDuckGo provider
-3. Add Google Custom Search provider
-4. Implement Bing Search provider
-5. Add provider abstraction layer
-6. Implement rate limiting
-7. Add comprehensive tests
+3. Add Google Custom Search provider - ask user for api key
+4. Implement Bing Search provider - ask user for api key
+5. Implement serpapi.com search provider - ask user for api key
+6. Implement serper.dev search provider - ask user for api key
+7. Add provider abstraction layer
+8. Implement rate limiting
+9. Add comprehensive tests
 
 **Definition of Done:**
-- [ ] All 3 providers functional
+- [ ] All 5 providers functional
 - [ ] Rate limiting working
 - [ ] Tests cover all providers
 - [ ] Documentation complete
