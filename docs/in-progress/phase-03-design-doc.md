@@ -245,7 +245,7 @@ where
     Fut: Future<Output = Result<T>>;
 
 pub fn create_http_client(config: HttpClientConfig) -> Result<Client>;
-pub fn parse_rate_limit_headers(headers: &HeaderMap) -> RateLimitInfo;
+pub fn parse_rate_limit_headers(headers: &HeaderMap) -> RateLimitInfo; // Now in llmspell-utils
 ```
 
 #### 2.3 Shared JSON Operations
@@ -397,7 +397,7 @@ impl Tool for WebSearchTool {
         let provider = input.get_optional_string("provider")
             .unwrap_or(&self.default_provider);
         
-        // Rate limiting
+        // Rate limiting (using llmspell-utils::ProviderRateLimiter)
         self.rate_limiter.check_and_wait(provider).await?;
         
         // Provider execution
@@ -561,7 +561,7 @@ impl Tool for DatabaseConnectorTool {
 
 **Week 11 Tasks**:
 - [ ] Implement WebSearchTool providers (Google, Brave, DuckDuckGo, SerpApi, SerperDev)
-- [ ] Create provider selection and rate limiting system
+- [x] Create provider selection and rate limiting system (completed as llmspell-utils utility)
 - [ ] Create WebScraperTool with JS rendering
 - [ ] Implement remaining web tools (5 tools)
 - [ ] Create EmailSenderTool with providers

@@ -40,6 +40,9 @@ tempfile = "3.20"
 # Security dependencies
 llmspell-security = { path = "../llmspell-security" }
 
+# Random number generation for jitter
+rand = { workspace = true }
+
 # JSON processing with jq
 jaq-core = "1.5"
 jaq-interpret = "1.5"

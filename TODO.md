@@ -716,12 +716,12 @@
 12. [x] Add integration tests ✅ (2025-07-12)
 
 **Notes:**
-- Core implementation complete with ApiKeyManager in llmspell-utils
-- CLI command 'llmspell keys' implemented with full subcommand support
+- Full implementation complete with encrypted persistent storage
+- CLI command 'llmspell keys' implemented with all subcommands
 - Tool integration layer created with RequiresApiKey trait
-- Some compilation errors remain in AWS SDK integration code
-- See docs/in-progress/task-3.1.5-api-key-management.md for details
-7. Create management CLI
+- Persistent storage using sled database with AES-256-GCM encryption
+- All compilation errors fixed, all tests passing
+- See docs/in-progress/task-3.1.5-api-key-management.md for full details
 
 **Definition of Done:**
 - [x] Key storage secure ✅ (encrypted persistent storage with sled)
@@ -730,35 +730,38 @@
 - [x] Audit logs working ✅ (comprehensive ApiKeyAction tracking)
 - [x] Security review passed ✅ (encryption, audit trail, secure storage)
 
-### Task 3.1.6: Rate Limiting Framework
+### Task 3.1.6: Rate Limiting Framework ✅
 **Priority**: HIGH  
 **Estimated Time**: 16 hours  
 **Assignee**: Infrastructure Team
+**Status**: Completed
+**Started**: 2025-07-12
+**Completed**: 2025-07-12
 
 **Description**: Implement comprehensive rate limiting for external APIs.
 
 **Acceptance Criteria:**
-- [ ] Token bucket implementation
-- [ ] Per-provider rate limits
-- [ ] Automatic retry with backoff
-- [ ] Rate limit headers parsing
-- [ ] Metrics and monitoring
+- [x] Token bucket implementation ✅ (uses llmspell-utils RateLimiter)
+- [x] Per-provider rate limits ✅ (12 providers pre-configured)
+- [x] Automatic retry with backoff ✅ (exponential, linear, custom strategies)
+- [x] Rate limit headers parsing ✅ (X-RateLimit-*, Retry-After)
+- [x] Metrics and monitoring ✅ (comprehensive metrics collection)
 
 **Implementation Steps:**
-1. Implement token bucket algorithm
-2. Create rate limiter trait
-3. Add per-provider configurations
-4. Implement retry logic
-5. Parse rate limit headers
-6. Add metrics collection
-7. Create monitoring hooks
+1. [x] Implement token bucket algorithm ✅
+2. [x] Create rate limiter trait ✅
+3. [x] Add per-provider configurations ✅
+4. [x] Implement retry logic ✅
+5. [x] Parse rate limit headers ✅
+6. [x] Add metrics collection ✅
+7. [x] Create monitoring hooks ✅
 
 **Definition of Done:**
-- [ ] Rate limiting working
-- [ ] All providers configured
-- [ ] Retry logic tested
-- [ ] Metrics available
-- [ ] Documentation complete
+- [x] Rate limiting working ✅ (ProviderRateLimiter with token bucket)
+- [x] All providers configured ✅ (12 providers with specific limits)
+- [x] Retry logic tested ✅ (comprehensive test suite)
+- [x] Metrics available ✅ (usage percentage, response times, retry stats)
+- [x] Documentation complete ✅ (task-3.1.6-rate-limiting-framework.md)
 
 ### Task 3.1.7: Circuit Breaker Implementation
 **Priority**: MEDIUM  
