@@ -2,6 +2,7 @@
 //! ABOUTME: Built-in tools library with registry, security sandbox, and tool implementations
 
 pub mod api;
+pub mod communication;
 pub mod data;
 pub mod fs;
 pub mod media;
@@ -16,6 +17,7 @@ pub use registry::{CapabilityMatcher, RegistryStatistics, ToolInfo, ToolRegistry
 
 // Re-export tools
 pub use api::{GraphQLQueryTool, HttpRequestTool};
+pub use communication::{DatabaseConnectorTool, EmailSenderTool};
 pub use data::{CsvAnalyzerTool, JsonProcessorTool};
 pub use fs::{
     ArchiveHandlerTool, FileConverterTool, FileOperationsTool, FileSearchTool, FileWatcherTool,

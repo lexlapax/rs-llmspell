@@ -90,8 +90,8 @@ impl WebSearchConfig {
         }
 
         // Brave configuration - check both prefixed and standard env var names
-        if let Ok(api_key) = std::env::var("WEBSEARCH_BRAVE_API_KEY")
-            .or_else(|_| std::env::var("BRAVE_API_KEY"))
+        if let Ok(api_key) =
+            std::env::var("WEBSEARCH_BRAVE_API_KEY").or_else(|_| std::env::var("BRAVE_API_KEY"))
         {
             let brave_config = ProviderConfig {
                 api_key: Some(api_key),
@@ -101,8 +101,8 @@ impl WebSearchConfig {
         }
 
         // SerpApi configuration - check both prefixed and standard env var names
-        if let Ok(api_key) = std::env::var("WEBSEARCH_SERPAPI_API_KEY")
-            .or_else(|_| std::env::var("SERPAPI_API_KEY"))
+        if let Ok(api_key) =
+            std::env::var("WEBSEARCH_SERPAPI_API_KEY").or_else(|_| std::env::var("SERPAPI_API_KEY"))
         {
             let serpapi_config = ProviderConfig {
                 api_key: Some(api_key),
