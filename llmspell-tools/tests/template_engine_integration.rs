@@ -271,10 +271,10 @@ async fn test_missing_parameters() {
     // The tool might handle this gracefully and return an error in the response
     assert!(result.is_err());
     let error_msg = result.unwrap_err().to_string();
-    // The error message might have changed slightly with refactoring
+    // The error message should mention missing input parameter (standardized from template)
     assert!(
-        error_msg.contains("template") || error_msg.contains("Template"),
-        "Expected error about missing template, got: {}",
+        error_msg.contains("input") || error_msg.contains("Input"),
+        "Expected error about missing input, got: {}",
         error_msg
     );
 }
@@ -287,10 +287,10 @@ async fn test_tool_schema() {
     assert_eq!(schema.name, "template_engine");
     assert_eq!(schema.parameters.len(), 4);
 
-    // Check required parameters
-    let template_param = &schema.parameters[0];
-    assert_eq!(template_param.name, "template");
-    assert!(template_param.required);
+    // Check required parameters (template parameter renamed to input)
+    let input_param = &schema.parameters[0];
+    assert_eq!(input_param.name, "input");
+    assert!(input_param.required);
 
     // Check optional parameters
     let context_param = &schema.parameters[1];

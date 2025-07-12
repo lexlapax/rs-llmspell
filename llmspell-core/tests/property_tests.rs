@@ -181,11 +181,8 @@ proptest! {
     #[test]
     fn test_agent_output_metadata_preservation(
         content in prop::string::string_regex("[a-zA-Z0-9 ]{1,100}").unwrap(),
-        metadata_keys in prop::collection::vec(
+        metadata_pairs in prop::collection::btree_map(
             prop::string::string_regex("[a-zA-Z][a-zA-Z0-9_]{0,31}").unwrap(),
-            0..5
-        ),
-        metadata_values in prop::collection::vec(
             prop_oneof![
                 Just(serde_json::json!(null)),
                 prop::num::i64::ANY.prop_map(|n| serde_json::json!(n)),
@@ -195,13 +192,13 @@ proptest! {
             0..5
         )
     ) {
-        // Property: Metadata values are preserved
+        // Property: Metadata values are preserved (using BTreeMap to ensure unique keys)
         let mut metadata = llmspell_core::types::OutputMetadata::default();
-        for (key, value) in metadata_keys.iter().zip(metadata_values.iter()) {
+        for (key, value) in metadata_pairs.iter() {
             metadata.extra.insert(key.clone(), value.clone());
         }
         let output = AgentOutput::text(content).with_metadata(metadata);
-        for (key, value) in metadata_keys.into_iter().zip(metadata_values.into_iter()) {
+        for (key, value) in metadata_pairs.into_iter() {
             prop_assert_eq!(output.metadata.extra.get(&key), Some(&value));
         }
     }
