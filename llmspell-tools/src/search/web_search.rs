@@ -1,5 +1,5 @@
-//! ABOUTME: Web search tool implementation with multiple provider support
-//! ABOUTME: Refactored to use shared rate limiter from llmspell-utils
+//! ABOUTME: Enhanced web search tool implementation with multiple provider support
+//! ABOUTME: Supports DuckDuckGo, Google, Brave, SerpApi, and SerperDev with rate limiting
 
 use async_trait::async_trait;
 use llmspell_core::{
@@ -11,234 +11,346 @@ use llmspell_core::{
     ComponentMetadata, LLMSpellError, Result,
 };
 use llmspell_utils::{
-    extract_optional_string,
-    extract_parameters,
-    extract_required_string,
-    // NEW: Using shared rate limiter
+    extract_optional_string, extract_parameters, extract_required_string,
     rate_limiter::{RateLimiter, RateLimiterBuilder},
     response::ResponseBuilder,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tracing::{debug, info, warn};
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::sync::Mutex;
+use tracing::{debug, error, info, warn};
 
-/// Search provider types
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum SearchProvider {
-    Google,
-    Bing,
-    DuckDuckGo,
-}
-
-impl std::fmt::Display for SearchProvider {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SearchProvider::Google => write!(f, "google"),
-            SearchProvider::Bing => write!(f, "bing"),
-            SearchProvider::DuckDuckGo => write!(f, "duckduckgo"),
-        }
-    }
-}
-
-impl std::str::FromStr for SearchProvider {
-    type Err = LLMSpellError;
-
-    fn from_str(s: &str) -> Result<Self> {
-        match s.to_lowercase().as_str() {
-            "google" => Ok(SearchProvider::Google),
-            "bing" => Ok(SearchProvider::Bing),
-            "duckduckgo" | "ddg" => Ok(SearchProvider::DuckDuckGo),
-            _ => Err(LLMSpellError::Validation {
-                message: format!("Unknown search provider: {}", s),
-                field: Some("provider".to_string()),
-            }),
-        }
-    }
-}
-
-/// Search result structure
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SearchResult {
-    pub title: String,
-    pub url: String,
-    pub snippet: String,
-    pub provider: SearchProvider,
-    pub rank: usize,
-}
+use crate::search::providers::{
+    BraveSearchProvider, DuckDuckGoProvider, GoogleSearchProvider, ProviderConfig, SearchOptions,
+    SearchProvider, SearchResult, SearchType, SerpApiProvider, SerperDevProvider,
+};
 
 /// Web search configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WebSearchConfig {
     /// Default search provider
-    pub default_provider: SearchProvider,
-    /// API keys for different providers
-    pub api_keys: HashMap<String, String>,
+    pub default_provider: String,
+    /// API keys and configuration for different providers
+    pub providers: HashMap<String, ProviderConfig>,
     /// Maximum results per search
     pub max_results: usize,
-    /// Rate limit (searches per minute)
-    pub rate_limit: u32,
     /// Enable safe search
     pub safe_search: bool,
     /// Language preference
     pub language: Option<String>,
+    /// Provider fallback chain
+    pub fallback_chain: Vec<String>,
 }
 
 impl Default for WebSearchConfig {
     fn default() -> Self {
+        // Default fallback chain prioritizes free/high-limit providers
+        let fallback_chain = vec![
+            "duckduckgo".to_string(), // No API key required
+            "serperdev".to_string(),  // 2,500/month free
+            "brave".to_string(),      // 2,000/month free
+            "google".to_string(),     // 100/day free
+            "serpapi".to_string(),    // 100/month free
+        ];
+
         Self {
-            default_provider: SearchProvider::DuckDuckGo, // No API key required
-            api_keys: HashMap::new(),
+            default_provider: "duckduckgo".to_string(),
+            providers: HashMap::new(),
             max_results: 10,
-            rate_limit: 60,
             safe_search: true,
             language: Some("en".to_string()),
+            fallback_chain,
         }
     }
 }
 
-/// Web search tool implementation (refactored)
+impl WebSearchConfig {
+    /// Load configuration from environment variables
+    pub fn from_env() -> Self {
+        let mut config = Self::default();
+        let mut providers = HashMap::new();
+
+        // Google configuration
+        if let Ok(api_key) = std::env::var("WEBSEARCH_GOOGLE_API_KEY") {
+            let additional_config =
+                if let Ok(engine_id) = std::env::var("WEBSEARCH_GOOGLE_SEARCH_ENGINE_ID") {
+                    serde_json::json!({
+                        "search_engine_id": engine_id
+                    })
+                } else {
+                    serde_json::Value::Null
+                };
+            let google_config = ProviderConfig {
+                api_key: Some(api_key),
+                additional_config,
+            };
+            providers.insert("google".to_string(), google_config);
+        }
+
+        // Brave configuration
+        if let Ok(api_key) = std::env::var("WEBSEARCH_BRAVE_API_KEY") {
+            let brave_config = ProviderConfig {
+                api_key: Some(api_key),
+                ..Default::default()
+            };
+            providers.insert("brave".to_string(), brave_config);
+        }
+
+        // SerpApi configuration
+        if let Ok(api_key) = std::env::var("WEBSEARCH_SERPAPI_API_KEY") {
+            let serpapi_config = ProviderConfig {
+                api_key: Some(api_key),
+                ..Default::default()
+            };
+            providers.insert("serpapi".to_string(), serpapi_config);
+        }
+
+        // SerperDev configuration
+        if let Ok(api_key) = std::env::var("WEBSEARCH_SERPERDEV_API_KEY") {
+            let serperdev_config = ProviderConfig {
+                api_key: Some(api_key),
+                ..Default::default()
+            };
+            providers.insert("serperdev".to_string(), serperdev_config);
+        }
+
+        // DuckDuckGo doesn't need configuration
+        providers.insert("duckduckgo".to_string(), ProviderConfig::default());
+
+        config.providers = providers;
+
+        // Override default provider if specified
+        if let Ok(default) = std::env::var("WEBSEARCH_DEFAULT_PROVIDER") {
+            config.default_provider = default;
+        }
+
+        config
+    }
+}
+
+/// Provider wrapper with rate limiting
+struct ProviderWrapper {
+    provider: Box<dyn SearchProvider>,
+    rate_limiter: Option<RateLimiter>,
+}
+
+/// Enhanced web search tool implementation
 pub struct WebSearchTool {
     metadata: ComponentMetadata,
     config: WebSearchConfig,
-    rate_limiter: RateLimiter,
+    providers: Arc<Mutex<HashMap<String, ProviderWrapper>>>,
 }
 
 impl WebSearchTool {
     /// Create a new web search tool
     pub fn new(config: WebSearchConfig) -> Result<Self> {
-        // Create rate limiter using shared utility
-        let rate_limiter = RateLimiterBuilder::default()
-            .per_minute(config.rate_limit)
-            .sliding_window()
-            .build()
-            .map_err(|e| LLMSpellError::Internal {
-                message: format!("Failed to create rate limiter: {}", e),
-                source: None,
-            })?;
+        let mut providers = HashMap::new();
+
+        // Initialize DuckDuckGo (always available)
+        let ddg_provider = DuckDuckGoProvider::new();
+        providers.insert(
+            "duckduckgo".to_string(),
+            ProviderWrapper {
+                provider: Box::new(ddg_provider),
+                rate_limiter: None, // No official rate limit
+            },
+        );
+
+        // Initialize configured providers
+        for (name, provider_config) in &config.providers {
+            let wrapper = match name.as_str() {
+                "google" => {
+                    let provider = GoogleSearchProvider::new(provider_config.clone());
+                    if provider.is_available() {
+                        Some(ProviderWrapper {
+                            provider: Box::new(provider),
+                            rate_limiter: Some(
+                                RateLimiterBuilder::default()
+                                    .custom(100, Duration::from_secs(24 * 60 * 60)) // 100 per day
+                                    .sliding_window()
+                                    .build()
+                                    .map_err(|e| LLMSpellError::Internal {
+                                        message: format!("Failed to create rate limiter: {}", e),
+                                        source: None,
+                                    })?,
+                            ),
+                        })
+                    } else {
+                        None
+                    }
+                }
+                "brave" => {
+                    let provider = BraveSearchProvider::new(provider_config.clone());
+                    if provider.is_available() {
+                        Some(ProviderWrapper {
+                            provider: Box::new(provider),
+                            rate_limiter: Some(
+                                RateLimiterBuilder::default()
+                                    .per_minute(60) // ~2000/month spread evenly
+                                    .sliding_window()
+                                    .build()
+                                    .map_err(|e| LLMSpellError::Internal {
+                                        message: format!("Failed to create rate limiter: {}", e),
+                                        source: None,
+                                    })?,
+                            ),
+                        })
+                    } else {
+                        None
+                    }
+                }
+                "serpapi" => {
+                    let provider = SerpApiProvider::new(provider_config.clone());
+                    if provider.is_available() {
+                        Some(ProviderWrapper {
+                            provider: Box::new(provider),
+                            rate_limiter: Some(
+                                RateLimiterBuilder::default()
+                                    .per_minute(2) // ~100/month conservative
+                                    .sliding_window()
+                                    .build()
+                                    .map_err(|e| LLMSpellError::Internal {
+                                        message: format!("Failed to create rate limiter: {}", e),
+                                        source: None,
+                                    })?,
+                            ),
+                        })
+                    } else {
+                        None
+                    }
+                }
+                "serperdev" => {
+                    let provider = SerperDevProvider::new(provider_config.clone());
+                    if provider.is_available() {
+                        Some(ProviderWrapper {
+                            provider: Box::new(provider),
+                            rate_limiter: Some(
+                                RateLimiterBuilder::default()
+                                    .per_minute(80) // ~2500/month spread evenly
+                                    .sliding_window()
+                                    .build()
+                                    .map_err(|e| LLMSpellError::Internal {
+                                        message: format!("Failed to create rate limiter: {}", e),
+                                        source: None,
+                                    })?,
+                            ),
+                        })
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            };
+
+            if let Some(wrapper) = wrapper {
+                providers.insert(name.clone(), wrapper);
+                info!("Initialized search provider: {}", name);
+            } else if name != "duckduckgo" {
+                warn!("Search provider {} not available (missing API key?)", name);
+            }
+        }
 
         Ok(Self {
             metadata: ComponentMetadata::new(
                 "web-search-tool".to_string(),
-                "Search the web using multiple providers".to_string(),
+                "Search the web using multiple providers with fallback support".to_string(),
             ),
             config,
-            rate_limiter,
+            providers: Arc::new(Mutex::new(providers)),
         })
     }
 
-    /// Perform search with a specific provider
-    async fn search_with_provider(
+    /// Create from environment configuration
+    pub fn from_env() -> Result<Self> {
+        Self::new(WebSearchConfig::from_env())
+    }
+
+    /// Perform search with fallback support
+    async fn search_with_fallback(
         &self,
         query: &str,
-        provider: SearchProvider,
-        num_results: usize,
+        requested_provider: Option<&str>,
+        options: SearchOptions,
     ) -> Result<Vec<SearchResult>> {
-        // Apply rate limiting
-        self.rate_limiter
-            .acquire()
-            .await
-            .map_err(|e| LLMSpellError::RateLimit {
-                message: format!("Search rate limit exceeded: {}", e),
-                retry_after: None,
-            })?;
+        let providers = self.providers.lock().await;
 
-        info!("Searching with {} for: {}", provider, query);
-
-        match provider {
-            SearchProvider::Google => self.search_google(query, num_results).await,
-            SearchProvider::Bing => self.search_bing(query, num_results).await,
-            SearchProvider::DuckDuckGo => self.search_duckduckgo(query, num_results).await,
-        }
-    }
-
-    /// Search using Google (requires API key)
-    async fn search_google(&self, query: &str, _num_results: usize) -> Result<Vec<SearchResult>> {
-        let _api_key =
-            self.config
-                .api_keys
-                .get("google")
-                .ok_or_else(|| LLMSpellError::Configuration {
-                    message: "Google API key not configured".to_string(),
-                    source: None,
-                })?;
-
-        // Mock implementation - would use actual Google Custom Search API
-        warn!("Google search not fully implemented - returning mock results");
-        Ok(vec![SearchResult {
-            title: format!("Google result for: {}", query),
-            url: "https://example.com".to_string(),
-            snippet: "Mock Google search result".to_string(),
-            provider: SearchProvider::Google,
-            rank: 1,
-        }])
-    }
-
-    /// Search using Bing (requires API key)
-    async fn search_bing(&self, query: &str, _num_results: usize) -> Result<Vec<SearchResult>> {
-        let _api_key =
-            self.config
-                .api_keys
-                .get("bing")
-                .ok_or_else(|| LLMSpellError::Configuration {
-                    message: "Bing API key not configured".to_string(),
-                    source: None,
-                })?;
-
-        // Mock implementation - would use actual Bing Search API
-        warn!("Bing search not fully implemented - returning mock results");
-        Ok(vec![SearchResult {
-            title: format!("Bing result for: {}", query),
-            url: "https://example.com".to_string(),
-            snippet: "Mock Bing search result".to_string(),
-            provider: SearchProvider::Bing,
-            rank: 1,
-        }])
-    }
-
-    /// Search using DuckDuckGo (no API key required)
-    async fn search_duckduckgo(
-        &self,
-        query: &str,
-        num_results: usize,
-    ) -> Result<Vec<SearchResult>> {
-        // Mock implementation - would use DuckDuckGo Instant Answer API
-        warn!("DuckDuckGo search not fully implemented - returning mock results");
-
-        let mut results = Vec::new();
-        for i in 0..num_results.min(5) {
-            results.push(SearchResult {
-                title: format!("DuckDuckGo result {} for: {}", i + 1, query),
-                url: format!("https://example{}.com", i + 1),
-                snippet: format!("Mock DuckDuckGo search result {}", i + 1),
-                provider: SearchProvider::DuckDuckGo,
-                rank: i + 1,
-            });
-        }
-
-        Ok(results)
-    }
-
-    /// Parse search parameters
-    fn parse_parameters(
-        &self,
-        params: &serde_json::Value,
-    ) -> Result<(String, SearchProvider, usize)> {
-        let query = extract_required_string(params, "input")?.to_string();
-
-        let provider = if let Some(provider_str) = extract_optional_string(params, "provider") {
-            provider_str.parse()?
+        // Determine provider order
+        let provider_chain = if let Some(requested) = requested_provider {
+            // If specific provider requested, try it first
+            let mut chain = vec![requested.to_string()];
+            // Then add fallback chain excluding the requested one
+            for fallback in &self.config.fallback_chain {
+                if fallback != requested {
+                    chain.push(fallback.clone());
+                }
+            }
+            chain
         } else {
-            self.config.default_provider
+            // Use default provider first, then fallback chain
+            let mut chain = vec![self.config.default_provider.clone()];
+            for fallback in &self.config.fallback_chain {
+                if fallback != &self.config.default_provider {
+                    chain.push(fallback.clone());
+                }
+            }
+            chain
         };
 
-        let num_results = params
-            .get("num_results")
-            .and_then(|v| v.as_u64())
-            .map(|n| n as usize)
-            .unwrap_or(self.config.max_results)
-            .min(self.config.max_results);
+        // Try each provider in order
+        let mut last_error = None;
 
-        Ok((query, provider, num_results))
+        for provider_name in provider_chain {
+            if let Some(wrapper) = providers.get(&provider_name) {
+                // Check rate limit if applicable
+                if let Some(rate_limiter) = &wrapper.rate_limiter {
+                    match rate_limiter.try_acquire().await {
+                        Ok(_) => {}
+                        Err(e) => {
+                            warn!("Rate limit exceeded for {}: {}", provider_name, e);
+                            continue;
+                        }
+                    }
+                }
+
+                // Try the search
+                info!("Searching with provider: {}", provider_name);
+                match wrapper.provider.search(query, &options).await {
+                    Ok(results) => {
+                        if !results.is_empty() {
+                            return Ok(results);
+                        } else {
+                            warn!("Provider {} returned no results", provider_name);
+                        }
+                    }
+                    Err(e) => {
+                        error!("Search failed with provider {}: {}", provider_name, e);
+                        last_error = Some(e);
+                    }
+                }
+            } else {
+                warn!(
+                    "Provider '{}' not found, skipping to next provider",
+                    provider_name
+                );
+            }
+        }
+
+        // All providers failed
+        Err(last_error.unwrap_or_else(|| LLMSpellError::Network {
+            message: "All search providers failed or returned no results".to_string(),
+            source: None,
+        }))
+    }
+
+    /// Parse search type from string
+    fn parse_search_type(type_str: Option<&str>) -> SearchType {
+        match type_str {
+            Some("news") => SearchType::News,
+            Some("images") => SearchType::Images,
+            _ => SearchType::Web,
+        }
     }
 }
 
@@ -255,7 +367,7 @@ impl Tool for WebSearchTool {
     fn schema(&self) -> ToolSchema {
         ToolSchema::new(
             "web_search".to_string(),
-            "Search the web using Google, Bing, or DuckDuckGo".to_string(),
+            "Search the web using multiple providers with automatic fallback".to_string(),
         )
         .with_parameter(ParameterDef {
             name: "input".to_string(),
@@ -267,16 +379,39 @@ impl Tool for WebSearchTool {
         .with_parameter(ParameterDef {
             name: "provider".to_string(),
             param_type: ParameterType::String,
-            description: "Search provider: google, bing, or duckduckgo (optional)".to_string(),
+            description:
+                "Search provider: google, brave, duckduckgo, serpapi, or serperdev (optional)"
+                    .to_string(),
             required: false,
-            default: Some(serde_json::json!("duckduckgo")),
+            default: Some(serde_json::json!(self.config.default_provider)),
         })
         .with_parameter(ParameterDef {
-            name: "num_results".to_string(),
+            name: "max_results".to_string(),
             param_type: ParameterType::Number,
-            description: "Maximum number of results to return".to_string(),
+            description: "Maximum number of results to return (1-100)".to_string(),
             required: false,
-            default: Some(serde_json::json!(10)),
+            default: Some(serde_json::json!(self.config.max_results)),
+        })
+        .with_parameter(ParameterDef {
+            name: "search_type".to_string(),
+            param_type: ParameterType::String,
+            description: "Type of search: web, news, or images".to_string(),
+            required: false,
+            default: Some(serde_json::json!("web")),
+        })
+        .with_parameter(ParameterDef {
+            name: "safe_search".to_string(),
+            param_type: ParameterType::Boolean,
+            description: "Enable safe search filtering".to_string(),
+            required: false,
+            default: Some(serde_json::json!(self.config.safe_search)),
+        })
+        .with_parameter(ParameterDef {
+            name: "language".to_string(),
+            param_type: ParameterType::String,
+            description: "Language code (e.g., en, es, fr)".to_string(),
+            required: false,
+            default: self.config.language.as_ref().map(|l| serde_json::json!(l)),
         })
     }
 }
@@ -288,36 +423,62 @@ impl BaseAgent for WebSearchTool {
     }
 
     async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
-        // Get parameters using shared utility
+        // Get parameters
         let params = extract_parameters(&input)?;
 
-        // Parse parameters
-        let (query, provider, num_results) = self.parse_parameters(params)?;
+        // Parse required parameters
+        let query = extract_required_string(params, "input")?.to_string();
+
+        // Parse optional parameters
+        let provider = extract_optional_string(params, "provider");
+        let max_results = params
+            .get("max_results")
+            .and_then(|v| v.as_u64())
+            .map(|n| n as usize)
+            .unwrap_or(self.config.max_results);
+        let search_type = Self::parse_search_type(extract_optional_string(params, "search_type"));
+        let safe_search = params
+            .get("safe_search")
+            .and_then(|v| v.as_bool())
+            .unwrap_or(self.config.safe_search);
+        let language = extract_optional_string(params, "language")
+            .map(|s| s.to_string())
+            .or_else(|| self.config.language.clone());
 
         debug!(
-            "Executing web search: query='{}', provider={}, results={}",
-            query, provider, num_results
+            "Executing web search: query='{}', provider={:?}, type={:?}, results={}",
+            query, provider, search_type, max_results
         );
 
-        // Perform search
-        let results = self
-            .search_with_provider(&query, provider, num_results)
-            .await?;
+        // Build search options
+        let options = SearchOptions {
+            max_results,
+            safe_search,
+            language,
+            search_type,
+        };
 
-        // Create success message
+        // Perform search with fallback
+        let results = self.search_with_fallback(&query, provider, options).await?;
+
+        // Create response
+        let provider_used = results
+            .first()
+            .map(|r| r.provider.clone())
+            .unwrap_or_else(|| "unknown".to_string());
+
         let message = format!(
             "Found {} results for '{}' using {}",
             results.len(),
             query,
-            provider
+            provider_used
         );
 
-        // Build response
         let response = ResponseBuilder::success("search")
-            .with_message(message)
+            .with_message(&message)
             .with_result(serde_json::json!({
                 "query": query,
-                "provider": provider.to_string(),
+                "provider": provider_used,
                 "count": results.len(),
                 "results": results,
             }))
@@ -337,6 +498,7 @@ impl BaseAgent for WebSearchTool {
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
-        Ok(AgentOutput::text(format!("Web search error: {}", error)))
+        let response = ResponseBuilder::error("search", error.to_string()).build();
+        Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
     }
 }

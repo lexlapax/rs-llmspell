@@ -387,7 +387,7 @@ impl Tool for WebSearchTool {
     fn schema(&self) -> ToolSchema {
         ToolSchema::new("web_search", "Enhanced web search with multiple providers")
             .with_parameter("input", ParameterType::String, "Search query", true)
-            .with_parameter("provider", ParameterType::String, "google|bing|duckduckgo", false)
+            .with_parameter("provider", ParameterType::String, "google|brave|duckduckgo|serpapi|serperdev", false)
             .with_parameter("max_results", ParameterType::Integer, "1-100", false)
             .with_parameter("search_type", ParameterType::String, "web|news|images", false)
     }
@@ -427,10 +427,57 @@ pub struct GoogleSearchProvider {
     client: Client,
 }
 
-// Bing Search (API key required)
-pub struct BingSearchProvider {
+// Brave Search (API key required)
+pub struct BraveSearchProvider {
     api_key: String,
     client: Client,
+}
+
+// SerpApi.com (API key required)
+pub struct SerpApiProvider {
+    api_key: String,
+    client: Client,
+}
+
+// Serper.dev (API key required)
+pub struct SerperDevProvider {
+    api_key: String,
+    client: Client,
+}
+```
+
+**Rate Limiting Considerations**:
+Each provider has different rate limits that must be respected:
+- DuckDuckGo: No official API, web scraping limits apply
+- Google Custom Search: 100 queries/day (free tier), 10,000/day (paid)
+- Brave: 2,000 queries/month (free tier), higher tiers available
+- SerpApi: Varies by plan (100-5,000 searches/month)
+- SerperDev: 2,500 queries/month (free tier), 50k+ (paid)
+
+**Provider Selection Strategy**:
+```rust
+pub struct ProviderSelector {
+    providers: Vec<(String, Box<dyn SearchProvider>)>,
+    rate_limiters: HashMap<String, RateLimiter>,
+    priority_order: Vec<String>, // Prefer free/high-limit providers
+}
+```
+
+**Configuration Management**:
+With 5 providers requiring different API keys and settings:
+```rust
+// Environment variables for API keys
+WEBSEARCH_GOOGLE_API_KEY=...
+WEBSEARCH_GOOGLE_SEARCH_ENGINE_ID=...
+WEBSEARCH_BRAVE_API_KEY=...
+WEBSEARCH_SERPAPI_API_KEY=...
+WEBSEARCH_SERPERDEV_API_KEY=...
+
+// Configuration structure
+pub struct WebSearchConfig {
+    providers: HashMap<String, ProviderConfig>,
+    default_provider: String,
+    fallback_chain: Vec<String>, // e.g., ["duckduckgo", "serperdev", "google"]
 }
 ```
 
@@ -543,11 +590,12 @@ impl Tool for XmlProcessorTool {
 ### 4. Implementation Checklist
 
 **Week 11 Tasks**:
-- [ ] Implement WebSearchTool providers (Google, Bing, DuckDuckGo)
+- [ ] Implement WebSearchTool providers (Google, Brave, DuckDuckGo, SerpApi, SerperDev)
+- [ ] Create provider selection and rate limiting system
 - [ ] Create WebScraperTool with JS rendering
 - [ ] Implement remaining web tools (5 tools)
 - [ ] Create EmailSenderTool with providers
-- [ ] Test all web/network tools
+- [ ] Test all web/network tools with rate limit simulation
 
 **Week 12 Tasks**:
 - [ ] Implement DatabaseConnectorTool
