@@ -201,23 +201,84 @@ impl EmailSenderTool {
     /// Send email via SMTP
     async fn send_via_smtp(
         &self,
-        _config: &EmailProviderConfig,
-        _from: &str,
-        _to: &str,
-        _subject: &str,
-        _body: &str,
-        _html: bool,
+        #[allow(unused_variables)] config: &EmailProviderConfig,
+        #[allow(unused_variables)] from: &str,
+        #[allow(unused_variables)] to: &str,
+        #[allow(unused_variables)] subject: &str,
+        #[allow(unused_variables)] body: &str,
+        #[allow(unused_variables)] html: bool,
     ) -> Result<serde_json::Value> {
-        // Note: SMTP implementation would require lettre crate
-        // For now, return a mock success response
-        warn!("SMTP email sending not fully implemented - returning mock response");
+        #[cfg(feature = "email")]
+        {
+            use lettre::{
+                message::{header::ContentType, Message},
+                transport::smtp::authentication::Credentials,
+                AsyncSmtpTransport, AsyncTransport, Tokio1Executor,
+            };
 
-        Ok(serde_json::json!({
-            "provider": "smtp",
-            "status": "mock_sent",
-            "message_id": format!("mock-{}", uuid::Uuid::new_v4()),
-            "timestamp": chrono::Utc::now().to_rfc3339()
-        }))
+            let host = config.credentials.get("host")
+                .ok_or_else(|| tool_error("SMTP host not configured", Some("host".to_string())))?;
+            let port = config.settings.get("port")
+                .and_then(|p| p.parse::<u16>().ok())
+                .unwrap_or(587);
+
+            let mut builder = Message::builder()
+                .from(from.parse().map_err(|e| tool_error(format!("Invalid from address: {}", e), Some("from".to_string())))?)
+                .to(to.parse().map_err(|e| tool_error(format!("Invalid to address: {}", e), Some("to".to_string())))?)
+                .subject(subject);
+
+            if html {
+                builder = builder.header(ContentType::TEXT_HTML);
+            } else {
+                builder = builder.header(ContentType::TEXT_PLAIN);
+            }
+
+            let email = builder
+                .body(body.to_string())
+                .map_err(|e| tool_error(format!("Failed to build email: {}", e), None))?;
+
+            let mut mailer_builder = AsyncSmtpTransport::<Tokio1Executor>::relay(host)
+                .map_err(|e| tool_error(format!("Failed to create SMTP transport: {}", e), None))?
+                .port(port);
+
+            if let (Some(username), Some(password)) = (
+                config.credentials.get("username"),
+                config.credentials.get("password"),
+            ) {
+                let creds = Credentials::new(username.clone(), password.clone());
+                mailer_builder = mailer_builder.credentials(creds);
+            }
+
+            let mailer = mailer_builder.build();
+
+            match mailer.send(email).await {
+                Ok(response) => {
+                    info!("Email sent successfully via SMTP");
+                    Ok(serde_json::json!({
+                        "provider": "smtp",
+                        "status": "sent",
+                        "message": response.message().collect::<Vec<_>>().join("\n"),
+                        "timestamp": chrono::Utc::now().to_rfc3339()
+                    }))
+                }
+                Err(e) => Err(tool_error(
+                    format!("Failed to send email via SMTP: {}", e),
+                    None,
+                )),
+            }
+        }
+        
+        #[cfg(not(feature = "email"))]
+        {
+            warn!("SMTP email sending not available - lettre feature not enabled");
+            Ok(serde_json::json!({
+                "provider": "smtp",
+                "status": "mock_sent",
+                "message_id": format!("mock-{}", uuid::Uuid::new_v4()),
+                "timestamp": chrono::Utc::now().to_rfc3339(),
+                "note": "Email feature not enabled. Enable with 'email' feature flag."
+            }))
+        }
     }
 
     /// Send email via SendGrid
@@ -245,23 +306,80 @@ impl EmailSenderTool {
     /// Send email via AWS SES
     async fn send_via_ses(
         &self,
-        _config: &EmailProviderConfig,
-        _from: &str,
-        _to: &str,
-        _subject: &str,
-        _body: &str,
-        _html: bool,
+        #[allow(unused_variables)] config: &EmailProviderConfig,
+        #[allow(unused_variables)] from: &str,
+        #[allow(unused_variables)] to: &str,
+        #[allow(unused_variables)] subject: &str,
+        #[allow(unused_variables)] body: &str,
+        #[allow(unused_variables)] html: bool,
     ) -> Result<serde_json::Value> {
-        // Note: SES implementation would require AWS SDK
-        // For now, return a mock success response
-        warn!("AWS SES email sending not fully implemented - returning mock response");
+        #[cfg(feature = "email-aws")]
+        {
+            use aws_sdk_ses::{types::{Body, Content, Destination, Message}, Client};
+            use aws_config::Region;
 
-        Ok(serde_json::json!({
-            "provider": "ses",
-            "status": "mock_sent",
-            "message_id": format!("mock-ses-{}", uuid::Uuid::new_v4()),
-            "timestamp": chrono::Utc::now().to_rfc3339()
-        }))
+            let region = config.credentials.get("region")
+                .map(|r| Region::new(r.clone()))
+                .unwrap_or_else(|| Region::new("us-east-1"));
+
+            let aws_config = aws_config::from_env()
+                .region(region)
+                .load()
+                .await;
+
+            let client = Client::new(&aws_config);
+
+            let mut body_builder = Body::builder();
+            if html {
+                body_builder = body_builder.html(Content::builder().data(body).charset("UTF-8").build()?);
+            } else {
+                body_builder = body_builder.text(Content::builder().data(body).charset("UTF-8").build()?);
+            }
+
+            let message = Message::builder()
+                .subject(Content::builder().data(subject).charset("UTF-8").build()?)
+                .body(body_builder.build())
+                .build();
+
+            let destination = Destination::builder()
+                .to_addresses(to)
+                .build();
+
+            match client
+                .send_email()
+                .source(from)
+                .destination(destination)
+                .message(message)
+                .send()
+                .await
+            {
+                Ok(output) => {
+                    info!("Email sent successfully via AWS SES");
+                    Ok(serde_json::json!({
+                        "provider": "ses",
+                        "status": "sent",
+                        "message_id": output.message_id().map(|s| s.to_string()),
+                        "timestamp": chrono::Utc::now().to_rfc3339()
+                    }))
+                }
+                Err(e) => Err(tool_error(
+                    format!("Failed to send email via AWS SES: {}", e),
+                    None,
+                )),
+            }
+        }
+
+        #[cfg(not(feature = "email-aws"))]
+        {
+            warn!("AWS SES email sending not available - aws-sdk-ses feature not enabled");
+            Ok(serde_json::json!({
+                "provider": "ses",
+                "status": "mock_sent",
+                "message_id": format!("mock-ses-{}", uuid::Uuid::new_v4()),
+                "timestamp": chrono::Utc::now().to_rfc3339(),
+                "note": "AWS SES feature not enabled. Enable with 'email-aws' feature flag."
+            }))
+        }
     }
 }
 

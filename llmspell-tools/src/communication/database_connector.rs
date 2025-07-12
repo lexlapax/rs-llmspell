@@ -305,22 +305,85 @@ impl DatabaseConnectorTool {
     /// Execute PostgreSQL query
     async fn execute_postgresql_query(
         &self,
-        _config: &DatabaseConfig,
+        #[allow(unused_variables)] config: &DatabaseConfig,
         query: &str,
     ) -> Result<serde_json::Value> {
-        // Note: PostgreSQL implementation would require sqlx or tokio-postgres
-        // For now, return a mock response
-        warn!("PostgreSQL query execution not fully implemented - returning mock response");
+        #[cfg(feature = "database-postgres")]
+        {
+            use sqlx::{postgres::PgPoolOptions, Row};
+            use std::time::Duration;
 
-        Ok(serde_json::json!({
-            "database_type": "postgresql",
-            "query": query,
-            "status": "mock_executed",
-            "rows_affected": 0,
-            "results": [],
-            "execution_time_ms": 42,
-            "timestamp": chrono::Utc::now().to_rfc3339()
-        }))
+            let url = config.connection.get("url")
+                .ok_or_else(|| tool_error("PostgreSQL URL not configured", Some("url".to_string())))?;
+
+            let pool = PgPoolOptions::new()
+                .max_connections(config.pool_settings.max_connections)
+                .min_connections(config.pool_settings.min_connections)
+                .acquire_timeout(Duration::from_secs(config.pool_settings.connect_timeout))
+                .connect(url)
+                .await
+                .map_err(|e| tool_error(format!("Failed to connect to PostgreSQL: {}", e), None))?;
+
+            let start = std::time::Instant::now();
+            
+            match sqlx::query(query)
+                .fetch_all(&pool)
+                .await
+            {
+                Ok(rows) => {
+                    let execution_time = start.elapsed().as_millis() as u64;
+                    let results: Vec<serde_json::Value> = rows.iter()
+                        .map(|row| {
+                            let mut result = serde_json::Map::new();
+                            for (i, column) in row.columns().iter().enumerate() {
+                                let value: serde_json::Value = if let Ok(v) = row.try_get::<String, _>(i) {
+                                    serde_json::Value::String(v)
+                                } else if let Ok(v) = row.try_get::<i64, _>(i) {
+                                    serde_json::Value::Number(v.into())
+                                } else if let Ok(v) = row.try_get::<f64, _>(i) {
+                                    serde_json::Value::Number(serde_json::Number::from_f64(v).unwrap_or(serde_json::Number::from(0)))
+                                } else if let Ok(v) = row.try_get::<bool, _>(i) {
+                                    serde_json::Value::Bool(v)
+                                } else {
+                                    serde_json::Value::Null
+                                };
+                                result.insert(column.name().to_string(), value);
+                            }
+                            serde_json::Value::Object(result)
+                        })
+                        .collect();
+
+                    Ok(serde_json::json!({
+                        "database_type": "postgresql",
+                        "query": query,
+                        "status": "executed",
+                        "rows_affected": rows.len(),
+                        "results": results,
+                        "execution_time_ms": execution_time,
+                        "timestamp": chrono::Utc::now().to_rfc3339()
+                    }))
+                }
+                Err(e) => Err(tool_error(
+                    format!("PostgreSQL query failed: {}", e),
+                    None,
+                )),
+            }
+        }
+
+        #[cfg(not(feature = "database-postgres"))]
+        {
+            warn!("PostgreSQL support not available - database-postgres feature not enabled");
+            Ok(serde_json::json!({
+                "database_type": "postgresql",
+                "query": query,
+                "status": "mock_executed",
+                "rows_affected": 0,
+                "results": [],
+                "execution_time_ms": 42,
+                "timestamp": chrono::Utc::now().to_rfc3339(),
+                "note": "PostgreSQL feature not enabled. Enable with 'database-postgres' feature flag."
+            }))
+        }
     }
 
     /// Execute MySQL query
