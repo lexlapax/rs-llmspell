@@ -14,7 +14,7 @@
 ## Phase Overview
 
 ### Goal
-Transform the existing 26 self-contained tools into a standardized, secure, and extensible library of 41+ tools, then implement comprehensive workflow orchestration patterns that leverage the full tool ecosystem.
+Transform the existing 26 self-contained tools into a standardized, secure, and extensible library of 33+ tools, then implement comprehensive workflow orchestration patterns that leverage the full tool ecosystem.
 
 ### Core Principles
 - **Standardization First**: Fix existing tools before adding new ones
@@ -27,15 +27,15 @@ Transform the existing 26 self-contained tools into a standardized, secure, and 
 Phase 3 is divided into four 2-week sub-phases:
 
 1. **Phase 3.0 (Weeks 9-10)**: Critical Tool Fixes - Standardization, DRY, and Initial Security
-2. **Phase 3.1 (Weeks 11-12)**: External Integration Tools - 16 new tools
-3. **Phase 3.2 (Weeks 13-14)**: Advanced Security & Performance - Optimization for all 41 tools
+2. **Phase 3.1 (Weeks 11-12)**: External Integration Tools - 8 new tools
+3. **Phase 3.2 (Weeks 13-14)**: Advanced Security & Performance - Optimization for all 33 tools
 4. **Phase 3.3 (Weeks 15-16)**: Workflow Orchestration - Patterns and engine
 
 ### Success Metrics
 - **Tool Consistency**: 95% parameter standardization (from 60%)
 - **DRY Compliance**: 95% shared utility usage (from 80%)
 - **Security Coverage**: Comprehensive vulnerability mitigation
-- **Tool Count**: 41+ production-ready tools
+- **Tool Count**: 33+ production-ready tools
 - **Workflow Support**: All patterns functional with full tool library
 
 ---
@@ -55,7 +55,7 @@ Phase 3 is divided into four 2-week sub-phases:
 1. **Comprehensive Documentation**: Every breaking change documented with examples
 2. **Clear Upgrade Path**: Step-by-step instructions for updating scripts
 3. **Example Conversions**: Before/after code samples for common patterns
-4. **Tool Reference**: Complete parameter documentation for all 41 tools
+4. **Tool Reference**: Complete parameter documentation for all 33 tools
 
 ---
 
@@ -365,7 +365,7 @@ pub fn validate_safe_path(path: &Path, jail_dir: &Path) -> Result<()> {
 ## Phase 3.1: External Integration Tools (Weeks 11-12)
 
 ### Goal
-Add 16 external integration tools following the standardized patterns established in Phase 3.0.
+Add 8 external integration tools following the standardized patterns established in Phase 3.0.
 
 ### 1. Web & Network Tools (7 tools)
 
@@ -508,7 +508,7 @@ impl Tool for WebScraperTool {
 - `WebpageMonitorTool`: Change detection and alerting
 - `SitemapCrawlerTool`: Sitemap parsing and analysis
 
-### 2. Communication & API Tools (4 tools)
+### 2. Communication Tools (1 tool)
 
 #### 2.1 EmailSenderTool
 
@@ -555,37 +555,7 @@ impl Tool for DatabaseConnectorTool {
 }
 ```
 
-**Other Communication Tools**:
-- `SlackIntegrationTool`: Send messages, manage channels
-- `GitHubIntegrationTool`: Issues, PRs, repository management
-
-### 3. Data Processing Tools (5 tools)
-
-#### 3.1 Core Data Tools
-
-**XmlProcessorTool**:
-```rust
-pub struct XmlProcessorTool {
-    parser: XmlParser,
-    validator: Option<XmlValidator>,
-}
-
-impl Tool for XmlProcessorTool {
-    fn schema(&self) -> ToolSchema {
-        ToolSchema::new("xml_processor", "Parse and transform XML")
-            .with_parameter("input", ParameterType::String, "XML content", true)
-            .with_parameter("operation", ParameterType::String, "parse|validate|transform", true)
-            .with_parameter("xpath", ParameterType::String, "XPath query", false)
-            .with_parameter("xslt", ParameterType::String, "XSLT stylesheet", false)
-    }
-}
-```
-
-**Other Data Tools**:
-- `YamlProcessorTool`: YAML parsing and validation
-- `DataTransformerTool`: Format conversions, ETL operations
-- `StatisticalAnalyzerTool`: Statistical computations
-- `TextAnalyzerTool`: Text analysis and NLP operations
+**Note**: SlackIntegrationTool and GitHubIntegrationTool have been deferred to Phase 19 (Additional Optional Enhancements).
 
 ### 4. Implementation Checklist
 
@@ -599,17 +569,16 @@ impl Tool for XmlProcessorTool {
 
 **Week 12 Tasks**:
 - [ ] Implement DatabaseConnectorTool
-- [ ] Create remaining communication tools
-- [ ] Implement all data processing tools
+- [ ] Complete EmailSenderTool testing
 - [ ] Integration testing with Phase 3.0 standards
-- [ ] Documentation for all 16 new tools
+- [ ] Documentation for all 8 new tools
 
 ---
 
 ## Phase 3.2: Security & Performance (Weeks 13-14)
 
 ### Goal
-Harden security across all 41 tools and optimize performance while maintaining the 52,600x speed advantage.
+Harden security across all 33 tools and optimize performance while maintaining the 52,600x speed advantage.
 
 ### 1. Security Hardening
 
@@ -1234,7 +1203,7 @@ let research_workflow = SequentialWorkflow::builder("research_assistant")
         "input": "{{extract.result.content}}",
         "max_length": 500
     }))
-    .add_step("analyze", "text_analyzer", json!({
+    .add_step("analyze", "sentiment_analyzer", json!({
         "input": "{{summarize.result}}",
         "operations": ["sentiment", "entities", "keywords"]
     }))
@@ -1284,7 +1253,7 @@ let etl_workflow = StreamingWorkflow::builder("etl_pipeline")
 - [ ] Implement LoopWorkflow
 - [ ] Create StreamingWorkflow
 - [ ] Build workflow examples
-- [ ] Integration testing with all 41 tools
+- [ ] Integration testing with all 33 tools
 - [ ] Performance benchmarking
 
 ---
@@ -1332,7 +1301,7 @@ let etl_workflow = StreamingWorkflow::builder("etl_pipeline")
 - Manual upgrade instructions
 
 ### 2. Tool Documentation
-- Updated schemas for all 41 tools
+- Updated schemas for all 33 tools
 - Usage examples with new interfaces
 - Performance characteristics
 - Security considerations
@@ -1364,7 +1333,7 @@ let etl_workflow = StreamingWorkflow::builder("etl_pipeline")
 - **Validation**: Continuous benchmarking
 
 ### 3. Integration Complexity
-- **Risk**: 41 tools with different patterns
+- **Risk**: 33 tools with different patterns
 - **Mitigation**: Strict adherence to standards
 - **Validation**: Integration test suite
 

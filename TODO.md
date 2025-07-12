@@ -16,21 +16,21 @@
 
 ## Overview
 
-**Goal**: Transform the existing 26 self-contained tools into a standardized, secure, and extensible library of 41+ tools, then implement comprehensive workflow orchestration patterns that leverage the full tool ecosystem.
+**Goal**: Transform the existing 26 self-contained tools into a standardized, secure, and extensible library of 33+ tools, then implement comprehensive workflow orchestration patterns that leverage the full tool ecosystem.
 
 **Clean Break Approach**: As a pre-1.0 project (v0.1.0), we're making breaking changes without migration tools to achieve the best architecture. This saves ~1 week of development time that we're investing in better security and features.
 
 **Sub-Phase Structure**:
 - **Phase 3.0 (Weeks 9-10)**: Critical Tool Fixes - Standardization, DRY, and Initial Security ✅ COMPLETE
-- **Phase 3.1 (Weeks 11-12)**: External Integration Tools - 16 new tools
-- **Phase 3.2 (Weeks 13-14)**: Advanced Security & Performance - Optimization for all 41 tools
+- **Phase 3.1 (Weeks 11-12)**: External Integration Tools - 8 new tools
+- **Phase 3.2 (Weeks 13-14)**: Advanced Security & Performance - Optimization for all 33 tools
 - **Phase 3.3 (Weeks 15-16)**: Workflow Orchestration - Patterns and engine
 
 **Success Criteria Summary:**
 - [x] 95% parameter consistency across all tools (from 60%) ✅ (Phase 3.0 Complete)
 - [x] 95% DRY compliance with shared utilities (from 80%) ✅ (Phase 3.0 Complete)
 - [x] Comprehensive security vulnerability mitigation ✅ (Phase 3.0 Complete)
-- [ ] 41+ production-ready tools (26/41 complete)
+- [ ] 33+ production-ready tools (26/33 complete)
 - [ ] All workflow patterns functional with full tool library
 
 ---
@@ -645,74 +645,7 @@
 - [ ] Tests complete
 - [ ] Documentation ready
 
-### Task 3.1.4: Data Processing Tools Extension (**DEFER to later phase**)
-**Priority**: MEDIUM  
-**Estimated Time**: 20 hours  
-**Assignee**: Data Tools Team
-
-**Description**: Implement additional data processing tools.
-
-**Tools to Implement:**
-- XmlProcessorTool (XML parsing and transformation)
-- YamlProcessorTool (YAML parsing and validation)
-- DataTransformerTool (format conversions, ETL)
-- StatisticalAnalyzerTool (statistical computations)
-- TextAnalyzerTool (text analysis and NLP)
-
-**Acceptance Criteria:**
-- [ ] All tools follow Phase 3.0 standards
-- [ ] Consistent with existing data tools
-- [ ] Performance optimized
-- [ ] Comprehensive tests
-
-**Implementation Steps:**
-1. Implement XmlProcessorTool
-2. Create YamlProcessorTool
-3. Build DataTransformerTool
-4. Implement StatisticalAnalyzerTool
-5. Create TextAnalyzerTool
-6. Add tests for all tools
-7. Document usage
-
-**Definition of Done:**
-- [ ] All 5 tools implemented
-- [ ] Tests passing
-- [ ] Documentation complete
-- [ ] Performance verified
-
-### Task 3.1.5: System Integration Tools Extension (**DEFER to later phase**)
-**Priority**: MEDIUM  
-**Estimated Time**: 12 hours  
-**Assignee**: System Tools Team
-
-**Description**: Implement additional system integration tools.
-
-**Tools to Implement:**
-- SlackIntegrationTool (Slack messaging)
-- GitHubIntegrationTool (GitHub API integration)
-- CronSchedulerTool (Cron job management)
-
-**Acceptance Criteria:**
-- [ ] API integrations functional
-- [ ] Secure credential handling
-- [ ] Rate limiting implemented
-- [ ] ResponseBuilder pattern
-
-**Implementation Steps:**
-1. Implement SlackIntegrationTool
-2. Create GitHubIntegrationTool
-3. Build CronSchedulerTool
-4. Add authentication handling
-5. Implement rate limiting
-6. Add comprehensive tests
-
-**Definition of Done:**
-- [ ] All 3 tools implemented
-- [ ] Authentication working
-- [ ] Tests complete
-- [ ] Documentation ready
-
-### Task 3.1.6: External Tool Dependencies
+### Task 3.1.4: External Tool Dependencies
 **Priority**: CRITICAL  
 **Estimated Time**: 8 hours  
 **Assignee**: Infrastructure Team
@@ -742,7 +675,7 @@
 - [ ] Build times acceptable
 - [ ] Documentation complete
 
-### Task 3.1.7: API Key Management System
+### Task 3.1.5: API Key Management System
 **Priority**: CRITICAL  
 **Estimated Time**: 12 hours  
 **Assignee**: Security Team
@@ -772,7 +705,7 @@
 - [ ] Audit logs working
 - [ ] Security review passed
 
-### Task 3.1.8: Rate Limiting Framework
+### Task 3.1.6: Rate Limiting Framework
 **Priority**: HIGH  
 **Estimated Time**: 16 hours  
 **Assignee**: Infrastructure Team
@@ -802,7 +735,7 @@
 - [ ] Metrics available
 - [ ] Documentation complete
 
-### Task 3.1.9: Circuit Breaker Implementation
+### Task 3.1.7: Circuit Breaker Implementation
 **Priority**: MEDIUM  
 **Estimated Time**: 12 hours  
 **Assignee**: Reliability Team
@@ -832,7 +765,7 @@
 - [ ] Metrics implemented
 - [ ] Tests comprehensive
 
-### Task 3.1.10: Integration Testing Suite
+### Task 3.1.8: Integration Testing Suite
 **Priority**: CRITICAL  
 **Estimated Time**: 16 hours  
 **Assignee**: QA Team
@@ -862,7 +795,7 @@
 - [ ] Performance acceptable
 - [ ] Security validated
 
-### Task 3.1.11: External Tools Documentation
+### Task 3.1.9: External Tools Documentation
 **Priority**: HIGH  
 **Estimated Time**: 12 hours  
 **Assignee**: Documentation Team
@@ -892,7 +825,7 @@
 - [ ] Review completed
 - [ ] Published to docs
 
-### Task 3.1.12: Phase 3.1 Validation
+### Task 3.1.10: Phase 3.1 Validation
 **Priority**: CRITICAL  
 **Estimated Time**: 8 hours  
 **Assignee**: Integration Lead
@@ -900,7 +833,7 @@
 **Description**: Validate all external tools meet requirements.
 
 **Acceptance Criteria:**
-- [ ] 16 external tools implemented
+- [ ] 8 external tools implemented
 - [ ] All follow Phase 3.0 standards
 - [ ] Rate limiting working
 - [ ] Security measures in place
@@ -922,6 +855,48 @@
 - [ ] Ready for hardening
 - [ ] Handoff complete
 
+### Task 3.1.11: Implement Lua Tool Examples
+**Priority**: HIGH  
+**Estimated Time**: 12 hours  
+**Assignee**: Developer Experience Team
+
+**Description**: Create comprehensive Lua examples for all 8 new external integration tools in `examples/tools-*.lua`.
+
+**Tools to Document:**
+- WebSearchTool (enhanced with multiple providers)
+- WebScraperTool (with JS rendering examples)
+- UrlAnalyzerTool (validation and metadata extraction)
+- ApiTesterTool (REST API testing scenarios)
+- WebhookCallerTool (webhook invocation with retries)
+- WebpageMonitorTool (change detection examples)
+- SitemapCrawlerTool (sitemap parsing)
+- EmailSenderTool (multiple provider examples)
+- DatabaseConnectorTool (query examples)
+
+**Acceptance Criteria:**
+- [ ] Examples follow existing `tools-*.lua` patterns
+- [ ] Each tool has at least 3 usage examples
+- [ ] Error handling demonstrated
+- [ ] Rate limiting behavior shown
+- [ ] Authentication patterns included
+- [ ] Comments explain key concepts
+
+**Implementation Steps:**
+1. Update `examples/tools-web.lua` with new web tools
+2. Create `examples/tools-integration.lua` for external integrations
+3. Add authentication setup examples
+4. Include rate limiting demonstrations
+5. Show error handling patterns
+6. Test all examples against actual tools
+7. Add inline documentation
+
+**Definition of Done:**
+- [ ] All 8 tools have working examples
+- [ ] Examples run without errors
+- [ ] Code follows Lua best practices
+- [ ] Comments are clear and helpful
+- [ ] Examples demonstrate real use cases
+
 ---
 
 ## Phase 3.2: Security & Performance (Weeks 13-14)
@@ -931,7 +906,7 @@
 **Estimated Time**: 16 hours  
 **Assignee**: Security Team Lead
 
-**Description**: Comprehensive security assessment of all 41 tools.
+**Description**: Comprehensive security assessment of all 33 tools.
 
 **Acceptance Criteria:**
 - [ ] All tools assessed for vulnerabilities
@@ -1081,7 +1056,7 @@
 **Estimated Time**: 20 hours  
 **Assignee**: Performance Team Lead
 
-**Description**: Optimize performance across all 41 tools.
+**Description**: Optimize performance across all 33 tools.
 
 **Acceptance Criteria:**
 - [ ] Shared resource pools
@@ -1445,7 +1420,7 @@
 **Estimated Time**: 16 hours  
 **Assignee**: Developer Experience Team
 
-**Description**: Create comprehensive workflow examples using all 41 tools.
+**Description**: Create comprehensive workflow examples using all 33 tools.
 
 **Acceptance Criteria:**
 - [ ] 10+ workflow examples
@@ -1508,7 +1483,7 @@
 **Description**: Final integration and validation of entire Phase 3.
 
 **Acceptance Criteria:**
-- [ ] All 41 tools standardized and secured
+- [ ] All 33 tools standardized and secured
 - [ ] All workflow patterns functional
 - [ ] Performance targets met
 - [ ] Documentation complete
@@ -1545,7 +1520,7 @@
 - [ ] 95% parameter consistency achieved
 - [ ] 95% DRY compliance verified
 - [ ] All security vulnerabilities addressed
-- [ ] 41+ tools production ready
+- [ ] 33+ tools production ready
 - [ ] All workflow patterns functional
 
 **System Test Steps:**
@@ -1558,7 +1533,7 @@
 
 **Phase 3 Success Metrics:**
 - [ ] **Tool Metrics**:
-  - 41+ tools implemented and standardized
+  - 33+ tools implemented and standardized
   - 95% parameter consistency (from 60%)
   - 95% DRY compliance (from 80%)
   - 100% ResponseBuilder adoption
@@ -1583,7 +1558,7 @@
 ## Handoff to Phase 4
 
 ### Deliverables Package
-- [ ] 41+ standardized production tools
+- [ ] 33+ standardized production tools
 - [ ] Complete workflow orchestration engine
 - [ ] Comprehensive security measures
 - [ ] Breaking changes documentation
