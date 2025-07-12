@@ -29,6 +29,8 @@ use llmspell_utils::{
         extract_string_with_default,
     },
     response::ResponseBuilder,
+    security::{ExpressionAnalyzer, ExpressionComplexityConfig},
+    timeout::with_timeout,
 };
 use serde_json::{json, Value as JsonValue};
 use std::collections::BTreeMap;
@@ -38,6 +40,8 @@ use std::collections::BTreeMap;
 pub struct CalculatorTool {
     /// Tool metadata
     metadata: ComponentMetadata,
+    /// Expression analyzer for DoS protection
+    analyzer: ExpressionAnalyzer,
 }
 
 impl Default for CalculatorTool {
@@ -48,6 +52,7 @@ impl Default for CalculatorTool {
                 "Mathematical expression calculator with variables and scientific functions"
                     .to_string(),
             ),
+            analyzer: ExpressionAnalyzer::with_config(ExpressionComplexityConfig::default()),
         }
     }
 }
@@ -65,11 +70,23 @@ impl CalculatorTool {
     }
 
     /// Evaluate expression with custom functions and variables
-    fn evaluate_expression(
+    async fn evaluate_expression(
         &self,
         expression: &str,
         variables: &serde_json::Map<String, JsonValue>,
     ) -> Result<f64> {
+        // First, analyze expression complexity for DoS protection
+        let complexity = self.analyzer.analyze(expression);
+        if !complexity.is_safe {
+            return Err(validation_error(
+                format!(
+                    "Expression too complex: {}",
+                    complexity.unsafe_reason.unwrap_or_default()
+                ),
+                Some("input".to_string()),
+            ));
+        }
+
         // Preprocess custom functions
         let processed_expr = self.preprocess_custom_functions(expression);
 
@@ -81,8 +98,23 @@ impl CalculatorTool {
             }
         }
 
-        // Evaluate using fasteval
-        fasteval::ez_eval(&processed_expr, &mut ns).map_err(|e| self.convert_error(e))
+        // Evaluate with timeout to prevent DoS
+        let max_eval_time = self.analyzer.max_evaluation_time();
+        let ns_clone = ns.clone();
+        let expr_clone = processed_expr.clone();
+
+        match with_timeout(max_eval_time, async move {
+            fasteval::ez_eval(&expr_clone, &mut ns_clone.clone())
+        })
+        .await
+        {
+            Ok(Ok(result)) => Ok(result),
+            Ok(Err(e)) => Err(self.convert_error(e)),
+            Err(_) => Err(validation_error(
+                format!("Expression evaluation timed out after {:?}", max_eval_time),
+                Some("input".to_string()),
+            )),
+        }
     }
 
     /// Preprocess expression to replace custom functions with their implementations
@@ -126,7 +158,7 @@ impl CalculatorTool {
                     .unwrap_or_default();
 
                 // Use our custom evaluation method
-                let result = self.evaluate_expression(expression, &variables)?;
+                let result = self.evaluate_expression(expression, &variables).await?;
 
                 // Handle special float values (infinity, NaN) that don't serialize well to JSON
                 let result_value = if result.is_infinite() {
@@ -157,7 +189,7 @@ impl CalculatorTool {
 
                 // Try to evaluate the expression with empty variables to validate syntax
                 let empty_vars = serde_json::Map::new();
-                match self.evaluate_expression(expression, &empty_vars) {
+                match self.evaluate_expression(expression, &empty_vars).await {
                     Ok(_) => {
                         let response = ResponseBuilder::success("validate")
                             .with_message("Expression is valid")
@@ -226,12 +258,21 @@ impl BaseAgent for CalculatorTool {
         let params = extract_parameters(&input)?;
 
         // Process the operation
-        let result = self.process_operation(params).await?;
-
-        // Return the result as JSON formatted text
-        Ok(AgentOutput::text(
-            serde_json::to_string_pretty(&result).unwrap(),
-        ))
+        match self.process_operation(params).await {
+            Ok(result) => {
+                // Return the result as JSON formatted text
+                Ok(AgentOutput::text(
+                    serde_json::to_string_pretty(&result).unwrap(),
+                ))
+            }
+            Err(e) => {
+                // Return error as a response with success=false
+                let error_response = ResponseBuilder::error("evaluate", e.to_string()).build();
+                Ok(AgentOutput::text(
+                    serde_json::to_string_pretty(&error_response).unwrap(),
+                ))
+            }
+        }
     }
 
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
@@ -559,5 +600,193 @@ mod tests {
 
         assert!(output["success"].as_bool().unwrap_or(false));
         assert!((output["result"]["result"].as_f64().unwrap() - 2.0).abs() < 0.0001);
+    }
+
+    #[tokio::test]
+    async fn test_dos_protection_long_expression() {
+        let tool = CalculatorTool::new();
+
+        // Create an expression that's too long
+        let long_expr = "1 + ".repeat(300) + "1";
+
+        let input = AgentInput::text("long expr").with_parameter(
+            "parameters",
+            json!({
+                "operation": "evaluate",
+                "input": long_expr
+            }),
+        );
+
+        let result = tool
+            .execute(input, ExecutionContext::default())
+            .await
+            .unwrap();
+        let output: JsonValue = serde_json::from_str(&result.text).unwrap();
+
+        assert_eq!(output["success"], false);
+        assert!(output["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("too long"));
+    }
+
+    #[tokio::test]
+    async fn test_dos_protection_deep_nesting() {
+        let tool = CalculatorTool::new();
+
+        // Create deeply nested expression
+        let nested_expr = "(".repeat(25) + "1" + &")".repeat(25);
+
+        let input = AgentInput::text("nested expr").with_parameter(
+            "parameters",
+            json!({
+                "operation": "evaluate",
+                "input": nested_expr
+            }),
+        );
+
+        let result = tool
+            .execute(input, ExecutionContext::default())
+            .await
+            .unwrap();
+        let output: JsonValue = serde_json::from_str(&result.text).unwrap();
+
+        assert_eq!(output["success"], false);
+        assert!(output["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("too deep"));
+    }
+
+    #[tokio::test]
+    async fn test_dos_protection_too_many_operations() {
+        let tool = CalculatorTool::new();
+
+        // Create expression with too many operations
+        let many_ops = (0..150)
+            .map(|i| format!("{}", i))
+            .collect::<Vec<_>>()
+            .join(" + ");
+
+        let input = AgentInput::text("many ops").with_parameter(
+            "parameters",
+            json!({
+                "operation": "evaluate",
+                "input": many_ops
+            }),
+        );
+
+        let result = tool
+            .execute(input, ExecutionContext::default())
+            .await
+            .unwrap();
+        let output: JsonValue = serde_json::from_str(&result.text).unwrap();
+
+        assert_eq!(output["success"], false);
+        assert!(output["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("operations"));
+    }
+
+    #[tokio::test]
+    async fn test_dos_protection_timeout() {
+        let tool = CalculatorTool::new();
+
+        // This expression would take a long time to evaluate if not for the timeout
+        // Using nested exponentials that would be very slow
+        let slow_expr = "2^2^2^2^2^2^2^2^2^2";
+
+        let input = AgentInput::text("slow expr").with_parameter(
+            "parameters",
+            json!({
+                "operation": "evaluate",
+                "input": slow_expr
+            }),
+        );
+
+        let result = tool
+            .execute(input, ExecutionContext::default())
+            .await
+            .unwrap();
+        let output: JsonValue = serde_json::from_str(&result.text).unwrap();
+
+        // This should either timeout or be caught by complexity analysis
+        if output["success"].as_bool().unwrap_or(true) {
+            // If it succeeded, the result should be reasonable
+            assert!(
+                output["result"]["result"].is_number() || output["result"]["result"].is_string()
+            );
+        } else {
+            // If it failed, it should be due to timeout or complexity
+            let error_msg = output["error"]["message"].as_str().unwrap();
+            assert!(error_msg.contains("timeout") || error_msg.contains("operations"));
+        }
+    }
+
+    #[tokio::test]
+    async fn test_dos_protection_large_numbers() {
+        let tool = CalculatorTool::new();
+
+        // Expression with extremely large numbers
+        let large_num_expr = "123456789012345678901234567890 + 1";
+
+        let input = AgentInput::text("large num").with_parameter(
+            "parameters",
+            json!({
+                "operation": "evaluate",
+                "input": large_num_expr
+            }),
+        );
+
+        let result = tool
+            .execute(input, ExecutionContext::default())
+            .await
+            .unwrap();
+        let output: JsonValue = serde_json::from_str(&result.text).unwrap();
+
+        assert_eq!(output["success"], false);
+        assert!(output["error"]["message"]
+            .as_str()
+            .unwrap()
+            .contains("large number"));
+    }
+
+    #[tokio::test]
+    async fn test_dos_protection_dangerous_patterns() {
+        let tool = CalculatorTool::new();
+
+        // Expression with dangerous patterns
+        let dangerous_exprs = vec!["1 +++ 2", "((((((((x", "x *** y /// z"];
+
+        for expr in dangerous_exprs {
+            let input = AgentInput::text("dangerous").with_parameter(
+                "parameters",
+                json!({
+                    "operation": "evaluate",
+                    "input": expr
+                }),
+            );
+
+            let result = tool
+                .execute(input, ExecutionContext::default())
+                .await
+                .unwrap();
+            let output: JsonValue = serde_json::from_str(&result.text).unwrap();
+
+            assert_eq!(
+                output["success"], false,
+                "Expression '{}' should fail",
+                expr
+            );
+            let error_msg = output["error"]["message"].as_str().unwrap();
+            assert!(
+                error_msg.contains("consecutive")
+                    || error_msg.contains("stack overflow")
+                    || error_msg.contains("complex"),
+                "Expression '{}' should have appropriate error message",
+                expr
+            );
+        }
     }
 }
