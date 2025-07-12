@@ -4,6 +4,7 @@
 pub mod exec;
 pub mod info;
 pub mod init;
+pub mod keys;
 pub mod providers;
 pub mod repl;
 pub mod run;
@@ -39,6 +40,7 @@ pub async fn execute_command(
         Commands::Validate { config } => validate::validate_config(config, output_format).await,
         Commands::Info { all } => info::show_engine_info(engine, all, output_format).await,
         Commands::Init { output, force } => init::init_config(output, force).await,
+        Commands::Keys(keys_cmd) => keys::KeysCommand { command: keys_cmd }.execute().await,
     }
 }
 

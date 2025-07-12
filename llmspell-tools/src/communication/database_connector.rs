@@ -22,6 +22,9 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tracing::{debug, error, info, warn};
 
+#[cfg(feature = "database")]
+use sqlx::Column;
+
 /// Database connection configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DatabaseConfig {
@@ -313,8 +316,9 @@ impl DatabaseConnectorTool {
             use sqlx::{postgres::PgPoolOptions, Row};
             use std::time::Duration;
 
-            let url = config.connection.get("url")
-                .ok_or_else(|| tool_error("PostgreSQL URL not configured", Some("url".to_string())))?;
+            let url = config.connection.get("url").ok_or_else(|| {
+                tool_error("PostgreSQL URL not configured", Some("url".to_string()))
+            })?;
 
             let pool = PgPoolOptions::new()
                 .max_connections(config.pool_settings.max_connections)
@@ -325,28 +329,30 @@ impl DatabaseConnectorTool {
                 .map_err(|e| tool_error(format!("Failed to connect to PostgreSQL: {}", e), None))?;
 
             let start = std::time::Instant::now();
-            
-            match sqlx::query(query)
-                .fetch_all(&pool)
-                .await
-            {
+
+            match sqlx::query(query).fetch_all(&pool).await {
                 Ok(rows) => {
                     let execution_time = start.elapsed().as_millis() as u64;
-                    let results: Vec<serde_json::Value> = rows.iter()
+                    let results: Vec<serde_json::Value> = rows
+                        .iter()
                         .map(|row| {
                             let mut result = serde_json::Map::new();
                             for (i, column) in row.columns().iter().enumerate() {
-                                let value: serde_json::Value = if let Ok(v) = row.try_get::<String, _>(i) {
-                                    serde_json::Value::String(v)
-                                } else if let Ok(v) = row.try_get::<i64, _>(i) {
-                                    serde_json::Value::Number(v.into())
-                                } else if let Ok(v) = row.try_get::<f64, _>(i) {
-                                    serde_json::Value::Number(serde_json::Number::from_f64(v).unwrap_or(serde_json::Number::from(0)))
-                                } else if let Ok(v) = row.try_get::<bool, _>(i) {
-                                    serde_json::Value::Bool(v)
-                                } else {
-                                    serde_json::Value::Null
-                                };
+                                let value: serde_json::Value =
+                                    if let Ok(v) = row.try_get::<String, _>(i) {
+                                        serde_json::Value::String(v)
+                                    } else if let Ok(v) = row.try_get::<i64, _>(i) {
+                                        serde_json::Value::Number(v.into())
+                                    } else if let Ok(v) = row.try_get::<f64, _>(i) {
+                                        serde_json::Value::Number(
+                                            serde_json::Number::from_f64(v)
+                                                .unwrap_or(serde_json::Number::from(0)),
+                                        )
+                                    } else if let Ok(v) = row.try_get::<bool, _>(i) {
+                                        serde_json::Value::Bool(v)
+                                    } else {
+                                        serde_json::Value::Null
+                                    };
                                 result.insert(column.name().to_string(), value);
                             }
                             serde_json::Value::Object(result)
@@ -363,10 +369,7 @@ impl DatabaseConnectorTool {
                         "timestamp": chrono::Utc::now().to_rfc3339()
                     }))
                 }
-                Err(e) => Err(tool_error(
-                    format!("PostgreSQL query failed: {}", e),
-                    None,
-                )),
+                Err(e) => Err(tool_error(format!("PostgreSQL query failed: {}", e), None)),
             }
         }
 

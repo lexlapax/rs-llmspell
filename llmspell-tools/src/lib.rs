@@ -2,6 +2,7 @@
 //! ABOUTME: Built-in tools library with registry, security sandbox, and tool implementations
 
 pub mod api;
+pub mod api_key_integration;
 pub mod communication;
 pub mod data;
 pub mod fs;

@@ -95,6 +95,12 @@ pub mod progress;
 /// Security utilities for DoS protection and resource limits
 pub mod security;
 
+/// API key management system
+pub mod api_key_manager;
+
+/// Persistent storage for API keys
+pub mod api_key_persistent_storage;
+
 // Re-export commonly used types and functions
 pub use async_utils::{
     concurrent_map, race_to_success, retry_async, timeout, timeout_with_default, AsyncError,
@@ -195,3 +201,9 @@ pub use security::{
     path::{PathSecurityConfig, PathSecurityValidator},
     ExpressionAnalyzer, ExpressionComplexity, ExpressionComplexityConfig,
 };
+
+// Re-export API key management utilities
+pub use api_key_manager::{
+    ApiKeyAction, ApiKeyAuditEntry, ApiKeyManager, ApiKeyMetadata, ApiKeyStorage, InMemoryStorage,
+};
+pub use api_key_persistent_storage::PersistentApiKeyStorage;

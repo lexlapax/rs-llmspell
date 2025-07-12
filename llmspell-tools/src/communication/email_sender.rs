@@ -22,6 +22,8 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tracing::{debug, error, info, warn};
 
+use crate::api_key_integration::{get_api_key, ApiKeyConfig, RequiresApiKey};
+
 /// Configuration for email providers
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EmailProviderConfig {
@@ -91,8 +93,10 @@ impl EmailSenderConfig {
             providers.insert("smtp".to_string(), smtp_config);
         }
 
-        // SendGrid configuration
-        if let Ok(api_key) = std::env::var("EMAIL_SENDGRID_API_KEY") {
+        // SendGrid configuration - use API key manager with fallback to env vars
+        if let Some(api_key) =
+            get_api_key("sendgrid").or_else(|| std::env::var("EMAIL_SENDGRID_API_KEY").ok())
+        {
             let mut credentials = HashMap::new();
             credentials.insert("api_key".to_string(), api_key);
 
@@ -104,12 +108,16 @@ impl EmailSenderConfig {
             providers.insert("sendgrid".to_string(), sendgrid_config);
         }
 
-        // AWS SES configuration
-        if let Ok(access_key) = std::env::var("EMAIL_SES_ACCESS_KEY_ID") {
+        // AWS SES configuration - use API key manager with fallback to env vars
+        if let Some(access_key) = get_api_key("aws_ses_access_key")
+            .or_else(|| std::env::var("EMAIL_SES_ACCESS_KEY_ID").ok())
+        {
             let mut credentials = HashMap::new();
             credentials.insert("access_key_id".to_string(), access_key);
 
-            if let Ok(secret_key) = std::env::var("EMAIL_SES_SECRET_ACCESS_KEY") {
+            if let Some(secret_key) = get_api_key("aws_ses_secret_key")
+                .or_else(|| std::env::var("EMAIL_SES_SECRET_ACCESS_KEY").ok())
+            {
                 credentials.insert("secret_access_key".to_string(), secret_key);
             }
             if let Ok(region) = std::env::var("EMAIL_SES_REGION") {
@@ -139,6 +147,16 @@ impl EmailSenderConfig {
 pub struct EmailSenderTool {
     config: EmailSenderConfig,
     metadata: ComponentMetadata,
+}
+
+impl RequiresApiKey for EmailSenderTool {
+    fn api_key_configs(&self) -> Vec<ApiKeyConfig> {
+        vec![
+            ApiKeyConfig::new("sendgrid").required(false),
+            ApiKeyConfig::new("aws_ses_access_key").required(false),
+            ApiKeyConfig::new("aws_ses_secret_key").required(false),
+        ]
+    }
 }
 
 impl EmailSenderTool {
@@ -216,15 +234,26 @@ impl EmailSenderTool {
                 AsyncSmtpTransport, AsyncTransport, Tokio1Executor,
             };
 
-            let host = config.credentials.get("host")
+            let host = config
+                .credentials
+                .get("host")
                 .ok_or_else(|| tool_error("SMTP host not configured", Some("host".to_string())))?;
-            let port = config.settings.get("port")
+            let port = config
+                .settings
+                .get("port")
                 .and_then(|p| p.parse::<u16>().ok())
                 .unwrap_or(587);
 
             let mut builder = Message::builder()
-                .from(from.parse().map_err(|e| tool_error(format!("Invalid from address: {}", e), Some("from".to_string())))?)
-                .to(to.parse().map_err(|e| tool_error(format!("Invalid to address: {}", e), Some("to".to_string())))?)
+                .from(from.parse().map_err(|e| {
+                    tool_error(
+                        format!("Invalid from address: {}", e),
+                        Some("from".to_string()),
+                    )
+                })?)
+                .to(to.parse().map_err(|e| {
+                    tool_error(format!("Invalid to address: {}", e), Some("to".to_string()))
+                })?)
                 .subject(subject);
 
             if html {
@@ -267,7 +296,7 @@ impl EmailSenderTool {
                 )),
             }
         }
-        
+
         #[cfg(not(feature = "email"))]
         {
             warn!("SMTP email sending not available - lettre feature not enabled");
@@ -315,14 +344,19 @@ impl EmailSenderTool {
     ) -> Result<serde_json::Value> {
         #[cfg(feature = "email-aws")]
         {
-            use aws_sdk_ses::{types::{Body, Content, Destination, Message}, Client};
             use aws_config::Region;
+            use aws_sdk_ses::{
+                types::{Body, Content, Destination, Message},
+                Client,
+            };
 
-            let region = config.credentials.get("region")
+            let region = config
+                .credentials
+                .get("region")
                 .map(|r| Region::new(r.clone()))
                 .unwrap_or_else(|| Region::new("us-east-1"));
 
-            let aws_config = aws_config::from_env()
+            let aws_config = aws_config::defaults(aws_config::BehaviorVersion::latest())
                 .region(region)
                 .load()
                 .await;
@@ -331,19 +365,37 @@ impl EmailSenderTool {
 
             let mut body_builder = Body::builder();
             if html {
-                body_builder = body_builder.html(Content::builder().data(body).charset("UTF-8").build()?);
+                let html_content = Content::builder()
+                    .data(body)
+                    .charset("UTF-8")
+                    .build()
+                    .map_err(|e| {
+                        tool_error(format!("Failed to build HTML content: {}", e), None)
+                    })?;
+                body_builder = body_builder.html(html_content);
             } else {
-                body_builder = body_builder.text(Content::builder().data(body).charset("UTF-8").build()?);
+                let text_content = Content::builder()
+                    .data(body)
+                    .charset("UTF-8")
+                    .build()
+                    .map_err(|e| {
+                        tool_error(format!("Failed to build text content: {}", e), None)
+                    })?;
+                body_builder = body_builder.text(text_content);
             }
 
+            let subject_content = Content::builder()
+                .data(subject)
+                .charset("UTF-8")
+                .build()
+                .map_err(|e| tool_error(format!("Failed to build subject: {}", e), None))?;
+
             let message = Message::builder()
-                .subject(Content::builder().data(subject).charset("UTF-8").build()?)
+                .subject(subject_content)
                 .body(body_builder.build())
                 .build();
 
-            let destination = Destination::builder()
-                .to_addresses(to)
-                .build();
+            let destination = Destination::builder().to_addresses(to).build();
 
             match client
                 .send_email()
@@ -358,7 +410,7 @@ impl EmailSenderTool {
                     Ok(serde_json::json!({
                         "provider": "ses",
                         "status": "sent",
-                        "message_id": output.message_id().map(|s| s.to_string()),
+                        "message_id": output.message_id(),
                         "timestamp": chrono::Utc::now().to_rfc3339()
                     }))
                 }

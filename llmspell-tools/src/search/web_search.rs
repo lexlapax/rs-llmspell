@@ -22,6 +22,8 @@ use std::time::Duration;
 use tokio::sync::Mutex;
 use tracing::{debug, error, info, warn};
 
+use crate::api_key_integration::{get_api_key, ApiKeyConfig, RequiresApiKey};
+
 use crate::search::providers::{
     BraveSearchProvider, DuckDuckGoProvider, GoogleSearchProvider, ProviderConfig, SearchOptions,
     SearchProvider, SearchResult, SearchType, SerpApiProvider, SerperDevProvider,
@@ -72,8 +74,10 @@ impl WebSearchConfig {
         let mut config = Self::default();
         let mut providers = HashMap::new();
 
-        // Google configuration
-        if let Ok(api_key) = std::env::var("WEBSEARCH_GOOGLE_API_KEY") {
+        // Google configuration - use API key manager with fallback to env vars
+        if let Some(api_key) =
+            get_api_key("google_search").or_else(|| std::env::var("WEBSEARCH_GOOGLE_API_KEY").ok())
+        {
             let additional_config =
                 if let Ok(engine_id) = std::env::var("WEBSEARCH_GOOGLE_SEARCH_ENGINE_ID") {
                     serde_json::json!({
@@ -89,9 +93,10 @@ impl WebSearchConfig {
             providers.insert("google".to_string(), google_config);
         }
 
-        // Brave configuration - check both prefixed and standard env var names
-        if let Ok(api_key) =
-            std::env::var("WEBSEARCH_BRAVE_API_KEY").or_else(|_| std::env::var("BRAVE_API_KEY"))
+        // Brave configuration - use API key manager with fallback to env vars
+        if let Some(api_key) = get_api_key("brave_search")
+            .or_else(|| std::env::var("WEBSEARCH_BRAVE_API_KEY").ok())
+            .or_else(|| std::env::var("BRAVE_API_KEY").ok())
         {
             let brave_config = ProviderConfig {
                 api_key: Some(api_key),
@@ -100,9 +105,10 @@ impl WebSearchConfig {
             providers.insert("brave".to_string(), brave_config);
         }
 
-        // SerpApi configuration - check both prefixed and standard env var names
-        if let Ok(api_key) =
-            std::env::var("WEBSEARCH_SERPAPI_API_KEY").or_else(|_| std::env::var("SERPAPI_API_KEY"))
+        // SerpApi configuration - use API key manager with fallback to env vars
+        if let Some(api_key) = get_api_key("serpapi")
+            .or_else(|| std::env::var("WEBSEARCH_SERPAPI_API_KEY").ok())
+            .or_else(|| std::env::var("SERPAPI_API_KEY").ok())
         {
             let serpapi_config = ProviderConfig {
                 api_key: Some(api_key),
@@ -111,9 +117,10 @@ impl WebSearchConfig {
             providers.insert("serpapi".to_string(), serpapi_config);
         }
 
-        // SerperDev configuration - check both prefixed and standard env var names
-        if let Ok(api_key) = std::env::var("WEBSEARCH_SERPERDEV_API_KEY")
-            .or_else(|_| std::env::var("SERPERDEV_API_KEY"))
+        // SerperDev configuration - use API key manager with fallback to env vars
+        if let Some(api_key) = get_api_key("serperdev")
+            .or_else(|| std::env::var("WEBSEARCH_SERPERDEV_API_KEY").ok())
+            .or_else(|| std::env::var("SERPERDEV_API_KEY").ok())
         {
             let serperdev_config = ProviderConfig {
                 api_key: Some(api_key),
@@ -147,6 +154,17 @@ pub struct WebSearchTool {
     metadata: ComponentMetadata,
     config: WebSearchConfig,
     providers: Arc<Mutex<HashMap<String, ProviderWrapper>>>,
+}
+
+impl RequiresApiKey for WebSearchTool {
+    fn api_key_configs(&self) -> Vec<ApiKeyConfig> {
+        vec![
+            ApiKeyConfig::new("google_search").required(false),
+            ApiKeyConfig::new("brave_search").required(false),
+            ApiKeyConfig::new("serpapi").required(false),
+            ApiKeyConfig::new("serperdev").required(false),
+        ]
+    }
 }
 
 impl WebSearchTool {
