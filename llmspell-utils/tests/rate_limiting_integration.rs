@@ -1,9 +1,10 @@
 //! ABOUTME: Integration tests for the rate limiting framework
 //! ABOUTME: Tests provider rate limiting, retry logic, and metrics collection
 
-use llmspell_utils::{
-    BackoffStrategy, ProviderLimits, ProviderRateLimitConfig, ProviderRateLimiter, RateLimitInfo,
-};
+#[cfg(feature = "rate-limiting-http")]
+use llmspell_utils::RateLimitInfo;
+use llmspell_utils::{BackoffStrategy, ProviderLimits, ProviderRateLimiter};
+#[cfg(feature = "rate-limiting-http")]
 use reqwest::header::{HeaderMap, HeaderValue};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -28,6 +29,7 @@ async fn test_provider_rate_limiter_creation() {
 }
 
 #[tokio::test]
+#[cfg(feature = "rate-limiting-http")]
 async fn test_rate_limit_headers_parsing() {
     let mut headers = HeaderMap::new();
     headers.insert("x-ratelimit-remaining", HeaderValue::from_static("0"));
@@ -182,6 +184,7 @@ async fn test_concurrent_rate_limiting() {
 }
 
 // Example of how to integrate with an actual HTTP client
+#[cfg(feature = "rate-limiting-http")]
 async fn example_http_request_with_rate_limiting() -> Result<(), Box<dyn std::error::Error>> {
     let limiter = ProviderRateLimiter::new();
 

@@ -6,9 +6,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::RwLock;
-use tracing::{debug, info};
 #[cfg(feature = "rate-limiting-http")]
 use tracing::warn;
+use tracing::{debug, info};
 
 mod metrics;
 mod provider_limits;
@@ -34,6 +34,7 @@ pub struct RateLimitInfo {
 impl RateLimitInfo {
     /// Parse rate limit information from HTTP headers
     #[cfg(feature = "rate-limiting-http")]
+    #[must_use]
     pub fn from_headers(headers: &reqwest::header::HeaderMap) -> Self {
         let remaining = headers
             .get("x-ratelimit-remaining")
@@ -70,6 +71,12 @@ impl RateLimitInfo {
     }
 
     /// Calculate wait time based on rate limit info
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if the system time is before the Unix epoch,
+    /// which should never happen on systems with correctly set clocks.
+    #[must_use]
     pub fn wait_time(&self) -> Option<Duration> {
         if let Some(retry_after) = self.retry_after {
             return Some(retry_after);
@@ -114,6 +121,7 @@ impl Default for ProviderRateLimiter {
 
 impl ProviderRateLimiter {
     /// Create a new provider rate limiter
+    #[must_use]
     pub fn new() -> Self {
         Self {
             limiters: Arc::new(RwLock::new(HashMap::new())),
@@ -124,6 +132,10 @@ impl ProviderRateLimiter {
     }
 
     /// Create with provider configurations
+    ///
+    /// # Errors
+    ///
+    /// Returns `RateLimitError` if any of the rate limiter configurations are invalid.
     pub async fn with_configs(
         configs: HashMap<String, ProviderRateLimitConfig>,
     ) -> Result<Self, RateLimitError> {
@@ -137,6 +149,10 @@ impl ProviderRateLimiter {
     }
 
     /// Add a provider with rate limit configuration
+    ///
+    /// # Errors
+    ///
+    /// Returns `RateLimitError` if the rate limiter configuration is invalid.
     pub async fn add_provider(
         &mut self,
         provider: &str,
@@ -161,6 +177,10 @@ impl ProviderRateLimiter {
     }
 
     /// Check if a request is allowed for a provider
+    ///
+    /// # Errors
+    ///
+    /// Returns `RateLimitError` if the rate limit has been exceeded for the provider.
     pub async fn check_rate_limit(&self, provider: &str) -> Result<(), RateLimitError> {
         let limiters = self.limiters.read().await;
 
@@ -183,6 +203,13 @@ impl ProviderRateLimiter {
     }
 
     /// Execute a request with rate limiting and retry logic
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The operation fails after all retry attempts are exhausted
+    /// - Rate limit is exceeded and retries are disabled
+    /// - The provided operation returns an error
     pub async fn execute_with_retry<F, T>(
         &self,
         provider: &str,

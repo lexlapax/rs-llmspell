@@ -40,11 +40,12 @@ impl Default for BackoffStrategy {
 
 impl BackoffStrategy {
     /// Calculate delay for a given retry attempt (0-indexed)
+    #[must_use]
     pub fn calculate_delay(&self, attempt: u32) -> Duration {
         match self {
             Self::None => Duration::ZERO,
             Self::Linear { increment_ms } => {
-                Duration::from_millis(*increment_ms * (attempt as u64 + 1))
+                Duration::from_millis(*increment_ms * (u64::from(attempt) + 1))
             }
             Self::Exponential { base_ms } => {
                 let delay = *base_ms * 2u64.pow(attempt);
@@ -95,6 +96,18 @@ impl Default for RetryHandler {
 
 impl RetryHandler {
     /// Execute an operation with retry logic
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The operation fails after all retry attempts are exhausted
+    /// - Rate limit is exceeded and `retry_on_rate_limit` is false
+    /// - The provided operation returns an error
+    ///
+    /// # Panics
+    ///
+    /// This function will panic if no error was recorded after retry attempts are exhausted,
+    /// which should never happen in practice as at least one operation attempt is always made.
     pub async fn execute_with_retry<F, T>(
         &self,
         provider: &str,
@@ -127,7 +140,7 @@ impl RetryHandler {
                                 // Create a generic error if we don't have one
                                 Box::new(std::io::Error::new(
                                     std::io::ErrorKind::Other,
-                                    format!("Rate limit exceeded for provider: {}", provider),
+                                    format!("Rate limit exceeded for provider: {provider}"),
                                 ))
                                     as Box<dyn std::error::Error + Send + Sync>
                             }));
@@ -164,7 +177,7 @@ impl RetryHandler {
                     return Ok(result);
                 }
                 Err(e) => {
-                    let error_msg = format!("{:?}", e);
+                    let error_msg = format!("{e:?}");
 
                     // Check if this is a rate limit error
                     let is_rate_limit = error_msg.to_lowercase().contains("rate limit")
@@ -205,6 +218,10 @@ impl RetryHandler {
     }
 
     /// Execute with simple retry (no rate limiting)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails after all retry attempts are exhausted.
     pub async fn simple_retry<F, T>(
         &self,
         operation: F,
@@ -295,7 +312,7 @@ mod tests {
         let attempts = Arc::new(AtomicU32::new(0));
         let attempts_clone = Arc::clone(&attempts);
 
-        let result = handler
+        let result: Result<String, Box<dyn std::error::Error + Send + Sync>> = handler
             .simple_retry(
                 move || {
                     let attempts = Arc::clone(&attempts_clone);

@@ -38,7 +38,8 @@ impl Default for RateLimitConfig {
 pub struct ProviderLimits;
 
 impl ProviderLimits {
-    /// OpenAI API rate limits (GPT-3.5-turbo tier)
+    /// `OpenAI` API rate limits (GPT-3.5-turbo tier)
+    #[must_use]
     pub fn openai() -> RateLimitConfig {
         RateLimitConfig {
             requests_per_minute: 3_500,
@@ -51,6 +52,7 @@ impl ProviderLimits {
     }
 
     /// Anthropic Claude API rate limits
+    #[must_use]
     pub fn anthropic() -> RateLimitConfig {
         RateLimitConfig {
             requests_per_minute: 50,
@@ -63,6 +65,7 @@ impl ProviderLimits {
     }
 
     /// Google Search API rate limits
+    #[must_use]
     pub fn google_search() -> RateLimitConfig {
         RateLimitConfig {
             requests_per_minute: 100,
@@ -74,7 +77,8 @@ impl ProviderLimits {
         }
     }
 
-    /// DuckDuckGo API rate limits (conservative estimate)
+    /// `DuckDuckGo` API rate limits (conservative estimate)
+    #[must_use]
     pub fn duckduckgo() -> RateLimitConfig {
         RateLimitConfig {
             requests_per_minute: 20,
@@ -87,6 +91,7 @@ impl ProviderLimits {
     }
 
     /// Bing Search API rate limits
+    #[must_use]
     pub fn bing_search() -> RateLimitConfig {
         RateLimitConfig {
             requests_per_minute: 1000,
@@ -99,6 +104,7 @@ impl ProviderLimits {
     }
 
     /// Brave Search API rate limits
+    #[must_use]
     pub fn brave_search() -> RateLimitConfig {
         RateLimitConfig {
             requests_per_minute: 60,
@@ -110,7 +116,8 @@ impl ProviderLimits {
         }
     }
 
-    /// SerpAPI rate limits
+    /// `SerpAPI` rate limits
+    #[must_use]
     pub fn serpapi() -> RateLimitConfig {
         RateLimitConfig {
             requests_per_minute: 60,
@@ -123,6 +130,7 @@ impl ProviderLimits {
     }
 
     /// GitHub API rate limits (authenticated)
+    #[must_use]
     pub fn github() -> RateLimitConfig {
         RateLimitConfig {
             requests_per_minute: 5000, // 5000 per hour = ~83 per minute
@@ -135,6 +143,7 @@ impl ProviderLimits {
     }
 
     /// Slack API rate limits
+    #[must_use]
     pub fn slack() -> RateLimitConfig {
         RateLimitConfig {
             requests_per_minute: 60,
@@ -146,7 +155,8 @@ impl ProviderLimits {
         }
     }
 
-    /// SendGrid API rate limits
+    /// `SendGrid` API rate limits
+    #[must_use]
     pub fn sendgrid() -> RateLimitConfig {
         RateLimitConfig {
             requests_per_minute: 600,
@@ -159,6 +169,7 @@ impl ProviderLimits {
     }
 
     /// AWS SES rate limits (default)
+    #[must_use]
     pub fn aws_ses() -> RateLimitConfig {
         RateLimitConfig {
             requests_per_minute: 14, // 14 emails per second = 840 per minute, being conservative
@@ -171,6 +182,7 @@ impl ProviderLimits {
     }
 
     /// Generic API rate limits (conservative defaults)
+    #[must_use]
     pub fn generic() -> RateLimitConfig {
         RateLimitConfig {
             requests_per_minute: 60,
@@ -183,6 +195,7 @@ impl ProviderLimits {
     }
 
     /// Get rate limit config for a provider by name
+    #[must_use]
     pub fn for_provider(provider: &str) -> RateLimitConfig {
         match provider.to_lowercase().as_str() {
             "openai" => Self::openai(),

@@ -104,6 +104,9 @@ pub mod api_key_persistent_storage;
 /// Provider-specific rate limiting framework
 pub mod rate_limiting;
 
+/// Circuit breaker pattern for fault tolerance
+pub mod circuit_breaker;
+
 // Re-export commonly used types and functions
 pub use async_utils::{
     concurrent_map, race_to_success, retry_async, timeout, timeout_with_default, AsyncError,
@@ -216,4 +219,11 @@ pub use rate_limiting::{
     BackoffStrategy, MetricsCollector, ProviderLimits, ProviderRateLimitConfig,
     ProviderRateLimiter, RateLimitInfo, RateLimitMetrics, RetryHandler,
     RetryPolicy as RateLimitRetryPolicy,
+};
+
+// Re-export circuit breaker utilities
+pub use circuit_breaker::{
+    CircuitBreaker, CircuitBreakerConfig, CircuitBreakerError, CircuitBreakerManager,
+    CircuitBreakerResult, CircuitMetrics, CircuitMetricsCollector, CircuitState, ServicePresets,
+    StateTransition, ThresholdConfig,
 };

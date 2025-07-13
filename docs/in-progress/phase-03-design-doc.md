@@ -562,6 +562,7 @@ impl Tool for DatabaseConnectorTool {
 **Week 11 Tasks**:
 - [ ] Implement WebSearchTool providers (Google, Brave, DuckDuckGo, SerpApi, SerperDev)
 - [x] Create provider selection and rate limiting system (completed as llmspell-utils utility)
+- [x] Implement circuit breaker pattern for fault tolerance (completed as llmspell-utils utility)
 - [ ] Create WebScraperTool with JS rendering
 - [ ] Implement remaining web tools (5 tools)
 - [ ] Create EmailSenderTool with providers

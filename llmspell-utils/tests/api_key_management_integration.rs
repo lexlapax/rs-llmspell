@@ -3,8 +3,7 @@
 
 use chrono::Utc;
 use llmspell_utils::{
-    ApiKeyAction, ApiKeyManager, ApiKeyMetadata, ApiKeyStorage, InMemoryStorage,
-    PersistentApiKeyStorage,
+    ApiKeyAction, ApiKeyManager, ApiKeyMetadata, ApiKeyStorage, PersistentApiKeyStorage,
 };
 use std::collections::HashMap;
 use tempfile::TempDir;
@@ -32,9 +31,7 @@ fn test_api_key_manager_basic_operations() {
         .expect("Failed to add key");
 
     // Get the key
-    let key = manager
-        .get_key("test_service")
-        .expect("Failed to get key");
+    let key = manager.get_key("test_service").expect("Failed to get key");
     assert_eq!(key, Some("test_api_key_123".to_string()));
 
     // Check audit log
@@ -84,9 +81,7 @@ fn test_environment_variable_loading() {
     std::env::set_var("LLMSPELL_API_KEY_ANTHROPIC", "test_anthropic_key");
 
     // Load from environment
-    manager
-        .load_from_env()
-        .expect("Failed to load from env");
+    manager.load_from_env().expect("Failed to load from env");
 
     // Verify keys were loaded
     assert_eq!(
@@ -146,7 +141,7 @@ fn test_persistent_storage_integration() {
         manager
             .add_key("persistent_service1_key", "key1_value", metadata1)
             .expect("Failed to add key1");
-        
+
         let metadata2 = create_test_metadata("persistent_service2");
         manager
             .add_key("persistent_service2_key", "key2_value", metadata2)
@@ -185,14 +180,16 @@ fn test_key_expiration() {
     let expires_at = Utc::now() + chrono::Duration::hours(1);
     let mut metadata = create_test_metadata("expiring_service");
     metadata.expires_at = Some(expires_at);
-    
+
     manager
         .add_key("expiring_service_key", "temp_key", metadata)
         .expect("Failed to add key with expiry");
 
     // Key should be available now
     assert_eq!(
-        manager.get_key("expiring_service").expect("Failed to get key"),
+        manager
+            .get_key("expiring_service")
+            .expect("Failed to get key"),
         Some("temp_key".to_string())
     );
 
@@ -212,7 +209,11 @@ fn test_audit_log_limits() {
     for i in 0..20 {
         let metadata = create_test_metadata(&format!("service_{}", i));
         manager
-            .add_key(&format!("service_{}_key", i), &format!("key_{}", i), metadata)
+            .add_key(
+                &format!("service_{}_key", i),
+                &format!("key_{}", i),
+                metadata,
+            )
             .expect("Failed to add key");
     }
 

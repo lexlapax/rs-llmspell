@@ -763,35 +763,46 @@
 - [x] Metrics available ✅ (usage percentage, response times, retry stats)
 - [x] Documentation complete ✅ (task-3.1.6-rate-limiting-framework.md)
 
-### Task 3.1.7: Circuit Breaker Implementation
+### Task 3.1.7: Circuit Breaker Implementation ✅
 **Priority**: MEDIUM  
 **Estimated Time**: 12 hours  
 **Assignee**: Reliability Team
+**Status**: Completed
+**Started**: 2025-07-12
+**Completed**: 2025-07-12
 
 **Description**: Add circuit breaker pattern for external service failures.
 
 **Acceptance Criteria:**
-- [ ] Circuit breaker state machine
-- [ ] Configurable thresholds
-- [ ] Automatic recovery testing
-- [ ] Metrics and alerting
-- [ ] Per-service configuration
+- [x] Circuit breaker state machine ✅ (3 states: Closed, Open, HalfOpen)
+- [x] Configurable thresholds ✅ (failure count, percentage, timeouts)
+- [x] Automatic recovery testing ✅ (half-open state with test limits)
+- [x] Metrics and alerting ✅ (comprehensive metrics, alert handlers)
+- [x] Per-service configuration ✅ (CircuitBreakerManager with service presets)
 
 **Implementation Steps:**
-1. Implement circuit breaker states
-2. Create threshold configuration
-3. Add failure detection logic
-4. Implement recovery testing
-5. Add metrics collection
-6. Create alerting hooks
-7. Test various failure scenarios
+1. [x] Implement circuit breaker states ✅
+2. [x] Create threshold configuration ✅
+3. [x] Add failure detection logic ✅
+4. [x] Implement recovery testing ✅
+5. [x] Add metrics collection ✅
+6. [x] Create alerting hooks ✅
+7. [x] Test various failure scenarios ✅
+
+**Notes:**
+- Implemented as infrastructure in llmspell-utils (not as a tool)
+- State machine with automatic transitions
+- Service presets for common patterns (HTTP API, database, etc.)
+- Comprehensive metrics including success rates and response times
+- Integration tests with concurrent access scenarios
+- See docs/completed/task-3.1.7-circuit-breaker.md for details
 
 **Definition of Done:**
-- [ ] Circuit breaker functional
-- [ ] Thresholds configurable
-- [ ] Recovery working
-- [ ] Metrics implemented
-- [ ] Tests comprehensive
+- [x] Circuit breaker functional ✅ (full state machine implementation)
+- [x] Thresholds configurable ✅ (builder pattern configuration)
+- [x] Recovery working ✅ (automatic half-open testing)
+- [x] Metrics implemented ✅ (success/failure rates, state tracking)
+- [x] Tests comprehensive ✅ (16 tests passing)
 
 ### Task 3.1.8: Integration Testing Suite
 **Priority**: CRITICAL  
@@ -823,7 +834,55 @@
 - [ ] Performance acceptable
 - [ ] Security validated
 
-### Task 3.1.9: External Tools Documentation
+### Task 3.1.9: Implement Lua Tool Examples
+**Priority**: HIGH  
+**Estimated Time**: 12 hours  
+**Assignee**: Developer Experience Team
+
+**Description**: Create comprehensive Lua examples for all 8 new external integration tools and rate-liming, circuit breaker examples in `examples/*.lua`.
+
+**Tools to Document:**
+- WebSearchTool (enhanced with multiple providers)
+- WebScraperTool (with JS rendering examples)
+- UrlAnalyzerTool (validation and metadata extraction)
+- ApiTesterTool (REST API testing scenarios)
+- WebhookCallerTool (webhook invocation with retries)
+- WebpageMonitorTool (change detection examples)
+- SitemapCrawlerTool (sitemap parsing)
+- EmailSenderTool (multiple provider examples)
+- DatabaseConnectorTool (query examples)
+- RateLimiting utility
+- CircuitBreaker utility
+- apikey utility
+
+**Acceptance Criteria:**
+- [ ] Examples follow existing `tools-*.lua` patterns
+- [ ] Each tool has at least 3 usage examples
+- [ ] Error handling demonstrated
+- [ ] Rate limiting behavior shown
+- [ ] Authentication patterns included
+- [ ] Comments explain key concepts
+
+**Implementation Steps:**
+1. Update `examples/tools-web.lua` with new web tools
+2. Create `examples/tools-integration.lua` for external integrations
+3. Create `examples/utils-rate-limit-circuit-break.lua` for provider utils
+4. Create `examples/utils-api-key.lua` for using api key management
+3. Add authentication setup examples
+4. Include rate limiting demonstrations
+5. Show error handling patterns
+6. Test all examples against actual tools
+7. Add inline documentation
+
+**Definition of Done:**
+- [ ] All 8 tools have working examples
+- [ ] apikey, rate limiting, and circuitbreaker utils have working examples
+- [ ] Examples run without errors
+- [ ] Code follows Lua best practices
+- [ ] Comments are clear and helpful
+- [ ] Examples demonstrate real use cases
+
+### Task 3.1.10: External Tools Documentation
 **Priority**: HIGH  
 **Estimated Time**: 12 hours  
 **Assignee**: Documentation Team
@@ -852,48 +911,6 @@
 - [ ] Guides comprehensive
 - [ ] Review completed
 - [ ] Published to docs
-
-### Task 3.1.10: Implement Lua Tool Examples
-**Priority**: HIGH  
-**Estimated Time**: 12 hours  
-**Assignee**: Developer Experience Team
-
-**Description**: Create comprehensive Lua examples for all 8 new external integration tools in `examples/tools-*.lua`.
-
-**Tools to Document:**
-- WebSearchTool (enhanced with multiple providers)
-- WebScraperTool (with JS rendering examples)
-- UrlAnalyzerTool (validation and metadata extraction)
-- ApiTesterTool (REST API testing scenarios)
-- WebhookCallerTool (webhook invocation with retries)
-- WebpageMonitorTool (change detection examples)
-- SitemapCrawlerTool (sitemap parsing)
-- EmailSenderTool (multiple provider examples)
-- DatabaseConnectorTool (query examples)
-
-**Acceptance Criteria:**
-- [ ] Examples follow existing `tools-*.lua` patterns
-- [ ] Each tool has at least 3 usage examples
-- [ ] Error handling demonstrated
-- [ ] Rate limiting behavior shown
-- [ ] Authentication patterns included
-- [ ] Comments explain key concepts
-
-**Implementation Steps:**
-1. Update `examples/tools-web.lua` with new web tools
-2. Create `examples/tools-integration.lua` for external integrations
-3. Add authentication setup examples
-4. Include rate limiting demonstrations
-5. Show error handling patterns
-6. Test all examples against actual tools
-7. Add inline documentation
-
-**Definition of Done:**
-- [ ] All 8 tools have working examples
-- [ ] Examples run without errors
-- [ ] Code follows Lua best practices
-- [ ] Comments are clear and helpful
-- [ ] Examples demonstrate real use cases
 
 ### Task 3.1.11: Phase 3.1 Validation
 **Priority**: CRITICAL  

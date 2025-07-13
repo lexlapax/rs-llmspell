@@ -49,24 +49,27 @@ impl RateLimitMetrics {
     }
 
     /// Calculate rate limit usage percentage
+    #[must_use]
     pub fn usage_percentage(&self) -> Option<f64> {
         match (self.requests_remaining, self.rate_limit_total) {
             (Some(remaining), Some(total)) if total > 0 => {
                 let used = total.saturating_sub(remaining);
-                Some((used as f64 / total as f64) * 100.0)
+                Some((f64::from(used) / f64::from(total)) * 100.0)
             }
             _ => None,
         }
     }
 
     /// Check if rate limit is critical (>90% used)
+    #[must_use]
     pub fn is_critical(&self) -> bool {
-        self.usage_percentage().map(|p| p > 90.0).unwrap_or(false)
+        self.usage_percentage().is_some_and(|p| p > 90.0)
     }
 
     /// Check if rate limit is warning level (>75% used)
+    #[must_use]
     pub fn is_warning(&self) -> bool {
-        self.usage_percentage().map(|p| p > 75.0).unwrap_or(false)
+        self.usage_percentage().is_some_and(|p| p > 75.0)
     }
 }
 
@@ -80,6 +83,7 @@ pub struct MetricsCollector {
 
 impl MetricsCollector {
     /// Create a new metrics collector
+    #[must_use]
     pub fn new() -> Self {
         Self {
             metrics: Arc::new(RwLock::new(HashMap::new())),
@@ -157,13 +161,16 @@ impl MetricsCollector {
         }
 
         // Update average in metrics
+        #[allow(clippy::cast_precision_loss)]
         let avg_ms =
             times.iter().map(|d| d.as_secs_f64() * 1000.0).sum::<f64>() / times.len() as f64;
 
         let mut metrics = self.metrics.write().await;
-        if let Some(entry) = metrics.get_mut(provider) {
-            entry.avg_response_time_ms = Some(avg_ms);
-        }
+        let entry = metrics
+            .entry(provider.to_string())
+            .or_insert_with(|| RateLimitMetrics::new(provider.to_string()));
+        entry.avg_response_time_ms = Some(avg_ms);
+        entry.last_updated = Instant::now();
     }
 
     /// Record a retry attempt
