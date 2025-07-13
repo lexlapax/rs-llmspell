@@ -1,0 +1,175 @@
+//! ABOUTME: Integration tests for WebhookCallerTool
+//! ABOUTME: Tests webhook calling functionality with various HTTP methods and payloads
+
+mod common;
+
+use common::*;
+use llmspell_core::BaseAgent;
+use llmspell_tools::WebhookCallerTool;
+use serde_json::json;
+
+#[tokio::test]
+async fn test_webhook_caller_post() {
+    let tool = WebhookCallerTool::new();
+    let context = create_test_context();
+
+    let webhook_data = json!({
+        "event": "test_event",
+        "data": {
+            "user_id": 123,
+            "action": "test_action"
+        }
+    });
+
+    let input = create_agent_input(json!({
+        "input": test_endpoints::HTTPBIN_POST,
+        "method": "POST",
+        "payload": webhook_data
+    }))
+    .unwrap();
+
+    let output = tool.execute(input, context).await.unwrap();
+
+    assert_success_output(&output, &["operation", "result"]);
+
+    let output_value: serde_json::Value = serde_json::from_str(&output.text).unwrap();
+    let result = &output_value["result"];
+
+    // httpbin should echo our webhook data
+    assert_eq!(result["status_code"], 200);
+    let response_body = result["response"]["json"].as_object().unwrap();
+    assert_eq!(response_body["event"], "test_event");
+}
+
+#[tokio::test]
+async fn test_webhook_caller_with_headers() {
+    let tool = WebhookCallerTool::new();
+    let context = create_test_context();
+
+    let input = create_agent_input(json!({
+        "input": test_endpoints::HTTPBIN_POST,
+        "headers": {
+            "X-Webhook-Secret": "test-secret",
+            "X-Event-Type": "user.created"
+        },
+        "payload": {
+            "user_id": 456
+        }
+    }))
+    .unwrap();
+
+    let output = tool.execute(input, context).await.unwrap();
+
+    let output_value: serde_json::Value = serde_json::from_str(&output.text).unwrap();
+    let result = &output_value["result"];
+
+    assert_eq!(result["status_code"], 200);
+    // httpbin should return our headers
+    let headers = result["response"]["headers"].as_object().unwrap();
+    assert_eq!(headers["X-Webhook-Secret"], "test-secret");
+    assert_eq!(headers["X-Event-Type"], "user.created");
+}
+
+#[tokio::test]
+async fn test_webhook_caller_get_method() {
+    let tool = WebhookCallerTool::new();
+    let context = create_test_context();
+
+    let input = create_agent_input(json!({
+        "input": test_endpoints::HTTPBIN_GET,
+        "method": "GET"
+    }))
+    .unwrap();
+
+    let output = tool.execute(input, context).await.unwrap();
+
+    let output_value: serde_json::Value = serde_json::from_str(&output.text).unwrap();
+    let result = &output_value["result"];
+
+    assert_eq!(result["status_code"], 200);
+    assert!(result["response_time_ms"].as_f64().unwrap() > 0.0);
+}
+
+#[tokio::test]
+async fn test_webhook_caller_retry_on_failure() {
+    let tool = WebhookCallerTool::new();
+    let context = create_test_context();
+
+    // Test with a 500 status code endpoint
+    let input = create_agent_input(json!({
+        "input": format!("{}/500", test_endpoints::HTTPBIN_STATUS),
+        "retry_count": 2,
+        "retry_delay": 100
+    }))
+    .unwrap();
+
+    let output = tool.execute(input, context).await.unwrap();
+
+    let output_value: serde_json::Value = serde_json::from_str(&output.text).unwrap();
+    let result = &output_value["result"];
+
+    // Should still get 500 but with retry attempts logged
+    assert_eq!(result["status_code"], 500);
+    assert!(result.get("retries_attempted").is_some() || result.get("retry_count").is_some());
+}
+
+#[tokio::test]
+async fn test_webhook_caller_timeout() {
+    let tool = WebhookCallerTool::new();
+    let context = create_test_context();
+
+    let input = create_agent_input(json!({
+        "input": format!("{}/3", test_endpoints::HTTPBIN_DELAY),
+        "timeout": 1
+    }))
+    .unwrap();
+
+    match tool.execute(input, context).await {
+        Ok(output) => {
+            assert_error_output(&output, "timeout");
+        }
+        Err(e) => {
+            assert!(e.to_string().contains("timeout") || e.to_string().contains("elapsed"));
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_webhook_caller_invalid_url() {
+    let tool = WebhookCallerTool::new();
+    let context = create_test_context();
+
+    let input = create_agent_input(json!({
+        "input": "not-a-url",
+        "payload": {"test": "data"}
+    }))
+    .unwrap();
+
+    let result = tool.execute(input, context).await;
+    assert!(result.is_err());
+    let error = result.unwrap_err();
+    assert!(error.to_string().contains("URL") || error.to_string().contains("url"));
+}
+
+#[tokio::test]
+async fn test_webhook_caller_custom_method() {
+    let tool = WebhookCallerTool::new();
+    let context = create_test_context();
+
+    let input = create_agent_input(json!({
+        "input": format!("{}/put", test_endpoints::HTTPBIN_BASE),
+        "method": "PUT",
+        "payload": {"updated": true}
+    }))
+    .unwrap();
+
+    let output = tool.execute(input, context).await.unwrap();
+
+    let output_value: serde_json::Value = serde_json::from_str(&output.text).unwrap();
+    let result = &output_value["result"];
+
+    assert!(
+        result["status_code"].as_u64().unwrap() == 200
+            || result["status_code"].as_u64().unwrap() == 405
+    );
+}

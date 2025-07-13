@@ -1,0 +1,211 @@
+//! ABOUTME: Integration tests for ApiTesterTool
+//! ABOUTME: Tests REST API testing functionality with real HTTP endpoints
+
+mod common;
+
+use common::*;
+use llmspell_core::BaseAgent;
+use llmspell_tools::ApiTesterTool;
+use serde_json::json;
+
+#[tokio::test]
+async fn test_api_tester_get_request() {
+    let tool = ApiTesterTool::new();
+    let context = create_test_context();
+
+    let input = create_agent_input(json!({
+        "input": test_endpoints::HTTPBIN_GET,
+        "method": "GET",
+        "headers": {
+            "User-Agent": "llmspell-test"
+        }
+    }))
+    .unwrap();
+
+    let output = tool.execute(input, context).await.unwrap();
+
+    assert_success_output(&output, &["operation", "result"]);
+
+    let output_value: serde_json::Value = serde_json::from_str(&output.text).unwrap();
+    assert_eq!(output_value["result"]["response"]["status_code"], 200);
+
+    // Verify httpbin echoed our header
+    let response_body = output_value["result"]["response"]["body"]
+        .as_object()
+        .unwrap();
+    let headers = response_body["headers"].as_object().unwrap();
+    assert_eq!(headers["User-Agent"], "llmspell-test");
+}
+
+#[tokio::test]
+async fn test_api_tester_post_request() {
+    let tool = ApiTesterTool::new();
+    let context = create_test_context();
+
+    let test_data = json!({
+        "name": "Test User",
+        "email": "test@example.com"
+    });
+
+    let input = create_agent_input(json!({
+        "input": test_endpoints::HTTPBIN_POST,
+        "method": "POST",
+        "body": test_data,
+        "headers": {
+            "Content-Type": "application/json"
+        }
+    }))
+    .unwrap();
+
+    let output = tool.execute(input, context).await.unwrap();
+
+    assert_success_output(&output, &["operation", "result"]);
+
+    let output_value: serde_json::Value = serde_json::from_str(&output.text).unwrap();
+    assert_eq!(output_value["result"]["response"]["status_code"], 200);
+
+    // Verify httpbin echoed our data
+    let response_body = output_value["result"]["response"]["body"]
+        .as_object()
+        .unwrap();
+    let json_data = response_body["json"].as_object().unwrap();
+    assert_eq!(json_data["name"], "Test User");
+    assert_eq!(json_data["email"], "test@example.com");
+}
+
+#[tokio::test]
+async fn test_api_tester_status_codes() {
+    let tool = ApiTesterTool::new();
+
+    // Test various status codes
+    for status_code in [200, 201, 400, 404, 500] {
+        let context = create_test_context();
+        let input = create_agent_input(json!({
+            "input": format!("{}/{}", test_endpoints::HTTPBIN_STATUS, status_code),
+            "method": "GET"
+        }))
+        .unwrap();
+
+        let output = tool.execute(input, context).await.unwrap();
+        let output_value: serde_json::Value = serde_json::from_str(&output.text).unwrap();
+
+        assert!(output_value["success"].as_bool().unwrap());
+        assert_eq!(
+            output_value["result"]["response"]["status_code"],
+            status_code
+        );
+    }
+}
+
+#[tokio::test]
+async fn test_api_tester_timeout() {
+    let tool = ApiTesterTool::new();
+    let context = create_test_context();
+
+    // Request with 2 second timeout to a 5 second delay endpoint
+    let input = create_agent_input(json!({
+        "input": format!("{}/5", test_endpoints::HTTPBIN_DELAY),
+        "method": "GET",
+        "timeout": 2
+    }))
+    .unwrap();
+
+    // Timeout might return an error or a response with error
+    match tool.execute(input, context).await {
+        Ok(output) => {
+            assert_error_output(&output, "timeout");
+        }
+        Err(e) => {
+            assert!(e.to_string().contains("timeout") || e.to_string().contains("elapsed"));
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_api_tester_invalid_url() {
+    let tool = ApiTesterTool::new();
+    let context = create_test_context();
+
+    let input = create_agent_input(json!({
+        "input": "not-a-valid-url",
+        "method": "GET"
+    }))
+    .unwrap();
+
+    let result = tool.execute(input, context).await;
+    assert!(result.is_err());
+    let error = result.unwrap_err();
+    assert!(error.to_string().contains("URL must start with"));
+}
+
+#[tokio::test]
+async fn test_api_tester_network_error() {
+    let tool = ApiTesterTool::new();
+    let context = create_test_context();
+
+    let input = create_agent_input(json!({
+        "input": test_endpoints::INVALID_URL,
+        "method": "GET"
+    }))
+    .unwrap();
+
+    // This might succeed with a network error in the response, or fail with an error
+    match tool.execute(input, context).await {
+        Ok(output) => {
+            // If it returns Ok, check for error in response
+            assert_error_output(&output, "error");
+        }
+        Err(e) => {
+            // If it returns Err, that's also acceptable for network errors
+            assert!(e.to_string().contains("error") || e.to_string().contains("network"));
+        }
+    }
+}
+
+#[tokio::test]
+async fn test_api_tester_all_http_methods() {
+    let tool = ApiTesterTool::new();
+
+    let methods = ["GET", "POST", "PUT", "DELETE", "PATCH"];
+
+    for method in methods {
+        let context = create_test_context();
+        let input = create_agent_input(json!({
+            "input": format!("{}/{}", test_endpoints::HTTPBIN_BASE, method.to_lowercase()),
+            "method": method
+        }))
+        .unwrap();
+
+        let output = tool.execute(input, context).await.unwrap();
+        let output_value: serde_json::Value = serde_json::from_str(&output.text).unwrap();
+
+        // httpbin returns 200 for all these methods
+        assert!(output_value["success"].as_bool().unwrap());
+        let status = output_value["result"]["response"]["status_code"]
+            .as_u64()
+            .unwrap();
+        assert!(status == 200 || status == 405); // Some methods might not be allowed
+    }
+}
+
+#[tokio::test]
+async fn test_api_tester_response_time_measurement() {
+    let tool = ApiTesterTool::new();
+    let context = create_test_context();
+
+    let input = create_agent_input(json!({
+        "input": test_endpoints::HTTPBIN_GET,
+        "method": "GET"
+    }))
+    .unwrap();
+
+    let output = tool.execute(input, context).await.unwrap();
+    let output_value: serde_json::Value = serde_json::from_str(&output.text).unwrap();
+
+    // Response time should be a positive number
+    let response_time = output_value["result"]["timing"]["duration_ms"]
+        .as_u64()
+        .unwrap();
+    assert!(response_time > 0);
+    assert!(response_time < 10000); // Less than 10 seconds
+}
