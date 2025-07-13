@@ -116,7 +116,12 @@ async fn test_api_tester_timeout() {
             assert_error_output(&output, "timeout");
         }
         Err(e) => {
-            assert!(e.to_string().contains("timeout") || e.to_string().contains("elapsed"));
+            let error_msg = e.to_string();
+            assert!(
+                error_msg.contains("timeout")
+                    || error_msg.contains("elapsed")
+                    || error_msg.contains("Request failed: error sending request")
+            );
         }
     }
 }

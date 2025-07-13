@@ -12,13 +12,16 @@ use llmspell_core::{
 };
 use llmspell_utils::{
     error_builders::llmspell::validation_error,
-    params::{extract_optional_object, extract_parameters, extract_required_string},
+    params::{
+        extract_optional_object, extract_optional_string, extract_optional_u64, extract_parameters,
+        extract_required_string,
+    },
     response::ResponseBuilder,
 };
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WebhookCallerTool {
@@ -84,6 +87,13 @@ impl Tool for WebhookCallerTool {
             required: false,
             default: Some(json!(30)),
         })
+        .with_parameter(ParameterDef {
+            name: "method".to_string(),
+            param_type: ParameterType::String,
+            description: "HTTP method (GET, POST, PUT, DELETE, etc.)".to_string(),
+            required: false,
+            default: Some(json!("POST")),
+        })
     }
 
     fn category(&self) -> ToolCategory {
@@ -114,16 +124,11 @@ impl BaseAgent for WebhookCallerTool {
         let url = extract_required_string(params, "input")?;
         let payload = extract_optional_object(params, "payload");
         let headers = extract_optional_object(params, "headers");
-        let max_retries = params
-            .get("parameters")
-            .and_then(|p| p.get("max_retries"))
-            .and_then(|r| r.as_u64())
-            .unwrap_or(3) as u32;
-        let timeout = params
-            .get("parameters")
-            .and_then(|p| p.get("timeout"))
-            .and_then(|t| t.as_u64())
-            .unwrap_or(30);
+        let method = extract_optional_string(params, "method")
+            .unwrap_or("POST")
+            .to_uppercase();
+        let max_retries = extract_optional_u64(params, "max_retries").unwrap_or(3) as u32;
+        let timeout = extract_optional_u64(params, "timeout").unwrap_or(30);
 
         // Validate URL
         if !url.starts_with("http://") && !url.starts_with("https://") {
@@ -152,14 +157,24 @@ impl BaseAgent for WebhookCallerTool {
                 retry_count += 1;
             }
 
-            let mut request = client.post(url);
+            let mut request = match method.as_str() {
+                "GET" => client.get(url),
+                "POST" => client.post(url),
+                "PUT" => client.put(url),
+                "DELETE" => client.delete(url),
+                "PATCH" => client.patch(url),
+                "HEAD" => client.head(url),
+                _ => client.post(url), // Default to POST for unknown methods
+            };
 
-            // Add payload
-            if let Some(payload_data) = &payload {
-                request = request.json(payload_data);
-            } else {
-                // Default empty JSON payload
-                request = request.json(&json!({}));
+            // Add payload for methods that support it
+            if method != "GET" && method != "HEAD" {
+                if let Some(payload_data) = &payload {
+                    request = request.json(payload_data);
+                } else if method == "POST" || method == "PUT" || method == "PATCH" {
+                    // Default empty JSON payload for write methods
+                    request = request.json(&json!({}));
+                }
             }
 
             // Add headers
@@ -171,8 +186,12 @@ impl BaseAgent for WebhookCallerTool {
                 }
             }
 
+            let start_time = Instant::now();
             match request.send().await {
                 Ok(response) => {
+                    let elapsed = start_time.elapsed();
+                    let response_time_ms = elapsed.as_secs_f64() * 1000.0;
+
                     let status = response.status();
                     let response_headers = response.headers().clone();
                     let body_text = response.text().await.unwrap_or_default();
@@ -199,14 +218,17 @@ impl BaseAgent for WebhookCallerTool {
                     let result = json!({
                         "success": status.is_success(),
                         "webhook_url": url,
+                        "status_code": status.as_u16(),
+                        "status_text": status.canonical_reason().unwrap_or("Unknown"),
                         "response": {
-                            "status_code": status.as_u16(),
-                            "status_text": status.canonical_reason().unwrap_or("Unknown"),
-                            "headers": headers_map,
                             "body": body_json.as_ref().unwrap_or(&json!(body_text)),
+                            "json": body_json,
+                            "headers": headers_map,
                             "body_is_json": body_json.is_some(),
                         },
+                        "response_time_ms": response_time_ms,
                         "retry_count": retry_count,
+                        "retries_attempted": retry_count,
                     });
 
                     let response = ResponseBuilder::success("call").with_result(result).build();
@@ -216,7 +238,18 @@ impl BaseAgent for WebhookCallerTool {
                     ));
                 }
                 Err(e) => {
-                    last_error = Some(e.to_string());
+                    let error_str = e.to_string();
+                    last_error = Some(error_str.clone());
+
+                    // Don't retry on timeout, connection refused, or connection errors
+                    if error_str.contains("timeout")
+                        || error_str.contains("connection")
+                        || error_str.contains("dns")
+                        || error_str.contains("refused")
+                    {
+                        break;
+                    }
+
                     if attempt < max_retries {
                         continue;
                     }

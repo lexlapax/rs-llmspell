@@ -263,8 +263,8 @@ impl ApiKeyManager {
             let mut found_key_id = None;
             for key_id in key_ids {
                 if let Some(_key) = storage.retrieve(&key_id)? {
-                    // Get metadata to check service
-                    if let Some(metadata) = self.get_metadata(&key_id)? {
+                    // Get metadata to check service directly from storage to avoid nested locks
+                    if let Some(metadata) = storage.retrieve_metadata(&key_id)? {
                         if metadata.service == service && metadata.is_active {
                             // Check expiration
                             if let Some(expires_at) = metadata.expires_at {
@@ -290,8 +290,8 @@ impl ApiKeyManager {
             let mut storage = self.storage.write();
 
             if let Some(key) = storage.retrieve(&key_id)? {
-                // Update metadata
-                if let Some(mut metadata) = self.get_metadata(&key_id)? {
+                // Get metadata directly from storage to avoid nested locks
+                if let Some(mut metadata) = storage.retrieve_metadata(&key_id)? {
                     metadata.last_used = Some(Utc::now());
                     metadata.usage_count += 1;
                     storage.update_metadata(&key_id, &metadata)?;
@@ -366,7 +366,8 @@ impl ApiKeyManager {
     pub fn deactivate_key(&self, key_id: &str) -> Result<(), String> {
         let mut storage = self.storage.write();
 
-        if let Some(mut metadata) = self.get_metadata(key_id)? {
+        // Get metadata directly from storage to avoid nested locks
+        if let Some(mut metadata) = storage.retrieve_metadata(key_id)? {
             metadata.is_active = false;
             storage.update_metadata(key_id, &metadata)?;
 

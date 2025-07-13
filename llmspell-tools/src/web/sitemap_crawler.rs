@@ -12,7 +12,9 @@ use llmspell_core::{
 };
 use llmspell_utils::{
     error_builders::llmspell::{component_error, validation_error},
-    params::{extract_optional_bool, extract_parameters, extract_required_string},
+    params::{
+        extract_optional_bool, extract_optional_u64, extract_parameters, extract_required_string,
+    },
     response::ResponseBuilder,
 };
 use reqwest::Client;
@@ -72,6 +74,13 @@ impl Tool for SitemapCrawlerTool {
             required: false,
             default: Some(json!(1000)),
         })
+        .with_parameter(ParameterDef {
+            name: "timeout".to_string(),
+            param_type: ParameterType::Number,
+            description: "Request timeout in seconds (default: 30)".to_string(),
+            required: false,
+            default: Some(json!(30)),
+        })
     }
 
     fn category(&self) -> ToolCategory {
@@ -104,11 +113,8 @@ impl BaseAgent for SitemapCrawlerTool {
         let params = extract_parameters(&input)?;
         let url = extract_required_string(params, "input")?;
         let follow_sitemaps = extract_optional_bool(params, "follow_sitemaps").unwrap_or(true);
-        let max_urls = params
-            .get("parameters")
-            .and_then(|p| p.get("max_urls"))
-            .and_then(|u| u.as_u64())
-            .unwrap_or(1000) as usize;
+        let max_urls = extract_optional_u64(params, "max_urls").unwrap_or(1000) as usize;
+        let timeout_secs = extract_optional_u64(params, "timeout").unwrap_or(30);
 
         // Validate URL
         if !url.starts_with("http://") && !url.starts_with("https://") {
@@ -122,10 +128,15 @@ impl BaseAgent for SitemapCrawlerTool {
         let mut visited_sitemaps = HashSet::new();
         let mut stats = SitemapStats::new();
 
-        self.crawl_sitemap(
-            url,
+        let options = CrawlOptions {
             follow_sitemaps,
             max_urls,
+            timeout_secs,
+        };
+
+        self.crawl_sitemap(
+            url,
+            &options,
             &mut all_urls,
             &mut visited_sitemaps,
             &mut stats,
@@ -146,9 +157,14 @@ impl BaseAgent for SitemapCrawlerTool {
             }
         });
 
-        let response = ResponseBuilder::success("crawl")
-            .with_result(result)
-            .build();
+        let response = if all_urls.is_empty() && stats.sitemaps_processed == 0 {
+            ResponseBuilder::error("crawl", "No sitemaps could be processed or no URLs found")
+                .build()
+        } else {
+            ResponseBuilder::success("crawl")
+                .with_result(result)
+                .build()
+        };
 
         Ok(AgentOutput::text(
             serde_json::to_string_pretty(&response).unwrap(),
@@ -175,12 +191,18 @@ impl SitemapStats {
     }
 }
 
+struct CrawlOptions {
+    follow_sitemaps: bool,
+    max_urls: usize,
+    timeout_secs: u64,
+}
+
 impl SitemapCrawlerTool {
+    #[allow(clippy::too_many_arguments)]
     fn crawl_sitemap<'a>(
         &'a self,
         url: &'a str,
-        follow_sitemaps: bool,
-        max_urls: usize,
+        options: &'a CrawlOptions,
         all_urls: &'a mut Vec<Value>,
         visited_sitemaps: &'a mut HashSet<String>,
         stats: &'a mut SitemapStats,
@@ -193,12 +215,12 @@ impl SitemapCrawlerTool {
             visited_sitemaps.insert(url.to_string());
 
             // Stop if we've reached max URLs
-            if all_urls.len() >= max_urls {
+            if all_urls.len() >= options.max_urls {
                 return Ok(());
             }
 
             let client = Client::builder()
-                .timeout(Duration::from_secs(30))
+                .timeout(Duration::from_secs(options.timeout_secs))
                 .user_agent("Mozilla/5.0 (compatible; LLMSpell-SitemapCrawler/1.0)")
                 .build()
                 .unwrap_or_default();
@@ -225,19 +247,18 @@ impl SitemapCrawlerTool {
             stats.sitemaps_processed += 1;
 
             // Try to parse as sitemap index first
-            if follow_sitemaps {
+            if options.follow_sitemaps {
                 if let Ok(index_urls) = self.parse_sitemap_index(&xml_content) {
                     if !index_urls.is_empty() {
                         stats.index_files_found += 1;
                         // Recursively crawl child sitemaps
                         for index_url in index_urls {
-                            if all_urls.len() >= max_urls {
+                            if all_urls.len() >= options.max_urls {
                                 break;
                             }
                             self.crawl_sitemap(
                                 &index_url,
-                                follow_sitemaps,
-                                max_urls,
+                                options,
                                 all_urls,
                                 visited_sitemaps,
                                 stats,
@@ -254,7 +275,7 @@ impl SitemapCrawlerTool {
             stats.total_urls_discovered += urls.len() as u32;
 
             for url_entry in urls {
-                if all_urls.len() >= max_urls {
+                if all_urls.len() >= options.max_urls {
                     break;
                 }
                 if url_entry
@@ -376,10 +397,6 @@ impl SitemapCrawlerTool {
                     }
                 }
             }
-        }
-
-        if urls.is_empty() {
-            return Err(component_error("No URLs found in sitemap"));
         }
 
         Ok(urls)

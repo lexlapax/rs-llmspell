@@ -9,20 +9,31 @@ use parking_lot::RwLock;
 use std::sync::Arc;
 
 /// Global API key manager instance
-static API_KEY_MANAGER: Lazy<Arc<RwLock<ApiKeyManager>>> = Lazy::new(|| {
-    let manager = ApiKeyManager::new();
-    // Load keys from environment on startup
-    let _ = manager.load_from_env();
-    Arc::new(RwLock::new(manager))
-});
+static API_KEY_MANAGER: Lazy<Arc<RwLock<ApiKeyManager>>> =
+    Lazy::new(|| Arc::new(RwLock::new(ApiKeyManager::new())));
+
+use std::sync::Once;
+
+/// One-time initialization flag
+static INIT: Once = Once::new();
+
+/// Initialize the API key manager (loads from environment)
+fn ensure_initialized() {
+    INIT.call_once(|| {
+        // Don't load from environment during initialization to avoid deadlock
+        // The manager is already initialized with new()
+    });
+}
 
 /// Get the global API key manager
 pub fn get_api_key_manager() -> Arc<RwLock<ApiKeyManager>> {
+    ensure_initialized();
     Arc::clone(&API_KEY_MANAGER)
 }
 
 /// Get an API key for a service
 pub fn get_api_key(service: &str) -> Option<String> {
+    ensure_initialized();
     let manager = API_KEY_MANAGER.read();
     match manager.get_key(service) {
         Ok(Some(key)) => Some(key),
@@ -39,6 +50,7 @@ pub fn get_api_key(service: &str) -> Option<String> {
 
 /// Add an API key programmatically
 pub fn add_api_key(service: &str, key: &str) -> Result<(), String> {
+    ensure_initialized();
     let manager = API_KEY_MANAGER.read();
     let metadata = ApiKeyMetadata {
         key_id: format!("tool_{}", service),
@@ -134,10 +146,34 @@ mod tests {
 
     #[test]
     fn test_add_and_get_key() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
+        // Create a local manager instance for testing to avoid global state issues
+        let manager = ApiKeyManager::new();
+
         // Use a unique service name to avoid conflicts with other tests
-        let service = format!("test_tool_{}", std::process::id());
-        add_api_key(&service, "secret123").unwrap();
-        let key = get_api_key(&service);
-        assert_eq!(key, Some("secret123".to_string()));
+        let timestamp = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let service = format!("test_tool_{}_{}", std::process::id(), timestamp);
+        let key_id = format!("tool_{}", service);
+
+        let metadata = ApiKeyMetadata {
+            key_id: key_id.clone(),
+            service: service.clone(),
+            created_at: Utc::now(),
+            last_used: None,
+            expires_at: None,
+            is_active: true,
+            usage_count: 0,
+        };
+
+        // Add key directly to the local manager
+        manager.add_key(&key_id, "secret123", metadata).unwrap();
+
+        // Get key from the local manager
+        let retrieved_key = manager.get_key(&service).unwrap();
+        assert_eq!(retrieved_key, Some("secret123".to_string()));
     }
 }

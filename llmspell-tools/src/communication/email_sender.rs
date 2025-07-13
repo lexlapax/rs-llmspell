@@ -630,8 +630,22 @@ mod tests {
 
     #[test]
     fn test_config_from_env() {
-        // Test that from_env doesn't panic
-        let _config = EmailSenderConfig::from_env();
+        // Set up test environment variables
+        std::env::set_var("EMAIL_SMTP_HOST", "test.smtp.host");
+        std::env::set_var("EMAIL_SMTP_PORT", "587");
+        std::env::set_var("EMAIL_DEFAULT_SENDER", "test@example.com");
+
+        // Test that from_env doesn't panic and loads correctly
+        let config = EmailSenderConfig::from_env();
+
+        // Verify SMTP was loaded
+        assert!(config.providers.contains_key("smtp"));
+        assert_eq!(config.default_sender, Some("test@example.com".to_string()));
+
+        // Clean up
+        std::env::remove_var("EMAIL_SMTP_HOST");
+        std::env::remove_var("EMAIL_SMTP_PORT");
+        std::env::remove_var("EMAIL_DEFAULT_SENDER");
     }
 
     #[tokio::test]

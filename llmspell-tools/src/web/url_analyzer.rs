@@ -118,6 +118,13 @@ impl Tool for UrlAnalyzerTool {
             required: false,
             default: Some(json!(false)),
         })
+        .with_parameter(ParameterDef {
+            name: "decode_params".to_string(),
+            param_type: ParameterType::Boolean,
+            description: "URL decode query parameters".to_string(),
+            required: false,
+            default: Some(json!(true)),
+        })
     }
 
     fn category(&self) -> ToolCategory {
@@ -147,17 +154,36 @@ impl BaseAgent for UrlAnalyzerTool {
         let params = extract_parameters(&input)?;
         let url_str = extract_required_string(params, "input")?;
         let fetch_metadata = extract_optional_bool(params, "fetch_metadata").unwrap_or(false);
+        let _decode_params = extract_optional_bool(params, "decode_params").unwrap_or(true);
 
         // Parse and validate URL
         let url = match Url::parse(url_str) {
             Ok(u) => u,
             Err(e) => {
+                // Check if it's a relative URL error
+                if e.to_string().contains("relative URL without a base") {
+                    return Err(validation_error(
+                        "Relative URLs are not supported. Please provide an absolute URL with scheme (http:// or https://)".to_string(),
+                        Some("input".to_string()),
+                    ));
+                }
                 return Err(validation_error(
                     format!("Invalid URL: {}", e),
                     Some("input".to_string()),
                 ));
             }
         };
+
+        // Validate scheme - only allow HTTP and HTTPS
+        if url.scheme() != "http" && url.scheme() != "https" {
+            return Err(validation_error(
+                format!(
+                    "Unsupported URL scheme '{}'. Only http:// and https:// are supported.",
+                    url.scheme()
+                ),
+                Some("input".to_string()),
+            ));
+        }
 
         let mut result = json!({
             "valid": true,
@@ -169,7 +195,17 @@ impl BaseAgent for UrlAnalyzerTool {
             "path": url.path(),
             "query": url.query(),
             "fragment": url.fragment(),
+            "query_params": {}
         });
+
+        // Add auth info if present
+        if !url.username().is_empty() {
+            result["username"] = json!(url.username());
+            result["has_auth"] = json!(true);
+            if url.password().is_some() {
+                result["has_password"] = json!(true);
+            }
+        }
 
         // Extract host details
         if let Some(host) = url.host() {
@@ -195,10 +231,12 @@ impl BaseAgent for UrlAnalyzerTool {
 
         // Parse query parameters
         if url.query().is_some() {
-            let query_params: Vec<(String, String)> = url
-                .query_pairs()
-                .map(|(k, v)| (k.to_string(), v.to_string()))
-                .collect();
+            let mut query_params = serde_json::Map::new();
+            for (k, v) in url.query_pairs() {
+                let key = k.to_string();
+                let value = v.to_string(); // url.query_pairs() handles decoding
+                query_params.insert(key, json!(value));
+            }
             result["query_params"] = json!(query_params);
         }
 

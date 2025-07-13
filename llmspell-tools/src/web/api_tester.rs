@@ -13,7 +13,7 @@ use llmspell_core::{
 use llmspell_utils::{
     error_builders::llmspell::{component_error, validation_error},
     params::{
-        extract_optional_object, extract_optional_string, extract_parameters,
+        extract_optional_object, extract_optional_string, extract_optional_u64, extract_parameters,
         extract_required_string,
     },
     response::ResponseBuilder,
@@ -119,11 +119,7 @@ impl BaseAgent for ApiTesterTool {
         let method_str = extract_optional_string(params, "method").unwrap_or("GET");
         let headers = extract_optional_object(params, "headers");
         let body = extract_optional_object(params, "body");
-        let timeout = params
-            .get("parameters")
-            .and_then(|p| p.get("timeout"))
-            .and_then(|t| t.as_u64())
-            .unwrap_or(30);
+        let timeout = extract_optional_u64(params, "timeout").unwrap_or(30);
 
         // Validate URL
         if !url.starts_with("http://") && !url.starts_with("https://") {

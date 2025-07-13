@@ -13,7 +13,8 @@ use llmspell_core::{
 use llmspell_utils::{
     error_builders::llmspell::{component_error, validation_error},
     params::{
-        extract_optional_bool, extract_optional_object, extract_parameters, extract_required_string,
+        extract_optional_bool, extract_optional_object, extract_optional_string,
+        extract_optional_u64, extract_parameters, extract_required_string,
     },
     response::ResponseBuilder,
 };
@@ -47,6 +48,7 @@ pub struct WebScraperTool {
     metadata: ComponentMetadata,
     #[allow(dead_code)]
     config: WebScraperConfig,
+    #[allow(dead_code)]
     client: Client,
 }
 
@@ -54,6 +56,13 @@ impl Default for WebScraperTool {
     fn default() -> Self {
         Self::new(WebScraperConfig::default())
     }
+}
+
+struct ScrapeOptions {
+    timeout_secs: u64,
+    extract_links: bool,
+    extract_images: bool,
+    extract_meta: bool,
 }
 
 impl WebScraperTool {
@@ -78,11 +87,19 @@ impl WebScraperTool {
     async fn scrape_page(
         &self,
         url: &str,
+        options: &ScrapeOptions,
         selectors: Option<HashMap<String, String>>,
+        single_selector: Option<String>,
     ) -> Result<Value> {
+        // Create client with custom timeout
+        let client = Client::builder()
+            .timeout(Duration::from_secs(options.timeout_secs))
+            .user_agent("Mozilla/5.0 (compatible; LLMSpell/1.0)")
+            .build()
+            .unwrap_or_default();
+
         // Fetch the page
-        let response = self
-            .client
+        let response = client
             .get(url)
             .send()
             .await
@@ -105,7 +122,31 @@ impl WebScraperTool {
         let document = Html::parse_document(&html_content);
         let mut result = HashMap::new();
 
-        if let Some(selectors) = selectors {
+        // Handle single selector (for test compatibility)
+        if let Some(selector_str) = single_selector {
+            match Selector::parse(&selector_str) {
+                Ok(selector) => {
+                    let elements: Vec<String> = document
+                        .select(&selector)
+                        .map(|el| {
+                            let text = el.text().collect::<Vec<_>>().join(" ").trim().to_string();
+                            if text.is_empty() {
+                                el.html()
+                            } else {
+                                text
+                            }
+                        })
+                        .collect();
+                    result.insert("selected_content".to_string(), json!(elements));
+                }
+                Err(e) => {
+                    return Err(validation_error(
+                        format!("Invalid CSS selector '{}': {:?}", selector_str, e),
+                        Some("selector".to_string()),
+                    ));
+                }
+            }
+        } else if let Some(selectors) = selectors {
             // Extract specific elements using CSS selectors
             for (name, selector_str) in selectors {
                 match Selector::parse(&selector_str) {
@@ -139,17 +180,10 @@ impl WebScraperTool {
                 }
             }
         } else {
-            // Extract common metadata if no selectors provided
+            // Extract basic content (always include title and text)
             let title_selector = Selector::parse("title").unwrap();
             if let Some(title) = document.select(&title_selector).next() {
                 result.insert("title".to_string(), json!(title.text().collect::<String>()));
-            }
-
-            let meta_description = Selector::parse("meta[name=\"description\"]").unwrap();
-            if let Some(desc) = document.select(&meta_description).next() {
-                if let Some(content) = desc.value().attr("content") {
-                    result.insert("description".to_string(), json!(content));
-                }
             }
 
             // Extract all text content
@@ -159,27 +193,63 @@ impl WebScraperTool {
                 let cleaned_text = text.split_whitespace().collect::<Vec<_>>().join(" ");
                 result.insert("text".to_string(), json!(cleaned_text));
             }
+        }
 
-            // Extract all links
+        // Extract links if requested
+        if options.extract_links {
             let link_selector = Selector::parse("a[href]").unwrap();
             let links: Vec<String> = document
                 .select(&link_selector)
                 .filter_map(|el| el.value().attr("href"))
                 .map(|href| href.to_string())
                 .collect();
-            if !links.is_empty() {
-                result.insert("links".to_string(), json!(links));
-            }
+            result.insert("links".to_string(), json!(links));
+        }
 
-            // Extract all images
+        // Extract images if requested
+        if options.extract_images {
             let img_selector = Selector::parse("img[src]").unwrap();
             let images: Vec<String> = document
                 .select(&img_selector)
                 .filter_map(|el| el.value().attr("src"))
                 .map(|src| src.to_string())
                 .collect();
-            if !images.is_empty() {
-                result.insert("images".to_string(), json!(images));
+            result.insert("images".to_string(), json!(images));
+        }
+
+        // Extract metadata if requested
+        if options.extract_meta {
+            let mut metadata = HashMap::new();
+
+            let meta_description = Selector::parse("meta[name=\"description\"]").unwrap();
+            if let Some(desc) = document.select(&meta_description).next() {
+                if let Some(content) = desc.value().attr("content") {
+                    metadata.insert("description".to_string(), json!(content));
+                }
+            }
+
+            // Extract all meta tags
+            let meta_selector = Selector::parse("meta").unwrap();
+            let mut meta_tags = HashMap::new();
+            for meta in document.select(&meta_selector) {
+                if let Some(name) = meta.value().attr("name") {
+                    if let Some(content) = meta.value().attr("content") {
+                        meta_tags.insert(name.to_string(), json!(content));
+                    }
+                }
+                if let Some(property) = meta.value().attr("property") {
+                    if let Some(content) = meta.value().attr("content") {
+                        meta_tags.insert(property.to_string(), json!(content));
+                    }
+                }
+            }
+
+            if !meta_tags.is_empty() {
+                metadata.insert("meta_tags".to_string(), json!(meta_tags));
+            }
+
+            if !metadata.is_empty() {
+                result.insert("metadata".to_string(), json!(metadata));
             }
         }
 
@@ -215,6 +285,41 @@ impl Tool for WebScraperTool {
             required: false,
             default: Some(serde_json::json!(false)),
         })
+        .with_parameter(ParameterDef {
+            name: "extract_links".to_string(),
+            param_type: ParameterType::Boolean,
+            description: "Extract all links from the page".to_string(),
+            required: false,
+            default: Some(serde_json::json!(false)),
+        })
+        .with_parameter(ParameterDef {
+            name: "extract_images".to_string(),
+            param_type: ParameterType::Boolean,
+            description: "Extract all images from the page".to_string(),
+            required: false,
+            default: Some(serde_json::json!(false)),
+        })
+        .with_parameter(ParameterDef {
+            name: "extract_meta".to_string(),
+            param_type: ParameterType::Boolean,
+            description: "Extract meta tags and metadata".to_string(),
+            required: false,
+            default: Some(serde_json::json!(false)),
+        })
+        .with_parameter(ParameterDef {
+            name: "selector".to_string(),
+            param_type: ParameterType::String,
+            description: "Single CSS selector to extract content".to_string(),
+            required: false,
+            default: None,
+        })
+        .with_parameter(ParameterDef {
+            name: "timeout".to_string(),
+            param_type: ParameterType::Number,
+            description: "Request timeout in seconds".to_string(),
+            required: false,
+            default: Some(serde_json::json!(30)),
+        })
     }
 
     fn category(&self) -> ToolCategory {
@@ -245,10 +350,17 @@ impl BaseAgent for WebScraperTool {
         let params = extract_parameters(&input)?;
         let url = extract_required_string(params, "input")?;
 
+        // Extract options
+        let extract_links = extract_optional_bool(params, "extract_links").unwrap_or(false);
+        let extract_images = extract_optional_bool(params, "extract_images").unwrap_or(false);
+        let extract_meta = extract_optional_bool(params, "extract_meta").unwrap_or(false);
+        let single_selector = extract_optional_string(params, "selector");
+        let timeout = extract_optional_u64(params, "timeout").unwrap_or(30);
+
         // Validate URL
         if !url.starts_with("http://") && !url.starts_with("https://") {
             return Err(validation_error(
-                "URL must start with http:// or https://",
+                "Invalid URL: URL must start with http:// or https://",
                 Some("input".to_string()),
             ));
         }
@@ -270,7 +382,21 @@ impl BaseAgent for WebScraperTool {
             ));
         }
 
-        let result = self.scrape_page(url, selectors).await?;
+        let options = ScrapeOptions {
+            timeout_secs: timeout,
+            extract_links,
+            extract_images,
+            extract_meta,
+        };
+
+        let result = self
+            .scrape_page(
+                url,
+                &options,
+                selectors,
+                single_selector.map(|s| s.to_string()),
+            )
+            .await?;
 
         let response = ResponseBuilder::success("scrape")
             .with_result(json!({
@@ -297,7 +423,7 @@ mod tests {
         let tool = WebScraperTool::new(WebScraperConfig::default());
         let schema = tool.schema();
         assert_eq!(schema.name, "web-scraper");
-        assert_eq!(schema.parameters.len(), 3);
+        assert_eq!(schema.parameters.len(), 8);
         assert_eq!(schema.parameters[0].name, "input");
         assert!(schema.parameters[0].required);
     }

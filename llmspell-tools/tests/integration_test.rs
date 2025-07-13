@@ -35,6 +35,7 @@ async fn test_web_search_tool_registration() {
 }
 
 #[tokio::test]
+#[ignore = "Requires external API keys"]
 async fn test_web_search_tool_execution_through_registry() {
     // Debug: Check which API keys are available
     println!(

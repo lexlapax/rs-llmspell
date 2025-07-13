@@ -30,6 +30,7 @@ pub fn create_simple_input(input: &str) -> Result<AgentInput, LLMSpellError> {
 }
 
 /// Validate that output is successful with expected fields
+#[allow(dead_code)]
 pub fn assert_success_output(output: &AgentOutput, expected_fields: &[&str]) {
     let output_value: Value = serde_json::from_str(&output.text).unwrap();
 
@@ -59,12 +60,26 @@ pub fn assert_error_output(output: &AgentOutput, error_pattern: &str) {
         output_value
     );
 
-    let error_msg = output_value["error"]
-        .as_str()
-        .unwrap_or_else(|| panic!("Expected error field in output, got: {}", output_value));
+    // Try different error message formats
+    let error_msg = if let Some(error_str) = output_value["error"].as_str() {
+        // Simple string error format
+        error_str.to_string()
+    } else if let Some(error_obj) = output_value["error"].as_object() {
+        // Complex error object format - try message field first
+        if let Some(msg) = error_obj.get("message").and_then(|m| m.as_str()) {
+            msg.to_string()
+        } else {
+            // Fallback to serializing the entire error object
+            serde_json::to_string(error_obj).unwrap_or_else(|_| format!("{:?}", error_obj))
+        }
+    } else {
+        panic!("Expected error field in output, got: {}", output_value);
+    };
 
     assert!(
-        error_msg.contains(error_pattern),
+        error_msg
+            .to_lowercase()
+            .contains(&error_pattern.to_lowercase()),
         "Expected error to contain '{}', got: '{}'",
         error_pattern,
         error_msg
