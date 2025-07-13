@@ -904,6 +904,8 @@
 - API key management examples shown with environment variable checks
 - Each tool has 3+ usage examples with error handling demonstrated
 - All examples follow existing patterns from tools-*.lua files
+- Added tool registrations to llmspell-bridge/src/tools.rs for all Phase 3.1 tools
+- Verified examples run successfully (URL analyzer confirmed working)
 
 **Definition of Done:**
 - [x] All 8 tools have working examples ✅
