@@ -25,7 +25,7 @@ chardetng = "0.1"
 
 # Parquet support
 arrow = "54.0"
-parquet = "54.0"
+parquet = "55.2"
 
 # Excel support
 calamine = "0.26"
