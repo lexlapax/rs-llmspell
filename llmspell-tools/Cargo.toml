@@ -28,7 +28,7 @@ arrow = "54.0"
 parquet = "54.0"
 
 # Excel support
-calamine = "0.26"
+calamine = "0.28"
 xlsxwriter = "0.6"
 
 # Base64 encoding
