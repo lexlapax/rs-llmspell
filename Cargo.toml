@@ -58,7 +58,7 @@ config = "0.15"
 # Testing framework
 mockall = "0.13"
 proptest = "1.4"
-criterion = { version = "0.5", features = ["html_reports"] }
+criterion = { version = "0.6", features = ["html_reports"] }
 serial_test = "3.1"
 
 # Storage backends
