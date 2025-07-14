@@ -45,7 +45,7 @@ jaq-core = "1.5"
 jaq-interpret = "1.5"
 jaq-parse = "1.0"
 jaq-syn = "1.0"
-jaq-std = "1.5"
+jaq-std = "2.1"
 indexmap = "2.10.0"
 
 # Archive support
