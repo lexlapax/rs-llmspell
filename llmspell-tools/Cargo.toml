@@ -41,7 +41,7 @@ tempfile = "3.20"
 llmspell-security = { path = "../llmspell-security" }
 
 # JSON processing with jq
-jaq-core = "1.5"
+jaq-core = "2.2"
 jaq-interpret = "1.5"
 jaq-parse = "1.0"
 jaq-syn = "1.0"
