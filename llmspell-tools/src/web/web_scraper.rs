@@ -17,7 +17,7 @@ use llmspell_utils::{
         extract_optional_u64, extract_parameters, extract_required_string,
     },
     response::ResponseBuilder,
-    security::input_sanitizer::InputSanitizer,
+    security::{input_sanitizer::InputSanitizer, ssrf_protection::SsrfProtector},
 };
 use reqwest::Client;
 use scraper::{Html, Selector};
@@ -358,15 +358,21 @@ impl BaseAgent for WebScraperTool {
         let single_selector = extract_optional_string(params, "selector");
         let timeout = extract_optional_u64(params, "timeout").unwrap_or(30);
 
-        // Validate URL
-        if !url.starts_with("http://") && !url.starts_with("https://") {
-            return Err(validation_error(
-                "Invalid URL: URL must start with http:// or https://",
-                Some("input".to_string()),
-            ));
+        // Validate URL with SSRF protection
+        let ssrf_protector = SsrfProtector::new();
+        match ssrf_protector.validate_url(url) {
+            Ok(_) => {
+                // URL is safe from SSRF perspective
+            }
+            Err(e) => {
+                return Err(validation_error(
+                    format!("URL validation failed: {}", e),
+                    Some("input".to_string()),
+                ));
+            }
         }
 
-        // Additional validation to prevent SSRF and XSS
+        // Additional validation to prevent XSS
         let sanitizer = InputSanitizer::new();
         let validation_report = sanitizer.validate(url);
         if !validation_report.is_safe {

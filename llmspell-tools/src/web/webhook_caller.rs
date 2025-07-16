@@ -17,6 +17,7 @@ use llmspell_utils::{
         extract_required_string,
     },
     response::ResponseBuilder,
+    security::ssrf_protection::SsrfProtector,
 };
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -130,10 +131,11 @@ impl BaseAgent for WebhookCallerTool {
         let max_retries = extract_optional_u64(params, "max_retries").unwrap_or(3) as u32;
         let timeout = extract_optional_u64(params, "timeout").unwrap_or(30);
 
-        // Validate URL
-        if !url.starts_with("http://") && !url.starts_with("https://") {
+        // Validate URL with SSRF protection
+        let ssrf_protector = SsrfProtector::new();
+        if let Err(e) = ssrf_protector.validate_url(url) {
             return Err(validation_error(
-                "URL must start with http:// or https://",
+                format!("URL validation failed: {}", e),
                 Some("input".to_string()),
             ));
         }
