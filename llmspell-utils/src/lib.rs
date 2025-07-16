@@ -107,6 +107,12 @@ pub mod rate_limiting;
 /// Circuit breaker pattern for fault tolerance
 pub mod circuit_breaker;
 
+/// Resource limit enforcement framework
+pub mod resource_limits;
+
+/// Resource monitoring and metrics
+pub mod resource_monitoring;
+
 // Re-export commonly used types and functions
 pub use async_utils::{
     concurrent_map, race_to_success, retry_async, timeout, timeout_with_default, AsyncError,
@@ -226,4 +232,14 @@ pub use circuit_breaker::{
     CircuitBreaker, CircuitBreakerConfig, CircuitBreakerError, CircuitBreakerManager,
     CircuitBreakerResult, CircuitMetrics, CircuitMetricsCollector, CircuitState, ServicePresets,
     StateTransition, ThresholdConfig,
+};
+
+// Re-export resource limits utilities
+pub use resource_limits::{
+    ConcurrentGuard, MemoryGuard, ResourceLimits, ResourceMetrics, ResourceTracker,
+};
+
+// Re-export resource monitoring utilities
+pub use resource_monitoring::{
+    MonitoringConfig, ResourceEvent, ResourceEventType, ResourceMonitor, ResourceStatistics,
 };

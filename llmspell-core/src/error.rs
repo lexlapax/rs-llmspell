@@ -213,6 +213,13 @@ pub enum LLMSpellError {
         #[source]
         source: Option<Box<dyn std::error::Error + Send + Sync>>,
     },
+
+    #[error("Resource limit exceeded: {resource} limit of {limit} exceeded (used: {used})")]
+    ResourceLimit {
+        resource: String,
+        limit: usize,
+        used: usize,
+    },
 }
 
 impl LLMSpellError {
@@ -223,7 +230,9 @@ impl LLMSpellError {
             Self::Provider { .. } | Self::Network { .. } | Self::RateLimit { .. } => {
                 ErrorCategory::Network
             }
-            Self::Resource { .. } | Self::Timeout { .. } => ErrorCategory::Resource,
+            Self::Resource { .. } | Self::Timeout { .. } | Self::ResourceLimit { .. } => {
+                ErrorCategory::Resource
+            }
             Self::Security { .. } => ErrorCategory::Security,
             Self::Validation { .. } | Self::Component { .. } => ErrorCategory::Logic,
             Self::Tool { .. } | Self::Script { .. } | Self::Workflow { .. } => {
@@ -261,6 +270,7 @@ impl LLMSpellError {
             }
             Self::Security { .. } | Self::Configuration { .. } | Self::Validation { .. } => false,
             Self::Internal { .. } => false,
+            Self::ResourceLimit { .. } => false, // Resource limits are not retryable
             _ => false,
         }
     }

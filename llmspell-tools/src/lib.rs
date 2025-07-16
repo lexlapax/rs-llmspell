@@ -8,6 +8,7 @@ pub mod data;
 pub mod fs;
 pub mod media;
 pub mod registry;
+pub mod resource_limited;
 pub mod search;
 pub mod system;
 pub mod util;
@@ -15,6 +16,7 @@ pub mod web;
 
 // Re-export main types
 pub use registry::{CapabilityMatcher, RegistryStatistics, ToolInfo, ToolRegistry};
+pub use resource_limited::{ResourceLimitExt, ResourceLimited, ResourceLimitedTool};
 
 // Re-export tools
 pub use api::{GraphQLQueryTool, HttpRequestTool};

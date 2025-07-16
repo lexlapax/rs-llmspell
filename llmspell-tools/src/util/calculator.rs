@@ -9,14 +9,15 @@
 //! - Variable storage and substitution
 //! - Expression validation with helpful errors
 
+use crate::resource_limited::ResourceLimited;
 use async_trait::async_trait;
 use fasteval::Error as FastevalError;
 use llmspell_core::{
     traits::{
         base_agent::BaseAgent,
         tool::{
-            ParameterDef, ParameterType, ResourceLimits, SecurityLevel, SecurityRequirements, Tool,
-            ToolCategory, ToolSchema,
+            ParameterDef, ParameterType, ResourceLimits as ToolResourceLimits, SecurityLevel,
+            SecurityRequirements, Tool, ToolCategory, ToolSchema,
         },
     },
     types::{AgentInput, AgentOutput, ExecutionContext},
@@ -28,6 +29,7 @@ use llmspell_utils::{
         extract_optional_object, extract_parameters, extract_required_string,
         extract_string_with_default,
     },
+    resource_limits::{ResourceLimits, ResourceTracker},
     response::ResponseBuilder,
     security::{
         EnhancedExpressionAnalyzer, EnhancedExpressionConfig, ExpressionAnalyzer,
@@ -291,19 +293,58 @@ impl BaseAgent for CalculatorTool {
     }
 
     async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+        // Create resource tracker for this execution
+        let limits = ResourceLimits {
+            max_memory_bytes: Some(10 * 1024 * 1024), // 10MB
+            max_cpu_time_ms: Some(5_000),             // 5 seconds
+            max_operations: Some(10_000),             // 10K operations
+            operation_timeout_ms: Some(5_000),        // 5 seconds
+            ..Default::default()
+        };
+        let tracker = ResourceTracker::new(limits);
+
+        // Track the operation
+        tracker.track_operation()?;
+
         // Get parameters using shared utility
         let params = extract_parameters(&input)?;
 
-        // Process the operation
-        match self.process_operation(params).await {
-            Ok(result) => {
+        // Process the operation with resource tracking
+        let result = tracker
+            .with_timeout(async { self.process_operation(params).await })
+            .await;
+
+        // Format the result
+        match result {
+            Ok(Ok(response)) => {
+                // Add resource metrics to the response
+                let mut response_with_metrics = response;
+                if let Some(obj) = response_with_metrics.as_object_mut() {
+                    let metrics = tracker.get_metrics();
+                    obj.insert(
+                        "resource_usage".to_string(),
+                        json!({
+                            "memory_bytes": metrics.memory_bytes,
+                            "cpu_time_ms": metrics.cpu_time_ms,
+                            "operations_count": metrics.operations_count,
+                        }),
+                    );
+                }
+
                 // Return the result as JSON formatted text
                 Ok(AgentOutput::text(
-                    serde_json::to_string_pretty(&result).unwrap(),
+                    serde_json::to_string_pretty(&response_with_metrics).unwrap(),
+                ))
+            }
+            Ok(Err(e)) => {
+                // Return error as a response with success=false
+                let error_response = ResponseBuilder::error("evaluate", e.to_string()).build();
+                Ok(AgentOutput::text(
+                    serde_json::to_string_pretty(&error_response).unwrap(),
                 ))
             }
             Err(e) => {
-                // Return error as a response with success=false
+                // Timeout error
                 let error_response = ResponseBuilder::error("evaluate", e.to_string()).build();
                 Ok(AgentOutput::text(
                     serde_json::to_string_pretty(&error_response).unwrap(),
@@ -372,10 +413,22 @@ impl Tool for CalculatorTool {
         SecurityRequirements::safe()
     }
 
-    fn resource_limits(&self) -> ResourceLimits {
-        ResourceLimits::strict()
+    fn resource_limits(&self) -> ToolResourceLimits {
+        ToolResourceLimits::strict()
             .with_memory_limit(10 * 1024 * 1024) // 10MB
             .with_cpu_limit(1000) // 1 second
+    }
+}
+
+impl ResourceLimited for CalculatorTool {
+    fn resource_limits(&self) -> ResourceLimits {
+        ResourceLimits {
+            max_memory_bytes: Some(10 * 1024 * 1024), // 10MB
+            max_cpu_time_ms: Some(5_000),             // 5 seconds
+            max_operations: Some(10_000),             // 10K operations
+            operation_timeout_ms: Some(5_000),        // 5 seconds
+            ..Default::default()
+        }
     }
 }
 
