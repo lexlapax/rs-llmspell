@@ -11,10 +11,14 @@
 //! - Path security validation
 
 pub mod expression_analyzer_enhanced;
+pub mod input_sanitizer;
 pub mod memory_tracker;
 pub mod path;
 
 pub use expression_analyzer_enhanced::{EnhancedExpressionAnalyzer, EnhancedExpressionConfig};
+pub use input_sanitizer::{
+    InputSanitizer, SanitizationConfig, SanitizationError, ValidationReport,
+};
 pub use memory_tracker::{MemoryGuard, MemoryTracker, ScopedMemoryTracker};
 
 use std::time::Duration;

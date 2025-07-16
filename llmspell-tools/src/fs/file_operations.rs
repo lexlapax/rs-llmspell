@@ -533,10 +533,32 @@ impl FileOperationsTool {
         let operation_str = extract_required_string(params, "operation")?;
         let operation: FileOperation = operation_str.parse()?;
 
-        let path = extract_optional_string(params, "path").map(PathBuf::from);
+        // Validate paths - we don't sanitize because the FileSandbox handles security
+        let path = extract_optional_string(params, "path").map(|p| {
+            // Check for obvious traversal attempts but allow absolute paths
+            // since FileSandbox will enforce the actual security boundaries
+            if p.contains("../") || p.contains("..\\") {
+                warn!("Path traversal attempt detected in path: {}", p);
+            }
+            PathBuf::from(p)
+        });
+
         let input = extract_optional_string(params, "input").map(String::from);
-        let source_path = extract_optional_string(params, "source_path").map(PathBuf::from);
-        let target_path = extract_optional_string(params, "target_path").map(PathBuf::from);
+
+        let source_path = extract_optional_string(params, "source_path").map(|p| {
+            if p.contains("../") || p.contains("..\\") {
+                warn!("Path traversal attempt detected in source_path: {}", p);
+            }
+            PathBuf::from(p)
+        });
+
+        let target_path = extract_optional_string(params, "target_path").map(|p| {
+            if p.contains("../") || p.contains("..\\") {
+                warn!("Path traversal attempt detected in target_path: {}", p);
+            }
+            PathBuf::from(p)
+        });
+
         let recursive = extract_optional_bool(params, "recursive").unwrap_or(false);
 
         Ok(FileParameters {

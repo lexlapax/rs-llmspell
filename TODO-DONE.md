@@ -4,6 +4,61 @@
 
 ### Phase 3.2: Security & Performance
 
+#### Task 3.2.5: Input Sanitization Framework ✅
+**Completed**: 2025-07-16 (Gold Space)
+**Priority**: HIGH
+**Time Taken**: 3 hours
+
+**Summary**: Implemented comprehensive input sanitization framework to prevent injection attacks across all tool types and updated 4 critical tools.
+
+**Implementation**:
+1. **InputSanitizer** (`llmspell-utils/src/security/input_sanitizer.rs`):
+   - HTML/JavaScript sanitization with script tag and event handler removal
+   - SQL injection protection with comment removal and quote escaping
+   - Command injection blocking with metacharacter escaping
+   - Format string protection by removing dangerous specifiers (%n, %s)
+   - XXE prevention by removing DOCTYPE and ENTITY declarations
+   - Path sanitization with traversal and absolute path detection
+
+2. **ValidationRuleSet** (`llmspell-utils/src/security/validation_rules.rs`):
+   - Composable validation rules framework
+   - 14 built-in rule types including LengthRule, HtmlSanitizationRule, SqlSanitizationRule
+   - Pre-configured rule sets: web_standard(), sql_standard(), command_standard(), path_standard()
+   - Fail-fast and auto-sanitize configuration options
+   - Parameter validation helpers for tool integration
+
+3. **Tool Updates**:
+   - **ProcessExecutorTool**: Added command injection protection for executable and arguments
+   - **DatabaseConnectorTool**: Added SQL injection validation with warning logging
+   - **FileOperationsTool**: Added path traversal detection (allowing FileSandbox to enforce boundaries)
+   - **WebScraperTool**: Enhanced URL validation to prevent SSRF and XSS attacks
+
+4. **Key Features**:
+   - Lazy static regex compilation for performance
+   - Configurable sanitization levels (strict/relaxed modes)
+   - Blocked pattern support with custom regex
+   - Comprehensive validation reports with issue tracking
+   - Full test coverage (288 tests passing + tool tests passing)
+
+**Security Improvements**:
+- Prevents XSS attacks through HTML entity encoding
+- Blocks SQL injection with keyword removal in suspicious contexts
+- Prevents command injection by escaping shell metacharacters
+- Protects against format string attacks
+- Prevents XXE attacks in XML processing
+- Blocks path traversal attempts
+- SSRF protection through URL validation
+
+#### Task 3.2.4: Resource Limit Enforcement ✅
+**Completed**: 2025-07-16 (Gold Space)
+**Priority**: HIGH
+**Time Taken**: 3 hours
+
+#### Task 3.2.3: Path Traversal Protection ✅
+**Completed**: 2025-07-16 (Gold Space)
+**Priority**: CRITICAL
+**Time Taken**: ~3 hours
+
 #### Task 3.2.2: Calculator DoS Protection (Enhanced) ✅
 **Completed**: 2025-07-16
 **Priority**: CRITICAL

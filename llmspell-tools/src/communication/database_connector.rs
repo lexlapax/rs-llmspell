@@ -17,6 +17,7 @@ use llmspell_utils::{
     error_builders::llmspell::{tool_error, validation_error},
     params::{extract_optional_string, extract_parameters, extract_required_string},
     response::ResponseBuilder,
+    security::input_sanitizer::InputSanitizer,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -488,10 +489,28 @@ impl BaseAgent for DatabaseConnectorTool {
         let database =
             extract_optional_string(params, "database").unwrap_or(&self.config.default_database);
 
+        // Create sanitizer for SQL input protection
+        let sanitizer = InputSanitizer::new();
+
         match operation {
             "query" => {
                 let query = extract_required_string(params, "query")?;
                 let query_type = extract_optional_string(params, "query_type").unwrap_or("SELECT");
+
+                // Note: For SQL queries, we validate but don't sanitize the query itself
+                // as that could break legitimate queries. Instead, we rely on parameterized
+                // queries in the actual implementation and validate the query structure.
+
+                // Validate the query for potential SQL injection
+                let validation_report = sanitizer.validate(query);
+                if !validation_report.is_safe {
+                    warn!(
+                        "Potentially unsafe SQL query detected: {:?}",
+                        validation_report.issues
+                    );
+                    // We log the warning but don't block the query since we have
+                    // other security measures in place (parameterized queries, permissions)
+                }
 
                 match self.execute_query(database, query, query_type).await {
                     Ok(result) => {

@@ -17,6 +17,7 @@ use llmspell_utils::{
         extract_optional_u64, extract_parameters, extract_required_string,
     },
     response::ResponseBuilder,
+    security::input_sanitizer::InputSanitizer,
 };
 use reqwest::Client;
 use scraper::{Html, Selector};
@@ -363,6 +364,25 @@ impl BaseAgent for WebScraperTool {
                 "Invalid URL: URL must start with http:// or https://",
                 Some("input".to_string()),
             ));
+        }
+
+        // Additional validation to prevent SSRF and XSS
+        let sanitizer = InputSanitizer::new();
+        let validation_report = sanitizer.validate(url);
+        if !validation_report.is_safe {
+            // Check if the issues are critical for URLs
+            for issue in &validation_report.issues {
+                if matches!(
+                    issue.severity,
+                    llmspell_utils::security::input_sanitizer::Severity::High
+                        | llmspell_utils::security::input_sanitizer::Severity::Critical
+                ) {
+                    return Err(validation_error(
+                        format!("URL contains potential security risk: {:?}", issue.message),
+                        Some("input".to_string()),
+                    ));
+                }
+            }
         }
 
         let selectors = if let Some(obj) = extract_optional_object(params, "selectors") {

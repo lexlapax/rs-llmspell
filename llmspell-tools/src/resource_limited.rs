@@ -199,8 +199,6 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use llmspell_core::traits::tool::{ParameterDef, ParameterType};
-    use serde_json::json;
 
     // Mock tool for testing
     struct MockTool {

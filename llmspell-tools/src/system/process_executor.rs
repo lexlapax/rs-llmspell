@@ -18,6 +18,7 @@ use llmspell_utils::{
     extract_parameters,
     extract_required_string,
     response::ResponseBuilder,
+    security::input_sanitizer::InputSanitizer,
     system_info::find_executable,
     // NEW: Using shared timeout utility
     timeout::TimeoutBuilder,
@@ -462,28 +463,58 @@ impl BaseAgent for ProcessExecutorTool {
         // Extract required parameters
         let executable = extract_required_string(params, "executable")?;
 
+        // Sanitize executable to prevent command injection
+        let sanitizer = InputSanitizer::new();
+        let sanitized_executable = sanitizer.sanitize_command(executable);
+
         // Extract optional parameters
         let args: Vec<String> = extract_optional_array(params, "arguments")
             .map(|arr| {
                 arr.iter()
                     .filter_map(|v| v.as_str())
-                    .map(|s| s.to_string())
+                    .map(|s| {
+                        // Sanitize each argument to prevent injection
+                        sanitizer.sanitize_command(s)
+                    })
                     .collect()
             })
             .unwrap_or_default();
 
-        let working_dir = extract_optional_string(params, "working_directory").map(Path::new);
+        let working_dir_str = extract_optional_string(params, "working_directory");
+        let working_dir = if let Some(dir) = working_dir_str.as_ref() {
+            // Sanitize path to prevent directory traversal
+            match sanitizer.sanitize_path(dir) {
+                Ok(safe_path) => Some(safe_path),
+                Err(_) => {
+                    warn!("Invalid working directory path detected: {}", dir);
+                    None
+                }
+            }
+        } else {
+            None
+        };
+        let working_dir_path = working_dir.as_deref().map(Path::new);
 
         let env_vars: Option<HashMap<String, String>> =
             extract_optional_object(params, "environment").map(|obj| {
                 obj.iter()
-                    .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                    .filter_map(|(k, v)| {
+                        v.as_str().map(|s| {
+                            // Sanitize environment variable values
+                            (k.clone(), sanitizer.sanitize_command(s))
+                        })
+                    })
                     .collect()
             });
 
         // Execute the process
         let result = self
-            .execute_process(executable, &args, working_dir, env_vars.as_ref())
+            .execute_process(
+                &sanitized_executable,
+                &args,
+                working_dir_path,
+                env_vars.as_ref(),
+            )
             .await?;
 
         // Format response
