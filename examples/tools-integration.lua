@@ -15,6 +15,15 @@ end
 
 -- Helper to print clean results
 local function print_result(label, result)
+    -- Check if the tool returned an error in the output
+    if result.output and type(result.output) == "string" then
+        local ok, parsed = pcall(function() return TestHelpers.json.decode(result.output) end)
+        if ok and parsed.success == false then
+            print("  ❌ " .. label .. ": " .. (parsed.error and parsed.error.message or "Failed"))
+            return
+        end
+    end
+    
     if result.error then
         print("  ❌ " .. label .. ": " .. (result.error.message or result.error))
     elseif result.success == false then
@@ -47,6 +56,7 @@ print("Set environment variables like SENDGRID_API_KEY, AWS_ACCESS_KEY_ID, etc.\
 -- SMTP Email example
 local smtp_result = use_tool("email-sender", {
     provider = "smtp",
+    from = "sender@example.com",
     to = "recipient@example.com",
     subject = "Test Email from LLMSpell",
     body = "This is a test email sent via SMTP.",
@@ -82,6 +92,7 @@ print_result("AWS SES email", ses_result)
 -- Email with attachments (conceptual - implementation pending)
 local attachment_result = use_tool("email-sender", {
     provider = "smtp",
+    from = "sender@example.com",
     to = "recipient@example.com",
     subject = "Email with Attachment",
     body = "Please find the report attached.",
@@ -165,7 +176,7 @@ print("\nDemonstrating rate limiting behavior:")
 -- Simulate rate limiting with web search
 print("\nTesting rate limits with rapid requests:")
 for i = 1, 5 do
-    local result = use_tool("web-search", {
+    local result = use_tool("web_search", {
         input = "test query " .. i,
         provider = "duckduckgo",
         max_results = 1
@@ -246,7 +257,7 @@ end
 print("\nUsing tools with API key requirements:")
 
 -- Web search with API key
-local api_search_result = use_tool("web-search", {
+local api_search_result = use_tool("web_search", {
     input = "artificial intelligence",
     provider = "google",  -- Requires LLMSPELL_API_KEY_GOOGLE
     max_results = 3

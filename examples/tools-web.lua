@@ -221,7 +221,7 @@ TestHelpers.print_section("Enhanced Web Search Tool")
 print("\nUsing enhanced web search with providers:")
 
 -- Basic web search (will use DuckDuckGo by default)
-local search_result = use_tool("web-search", {
+local search_result = use_tool("web_search", {
     input = "Rust programming language",
     provider = "duckduckgo",
     max_results = 5
@@ -229,7 +229,7 @@ local search_result = use_tool("web-search", {
 print_result("DuckDuckGo search", search_result)
 
 -- Search with specific provider (if API key is configured)
-local google_search_result = use_tool("web-search", {
+local google_search_result = use_tool("web_search", {
     input = "machine learning tutorials",
     provider = "google",
     max_results = 3
@@ -237,7 +237,7 @@ local google_search_result = use_tool("web-search", {
 print_result("Google search", google_search_result)
 
 -- Search with filters
-local filtered_search_result = use_tool("web-search", {
+local filtered_search_result = use_tool("web_search", {
     input = "climate change",
     provider = "brave",
     max_results = 5,

@@ -905,7 +905,11 @@
 - Each tool has 3+ usage examples with error handling demonstrated
 - All examples follow existing patterns from tools-*.lua files
 - Added tool registrations to llmspell-bridge/src/tools.rs for all Phase 3.1 tools
-- Verified examples run successfully (URL analyzer confirmed working)
+- Fixed tool naming issues (web_search vs web-search) and missing parameters
+- Thoroughly tested both example files:
+  - tools-web.lua: All web tools working (URL analyzer, web scraper, API tester, etc.)
+  - tools-integration.lua: Email/database tools show expected errors without configuration
+  - Rate limiting and web search examples execute successfully
 
 **Definition of Done:**
 - [x] All 8 tools have working examples ✅
