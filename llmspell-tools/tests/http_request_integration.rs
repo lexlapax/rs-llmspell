@@ -315,6 +315,7 @@ async fn test_http_delete_request() {
 }
 
 #[tokio::test]
+#[ignore = "httpbin.org intermittent network issues"]
 async fn test_http_api_key_auth() {
     let tool = HttpRequestTool::new(Default::default()).unwrap();
 
