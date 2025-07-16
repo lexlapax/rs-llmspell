@@ -51,6 +51,7 @@ pub fn assert_success_output(output: &AgentOutput, expected_fields: &[&str]) {
 }
 
 /// Validate that output is an error with expected message pattern
+#[allow(dead_code)]
 pub fn assert_error_output(output: &AgentOutput, error_pattern: &str) {
     let output_value: Value = serde_json::from_str(&output.text).unwrap();
 

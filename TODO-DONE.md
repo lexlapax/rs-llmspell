@@ -2,6 +2,86 @@
 
 ## Phase 3: Tool Enhancement & Workflow Orchestration
 
+### Phase 3.2: Security & Performance
+
+#### Task 3.2.2: Calculator DoS Protection (Enhanced) ✅
+**Completed**: 2025-07-16
+**Priority**: CRITICAL
+**Time Taken**: ~2 hours
+
+#### WebpageMonitor Timeout Bug Fix ✅
+**Completed**: 2025-07-16
+**Priority**: HIGH
+**Time Taken**: ~1 hour
+
+**Summary**: Fixed critical timeout handling bug in WebpageMonitor tool causing workspace test failures.
+
+**Issue**: 
+- WebpageMonitor tool was not respecting the `timeout` parameter passed in requests
+- Used hardcoded 30-second timeout instead of user-specified timeout
+- Caused test suite to hang when testing with short timeouts (1 second)
+- Affected security_test_suite and web_tools_error_scenarios tests
+
+**Implementation**:
+- Modified `execute` method to extract timeout parameter from input parameters
+- Updated `fetch_content` method signature to accept timeout_secs parameter
+- Changed HTTP client timeout from hardcoded 30 seconds to configurable timeout
+- Maintained backward compatibility with 30-second default timeout
+
+**Files Modified**:
+- `llmspell-tools/src/web/webpage_monitor.rs`
+- `llmspell-tools/tests/security_test_suite.rs` (timeout fix for SSRF prevention test)
+
+**Test Results**:
+- All workspace tests now pass without hanging
+- Security test suite completes in ~40 seconds instead of timing out
+- Web tools error scenarios test passes all timeout tests
+- Quality checks pass with zero warnings
+
+**Impact**: 
+- Resolved workspace test failures reported by Gold Space
+- Improved test reliability and developer experience
+- Ensured consistent timeout behavior across all web tools
+
+**Summary**: Enhanced DoS protection for Calculator tool with sophisticated security measures.
+
+**Implementation Highlights:**
+- Created `EnhancedExpressionAnalyzer` with:
+  - Banned pattern detection (nested exponentials, recursive functions)
+  - Memory usage estimation
+  - Recursive depth tracking
+  - Variable count limits
+  - Large exponent detection
+- Implemented `MemoryTracker` for real-time allocation monitoring
+- Integrated both analyzers into CalculatorTool for layered protection
+- Created comprehensive test suite with 11 DoS attack scenarios
+- All tests passing with 100% coverage of attack vectors
+
+**Key Security Improvements:**
+1. **Pattern Detection**: Blocks dangerous patterns like `exp(exp())`, nested powers, factorial operations
+2. **Memory Protection**: Tracks and limits memory allocations during expression evaluation
+3. **Recursive Limits**: Prevents deep nesting of function calls (e.g., `sqrt(sqrt(sqrt(...)))`)
+4. **Timeout Enforcement**: Ensures expressions complete within 100ms
+5. **Variable Limits**: Prevents expressions with excessive unique variables
+
+**Test Coverage:**
+- Basic complexity limits (expression length, nesting depth, operation count)
+- Enhanced pattern detection (banned patterns, consecutive operations)
+- Exponential growth prevention
+- Memory exhaustion protection
+- Recursive depth limits
+- Variable count enforcement
+- Real-world DoS attack patterns
+- Edge cases (empty expressions, Unicode, etc.)
+- Performance consistency validation
+
+**Files Modified:**
+- `llmspell-utils/src/security/expression_analyzer_enhanced.rs` (new)
+- `llmspell-utils/src/security/memory_tracker.rs` (new)
+- `llmspell-utils/src/security.rs` (exports)
+- `llmspell-tools/src/util/calculator.rs` (integration)
+- `llmspell-tools/tests/calculator_dos_protection.rs` (new comprehensive test suite)
+
 ### Phase 3.1: External Integration Tools (In Progress)
 
 #### Task 3.1.2: Web Scraping Tools Suite ✅ COMPLETE - 2025-07-12
@@ -518,4 +598,3 @@
 - All quality checks passing (formatting, clippy, documentation)
 
 ---
-

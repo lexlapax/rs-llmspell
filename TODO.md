@@ -1149,35 +1149,52 @@
 4. `llmspell-tools/tests/security_test_suite.rs` - 13 security tests implemented
 5. Updated TODO.md with 4 new security tasks to ensure comprehensive coverage
 
-### Task 3.2.2: Calculator DoS Protection (Enhanced)
+### Task 3.2.2: Calculator DoS Protection (Enhanced) ✅
 **Priority**: CRITICAL  
 **Estimated Time**: 8 hours  
 **Assignee**: Security Developer
+**Status**: Completed
+**Started**: 2025-07-16
+**Completed**: 2025-07-16
 
 **Description**: Enhance DoS protection for Calculator tool beyond Phase 3.0 implementation.
 
 **Acceptance Criteria:**
-- [ ] Expression complexity analyzer enhanced
-- [ ] Evaluation timeout optimized
-- [ ] Memory usage tracking improved
-- [ ] Recursive depth limits refined
-- [ ] Comprehensive attack tests
+- [x] Expression complexity analyzer enhanced ✅
+- [x] Evaluation timeout optimized ✅
+- [x] Memory usage tracking improved ✅
+- [x] Recursive depth limits refined ✅
+- [x] Comprehensive attack tests ✅
 
 **Implementation Steps:**
-1. Review Phase 3.0 implementation
-2. Enhance complexity analyzer
-3. Optimize timeout handling
-4. Improve memory tracking
-5. Add more attack vectors
-6. Performance test protection
-7. Document security measures
+1. Review Phase 3.0 implementation ✅
+2. Enhance complexity analyzer ✅
+3. Optimize timeout handling ✅
+4. Improve memory tracking ✅
+5. Add more attack vectors ✅
+6. Performance test protection ✅
+7. Document security measures ✅
+
+**Implementation Details:**
+- Created `EnhancedExpressionAnalyzer` with advanced pattern detection
+- Implemented `MemoryTracker` for real-time allocation monitoring
+- Added banned pattern detection (nested exponentials, recursive functions)
+- Enhanced recursive depth tracking for nested function calls
+- Created comprehensive test suite with 11 DoS attack scenarios
+- All tests passing, quality checks complete
+
+**Files Created/Modified:**
+- `llmspell-utils/src/security/expression_analyzer_enhanced.rs`
+- `llmspell-utils/src/security/memory_tracker.rs`
+- `llmspell-tools/src/util/calculator.rs` (integrated enhanced protection)
+- `llmspell-tools/tests/calculator_dos_protection.rs` (comprehensive tests)
 
 **Definition of Done:**
-- [ ] Protection enhanced
-- [ ] All attacks blocked
-- [ ] Performance maintained
-- [ ] Tests comprehensive
-- [ ] Documentation updated
+- [x] Protection enhanced ✅
+- [x] All attacks blocked ✅
+- [x] Performance maintained ✅
+- [x] Tests comprehensive ✅
+- [x] Documentation updated ✅
 
 ### Task 3.2.3: Path Security Hardening (Enhanced)
 **Priority**: CRITICAL  

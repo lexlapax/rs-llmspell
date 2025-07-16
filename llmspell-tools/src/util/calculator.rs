@@ -29,7 +29,10 @@ use llmspell_utils::{
         extract_string_with_default,
     },
     response::ResponseBuilder,
-    security::{ExpressionAnalyzer, ExpressionComplexityConfig},
+    security::{
+        EnhancedExpressionAnalyzer, EnhancedExpressionConfig, ExpressionAnalyzer,
+        ExpressionComplexityConfig, MemoryTracker,
+    },
     timeout::with_timeout,
 };
 use serde_json::{json, Value as JsonValue};
@@ -40,8 +43,10 @@ use std::collections::BTreeMap;
 pub struct CalculatorTool {
     /// Tool metadata
     metadata: ComponentMetadata,
-    /// Expression analyzer for DoS protection
+    /// Basic expression analyzer for DoS protection
     analyzer: ExpressionAnalyzer,
+    /// Enhanced analyzer for advanced DoS protection
+    enhanced_analyzer: EnhancedExpressionAnalyzer,
 }
 
 impl Default for CalculatorTool {
@@ -53,6 +58,9 @@ impl Default for CalculatorTool {
                     .to_string(),
             ),
             analyzer: ExpressionAnalyzer::with_config(ExpressionComplexityConfig::default()),
+            enhanced_analyzer: EnhancedExpressionAnalyzer::with_config(
+                EnhancedExpressionConfig::default(),
+            ),
         }
     }
 }
@@ -87,6 +95,18 @@ impl CalculatorTool {
             ));
         }
 
+        // Then run enhanced analysis for advanced DoS protection
+        let enhanced_complexity = self.enhanced_analyzer.analyze(expression);
+        if !enhanced_complexity.is_safe {
+            return Err(validation_error(
+                format!(
+                    "Expression failed security check: {}",
+                    enhanced_complexity.unsafe_reason.unwrap_or_default()
+                ),
+                Some("input".to_string()),
+            ));
+        }
+
         // Preprocess custom functions
         let processed_expr = self.preprocess_custom_functions(expression);
 
@@ -98,12 +118,24 @@ impl CalculatorTool {
             }
         }
 
+        // Create memory tracker for this evaluation
+        let memory_tracker = MemoryTracker::new(1_000_000); // 1MB limit per evaluation
+
+        // Track initial memory for expression and variables
+        let expr_memory = processed_expr.len() * 8 + variables.len() * 64;
+        if let Err(e) = memory_tracker.allocate(expr_memory) {
+            return Err(validation_error(
+                format!("Expression requires too much memory: {}", e),
+                Some("input".to_string()),
+            ));
+        }
+
         // Evaluate with timeout to prevent DoS
         let max_eval_time = self.analyzer.max_evaluation_time();
         let ns_clone = ns.clone();
         let expr_clone = processed_expr.clone();
 
-        match with_timeout(max_eval_time, async move {
+        let result = match with_timeout(max_eval_time, async move {
             fasteval::ez_eval(&expr_clone, &mut ns_clone.clone())
         })
         .await
@@ -114,7 +146,12 @@ impl CalculatorTool {
                 format!("Expression evaluation timed out after {:?}", max_eval_time),
                 Some("input".to_string()),
             )),
-        }
+        };
+
+        // Clean up memory tracking
+        memory_tracker.reset();
+
+        result
     }
 
     /// Preprocess expression to replace custom functions with their implementations

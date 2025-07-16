@@ -117,6 +117,11 @@ impl BaseAgent for WebpageMonitorTool {
             .and_then(|p| p.get("ignore_whitespace"))
             .and_then(|w| w.as_bool())
             .unwrap_or(true);
+        let timeout = params
+            .get("parameters")
+            .and_then(|p| p.get("timeout"))
+            .and_then(|t| t.as_u64())
+            .unwrap_or(30);
 
         // Validate URL
         if !url.starts_with("http://") && !url.starts_with("https://") {
@@ -127,7 +132,7 @@ impl BaseAgent for WebpageMonitorTool {
         }
 
         // Fetch current content
-        let current_content = self.fetch_content(url, selector).await?;
+        let current_content = self.fetch_content(url, selector, timeout).await?;
 
         // If no previous content provided, just return current state
         let Some(prev_content) = previous_content else {
@@ -173,9 +178,14 @@ impl BaseAgent for WebpageMonitorTool {
 }
 
 impl WebpageMonitorTool {
-    async fn fetch_content(&self, url: &str, selector: Option<&str>) -> Result<String> {
+    async fn fetch_content(
+        &self,
+        url: &str,
+        selector: Option<&str>,
+        timeout_secs: u64,
+    ) -> Result<String> {
         let client = Client::builder()
-            .timeout(Duration::from_secs(30))
+            .timeout(Duration::from_secs(timeout_secs))
             .user_agent("Mozilla/5.0 (compatible; LLMSpell-WebpageMonitor/1.0)")
             .build()
             .unwrap_or_default();
