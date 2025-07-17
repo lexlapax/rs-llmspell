@@ -12,6 +12,7 @@
 
 pub mod credential_protection;
 pub mod expression_analyzer_enhanced;
+pub mod file_upload_security;
 pub mod input_sanitizer;
 pub mod memory_tracker;
 pub mod path;
@@ -22,6 +23,10 @@ pub use credential_protection::{
     SecureCredential, SecureString,
 };
 pub use expression_analyzer_enhanced::{EnhancedExpressionAnalyzer, EnhancedExpressionConfig};
+pub use file_upload_security::{
+    FileProcessingSandbox, FileUploadConfig, FileUploadValidator, FileValidationError,
+    FileValidationResult,
+};
 pub use input_sanitizer::{
     InputSanitizer, SanitizationConfig, SanitizationError, ValidationReport,
 };

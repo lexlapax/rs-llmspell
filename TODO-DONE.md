@@ -653,3 +653,69 @@
 - All quality checks passing (formatting, clippy, documentation)
 
 ---
+
+### Task 3.2.8: File Upload Security ✅
+**Completed**: 2025-07-17  
+**Priority**: HIGH  
+**Time Taken**: 2 hours  
+
+**Description**: Implemented secure file upload handling for media processing tools.
+
+**Acceptance Criteria Completed:**
+- ✅ File type validation with allowed extensions configuration
+- ✅ Magic number verification for 20+ file types
+- ✅ Content scanning for malicious patterns
+- ✅ Processing sandbox with isolated temp directory
+- ✅ Size and resource limits enforcement
+
+**Implementation Details:**
+1. **FileUploadValidator**: Comprehensive validation framework
+   - Configurable allowed file extensions and MIME types
+   - Maximum file size enforcement (default 100MB)
+   - Filename sanitization and length validation
+   
+2. **Magic Number Verification**:
+   - Images: PNG, JPEG, GIF
+   - Documents: PDF, DOC, DOCX
+   - Archives: ZIP, RAR, 7Z
+   - Executables: EXE, ELF, Mach-O (blocked)
+   - Scripts: Shell scripts with shebang (blocked)
+   
+3. **Content Scanning**:
+   - Script injection patterns (XSS prevention)
+   - PHP code detection
+   - Shell command patterns
+   - Warnings for suspicious content
+   
+4. **FileProcessingSandbox**:
+   - Isolated temporary directory per operation
+   - Automatic cleanup on drop
+   - Copy files to sandbox for safe processing
+   - Configurable processing time and memory limits
+   
+5. **Security Features**:
+   - Directory traversal prevention in filenames
+   - Control character and null byte filtering
+   - Special character replacement
+   - Timestamp-based unique filenames
+   - Extension validation against magic numbers
+
+**Files Created/Modified:**
+- `llmspell-utils/src/security/file_upload_security.rs` - Complete implementation
+- `llmspell-utils/src/security.rs` - Module exports
+- Tests cover all validation scenarios
+
+**Test Results:**
+- All 307 llmspell-utils tests passing
+- File size validation test
+- Filename sanitization test  
+- Magic number detection test
+- Malicious content detection test
+- Sandbox lifecycle test
+
+**Integration Status:**
+- Ready for integration with media processing tools
+- Can be used by any tool handling file uploads
+- Provides both validation and sandboxing capabilities
+
+---
