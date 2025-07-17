@@ -15,6 +15,7 @@ use llmspell_core::{
 };
 use llmspell_utils::{
     error_builders::llmspell::{tool_error, validation_error},
+    error_handling::{ErrorContext, SafeErrorHandler},
     params::{extract_optional_string, extract_parameters, extract_required_string},
     response::ResponseBuilder,
     security::{
@@ -188,11 +189,14 @@ pub struct DatabaseConnectorTool {
     error_sanitizer: ErrorSanitizer,
     #[allow(dead_code)]
     credential_filter: CredentialFilter,
+    error_handler: SafeErrorHandler,
 }
 
 impl DatabaseConnectorTool {
     /// Create a new database connector tool
     pub fn new(config: DatabaseConnectorConfig) -> Result<Self> {
+        let is_production = !cfg!(debug_assertions);
+
         Ok(Self {
             config,
             metadata: ComponentMetadata::new(
@@ -203,6 +207,7 @@ impl DatabaseConnectorTool {
             auditor: parking_lot::Mutex::new(CredentialAuditor::new()),
             error_sanitizer: ErrorSanitizer::new(),
             credential_filter: CredentialFilter::new(),
+            error_handler: SafeErrorHandler::new(is_production),
         })
     }
 
@@ -621,9 +626,17 @@ impl BaseAgent for DatabaseConnectorTool {
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
-        Ok(AgentOutput::text(format!(
-            "Database connector error: {error}"
-        )))
+        // Use SafeErrorHandler to sanitize error messages
+        let context = ErrorContext::new()
+            .with_operation("database_query")
+            .with_metadata("tool", "database_connector");
+
+        let safe_response = self.error_handler.handle_llmspell_error(&error, &context);
+
+        Ok(AgentOutput::text(
+            serde_json::to_string_pretty(&safe_response)
+                .unwrap_or_else(|_| format!("{:?}", safe_response)),
+        ))
     }
 }
 

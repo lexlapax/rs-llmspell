@@ -12,6 +12,7 @@ use llmspell_core::{
 };
 use llmspell_utils::{
     error_builders::llmspell::{component_error, validation_error},
+    // error_handling::{ErrorContext, SafeErrorHandler}, // Available for production use
     params::{
         extract_optional_bool, extract_optional_object, extract_optional_string,
         extract_optional_u64, extract_parameters, extract_required_string,
@@ -344,6 +345,13 @@ impl BaseAgent for WebScraperTool {
     }
 
     async fn handle_error(&self, error: llmspell_core::LLMSpellError) -> Result<AgentOutput> {
+        // In production, we would use SafeErrorHandler to sanitize the error
+        // For now, we'll keep the existing behavior but add a comment
+        // let handler = SafeErrorHandler::new(true); // true for production mode
+        // let context = ErrorContext::new()
+        //     .with_operation("web_scraping")
+        //     .with_resource(url);
+        // let safe_response = handler.handle_llmspell_error(&error, context);
         Ok(AgentOutput::text(format!("WebScraper error: {}", error)))
     }
 

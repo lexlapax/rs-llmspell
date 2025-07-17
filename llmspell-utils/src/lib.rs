@@ -113,6 +113,9 @@ pub mod resource_limits;
 /// Resource monitoring and metrics
 pub mod resource_monitoring;
 
+/// Production-ready error handling with information disclosure prevention
+pub mod error_handling;
+
 // Re-export commonly used types and functions
 pub use async_utils::{
     concurrent_map, race_to_success, retry_async, timeout, timeout_with_default, AsyncError,

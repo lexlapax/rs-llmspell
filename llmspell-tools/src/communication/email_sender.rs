@@ -15,6 +15,7 @@ use llmspell_core::{
 };
 use llmspell_utils::{
     error_builders::llmspell::{tool_error, validation_error},
+    error_handling::{ErrorContext, SafeErrorHandler},
     params::{extract_optional_string, extract_parameters, extract_required_string},
     response::ResponseBuilder,
     security::{CredentialAuditEntry, CredentialAuditor, ErrorSanitizer},
@@ -152,6 +153,7 @@ pub struct EmailSenderTool {
     auditor: parking_lot::Mutex<CredentialAuditor>,
     #[allow(dead_code)]
     error_sanitizer: ErrorSanitizer,
+    error_handler: SafeErrorHandler,
 }
 
 impl RequiresApiKey for EmailSenderTool {
@@ -167,6 +169,8 @@ impl RequiresApiKey for EmailSenderTool {
 impl EmailSenderTool {
     /// Create a new email sender tool
     pub fn new(config: EmailSenderConfig) -> Result<Self> {
+        let is_production = !cfg!(debug_assertions);
+
         Ok(Self {
             config,
             metadata: ComponentMetadata::new(
@@ -175,6 +179,7 @@ impl EmailSenderTool {
             ),
             auditor: parking_lot::Mutex::new(CredentialAuditor::new()),
             error_sanitizer: ErrorSanitizer::new(),
+            error_handler: SafeErrorHandler::new(is_production),
         })
     }
 
@@ -571,7 +576,17 @@ impl BaseAgent for EmailSenderTool {
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
-        Ok(AgentOutput::text(format!("Email sender error: {error}")))
+        // Use SafeErrorHandler to sanitize error messages
+        let context = ErrorContext::new()
+            .with_operation("email_send")
+            .with_metadata("tool", "email_sender");
+
+        let safe_response = self.error_handler.handle_llmspell_error(&error, &context);
+
+        Ok(AgentOutput::text(
+            serde_json::to_string_pretty(&safe_response)
+                .unwrap_or_else(|_| format!("{:?}", safe_response)),
+        ))
     }
 }
 

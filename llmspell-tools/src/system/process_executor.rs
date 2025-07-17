@@ -12,6 +12,8 @@ use llmspell_core::{
 };
 use llmspell_security::sandbox::SandboxContext;
 use llmspell_utils::{
+    // NEW: Error handling with information disclosure prevention
+    error_handling::{ErrorContext, SafeErrorHandler},
     extract_optional_array,
     extract_optional_object,
     extract_optional_string,
@@ -146,17 +148,20 @@ impl Default for ProcessExecutorConfig {
 }
 
 /// Process executor tool for safe process execution
-#[derive(Clone)]
 pub struct ProcessExecutorTool {
     metadata: ComponentMetadata,
     config: ProcessExecutorConfig,
     #[allow(dead_code)] // Reserved for future sandbox integration
     sandbox_context: Option<Arc<SandboxContext>>,
+    error_handler: SafeErrorHandler,
 }
 
 impl ProcessExecutorTool {
     /// Create a new process executor tool
     pub fn new(config: ProcessExecutorConfig) -> Self {
+        // Determine if in production mode based on config
+        let is_production = !cfg!(debug_assertions);
+
         Self {
             metadata: ComponentMetadata::new(
                 "process_executor".to_string(),
@@ -164,6 +169,7 @@ impl ProcessExecutorTool {
             ),
             config,
             sandbox_context: None,
+            error_handler: SafeErrorHandler::new(is_production),
         }
     }
 
@@ -172,6 +178,8 @@ impl ProcessExecutorTool {
         config: ProcessExecutorConfig,
         sandbox_context: Arc<SandboxContext>,
     ) -> Self {
+        let is_production = !cfg!(debug_assertions);
+
         Self {
             metadata: ComponentMetadata::new(
                 "process_executor".to_string(),
@@ -179,6 +187,7 @@ impl ProcessExecutorTool {
             ),
             config,
             sandbox_context: Some(sandbox_context),
+            error_handler: SafeErrorHandler::new(is_production),
         }
     }
 
@@ -563,10 +572,17 @@ impl BaseAgent for ProcessExecutorTool {
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> LLMResult<AgentOutput> {
-        Ok(AgentOutput::text(format!(
-            "Process executor error: {}",
-            error
-        )))
+        // Use SafeErrorHandler to sanitize error messages
+        let context = ErrorContext::new()
+            .with_operation("process_execution")
+            .with_metadata("tool", "process_executor");
+
+        let safe_response = self.error_handler.handle_llmspell_error(&error, &context);
+
+        Ok(AgentOutput::text(
+            serde_json::to_string_pretty(&safe_response)
+                .unwrap_or_else(|_| format!("{:?}", safe_response)),
+        ))
     }
 }
 

@@ -104,3 +104,6 @@ criterion = { workspace = true }
 [[bench]]
 name = "file_utils_benchmarks"
 harness = false
+
+[[example]]
+name = "information_disclosure_prevention"
