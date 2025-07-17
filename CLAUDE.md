@@ -43,16 +43,17 @@ cargo fmt --all                        # Apply formatting
 ./scripts/quality-check-fast.sh        # Fast check (~1 min) - adds unit tests & docs
 ./scripts/quality-check.sh             # Full check (5+ min) - all tests & coverage
 
-# Individual Checks
-cargo test --workspace                 # Run all tests (can be slow)
-cargo test --lib --all                 # Run only unit tests (faster)
-cargo check --workspace                # Quick compilation check
+# Test Runners (See scripts/README.md for full documentation)
+./scripts/test-by-tag.sh unit         # Run only unit tests
+./scripts/test-by-tag.sh tool         # Run tool tests
+./scripts/test-by-tag.sh external     # Run external/network tests
+./scripts/list-tests-by-tag.sh all    # List test categories
+SKIP_SLOW_TESTS=true ./scripts/quality-check.sh  # Skip slow tests
 
 # Phase 3 Specific
 cargo test -p llmspell-tools          # Test tools crate
 cargo test -p llmspell-utils          # Test shared utilities
 cargo bench -p llmspell-tools         # Benchmark tool performance
-cargo test --all-features             # Test with all external integrations
 
 # Phase 3.3 Agent Development
 cargo test -p llmspell-agents         # Test agents crate (when created)

@@ -35,9 +35,7 @@ async fn test_http_get_request() {
         }),
     );
 
-    let result = tool
-        .execute(input, ExecutionContext::default())
-        .await;
+    let result = tool.execute(input, ExecutionContext::default()).await;
 
     match result {
         Ok(output) => {
@@ -161,9 +159,7 @@ async fn test_http_custom_headers() {
         }),
     );
 
-    let result = tool
-        .execute(input, ExecutionContext::default())
-        .await;
+    let result = tool.execute(input, ExecutionContext::default()).await;
 
     match result {
         Ok(output) => {
@@ -172,7 +168,10 @@ async fn test_http_custom_headers() {
             assert!(output.text.contains("custom-value"));
         }
         Err(e) => {
-            eprintln!("Warning: HTTP custom headers test failed due to network issue: {}", e);
+            eprintln!(
+                "Warning: HTTP custom headers test failed due to network issue: {}",
+                e
+            );
             eprintln!("This is likely due to httpbin.org being unavailable");
             // Skip test instead of panicking
         }
@@ -220,9 +219,7 @@ async fn test_http_retry_logic() {
 
     // Should retry but still fail
     let start = std::time::Instant::now();
-    let result = tool
-        .execute(input, ExecutionContext::default())
-        .await;
+    let result = tool.execute(input, ExecutionContext::default()).await;
 
     match result {
         Ok(output) => {
@@ -231,7 +228,10 @@ async fn test_http_retry_logic() {
             assert!(output.text.contains("503"));
         }
         Err(e) => {
-            eprintln!("Warning: HTTP retry logic test failed due to network issue: {}", e);
+            eprintln!(
+                "Warning: HTTP retry logic test failed due to network issue: {}",
+                e
+            );
             eprintln!("This is likely due to httpbin.org being unavailable");
             // Skip test instead of panicking
         }

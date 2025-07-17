@@ -9,6 +9,7 @@ use llmspell_tools::WebScraperTool;
 use serde_json::json;
 
 #[tokio::test]
+#[ignore = "external,tool,integration"]
 async fn test_web_scraper_basic() {
     let tool = WebScraperTool::default();
     let context = create_test_context();
@@ -34,6 +35,7 @@ async fn test_web_scraper_basic() {
 }
 
 #[tokio::test]
+#[ignore = "external,tool,integration"]
 async fn test_web_scraper_selectors() {
     let tool = WebScraperTool::default();
     let context = create_test_context();
@@ -56,6 +58,7 @@ async fn test_web_scraper_selectors() {
 }
 
 #[tokio::test]
+#[ignore = "external,tool,integration"]
 async fn test_web_scraper_metadata() {
     let tool = WebScraperTool::default();
     let context = create_test_context();
@@ -78,6 +81,7 @@ async fn test_web_scraper_metadata() {
 }
 
 #[tokio::test]
+#[ignore = "external,tool,integration"]
 async fn test_web_scraper_httpbin_html() {
     let tool = WebScraperTool::default();
     let context = create_test_context();
@@ -104,6 +108,7 @@ async fn test_web_scraper_httpbin_html() {
 }
 
 #[tokio::test]
+#[ignore = "external,tool,integration"]
 async fn test_web_scraper_invalid_url() {
     let tool = WebScraperTool::default();
     let context = create_test_context();
@@ -120,6 +125,7 @@ async fn test_web_scraper_invalid_url() {
 }
 
 #[tokio::test]
+#[ignore = "tool,integration"]
 async fn test_web_scraper_network_error() {
     let tool = WebScraperTool::default();
     let context = create_test_context();
@@ -142,6 +148,7 @@ async fn test_web_scraper_network_error() {
 }
 
 #[tokio::test]
+#[ignore = "external,tool,integration,slow"]
 async fn test_web_scraper_timeout() {
     let tool = WebScraperTool::default();
     let context = create_test_context();

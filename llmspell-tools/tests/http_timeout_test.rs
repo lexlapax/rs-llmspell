@@ -63,7 +63,10 @@ async fn test_http_no_timeout_with_long_timeout() {
     // Should succeed, but handle potential network issues gracefully
     match result {
         Ok(output) => {
-            assert!(output.text.contains("200"), "Expected successful response with status 200");
+            assert!(
+                output.text.contains("200"),
+                "Expected successful response with status 200"
+            );
         }
         Err(e) => {
             // Don't panic on network errors, just skip the test

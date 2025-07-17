@@ -70,10 +70,31 @@ fi
 # 4. Run only unit tests (fast)
 echo ""
 echo "4. Running unit tests..."
-if cargo test --lib --all > /dev/null 2>&1; then
-    print_status 0 "Unit tests passed"
+print_info "Running core unit tests..."
+if cargo test --lib -p llmspell-core > /dev/null 2>&1; then
+    print_status 0 "Core unit tests passed"
 else
-    print_status 1 "Unit tests failed"
+    print_status 1 "Core unit tests failed"
+    OVERALL_SUCCESS=1
+fi
+
+# 4a. Run tool unit tests separately
+echo ""
+echo "4a. Running tool unit tests..."
+if cargo test --lib -p llmspell-tools > /dev/null 2>&1; then
+    print_status 0 "Tool unit tests passed"
+else
+    print_status 1 "Tool unit tests failed"
+    OVERALL_SUCCESS=1
+fi
+
+# 4b. Run other package unit tests
+echo ""
+echo "4b. Running other unit tests..."
+if cargo test --lib -p llmspell-bridge -p llmspell-utils -p llmspell-storage > /dev/null 2>&1; then
+    print_status 0 "Other unit tests passed"
+else
+    print_status 1 "Other unit tests failed"
     OVERALL_SUCCESS=1
 fi
 

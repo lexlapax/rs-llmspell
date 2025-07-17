@@ -10,6 +10,7 @@ use serde_json::Value;
 
 /// Test basic DuckDuckGo search functionality with real API call
 #[tokio::test]
+#[ignore = "external,integration"]
 async fn test_duckduckgo_real_search() {
     // Create config with only DuckDuckGo
     let mut config = WebSearchConfig::default();
@@ -55,6 +56,7 @@ async fn test_duckduckgo_real_search() {
 
 /// Test provider fallback mechanism
 #[tokio::test]
+#[ignore = "external,integration"]
 async fn test_provider_fallback() {
     let mut config = WebSearchConfig::default();
     // Set a non-existent provider as default
@@ -100,6 +102,7 @@ async fn test_provider_fallback() {
 
 /// Test search with specific parameters
 #[tokio::test]
+#[ignore = "external,integration"]
 async fn test_search_with_parameters() {
     let config = WebSearchConfig::default();
     let tool = WebSearchTool::new(config).expect("Failed to create WebSearchTool");
@@ -139,6 +142,7 @@ async fn test_search_with_parameters() {
 
 /// Test error handling for invalid queries
 #[tokio::test]
+#[ignore = "external,integration"]
 async fn test_error_handling() {
     let config = WebSearchConfig::default();
     let tool = WebSearchTool::new(config).expect("Failed to create WebSearchTool");
@@ -170,6 +174,7 @@ async fn test_error_handling() {
 
 /// Test that validates the WebSearchTool meets Phase 3.0 standards
 #[tokio::test]
+#[ignore = "external,integration"]
 async fn test_phase_30_compliance() {
     let config = WebSearchConfig::default();
     let tool = WebSearchTool::new(config).expect("Failed to create WebSearchTool");
@@ -208,7 +213,7 @@ async fn test_phase_30_compliance() {
 
 /// Debug test to see raw DuckDuckGo API response
 #[tokio::test]
-#[ignore] // Run with --ignored to see debug output
+#[ignore = "external,debug"] // Run with --ignored to see debug output
 async fn debug_duckduckgo_api() {
     use reqwest::Client;
 
@@ -248,7 +253,7 @@ async fn debug_duckduckgo_api() {
 
 /// Test with environment variables for API keys
 #[tokio::test]
-#[ignore] // Only run if API keys are configured
+#[ignore = "external,api_keys"] // Only run if API keys are configured
 async fn test_with_api_keys() {
     // This test requires environment variables to be set:
     // WEBSEARCH_GOOGLE_API_KEY
