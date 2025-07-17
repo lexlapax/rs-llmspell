@@ -1,9 +1,9 @@
-# Phase 3: Tool Enhancement & Workflow Orchestration - TODO List
+# Phase 3: Tool Enhancement & Agent Infrastructure - TODO List
 
 **Version**: 1.0  
 **Date**: July 2025  
 **Status**: Implementation Ready  
-**Phase**: 3 (Tool Enhancement & Workflow Orchestration)  
+**Phase**: 3 (Tool Enhancement & Agent Infrastructure)  
 **Timeline**: Weeks 9-16 (40 working days)  
 **Priority**: HIGH (MVP Completion)
 **Arch-Document**: docs/technical/rs-llmspell-final-architecture.md
@@ -16,7 +16,7 @@
 
 ## Overview
 
-**Goal**: Transform the existing 26 self-contained tools into a standardized, secure, and extensible library of 33+ tools, then implement comprehensive workflow orchestration patterns that leverage the full tool ecosystem.
+**Goal**: Transform the existing 26 self-contained tools into a standardized, secure, and extensible library of 33+ tools, then implement comprehensive agent infrastructure patterns that enable sophisticated agent composition and orchestration.
 
 **Clean Break Approach**: As a pre-1.0 project (v0.1.0), we're making breaking changes without migration tools to achieve the best architecture. This saves ~1 week of development time that we're investing in better security and features.
 
@@ -24,14 +24,14 @@
 - **Phase 3.0 (Weeks 9-10)**: Critical Tool Fixes - Standardization, DRY, and Initial Security ✅ COMPLETE
 - **Phase 3.1 (Weeks 11-12)**: External Integration Tools - 8 new tools
 - **Phase 3.2 (Weeks 13-14)**: Advanced Security & Performance - Optimization for all 33 tools
-- **Phase 3.3 (Weeks 15-16)**: Workflow Orchestration - Patterns and engine
+- **Phase 3.3 (Weeks 15-16)**: Agent Infrastructure - Factory, Registry, Lifecycle, Templates, Communication, and Composition
 
 **Success Criteria Summary:**
 - [x] 95% parameter consistency across all tools (from 60%) ✅ (Phase 3.0 Complete)
 - [x] 95% DRY compliance with shared utilities (from 80%) ✅ (Phase 3.0 Complete)
 - [x] Comprehensive security vulnerability mitigation ✅ (Phase 3.0 Complete)
 - [ ] 33+ production-ready tools (26/33 complete)
-- [ ] All workflow patterns functional with full tool library
+- [ ] Comprehensive agent infrastructure enabling sophisticated agent patterns
 
 ---
 
@@ -1680,267 +1680,300 @@
 
 ---
 
-## Phase 3.3: Workflow Orchestration (Weeks 15-16)
+## Phase 3.3: Agent Infrastructure (Weeks 15-16)
 
-### Task 3.3.1: Workflow Engine Architecture
+### Task 3.3.1: Agent Factory Implementation
 **Priority**: CRITICAL  
 **Estimated Time**: 16 hours  
 **Assignee**: Architecture Team Lead
 
-**Description**: Design and implement core workflow engine architecture.
+**Description**: Implement a flexible Agent Factory system for creating and configuring agents.
 
 **Acceptance Criteria:**
-- [ ] Workflow trait enhancements
-- [ ] Execution engine design
-- [ ] State management system
-- [ ] Event system integration
-- [ ] Extensibility framework
+- [ ] Agent factory pattern implementation
+- [ ] Configuration builder support
+- [ ] Default agent templates
+- [ ] Dependency injection support
+- [ ] Agent creation hooks
 
 **Implementation Steps:**
-1. Enhance Workflow trait definition
-2. Design execution engine
-3. Implement state management
-4. Integrate event system
-5. Create extension points
-6. Add workflow registry
-7. Document architecture
+1. Design AgentFactory trait and interface
+2. Implement AgentBuilder with fluent API
+3. Create default agent configurations
+4. Add dependency injection container
+5. Implement creation lifecycle hooks
+6. Add factory registry system
+7. Document factory patterns
 
 **Definition of Done:**
-- [ ] Architecture complete
-- [ ] Traits enhanced
-- [ ] Engine designed
-- [ ] State system ready
-- [ ] Documentation done
+- [ ] Factory implemented
+- [ ] Builder pattern working
+- [ ] Templates available
+- [ ] DI system functional
+- [ ] Documentation complete
 
-### Task 3.3.2: Sequential Workflow Implementation
+### Task 3.3.2: Agent Registry System
 **Priority**: CRITICAL  
 **Estimated Time**: 20 hours  
-**Assignee**: Workflow Team
+**Assignee**: Infrastructure Team
 
-**Description**: Implement SequentialWorkflow for step-by-step execution.
+**Description**: Implement a centralized Agent Registry for managing agent instances and metadata.
 
 **Acceptance Criteria:**
-- [ ] Step definition and ordering
-- [ ] State passing between steps
-- [ ] Error handling and recovery
-- [ ] Progress tracking
-- [ ] Comprehensive tests
+- [ ] Agent registration and discovery
+- [ ] Metadata management system
+- [ ] Agent categorization and tagging
+- [ ] Query and search capabilities
+- [ ] Registry persistence options
 
 **Implementation Steps:**
-1. Implement SequentialWorkflow struct
-2. Create step management system
-3. Add state passing mechanism
-4. Implement error handling
-5. Add progress tracking
-6. Create workflow examples
+1. Design AgentRegistry interface
+2. Implement registration mechanism
+3. Add metadata storage system
+4. Create categorization scheme
+5. Implement search and query API
+6. Add persistence backends
 7. Write comprehensive tests
 
 **Definition of Done:**
-- [ ] Implementation complete
-- [ ] State passing working
-- [ ] Error handling robust
-- [ ] Tests comprehensive
-- [ ] Examples functional
+- [ ] Registry operational
+- [ ] Metadata system working
+- [ ] Search functional
+- [ ] Persistence tested
+- [ ] API documented
 
-### Task 3.3.3: Conditional Workflow Implementation
+### Task 3.3.3: Agent Lifecycle Management
 **Priority**: CRITICAL  
 **Estimated Time**: 24 hours  
-**Assignee**: Workflow Team
+**Assignee**: Core Team
 
-**Description**: Implement ConditionalWorkflow for branching logic.
+**Description**: Implement comprehensive agent lifecycle management including initialization, running, pausing, and termination.
 
 **Acceptance Criteria:**
-- [ ] Condition evaluation system
-- [ ] Branch management
-- [ ] Complex condition support
-- [ ] State merging logic
-- [ ] Visual flow representation
+- [ ] Agent state machine implementation
+- [ ] Lifecycle event system
+- [ ] Resource management hooks
+- [ ] Graceful shutdown support
+- [ ] Health monitoring integration
 
 **Implementation Steps:**
-1. Implement ConditionalWorkflow struct
-2. Create condition evaluator
-3. Add branch management
-4. Implement state merging
-5. Add flow visualization
-6. Create complex examples
-7. Write extensive tests
+1. Design agent state machine (Created, Initializing, Ready, Running, Paused, Stopping, Terminated)
+2. Implement lifecycle event system
+3. Add resource allocation/deallocation hooks
+4. Create graceful shutdown mechanism
+5. Integrate health monitoring
+6. Add lifecycle middleware support
+7. Write state transition tests
 
 **Definition of Done:**
-- [ ] Branching working
-- [ ] Conditions evaluated
-- [ ] State merged correctly
-- [ ] Visualization ready
-- [ ] Tests complete
+- [ ] State machine working
+- [ ] Events firing correctly
+- [ ] Resources managed
+- [ ] Shutdown graceful
+- [ ] Monitoring active
 
-### Task 3.3.4: Loop Workflow Implementation
+### Task 3.3.4: Agent Templates System
 **Priority**: HIGH  
 **Estimated Time**: 20 hours  
-**Assignee**: Workflow Team
+**Assignee**: Developer Experience Team
 
-**Description**: Implement LoopWorkflow for iterative processes.
+**Description**: Create a comprehensive agent template system with pre-configured agent patterns.
 
 **Acceptance Criteria:**
-- [ ] Loop condition management
-- [ ] Iteration state tracking
-- [ ] Break/continue support
-- [ ] Infinite loop prevention
-- [ ] Performance optimization
+- [ ] Template definition framework
+- [ ] Common agent templates (Tool Agent, Orchestrator Agent, Monitor Agent, etc.)
+- [ ] Template customization support
+- [ ] Template validation system
+- [ ] Template marketplace preparation
 
 **Implementation Steps:**
-1. Implement LoopWorkflow struct
-2. Create iteration manager
-3. Add loop conditions
-4. Implement break/continue
-5. Add loop protection
-6. Optimize performance
-7. Create test scenarios
+1. Design template definition schema
+2. Create base template classes
+3. Implement common agent templates
+4. Add template customization API
+5. Build template validation
+6. Create template examples
+7. Document template usage
 
 **Definition of Done:**
-- [ ] Loops functional
-- [ ] State tracked
-- [ ] Protection active
-- [ ] Performance good
-- [ ] Tests thorough
+- [ ] Templates defined
+- [ ] Common patterns implemented
+- [ ] Customization working
+- [ ] Validation complete
+- [ ] Examples ready
 
-### Task 3.3.5: Streaming Workflow Implementation
+### Task 3.3.5: Enhanced ExecutionContext
 **Priority**: HIGH  
 **Estimated Time**: 24 hours  
-**Assignee**: Streaming Team
+**Assignee**: Core Team
 
-**Description**: Implement StreamingWorkflow for real-time data processing.
+**Description**: Enhance ExecutionContext to support advanced agent features and inter-agent communication.
 
 **Acceptance Criteria:**
-- [ ] Stream processing pipeline
-- [ ] Backpressure handling
-- [ ] Buffering strategies
-- [ ] Error recovery
+- [ ] Hierarchical context support
+- [ ] Context inheritance mechanisms
+- [ ] Shared memory regions
+- [ ] Event bus integration
+- [ ] Distributed context support
+
+**Implementation Steps:**
+1. Enhance ExecutionContext structure
+2. Implement context hierarchy
+3. Add context inheritance rules
+4. Create shared memory system
+5. Integrate event bus
+6. Add distributed context sync
+7. Create context examples
+
+**Definition of Done:**
+- [ ] Hierarchy working
+- [ ] Inheritance functional
+- [ ] Memory shared safely
+- [ ] Events propagated
+- [ ] Distribution ready
+
+### Task 3.3.6: Agent Communication Protocols
+**Priority**: CRITICAL  
+**Estimated Time**: 24 hours  
+**Assignee**: Infrastructure Team
+
+**Description**: Implement comprehensive agent communication protocols for inter-agent messaging and coordination.
+
+**Acceptance Criteria:**
+- [ ] Message passing system
+- [ ] Request/response patterns
+- [ ] Publish/subscribe mechanism
+- [ ] Message routing and filtering
+- [ ] Protocol versioning support
+- [ ] Security and authentication
+
+**Implementation Steps:**
+1. Design message protocol schema
+2. Implement message passing core
+3. Create request/response handlers
+4. Build pub/sub infrastructure
+5. Add message routing logic
+6. Implement protocol versioning
+7. Add security layer
+8. Create communication examples
+
+**Definition of Done:**
+- [ ] Messages delivered reliably
+- [ ] Patterns implemented
+- [ ] Routing functional
+- [ ] Versioning working
+- [ ] Security enforced
+- [ ] Examples demonstrate patterns
+
+### Task 3.3.7: Agent Composition Patterns
+**Priority**: CRITICAL  
+**Estimated Time**: 16 hours  
+**Assignee**: Architecture Team
+
+**Description**: Implement agent composition patterns enabling agents to be composed into higher-level agents.
+
+**Acceptance Criteria:**
+- [ ] Hierarchical agent composition
+- [ ] Agent delegation patterns
+- [ ] Capability aggregation
+- [ ] Composite agent lifecycle
 - [ ] Performance optimization
 
 **Implementation Steps:**
-1. Implement StreamingWorkflow struct
-2. Create stream pipeline
-3. Add backpressure handling
-4. Implement buffering
-5. Add error recovery
-6. Optimize throughput
-7. Create streaming tests
+1. Design composition interfaces
+2. Implement hierarchical agents
+3. Create delegation mechanisms
+4. Build capability aggregation
+5. Handle composite lifecycle
+6. Optimize composition overhead
+7. Create composition examples
 
 **Definition of Done:**
-- [ ] Streaming working
-- [ ] Backpressure handled
-- [ ] Buffering efficient
-- [ ] Errors recovered
-- [ ] Performance optimal
+- [ ] Composition working
+- [ ] Delegation functional
+- [ ] Capabilities aggregated
+- [ ] Lifecycle managed
+- [ ] Performance acceptable
 
-### Task 3.3.6: Workflow State Management
-**Priority**: CRITICAL  
-**Estimated Time**: 16 hours  
-**Assignee**: State Team
-
-**Description**: Implement comprehensive workflow state management.
-
-**Acceptance Criteria:**
-- [ ] State persistence options
-- [ ] State snapshots
-- [ ] Rollback capabilities
-- [ ] State versioning
-- [ ] Distributed state support
-
-**Implementation Steps:**
-1. Design state system
-2. Implement persistence
-3. Add snapshot support
-4. Create rollback mechanism
-5. Add state versioning
-6. Prepare for distribution
-7. Test state scenarios
-
-**Definition of Done:**
-- [ ] State persisted
-- [ ] Snapshots working
-- [ ] Rollback functional
-- [ ] Versioning tested
-- [ ] Ready for scale
-
-### Task 3.3.7: Workflow Error Handling
+### Task 3.3.8: Agent Monitoring & Observability
 **Priority**: HIGH  
 **Estimated Time**: 12 hours  
 **Assignee**: Reliability Team
 
-**Description**: Implement comprehensive error handling for workflows.
+**Description**: Implement comprehensive monitoring and observability for agent infrastructure.
 
 **Acceptance Criteria:**
-- [ ] Error propagation rules
-- [ ] Retry strategies
-- [ ] Compensation logic
-- [ ] Error aggregation
-- [ ] Recovery mechanisms
+- [ ] Agent health metrics
+- [ ] Performance monitoring
+- [ ] Distributed tracing
+- [ ] Event logging system
+- [ ] Alerting framework
 
 **Implementation Steps:**
-1. Define error propagation
-2. Implement retry logic
-3. Add compensation support
-4. Create error aggregation
-5. Build recovery mechanisms
-6. Test error scenarios
-7. Document patterns
+1. Define agent metrics schema
+2. Implement health monitoring
+3. Add performance tracking
+4. Create distributed tracing
+5. Build event logging
+6. Add alerting rules
+7. Create monitoring dashboard
 
 **Definition of Done:**
-- [ ] Errors handled
-- [ ] Retries working
-- [ ] Compensation active
-- [ ] Recovery tested
-- [ ] Patterns documented
+- [ ] Metrics collected
+- [ ] Health monitored
+- [ ] Tracing active
+- [ ] Logs structured
+- [ ] Alerts configured
 
-### Task 3.3.8: Workflow Examples and Templates
+### Task 3.3.9: Agent Examples and Use Cases
 **Priority**: HIGH  
 **Estimated Time**: 16 hours  
 **Assignee**: Developer Experience Team
 
-**Description**: Create comprehensive workflow examples using all 33 tools.
+**Description**: Create comprehensive agent examples demonstrating various agent patterns and use cases.
 
 **Acceptance Criteria:**
-- [ ] 10+ workflow examples
+- [ ] 10+ agent examples
 - [ ] All patterns demonstrated
 - [ ] Real-world use cases
 - [ ] Performance showcases
-- [ ] Template library
+- [ ] Example library
 
 **Implementation Steps:**
 1. Design example scenarios
-2. Implement data pipeline workflow
-3. Create multi-tool workflow
-4. Build error handling example
-5. Add performance workflow
-6. Create template library
+2. Implement tool orchestrator agent
+3. Create multi-agent coordinator
+4. Build monitoring agent example
+5. Add data pipeline agent
+6. Create agent library
 7. Document examples
 
 **Definition of Done:**
 - [ ] Examples complete
 - [ ] All patterns shown
 - [ ] Use cases clear
-- [ ] Templates ready
+- [ ] Library ready
 - [ ] Documentation done
 
-### Task 3.3.9: Workflow Testing Framework
+### Task 3.3.10: Agent Testing Framework
 **Priority**: CRITICAL  
 **Estimated Time**: 16 hours  
 **Assignee**: QA Team
 
-**Description**: Create comprehensive testing framework for workflows.
+**Description**: Create comprehensive testing framework for agent infrastructure.
 
 **Acceptance Criteria:**
-- [ ] Workflow test utilities
-- [ ] Mock tool support
-- [ ] State verification
-- [ ] Performance testing
+- [ ] Agent test utilities
+- [ ] Mock agent support
+- [ ] Lifecycle testing
+- [ ] Communication testing
 - [ ] Integration tests
 
 **Implementation Steps:**
 1. Create test framework
-2. Add mock tool support
-3. Implement state verification
-4. Add performance tests
+2. Add mock agent support
+3. Implement lifecycle tests
+4. Add communication tests
 5. Create integration tests
 6. Build test scenarios
 7. Document testing
@@ -1948,11 +1981,11 @@
 **Definition of Done:**
 - [ ] Framework ready
 - [ ] Mocks working
-- [ ] State verified
-- [ ] Performance tested
+- [ ] Lifecycle tested
+- [ ] Communication verified
 - [ ] Tests automated
 
-### Task 3.3.10: Phase 3 Final Integration
+### Task 3.3.11: Phase 3 Final Integration
 **Priority**: CRITICAL  
 **Estimated Time**: 16 hours  
 **Assignee**: Integration Lead
@@ -1961,7 +1994,7 @@
 
 **Acceptance Criteria:**
 - [ ] All 33 tools standardized and secured
-- [ ] All workflow patterns functional
+- [ ] Agent infrastructure fully functional
 - [ ] Performance targets met
 - [ ] Documentation complete
 - [ ] Ready for production
@@ -1969,7 +2002,7 @@
 **Implementation Steps:**
 1. Run full integration tests
 2. Verify tool standardization
-3. Test all workflows
+3. Test agent infrastructure
 4. Measure performance
 5. Review documentation
 6. Prepare handoff package
@@ -1998,13 +2031,13 @@
 - [ ] 95% DRY compliance verified
 - [ ] All security vulnerabilities addressed
 - [ ] 33+ tools production ready
-- [ ] All workflow patterns functional
+- [ ] Agent infrastructure operational
 
 **System Test Steps:**
 1. Tool consistency audit
 2. DRY compliance check
 3. Security validation
-4. Workflow integration tests
+4. Agent infrastructure tests
 5. Performance verification
 6. Documentation review
 
@@ -2016,10 +2049,18 @@
   - 100% ResponseBuilder adoption
   - Zero known security vulnerabilities
 
+- [ ] **Agent Infrastructure Metrics**:
+  - Agent Factory operational
+  - Registry system functional
+  - Lifecycle management working
+  - Templates available
+  - Communication protocols tested
+  - Composition patterns implemented
+
 - [ ] **Performance Metrics**:
   - 52,600x performance target maintained
   - <10ms tool initialization
-  - <50ms workflow overhead
+  - <50ms agent creation overhead
   - Memory usage optimized
   - Resource limits enforced
 
@@ -2036,7 +2077,7 @@
 
 ### Deliverables Package
 - [ ] 33+ standardized production tools
-- [ ] Complete workflow orchestration engine
+- [ ] Complete agent infrastructure system
 - [ ] Comprehensive security measures
 - [ ] Breaking changes documentation
 - [ ] Performance benchmarks
@@ -2047,9 +2088,9 @@
 ### Knowledge Transfer Session
 - [ ] Tool standardization walkthrough
 - [ ] Security measures review
-- [ ] Workflow patterns demonstration
+- [ ] Agent infrastructure demonstration
 - [ ] Performance optimization review
 - [ ] Update strategy explanation
 - [ ] Q&A with Phase 4 team
 
-**Phase 3 Completion**: Tool enhancement and workflow orchestration complete, ready for Phase 4 vector storage implementation.
+**Phase 3 Completion**: Tool enhancement and agent infrastructure complete, ready for Phase 4 vector storage implementation.

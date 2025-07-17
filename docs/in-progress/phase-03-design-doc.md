@@ -1,20 +1,20 @@
-# Phase 3: Tool Enhancement & Workflow Orchestration - Design Document
+# Phase 3: Tool Enhancement & Agent Infrastructure - Design Document
 
 **Version**: 1.0  
 **Date**: July 2025  
 **Status**: Implementation Ready  
-**Phase**: 3 (Tool Enhancement & Workflow Orchestration)  
+**Phase**: 3 (Tool Enhancement & Agent Infrastructure)  
 **Timeline**: Weeks 9-16 (8 weeks)  
 **Priority**: HIGH (MVP Completion)
 
-> **📋 Comprehensive Implementation Guide**: This document provides complete specifications for implementing Phase 3, which spans 8 weeks and encompasses critical tool fixes, external integrations, security hardening, and workflow orchestration.
+> **📋 Comprehensive Implementation Guide**: This document provides complete specifications for implementing Phase 3, which spans 8 weeks and encompasses critical tool fixes, external integrations, security hardening, and agent infrastructure.
 
 ---
 
 ## Phase Overview
 
 ### Goal
-Transform the existing 26 self-contained tools into a standardized, secure, and extensible library of 33+ tools, then implement comprehensive workflow orchestration patterns that leverage the full tool ecosystem.
+Transform the existing 26 self-contained tools into a standardized, secure, and extensible library of 33+ tools, then implement comprehensive agent infrastructure patterns that leverage the full tool ecosystem.
 
 ### Core Principles
 - **Standardization First**: Fix existing tools before adding new ones
@@ -29,14 +29,14 @@ Phase 3 is divided into four 2-week sub-phases:
 1. **Phase 3.0 (Weeks 9-10)**: Critical Tool Fixes - Standardization, DRY, and Initial Security
 2. **Phase 3.1 (Weeks 11-12)**: External Integration Tools - 8 new tools
 3. **Phase 3.2 (Weeks 13-14)**: Advanced Security & Performance - Optimization for all 33 tools
-4. **Phase 3.3 (Weeks 15-16)**: Workflow Orchestration - Patterns and engine
+4. **Phase 3.3 (Weeks 15-16)**: Agent Infrastructure - Factory, Registry, and Templates
 
 ### Success Metrics
 - **Tool Consistency**: 95% parameter standardization (from 60%)
 - **DRY Compliance**: 95% shared utility usage (from 80%)
 - **Security Coverage**: Comprehensive vulnerability mitigation
 - **Tool Count**: 33+ production-ready tools
-- **Workflow Support**: All patterns functional with full tool library
+- **Agent Support**: Factory, Registry, and Templates operational with full tool library
 
 ---
 
@@ -833,428 +833,950 @@ impl ToolCache {
 
 ---
 
-## Phase 3.3: Workflow Orchestration (Weeks 15-16)
+## Phase 3.3: Agent Infrastructure (Weeks 15-16)
 
 ### Goal
-Implement comprehensive workflow orchestration patterns that leverage all 41+ standardized and secured tools.
+Implement comprehensive agent infrastructure including factory patterns, registry system, lifecycle management, and pre-configured templates that leverage all 41+ standardized and secured tools.
 
-### 1. Workflow Trait System
-
-```rust
-// llmspell-workflows/src/traits.rs
-#[async_trait]
-pub trait Workflow: Send + Sync {
-    /// Unique identifier for the workflow
-    fn id(&self) -> &str;
-    
-    /// Human-readable name
-    fn name(&self) -> &str;
-    
-    /// Workflow metadata
-    fn metadata(&self) -> &WorkflowMetadata;
-    
-    /// Execute the workflow
-    async fn execute(&self, input: WorkflowInput, context: ExecutionContext) -> Result<WorkflowOutput>;
-    
-    /// Validate workflow configuration
-    fn validate(&self) -> Result<()>;
-    
-    /// Get workflow schema for validation
-    fn schema(&self) -> WorkflowSchema;
-}
-
-#[derive(Debug, Clone)]
-pub struct WorkflowMetadata {
-    pub version: String,
-    pub description: String,
-    pub author: Option<String>,
-    pub tags: Vec<String>,
-    pub required_tools: Vec<String>,
-}
-
-#[derive(Debug, Clone)]
-pub struct WorkflowInput {
-    pub initial_data: Value,
-    pub parameters: HashMap<String, Value>,
-    pub starting_step: Option<String>,
-}
-
-#[derive(Debug, Clone)]
-pub struct WorkflowOutput {
-    pub final_result: Value,
-    pub step_results: HashMap<String, StepResult>,
-    pub execution_path: Vec<String>,
-    pub metrics: WorkflowMetrics,
-}
-```
-
-### 2. Workflow Patterns
-
-#### 2.1 Sequential Workflow
+### 1. Agent Factory Pattern
 
 ```rust
-pub struct SequentialWorkflow {
-    id: String,
-    name: String,
-    steps: Vec<WorkflowStep>,
-    error_handling: ErrorStrategy,
+// llmspell-agents/src/factory.rs
+pub struct AgentFactory {
+    builders: HashMap<String, Box<dyn AgentBuilder>>,
+    tool_registry: Arc<ToolRegistry>,
+    llm_providers: Arc<LlmProviderRegistry>,
+    default_config: AgentConfig,
 }
 
-impl SequentialWorkflow {
-    pub fn builder(name: &str) -> SequentialWorkflowBuilder {
-        SequentialWorkflowBuilder::new(name)
+impl AgentFactory {
+    pub fn new(tool_registry: Arc<ToolRegistry>) -> Self {
+        Self {
+            builders: HashMap::new(),
+            tool_registry,
+            llm_providers: Arc::new(LlmProviderRegistry::default()),
+            default_config: AgentConfig::default(),
+        }
     }
-}
-
-#[async_trait]
-impl Workflow for SequentialWorkflow {
-    async fn execute(&self, input: WorkflowInput, context: ExecutionContext) -> Result<WorkflowOutput> {
-        let mut state = WorkflowState::new(input.initial_data);
-        let mut step_results = HashMap::new();
-        let mut execution_path = Vec::new();
+    
+    pub fn register_builder<B: AgentBuilder + 'static>(&mut self, name: &str, builder: B) {
+        self.builders.insert(name.to_string(), Box::new(builder));
+    }
+    
+    pub async fn create_agent(&self, spec: &AgentSpec) -> Result<Box<dyn Agent>> {
+        let builder = self.builders.get(&spec.agent_type)
+            .ok_or_else(|| AgentError::UnknownType(spec.agent_type.clone()))?;
         
-        for step in &self.steps {
-            execution_path.push(step.id.clone());
-            
-            // Execute step
-            let step_input = self.prepare_step_input(&step, &state)?;
-            let result = match self.execute_step(&step, step_input, &context).await {
-                Ok(r) => r,
-                Err(e) => {
-                    match self.error_handling {
-                        ErrorStrategy::Fail => return Err(e),
-                        ErrorStrategy::Continue => {
-                            step_results.insert(step.id.clone(), StepResult::Failed(e.to_string()));
-                            continue;
-                        }
-                        ErrorStrategy::Retry(attempts) => {
-                            self.retry_step(&step, step_input, &context, attempts).await?
-                        }
-                    }
-                }
-            };
-            
-            // Update state
-            state.update(&step.id, &result)?;
-            step_results.insert(step.id.clone(), StepResult::Success(result));
+        let mut agent = builder.build(spec)?;
+        
+        // Configure with tools
+        for tool_name in &spec.tools {
+            let tool = self.tool_registry.get(tool_name)?;
+            agent.add_tool(tool_name, tool)?;
         }
         
-        Ok(WorkflowOutput {
-            final_result: state.get_final_result()?,
-            step_results,
-            execution_path,
-            metrics: state.get_metrics(),
-        })
+        // Configure LLM provider
+        if let Some(provider_spec) = &spec.llm_provider {
+            let provider = self.llm_providers.create(provider_spec)?;
+            agent.set_llm_provider(provider)?;
+        }
+        
+        // Apply configuration
+        agent.configure(spec.config.as_ref().unwrap_or(&self.default_config))?;
+        
+        Ok(agent)
     }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentSpec {
+    pub name: String,
+    pub agent_type: String,
+    pub description: Option<String>,
+    pub tools: Vec<String>,
+    pub llm_provider: Option<LlmProviderSpec>,
+    pub config: Option<AgentConfig>,
+    pub metadata: HashMap<String, Value>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentConfig {
+    pub max_iterations: usize,
+    pub timeout: Duration,
+    pub temperature: f32,
+    pub max_tokens: usize,
+    pub retry_policy: RetryPolicy,
+    pub memory_config: MemoryConfig,
+    pub security_config: SecurityConfig,
+}
+
+pub trait AgentBuilder: Send + Sync {
+    fn build(&self, spec: &AgentSpec) -> Result<Box<dyn Agent>>;
+    fn supported_features(&self) -> Vec<AgentFeature>;
+    fn validate_spec(&self, spec: &AgentSpec) -> Result<()>;
 }
 ```
 
-#### 2.2 Conditional Workflow
+### 2. Agent Registry with Discovery
+
+#### 2.1 Registry Architecture
 
 ```rust
-pub struct ConditionalWorkflow {
-    id: String,
-    name: String,
-    initial_step: String,
-    steps: HashMap<String, ConditionalStep>,
-    conditions: HashMap<String, Condition>,
+// llmspell-agents/src/registry.rs
+pub struct AgentRegistry {
+    agents: Arc<RwLock<HashMap<String, AgentEntry>>>,
+    factory: Arc<AgentFactory>,
+    discovery: Arc<DiscoveryService>,
+    persistence: Arc<dyn RegistryPersistence>,
 }
 
 #[derive(Debug, Clone)]
-pub struct ConditionalStep {
+pub struct AgentEntry {
     pub id: String,
-    pub tool: String,
-    pub parameters: Value,
-    pub branches: Vec<Branch>,
+    pub spec: AgentSpec,
+    pub instance: Option<Arc<Mutex<Box<dyn Agent>>>>,
+    pub status: AgentStatus,
+    pub metadata: RegistryMetadata,
 }
 
-#[derive(Debug, Clone)]
-pub struct Branch {
-    pub condition: String,
-    pub next_step: Option<String>,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RegistryMetadata {
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub last_accessed: DateTime<Utc>,
+    pub access_count: u64,
+    pub tags: Vec<String>,
+    pub capabilities: Vec<AgentCapability>,
 }
 
-impl ConditionalWorkflow {
-    async fn execute_step(&self, step_id: &str, state: &WorkflowState, context: &ExecutionContext) -> Result<(StepResult, Option<String>)> {
-        let step = self.steps.get(step_id)
-            .ok_or_else(|| WorkflowError::StepNotFound(step_id.to_string()))?;
+impl AgentRegistry {
+    pub async fn new(factory: Arc<AgentFactory>, config: RegistryConfig) -> Result<Self> {
+        let persistence = Self::create_persistence(&config)?;
+        let discovery = Arc::new(DiscoveryService::new(config.discovery));
         
-        // Execute the tool
-        let tool_result = self.execute_tool(&step.tool, &step.parameters, state, context).await?;
-        
-        // Evaluate branches
-        for branch in &step.branches {
-            let condition = self.conditions.get(&branch.condition)
-                .ok_or_else(|| WorkflowError::ConditionNotFound(branch.condition.clone()))?;
-            
-            if condition.evaluate(&tool_result, state)? {
-                return Ok((StepResult::Success(tool_result), branch.next_step.clone()));
-            }
-        }
-        
-        // No matching branch
-        Ok((StepResult::Success(tool_result), None))
-    }
-}
-```
-
-#### 2.3 Loop Workflow
-
-```rust
-pub struct LoopWorkflow {
-    id: String,
-    name: String,
-    iterator: Iterator,
-    body: Box<dyn Workflow>,
-    max_iterations: Option<usize>,
-    break_condition: Option<Condition>,
-}
-
-#[derive(Debug, Clone)]
-pub enum Iterator {
-    Collection(String),      // Iterate over collection in state
-    Range(usize, usize),    // Iterate over numeric range
-    WhileCondition(Condition), // While condition is true
-}
-
-impl LoopWorkflow {
-    async fn execute(&self, input: WorkflowInput, context: ExecutionContext) -> Result<WorkflowOutput> {
-        let mut state = WorkflowState::new(input.initial_data);
-        let mut iterations = 0;
-        let mut all_results = Vec::new();
-        
-        loop {
-            // Check max iterations
-            if let Some(max) = self.max_iterations {
-                if iterations >= max {
-                    break;
-                }
-            }
-            
-            // Check break condition
-            if let Some(condition) = &self.break_condition {
-                if condition.evaluate(&Value::Null, &state)? {
-                    break;
-                }
-            }
-            
-            // Get next item
-            let item = match &self.iterator {
-                Iterator::Collection(path) => {
-                    state.get_collection_item(path, iterations)?
-                }
-                Iterator::Range(start, end) => {
-                    if start + iterations >= *end {
-                        break;
-                    }
-                    Value::Number((start + iterations).into())
-                }
-                Iterator::WhileCondition(condition) => {
-                    if !condition.evaluate(&Value::Null, &state)? {
-                        break;
-                    }
-                    Value::Null
-                }
-            };
-            
-            // Execute body with item
-            let body_input = WorkflowInput {
-                initial_data: item,
-                parameters: state.get_loop_parameters(),
-                starting_step: None,
-            };
-            
-            let result = self.body.execute(body_input, context.clone()).await?;
-            all_results.push(result.final_result);
-            
-            iterations += 1;
-        }
-        
-        Ok(WorkflowOutput {
-            final_result: Value::Array(all_results),
-            step_results: HashMap::new(),
-            execution_path: vec![format!("loop_{}_iterations", iterations)],
-            metrics: WorkflowMetrics::default(),
-        })
-    }
-}
-```
-
-#### 2.4 Streaming Workflow
-
-```rust
-pub struct StreamingWorkflow {
-    id: String,
-    name: String,
-    source: StreamSource,
-    pipeline: Vec<StreamProcessor>,
-    sink: StreamSink,
-    backpressure_strategy: BackpressureStrategy,
-}
-
-#[derive(Debug, Clone)]
-pub enum StreamSource {
-    Tool(String, Value),           // Tool that produces stream
-    File(PathBuf),                // File to stream
-    Network(String),              // Network endpoint
-    Collection(Vec<Value>),       // In-memory collection
-}
-
-impl StreamingWorkflow {
-    async fn execute(&self, input: WorkflowInput, context: ExecutionContext) -> Result<WorkflowOutput> {
-        // Create stream from source
-        let stream = self.create_stream(&self.source, &context).await?;
-        
-        // Apply processors
-        let processed = self.pipeline.iter().fold(stream, |s, processor| {
-            processor.apply(s, &context)
-        });
-        
-        // Handle backpressure
-        let controlled = match self.backpressure_strategy {
-            BackpressureStrategy::Buffer(size) => processed.buffer_unordered(size),
-            BackpressureStrategy::Drop => processed.drop_on_overflow(),
-            BackpressureStrategy::Pause => processed.pause_on_pressure(),
+        let mut registry = Self {
+            agents: Arc::new(RwLock::new(HashMap::new())),
+            factory,
+            discovery,
+            persistence,
         };
         
-        // Collect to sink
-        let results = self.sink.collect(controlled).await?;
+        // Load persisted agents
+        registry.load_from_persistence().await?;
         
-        Ok(WorkflowOutput {
-            final_result: results,
-            step_results: HashMap::new(),
-            execution_path: vec!["streaming".to_string()],
-            metrics: WorkflowMetrics::default(),
+        // Start discovery service
+        registry.start_discovery().await?;
+        
+        Ok(registry)
+    }
+    
+    pub async fn register(&self, spec: AgentSpec) -> Result<String> {
+        let id = Uuid::new_v4().to_string();
+        let entry = AgentEntry {
+            id: id.clone(),
+            spec: spec.clone(),
+            instance: None,
+            status: AgentStatus::Registered,
+            metadata: RegistryMetadata::new(&spec),
+        };
+        
+        self.agents.write().await.insert(id.clone(), entry);
+        self.persistence.save_agent(&id, &spec).await?;
+        
+        Ok(id)
+    }
+    
+    pub async fn instantiate(&self, id: &str) -> Result<Arc<Mutex<Box<dyn Agent>>>> {
+        let mut agents = self.agents.write().await;
+        let entry = agents.get_mut(id)
+            .ok_or_else(|| RegistryError::AgentNotFound(id.to_string()))?;
+        
+        if let Some(instance) = &entry.instance {
+            entry.metadata.last_accessed = Utc::now();
+            entry.metadata.access_count += 1;
+            return Ok(instance.clone());
+        }
+        
+        // Create new instance
+        let agent = self.factory.create_agent(&entry.spec).await?;
+        let instance = Arc::new(Mutex::new(agent));
+        
+        entry.instance = Some(instance.clone());
+        entry.status = AgentStatus::Active;
+        entry.metadata.last_accessed = Utc::now();
+        entry.metadata.access_count += 1;
+        
+        Ok(instance)
+    }
+    
+    pub async fn discover(&self, query: &DiscoveryQuery) -> Result<Vec<AgentEntry>> {
+        let agents = self.agents.read().await;
+        let mut results = Vec::new();
+        
+        for entry in agents.values() {
+            if self.matches_query(entry, query) {
+                results.push(entry.clone());
+            }
+        }
+        
+        // Sort by relevance
+        results.sort_by(|a, b| {
+            self.calculate_relevance(a, query)
+                .partial_cmp(&self.calculate_relevance(b, query))
+                .unwrap_or(Ordering::Equal)
+                .reverse()
+        });
+        
+        Ok(results)
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DiscoveryQuery {
+    pub capabilities: Vec<AgentCapability>,
+    pub tags: Vec<String>,
+    pub tools: Vec<String>,
+    pub text_search: Option<String>,
+    pub filters: HashMap<String, Value>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AgentCapability {
+    Research,
+    CodeGeneration,
+    DataAnalysis,
+    Conversation,
+    TaskAutomation,
+    ApiIntegration,
+    FileProcessing,
+    WebScraping,
+    Custom(String),
+}
+```
+
+#### 2.2 Discovery Service
+
+```rust
+pub struct DiscoveryService {
+    providers: Vec<Box<dyn DiscoveryProvider>>,
+    cache: Arc<Mutex<DiscoveryCache>>,
+    config: DiscoveryConfig,
+}
+
+#[async_trait]
+pub trait DiscoveryProvider: Send + Sync {
+    async fn discover(&self, query: &DiscoveryQuery) -> Result<Vec<DiscoveredAgent>>;
+    fn provider_name(&self) -> &str;
+    fn supports_capability(&self, capability: &AgentCapability) -> bool;
+}
+
+// Local file-based discovery
+pub struct FileDiscoveryProvider {
+    search_paths: Vec<PathBuf>,
+    file_patterns: Vec<String>,
+}
+
+#[async_trait]
+impl DiscoveryProvider for FileDiscoveryProvider {
+    async fn discover(&self, query: &DiscoveryQuery) -> Result<Vec<DiscoveredAgent>> {
+        let mut results = Vec::new();
+        
+        for path in &self.search_paths {
+            for entry in WalkDir::new(path) {
+                if let Ok(entry) = entry {
+                    if self.matches_pattern(&entry) {
+                        if let Ok(spec) = self.load_agent_spec(&entry.path()).await {
+                            if self.matches_query(&spec, query) {
+                                results.push(DiscoveredAgent {
+                                    spec,
+                                    source: DiscoverySource::File(entry.path().to_path_buf()),
+                                    confidence: 1.0,
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        Ok(results)
+    }
+}
+
+// Network-based discovery
+pub struct NetworkDiscoveryProvider {
+    registry_urls: Vec<String>,
+    client: reqwest::Client,
+}
+
+#[async_trait]
+impl DiscoveryProvider for NetworkDiscoveryProvider {
+    async fn discover(&self, query: &DiscoveryQuery) -> Result<Vec<DiscoveredAgent>> {
+        let mut results = Vec::new();
+        
+        for url in &self.registry_urls {
+            let response = self.client
+                .post(format!("{}/discover", url))
+                .json(query)
+                .send()
+                .await?;
+                
+            let agents: Vec<DiscoveredAgent> = response.json().await?;
+            results.extend(agents);
+        }
+        
+        Ok(results)
+    }
+}
+```
+
+### 3. Agent Lifecycle Management
+
+```rust
+// llmspell-agents/src/lifecycle.rs
+pub struct AgentLifecycleManager {
+    registry: Arc<AgentRegistry>,
+    state_store: Arc<dyn StateStore>,
+    monitor: Arc<AgentMonitor>,
+    scheduler: Arc<AgentScheduler>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AgentState {
+    Created,
+    Initializing,
+    Ready,
+    Running,
+    Paused,
+    Stopping,
+    Stopped,
+    Failed(AgentError),
+}
+
+impl AgentLifecycleManager {
+    pub async fn transition(&self, agent_id: &str, new_state: AgentState) -> Result<()> {
+        let current_state = self.state_store.get_state(agent_id).await?;
+        
+        // Validate transition
+        if !self.is_valid_transition(&current_state, &new_state) {
+            return Err(LifecycleError::InvalidTransition(
+                current_state,
+                new_state
+            ));
+        }
+        
+        // Execute transition
+        match new_state {
+            AgentState::Initializing => self.initialize_agent(agent_id).await?,
+            AgentState::Running => self.start_agent(agent_id).await?,
+            AgentState::Paused => self.pause_agent(agent_id).await?,
+            AgentState::Stopping => self.stop_agent(agent_id).await?,
+            _ => {}
+        }
+        
+        // Update state
+        self.state_store.set_state(agent_id, new_state).await?;
+        
+        // Notify monitors
+        self.monitor.notify_state_change(agent_id, current_state, new_state).await;
+        
+        Ok(())
+    }
+    
+    fn is_valid_transition(&self, from: &AgentState, to: &AgentState) -> bool {
+        match (from, to) {
+            (AgentState::Created, AgentState::Initializing) => true,
+            (AgentState::Initializing, AgentState::Ready) => true,
+            (AgentState::Ready, AgentState::Running) => true,
+            (AgentState::Running, AgentState::Paused) => true,
+            (AgentState::Running, AgentState::Stopping) => true,
+            (AgentState::Paused, AgentState::Running) => true,
+            (AgentState::Paused, AgentState::Stopping) => true,
+            (AgentState::Stopping, AgentState::Stopped) => true,
+            (_, AgentState::Failed(_)) => true,
+            _ => false,
+        }
+    }
+}
+
+// State machine for agent lifecycle
+pub struct AgentStateMachine {
+    states: HashMap<AgentState, StateHandler>,
+    transitions: HashMap<(AgentState, AgentState), TransitionHandler>,
+}
+
+type StateHandler = Box<dyn Fn(&Agent) -> Result<()> + Send + Sync>;
+type TransitionHandler = Box<dyn Fn(&Agent, &AgentState, &AgentState) -> Result<()> + Send + Sync>;
+
+impl AgentStateMachine {
+    pub fn new() -> Self {
+        let mut sm = Self {
+            states: HashMap::new(),
+            transitions: HashMap::new(),
+        };
+        
+        // Register state handlers
+        sm.register_state(AgentState::Initializing, Box::new(|agent| {
+            agent.load_tools()?;
+            agent.connect_llm()?;
+            agent.initialize_memory()?;
+            Ok(())
+        }));
+        
+        sm.register_state(AgentState::Running, Box::new(|agent| {
+            agent.start_message_loop()?;
+            agent.enable_monitoring()?;
+            Ok(())
+        }));
+        
+        sm.register_state(AgentState::Stopping, Box::new(|agent| {
+            agent.stop_message_loop()?;
+            agent.save_state()?;
+            agent.cleanup_resources()?;
+            Ok(())
+        }));
+        
+        sm
+    }
+}
+```
+
+### 4. Agent Templates
+
+```rust
+// llmspell-agents/src/templates/mod.rs
+pub trait AgentTemplate {
+    fn name(&self) -> &str;
+    fn description(&self) -> &str;
+    fn build_spec(&self, params: &TemplateParams) -> Result<AgentSpec>;
+    fn default_tools(&self) -> Vec<&'static str>;
+    fn required_capabilities(&self) -> Vec<AgentCapability>;
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TemplateParams {
+    pub name: String,
+    pub custom_tools: Vec<String>,
+    pub llm_config: Option<LlmConfig>,
+    pub memory_size: Option<usize>,
+    pub custom_prompts: HashMap<String, String>,
+}
+
+// Research Agent Template
+pub struct ResearchAgentTemplate;
+
+impl AgentTemplate for ResearchAgentTemplate {
+    fn name(&self) -> &str { "research_agent" }
+    
+    fn description(&self) -> &str {
+        "Agent optimized for research tasks with web search, content analysis, and summarization"
+    }
+    
+    fn default_tools(&self) -> Vec<&'static str> {
+        vec![
+            "web_search",
+            "web_scraper",
+            "text_summarizer",
+            "file_writer",
+            "json_processor",
+            "template_engine",
+        ]
+    }
+    
+    fn build_spec(&self, params: &TemplateParams) -> Result<AgentSpec> {
+        let mut tools = self.default_tools().iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        tools.extend(params.custom_tools.clone());
+        
+        Ok(AgentSpec {
+            name: params.name.clone(),
+            agent_type: "research".to_string(),
+            description: Some(self.description().to_string()),
+            tools,
+            llm_provider: Some(LlmProviderSpec {
+                provider: "openai".to_string(),
+                model: "gpt-4".to_string(),
+                config: params.llm_config.clone(),
+            }),
+            config: Some(AgentConfig {
+                max_iterations: 20,
+                timeout: Duration::from_secs(300),
+                temperature: 0.7,
+                max_tokens: 2000,
+                retry_policy: RetryPolicy::exponential(3),
+                memory_config: MemoryConfig::conversational(10),
+                security_config: SecurityConfig::standard(),
+            }),
+            metadata: hashmap!{
+                "template".to_string() => json!(self.name()),
+                "version".to_string() => json!("1.0"),
+            },
+        })
+    }
+}
+
+// Code Generation Agent Template
+pub struct CodeAgentTemplate;
+
+impl AgentTemplate for CodeAgentTemplate {
+    fn name(&self) -> &str { "code_agent" }
+    
+    fn default_tools(&self) -> Vec<&'static str> {
+        vec![
+            "file_operations",
+            "file_search",
+            "process_executor",
+            "git_operations",
+            "code_analyzer",
+            "test_runner",
+            "linter",
+        ]
+    }
+    
+    fn build_spec(&self, params: &TemplateParams) -> Result<AgentSpec> {
+        // Implementation similar to research agent
+        // but with code-specific configuration
+        Ok(AgentSpec {
+            name: params.name.clone(),
+            agent_type: "code".to_string(),
+            tools: self.default_tools().iter().map(|s| s.to_string()).collect(),
+            config: Some(AgentConfig {
+                temperature: 0.2, // Lower temperature for code
+                security_config: SecurityConfig::restricted(), // Sandbox file access
+                ..Default::default()
+            }),
+            ..Default::default()
         })
     }
 }
 ```
 
-### 3. Workflow State Management
+#### 4.1 Additional Agent Templates
+
+Pre-configured templates for common agent patterns.
 
 ```rust
-pub struct WorkflowState {
-    data: HashMap<String, Value>,
-    history: Vec<StateChange>,
-    variables: HashMap<String, Variable>,
+// Chat Agent Template
+pub struct ChatAgentTemplate;
+
+impl AgentTemplate for ChatAgentTemplate {
+    fn name(&self) -> &str { "chat_agent" }
+    
+    fn default_tools(&self) -> Vec<&'static str> {
+        vec![
+            "text_manipulator",
+            "template_engine",
+            "datetime_handler",
+            "calculator",
+        ]
+    }
+    
+    fn build_spec(&self, params: &TemplateParams) -> Result<AgentSpec> {
+        Ok(AgentSpec {
+            name: params.name.clone(),
+            agent_type: "chat".to_string(),
+            config: Some(AgentConfig {
+                temperature: 0.9,
+                memory_config: MemoryConfig::conversational(50),
+                ..Default::default()
+            }),
+            ..Default::default()
+        })
+    }
 }
 
-impl WorkflowState {
-    pub fn new(initial_data: Value) -> Self {
-        let mut data = HashMap::new();
-        data.insert("$input".to_string(), initial_data);
-        
+// API Integration Agent Template
+pub struct ApiAgentTemplate;
+
+impl AgentTemplate for ApiAgentTemplate {
+    fn name(&self) -> &str { "api_agent" }
+    
+    fn default_tools(&self) -> Vec<&'static str> {
+        vec![
+            "http_request",
+            "graphql_query",
+            "json_processor",
+            "data_validator",
+            "webhook_caller",
+            "api_tester",
+        ]
+    }
+}
+
+// Data Processing Agent Template
+pub struct DataAgentTemplate;
+
+impl AgentTemplate for DataAgentTemplate {
+    fn name(&self) -> &str { "data_agent" }
+    
+    fn default_tools(&self) -> Vec<&'static str> {
+        vec![
+            "csv_analyzer",
+            "json_processor",
+            "database_connector",
+            "data_validator",
+            "file_converter",
+            "archive_handler",
+        ]
+    }
+}
+```
+
+### 5. Enhanced ExecutionContext
+
+```rust
+// llmspell-agents/src/context.rs
+pub struct ExecutionContext {
+    pub agent_id: String,
+    pub session_id: String,
+    pub services: ServiceBundle,
+    pub state: Arc<RwLock<ContextState>>,
+    pub metrics: Arc<Mutex<ContextMetrics>>,
+}
+
+#[derive(Clone)]
+pub struct ServiceBundle {
+    pub tool_registry: Arc<ToolRegistry>,
+    pub llm_provider: Arc<dyn LlmProvider>,
+    pub memory_store: Arc<dyn MemoryStore>,
+    pub event_bus: Arc<EventBus>,
+    pub logger: Arc<Logger>,
+    pub cache: Arc<dyn CacheProvider>,
+}
+
+impl ExecutionContext {
+    pub fn new(agent_id: String, services: ServiceBundle) -> Self {
         Self {
-            data,
-            history: Vec::new(),
-            variables: HashMap::new(),
+            agent_id: agent_id.clone(),
+            session_id: Uuid::new_v4().to_string(),
+            services,
+            state: Arc::new(RwLock::new(ContextState::new())),
+            metrics: Arc::new(Mutex::new(ContextMetrics::new())),
         }
     }
     
-    pub fn get(&self, path: &str) -> Result<&Value> {
-        // JSONPath-like access
-        jsonpath::select(&self.data, path)?
-            .first()
-            .ok_or_else(|| StateError::PathNotFound(path.to_string()))
+    pub async fn with_tool<F, R>(&self, tool_name: &str, f: F) -> Result<R>
+    where
+        F: FnOnce(&dyn Tool) -> Fut,
+        Fut: Future<Output = Result<R>>,
+    {
+        let tool = self.services.tool_registry.get(tool_name)?;
+        self.metrics.lock().await.record_tool_use(tool_name);
+        f(tool.as_ref()).await
     }
     
-    pub fn set(&mut self, path: &str, value: Value) -> Result<()> {
-        // Record change
-        self.history.push(StateChange {
-            timestamp: Instant::now(),
-            path: path.to_string(),
-            old_value: self.get(path).ok().cloned(),
-            new_value: value.clone(),
-        });
-        
-        // Update data
-        jsonpath::set(&mut self.data, path, value)?;
+    pub async fn store_memory(&self, key: &str, value: Value) -> Result<()> {
+        self.services.memory_store.set(key, value).await
+    }
+    
+    pub async fn recall_memory(&self, key: &str) -> Result<Option<Value>> {
+        self.services.memory_store.get(key).await
+    }
+}
+```
+
+### 6. Agent Communication Protocols
+
+```rust
+// llmspell-agents/src/communication.rs
+pub trait AgentCommunication: Send + Sync {
+    async fn send_message(&self, to: &str, message: AgentMessage) -> Result<()>;
+    async fn receive_message(&self) -> Result<Option<AgentMessage>>;
+    async fn subscribe(&self, topic: &str) -> Result<MessageStream>;
+    async fn publish(&self, topic: &str, message: AgentMessage) -> Result<()>;
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentMessage {
+    pub id: String,
+    pub from: String,
+    pub to: Option<String>,
+    pub topic: Option<String>,
+    pub message_type: MessageType,
+    pub payload: Value,
+    pub timestamp: DateTime<Utc>,
+    pub correlation_id: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum MessageType {
+    Request,
+    Response,
+    Event,
+    Command,
+    Query,
+    Notification,
+}
+
+// Direct agent-to-agent communication
+pub struct DirectCommunication {
+    agents: Arc<RwLock<HashMap<String, MessageQueue>>>,
+}
+
+impl DirectCommunication {
+    pub async fn send(&self, from: &str, to: &str, message: AgentMessage) -> Result<()> {
+        let mut agents = self.agents.write().await;
+        let queue = agents.entry(to.to_string())
+            .or_insert_with(|| MessageQueue::new(1000));
+        queue.push(message)?;
         Ok(())
     }
+}
+
+// Event-based communication
+pub struct EventBusCommunication {
+    bus: Arc<EventBus>,
+    subscriptions: Arc<RwLock<HashMap<String, Vec<String>>>>,
+}
+
+impl EventBusCommunication {
+    pub async fn publish(&self, topic: &str, message: AgentMessage) -> Result<()> {
+        self.bus.publish(topic, message).await
+    }
     
-    pub fn merge(&mut self, other: &WorkflowState) -> Result<()> {
-        for (key, value) in &other.data {
-            if key != "$input" {
-                self.set(key, value.clone())?;
+    pub async fn subscribe(&self, agent_id: &str, topic: &str) -> Result<MessageStream> {
+        let mut subs = self.subscriptions.write().await;
+        subs.entry(agent_id.to_string())
+            .or_insert_with(Vec::new)
+            .push(topic.to_string());
+        
+        self.bus.subscribe(topic).await
+    }
+}
+```
+
+### 7. Agent Composition Patterns
+
+```rust
+// llmspell-agents/src/composition.rs
+pub trait AgentComposition {
+    fn compose(agents: Vec<Box<dyn Agent>>) -> Result<Box<dyn Agent>>;
+}
+
+// Pipeline Composition: Agents process in sequence
+pub struct PipelineComposition {
+    agents: Vec<Box<dyn Agent>>,
+}
+
+impl Agent for PipelineComposition {
+    async fn process(&self, input: AgentInput) -> Result<AgentOutput> {
+        let mut current = input;
+        
+        for agent in &self.agents {
+            let output = agent.process(current).await?;
+            current = AgentInput::from_output(output)?;
+        }
+        
+        Ok(current.into_output())
+    }
+}
+
+// Ensemble Composition: Multiple agents vote on result
+pub struct EnsembleComposition {
+    agents: Vec<Box<dyn Agent>>,
+    voting_strategy: VotingStrategy,
+}
+
+impl Agent for EnsembleComposition {
+    async fn process(&self, input: AgentInput) -> Result<AgentOutput> {
+        let mut results = Vec::new();
+        
+        // Process in parallel
+        let futures: Vec<_> = self.agents.iter()
+            .map(|agent| agent.process(input.clone()))
+            .collect();
+        
+        let outputs = futures::future::join_all(futures).await;
+        
+        for output in outputs {
+            if let Ok(result) = output {
+                results.push(result);
             }
         }
-        Ok(())
+        
+        // Apply voting strategy
+        self.voting_strategy.select(results)
     }
+}
+
+// Hierarchical Composition: Parent agent delegates to children
+pub struct HierarchicalComposition {
+    parent: Box<dyn Agent>,
+    children: HashMap<String, Box<dyn Agent>>,
+    delegation_strategy: DelegationStrategy,
+}
+
+impl Agent for HierarchicalComposition {
+    async fn process(&self, input: AgentInput) -> Result<AgentOutput> {
+        // Parent analyzes and decides delegation
+        let analysis = self.parent.process(input.clone()).await?;
+        
+        // Determine which child agents to use
+        let delegations = self.delegation_strategy.decide(&analysis)?;
+        
+        // Execute delegated tasks
+        let mut results = HashMap::new();
+        for (task, agent_name) in delegations {
+            if let Some(agent) = self.children.get(&agent_name) {
+                let result = agent.process(task).await?;
+                results.insert(agent_name, result);
+            }
+        }
+        
+        // Parent aggregates results
+        self.parent.aggregate(results).await
 }
 ```
 
-### 4. Workflow Examples
+### 8. Agent Examples
 
-#### 4.1 Research Workflow
-
-```rust
-let research_workflow = SequentialWorkflow::builder("research_assistant")
-    .add_step("search", "web_search", json!({
-        "input": "{{query}}",
-        "max_results": 10
-    }))
-    .add_step("extract", "web_scraper", json!({
-        "input": "{{search.results[0].url}}",
-        "selectors": {
-            "title": "h1",
-            "content": ".article-body"
-        }
-    }))
-    .add_step("summarize", "text_summarizer", json!({
-        "input": "{{extract.result.content}}",
-        "max_length": 500
-    }))
-    .add_step("analyze", "sentiment_analyzer", json!({
-        "input": "{{summarize.result}}",
-        "operations": ["sentiment", "entities", "keywords"]
-    }))
-    .with_error_handling(ErrorStrategy::Retry(3))
-    .build()?;
-```
-
-#### 4.2 Data Processing Pipeline
+#### 8.1 Research Agent Configuration
 
 ```rust
-let etl_workflow = StreamingWorkflow::builder("etl_pipeline")
-    .source(StreamSource::Tool("database_connector", json!({
-        "query": "SELECT * FROM users WHERE created_at > ?",
-        "parameters": ["2025-01-01"]
-    })))
-    .add_processor(StreamProcessor::Transform("data_transformer", json!({
-        "operation": "map",
-        "mapping": {
-            "id": "user_id",
-            "email": "contact_email"
-        }
-    })))
-    .add_processor(StreamProcessor::Filter("data_validator", json!({
-        "rules": {
-            "contact_email": {"type": "email"}
-        }
-    })))
-    .add_processor(StreamProcessor::Batch(100))
-    .sink(StreamSink::Tool("file_writer", json!({
-        "path": "/output/users.jsonl",
-        "format": "jsonl"
-    })))
-    .with_backpressure(BackpressureStrategy::Buffer(1000))
-    .build()?;
+let research_agent_spec = AgentSpec {
+    name: "research_assistant".to_string(),
+    agent_type: "research".to_string(),
+    description: Some("Agent for conducting web research and analysis".to_string()),
+    tools: vec![
+        "web_search".to_string(),
+        "web_scraper".to_string(),
+        "text_summarizer".to_string(),
+        "sentiment_analyzer".to_string(),
+        "file_writer".to_string(),
+        "json_processor".to_string(),
+    ],
+    llm_provider: Some(LlmProviderSpec {
+        provider: "openai".to_string(),
+        model: "gpt-4".to_string(),
+        config: Some(json!({
+            "temperature": 0.7,
+            "max_tokens": 2000,
+        })),
+    }),
+    config: Some(AgentConfig {
+        max_iterations: 20,
+        timeout: Duration::from_secs(300),
+        temperature: 0.7,
+        max_tokens: 2000,
+        retry_policy: RetryPolicy::exponential(3),
+        memory_config: MemoryConfig::conversational(10),
+        security_config: SecurityConfig::standard(),
+    }),
+    metadata: hashmap!{
+        "capabilities".to_string() => json!(["research", "analysis", "summarization"]),
+        "version".to_string() => json!("1.0"),
+    },
+};
+
+// Create agent using factory
+let agent = factory.create_agent(&research_agent_spec).await?;
+
+// Use the agent
+let result = agent.process(AgentInput {
+    message: "Research the latest developments in quantum computing".to_string(),
+    context: Default::default(),
+}).await?;
 ```
 
-### 5. Implementation Checklist
+#### 8.2 Code Generation Agent with Composition
+
+```rust
+// Create a hierarchical code agent with specialized sub-agents
+let code_agent = HierarchicalComposition {
+    parent: factory.create_agent(&AgentSpec {
+        name: "code_orchestrator".to_string(),
+        agent_type: "orchestrator".to_string(),
+        tools: vec!["code_analyzer".to_string()],
+        ..Default::default()
+    }).await?,
+    
+    children: hashmap!{
+        "generator".to_string() => factory.create_agent(&AgentSpec {
+            name: "code_generator".to_string(),
+            agent_type: "code".to_string(),
+            tools: vec!["file_operations", "template_engine"],
+            config: Some(AgentConfig {
+                temperature: 0.2,
+                ..Default::default()
+            }),
+            ..Default::default()
+        }).await?,
+        
+        "tester".to_string() => factory.create_agent(&AgentSpec {
+            name: "test_generator".to_string(),
+            agent_type: "code".to_string(),
+            tools: vec!["test_runner", "file_operations"],
+            ..Default::default()
+        }).await?,
+        
+        "documenter".to_string() => factory.create_agent(&AgentSpec {
+            name: "doc_generator".to_string(),
+            agent_type: "documentation".to_string(),
+            tools: vec!["markdown_processor", "template_engine"],
+            ..Default::default()
+        }).await?,
+    },
+    
+    delegation_strategy: DelegationStrategy::TaskBased,
+};
+```
+
+#### 8.3 Data Processing Pipeline
+
+```rust
+// Create a pipeline of agents for data processing
+let data_pipeline = PipelineComposition {
+    agents: vec![
+        // Stage 1: Data extraction
+        factory.create_agent(&AgentSpec {
+            name: "data_extractor".to_string(),
+            agent_type: "data".to_string(),
+            tools: vec!["database_connector", "csv_analyzer"],
+            ..Default::default()
+        }).await?,
+        
+        // Stage 2: Data validation
+        factory.create_agent(&AgentSpec {
+            name: "data_validator".to_string(),
+            agent_type: "validation".to_string(),
+            tools: vec!["data_validator", "json_processor"],
+            ..Default::default()
+        }).await?,
+        
+        // Stage 3: Data transformation
+        factory.create_agent(&AgentSpec {
+            name: "data_transformer".to_string(),
+            agent_type: "transform".to_string(),
+            tools: vec!["json_processor", "template_engine"],
+            ..Default::default()
+        }).await?,
+        
+        // Stage 4: Data storage
+        factory.create_agent(&AgentSpec {
+            name: "data_writer".to_string(),
+            agent_type: "storage".to_string(),
+            tools: vec!["file_writer", "database_connector"],
+            ..Default::default()
+        }).await?,
+    ],
+};
+```
+
+### 9. Implementation Checklist
 
 **Week 15 Tasks**:
-- [ ] Implement Workflow trait system
-- [ ] Create SequentialWorkflow
-- [ ] Create ConditionalWorkflow
-- [ ] Implement workflow state management
-- [ ] Create workflow builder patterns
+- [ ] Implement Agent Factory pattern with builders
+- [ ] Create Agent Registry with persistence
+- [ ] Build Discovery Service with providers
+- [ ] Implement Agent Lifecycle Management
+- [ ] Create Agent State Machine
+- [ ] Design Agent Templates (Research, Chat, Code, API, Data)
 
 **Week 16 Tasks**:
-- [ ] Implement LoopWorkflow
-- [ ] Create StreamingWorkflow
-- [ ] Build workflow examples
-- [ ] Integration testing with all 33 tools
+- [ ] Implement Enhanced ExecutionContext
+- [ ] Build Agent Communication protocols
+- [ ] Create Agent Composition patterns
+- [ ] Develop example agent configurations
+- [ ] Integration testing with all 41+ tools
 - [ ] Performance benchmarking
 
 ---
@@ -1264,11 +1786,12 @@ let etl_workflow = StreamingWorkflow::builder("etl_pipeline")
 ### 1. Unit Tests
 - Each tool standardization change
 - Security vulnerability fixes
-- Workflow pattern implementations
+- Agent infrastructure components
 - State management operations
 
 ### 2. Integration Tests
-- Tool chain workflows
+- Tool chain interactions
+- Agent-to-agent communication
 - Cross-tool data flow
 - Security boundary testing
 - Performance regression tests
@@ -1287,7 +1810,7 @@ let etl_workflow = StreamingWorkflow::builder("etl_pipeline")
 
 ### 5. Performance Tests
 - Tool initialization benchmarks
-- Workflow execution timing
+- Agent lifecycle timing
 - Memory usage profiling
 - Concurrent execution stress tests
 
@@ -1302,15 +1825,15 @@ let etl_workflow = StreamingWorkflow::builder("etl_pipeline")
 - Manual upgrade instructions
 
 ### 2. Tool Documentation
-- Updated schemas for all 33 tools
+- Updated schemas for all 41+ tools
 - Usage examples with new interfaces
 - Performance characteristics
 - Security considerations
 
-### 3. Workflow Documentation
-- Pattern explanations
-- Builder API reference
-- Example workflows
+### 3. Agent Documentation
+- Factory pattern explanations
+- Registry API reference
+- Template usage examples
 - Best practices guide
 
 ### 4. Security Documentation
@@ -1334,7 +1857,7 @@ let etl_workflow = StreamingWorkflow::builder("etl_pipeline")
 - **Validation**: Continuous benchmarking
 
 ### 3. Integration Complexity
-- **Risk**: 33 tools with different patterns
+- **Risk**: 41+ tools with different patterns
 - **Mitigation**: Strict adherence to standards
 - **Validation**: Integration test suite
 
@@ -1358,7 +1881,7 @@ let etl_workflow = StreamingWorkflow::builder("etl_pipeline")
 - Developer experience improvement
 - Clear documentation and examples
 - Clean, maintainable codebase
-- Robust workflow patterns
+- Robust agent infrastructure
 - Comprehensive security posture
 
 ---
@@ -1384,11 +1907,11 @@ let etl_workflow = StreamingWorkflow::builder("etl_pipeline")
 - [ ] Resource limits enforced
 
 ### Phase 3.3 Handoff
-- [ ] All workflow patterns implemented
+- [ ] All agent infrastructure patterns implemented
 - [ ] 41+ tools integrated
-- [ ] Example workflows functional
+- [ ] Example agent configurations functional
 - [ ] Full test suite passing
 
 ---
 
-This comprehensive design document provides the detailed specifications needed to implement Phase 3's ambitious 8-week plan, transforming the tool library into a standardized, secure, and workflow-ready ecosystem.
+This comprehensive design document provides the detailed specifications needed to implement Phase 3's ambitious 8-week plan, transforming the tool library into a standardized, secure, and agent-ready ecosystem.
