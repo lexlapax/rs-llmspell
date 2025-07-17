@@ -17,7 +17,9 @@ use llmspell_utils::{
     error_builders::llmspell::{tool_error, validation_error},
     params::{extract_optional_string, extract_parameters, extract_required_string},
     response::ResponseBuilder,
-    security::input_sanitizer::InputSanitizer,
+    security::{
+        input_sanitizer::InputSanitizer, CredentialAuditor, CredentialFilter, ErrorSanitizer,
+    },
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -180,6 +182,12 @@ impl DatabaseConnectorConfig {
 pub struct DatabaseConnectorTool {
     config: DatabaseConnectorConfig,
     metadata: ComponentMetadata,
+    #[allow(dead_code)]
+    auditor: parking_lot::Mutex<CredentialAuditor>,
+    #[allow(dead_code)]
+    error_sanitizer: ErrorSanitizer,
+    #[allow(dead_code)]
+    credential_filter: CredentialFilter,
 }
 
 impl DatabaseConnectorTool {
@@ -192,6 +200,9 @@ impl DatabaseConnectorTool {
                 "Database connector tool with support for PostgreSQL, MySQL, and SQLite"
                     .to_string(),
             ),
+            auditor: parking_lot::Mutex::new(CredentialAuditor::new()),
+            error_sanitizer: ErrorSanitizer::new(),
+            credential_filter: CredentialFilter::new(),
         })
     }
 

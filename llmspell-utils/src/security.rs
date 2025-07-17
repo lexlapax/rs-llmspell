@@ -10,12 +10,17 @@
 //! - Input size validation
 //! - Path security validation
 
+pub mod credential_protection;
 pub mod expression_analyzer_enhanced;
 pub mod input_sanitizer;
 pub mod memory_tracker;
 pub mod path;
 pub mod ssrf_protection;
 
+pub use credential_protection::{
+    CredentialAuditEntry, CredentialAuditor, CredentialFilter, CredentialType, ErrorSanitizer,
+    SecureCredential, SecureString,
+};
 pub use expression_analyzer_enhanced::{EnhancedExpressionAnalyzer, EnhancedExpressionConfig};
 pub use input_sanitizer::{
     InputSanitizer, SanitizationConfig, SanitizationError, ValidationReport,

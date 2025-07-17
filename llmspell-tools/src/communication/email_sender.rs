@@ -17,6 +17,7 @@ use llmspell_utils::{
     error_builders::llmspell::{tool_error, validation_error},
     params::{extract_optional_string, extract_parameters, extract_required_string},
     response::ResponseBuilder,
+    security::{CredentialAuditEntry, CredentialAuditor, ErrorSanitizer},
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -147,6 +148,10 @@ impl EmailSenderConfig {
 pub struct EmailSenderTool {
     config: EmailSenderConfig,
     metadata: ComponentMetadata,
+    #[allow(dead_code)]
+    auditor: parking_lot::Mutex<CredentialAuditor>,
+    #[allow(dead_code)]
+    error_sanitizer: ErrorSanitizer,
 }
 
 impl RequiresApiKey for EmailSenderTool {
@@ -168,7 +173,32 @@ impl EmailSenderTool {
                 "email_sender".to_string(),
                 "Email sending tool with support for SMTP, SendGrid, and AWS SES".to_string(),
             ),
+            auditor: parking_lot::Mutex::new(CredentialAuditor::new()),
+            error_sanitizer: ErrorSanitizer::new(),
         })
+    }
+
+    /// Log credential access
+    #[allow(dead_code)]
+    fn log_credential_access(
+        &self,
+        action: &str,
+        credential_type: &str,
+        success: bool,
+        error: Option<String>,
+    ) {
+        let mut entry = CredentialAuditEntry::new(
+            action.to_string(),
+            credential_type.to_string(),
+            "email_sender".to_string(),
+            success,
+        );
+
+        if let Some(err) = error {
+            entry = entry.with_error(&err);
+        }
+
+        self.auditor.lock().log_access(entry);
     }
 
     /// Send email using the specified provider
@@ -274,6 +304,7 @@ impl EmailSenderTool {
                 config.credentials.get("username"),
                 config.credentials.get("password"),
             ) {
+                self.log_credential_access("smtp_auth", "smtp_credentials", true, None);
                 let creds = Credentials::new(username.clone(), password.clone());
                 mailer_builder = mailer_builder.credentials(creds);
             }
@@ -290,10 +321,16 @@ impl EmailSenderTool {
                         "timestamp": chrono::Utc::now().to_rfc3339()
                     }))
                 }
-                Err(e) => Err(tool_error(
-                    format!("Failed to send email via SMTP: {}", e),
-                    None,
-                )),
+                Err(e) => {
+                    let error_msg = format!("Failed to send email via SMTP: {}", e);
+                    self.log_credential_access(
+                        "smtp_send",
+                        "smtp_credentials",
+                        false,
+                        Some(error_msg.clone()),
+                    );
+                    Err(tool_error(self.error_sanitizer.sanitize(&error_msg), None))
+                }
             }
         }
 
@@ -414,10 +451,16 @@ impl EmailSenderTool {
                         "timestamp": chrono::Utc::now().to_rfc3339()
                     }))
                 }
-                Err(e) => Err(tool_error(
-                    format!("Failed to send email via AWS SES: {}", e),
-                    None,
-                )),
+                Err(e) => {
+                    let error_msg = format!("Failed to send email via AWS SES: {}", e);
+                    self.log_credential_access(
+                        "ses_send",
+                        "aws_credentials",
+                        false,
+                        Some(error_msg.clone()),
+                    );
+                    Err(tool_error(self.error_sanitizer.sanitize(&error_msg), None))
+                }
             }
         }
 

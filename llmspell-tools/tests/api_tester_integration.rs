@@ -173,7 +173,7 @@ async fn test_api_tester_invalid_url() {
     let result = tool.execute(input, context).await;
     assert!(result.is_err());
     let error = result.unwrap_err();
-    assert!(error.to_string().contains("URL must start with"));
+    assert!(error.to_string().contains("URL validation failed"));
 }
 
 #[tokio::test]
@@ -245,5 +245,5 @@ async fn test_api_tester_response_time_measurement() {
         .as_u64()
         .unwrap();
     assert!(response_time > 0);
-    assert!(response_time < 10000); // Less than 10 seconds
+    assert!(response_time < 30000); // Less than 30 seconds (accounting for network latency)
 }
