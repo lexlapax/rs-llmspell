@@ -14,7 +14,7 @@
 ## Phase Overview
 
 ### Goal
-Transform the existing 26 self-contained tools into a standardized, secure, and extensible library of 33+ tools, then implement comprehensive agent infrastructure patterns that leverage the full tool ecosystem.
+Transform the existing 26 self-contained tools into a standardized, secure, and extensible library of 33+ tools, then implement comprehensive agent infrastructure and basic multi-agent coordination patterns through workflow orchestration.
 
 ### Core Principles
 - **Standardization First**: Fix existing tools before adding new ones
@@ -29,7 +29,7 @@ Phase 3 is divided into four 2-week sub-phases:
 1. **Phase 3.0 (Weeks 9-10)**: Critical Tool Fixes - Standardization, DRY, and Initial Security
 2. **Phase 3.1 (Weeks 11-12)**: External Integration Tools - 8 new tools
 3. **Phase 3.2 (Weeks 13-14)**: Advanced Security & Performance - Optimization for all 33 tools
-4. **Phase 3.3 (Weeks 15-16)**: Agent Infrastructure - Factory, Registry, and Templates
+4. **Phase 3.3 (Weeks 15-16)**: Agent Infrastructure & Basic Workflows - Factory, Registry, Templates, and Multi-Agent Coordination
 
 ### Success Metrics
 - **Tool Consistency**: 95% parameter standardization (from 60%)
@@ -37,6 +37,8 @@ Phase 3 is divided into four 2-week sub-phases:
 - **Security Coverage**: Comprehensive vulnerability mitigation
 - **Tool Count**: 33+ production-ready tools
 - **Agent Support**: Factory, Registry, and Templates operational with full tool library
+- **Multi-Agent Coordination**: Basic workflow patterns (Sequential, Conditional, Loop) functional
+- **Workflow-Agent Integration**: Agents can execute workflows and workflows can use agents
 
 ---
 
@@ -1474,77 +1476,587 @@ impl ExecutionContext {
 }
 ```
 
-### 6. Agent Communication Protocols
+### 6. BaseAgent Tool Integration Infrastructure
 
 ```rust
-// llmspell-agents/src/communication.rs
-pub trait AgentCommunication: Send + Sync {
-    async fn send_message(&self, to: &str, message: AgentMessage) -> Result<()>;
-    async fn receive_message(&self) -> Result<Option<AgentMessage>>;
-    async fn subscribe(&self, topic: &str) -> Result<MessageStream>;
-    async fn publish(&self, topic: &str, message: AgentMessage) -> Result<()>;
+// llmspell-core/src/base_agent.rs
+pub trait BaseAgent: Send + Sync {
+    // Existing methods...
+    
+    // Tool management methods
+    async fn register_tool(&mut self, name: &str, tool: Box<dyn Tool>) -> Result<()>;
+    async fn unregister_tool(&mut self, name: &str) -> Result<()>;
+    async fn invoke_tool(&self, name: &str, input: ToolInput) -> Result<ToolOutput>;
+    fn available_tools(&self) -> Vec<&str>;
+    fn has_tool(&self, name: &str) -> bool;
+    async fn discover_tools(&self, registry: &ToolRegistry) -> Result<Vec<ToolMetadata>>;
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgentMessage {
-    pub id: String,
-    pub from: String,
-    pub to: Option<String>,
-    pub topic: Option<String>,
-    pub message_type: MessageType,
-    pub payload: Value,
-    pub timestamp: DateTime<Utc>,
-    pub correlation_id: Option<String>,
+// Tool manager for BaseAgent implementations
+pub struct ToolManager {
+    tools: HashMap<String, Box<dyn Tool>>,
+    tool_metadata: HashMap<String, ToolMetadata>,
+    execution_context: ExecutionContext,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum MessageType {
-    Request,
-    Response,
-    Event,
-    Command,
-    Query,
-    Notification,
-}
-
-// Direct agent-to-agent communication
-pub struct DirectCommunication {
-    agents: Arc<RwLock<HashMap<String, MessageQueue>>>,
-}
-
-impl DirectCommunication {
-    pub async fn send(&self, from: &str, to: &str, message: AgentMessage) -> Result<()> {
-        let mut agents = self.agents.write().await;
-        let queue = agents.entry(to.to_string())
-            .or_insert_with(|| MessageQueue::new(1000));
-        queue.push(message)?;
-        Ok(())
-    }
-}
-
-// Event-based communication
-pub struct EventBusCommunication {
-    bus: Arc<EventBus>,
-    subscriptions: Arc<RwLock<HashMap<String, Vec<String>>>>,
-}
-
-impl EventBusCommunication {
-    pub async fn publish(&self, topic: &str, message: AgentMessage) -> Result<()> {
-        self.bus.publish(topic, message).await
+impl ToolManager {
+    pub fn new(execution_context: ExecutionContext) -> Self {
+        Self {
+            tools: HashMap::new(),
+            tool_metadata: HashMap::new(),
+            execution_context,
+        }
     }
     
-    pub async fn subscribe(&self, agent_id: &str, topic: &str) -> Result<MessageStream> {
-        let mut subs = self.subscriptions.write().await;
-        subs.entry(agent_id.to_string())
-            .or_insert_with(Vec::new)
-            .push(topic.to_string());
+    pub async fn register_tool(&mut self, name: &str, tool: Box<dyn Tool>) -> Result<()> {
+        // Validate tool compatibility
+        self.validate_tool_compatibility(&tool)?;
         
-        self.bus.subscribe(topic).await
+        // Extract tool metadata
+        let metadata = ToolMetadata {
+            name: name.to_string(),
+            description: tool.description().to_string(),
+            parameters: tool.parameters().clone(),
+            capabilities: tool.capabilities().clone(),
+        };
+        
+        self.tools.insert(name.to_string(), tool);
+        self.tool_metadata.insert(name.to_string(), metadata);
+        Ok(())
+    }
+    
+    pub async fn invoke_with_validation(
+        &self, 
+        name: &str, 
+        input: ToolInput,
+        context: &ExecutionContext
+    ) -> Result<ToolOutput> {
+        // Parameter validation
+        let tool = self.tools.get(name)
+            .ok_or_else(|| LLMSpellError::ToolNotFound(name.to_string()))?;
+        
+        // Validate input against tool schema
+        self.validate_tool_input(tool, &input)?;
+        
+        // Execute with context propagation
+        let enhanced_input = self.enhance_input_with_context(input, context)?;
+        tool.execute(enhanced_input).await
+    }
+    
+    pub fn available_tools(&self) -> Vec<&str> {
+        self.tools.keys().map(|k| k.as_str()).collect()
+    }
+    
+    pub fn has_tool(&self, name: &str) -> bool {
+        self.tools.contains_key(name)
+    }
+    
+    async fn validate_tool_compatibility(&self, tool: &Box<dyn Tool>) -> Result<()> {
+        // Check version compatibility
+        // Check security requirements
+        // Check resource requirements
+        Ok(())
+    }
+    
+    fn validate_tool_input(&self, tool: &Box<dyn Tool>, input: &ToolInput) -> Result<()> {
+        // Validate against tool schema
+        // Type checking
+        // Parameter validation
+        Ok(())
+    }
+    
+    fn enhance_input_with_context(&self, input: ToolInput, context: &ExecutionContext) -> Result<ToolInput> {
+        // Add execution context to tool input
+        // Propagate security context
+        // Add resource limits
+        Ok(input)
+    }
+}
+
+// Agent-as-tool wrapping support
+pub struct AgentWrappedTool {
+    agent: Box<dyn Agent>,
+    tool_interface: ToolInterface,
+    recursion_detector: RecursionDetector,
+}
+
+impl AgentWrappedTool {
+    pub fn new(agent: Box<dyn Agent>, tool_interface: ToolInterface) -> Self {
+        Self {
+            agent,
+            tool_interface,
+            recursion_detector: RecursionDetector::new(),
+        }
+    }
+}
+
+impl Tool for AgentWrappedTool {
+    async fn execute(&self, input: ToolInput) -> Result<ToolOutput> {
+        // Prevent infinite recursion
+        self.recursion_detector.check_recursion(&input)?;
+        
+        // Convert tool input to agent input
+        let agent_input = self.tool_interface.convert_input(input)?;
+        
+        // Execute agent
+        let agent_output = self.agent.process(agent_input).await?;
+        
+        // Convert agent output back to tool output
+        self.tool_interface.convert_output(agent_output)
+    }
+    
+    fn name(&self) -> &str {
+        &self.tool_interface.name
+    }
+    
+    fn description(&self) -> &str {
+        &self.tool_interface.description
+    }
+    
+    fn parameters(&self) -> &ToolParameters {
+        &self.tool_interface.parameters
+    }
+}
+
+// Tool interface for agent-as-tool conversion
+pub struct ToolInterface {
+    name: String,
+    description: String,
+    parameters: ToolParameters,
+    input_converter: Box<dyn InputConverter>,
+    output_converter: Box<dyn OutputConverter>,
+}
+
+impl ToolInterface {
+    pub fn convert_input(&self, input: ToolInput) -> Result<AgentInput> {
+        self.input_converter.convert(input)
+    }
+    
+    pub fn convert_output(&self, output: AgentOutput) -> Result<ToolOutput> {
+        self.output_converter.convert(output)
+    }
+}
+
+// Recursion detection for agent-as-tool
+pub struct RecursionDetector {
+    call_stack: Vec<String>,
+    max_depth: usize,
+}
+
+impl RecursionDetector {
+    pub fn new() -> Self {
+        Self {
+            call_stack: Vec::new(),
+            max_depth: 10,
+        }
+    }
+    
+    pub fn check_recursion(&self, input: &ToolInput) -> Result<()> {
+        if self.call_stack.len() >= self.max_depth {
+            return Err(LLMSpellError::RecursionLimit("Maximum recursion depth exceeded".to_string()));
+        }
+        
+        // Check for circular dependencies
+        let input_signature = self.create_input_signature(input);
+        if self.call_stack.contains(&input_signature) {
+            return Err(LLMSpellError::CircularDependency("Circular tool dependency detected".to_string()));
+        }
+        
+        Ok(())
+    }
+    
+    fn create_input_signature(&self, input: &ToolInput) -> String {
+        // Create a unique signature for the input to detect recursion
+        format!("{:?}", input)
+    }
+}
+
+// Tool composition patterns
+pub trait ToolComposition {
+    fn compose_tools(&self, tools: Vec<&str>) -> Result<ComposedTool>;
+}
+
+pub struct ComposedTool {
+    tools: Vec<Box<dyn Tool>>,
+    composition_pattern: CompositionPattern,
+}
+
+pub enum CompositionPattern {
+    Sequential,  // Tools execute in sequence
+    Parallel,    // Tools execute in parallel
+    Conditional, // Tools execute based on conditions
+    Pipeline,    // Output of one tool feeds into next
+}
+
+impl Tool for ComposedTool {
+    async fn execute(&self, input: ToolInput) -> Result<ToolOutput> {
+        match self.composition_pattern {
+            CompositionPattern::Sequential => self.execute_sequential(input).await,
+            CompositionPattern::Parallel => self.execute_parallel(input).await,
+            CompositionPattern::Conditional => self.execute_conditional(input).await,
+            CompositionPattern::Pipeline => self.execute_pipeline(input).await,
+        }
+    }
+    
+    fn name(&self) -> &str { "composed_tool" }
+    fn description(&self) -> &str { "A composition of multiple tools" }
+    fn parameters(&self) -> &ToolParameters { &ToolParameters::default() }
+}
+
+impl ComposedTool {
+    async fn execute_sequential(&self, input: ToolInput) -> Result<ToolOutput> {
+        let mut results = Vec::new();
+        for tool in &self.tools {
+            let result = tool.execute(input.clone()).await?;
+            results.push(result);
+        }
+        Ok(ToolOutput::Multiple(results))
+    }
+    
+    async fn execute_parallel(&self, input: ToolInput) -> Result<ToolOutput> {
+        let tasks: Vec<_> = self.tools.iter()
+            .map(|tool| tool.execute(input.clone()))
+            .collect();
+        
+        let results = futures::future::join_all(tasks).await;
+        let successful_results: Result<Vec<_>, _> = results.into_iter().collect();
+        Ok(ToolOutput::Multiple(successful_results?))
+    }
+    
+    async fn execute_conditional(&self, input: ToolInput) -> Result<ToolOutput> {
+        // Implement conditional logic based on input
+        // For now, just execute the first tool
+        if let Some(tool) = self.tools.first() {
+            tool.execute(input).await
+        } else {
+            Err(LLMSpellError::Tool("No tools available for conditional execution".to_string()))
+        }
+    }
+    
+    async fn execute_pipeline(&self, input: ToolInput) -> Result<ToolOutput> {
+        let mut current_input = input;
+        
+        for tool in &self.tools {
+            let output = tool.execute(current_input).await?;
+            current_input = self.convert_output_to_input(output)?;
+        }
+        
+        Ok(ToolOutput::from_input(current_input))
+    }
+    
+    fn convert_output_to_input(&self, output: ToolOutput) -> Result<ToolInput> {
+        // Convert tool output back to input for next tool in pipeline
+        // This is a simplified implementation
+        Ok(ToolInput::from_output(output))
     }
 }
 ```
 
-### 7. Agent Composition Patterns
+### 7. Script-to-Agent Integration
+
+```rust
+// llmspell-bridge/src/agent_bridge.rs
+pub struct AgentBridge {
+    agent_registry: Arc<AgentRegistry>,
+    script_engine: Arc<dyn ScriptEngineBridge>,
+    parameter_converter: ParameterConverter,
+    result_handler: ResultHandler,
+}
+
+impl AgentBridge {
+    pub fn new(
+        agent_registry: Arc<AgentRegistry>,
+        script_engine: Arc<dyn ScriptEngineBridge>
+    ) -> Self {
+        Self {
+            agent_registry,
+            script_engine,
+            parameter_converter: ParameterConverter::new(),
+            result_handler: ResultHandler::new(),
+        }
+    }
+    
+    pub async fn register_agents_with_script(&self) -> Result<()> {
+        let agents = self.agent_registry.list_agents().await?;
+        
+        for agent in agents {
+            let script_callable = self.create_script_callable(agent)?;
+            self.script_engine.register_function(
+                &agent.name(),
+                script_callable
+            ).await?;
+        }
+        Ok(())
+    }
+    
+    pub async fn call_agent_from_script(
+        &self,
+        agent_name: &str,
+        script_params: ScriptValue
+    ) -> Result<ScriptValue> {
+        // Convert script parameters to agent input
+        let agent_input = self.parameter_converter.script_to_agent(script_params)?;
+        
+        // Get agent from registry
+        let agent = self.agent_registry.get(agent_name).await?;
+        
+        // Execute agent
+        let agent_output = agent.process(agent_input).await?;
+        
+        // Convert agent output back to script value
+        self.result_handler.agent_to_script(agent_output)
+    }
+    
+    fn create_script_callable(&self, agent: &dyn Agent) -> Result<ScriptCallable> {
+        let agent_name = agent.name().to_string();
+        let bridge = Arc::clone(&self);
+        
+        Ok(ScriptCallable::new(move |params: ScriptValue| {
+            let bridge = Arc::clone(&bridge);
+            let agent_name = agent_name.clone();
+            
+            Box::pin(async move {
+                bridge.call_agent_from_script(&agent_name, params).await
+            })
+        }))
+    }
+}
+
+// Parameter conversion between script types and agent inputs
+pub struct ParameterConverter {
+    type_mapping: HashMap<String, AgentInputType>,
+}
+
+impl ParameterConverter {
+    pub fn new() -> Self {
+        Self {
+            type_mapping: Self::create_default_type_mapping(),
+        }
+    }
+    
+    pub fn script_to_agent(&self, script_value: ScriptValue) -> Result<AgentInput> {
+        match script_value {
+            ScriptValue::String(s) => Ok(AgentInput::text(s)),
+            ScriptValue::Table(t) => self.convert_table_to_input(t),
+            ScriptValue::Array(a) => self.convert_array_to_input(a),
+            ScriptValue::Number(n) => Ok(AgentInput::text(n.to_string())),
+            ScriptValue::Boolean(b) => Ok(AgentInput::text(b.to_string())),
+            ScriptValue::Nil => Ok(AgentInput::default()),
+            _ => Err(LLMSpellError::InvalidParameter("Unsupported script type".to_string())),
+        }
+    }
+    
+    fn convert_table_to_input(&self, table: ScriptTable) -> Result<AgentInput> {
+        let mut input = AgentInput::default();
+        
+        for (key, value) in table {
+            match key.as_str() {
+                "message" => input.message = value.as_string()?,
+                "context" => input.context = self.convert_to_context(value)?,
+                "metadata" => input.metadata = self.convert_to_metadata(value)?,
+                "session_id" => input.session_id = Some(value.as_string()?),
+                _ => {
+                    // Store unknown keys in metadata
+                    input.metadata.insert(key, value.into());
+                }
+            }
+        }
+        
+        Ok(input)
+    }
+    
+    fn convert_array_to_input(&self, array: Vec<ScriptValue>) -> Result<AgentInput> {
+        // Convert array to a multi-part message
+        let messages: Result<Vec<String>, _> = array.into_iter()
+            .map(|v| v.as_string())
+            .collect();
+        
+        Ok(AgentInput::text(messages?.join("\n")))
+    }
+    
+    fn convert_to_context(&self, value: ScriptValue) -> Result<AgentContext> {
+        let mut context = AgentContext::default();
+        
+        if let ScriptValue::Table(table) = value {
+            for (key, value) in table {
+                context.insert(key, value.into());
+            }
+        }
+        
+        Ok(context)
+    }
+    
+    fn convert_to_metadata(&self, value: ScriptValue) -> Result<HashMap<String, serde_json::Value>> {
+        let mut metadata = HashMap::new();
+        
+        if let ScriptValue::Table(table) = value {
+            for (key, value) in table {
+                metadata.insert(key, value.into());
+            }
+        }
+        
+        Ok(metadata)
+    }
+    
+    fn create_default_type_mapping() -> HashMap<String, AgentInputType> {
+        let mut mapping = HashMap::new();
+        mapping.insert("text".to_string(), AgentInputType::Text);
+        mapping.insert("json".to_string(), AgentInputType::Json);
+        mapping.insert("binary".to_string(), AgentInputType::Binary);
+        mapping
+    }
+}
+
+// Result handling from agents back to scripts
+pub struct ResultHandler {
+    format_config: ResultFormatConfig,
+}
+
+impl ResultHandler {
+    pub fn new() -> Self {
+        Self {
+            format_config: ResultFormatConfig::default(),
+        }
+    }
+    
+    pub fn agent_to_script(&self, agent_output: AgentOutput) -> Result<ScriptValue> {
+        let mut result = ScriptTable::new();
+        
+        result.insert("content".to_string(), ScriptValue::String(agent_output.content));
+        result.insert("success".to_string(), ScriptValue::Boolean(agent_output.success));
+        
+        if let Some(metadata) = agent_output.metadata {
+            result.insert("metadata".to_string(), self.convert_metadata_to_script(metadata)?);
+        }
+        
+        if let Some(error) = agent_output.error {
+            result.insert("error".to_string(), ScriptValue::String(error.to_string()));
+        }
+        
+        if let Some(session_id) = agent_output.session_id {
+            result.insert("session_id".to_string(), ScriptValue::String(session_id));
+        }
+        
+        Ok(ScriptValue::Table(result))
+    }
+    
+    fn convert_metadata_to_script(&self, metadata: HashMap<String, serde_json::Value>) -> Result<ScriptValue> {
+        let mut script_table = ScriptTable::new();
+        
+        for (key, value) in metadata {
+            let script_value = self.json_to_script_value(value)?;
+            script_table.insert(key, script_value);
+        }
+        
+        Ok(ScriptValue::Table(script_table))
+    }
+    
+    fn json_to_script_value(&self, value: serde_json::Value) -> Result<ScriptValue> {
+        match value {
+            serde_json::Value::String(s) => Ok(ScriptValue::String(s)),
+            serde_json::Value::Number(n) => {
+                if let Some(i) = n.as_i64() {
+                    Ok(ScriptValue::Integer(i))
+                } else if let Some(f) = n.as_f64() {
+                    Ok(ScriptValue::Number(f))
+                } else {
+                    Ok(ScriptValue::String(n.to_string()))
+                }
+            },
+            serde_json::Value::Bool(b) => Ok(ScriptValue::Boolean(b)),
+            serde_json::Value::Array(arr) => {
+                let script_array: Result<Vec<ScriptValue>, _> = arr.into_iter()
+                    .map(|v| self.json_to_script_value(v))
+                    .collect();
+                Ok(ScriptValue::Array(script_array?))
+            },
+            serde_json::Value::Object(obj) => {
+                let mut script_table = ScriptTable::new();
+                for (key, value) in obj {
+                    script_table.insert(key, self.json_to_script_value(value)?);
+                }
+                Ok(ScriptValue::Table(script_table))
+            },
+            serde_json::Value::Null => Ok(ScriptValue::Nil),
+        }
+    }
+}
+
+// Agent discovery from scripts
+pub trait AgentDiscovery {
+    async fn discover_agents(&self) -> Result<Vec<AgentMetadata>>;
+    async fn get_agent_info(&self, name: &str) -> Result<AgentInfo>;
+    async fn list_agent_templates(&self) -> Result<Vec<AgentTemplateInfo>>;
+}
+
+impl AgentDiscovery for AgentBridge {
+    async fn discover_agents(&self) -> Result<Vec<AgentMetadata>> {
+        self.agent_registry.list_available_agents().await
+    }
+    
+    async fn get_agent_info(&self, name: &str) -> Result<AgentInfo> {
+        let agent = self.agent_registry.get(name).await?;
+        
+        Ok(AgentInfo {
+            name: agent.name().to_string(),
+            description: agent.description().to_string(),
+            parameters: agent.expected_parameters(),
+            capabilities: agent.capabilities(),
+            examples: agent.usage_examples(),
+            tools: agent.available_tools(),
+            status: agent.status(),
+        })
+    }
+    
+    async fn list_agent_templates(&self) -> Result<Vec<AgentTemplateInfo>> {
+        // Get available templates from agent factory
+        let factory = self.agent_registry.get_factory().await?;
+        factory.list_templates().await
+    }
+}
+
+// Configuration for result formatting
+pub struct ResultFormatConfig {
+    pub include_metadata: bool,
+    pub include_timing: bool,
+    pub include_debug_info: bool,
+    pub max_content_length: Option<usize>,
+}
+
+impl Default for ResultFormatConfig {
+    fn default() -> Self {
+        Self {
+            include_metadata: true,
+            include_timing: false,
+            include_debug_info: false,
+            max_content_length: Some(10_000),
+        }
+    }
+}
+
+// Script callable wrapper for async agent functions
+pub struct ScriptCallable {
+    function: Box<dyn Fn(ScriptValue) -> Pin<Box<dyn Future<Output = Result<ScriptValue>> + Send>> + Send + Sync>,
+}
+
+impl ScriptCallable {
+    pub fn new<F, Fut>(f: F) -> Self 
+    where
+        F: Fn(ScriptValue) -> Fut + Send + Sync + 'static,
+        Fut: Future<Output = Result<ScriptValue>> + Send + 'static,
+    {
+        Self {
+            function: Box::new(move |params| Box::pin(f(params))),
+        }
+    }
+    
+    pub async fn call(&self, params: ScriptValue) -> Result<ScriptValue> {
+        (self.function)(params).await
+    }
+}
+```
+
+### 8. Agent Composition Patterns
 
 ```rust
 // llmspell-agents/src/composition.rs
@@ -1627,9 +2139,9 @@ impl Agent for HierarchicalComposition {
 }
 ```
 
-### 8. Agent Examples
+### 9. Agent Examples
 
-#### 8.1 Research Agent Configuration
+#### 9.1 Research Agent Configuration
 
 ```rust
 let research_agent_spec = AgentSpec {
@@ -1677,7 +2189,7 @@ let result = agent.process(AgentInput {
 }).await?;
 ```
 
-#### 8.2 Code Generation Agent with Composition
+#### 9.2 Code Generation Agent with Composition
 
 ```rust
 // Create a hierarchical code agent with specialized sub-agents
@@ -1720,7 +2232,7 @@ let code_agent = HierarchicalComposition {
 };
 ```
 
-#### 8.3 Data Processing Pipeline
+#### 9.3 Data Processing Pipeline
 
 ```rust
 // Create a pipeline of agents for data processing
@@ -1761,11 +2273,833 @@ let data_pipeline = PipelineComposition {
 };
 ```
 
-### 9. Implementation Checklist
+### 10. Basic Workflow Patterns
+
+Basic workflow patterns that leverage current Phase 3 infrastructure without requiring persistent state, hooks, or sessions from later phases.
+
+#### 10.1 Basic Workflow Traits
+
+```rust
+// llmspell-workflows/src/basic.rs
+#[async_trait]
+pub trait BasicWorkflow: Send + Sync {
+    /// Unique identifier for the workflow
+    fn id(&self) -> &str;
+    
+    /// Human-readable name
+    fn name(&self) -> &str;
+    
+    /// Execute workflow with current infrastructure
+    async fn execute(&self, input: WorkflowInput, context: &ExecutionContext) -> Result<WorkflowOutput>;
+    
+    /// Validate workflow configuration
+    fn validate(&self) -> Result<()>;
+}
+
+#[derive(Debug, Clone)]
+pub struct WorkflowInput {
+    pub initial_data: Value,
+    pub parameters: HashMap<String, Value>,
+}
+
+#[derive(Debug, Clone)]
+pub struct WorkflowOutput {
+    pub final_result: Value,
+    pub step_results: Vec<StepResult>,
+    pub execution_path: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct StepResult {
+    pub step_id: String,
+    pub result: Value,
+    pub status: StepStatus,
+    pub duration: Duration,
+}
+
+#[derive(Debug, Clone)]
+pub enum StepStatus {
+    Success,
+    Failed(String),
+    Skipped,
+}
+```
+
+#### 10.2 Basic Sequential Workflow
+
+```rust
+// Simple sequential execution using tools and agents
+pub struct BasicSequentialWorkflow {
+    id: String,
+    name: String,
+    steps: Vec<WorkflowStep>,
+    error_handling: BasicErrorStrategy,
+}
+
+#[derive(Debug, Clone)]
+pub struct WorkflowStep {
+    pub id: String,
+    pub step_type: StepType,
+    pub parameters: Value,
+}
+
+#[derive(Debug, Clone)]
+pub enum StepType {
+    Tool(String),              // Execute a tool
+    Agent(String),             // Execute an agent  
+    Transform(String),         // Data transformation
+}
+
+#[derive(Debug, Clone)]
+pub enum BasicErrorStrategy {
+    Fail,                      // Stop on first error
+    Continue,                  // Skip failed steps
+    Retry(usize),             // Retry failed steps
+}
+
+#[async_trait]
+impl BasicWorkflow for BasicSequentialWorkflow {
+    async fn execute(&self, input: WorkflowInput, context: &ExecutionContext) -> Result<WorkflowOutput> {
+        let mut current_data = input.initial_data;
+        let mut step_results = Vec::new();
+        let mut execution_path = Vec::new();
+        
+        for step in &self.steps {
+            execution_path.push(step.id.clone());
+            let start_time = Instant::now();
+            
+            let result = match &step.step_type {
+                StepType::Tool(tool_name) => {
+                    self.execute_tool(tool_name, &step.parameters, &current_data, context).await
+                }
+                StepType::Agent(agent_name) => {
+                    self.execute_agent(agent_name, &step.parameters, &current_data, context).await
+                }
+                StepType::Transform(transform_name) => {
+                    self.execute_transform(transform_name, &step.parameters, &current_data).await
+                }
+            };
+            
+            let duration = start_time.elapsed();
+            
+            match result {
+                Ok(value) => {
+                    current_data = value.clone();
+                    step_results.push(StepResult {
+                        step_id: step.id.clone(),
+                        result: value,
+                        status: StepStatus::Success,
+                        duration,
+                    });
+                }
+                Err(e) => {
+                    let error_msg = e.to_string();
+                    step_results.push(StepResult {
+                        step_id: step.id.clone(),
+                        result: Value::Null,
+                        status: StepStatus::Failed(error_msg.clone()),
+                        duration,
+                    });
+                    
+                    match &self.error_handling {
+                        BasicErrorStrategy::Fail => return Err(e),
+                        BasicErrorStrategy::Continue => continue,
+                        BasicErrorStrategy::Retry(attempts) => {
+                            // Implement basic retry logic
+                            for attempt in 1..=*attempts {
+                                tokio::time::sleep(Duration::from_millis(100 * attempt as u64)).await;
+                                if let Ok(retry_result) = self.retry_step(step, &current_data, context).await {
+                                    current_data = retry_result;
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        Ok(WorkflowOutput {
+            final_result: current_data,
+            step_results,
+            execution_path,
+        })
+    }
+}
+```
+
+#### 10.3 Basic Conditional Workflow
+
+```rust
+// Simple conditional logic using memory-based conditions
+pub struct BasicConditionalWorkflow {
+    id: String,
+    name: String,
+    initial_step: String,
+    steps: HashMap<String, ConditionalStep>,
+    conditions: HashMap<String, BasicCondition>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ConditionalStep {
+    pub id: String,
+    pub step_type: StepType,
+    pub parameters: Value,
+    pub branches: Vec<ConditionalBranch>,
+}
+
+#[derive(Debug, Clone)]
+pub struct ConditionalBranch {
+    pub condition: String,
+    pub next_step: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+pub enum BasicCondition {
+    ValueEquals(String, Value),          // data.field == value
+    ValueGreaterThan(String, f64),       // data.field > value
+    ValueContains(String, String),       // data.field contains string
+    ResultSuccess,                       // previous step succeeded
+    Custom(String),                      // custom condition function
+}
+
+impl BasicCondition {
+    pub fn evaluate(&self, data: &Value, step_result: &StepResult) -> Result<bool> {
+        match self {
+            BasicCondition::ValueEquals(path, expected) => {
+                let actual = self.extract_value(data, path)?;
+                Ok(actual == *expected)
+            }
+            BasicCondition::ValueGreaterThan(path, threshold) => {
+                let actual = self.extract_value(data, path)?;
+                if let Some(num) = actual.as_f64() {
+                    Ok(num > *threshold)
+                } else {
+                    Ok(false)
+                }
+            }
+            BasicCondition::ValueContains(path, substring) => {
+                let actual = self.extract_value(data, path)?;
+                if let Some(text) = actual.as_str() {
+                    Ok(text.contains(substring))
+                } else {
+                    Ok(false)
+                }
+            }
+            BasicCondition::ResultSuccess => {
+                Ok(matches!(step_result.status, StepStatus::Success))
+            }
+            BasicCondition::Custom(func_name) => {
+                // Custom condition evaluation
+                self.evaluate_custom_condition(func_name, data, step_result)
+            }
+        }
+    }
+}
+```
+
+#### 10.4 Basic Loop Workflow
+
+```rust
+// Simple iteration patterns without persistent state
+pub struct BasicLoopWorkflow {
+    id: String,
+    name: String,
+    iterator: BasicIterator,
+    body_steps: Vec<WorkflowStep>,
+    max_iterations: usize,
+    break_condition: Option<BasicCondition>,
+}
+
+#[derive(Debug, Clone)]
+pub enum BasicIterator {
+    Collection(Vec<Value>),              // Iterate over in-memory collection
+    Range(usize, usize),                // Iterate over numeric range
+    WhileCondition(BasicCondition),     // While condition is true
+}
+
+#[async_trait]
+impl BasicWorkflow for BasicLoopWorkflow {
+    async fn execute(&self, input: WorkflowInput, context: &ExecutionContext) -> Result<WorkflowOutput> {
+        let mut iterations = 0;
+        let mut all_results = Vec::new();
+        let mut execution_path = Vec::new();
+        
+        loop {
+            // Check max iterations
+            if iterations >= self.max_iterations {
+                break;
+            }
+            
+            // Get next item
+            let (should_continue, item) = match &self.iterator {
+                BasicIterator::Collection(items) => {
+                    if iterations < items.len() {
+                        (true, items[iterations].clone())
+                    } else {
+                        (false, Value::Null)
+                    }
+                }
+                BasicIterator::Range(start, end) => {
+                    let current = start + iterations;
+                    if current < *end {
+                        (true, Value::Number(current.into()))
+                    } else {
+                        (false, Value::Null)
+                    }
+                }
+                BasicIterator::WhileCondition(condition) => {
+                    // Evaluate condition with current context
+                    if iterations == 0 {
+                        (true, input.initial_data.clone())
+                    } else {
+                        let dummy_result = StepResult {
+                            step_id: "loop_check".to_string(),
+                            result: Value::Null,
+                            status: StepStatus::Success,
+                            duration: Duration::ZERO,
+                        };
+                        let should_continue = condition.evaluate(&input.initial_data, &dummy_result)?;
+                        (should_continue, input.initial_data.clone())
+                    }
+                }
+            };
+            
+            if !should_continue {
+                break;
+            }
+            
+            // Check break condition
+            if let Some(break_cond) = &self.break_condition {
+                let dummy_result = StepResult {
+                    step_id: "break_check".to_string(),
+                    result: Value::Null,
+                    status: StepStatus::Success,
+                    duration: Duration::ZERO,
+                };
+                if break_cond.evaluate(&item, &dummy_result)? {
+                    break;
+                }
+            }
+            
+            // Execute body steps with current item
+            let mut current_data = item;
+            for step in &self.body_steps {
+                execution_path.push(format!("{}_{}", step.id, iterations));
+                
+                let result = match &step.step_type {
+                    StepType::Tool(tool_name) => {
+                        self.execute_tool(tool_name, &step.parameters, &current_data, context).await?
+                    }
+                    StepType::Agent(agent_name) => {
+                        self.execute_agent(agent_name, &step.parameters, &current_data, context).await?
+                    }
+                    StepType::Transform(transform_name) => {
+                        self.execute_transform(transform_name, &step.parameters, &current_data).await?
+                    }
+                };
+                
+                current_data = result;
+            }
+            
+            all_results.push(current_data);
+            iterations += 1;
+        }
+        
+        Ok(WorkflowOutput {
+            final_result: Value::Array(all_results),
+            step_results: vec![], // Simplified for basic implementation
+            execution_path,
+        })
+    }
+}
+```
+
+#### 10.5 Workflow-Agent Integration
+
+```rust
+// Agents can execute workflows
+pub struct WorkflowAgent {
+    id: String,
+    name: String,
+    workflow_registry: Arc<BasicWorkflowRegistry>,
+    default_workflow: Option<String>,
+}
+
+#[async_trait]
+impl Agent for WorkflowAgent {
+    async fn process(&self, input: AgentInput) -> Result<AgentOutput> {
+        // Determine which workflow to use
+        let workflow_name = input.parameters.get("workflow")
+            .and_then(|v| v.as_str())
+            .or(self.default_workflow.as_deref())
+            .ok_or_else(|| LLMSpellError::InvalidInput("No workflow specified".to_string()))?;
+        
+        // Get workflow from registry
+        let workflow = self.workflow_registry.get(workflow_name)
+            .ok_or_else(|| LLMSpellError::NotFound(format!("Workflow: {}", workflow_name)))?;
+        
+        // Execute workflow
+        let workflow_input = WorkflowInput {
+            initial_data: input.message.into(),
+            parameters: input.parameters,
+        };
+        
+        let result = workflow.execute(workflow_input, &input.context).await?;
+        
+        Ok(AgentOutput {
+            content: result.final_result.to_string(),
+            metadata: Some(json!({
+                "workflow_name": workflow_name,
+                "execution_path": result.execution_path,
+                "step_count": result.step_results.len()
+            })),
+            context: input.context,
+        })
+    }
+}
+
+// Workflows can use agents as steps
+impl BasicSequentialWorkflow {
+    async fn execute_agent(
+        &self,
+        agent_name: &str,
+        parameters: &Value,
+        data: &Value,
+        context: &ExecutionContext,
+    ) -> Result<Value> {
+        // Get agent from context
+        let agent = context.agent_locator.find(agent_name)
+            .ok_or_else(|| LLMSpellError::NotFound(format!("Agent: {}", agent_name)))?;
+        
+        // Prepare agent input
+        let agent_input = AgentInput {
+            message: data.to_string(),
+            parameters: parameters.as_object().unwrap_or(&serde_json::Map::new()).clone(),
+            context: context.clone(),
+        };
+        
+        // Execute agent
+        let result = agent.process(agent_input).await?;
+        
+        // Return result as JSON value
+        Ok(json!({
+            "content": result.content,
+            "metadata": result.metadata
+        }))
+    }
+}
+```
+
+#### 10.6 Basic Workflow Registry
+
+```rust
+// Simple in-memory workflow registry for Phase 3
+pub struct BasicWorkflowRegistry {
+    workflows: HashMap<String, Box<dyn BasicWorkflow>>,
+}
+
+impl BasicWorkflowRegistry {
+    pub fn new() -> Self {
+        Self {
+            workflows: HashMap::new(),
+        }
+    }
+    
+    pub fn register<W: BasicWorkflow + 'static>(&mut self, workflow: W) {
+        self.workflows.insert(workflow.id().to_string(), Box::new(workflow));
+    }
+    
+    pub fn get(&self, id: &str) -> Option<&dyn BasicWorkflow> {
+        self.workflows.get(id).map(|w| w.as_ref())
+    }
+    
+    pub fn list(&self) -> Vec<String> {
+        self.workflows.keys().cloned().collect()
+    }
+    
+    pub fn remove(&mut self, id: &str) -> Option<Box<dyn BasicWorkflow>> {
+        self.workflows.remove(id)
+    }
+}
+```
+
+### 11. Lua Agent Examples
+
+#### 10.1 Basic Agent Calling
+
+```lua
+-- examples/agents-basic.lua
+local llmspell = require('llmspell')
+
+-- Discover available agents
+local agents = llmspell.agents.discover()
+for _, agent in ipairs(agents) do
+    print(string.format("Agent: %s - %s", agent.name, agent.description))
+end
+
+-- Create a research agent
+local research_agent = llmspell.agents.create({
+    name = "research_assistant",
+    template = "research",
+    tools = {"web_search", "web_scraper", "text_summarizer"},
+    llm_provider = {
+        provider = "openai",
+        model = "gpt-4",
+        temperature = 0.7
+    }
+})
+
+-- Use the agent
+local result = research_agent:process({
+    message = "Research the latest developments in quantum computing",
+    context = {
+        depth = "comprehensive",
+        sources = {"academic", "industry"}
+    }
+})
+
+print("Research Result:", result.content)
+if result.metadata then
+    print("Sources found:", #result.metadata.sources)
+end
+
+-- Get agent information
+local agent_info = llmspell.agents.get_info("research_assistant")
+print("Agent capabilities:", table.concat(agent_info.capabilities, ", "))
+print("Available tools:", table.concat(agent_info.tools, ", "))
+```
+
+#### 10.2 Agent Orchestration
+
+```lua
+-- examples/agents-composition.lua
+local llmspell = require('llmspell')
+
+-- Create multiple specialized agents
+local research_agent = llmspell.agents.create({
+    name = "researcher",
+    template = "research",
+    tools = {"web_search", "web_scraper"}
+})
+
+local analysis_agent = llmspell.agents.create({
+    name = "analyzer",
+    template = "analysis",
+    tools = {"text_summarizer", "sentiment_analyzer"}
+})
+
+local writing_agent = llmspell.agents.create({
+    name = "writer",
+    template = "writing",
+    tools = {"template_engine", "text_manipulator"}
+})
+
+-- Orchestrate agents in sequence
+local function research_and_write(topic)
+    -- Step 1: Research
+    local research_result = research_agent:process({
+        message = "Research information about " .. topic
+    })
+    
+    if not research_result.success then
+        error("Research failed: " .. (research_result.error or "Unknown error"))
+    end
+    
+    -- Step 2: Analyze
+    local analysis_result = analysis_agent:process({
+        message = "Analyze this research data",
+        context = {
+            data = research_result.content
+        }
+    })
+    
+    if not analysis_result.success then
+        error("Analysis failed: " .. (analysis_result.error or "Unknown error"))
+    end
+    
+    -- Step 3: Write
+    local writing_result = writing_agent:process({
+        message = "Write a comprehensive report",
+        context = {
+            research = research_result.content,
+            analysis = analysis_result.content,
+            format = "markdown"
+        }
+    })
+    
+    return writing_result
+end
+
+-- Execute the orchestrated workflow
+local report = research_and_write("artificial intelligence in healthcare")
+print("Generated Report:", report.content)
+
+-- Error handling example
+local function safe_agent_call(agent, input)
+    local success, result = pcall(function()
+        return agent:process(input)
+    end)
+    
+    if not success then
+        print("Agent call failed:", result)
+        return nil
+    end
+    
+    if not result.success then
+        print("Agent execution failed:", result.error)
+        return nil
+    end
+    
+    return result
+end
+```
+
+#### 10.3 Agent Factory Usage
+
+```lua
+-- examples/agents-factory.lua
+local llmspell = require('llmspell')
+
+-- Get the agent factory
+local factory = llmspell.agents.factory()
+
+-- List available templates
+local templates = factory:list_templates()
+for _, template in ipairs(templates) do
+    print(string.format("Template: %s - %s", template.name, template.description))
+    print("  Required tools:", table.concat(template.required_tools, ", "))
+end
+
+-- Create agents using different templates
+local agents = {
+    researcher = factory:create({
+        template = "research",
+        tools = {"web_search", "web_scraper", "url_analyzer"},
+        config = {
+            max_iterations = 10,
+            timeout = 300
+        }
+    }),
+    
+    coder = factory:create({
+        template = "coding",
+        tools = {"file_operations", "text_manipulator", "template_engine"},
+        config = {
+            language = "rust",
+            style = "clean"
+        }
+    }),
+    
+    assistant = factory:create({
+        template = "conversation",
+        tools = {"calculator", "datetime_handler", "uuid_generator"},
+        config = {
+            personality = "helpful",
+            response_length = "medium"
+        }
+    })
+}
+
+-- Use the agents
+local code_result = agents.coder:process({
+    message = "Create a simple HTTP server in Rust",
+    context = {
+        framework = "tokio",
+        features = {"json", "cors"}
+    }
+})
+
+print("Generated Code:", code_result.content)
+
+-- Agent composition with factory
+local composed_agent = factory:compose({
+    agents = {"researcher", "coder"},
+    pattern = "sequential",
+    coordination = {
+        pass_context = true,
+        aggregate_results = true
+    }
+})
+
+local composed_result = composed_agent:process({
+    message = "Research Rust web frameworks and create a sample server"
+})
+
+print("Composed Result:", composed_result.content)
+```
+
+#### 10.4 Integration with Tools
+
+```lua
+-- examples/agents-tool-integration.lua
+local llmspell = require('llmspell')
+
+-- Create an agent that can use tools directly
+local tool_agent = llmspell.agents.create({
+    name = "tool_orchestrator",
+    template = "tool_orchestrator",
+    tools = {
+        "calculator", "web_search", "file_operations", 
+        "text_manipulator", "json_processor"
+    }
+})
+
+-- Agent can call tools as part of its reasoning
+local calculation_result = tool_agent:process({
+    message = "Calculate the compound interest for $10,000 at 5% annually for 10 years, then search for current investment advice",
+    context = {
+        use_tools = true,
+        steps = {
+            "calculate_compound_interest",
+            "search_investment_advice",
+            "summarize_findings"
+        }
+    }
+})
+
+print("Tool Integration Result:", calculation_result.content)
+
+-- Direct tool access for comparison
+local calc_tool = llmspell.tools.calculator
+local direct_result = calc_tool({
+    operation = "evaluate",
+    input = "10000 * (1 + 0.05)^10"
+})
+
+print("Direct Tool Result:", direct_result.result)
+
+-- Agent can also be used as a tool by other agents
+local meta_agent = llmspell.agents.create({
+    name = "meta_orchestrator",
+    template = "orchestrator"
+})
+
+-- Register the tool_agent as a tool for the meta_agent
+meta_agent:register_tool("calculation_assistant", tool_agent)
+
+local meta_result = meta_agent:process({
+    message = "Use the calculation assistant to analyze multiple investment scenarios"
+})
+
+print("Meta Agent Result:", meta_result.content)
+```
+
+#### 10.5 Error Handling and Debugging
+
+```lua
+-- examples/agents-error-handling.lua
+local llmspell = require('llmspell')
+
+-- Enable debug mode for detailed logging
+llmspell.config.debug = true
+llmspell.config.log_level = "debug"
+
+-- Create agent with error handling
+local function create_robust_agent(template_name, tools)
+    local success, agent = pcall(function()
+        return llmspell.agents.create({
+            name = template_name .. "_agent",
+            template = template_name,
+            tools = tools,
+            config = {
+                timeout = 30,
+                max_retries = 3,
+                error_handling = "graceful"
+            }
+        })
+    end)
+    
+    if not success then
+        print("Failed to create agent:", agent)
+        return nil
+    end
+    
+    return agent
+end
+
+-- Robust agent processing with retry logic
+local function robust_process(agent, input, max_attempts)
+    max_attempts = max_attempts or 3
+    
+    for attempt = 1, max_attempts do
+        print(string.format("Attempt %d/%d", attempt, max_attempts))
+        
+        local success, result = pcall(function()
+            return agent:process(input)
+        end)
+        
+        if success and result.success then
+            return result
+        end
+        
+        if success then
+            print("Agent execution failed:", result.error)
+        else
+            print("Agent call failed:", result)
+        end
+        
+        if attempt < max_attempts then
+            print("Retrying in 1 second...")
+            os.execute("sleep 1")
+        end
+    end
+    
+    return {
+        success = false,
+        error = "Max retry attempts exceeded"
+    }
+end
+
+-- Usage example
+local research_agent = create_robust_agent("research", {"web_search"})
+if research_agent then
+    local result = robust_process(research_agent, {
+        message = "Research quantum computing developments"
+    })
+    
+    if result.success then
+        print("Success:", result.content)
+    else
+        print("Failed after all retries:", result.error)
+    end
+end
+
+-- Performance monitoring
+local function monitor_agent_performance(agent, input)
+    local start_time = os.clock()
+    
+    local result = agent:process(input)
+    
+    local end_time = os.clock()
+    local duration = end_time - start_time
+    
+    print(string.format("Agent execution took %.2f seconds", duration))
+    
+    if result.metadata and result.metadata.performance then
+        print("LLM calls:", result.metadata.performance.llm_calls)
+        print("Tool calls:", result.metadata.performance.tool_calls)
+        print("Memory usage:", result.metadata.performance.memory_mb, "MB")
+    end
+    
+    return result
+end
+```
+
+### 11. Implementation Checklist
 
 **Week 15 Tasks**:
 - [ ] Implement Agent Factory pattern with builders
 - [ ] Create Agent Registry with persistence
+- [ ] Implement BaseAgent tool integration infrastructure
+- [ ] Create tool discovery and registration mechanisms
+- [ ] Build agent-as-tool wrapping support
+- [ ] Add tool composition patterns
+- [ ] Integrate with existing 33+ tool ecosystem
+- [ ] Implement script-to-agent integration bridge
+- [ ] Register agents with llmspell-bridge
+- [ ] Create parameter conversion utilities
+- [ ] Implement agent discovery from scripts
 - [ ] Build Discovery Service with providers
 - [ ] Implement Agent Lifecycle Management
 - [ ] Create Agent State Machine
@@ -1773,9 +3107,10 @@ let data_pipeline = PipelineComposition {
 
 **Week 16 Tasks**:
 - [ ] Implement Enhanced ExecutionContext
-- [ ] Build Agent Communication protocols
 - [ ] Create Agent Composition patterns
 - [ ] Develop example agent configurations
+- [ ] Create Lua agent calling examples
+- [ ] Update existing Lua examples with agent integration
 - [ ] Integration testing with all 41+ tools
 - [ ] Performance benchmarking
 

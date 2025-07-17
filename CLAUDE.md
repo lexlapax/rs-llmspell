@@ -6,22 +6,32 @@ rs-llmspell: **Scriptable LLM interactions** via Lua, JavaScript - Cast scriptin
 ## Phase Status
 - ✅ Phase 0: Foundation Infrastructure (COMPLETE)
 - ✅ Phase 1: Core Execution Runtime (COMPLETE)
-- ✅ Phase 2: Self-Contained Tools Library (COMPLETE - 25 tools)
-- 🚀 **Phase 3: Tool Enhancement & Workflow Orchestration** (ACTIVE - Weeks 9-16)
-  - ✅ Phase 3.0: Critical Tool Fixes (Weeks 9-10) - COMPLETE 2025-07-12
-  - Phase 3.1: External Integration Tools (Weeks 11-12) - STARTING
-  - Phase 3.2: Security & Performance (Weeks 13-14)
-  - Phase 3.3: Workflow Orchestration (Weeks 15-16)
-- ⏳ Phase 4: Vector Storage and Search (Weeks 17-18)
-- ⏳ Phase 5+: Future phases...
+- ✅ Phase 2: Self-Contained Tools Library (COMPLETE - 26 tools)
+- 🚀 **Phase 3: Tool Enhancement & Agent Infrastructure** (ACTIVE - Weeks 9-16)
+  - ✅ Phase 3.0: Critical Tool Fixes (Weeks 9-10) - COMPLETE 2025-07-11
+  - ✅ Phase 3.1: External Integration Tools (Weeks 11-12) - COMPLETE 2025-07-16
+  - ✅ Phase 3.2: Security & Performance (Weeks 13-14) - COMPLETE 2025-07-17
+  - 🚧 **Phase 3.3: Agent Infrastructure & Basic Multi-Agent Coordination (Weeks 15-16) - IN PROGRESS**
+- ⏳ Phase 4: Hook and Event System (Weeks 17-18)
+- ⏳ Phase 5: Persistent State Management (Weeks 19-20)
+- ⏳ Phase 6: Session and Artifact Management (Weeks 21-22)
+- ⏳ Phase 7: Vector Storage (Weeks 23-24)
+- ⏳ Phase 8: Advanced Workflow Features (Weeks 25-26)
+- ⏳ Phase 9+: Future phases...
 
 ## Current Status
 
-🚀 **Phase 3.1 - External Integration Tools**: STARTING (Phase 3.0 Complete 2025-07-12)
-- **Completed**: Phases 0, 1, 2, 3.0 ✅ (26 standardized tools with consistent interfaces)
-- **Current**: Phase 3.1 - External Integration Tools (16 new tools)
-- **Next Task**: Task 3.1.1 - WebSearchTool Enhancement
-- **Achievements**: 95% parameter consistency, 95% DRY compliance, security hardening complete
+🚧 **Phase 3.3 - Agent Infrastructure & Basic Multi-Agent Coordination**: IN PROGRESS
+- **Completed**: Phases 0, 1, 2, 3.0, 3.1, 3.2 ✅ (33+ standardized and secured tools)
+- **Current Focus**: Implementing agent infrastructure foundation
+- **Next Task**: Task 3.3.1 - Agent Factory Implementation
+- **Phase 3.3 Scope**: 
+  - Agent factory, registry, and lifecycle management
+  - BaseAgent tool integration for agent-tool composition
+  - Basic workflow patterns (Sequential, Conditional, Loop)
+  - Script-to-agent integration bridge
+  - Multi-agent coordination via workflows
+- **Achievements**: 95% parameter consistency, 95% DRY compliance, comprehensive security hardening, 33+ production-ready tools
 
 ## Key Commands
 
@@ -43,15 +53,27 @@ cargo test -p llmspell-tools          # Test tools crate
 cargo test -p llmspell-utils          # Test shared utilities
 cargo bench -p llmspell-tools         # Benchmark tool performance
 cargo test --all-features             # Test with all external integrations
+
+# Phase 3.3 Agent Development
+cargo test -p llmspell-agents         # Test agents crate (when created)
+cargo test -p llmspell-workflows      # Test workflows crate (when created)
+cargo run --example agent-basic       # Run basic agent example
+cargo run --example workflow-sequential # Run sequential workflow example
 ```
 
 ## Architecture Overview
 
-**Core-Bridge-Script Architecture**: BaseAgent → Tool → Workflow hierarchy with scriptable interfaces.
+**Core-Bridge-Script Architecture**: BaseAgent → Agent → Tool → Workflow hierarchy with full composition support.
 
 **Tech Stack**: `rig` (LLM providers), `mlua` (scripting), `sled`/`rocksdb` (storage), comprehensive testing.
 
-**Phase 3 Focus**: Standardize 25 existing tools, add 16 external integration tools, security hardening, workflow orchestration.
+**Phase 3.3 Agent Infrastructure Focus**:
+- **Agent Factory**: Flexible agent creation with configuration builders
+- **Agent Registry**: Centralized discovery and management
+- **BaseAgent Tool Integration**: Agents can discover and invoke tools
+- **Basic Workflows**: Sequential, Conditional, and Loop patterns for multi-agent coordination
+- **Script Bridge**: Lua/JavaScript access to agents and workflows
+- **Composition**: Agents as tools, workflows using agents, full bidirectional integration
 
 ## Quality Requirements
 
@@ -122,10 +144,12 @@ Three levels of quality validation are available:
 - Performance optimization (maintain 52,600x target)
 - Resource limit enforcement
 
-**Phase 3.3 (Weeks 15-16)**: Workflow Orchestration
-- Sequential, Conditional, Loop, Streaming workflows
-- State management and error handling
-- Integration with full tool library
+**Phase 3.3 (Weeks 15-16)**: Agent Infrastructure & Basic Multi-Agent Coordination ✅ STARTING
+- Agent Factory, Registry, Lifecycle Management
+- BaseAgent Tool Integration (agents can discover and use tools)
+- Basic Workflow Patterns (Sequential, Conditional, Loop)
+- Script-to-Agent Integration Bridge
+- Multi-agent coordination via workflows
 
 ## Phase 3 Breaking Changes
 
@@ -138,6 +162,35 @@ Three levels of quality validation are available:
 - **No Migration Tools**: Clear documentation and examples instead
 
 **Documentation**: See `/docs/in-progress/CHANGELOG_v0.3.0.md` for complete breaking changes.
+
+## Agent Implementation Guidelines (Phase 3.3)
+
+### Core Agent Architecture
+- **BaseAgent Trait**: Foundation trait that all components (Agent, Tool, Workflow) implement
+- **Agent Trait**: Extends BaseAgent with LLM-specific capabilities
+- **Tool Integration**: BaseAgent includes tool discovery and invocation methods
+- **Composition Pattern**: Agents can wrap tools, tools can wrap agents
+
+### Implementation Priorities
+1. **Agent Factory** (Task 3.3.1): Start with flexible creation patterns
+2. **Agent Registry** (Task 3.3.2): Enable discovery and management
+3. **Tool Integration** (Task 3.3.3): Connect agents to 33+ existing tools
+4. **Script Bridge** (Task 3.3.4): Enable Lua/JS access to agents
+5. **Basic Workflows** (Tasks 3.3.12-3.3.14): Implement multi-agent coordination
+
+### Key Design Principles
+- **ADK Alignment**: Follow Google ADK patterns for multi-agent coordination
+- **Tool Reuse**: Leverage all 33+ standardized tools from Phases 3.0-3.2
+- **Memory-Based State**: Phase 3.3 uses in-memory state (persistence in Phase 5)
+- **Script-First**: All agent capabilities must be accessible from Lua/JavaScript
+- **Composition Over Inheritance**: Prefer composition patterns for flexibility
+
+### Testing Requirements
+- **Agent Unit Tests**: Test factory, registry, lifecycle independently
+- **Tool Integration Tests**: Verify agents can invoke all 33+ tools
+- **Workflow Tests**: Test Sequential, Conditional, Loop patterns
+- **Script Integration Tests**: Verify Lua can create and invoke agents
+- **Performance**: <50ms agent creation, <10ms tool invocation overhead
 
 ## Testing Strategy
 

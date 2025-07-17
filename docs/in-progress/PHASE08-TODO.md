@@ -1,11 +1,11 @@
-# Phase 8: Workflow Orchestration - TODO List
+# Phase 8: Advanced Workflow Features - TODO List
 
-**Version**: 1.0  
-**Date**: January 2025  
+**Version**: 2.0  
+**Date**: July 2025  
 **Status**: Future Implementation  
-**Phase**: 8 (Workflow Orchestration)  
+**Phase**: 8 (Advanced Workflow Features)  
 **Timeline**: Weeks 25-26 (10 working days)  
-**Priority**: HIGH (Advanced Features)
+**Priority**: MEDIUM (Enterprise Features)
 **Arch-Document**: docs/technical/rs-llmspell-final-architecture.md
 **All-Phases-Document**: docs/in-progress/implementation-phases.md
 **Design-Document**: docs/in-progress/phase-08-design-doc-from-previous.md
@@ -16,62 +16,71 @@
 
 ## Overview
 
-**Goal**: Implement comprehensive workflow orchestration patterns that leverage all standardized tools and the complete infrastructure stack (agents, hooks, events, state, sessions).
+**Goal**: Enhance Phase 3.3 basic workflow patterns with enterprise-grade features leveraging the complete infrastructure stack.
 
-**Dependencies**: 
-- Phase 3: All 41+ tools standardized and secured
-- Phase 4: Agent Infrastructure (factory, registry, lifecycle)
-- Phase 5: Hook and Event System
-- Phase 6: Persistent State Management
-- Phase 7: Session and Artifact Management
+**Foundation**: 
+- Phase 3.3: Basic workflow patterns (Sequential, Conditional, Loop) with memory-based state
+
+**Critical Dependencies**: 
+- Phase 4: Hook and Event System for workflow lifecycle integration
+- Phase 5: Persistent State Management for workflow state persistence
+- Phase 6: Session and Artifact Management for multi-session workflows
+- Phase 7: Vector Storage for workflow context and template search
 
 **Success Criteria:**
-- [ ] All workflow patterns functional with full infrastructure support
-- [ ] Hooks integrated for workflow lifecycle events
-- [ ] State persistence for workflow execution
-- [ ] Session context for multi-step workflows
-- [ ] Event emission for workflow monitoring
+- [ ] Phase 3.3 basic workflows enhanced with infrastructure integration
+- [ ] Workflow state persists across sessions (Phase 5 integration)
+- [ ] Workflow lifecycle hooks firing correctly (Phase 4 integration)
+- [ ] Session context preserved in workflows (Phase 6 integration)
+- [ ] Vector storage enables workflow context search (Phase 7 integration)
+- [ ] Advanced streaming and parallel patterns functional
+- [ ] Enterprise monitoring and observability operational
+- [ ] Distributed workflow execution capabilities
 
 ---
 
 ## Phase 8 Tasks
 
-### Task 8.1: Workflow Engine Architecture
+### Task 8.1: Enhanced Workflow Engine Architecture
 **Priority**: CRITICAL  
 **Estimated Time**: 16 hours  
 **Assignee**: Architecture Team Lead
 
-**Description**: Design and implement core workflow engine architecture with full infrastructure integration.
+**Description**: Enhance Phase 3.3 basic workflow engine with full infrastructure integration (hooks, state persistence, sessions, vector storage).
 
 **Acceptance Criteria:**
-- [ ] Workflow trait enhancements with lifecycle hooks
-- [ ] Execution engine with state persistence
-- [ ] Session-aware workflow context
-- [ ] Event system integration for monitoring
-- [ ] Agent infrastructure integration
+- [ ] AdvancedWorkflow trait extends Phase 3.3 BasicWorkflow
+- [ ] EnhancedExecutionContext includes all infrastructure services
+- [ ] Workflow lifecycle hooks integration (Phase 4)
+- [ ] State persistence framework (Phase 5)
+- [ ] Session-aware workflow context (Phase 6)
+- [ ] Vector storage integration (Phase 7)
+- [ ] Backward compatibility with Phase 3.3 basic workflows
 
 **Implementation Steps:**
-1. Enhance Workflow trait with lifecycle methods
-2. Design execution engine with hook points
-3. Implement state management integration
-4. Add session context support
-5. Integrate event emission
-6. Add workflow registry using agent infrastructure
-7. Document architecture with infrastructure usage
+1. Create AdvancedWorkflow trait extending BasicWorkflow from Phase 3.3
+2. Design EnhancedExecutionContext with all infrastructure services
+3. Implement hook integration points (Phase 4 dependency)
+4. Add state persistence framework (Phase 5 dependency)
+5. Integrate session management (Phase 6 dependency)
+6. Add vector storage for context search (Phase 7 dependency)
+7. Ensure backward compatibility with Phase 3.3 workflows
+8. Document migration path from basic to advanced workflows
 
 **Definition of Done:**
-- [ ] Architecture leverages all infrastructure
-- [ ] Hooks integrated at all lifecycle points
-- [ ] State persistence working
-- [ ] Session context available
-- [ ] Events emitted properly
+- [ ] AdvancedWorkflow trait operational and extends BasicWorkflow
+- [ ] All infrastructure phases integrated (4, 5, 6, 7)
+- [ ] Phase 3.3 workflows can be enhanced without breaking changes
+- [ ] Migration documentation complete
+- [ ] Full test coverage for infrastructure integration
+- [ ] Performance acceptable (<20% overhead vs basic workflows)
 
-### Task 8.2: Sequential Workflow Implementation
+### Task 8.2: Enhanced Sequential Workflow
 **Priority**: CRITICAL  
 **Estimated Time**: 20 hours  
 **Assignee**: Workflow Team
 
-**Description**: Implement SequentialWorkflow with full infrastructure support.
+**Description**: Enhance Phase 3.3 BasicSequentialWorkflow with full infrastructure support (state persistence, hooks, sessions).
 
 **Acceptance Criteria:**
 - [ ] Step definition with agent registry integration

@@ -175,9 +175,9 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 
 ---
 
-### **Phase 3: Tool Enhancement & Workflow Orchestration (Weeks 9-16)**
+### **Phase 3: Tool Enhancement & Agent Infrastructure (Weeks 9-16)**
 
-**Goal**: Standardize tools, add external integrations, and implement workflow orchestration  
+**Goal**: Standardize tools, add external integrations, and implement agent infrastructure with basic multi-agent coordination  
 **Priority**: HIGH (MVP Completion)
 **Duration**: 8 weeks (expanded from original 2 weeks)
 
@@ -226,23 +226,37 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 - [ ] Performance maintained at 52,600x target
 - [ ] Security test coverage >95%
 
-#### **Phase 3.3: Agent Infrastructure (Weeks 15-16)**
-**Goal**: Implement advanced agent infrastructure and capabilities
+#### **Phase 3.3: Agent Infrastructure & Basic Workflows (Weeks 15-16)**
+**Goal**: Implement agent infrastructure and basic multi-agent coordination patterns
 
 **Scope**:
 - Enhanced agent lifecycle management
-- Agent communication protocols
 - Agent registry and discovery
-- Capability negotiation framework
+- BaseAgent tool integration infrastructure
+- Script-to-agent integration bridge
+- Agent-as-tool wrapping support
+- Tool composition patterns
 - Agent composition patterns
+- **Basic Workflow Patterns** (Sequential, Conditional, Loop)
+- **Workflow-Agent Integration**
+- Lua agent examples and documentation
 - Multi-agent coordination primitives
 
 **Success Criteria**:
 - [ ] Agent lifecycle hooks implemented
-- [ ] Inter-agent communication working
 - [ ] Agent registry and discovery functional
-- [ ] Capability negotiation protocol defined
+- [ ] BaseAgent tool integration functional
+- [ ] Agents can discover and invoke tools from 33+ tool ecosystem
+- [ ] Agent-as-tool wrapping works seamlessly
+- [ ] Tool composition patterns demonstrated
 - [ ] Agent composition patterns demonstrated
+- [ ] **Basic workflow patterns functional** (Sequential, Conditional, Loop)
+- [ ] **Workflow-agent integration operational**
+- [ ] **Multi-agent coordination via workflows demonstrated**
+- [ ] Agents accessible from scripts via bridges
+- [ ] Script-to-agent calling mechanism functional
+- [ ] Lua agent examples working and documented
+- [ ] Agent discovery from scripts operational
 
 **Testing Requirements**:
 - Tool standardization validation tests
@@ -380,35 +394,47 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 
 ---
 
-### **Phase 8: Workflow Orchestration (Weeks 25-26)**
+### **Phase 8: Advanced Workflow Features (Weeks 25-26)**
 
-**Goal**: Implement workflow patterns leveraging full agent and tool infrastructure
+**Goal**: Enhance basic workflows with enterprise-grade features leveraging full infrastructure
 **Priority**: MEDIUM (Advanced Orchestration)
-**Dependencies**: Requires Phase 7 Vector Storage for workflow context
+**Dependencies**: Requires Phase 7 Vector Storage and all infrastructure phases
 
 **Components**:
-- `SequentialWorkflow` for step-by-step execution
-- `ConditionalWorkflow` for branching logic
-- `LoopWorkflow` for iterative processes
-- `StreamingWorkflow` for real-time data processing
-- Workflow state management with persistence
-- Integration with agent infrastructure
-- Examples using all 41+ tools
+- **Advanced Workflow Features**:
+  - Workflow state persistence integration (builds on Phase 5 State Management)
+  - Hook/event integration for workflow lifecycle (builds on Phase 4 Hooks)
+  - Session-aware workflow context (builds on Phase 6 Sessions)
+  - Vector storage for workflow context and templates
+- **Advanced Workflow Patterns**:
+  - `StreamingWorkflow` for real-time data processing
+  - `ParallelWorkflow` with complex synchronization
+  - Advanced error recovery and rollback mechanisms
+  - Workflow template marketplace and sharing
+- **Enterprise Features**:
+  - Workflow monitoring and observability
+  - Performance optimization and caching
+  - Distributed workflow execution
+  - Integration with external workflow engines
 
 **Success Criteria**:
-- [ ] All workflow patterns functional
-- [ ] State passing between steps working
-- [ ] Error recovery mechanisms in place
-- [ ] Integration with full tool library verified
-- [ ] Performance benchmarks met
-- [ ] Workflow persistence and recovery working
+- [ ] Workflow state persists across sessions (Phase 5 integration)
+- [ ] Workflow lifecycle hooks firing correctly (Phase 4 integration)
+- [ ] Session context preserved in workflows (Phase 6 integration)
+- [ ] Vector storage enables workflow context search (Phase 7 integration)
+- [ ] Advanced streaming and parallel patterns functional
+- [ ] Workflow monitoring and observability operational
+- [ ] Performance optimization delivers measurable improvements
+- [ ] Enterprise-grade error recovery mechanisms working
 
 **Testing Requirements**:
-- Workflow pattern unit tests
-- State management integration tests
-- Error recovery validation
-- Performance benchmarking
-- Workflow persistence tests
+- Advanced workflow pattern unit tests
+- Infrastructure integration tests (state, hooks, sessions, vector storage)
+- Complex error recovery validation
+- Performance benchmarking and optimization validation
+- Workflow persistence and session integration tests
+- Distributed workflow execution tests
+- Workflow template marketplace validation
 
 ---
 

@@ -1,28 +1,49 @@
-# Phase 8: Workflow Orchestration Design Document
+# Phase 8: Advanced Workflow Features Design Document
 
-**Version**: 1.0  
-**Date**: January 2025  
-**Status**: Design Document (Extracted from Phase 3.3)  
+**Version**: 2.0  
+**Date**: July 2025  
+**Status**: Design Document (Updated from Basic Workflows)  
 **Timeline**: Weeks 25-26  
 
-> **📋 Note**: This document was extracted from the original Phase 3.3 design in phase-03-design-doc.md and updated to reflect Phase 8 implementation requirements.
+> **📋 Note**: This document builds on the basic workflow patterns implemented in Phase 3.3 and focuses on enterprise-grade workflow features that leverage the complete infrastructure stack.
 
 ---
 
 ## Overview
 
-Phase 8 implements comprehensive workflow orchestration patterns that leverage all 41+ standardized and secured tools from previous phases. This phase provides the foundation for complex multi-step operations, conditional logic, iterative processing, and parallel execution patterns.
+Phase 8 enhances the basic workflow patterns from Phase 3.3 with enterprise-grade features including persistent state management, hook/event integration, advanced streaming patterns, and distributed execution capabilities.
 
 ## Goal
 
-Implement workflow patterns leveraging full agent and tool infrastructure with persistent state management and integration with vector storage for workflow context.
+Transform basic workflows into enterprise-grade workflow orchestration with full infrastructure integration: persistent state (Phase 5), hooks/events (Phase 4), sessions (Phase 6), and vector storage (Phase 7).
+
+## Phase 3.3 Foundation
+
+**What Phase 3.3 Delivered**:
+- Basic Sequential, Conditional, and Loop workflows
+- Memory-based state management
+- Tool and agent integration
+- Simple error handling
+- Basic workflow registry
+
+**What Phase 8 Adds**:
+- Persistent state across sessions
+- Hook/event lifecycle integration
+- Advanced streaming and parallel patterns
+- Distributed workflow execution
+- Enterprise monitoring and observability
+- Workflow template marketplace
 
 ## Dependencies
 
-- **Phase 7**: Vector Storage for workflow context
-- **Phase 6**: Session Management for workflow persistence
-- **Phase 5**: Persistent State Management
-- **Phase 4**: Hook System for workflow events
+**Critical Dependencies**:
+- **Phase 3.3**: Basic workflow patterns (Sequential, Conditional, Loop)
+- **Phase 4**: Hook System for advanced workflow lifecycle events
+- **Phase 5**: Persistent State Management for workflow state persistence
+- **Phase 6**: Session Management for multi-session workflow execution
+- **Phase 7**: Vector Storage for workflow context and template search
+
+**Foundation Dependencies**:
 - **Phase 3**: Complete tool standardization and agent infrastructure
 - **Phase 2**: Self-contained tools library
 - **Phase 1**: Core execution runtime
@@ -30,23 +51,47 @@ Implement workflow patterns leveraging full agent and tool infrastructure with p
 
 ---
 
-## 1. Workflow Trait System
+## 1. Enhanced Workflow Trait System
+
+### 1.1 Advanced Workflow Trait (Built on Phase 3.3 BasicWorkflow)
 
 ```rust
-// llmspell-workflows/src/traits.rs
+// llmspell-workflows/src/advanced.rs
+// Extends the BasicWorkflow from Phase 3.3 with enterprise features
+use crate::basic::BasicWorkflow; // From Phase 3.3
+
 #[async_trait]
-pub trait Workflow: Send + Sync {
-    /// Unique identifier for the workflow
-    fn id(&self) -> &str;
+pub trait AdvancedWorkflow: BasicWorkflow + Send + Sync {
+    /// Execute with full infrastructure integration
+    async fn execute_with_infrastructure(&self, 
+        input: WorkflowInput, 
+        context: EnhancedExecutionContext
+    ) -> Result<AdvancedWorkflowOutput>;
     
-    /// Human-readable name
-    fn name(&self) -> &str;
+    /// Lifecycle hooks integration (Phase 4 dependency)
+    async fn on_start(&self, context: &HookContext) -> Result<()> { Ok(()) }
+    async fn on_step_start(&self, step_id: &str, context: &HookContext) -> Result<()> { Ok(()) }
+    async fn on_step_end(&self, step_id: &str, result: &StepResult, context: &HookContext) -> Result<()> { Ok(()) }
+    async fn on_complete(&self, output: &AdvancedWorkflowOutput, context: &HookContext) -> Result<()> { Ok(()) }
+    async fn on_error(&self, error: &WorkflowError, context: &HookContext) -> Result<()> { Ok(()) }
     
-    /// Workflow metadata
-    fn metadata(&self) -> &WorkflowMetadata;
+    /// State persistence integration (Phase 5 dependency)
+    async fn save_state(&self, state: &WorkflowState, storage: &dyn StateStorage) -> Result<()>;
+    async fn load_state(&self, workflow_id: &str, storage: &dyn StateStorage) -> Result<Option<WorkflowState>>;
     
-    /// Execute the workflow
-    async fn execute(&self, input: WorkflowInput, context: ExecutionContext) -> Result<WorkflowOutput>;
+    /// Session integration (Phase 6 dependency)
+    fn supports_session_persistence(&self) -> bool { true }
+    async fn resume_from_session(&self, session_id: &str, storage: &dyn SessionStorage) -> Result<Option<WorkflowState>>;
+    
+    /// Vector storage integration for context (Phase 7 dependency)
+    async fn get_context_embeddings(&self, input: &WorkflowInput) -> Result<Vec<f32>>;
+    async fn find_similar_executions(&self, context: &VectorStorage) -> Result<Vec<WorkflowExecution>>;
+    
+    /// Basic execution (delegates to Phase 3.3 BasicWorkflow)
+    async fn execute(&self, input: WorkflowInput, context: ExecutionContext) -> Result<WorkflowOutput> {
+        // Default implementation delegates to basic workflow
+        self.execute_basic(input, &context).await
+    }
     
     /// Validate workflow configuration
     fn validate(&self) -> Result<()>;
@@ -80,9 +125,221 @@ pub struct WorkflowOutput {
 }
 ```
 
+### 1.2 Enhanced Execution Context
+
+```rust
+// Enhanced context that includes all infrastructure services
+#[derive(Debug, Clone)]
+pub struct EnhancedExecutionContext {
+    // Basic context from Phase 3.3
+    pub basic_context: ExecutionContext,
+    
+    // Phase 4: Hook System integration
+    pub hook_dispatcher: Arc<HookDispatcher>,
+    pub event_bus: Arc<EventBus>,
+    
+    // Phase 5: Persistent State Management
+    pub state_storage: Arc<dyn StateStorage>,
+    pub state_manager: Arc<StateManager>,
+    
+    // Phase 6: Session Management
+    pub session_storage: Arc<dyn SessionStorage>,
+    pub session_manager: Arc<SessionManager>,
+    
+    // Phase 7: Vector Storage
+    pub vector_storage: Arc<dyn VectorStorage>,
+    pub embedding_service: Arc<dyn EmbeddingService>,
+}
+
+#[derive(Debug, Clone)]
+pub struct AdvancedWorkflowOutput {
+    // Basic output from Phase 3.3
+    pub basic_output: WorkflowOutput,
+    
+    // Enhanced features
+    pub state_snapshot: Option<WorkflowState>,
+    pub session_id: Option<String>,
+    pub execution_events: Vec<WorkflowEvent>,
+    pub performance_metrics: AdvancedMetrics,
+    pub similar_executions: Vec<WorkflowExecution>,
+}
+```
+
 ---
 
-## 2. Workflow Patterns
+## 2. Phase 3.3 to Phase 8 Evolution
+
+### 2.1 Enhanced Sequential Workflow (Built on BasicSequentialWorkflow)
+
+```rust
+// Extends BasicSequentialWorkflow from Phase 3.3
+pub struct EnhancedSequentialWorkflow {
+    // Embed the basic workflow
+    basic_workflow: BasicSequentialWorkflow,
+    
+    // Enhanced features
+    state_persistence: bool,
+    hook_points: Vec<HookPoint>,
+    session_aware: bool,
+    context_embedding: bool,
+}
+
+#[async_trait]
+impl AdvancedWorkflow for EnhancedSequentialWorkflow {
+    async fn execute_with_infrastructure(&self, 
+        input: WorkflowInput, 
+        context: EnhancedExecutionContext
+    ) -> Result<AdvancedWorkflowOutput> {
+        // Start workflow with hooks
+        context.hook_dispatcher.dispatch(HookEvent::WorkflowStart {
+            workflow_id: self.id(),
+            input: &input,
+        }).await?;
+        
+        // Load previous state if session-aware
+        let mut workflow_state = if self.session_aware {
+            self.load_state_from_session(&context).await?
+        } else {
+            WorkflowState::new(input.initial_data.clone())
+        };
+        
+        // Execute basic workflow with enhanced monitoring
+        let mut step_results = Vec::new();
+        
+        for (index, step) in self.basic_workflow.steps.iter().enumerate() {
+            // Pre-step hooks
+            context.hook_dispatcher.dispatch(HookEvent::StepStart {
+                workflow_id: self.id(),
+                step_id: &step.id,
+                step_index: index,
+            }).await?;
+            
+            // Execute step using basic workflow logic
+            let result = self.execute_step_enhanced(step, &workflow_state, &context).await?;
+            
+            // Update state with persistence
+            workflow_state.update(&step.id, &result)?;
+            if self.state_persistence {
+                context.state_storage.save_workflow_state(self.id(), &workflow_state).await?;
+            }
+            
+            // Post-step hooks
+            context.hook_dispatcher.dispatch(HookEvent::StepEnd {
+                workflow_id: self.id(),
+                step_id: &step.id,
+                result: &result,
+            }).await?;
+            
+            step_results.push(result);
+        }
+        
+        // Complete workflow with hooks
+        let basic_output = WorkflowOutput {
+            final_result: workflow_state.get_final_result()?,
+            step_results: step_results.into_iter().map(|r| (r.step_id.clone(), r)).collect(),
+            execution_path: vec![], // Simplified
+        };
+        
+        context.hook_dispatcher.dispatch(HookEvent::WorkflowComplete {
+            workflow_id: self.id(),
+            output: &basic_output,
+        }).await?;
+        
+        // Find similar executions using vector storage
+        let similar = if self.context_embedding {
+            self.find_similar_executions(&context.vector_storage).await?
+        } else {
+            vec![]
+        };
+        
+        Ok(AdvancedWorkflowOutput {
+            basic_output,
+            state_snapshot: Some(workflow_state),
+            session_id: context.session_manager.current_session_id(),
+            execution_events: context.event_bus.collect_events().await,
+            performance_metrics: AdvancedMetrics::default(),
+            similar_executions: similar,
+        })
+    }
+}
+```
+
+### 2.2 Streaming Workflow (New Advanced Pattern)
+
+```rust
+// Advanced pattern not available in Phase 3.3
+pub struct StreamingWorkflow {
+    id: String,
+    name: String,
+    source: StreamSource,
+    pipeline: Vec<StreamProcessor>,
+    sink: StreamSink,
+    backpressure_strategy: BackpressureStrategy,
+    // Enhanced features
+    state_checkpointing: bool,
+    event_emission: bool,
+}
+
+#[async_trait]
+impl AdvancedWorkflow for StreamingWorkflow {
+    async fn execute_with_infrastructure(&self, 
+        input: WorkflowInput, 
+        context: EnhancedExecutionContext
+    ) -> Result<AdvancedWorkflowOutput> {
+        // Create stream from source
+        let mut stream = self.create_stream(&input, &context).await?;
+        let mut processed_count = 0;
+        let mut checkpoints = Vec::new();
+        
+        // Process stream with checkpointing
+        while let Some(item) = stream.next().await {
+            // Process through pipeline
+            let result = self.process_item(item, &context).await?;
+            
+            // Emit events for monitoring
+            if self.event_emission {
+                context.event_bus.emit(WorkflowEvent::StreamItem {
+                    workflow_id: self.id().to_string(),
+                    item_index: processed_count,
+                    result: result.clone(),
+                }).await?;
+            }
+            
+            // Checkpoint state periodically
+            if self.state_checkpointing && processed_count % 100 == 0 {
+                let checkpoint = StreamCheckpoint {
+                    position: processed_count,
+                    state: result.clone(),
+                    timestamp: Instant::now(),
+                };
+                context.state_storage.save_checkpoint(self.id(), &checkpoint).await?;
+                checkpoints.push(checkpoint);
+            }
+            
+            processed_count += 1;
+        }
+        
+        Ok(AdvancedWorkflowOutput {
+            basic_output: WorkflowOutput {
+                final_result: json!({ "processed_count": processed_count }),
+                step_results: HashMap::new(),
+                execution_path: vec!["streaming_complete".to_string()],
+            },
+            state_snapshot: None,
+            session_id: context.session_manager.current_session_id(),
+            execution_events: context.event_bus.collect_events().await,
+            performance_metrics: AdvancedMetrics::from_stream_execution(processed_count, &checkpoints),
+            similar_executions: vec![],
+        })
+    }
+}
+```
+
+---
+
+## 3. Legacy Workflow Patterns (From Phase 3.3 Design)
+
+> **Note**: These patterns were originally designed for Phase 3.3 but moved to Phase 8. They are now enhanced with infrastructure integration.
 
 ### 2.1 Sequential Workflow
 
