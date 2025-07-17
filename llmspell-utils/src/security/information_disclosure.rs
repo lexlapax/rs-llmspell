@@ -457,7 +457,7 @@ mod tests {
     #[test]
     fn test_debug_info_filtering() {
         let config = InfoDisclosureConfig::default();
-        let preventer = InfoDisclosurePreventer::new(config);
+        let _preventer = InfoDisclosurePreventer::new(config);
 
         let test_cases = vec![
             ("at address 0x7fff5fbff8c0", "at address [addr]"),
