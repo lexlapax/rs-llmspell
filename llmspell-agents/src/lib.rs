@@ -9,6 +9,7 @@ pub mod config;
 pub mod di;
 pub mod factory;
 pub mod factory_registry;
+pub mod health;
 pub mod lifecycle;
 pub mod registry;
 pub mod tool_context;
@@ -29,7 +30,29 @@ pub use factory::{
     AgentConfig, AgentFactory, CreationHook, DefaultAgentFactory, ModelConfig, ResourceLimits,
 };
 pub use factory_registry::{global_registry, CustomAgentFactory, FactoryRegistry};
-pub use lifecycle::hooks::{CompositeHook, LoggingHook, MetricsHook, SecurityHook, ValidationHook};
+pub use health::{
+    AgentHealthMonitor, HealthCheckResult, HealthIssue, HealthMonitorConfig, HealthStatus,
+    ResourceHealthCheck, ResponsivenessHealthCheck, StateMachineHealthCheck,
+};
+pub use lifecycle::{
+    events::{
+        EventSubscription, LifecycleEvent, LifecycleEventData, LifecycleEventSystem,
+        LifecycleEventType, LoggingEventListener, MetricsEventListener,
+    },
+    hooks::{CompositeHook, LoggingHook, MetricsHook, SecurityHook, ValidationHook},
+    middleware::{
+        LifecycleMiddleware, LifecycleMiddlewareChain, LifecyclePhase, LoggingMiddleware,
+        MetricsMiddleware, MiddlewareConfig, MiddlewareContext,
+    },
+    resources::{
+        LoggingResourceHook, ResourceAllocation, ResourceManager, ResourceRequest, ResourceType,
+    },
+    shutdown::{
+        LoggingShutdownHook, ResourceCleanupHook, ShutdownConfig, ShutdownCoordinator,
+        ShutdownPriority, ShutdownRequest, ShutdownResult,
+    },
+    state_machine::{AgentState, AgentStateMachine, StateMachineConfig, StateMachineMetrics},
+};
 pub use tool_context::{
     ContextInheritanceRule, ToolContextManager, ToolExecutionContext, ToolExecutionRecord,
 };
