@@ -12,6 +12,7 @@ pub mod factory;
 pub mod factory_registry;
 pub mod health;
 pub mod lifecycle;
+pub mod monitoring;
 pub mod registry;
 pub mod templates;
 pub mod tool_context;
@@ -64,6 +65,32 @@ pub use tool_errors::{
 };
 pub use tool_invocation::{InvocationConfig, InvocationMetrics, InvocationResult, ToolInvoker};
 pub use tool_manager::{ToolManager, ToolManagerConfig};
+
+// Re-export monitoring types
+pub use monitoring::{
+    alerts::{
+        Alert, AlertCondition, AlertConfig, AlertContext, AlertManager, AlertRule, AlertSeverity,
+        AlertState, ConsoleNotificationChannel, ThresholdOperator,
+    },
+    events::{
+        ComponentFilter, ConsoleLogExporter, ErrorDetails, EventLogger, LevelFilter, LogEvent,
+        LogLevel, RateLimitFilter,
+    },
+    health::{
+        AgentHealthCheck, ComponentHealth, HealthCheck,
+        HealthCheckResult as MonitoringHealthCheckResult, HealthIndicator, HealthMonitor,
+        HealthStatus as MonitoringHealthStatus,
+    },
+    metrics::{AgentMetrics, Counter, Gauge, Histogram, MetricRegistry, MetricType, MetricValue},
+    performance::{
+        PerformanceMonitor, PerformanceReport, PerformanceSnapshot, PerformanceThresholds,
+        PerformanceViolation, ResourceUsage,
+    },
+    tracing::{
+        ConsoleTraceExporter, SpanContext, SpanStatus, TraceAnalyzer, TraceCollector, TraceEvent,
+        TraceSpan,
+    },
+};
 
 /// Prelude module for convenient imports
 pub mod prelude {

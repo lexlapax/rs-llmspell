@@ -300,36 +300,47 @@ ensure it's certain implementations are consisten with what should go in `llmspe
 - [x] Lifecycle managed
 - [x] Performance acceptable
 
-### Task 3.3.8: Agent Monitoring & Observability
+### Task 3.3.8: Agent Monitoring & Observability ✅
 **Priority**: HIGH  
 **Estimated Time**: 12 hours  
 **Assignee**: Reliability Team
+**Status**: COMPLETE 2025-07-18
 
 **Description**: Implement comprehensive monitoring and observability for agent infrastructure.
 
 **Acceptance Criteria:**
-- [ ] Agent health metrics
-- [ ] Performance monitoring
-- [ ] Distributed tracing
-- [ ] Event logging system
-- [ ] Alerting framework
+- [x] Agent health metrics
+- [x] Performance monitoring
+- [x] Distributed tracing
+- [x] Event logging system
+- [x] Alerting framework
 
 **Implementation Steps:**
-1. Define agent metrics schema in `llmspell-agents/src/monitoring/metrics.rs`
-2. Implement health monitoring in `llmspell-agents/src/monitoring/health.rs`
-3. Add performance tracking in `llmspell-agents/src/monitoring/performance.rs`
-4. Create distributed tracing in `llmspell-agents/src/monitoring/tracing.rs`
-5. Build event logging in `llmspell-agents/src/monitoring/logging.rs`
-6. Add alerting rules in `llmspell-agents/src/monitoring/alerts.rs`
-7. Create monitoring examples in `llmspell-agents/examples/monitoring_setup.rs`
-8. Update `llmspell-agents/src/monitoring/mod.rs` to coordinate monitoring
+1. ✅ Define agent metrics schema in `llmspell-agents/src/monitoring/metrics.rs`
+2. ✅ Implement health monitoring in `llmspell-agents/src/monitoring/health.rs`
+3. ✅ Add performance tracking in `llmspell-agents/src/monitoring/performance.rs`
+4. ✅ Create distributed tracing in `llmspell-agents/src/monitoring/tracing.rs`
+5. ✅ Build event logging in `llmspell-agents/src/monitoring/events.rs`
+6. ✅ Add alerting rules in `llmspell-agents/src/monitoring/alerts.rs`
+7. ✅ Create monitoring examples in `llmspell-agents/examples/monitoring_setup.rs`
+8. ✅ Update `llmspell-agents/src/monitoring/mod.rs` to coordinate monitoring
 
 **Definition of Done:**
-- [ ] Metrics collected
-- [ ] Health monitored
-- [ ] Tracing active
-- [ ] Logs structured
-- [ ] Alerts configured
+- [x] Metrics collected
+- [x] Health monitored
+- [x] Tracing active
+- [x] Logs structured
+- [x] Alerts configured
+
+**Key Achievements:**
+- Comprehensive metrics system with counters, gauges, and histograms
+- Health monitoring with configurable thresholds and indicators
+- Performance tracking with resource usage and report generation
+- Distributed tracing with parent-child span relationships
+- Structured event logging with levels and filtering
+- Alert framework with rules, conditions, and notification channels
+- All timestamps updated to use `DateTime<Utc>` for serialization
+- Working example demonstrating all monitoring features
 
 ### Task 3.3.9: Script-to-Agent Integration
 **Priority**: CRITICAL  
