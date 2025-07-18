@@ -4,6 +4,7 @@
 pub mod capabilities;
 pub mod delegation;
 pub mod hierarchical;
+pub mod lifecycle;
 pub mod tool_composition;
 pub mod traits;
 
@@ -31,3 +32,9 @@ pub use delegation::{
     DelegationStrategy,
 };
 pub use hierarchical::{HierarchicalAgentBuilder, HierarchicalCompositeAgent, HierarchicalConfig};
+
+pub use lifecycle::{
+    CascadeDirection, ComponentHealth, ComponentLifecycle, CompositeLifecycleManager,
+    ErrorSeverity, HealthCheckResult, HierarchicalLifecycleManager, LifecycleConfig,
+    LifecycleEvent, LifecycleEventHandler, LifecycleState,
+};

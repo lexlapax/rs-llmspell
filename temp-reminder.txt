@@ -1,1 +1,2 @@
 reminders for me
+│ > should we rename llmspell-agents/src/agent_wrapped_tool.rs to agent_as_tool.rs or leave it that way? don't change, megathink.   │
