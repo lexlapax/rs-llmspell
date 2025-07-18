@@ -24,7 +24,7 @@
 - **Phase 3.0 (Weeks 9-10)**: Critical Tool Fixes - Standardization, DRY, and Initial Security ✅ COMPLETE
 - **Phase 3.1 (Weeks 11-12)**: External Integration Tools - 8 new tools
 - **Phase 3.2 (Weeks 13-14)**: Advanced Security & Performance - Optimization for all 33 tools
-- **Phase 3.3 (Weeks 15-16)**: Agent Infrastructure - Factory, Registry, Tool Integration, Lifecycle, Templates, and Composition
+- **Phase 3.3 (Weeks 15-16)**: Agent Infrastructure - Factory, Registry, Tool Integration, Lifecycle, Templates, Composition, and Bridge Integration
 
 **Success Criteria Summary:**
 - [x] 95% parameter consistency across all tools (from 60%) ✅ (Phase 3.0 Complete)
@@ -588,7 +588,45 @@ ensure it's certain implementations are consisten with what should go in `llmspe
 - [ ] Integration examples working
 - [ ] Documentation complete
 
-### Task 3.3.16: Workflow Examples and Testing
+### Task 3.3.16: Script-to-Workflow Integration
+**Priority**: CRITICAL  
+**Estimated Time**: 16 hours  
+**Assignee**: Bridge Team
+
+**Description**: Implement bridge infrastructure for scripts to discover, invoke, and manage workflows through llmspell-bridge, completing the comprehensive script integration pattern alongside tools and agents.
+
+**Acceptance Criteria:**
+- [ ] WorkflowBridge for script-to-workflow communication
+- [ ] Workflow discovery API for scripts
+- [ ] Parameter conversion between script and workflow types
+- [ ] Result transformation and error handling
+- [ ] Integration with existing bridge architecture
+- [ ] Support for all workflow types (Sequential, Conditional, Loop)
+- [ ] Script API consistency with tool and agent APIs
+- [ ] Performance optimization for bridge operations
+
+**Implementation Steps:**
+1. Extend llmspell-bridge with workflow discovery in `llmspell-bridge/src/workflows.rs`
+2. Implement WorkflowBridge in `llmspell-bridge/src/workflow_bridge.rs`
+3. Create parameter conversion system in `llmspell-bridge/src/workflow_conversion.rs`
+4. Add result transformation in `llmspell-bridge/src/workflow_results.rs`
+5. Update `llmspell-bridge/src/lua/workflow_api.rs` for Lua workflow access
+6. Update `llmspell-bridge/src/javascript/workflow_api.rs` for JS workflow access
+7. Implement workflow registry integration in `llmspell-bridge/src/workflow_registry_bridge.rs`
+8. Add tests in `llmspell-bridge/tests/workflow_bridge_tests.rs`
+9. Update `llmspell-bridge/src/lib.rs` to export workflow bridge components
+
+**Definition of Done:**
+- [ ] WorkflowBridge implemented and functional
+- [ ] Workflow discovery working from scripts
+- [ ] Parameter conversion bidirectional
+- [ ] Error handling comprehensive
+- [ ] Integration with bridge architecture complete
+- [ ] Performance acceptable (<10ms overhead)
+- [ ] Script APIs consistent with existing patterns
+- [ ] Documentation complete
+
+### Task 3.3.17: Workflow Examples and Testing
 **Priority**: HIGH  
 **Estimated Time**: 12 hours  
 **Assignee**: QA Team
@@ -626,19 +664,20 @@ ensure it's certain implementations are consisten with what should go in `llmspe
 - [ ] Documentation comprehensive
 - [ ] Examples integrated with library
 
-### Task 3.3.17: Lua Agent and Workflow Examples
+### Task 3.3.18: Lua Agent and Workflow Examples
 **Priority**: HIGH  
 **Estimated Time**: 12 hours  
 **Assignee**: Bridge Team
 
-**Description**: Create comprehensive Lua examples demonstrating agent and workflow usage from scripts, building on the script-to-agent integration and basic workflow patterns.
+**Description**: Create comprehensive Lua examples demonstrating agent and workflow usage from scripts, building on the script-to-agent and script-to-workflow integration infrastructure.
 
 **Acceptance Criteria:**
-- [ ] 7+ comprehensive Lua examples (agents and workflows)
+- [ ] 8+ comprehensive Lua examples (agents and workflows)
 - [ ] Cover all major agent patterns (tool orchestrator, monitor, data processor, coordinator)
 - [ ] **Demonstrate all workflow patterns** (sequential, conditional, loop)
 - [ ] **Show workflow-agent integration** from Lua
 - [ ] Demonstrate agent discovery and invocation from scripts
+- [ ] Demonstrate workflow discovery and invocation from scripts
 - [ ] Show parameter passing and result handling
 - [ ] Include error handling and timeout patterns
 - [ ] Integration with existing Lua tool examples
@@ -654,12 +693,11 @@ ensure it's certain implementations are consisten with what should go in `llmspe
 6. Create workflow-conditional.lua in `examples/lua/workflows/workflow-conditional.lua`
 7. Create workflow-loop.lua in `examples/lua/workflows/workflow-loop.lua`
 8. Create workflow-agent-integration.lua in `examples/lua/workflows/workflow-agent-integration.lua`
-9. Update `llmspell-bridge/src/lua/agent_api.rs` to expose agent functions
-10. Update `llmspell-bridge/src/lua/workflow_api.rs` to expose workflow functions
-11. Create Lua API documentation in `examples/lua/AGENT_WORKFLOW_API.md`
+9. Create Lua API documentation in `examples/lua/AGENT_WORKFLOW_API.md`
+10. Create comprehensive tutorial in `examples/lua/TUTORIAL.md`
 
 **Definition of Done:**
-- [ ] 7 comprehensive Lua examples created
+- [ ] 8 comprehensive Lua examples created
 - [ ] All agent patterns demonstrated
 - [ ] **All workflow patterns demonstrated**
 - [ ] **Workflow-agent integration shown**
@@ -670,7 +708,7 @@ ensure it's certain implementations are consisten with what should go in `llmspe
 - [ ] Integration with bridge complete
 - [ ] Documentation complete
 
-### Task 3.3.18: Phase 3 Final Integration
+### Task 3.3.19: Phase 3 Final Integration
 **Priority**: CRITICAL  
 **Estimated Time**: 16 hours  
 **Assignee**: Integration Lead
@@ -684,6 +722,7 @@ ensure it's certain implementations are consisten with what should go in `llmspe
 - [ ] **Workflow-agent integration functional**
 - [ ] **Multi-agent coordination via workflows demonstrated**
 - [ ] Script-to-agent integration operational
+- [ ] **Script-to-workflow integration operational**
 - [ ] Lua agent and workflow examples working
 - [ ] Performance targets met
 - [ ] Documentation complete
@@ -697,11 +736,12 @@ ensure it's certain implementations are consisten with what should go in `llmspe
 5. Test workflow-agent integration in `llmspell-workflows/tests/agent_integration_tests.rs`
 6. Verify multi-agent coordination in `tests/multi_agent_scenarios.rs`
 7. Validate script-to-agent bridge in `llmspell-bridge/tests/agent_bridge_tests.rs`
-8. Test Lua examples in `examples/lua/test_all_examples.sh`
-9. Measure performance in `benches/phase3_benchmarks.rs`
-10. Review documentation in `docs/phase3_checklist.md`
-11. Create handoff package in `docs/phase3_handoff/`
-12. Conduct final review using `scripts/phase3_validation.sh`
+8. **Validate script-to-workflow bridge in `llmspell-bridge/tests/workflow_bridge_tests.rs`**
+9. Test Lua examples in `examples/lua/test_all_examples.sh`
+10. Measure performance in `benches/phase3_benchmarks.rs`
+11. Review documentation in `docs/phase3_checklist.md`
+12. Create handoff package in `docs/phase3_handoff/`
+13. Conduct final review using `scripts/phase3_validation.sh`
 
 **Definition of Done:**
 - [ ] Integration complete
@@ -710,6 +750,7 @@ ensure it's certain implementations are consisten with what should go in `llmspe
 - [ ] **Workflow-agent integration working**
 - [ ] **Multi-agent coordination functional**
 - [ ] Script-to-agent bridge validated
+- [ ] **Script-to-workflow bridge validated**
 - [ ] Lua examples functional
 - [ ] Performance verified
 - [ ] Documentation ready
@@ -756,11 +797,12 @@ ensure it's certain implementations are consisten with what should go in `llmspe
   - Templates available
   - BaseAgent tool integration functional
   - Script-to-agent bridge operational
+  - **Script-to-workflow bridge operational**
   - **Basic workflow patterns functional** (Sequential, Conditional, Loop)
   - **Workflow-agent integration operational**
   - **Multi-agent coordination via workflows demonstrated**
   - Composition patterns implemented
-  - Lua agent examples working
+  - Lua agent and workflow examples working
 
 - [ ] **Performance Metrics**:
   - 52,600x performance target maintained

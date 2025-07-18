@@ -15,7 +15,7 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 ### Phase Categories
 
 - **MVP Foundation** (Phases 0-2): Core functionality with comprehensive tools for minimal viable product
-- **MVP Completion** (Phase 3): Tool enhancement and agent infrastructure
+- **MVP Completion** (Phase 3): Tool enhancement, agent infrastructure, and bridge integration
 - **Production Infrastructure** (Phases 4-7): Hook system, state management, sessions, and vector storage
 - **Advanced Features** (Phases 8-10): Workflow orchestration, multimodal tools, and REPL
 - **Extended Features** (Phases 11-14): Daemon mode, MCP protocols, and AI/ML tools
@@ -177,7 +177,7 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 
 ### **Phase 3: Tool Enhancement & Agent Infrastructure (Weeks 9-16)**
 
-**Goal**: Standardize tools, add external integrations, and implement agent infrastructure with basic multi-agent coordination  
+**Goal**: Standardize tools, add external integrations, implement agent infrastructure, bridge integration, and basic multi-agent coordination  
 **Priority**: HIGH (MVP Completion)
 **Duration**: 8 weeks (expanded from original 2 weeks)
 
@@ -234,13 +234,20 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 - Agent registry and discovery
 - BaseAgent tool integration infrastructure
 - Script-to-agent integration bridge
+- **Script-to-workflow integration bridge**
 - Agent-as-tool wrapping support
 - Tool composition patterns
 - Agent composition patterns
 - **Basic Workflow Patterns** (Sequential, Conditional, Loop)
 - **Workflow-Agent Integration**
-- Lua agent examples and documentation
+- Lua agent and workflow examples and documentation
 - Multi-agent coordination primitives
+
+**Bridge Integration Strategy**:
+1. **Tool Bridge**: Pre-existing infrastructure
+2. **Agent Bridge**: Script-to-agent integration (Task 3.3.9)
+3. **Workflow Bridge**: Script-to-workflow integration (Task 3.3.16)
+4. **Unified Bridge APIs**: Consistent patterns across all component types
 
 **Success Criteria**:
 - [ ] Agent lifecycle hooks implemented
@@ -255,8 +262,10 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 - [ ] **Multi-agent coordination via workflows demonstrated**
 - [ ] Agents accessible from scripts via bridges
 - [ ] Script-to-agent calling mechanism functional
-- [ ] Lua agent examples working and documented
-- [ ] Agent discovery from scripts operational
+- [ ] **Script-to-workflow bridge operational**
+- [ ] **Workflow discovery from scripts functional**
+- [ ] Lua agent and workflow examples working and documented
+- [ ] Agent and workflow discovery from scripts operational
 
 **Testing Requirements**:
 - Tool standardization validation tests

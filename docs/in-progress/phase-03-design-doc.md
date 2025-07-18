@@ -2944,7 +2944,325 @@ impl BasicWorkflowRegistry {
 }
 ```
 
-### 11. Lua Agent Examples
+### 11. Script-to-Workflow Integration
+
+#### 11.1 Workflow Bridge Architecture
+
+```rust
+// llmspell-bridge/src/workflow_bridge.rs
+pub struct WorkflowBridge {
+    workflow_registry: Arc<BasicWorkflowRegistry>,
+    script_engine: Arc<dyn ScriptEngineBridge>,
+    parameter_converter: WorkflowParameterConverter,
+    result_handler: WorkflowResultHandler,
+}
+
+impl WorkflowBridge {
+    pub fn new(
+        workflow_registry: Arc<BasicWorkflowRegistry>,
+        script_engine: Arc<dyn ScriptEngineBridge>
+    ) -> Self {
+        Self {
+            workflow_registry,
+            script_engine,
+            parameter_converter: WorkflowParameterConverter::new(),
+            result_handler: WorkflowResultHandler::new(),
+        }
+    }
+    
+    pub async fn register_workflows_with_script(&self) -> Result<()> {
+        let workflows = self.workflow_registry.list_all();
+        
+        for workflow_id in workflows {
+            let script_callable = self.create_workflow_callable(&workflow_id)?;
+            self.script_engine.register_function(
+                &format!("workflow_{}", workflow_id),
+                script_callable
+            ).await?;
+        }
+        Ok(())
+    }
+    
+    pub async fn call_workflow_from_script(
+        &self,
+        workflow_id: &str,
+        script_params: ScriptValue,
+        script_context: ScriptExecutionContext
+    ) -> Result<ScriptValue> {
+        // Convert script parameters to workflow input
+        let workflow_input = self.parameter_converter.script_to_workflow(script_params)?;
+        
+        // Convert script execution context 
+        let execution_context = self.parameter_converter.script_context_to_execution_context(script_context)?;
+        
+        // Get workflow from registry
+        let workflow = self.workflow_registry.get(workflow_id)
+            .ok_or_else(|| LLMSpellError::NotFound(format!("Workflow: {}", workflow_id)))?;
+        
+        // Execute workflow
+        let start = std::time::Instant::now();
+        let result = workflow.execute(workflow_input, &execution_context).await;
+        let duration = start.elapsed();
+        
+        // Convert result back to script value
+        let script_result = match result {
+            Ok(output) => self.result_handler.success_to_script(output, duration)?,
+            Err(error) => self.result_handler.error_to_script(error, duration)?,
+        };
+        
+        Ok(script_result)
+    }
+    
+    fn create_workflow_callable(&self, workflow_id: &str) -> Result<ScriptCallable> {
+        let bridge = Arc::clone(&self);
+        let workflow_id = workflow_id.to_string();
+        
+        Ok(ScriptCallable::new(move |params, context| {
+            let bridge = Arc::clone(&bridge);
+            let workflow_id = workflow_id.clone();
+            
+            async move {
+                bridge.call_workflow_from_script(&workflow_id, params, context).await
+            }
+        }))
+    }
+}
+
+// Workflow parameter conversion
+pub struct WorkflowParameterConverter {
+    type_converter: TypeConverter,
+}
+
+impl WorkflowParameterConverter {
+    pub fn new() -> Self {
+        Self {
+            type_converter: TypeConverter::new(),
+        }
+    }
+    
+    pub fn script_to_workflow(&self, script_value: ScriptValue) -> Result<WorkflowInput> {
+        let data = self.type_converter.script_to_json(script_value)?;
+        Ok(WorkflowInput {
+            data,
+            metadata: HashMap::new(),
+        })
+    }
+    
+    pub fn script_context_to_execution_context(&self, script_context: ScriptExecutionContext) -> Result<ExecutionContext> {
+        let mut context = ExecutionContext::new();
+        
+        // Transfer relevant context data
+        if let Some(user_id) = script_context.user_id {
+            context.set_user_id(user_id);
+        }
+        
+        if let Some(session_id) = script_context.session_id {
+            context.set_session_id(session_id);
+        }
+        
+        // Add script-specific metadata
+        context.set_metadata("script_initiated", true);
+        context.set_metadata("script_engine", script_context.engine_type);
+        
+        Ok(context)
+    }
+}
+
+// Workflow result handling
+pub struct WorkflowResultHandler {
+    format_config: ResultFormatConfig,
+}
+
+impl WorkflowResultHandler {
+    pub fn new() -> Self {
+        Self {
+            format_config: ResultFormatConfig::default(),
+        }
+    }
+    
+    pub fn success_to_script(&self, output: WorkflowOutput, duration: Duration) -> Result<ScriptValue> {
+        let mut result = serde_json::Map::new();
+        
+        result.insert("success".to_string(), serde_json::Value::Bool(true));
+        result.insert("data".to_string(), output.data);
+        result.insert("metadata".to_string(), serde_json::to_value(output.metadata)?);
+        
+        if self.format_config.include_timing {
+            result.insert("execution_time_ms".to_string(), 
+                serde_json::Value::Number(serde_json::Number::from(duration.as_millis() as u64)));
+        }
+        
+        self.json_to_script(serde_json::Value::Object(result))
+    }
+    
+    pub fn error_to_script(&self, error: LLMSpellError, duration: Duration) -> Result<ScriptValue> {
+        let mut result = serde_json::Map::new();
+        
+        result.insert("success".to_string(), serde_json::Value::Bool(false));
+        result.insert("error".to_string(), serde_json::Value::String(error.to_string()));
+        result.insert("error_type".to_string(), serde_json::Value::String(error.error_type()));
+        
+        if self.format_config.include_timing {
+            result.insert("execution_time_ms".to_string(), 
+                serde_json::Value::Number(serde_json::Number::from(duration.as_millis() as u64)));
+        }
+        
+        self.json_to_script(serde_json::Value::Object(result))
+    }
+    
+    fn json_to_script(&self, value: serde_json::Value) -> Result<ScriptValue> {
+        match value {
+            serde_json::Value::String(s) => Ok(ScriptValue::String(s)),
+            serde_json::Value::Number(n) => {
+                if let Some(i) = n.as_i64() {
+                    Ok(ScriptValue::Integer(i))
+                } else if let Some(f) = n.as_f64() {
+                    Ok(ScriptValue::Float(f))
+                } else {
+                    Ok(ScriptValue::Float(0.0))
+                }
+            },
+            serde_json::Value::Bool(b) => Ok(ScriptValue::Boolean(b)),
+            serde_json::Value::Array(arr) => {
+                let script_array: Result<Vec<_>> = arr.into_iter()
+                    .map(|v| self.json_to_script(v))
+                    .collect();
+                Ok(ScriptValue::Array(script_array?))
+            },
+            serde_json::Value::Object(obj) => {
+                let script_map: Result<std::collections::HashMap<String, ScriptValue>> = obj.into_iter()
+                    .map(|(k, v)| Ok((k, self.json_to_script(v)?)))
+                    .collect();
+                Ok(ScriptValue::Map(script_map?))
+            },
+            serde_json::Value::Null => Ok(ScriptValue::Nil),
+        }
+    }
+}
+
+// Workflow discovery from scripts
+pub trait WorkflowDiscovery {
+    async fn discover_workflows(&self) -> Result<Vec<WorkflowMetadata>>;
+    async fn get_workflow_info(&self, id: &str) -> Result<WorkflowInfo>;
+    async fn list_workflow_types(&self) -> Result<Vec<WorkflowTypeInfo>>;
+}
+
+impl WorkflowDiscovery for WorkflowBridge {
+    async fn discover_workflows(&self) -> Result<Vec<WorkflowMetadata>> {
+        let workflow_ids = self.workflow_registry.list_all();
+        let mut workflows = Vec::new();
+        
+        for id in workflow_ids {
+            if let Some(workflow) = self.workflow_registry.get(&id) {
+                workflows.push(WorkflowMetadata {
+                    id: workflow.id().to_string(),
+                    name: workflow.name().to_string(),
+                    description: workflow.description().to_string(),
+                    workflow_type: workflow.workflow_type(),
+                    parameters: workflow.expected_parameters(),
+                    outputs: workflow.expected_outputs(),
+                });
+            }
+        }
+        
+        Ok(workflows)
+    }
+    
+    async fn get_workflow_info(&self, id: &str) -> Result<WorkflowInfo> {
+        let workflow = self.workflow_registry.get(id)
+            .ok_or_else(|| LLMSpellError::NotFound(format!("Workflow: {}", id)))?;
+        
+        Ok(WorkflowInfo {
+            id: workflow.id().to_string(),
+            name: workflow.name().to_string(),
+            description: workflow.description().to_string(),
+            workflow_type: workflow.workflow_type(),
+            parameters: workflow.expected_parameters(),
+            outputs: workflow.expected_outputs(),
+            examples: workflow.usage_examples(),
+            capabilities: workflow.capabilities(),
+            status: workflow.status(),
+        })
+    }
+    
+    async fn list_workflow_types(&self) -> Result<Vec<WorkflowTypeInfo>> {
+        Ok(vec![
+            WorkflowTypeInfo {
+                name: "sequential".to_string(),
+                description: "Execute steps in sequence".to_string(),
+                use_cases: vec!["Data processing".to_string(), "Multi-step analysis".to_string()],
+            },
+            WorkflowTypeInfo {
+                name: "conditional".to_string(),
+                description: "Execute steps based on conditions".to_string(),
+                use_cases: vec!["Decision making".to_string(), "Branching logic".to_string()],
+            },
+            WorkflowTypeInfo {
+                name: "loop".to_string(),
+                description: "Execute steps iteratively".to_string(),
+                use_cases: vec!["Batch processing".to_string(), "Iterative analysis".to_string()],
+            },
+        ])
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct WorkflowMetadata {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub workflow_type: String,
+    pub parameters: Vec<ParameterInfo>,
+    pub outputs: Vec<OutputInfo>,
+}
+
+#[derive(Debug, Clone)]
+pub struct WorkflowInfo {
+    pub id: String,
+    pub name: String,
+    pub description: String,
+    pub workflow_type: String,
+    pub parameters: Vec<ParameterInfo>,
+    pub outputs: Vec<OutputInfo>,
+    pub examples: Vec<String>,
+    pub capabilities: Vec<String>,
+    pub status: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct WorkflowTypeInfo {
+    pub name: String,
+    pub description: String,
+    pub use_cases: Vec<String>,
+}
+```
+
+#### 11.2 Unified Bridge Integration Pattern
+
+The script-to-workflow integration follows the same pattern as script-to-tool and script-to-agent integration, ensuring consistency across all component types:
+
+**Bridge Pattern Consistency:**
+```rust
+// Unified pattern across all bridges
+pub trait ComponentBridge<T> {
+    async fn register_components_with_script(&self) -> Result<()>;
+    async fn call_component_from_script(&self, id: &str, params: ScriptValue) -> Result<ScriptValue>;
+    async fn discover_components(&self) -> Result<Vec<ComponentMetadata>>;
+}
+
+// Implemented by:
+// - ToolBridge (existing)
+// - AgentBridge (Task 3.3.9) 
+// - WorkflowBridge (Task 3.3.16)
+```
+
+**Performance Requirements:**
+- **<10ms overhead** for workflow bridge operations
+- **Consistent API** patterns across all bridge types
+- **Memory efficient** parameter conversion
+- **Error handling** with proper script error formatting
+
+### 12. Lua Agent Examples
 
 #### 10.1 Basic Agent Calling
 

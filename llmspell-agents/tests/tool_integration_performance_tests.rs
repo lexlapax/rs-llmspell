@@ -4,7 +4,7 @@
 use llmspell_agents::composition::{CompositionStep, DataFlow, ToolComposition};
 use llmspell_agents::{
     AgentWrappedTool, InvocationConfig, ToolDiscoveryService, ToolInvoker, ToolManager,
-    ToolManagerConfig, ToolSearchCriteria,
+    ToolSearchCriteria,
 };
 use llmspell_core::{
     traits::{
@@ -310,7 +310,7 @@ async fn test_tool_manager_performance() {
 
     // Benchmark tool invocation
     let context = ExecutionContext::new();
-    let params = json!({"expression": "2 + 2"});
+    let params = json!({"input": "2 + 2"});
 
     let invocation_start = Instant::now();
     let _result = manager
@@ -488,7 +488,7 @@ async fn test_full_integration_performance() {
     let calc_result = manager
         .invoke_tool(
             "calculator",
-            json!({"expression": "10 * 5"}),
+            json!({"input": "10 * 5"}),
             ExecutionContext::new(),
         )
         .await
@@ -524,7 +524,7 @@ async fn test_full_integration_performance() {
         "Calculator should compute 10 * 5 = 50"
     );
     assert!(
-        agent_result.text.contains("integration test"),
+        agent_result.text.contains("integration_agent"),
         "Agent should process input"
     );
 }
