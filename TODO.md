@@ -118,48 +118,217 @@
 - [x] Persistence tested ✅ (Comprehensive test suite with storage backend integration)
 - [x] API documented ✅ (Full documentation in design docs and code comments)
 
-### Task 3.3.3: BaseAgent Tool Integration Infrastructure
+### Task 3.3.3: BaseAgent Tool Integration Infrastructure (Clean Trait Architecture) ✅ COMPLETE
 **Priority**: CRITICAL  
 **Estimated Time**: 20 hours  
 **Assignee**: Core Team
+**Status**: Completed
+**Started**: 2025-07-18
+**Completed**: 2025-07-18
 
-**Description**: Implement foundational tool discovery, registration, and invocation capabilities in BaseAgent to enable tool composition across all component types.
+**Description**: Implement foundational tool discovery, registration, and invocation capabilities through a separate `ToolCapable` trait to enable tool composition across all component types while maintaining clean architectural separation.
+
+**Architecture Decision**: Use separate `ToolCapable` trait extending `BaseAgent` rather than polluting the foundation trait with specialized functionality. This prevents trait cyclicity (since `Tool: BaseAgent`) and maintains clean separation of concerns.
 
 **Acceptance Criteria:**
-- [ ] BaseAgent trait extended with tool management methods
-- [ ] Tool discovery and registration mechanisms
-- [ ] Tool invocation with parameter validation
-- [ ] Tool execution context propagation
-- [ ] Agent-as-tool wrapping support
-- [ ] Tool composition patterns (tools calling tools)
-- [ ] Integration with existing tool ecosystem (33+ tools)
-- [ ] Error handling and result processing
-- [ ] Performance optimization for tool invocation
+- [x] ToolCapable trait created extending BaseAgent with tool management methods ✅ (Created in `llmspell-core/src/traits/tool_capable.rs`)
+- [x] BaseAgent trait kept clean with only core functionality ✅ (Reverted all tool methods from BaseAgent)
+- [x] Tool discovery and registration mechanisms ✅ (Implemented in ToolDiscoveryService)
+- [x] Tool invocation with parameter validation ✅ (Implemented in ToolInvoker with timeout support)
+- [x] Tool execution context propagation ✅ (Implemented in ToolExecutionContext)
+- [x] Agent-as-tool wrapping support ✅ (Implemented in AgentWrappedTool)
+- [x] Tool composition patterns (tools calling tools) ✅ (Implemented in ToolComposition)
+- [x] Integration with existing tool ecosystem (33+ tools) ✅ (ToolRegistry properly exposed)
+- [x] Error handling and result processing ✅ (Implemented in ToolIntegrationError)
+- [x] Performance optimization for tool invocation ✅ (Performance tests ensure <5ms overhead)
 
 **Implementation Steps:**
-1. Extend BaseAgent trait with tool management methods in `llmspell-core/src/traits/base_agent.rs`
-2. Implement ToolManager in `llmspell-agents/src/tool_manager.rs`
-3. Create tool discovery and registration APIs in `llmspell-agents/src/tool_discovery.rs`
-4. Build tool invocation wrapper with validation in `llmspell-agents/src/tool_invocation.rs`
-5. Add tool execution context integration in `llmspell-agents/src/tool_context.rs`
-6. Implement AgentWrappedTool in `llmspell-agents/src/agent_wrapped_tool.rs`
-7. Add tool composition patterns in `llmspell-agents/src/composition/tool_composition.rs`
-8. Update `llmspell-tools/src/lib.rs` to expose tool registry for agent access
-9. Add error handling in `llmspell-agents/src/tool_errors.rs`
-10. Create performance tests in `llmspell-agents/tests/tool_integration_tests.rs`
+1. ✅ Create ToolCapable trait in `llmspell-core/src/traits/tool_capable.rs`
+2. ✅ Move tool integration types from BaseAgent to supporting types module
+3. ✅ Implement ToolManager in `llmspell-agents/src/tool_manager.rs`
+4. ✅ Create tool discovery and registration APIs in `llmspell-agents/src/tool_discovery.rs`
+5. ✅ Build tool invocation wrapper with validation in `llmspell-agents/src/tool_invocation.rs`
+6. ✅ Add tool execution context integration in `llmspell-agents/src/tool_context.rs`
+7. ✅ Implement AgentWrappedTool in `llmspell-agents/src/agent_wrapped_tool.rs`
+8. ✅ Add tool composition patterns in `llmspell-agents/src/composition/tool_composition.rs`
+9. ✅ Update `llmspell-tools/src/lib.rs` to expose tool registry for agent access
+10. ✅ Add error handling in `llmspell-agents/src/tool_errors.rs`
+11. ✅ Create performance tests in `llmspell-agents/tests/tool_integration_performance_tests.rs`
 
 **Definition of Done:**
-- [ ] BaseAgent trait extended with tool methods
-- [ ] Tool discovery and registration working
-- [ ] Tool invocation with validation functional
-- [ ] Agent-as-tool wrapping operational
-- [ ] Tool composition patterns demonstrated
-- [ ] Integration with 33+ tools validated
-- [ ] Error handling comprehensive
-- [ ] Performance acceptable (<5ms overhead)
-- [ ] Documentation complete
+- [x] ToolCapable trait implemented and functional ✅ (Full trait with default implementations)
+- [x] BaseAgent trait remains clean and focused ✅ (Only core methods remain)
+- [x] Tool discovery and registration working ✅ (ToolDiscoveryService fully functional)
+- [x] Tool invocation with validation functional ✅ (ToolInvoker with comprehensive validation)
+- [x] Agent-as-tool wrapping operational ✅ (AgentWrappedTool with parameter mapping)
+- [x] Tool composition patterns demonstrated ✅ (ToolComposition with workflow patterns)
+- [x] Integration with 33+ tools validated ✅ (ToolRegistry properly exposed and accessible)
+- [x] Error handling comprehensive ✅ (ToolIntegrationError with recovery strategies)
+- [x] Performance acceptable (<5ms overhead) ✅ (Performance tests validate requirements)
+- [x] Documentation complete ✅ (Full documentation in all modules)
 
-### Task 3.3.4: Script-to-Agent Integration
+### Task 3.3.4: Agent Lifecycle Management
+**Priority**: CRITICAL  
+**Estimated Time**: 24 hours  
+**Assignee**: Core Team
+
+**Description**: Implement comprehensive agent lifecycle management including initialization, running, pausing, and termination.
+
+**Acceptance Criteria:**
+- [ ] Agent state machine implementation
+- [ ] Lifecycle event system
+- [ ] Resource management hooks
+- [ ] Graceful shutdown support
+- [ ] Health monitoring integration
+
+**Implementation Steps:**
+ensure it's certain implementations are consisten with what should go in `llmspell-hooks` look at `docs/technical/rs-llmspell-final-architecture.md` and `docs/in-progress/implementation-phases.md` e.g. hooks, health etc..
+1. Design agent state machine in `llmspell-agents/src/lifecycle/state_machine.rs`
+2. Implement lifecycle event system in `llmspell-agents/src/lifecycle/events.rs`
+3. Add resource allocation/deallocation hooks in `llmspell-agents/src/lifecycle/resources.rs`
+4. Create graceful shutdown mechanism in `llmspell-agents/src/lifecycle/shutdown.rs`
+5. Integrate health monitoring in `llmspell-agents/src/health.rs`
+6. Add lifecycle middleware support in `llmspell-agents/src/lifecycle/middleware.rs`
+7. Write state transition tests in `llmspell-agents/tests/lifecycle_tests.rs`
+8. Update `llmspell-agents/src/lifecycle/mod.rs` to coordinate all lifecycle components
+
+**Definition of Done:**
+- [ ] State machine working
+- [ ] Events firing correctly
+- [ ] Resources managed
+- [ ] Shutdown graceful
+- [ ] Monitoring active
+
+### Task 3.3.5: Agent Templates System
+**Priority**: HIGH  
+**Estimated Time**: 20 hours  
+**Assignee**: Developer Experience Team
+
+**Description**: Create a comprehensive agent template system with pre-configured agent patterns.
+
+**Acceptance Criteria:**
+- [ ] Template definition framework
+- [ ] Common agent templates (Tool Agent, Orchestrator Agent, Monitor Agent, etc.)
+- [ ] Template customization support
+- [ ] Template validation system
+- [ ] Template marketplace preparation
+- [ ] Templates can specify tool dependencies
+- [ ] Tool integration patterns in templates
+
+**Implementation Steps:**
+1. Design template definition schema in `llmspell-agents/src/templates/schema.rs`
+2. Create base template trait in `llmspell-agents/src/templates/base.rs`
+3. Implement Tool Agent template in `llmspell-agents/src/templates/tool_agent.rs`
+4. Implement Orchestrator Agent template in `llmspell-agents/src/templates/orchestrator_agent.rs`
+5. Implement Monitor Agent template in `llmspell-agents/src/templates/monitor_agent.rs`
+6. Add template customization API in `llmspell-agents/src/templates/customization.rs`
+7. Build template validation in `llmspell-agents/src/templates/validation.rs`
+8. Create template examples in `llmspell-agents/examples/template_usage.rs`
+9. Update `llmspell-agents/src/templates/mod.rs` to export all templates
+
+**Definition of Done:**
+- [ ] Templates defined
+- [ ] Common patterns implemented
+- [ ] Customization working
+- [ ] Validation complete
+- [ ] Examples ready
+
+### Task 3.3.6: Enhanced ExecutionContext
+**Priority**: HIGH  
+**Estimated Time**: 24 hours  
+**Assignee**: Core Team
+
+**Description**: Enhance ExecutionContext to support advanced agent features and inter-agent communication.
+
+**Acceptance Criteria:**
+- [ ] Hierarchical context support
+- [ ] Context inheritance mechanisms
+- [ ] Shared memory regions
+- [ ] Event bus integration
+- [ ] Distributed context support
+
+**Implementation Steps:**
+1. Enhance ExecutionContext structure in `llmspell-core/src/execution_context.rs`
+2. Implement context hierarchy in `llmspell-agents/src/context/hierarchy.rs`
+3. Add context inheritance rules in `llmspell-agents/src/context/inheritance.rs`
+4. Create shared memory system in `llmspell-agents/src/context/shared_memory.rs`
+5. Integrate event bus in `llmspell-agents/src/context/event_integration.rs`
+6. Add distributed context sync in `llmspell-agents/src/context/distributed.rs`
+7. Create context examples in `llmspell-agents/examples/context_usage.rs`
+8. Update `llmspell-agents/src/context/mod.rs` to coordinate context features
+
+**Definition of Done:**
+- [ ] Hierarchy working
+- [ ] Inheritance functional
+- [ ] Memory shared safely
+- [ ] Events propagated
+- [ ] Distribution ready
+
+### Task 3.3.7: Agent Composition Patterns
+**Priority**: CRITICAL  
+**Estimated Time**: 16 hours  
+**Assignee**: Architecture Team
+
+**Description**: Implement agent composition patterns enabling agents to be composed into higher-level agents.
+
+**Acceptance Criteria:**
+- [ ] Hierarchical agent composition
+- [ ] Agent delegation patterns
+- [ ] Capability aggregation
+- [ ] Composite agent lifecycle
+- [ ] Performance optimization
+- [ ] Tool-to-tool composition patterns
+- [ ] Agent-tool hybrid compositions
+
+**Implementation Steps:**
+1. Design composition interfaces in `llmspell-agents/src/composition/traits.rs`
+2. Implement hierarchical agents in `llmspell-agents/src/composition/hierarchical.rs`
+3. Create delegation mechanisms in `llmspell-agents/src/composition/delegation.rs`
+4. Build capability aggregation in `llmspell-agents/src/composition/capabilities.rs`
+5. Handle composite lifecycle in `llmspell-agents/src/composition/lifecycle.rs`
+6. Add tool composition patterns in `llmspell-agents/src/composition/tool_composition.rs`
+7. Create composition examples in `llmspell-agents/examples/composition_patterns.rs`
+8. Update `llmspell-agents/src/composition/mod.rs` to export all patterns
+
+**Definition of Done:**
+- [ ] Composition working
+- [ ] Delegation functional
+- [ ] Capabilities aggregated
+- [ ] Lifecycle managed
+- [ ] Performance acceptable
+
+### Task 3.3.8: Agent Monitoring & Observability
+**Priority**: HIGH  
+**Estimated Time**: 12 hours  
+**Assignee**: Reliability Team
+
+**Description**: Implement comprehensive monitoring and observability for agent infrastructure.
+
+**Acceptance Criteria:**
+- [ ] Agent health metrics
+- [ ] Performance monitoring
+- [ ] Distributed tracing
+- [ ] Event logging system
+- [ ] Alerting framework
+
+**Implementation Steps:**
+1. Define agent metrics schema in `llmspell-agents/src/monitoring/metrics.rs`
+2. Implement health monitoring in `llmspell-agents/src/monitoring/health.rs`
+3. Add performance tracking in `llmspell-agents/src/monitoring/performance.rs`
+4. Create distributed tracing in `llmspell-agents/src/monitoring/tracing.rs`
+5. Build event logging in `llmspell-agents/src/monitoring/logging.rs`
+6. Add alerting rules in `llmspell-agents/src/monitoring/alerts.rs`
+7. Create monitoring examples in `llmspell-agents/examples/monitoring_setup.rs`
+8. Update `llmspell-agents/src/monitoring/mod.rs` to coordinate monitoring
+
+**Definition of Done:**
+- [ ] Metrics collected
+- [ ] Health monitored
+- [ ] Tracing active
+- [ ] Logs structured
+- [ ] Alerts configured
+
+### Task 3.3.9: Script-to-Agent Integration
 **Priority**: CRITICAL  
 **Estimated Time**: 16 hours  
 **Assignee**: Bridge Team
@@ -196,167 +365,6 @@
 - [ ] Performance acceptable (<10ms overhead)
 - [ ] Script APIs consistent with existing patterns
 - [ ] Documentation complete
-
-### Task 3.3.5: Agent Lifecycle Management
-**Priority**: CRITICAL  
-**Estimated Time**: 24 hours  
-**Assignee**: Core Team
-
-**Description**: Implement comprehensive agent lifecycle management including initialization, running, pausing, and termination.
-
-**Acceptance Criteria:**
-- [ ] Agent state machine implementation
-- [ ] Lifecycle event system
-- [ ] Resource management hooks
-- [ ] Graceful shutdown support
-- [ ] Health monitoring integration
-
-**Implementation Steps:**
-ensure it's certain implementations are consisten with what should go in `llmspell-hooks` look at `docs/technical/rs-llmspell-final-architecture.md` and `docs/in-progress/implementation-phases.md` e.g. hooks, health etc..
-1. Design agent state machine in `llmspell-agents/src/lifecycle/state_machine.rs`
-2. Implement lifecycle event system in `llmspell-agents/src/lifecycle/events.rs`
-3. Add resource allocation/deallocation hooks in `llmspell-agents/src/lifecycle/resources.rs`
-4. Create graceful shutdown mechanism in `llmspell-agents/src/lifecycle/shutdown.rs`
-5. Integrate health monitoring in `llmspell-agents/src/health.rs`
-6. Add lifecycle middleware support in `llmspell-agents/src/lifecycle/middleware.rs`
-7. Write state transition tests in `llmspell-agents/tests/lifecycle_tests.rs`
-8. Update `llmspell-agents/src/lifecycle/mod.rs` to coordinate all lifecycle components
-
-**Definition of Done:**
-- [ ] State machine working
-- [ ] Events firing correctly
-- [ ] Resources managed
-- [ ] Shutdown graceful
-- [ ] Monitoring active
-
-### Task 3.3.6: Agent Templates System
-**Priority**: HIGH  
-**Estimated Time**: 20 hours  
-**Assignee**: Developer Experience Team
-
-**Description**: Create a comprehensive agent template system with pre-configured agent patterns.
-
-**Acceptance Criteria:**
-- [ ] Template definition framework
-- [ ] Common agent templates (Tool Agent, Orchestrator Agent, Monitor Agent, etc.)
-- [ ] Template customization support
-- [ ] Template validation system
-- [ ] Template marketplace preparation
-- [ ] Templates can specify tool dependencies
-- [ ] Tool integration patterns in templates
-
-**Implementation Steps:**
-1. Design template definition schema in `llmspell-agents/src/templates/schema.rs`
-2. Create base template trait in `llmspell-agents/src/templates/base.rs`
-3. Implement Tool Agent template in `llmspell-agents/src/templates/tool_agent.rs`
-4. Implement Orchestrator Agent template in `llmspell-agents/src/templates/orchestrator_agent.rs`
-5. Implement Monitor Agent template in `llmspell-agents/src/templates/monitor_agent.rs`
-6. Add template customization API in `llmspell-agents/src/templates/customization.rs`
-7. Build template validation in `llmspell-agents/src/templates/validation.rs`
-8. Create template examples in `llmspell-agents/examples/template_usage.rs`
-9. Update `llmspell-agents/src/templates/mod.rs` to export all templates
-
-**Definition of Done:**
-- [ ] Templates defined
-- [ ] Common patterns implemented
-- [ ] Customization working
-- [ ] Validation complete
-- [ ] Examples ready
-
-### Task 3.3.7: Enhanced ExecutionContext
-**Priority**: HIGH  
-**Estimated Time**: 24 hours  
-**Assignee**: Core Team
-
-**Description**: Enhance ExecutionContext to support advanced agent features and inter-agent communication.
-
-**Acceptance Criteria:**
-- [ ] Hierarchical context support
-- [ ] Context inheritance mechanisms
-- [ ] Shared memory regions
-- [ ] Event bus integration
-- [ ] Distributed context support
-
-**Implementation Steps:**
-1. Enhance ExecutionContext structure in `llmspell-core/src/execution_context.rs`
-2. Implement context hierarchy in `llmspell-agents/src/context/hierarchy.rs`
-3. Add context inheritance rules in `llmspell-agents/src/context/inheritance.rs`
-4. Create shared memory system in `llmspell-agents/src/context/shared_memory.rs`
-5. Integrate event bus in `llmspell-agents/src/context/event_integration.rs`
-6. Add distributed context sync in `llmspell-agents/src/context/distributed.rs`
-7. Create context examples in `llmspell-agents/examples/context_usage.rs`
-8. Update `llmspell-agents/src/context/mod.rs` to coordinate context features
-
-**Definition of Done:**
-- [ ] Hierarchy working
-- [ ] Inheritance functional
-- [ ] Memory shared safely
-- [ ] Events propagated
-- [ ] Distribution ready
-
-### Task 3.3.8: Agent Composition Patterns
-**Priority**: CRITICAL  
-**Estimated Time**: 16 hours  
-**Assignee**: Architecture Team
-
-**Description**: Implement agent composition patterns enabling agents to be composed into higher-level agents.
-
-**Acceptance Criteria:**
-- [ ] Hierarchical agent composition
-- [ ] Agent delegation patterns
-- [ ] Capability aggregation
-- [ ] Composite agent lifecycle
-- [ ] Performance optimization
-- [ ] Tool-to-tool composition patterns
-- [ ] Agent-tool hybrid compositions
-
-**Implementation Steps:**
-1. Design composition interfaces in `llmspell-agents/src/composition/traits.rs`
-2. Implement hierarchical agents in `llmspell-agents/src/composition/hierarchical.rs`
-3. Create delegation mechanisms in `llmspell-agents/src/composition/delegation.rs`
-4. Build capability aggregation in `llmspell-agents/src/composition/capabilities.rs`
-5. Handle composite lifecycle in `llmspell-agents/src/composition/lifecycle.rs`
-6. Add tool composition patterns in `llmspell-agents/src/composition/tool_composition.rs`
-7. Create composition examples in `llmspell-agents/examples/composition_patterns.rs`
-8. Update `llmspell-agents/src/composition/mod.rs` to export all patterns
-
-**Definition of Done:**
-- [ ] Composition working
-- [ ] Delegation functional
-- [ ] Capabilities aggregated
-- [ ] Lifecycle managed
-- [ ] Performance acceptable
-
-### Task 3.3.9: Agent Monitoring & Observability
-**Priority**: HIGH  
-**Estimated Time**: 12 hours  
-**Assignee**: Reliability Team
-
-**Description**: Implement comprehensive monitoring and observability for agent infrastructure.
-
-**Acceptance Criteria:**
-- [ ] Agent health metrics
-- [ ] Performance monitoring
-- [ ] Distributed tracing
-- [ ] Event logging system
-- [ ] Alerting framework
-
-**Implementation Steps:**
-1. Define agent metrics schema in `llmspell-agents/src/monitoring/metrics.rs`
-2. Implement health monitoring in `llmspell-agents/src/monitoring/health.rs`
-3. Add performance tracking in `llmspell-agents/src/monitoring/performance.rs`
-4. Create distributed tracing in `llmspell-agents/src/monitoring/tracing.rs`
-5. Build event logging in `llmspell-agents/src/monitoring/logging.rs`
-6. Add alerting rules in `llmspell-agents/src/monitoring/alerts.rs`
-7. Create monitoring examples in `llmspell-agents/examples/monitoring_setup.rs`
-8. Update `llmspell-agents/src/monitoring/mod.rs` to coordinate monitoring
-
-**Definition of Done:**
-- [ ] Metrics collected
-- [ ] Health monitored
-- [ ] Tracing active
-- [ ] Logs structured
-- [ ] Alerts configured
 
 ### Task 3.3.10: Agent Examples and Use Cases
 **Priority**: HIGH  

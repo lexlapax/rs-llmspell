@@ -1641,21 +1641,76 @@ impl ExecutionContext {
 }
 ```
 
-### 6. BaseAgent Tool Integration Infrastructure
+### 6. BaseAgent Tool Integration Infrastructure (Clean Trait Separation)
+
+**Architecture Decision**: Use a separate `ToolCapable` trait to avoid polluting the foundational `BaseAgent` trait with specialized tool functionality. This ensures clean separation of concerns and prevents trait cyclicity issues.
 
 ```rust
-// llmspell-core/src/base_agent.rs
+// llmspell-core/src/traits/base_agent.rs - Foundation trait remains clean
 pub trait BaseAgent: Send + Sync {
-    // Existing methods...
-    
-    // Tool management methods
-    async fn register_tool(&mut self, name: &str, tool: Box<dyn Tool>) -> Result<()>;
-    async fn unregister_tool(&mut self, name: &str) -> Result<()>;
-    async fn invoke_tool(&self, name: &str, input: ToolInput) -> Result<ToolOutput>;
-    fn available_tools(&self) -> Vec<&str>;
-    fn has_tool(&self, name: &str) -> bool;
-    async fn discover_tools(&self, registry: &ToolRegistry) -> Result<Vec<ToolMetadata>>;
+    fn metadata(&self) -> &ComponentMetadata;
+    async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput>;
+    async fn validate_input(&self, input: &AgentInput) -> Result<()>;
+    async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput>;
+    // ... other core methods only
 }
+
+// llmspell-core/src/traits/tool_capable.rs - Separate trait for tool integration
+pub trait ToolCapable: BaseAgent {
+    /// Discover available tools based on query criteria
+    async fn discover_tools(&self, query: &ToolQuery) -> Result<Vec<ToolInfo>>;
+    
+    /// Invoke a tool by name with given parameters
+    async fn invoke_tool(&self, tool_name: &str, parameters: JsonValue, context: ExecutionContext) -> Result<AgentOutput>;
+    
+    /// List all available tools that this component can access
+    async fn list_available_tools(&self) -> Result<Vec<String>>;
+    
+    /// Check if a specific tool is available for invocation
+    async fn tool_available(&self, tool_name: &str) -> bool;
+    
+    /// Get information about a specific tool
+    async fn get_tool_info(&self, tool_name: &str) -> Result<Option<ToolInfo>>;
+    
+    /// Compose multiple tools into a workflow
+    async fn compose_tools(&self, composition: &ToolComposition, context: ExecutionContext) -> Result<AgentOutput>;
+}
+
+// Supporting types for tool integration
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct ToolQuery {
+    pub categories: Vec<String>,
+    pub capabilities: Vec<String>,
+    pub max_security_level: Option<String>,
+    pub text_search: Option<String>,
+    pub custom_filters: HashMap<String, JsonValue>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ToolInfo {
+    pub name: String,
+    pub description: String,
+    pub category: String,
+    pub security_level: String,
+    pub schema: JsonValue,
+    pub capabilities: Vec<String>,
+    pub requirements: JsonValue,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct ToolComposition {
+    pub name: String,
+    pub description: String,
+    pub steps: Vec<ToolCompositionStep>,
+    pub parallel: bool,
+}
+```
+
+**Benefits of Trait Separation**:
+- ✅ **Clean Foundation**: `BaseAgent` remains focused on core functionality
+- ✅ **Optional Capability**: Components opt-in to tool integration via `ToolCapable`
+- ✅ **No Cyclicity**: `Tool: BaseAgent` and `ToolCapable: BaseAgent` with no circular dependencies
+- ✅ **Composable**: Components can implement just `BaseAgent` or both traits as needed
 
 // Tool manager for BaseAgent implementations
 pub struct ToolManager {

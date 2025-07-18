@@ -119,10 +119,13 @@ pub mod traits {
     pub mod agent;
     pub mod base_agent;
     pub mod tool;
+    pub mod tool_capable;
     pub mod workflow;
 }
 
 // Re-export commonly used types
 pub use error::{LLMSpellError, Result};
-pub use traits::{agent::Agent, base_agent::BaseAgent, tool::Tool, workflow::Workflow};
+pub use traits::{
+    agent::Agent, base_agent::BaseAgent, tool::Tool, tool_capable::ToolCapable, workflow::Workflow,
+};
 pub use types::{ComponentId, ComponentMetadata, Version};
