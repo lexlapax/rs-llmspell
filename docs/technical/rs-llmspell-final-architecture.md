@@ -2088,6 +2088,12 @@ llmspell-utils:
   - File helpers, async patterns, string utils
   - System info, error builders, path normalization
     ↓
+llmspell-storage:
+  - Backend-agnostic persistence layer
+  - StorageBackend trait with Memory, Sled, RocksDB implementations
+  - Type-safe serialization abstractions (StorageSerialize trait)
+  - Used by agent registry and future persistent components
+    ↓
 llmspell-bridge: 
   - ScriptEngineBridge, ExternalRuntimeBridge, C API
   - Abstraction layer for all external integrations

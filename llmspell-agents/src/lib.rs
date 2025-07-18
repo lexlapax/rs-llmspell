@@ -8,6 +8,7 @@ pub mod di;
 pub mod factory;
 pub mod factory_registry;
 pub mod lifecycle;
+pub mod registry;
 
 // Re-export main types and traits
 pub use builder::AgentBuilder;

@@ -303,9 +303,11 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 **Priority**: MEDIUM (Production Important)
 **Dependencies**: Requires Phase 4 Hook System for state change notifications
 
+**Note**: This phase will leverage the `llmspell-storage` infrastructure implemented in Phase 3.3, extending it for general state management beyond agent registry persistence.
+
 **Components**:
-- `StateManager` with persistent backend
-- Agent state serialization/deserialization
+- `StateManager` with persistent backend (using llmspell-storage)
+- Agent state serialization/deserialization (extending StorageSerialize trait)
 - State migration and versioning
 - Backup and recovery mechanisms
 - Hook integration for state change events
@@ -333,9 +335,11 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 **Priority**: MEDIUM (Production Enhancement)
 **Dependencies**: Requires Phase 5 Persistent State Management
 
+**Note**: Session and artifact storage will use the `llmspell-storage` backend infrastructure for consistent persistence patterns across the system.
+
 **Components**:
 - Session lifecycle management
-- Artifact storage and retrieval system
+- Artifact storage and retrieval system (using llmspell-storage)
 - Session context preservation
 - Artifact versioning and metadata
 - Session replay capabilities

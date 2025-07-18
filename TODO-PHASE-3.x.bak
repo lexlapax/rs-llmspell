@@ -1,774 +1,40 @@
-# rs-llmspell Completed Tasks
+# Phase 3: Tool Enhancement & Agent Infrastructure - TODO List
 
-## Phase 3: Tool Enhancement & Workflow Orchestration
+**Version**: 1.0  
+**Date**: July 2025  
+**Status**: Implementation Ready  
+**Phase**: 3 (Tool Enhancement & Agent Infrastructure)  
+**Timeline**: Weeks 9-16 (40 working days)  
+**Priority**: HIGH (MVP Completion)
+**Arch-Document**: docs/technical/rs-llmspell-final-architecture.md
+**All-Phases-Document**: docs/in-progress/implementation-phases.md
+**Design-Document**: docs/in-progress/phase-03-design-doc.md
 
-### Phase 3.2: Security & Performance
-
-#### Task 3.2.5: Input Sanitization Framework ✅
-**Completed**: 2025-07-16 (Gold Space)
-**Priority**: HIGH
-**Time Taken**: 3 hours
-
-**Summary**: Implemented comprehensive input sanitization framework to prevent injection attacks across all tool types and updated 4 critical tools.
-
-**Implementation**:
-1. **InputSanitizer** (`llmspell-utils/src/security/input_sanitizer.rs`):
-   - HTML/JavaScript sanitization with script tag and event handler removal
-   - SQL injection protection with comment removal and quote escaping
-   - Command injection blocking with metacharacter escaping
-   - Format string protection by removing dangerous specifiers (%n, %s)
-   - XXE prevention by removing DOCTYPE and ENTITY declarations
-   - Path sanitization with traversal and absolute path detection
-
-2. **ValidationRuleSet** (`llmspell-utils/src/security/validation_rules.rs`):
-   - Composable validation rules framework
-   - 14 built-in rule types including LengthRule, HtmlSanitizationRule, SqlSanitizationRule
-   - Pre-configured rule sets: web_standard(), sql_standard(), command_standard(), path_standard()
-   - Fail-fast and auto-sanitize configuration options
-   - Parameter validation helpers for tool integration
-
-3. **Tool Updates**:
-   - **ProcessExecutorTool**: Added command injection protection for executable and arguments
-   - **DatabaseConnectorTool**: Added SQL injection validation with warning logging
-   - **FileOperationsTool**: Added path traversal detection (allowing FileSandbox to enforce boundaries)
-   - **WebScraperTool**: Enhanced URL validation to prevent SSRF and XSS attacks
-
-4. **Key Features**:
-   - Lazy static regex compilation for performance
-   - Configurable sanitization levels (strict/relaxed modes)
-   - Blocked pattern support with custom regex
-   - Comprehensive validation reports with issue tracking
-   - Full test coverage (288 tests passing + tool tests passing)
-
-**Security Improvements**:
-- Prevents XSS attacks through HTML entity encoding
-- Blocks SQL injection with keyword removal in suspicious contexts
-- Prevents command injection by escaping shell metacharacters
-- Protects against format string attacks
-- Prevents XXE attacks in XML processing
-- Blocks path traversal attempts
-- SSRF protection through URL validation
-
-#### Task 3.2.4: Resource Limit Enforcement ✅
-**Completed**: 2025-07-16 (Gold Space)
-**Priority**: HIGH
-**Time Taken**: 3 hours
-
-#### Task 3.2.3: Path Traversal Protection ✅
-**Completed**: 2025-07-16 (Gold Space)
-**Priority**: CRITICAL
-**Time Taken**: ~3 hours
-
-#### Task 3.2.2: Calculator DoS Protection (Enhanced) ✅
-**Completed**: 2025-07-16
-**Priority**: CRITICAL
-**Time Taken**: ~2 hours
-
-#### WebpageMonitor Timeout Bug Fix ✅
-**Completed**: 2025-07-16
-**Priority**: HIGH
-**Time Taken**: ~1 hour
-
-**Summary**: Fixed critical timeout handling bug in WebpageMonitor tool causing workspace test failures.
-
-**Issue**: 
-- WebpageMonitor tool was not respecting the `timeout` parameter passed in requests
-- Used hardcoded 30-second timeout instead of user-specified timeout
-- Caused test suite to hang when testing with short timeouts (1 second)
-- Affected security_test_suite and web_tools_error_scenarios tests
-
-**Implementation**:
-- Modified `execute` method to extract timeout parameter from input parameters
-- Updated `fetch_content` method signature to accept timeout_secs parameter
-- Changed HTTP client timeout from hardcoded 30 seconds to configurable timeout
-- Maintained backward compatibility with 30-second default timeout
-
-**Files Modified**:
-- `llmspell-tools/src/web/webpage_monitor.rs`
-- `llmspell-tools/tests/security_test_suite.rs` (timeout fix for SSRF prevention test)
-
-**Test Results**:
-- All workspace tests now pass without hanging
-- Security test suite completes in ~40 seconds instead of timing out
-- Web tools error scenarios test passes all timeout tests
-- Quality checks pass with zero warnings
-
-**Impact**: 
-- Resolved workspace test failures reported by Gold Space
-- Improved test reliability and developer experience
-- Ensured consistent timeout behavior across all web tools
-
-**Summary**: Enhanced DoS protection for Calculator tool with sophisticated security measures.
-
-**Implementation Highlights:**
-- Created `EnhancedExpressionAnalyzer` with:
-  - Banned pattern detection (nested exponentials, recursive functions)
-  - Memory usage estimation
-  - Recursive depth tracking
-  - Variable count limits
-  - Large exponent detection
-- Implemented `MemoryTracker` for real-time allocation monitoring
-- Integrated both analyzers into CalculatorTool for layered protection
-- Created comprehensive test suite with 11 DoS attack scenarios
-- All tests passing with 100% coverage of attack vectors
-
-**Key Security Improvements:**
-1. **Pattern Detection**: Blocks dangerous patterns like `exp(exp())`, nested powers, factorial operations
-2. **Memory Protection**: Tracks and limits memory allocations during expression evaluation
-3. **Recursive Limits**: Prevents deep nesting of function calls (e.g., `sqrt(sqrt(sqrt(...)))`)
-4. **Timeout Enforcement**: Ensures expressions complete within 100ms
-5. **Variable Limits**: Prevents expressions with excessive unique variables
-
-**Test Coverage:**
-- Basic complexity limits (expression length, nesting depth, operation count)
-- Enhanced pattern detection (banned patterns, consecutive operations)
-- Exponential growth prevention
-- Memory exhaustion protection
-- Recursive depth limits
-- Variable count enforcement
-- Real-world DoS attack patterns
-- Edge cases (empty expressions, Unicode, etc.)
-- Performance consistency validation
-
-**Files Modified:**
-- `llmspell-utils/src/security/expression_analyzer_enhanced.rs` (new)
-- `llmspell-utils/src/security/memory_tracker.rs` (new)
-- `llmspell-utils/src/security.rs` (exports)
-- `llmspell-tools/src/util/calculator.rs` (integration)
-- `llmspell-tools/tests/calculator_dos_protection.rs` (new comprehensive test suite)
-
-### Phase 3.1: External Integration Tools (In Progress)
-
-#### Task 3.1.2: Web Scraping Tools Suite ✅ COMPLETE - 2025-07-12
-**Completed by**: Gold Space  
-**Time Taken**: 8 hours (6/6 tools complete)
-
-**Completed Items:**
-- [x] WebScraperTool full implementation
-  - HTML parsing with scraper crate  
-  - CSS selector support for content extraction
-  - URL validation
-  - ResponseBuilder integration
-  - Unit tests included
-
-- [x] UrlAnalyzerTool full implementation
-  - URL parsing and validation
-  - Host details extraction (domain/IP)
-  - Query parameter parsing
-  - Optional HTTP metadata fetching
-  - Comprehensive URL analysis
-
-- [x] ApiTesterTool full implementation
-  - Full HTTP method support (GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS)
-  - Request timing measurement
-  - Header and body handling
-  - JSON response parsing
-  - Request/response validation
-
-- [x] WebhookCallerTool full implementation
-  - Webhook invocation with retry logic
-  - Exponential backoff on failures
-  - Configurable timeout and retry counts
-  - JSON payload support
-  - Custom headers support
-
-- [x] WebpageMonitorTool full implementation
-  - Web page change detection using text diffing
-  - CSS selector support for specific content monitoring
-  - Configurable whitespace ignoring
-  - Structured change reporting with line numbers
-  - ResponseBuilder integration
-
-- [x] SitemapCrawlerTool full implementation
-  - XML sitemap parsing with recursive support
-  - Sitemap index file support
-  - URL metadata extraction (lastmod, changefreq, priority)
-  - Configurable max URLs limit
-  - Statistical reporting of crawl results
-  - Async recursion with Box::pin for sitemap indices
-
-- [x] All 6 implemented tools follow Phase 3.0 standards
-- [x] Compilation passing for all tools with minimal quality checks
-- [x] Comprehensive integration tests created (22 tests, all passing)
-- [x] Complete documentation created (task-3.1.2-web-scraping-tools-documentation.md)
-- [x] Security review completed and passed (task-3.1.2-security-review.md)
-
-**Final Status**: ✅ FULLY COMPLETE - All Definition of Done criteria satisfied
-**Quality Assurance**: Zero clippy warnings, all tests passing, comprehensive security review
-**Ready for**: Integration into Phase 3.1 and subsequent task development
-
-### Phase 3.0: Critical Tool Fixes ✅ COMPLETE (2025-07-11)
-
-### Task 3.0.1: Tool Signature Analysis and Planning ✅
-**Completed**: 2025-07-11  
-**Priority**: CRITICAL  
-**Time Taken**: 8 hours  
-
-**Description**: Analyzed all 26 existing tools to identify parameter inconsistencies and created standardization plan.
-
-**Deliverables Completed:**
-- Complete analysis of all tool parameter names
-- Categorization of inconsistencies documented
-- Standardization approach defined for each tool
-- Breaking changes clearly identified
-- Priority order for tool updates established
-- Parameter mapping table added to phase-03-design-doc.md
-- CHANGELOG_v0.3.0.md created with comprehensive breaking changes
+> **📋 Actionable Task List**: This document breaks down Phase 3 implementation into specific, measurable tasks across 4 sub-phases with clear acceptance criteria.
 
 ---
 
-### Task 3.0.2: ResponseBuilder Pattern Implementation ✅
-**Completed**: 2025-07-11  
-**Priority**: CRITICAL  
-**Time Taken**: 16 hours  
+## Overview
 
-**Description**: Implemented ResponseBuilder pattern in llmspell-utils for standardized tool responses.
+**Goal**: Transform the existing 26 self-contained tools into a standardized, secure, and extensible library of 33+ tools, then implement comprehensive agent infrastructure patterns that enable sophisticated agent composition and orchestration.
 
-**Deliverables Completed:**
-- `ResponseBuilder` struct implemented with fluent API
-- Standard response fields defined (operation, success, error, data, metadata)
-- Builder methods for all response scenarios
-- `ErrorDetails` type for structured error responses
-- `ValidationError` type and `validation_response` helper
-- Integration with existing response patterns
-- Comprehensive unit tests (10 tests passing)
-- Response builder example created (examples/response_builder.rs)
-- All clippy warnings fixed and code formatted
+**Clean Break Approach**: As a pre-1.0 project (v0.1.0), we're making breaking changes without migration tools to achieve the best architecture. This saves ~1 week of development time that we're investing in better security and features.
 
----
+**Sub-Phase Structure**:
+- **Phase 3.0 (Weeks 9-10)**: Critical Tool Fixes - Standardization, DRY, and Initial Security ✅ COMPLETE
+- **Phase 3.1 (Weeks 11-12)**: External Integration Tools - 8 new tools
+- **Phase 3.2 (Weeks 13-14)**: Advanced Security & Performance - Optimization for all 33 tools
+- **Phase 3.3 (Weeks 15-16)**: Agent Infrastructure - Factory, Registry, Tool Integration, Lifecycle, Templates, and Composition
 
-### Task 3.0.3: Shared Validators Implementation ✅
-**Completed**: 2025-07-11  
-**Priority**: CRITICAL  
-**Time Taken**: 12 hours  
-
-**Description**: Extracted and implemented common validation logic from tools into shared utilities.
-
-**Deliverables Completed:**
-- Path validation utilities (exists, permissions, security)
-  - `validate_safe_path` - prevents path traversal and symlink attacks
-  - `validate_file_permissions` - Unix-specific permission validation
-- Parameter validation framework (ranges, formats, patterns)
-  - `validate_json_schema` - JSON schema validation
-  - `validate_regex_pattern` - regex pattern validation
-  - `validate_date_format` - date format validation
-- Input sanitization utilities
-  - `sanitize_string` - removes control characters
-  - `validate_no_shell_injection` - prevents shell injection attacks
-- Resource limit validators
-  - `validate_resource_limit` - generic resource limit validation
-- Comprehensive test coverage (21 tests passing)
-- All validators exported in llmspell-utils
-- All quality checks passing (formatting, clippy, compilation)
+**Success Criteria Summary:**
+- [x] 95% parameter consistency across all tools (from 60%) ✅ (Phase 3.0 Complete)
+- [x] 95% DRY compliance with shared utilities (from 80%) ✅ (Phase 3.0 Complete)
+- [x] Comprehensive security vulnerability mitigation ✅ (Phase 3.0 Complete)
+- [ ] 33+ production-ready tools (26/33 complete)
+- [ ] Comprehensive agent infrastructure enabling sophisticated agent patterns
 
 ---
 
-### Task 3.0.4: Tool Standardization - File Operations ✅
-**Completed**: 2025-07-11  
-**Priority**: CRITICAL  
-**Time Taken**: 16 hours  
-
-**Description**: Standardized all file system tools (5 tools) to use consistent parameters and ResponseBuilder.
-
-**Tools Updated:**
-- FileOperationsTool ✅ - Changed `content` → `input`, `from_path`/`to_path` → `source_path`/`target_path`
-- ArchiveHandlerTool ✅ - Changed `archive_path` → `path`, `output_dir` → `target_path`, `files` → `input`
-- FileWatcherTool ✅ - Changed `paths` → `input`, implemented ResponseBuilder
-- FileConverterTool ✅ - Changed `input_path` → `path`, `output_path` → `target_path`
-- FileSearchTool ✅ - Already had standardized parameters, added ResponseBuilder
-
-**Implementation Completed:**
-- All file paths use `path: PathBuf` parameter
-- Operations use `operation: String` consistently
-- All responses use ResponseBuilder pattern
-- Shared validators used for all validations
-- All tests updated and passing
-- In-code documentation (schemas) updated
-- All 5 tools compile with new signatures
-- No performance regressions
-- No security issues introduced
-
-**Documentation Created:**
-- `docs/in-progress/phase-3-file-tools-migration.md` - Comprehensive migration guide
-- Updated `CHANGELOG_v0.3.0.md` with accurate parameter changes
-- Included migration examples for all 5 tools
-- Common errors and solutions documented
-- Benefits of standardization explained
-
----
-
-### Task 3.0.5: Tool Standardization - Data Processing ✅
-**Completed**: 2025-07-11  
-**Priority**: CRITICAL  
-**Time Taken**: 12 hours  
-
-**Description**: Standardized all data processing tools (2 tools) to use consistent parameters.
-
-**Tools Updated:**
-- JsonProcessorTool ✅ - Changed `content` → `input` for stream operation
-- CsvAnalyzerTool ✅ - Changed `content` → `input` parameter
-
-**Implementation Completed:**
-- Primary data parameter is now `input: String | Value`
-- All responses use ResponseBuilder pattern
-- Consistent error handling across both tools
-- Both tools return actual data as text output (not just messages)
-- All integration tests updated and passing
-- Performance maintained
-
-**Key Changes:**
-- JsonProcessorTool: Stream operation now uses `input` instead of `content`
-- CsvAnalyzerTool: All operations now use `input` instead of `content`
-- Both tools use ResponseBuilder for metadata while returning data as text
-- Specialized validators remain tool-specific (JSON schema vs CSV rules)
-
----
-
-### Task 3.0.6: Tool Standardization - Utilities ✅
-**Completed**: 2025-07-11  
-**Priority**: HIGH  
-**Time Taken**: 16 hours  
-
-**Description**: Standardized all utility tools (9 tools) to consistent interfaces.
-
-**Tools Updated:**
-- CalculatorTool ✅ - Changed `expression` → `input`
-- TextManipulatorTool ✅ - Changed `text` → `input`
-- DateTimeHandlerTool ✅ - Already using `input`
-- UuidGeneratorTool ✅ - Left as-is (operation-specific params)
-- HashCalculatorTool ✅ - Changed `data` → `input`
-- Base64EncoderTool ✅ - Already using `input`
-- DiffCalculatorTool ✅ - Left as-is (uses `old_text`/`new_text`)
-- TemplateEngineTool ✅ - Changed `template` → `input`
-- DataValidationTool ✅ - Changed `data` → `input`
-
-**Implementation Completed:**
-- Consistent `input` parameter naming where applicable
-- ResponseBuilder pattern implemented throughout
-- Shared error handling utilities in use
-- Performance maintained
-- All tests updated and passing
-- Complete update documentation
-
-**Key Decisions:**
-- UuidGeneratorTool kept operation-specific parameters (no primary data input)
-- DiffCalculatorTool kept `old_text`/`new_text` for clarity
-- Other tools standardized to use `input` for primary data
-
----
-
-### Task 3.0.7: Tool Standardization - System Integration ✅
-**Completed**: 2025-07-11  
-**Priority**: HIGH  
-**Time Taken**: 12 hours  
-
-**Description**: Standardized system integration tools (4 tools) to consistent interfaces.
-
-**Tools Updated:**
-- EnvironmentReaderTool ✅ - Added ResponseBuilder pattern
-- ProcessExecutorTool ✅ - Added ResponseBuilder pattern  
-- ServiceCheckerTool ✅ - Added ResponseBuilder pattern
-- SystemMonitorTool ✅ - Added ResponseBuilder pattern
-
-**Implementation Completed:**
-- Consistent parameter naming (already had domain-appropriate names)
-- ResponseBuilder usage throughout
-- Security validations already in place
-- Resource limits already enforced
-- All integration tests passing (53 tests)
-- Performance acceptable
-
-**Key Findings:**
-- System tools already had appropriate parameter naming
-- Main change was adding ResponseBuilder pattern
-- Security and resource limits were already well-implemented
-
----
-
-### Task 3.0.8: Tool Standardization - Media Processing ✅
-**Completed**: 2025-07-11  
-**Priority**: HIGH  
-**Time Taken**: 12 hours  
-
-**Description**: Standardized media processing tools (3 tools) to consistent interfaces.
-
-**Tools Updated:**
-- ImageProcessorTool ✅ - Changed `input_path`/`output_path` → `source_path`/`target_path`
-- AudioProcessorTool ✅ - Changed `input_path`/`output_path` → `source_path`/`target_path`
-- VideoProcessorTool ✅ - Changed `output_path` → `target_path`
-
-**Implementation Completed:**
-- Consistent path parameters (`source_path`, `target_path`)
-- ResponseBuilder usage throughout
-- Resource limits already enforced
-- All tests passing (41 tests across 3 tools)
-- Documentation complete (phase-3-media-tools-migration.md)
-- Performance maintained
-
----
-
-### Task 3.0.9: Tool Standardization - API/Web ✅
-**Completed**: 2025-07-11  
-**Priority**: HIGH  
-**Time Taken**: 8 hours  
-
-**Description**: Standardized API/Web tools (3 tools) to consistent interfaces.
-
-**Tools Updated:**
-- HttpRequestTool ✅ - Changed `url` → `input`
-- GraphQLQueryTool ✅ - Changed `query` → `input`
-- WebSearchTool ✅ - Changed `query` → `input`
-
-**Implementation Completed:**
-- Consistent `input` parameter for primary data
-- ResponseBuilder usage throughout
-- Rate limiting already implemented
-- All tests passing
-- Documentation complete (phase-3-api-web-tools-migration.md)
-- Ready for Phase 3.1 enhancements
-
----
-
-### Task 3.0.10: DRY Compliance - Extract Common Patterns ✅
-**Completed**: 2025-07-11  
-**Priority**: HIGH  
-**Time Taken**: 20 hours  
-
-**Description**: Extracted remaining duplicate code patterns to shared utilities.
-
-**Utilities Created:**
-1. **retry.rs** - Generic retry logic with exponential backoff, jitter, and configurable policies
-2. **rate_limiter.rs** - Rate limiting framework with 3 algorithms (token bucket, sliding window, fixed window)
-3. **connection_pool.rs** - Connection pooling abstraction with health checks and metrics
-4. **timeout.rs** - Timeout management utilities with cancellation support
-5. **progress.rs** - Progress reporting framework with event streaming
-
-**Implementation Completed:**
-- All utilities compile without warnings (fixed all clippy warnings)
-- >95% code duplication eliminated
-- Performance impact measured (all unit tests pass in < 4s)
-- Documentation complete (all public APIs documented with examples)
-- Comprehensive test coverage
-
-**Key Features:**
-- Retry: Exponential backoff, jitter, custom policies, failure tracking
-- Rate Limiter: Multiple algorithms, per-key limiting, metrics
-- Connection Pool: Health checks, auto-recovery, configurable limits
-- Timeout: Warning thresholds, graceful cancellation, metrics
-- Progress: Subtasks, streaming updates, completion tracking
-
----
-
-### Task 3.0.10.13: Update tools to use new shared utilities ✅
-**Completed**: 2025-07-11  
-**Priority**: HIGH  
-**Time Taken**: 8 hours  
-
-**Description**: Migrated tools to use the new shared utilities from llmspell-utils.
-
-**Tools Migrated:**
-1. **ProcessExecutorTool** - Now uses TimeoutBuilder from llmspell-utils
-2. **HttpRequestTool** - Uses shared retry, rate_limiter, and timeout utilities
-3. **WebSearchTool** - Uses shared retry logic with exponential backoff
-
-**Implementation Completed:**
-- Eliminated duplicate timeout implementations
-- Standardized retry logic across tools
-- Consistent rate limiting behavior
-- Fixed Tool/BaseAgent trait conflicts
-- All tests passing
-- No performance regressions
-
----
-
-### Task: Fix clippy warnings in llmspell-utils ✅
-**Completed**: 2025-07-11  
-**Priority**: HIGH  
-**Time Taken**: 2 hours  
-
-**Description**: Fixed all 48 clippy warnings in llmspell-utils for super clean codebase.
-
-**Warnings Fixed:**
-- 2 unused async function warnings - removed unnecessary `async` keywords
-- 46 missing documentation warnings - added comprehensive documentation
-
-**Implementation:**
-- Fixed async warnings in progress.rs (subtask and update_subtask methods)
-- Added complete documentation for all public structs, enums, and functions
-- All modules now have proper documentation headers
-- Examples added to key functions
-- Clippy now shows 0 warnings
-
----
-
-### Task: Fix failing property tests ✅
-**Completed**: 2025-07-11  
-**Priority**: HIGH  
-**Time Taken**: 2 hours  
-
-**Description**: Fixed failing property tests in llmspell-core due to duplicate metadata keys.
-
-**Issue Fixed:**
-- Property test was generating duplicate keys in metadata
-- Changed from separate key/value vectors to BTreeMap generation
-- Ensures unique keys in metadata
-
-**Implementation:**
-- Updated test_metadata_preservation in property_tests.rs
-- Now uses prop::collection::btree_map for unique key generation
-- All property tests now passing
-
----
-
-### Task: Fix template engine integration tests ✅
-**Completed**: 2025-07-11  
-**Priority**: HIGH  
-**Time Taken**: 1 hour  
-
-**Description**: Fixed template engine integration tests to use new parameter names.
-
-**Changes:**
-- Updated test_template_rendering to use `input` instead of `template`
-- Fixed response parsing to handle new format
-- All template engine tests now passing
-
----
-
-### Task: Combine Phase 3 migration documents ✅
-**Completed**: 2025-07-11  
-**Priority**: HIGH  
-**Time Taken**: 2 hours  
-
-**Description**: Combined 6 individual phase-3 migration documents into one comprehensive guide.
-
-**Documents Consolidated:**
-- phase-3-file-tools-migration.md
-- phase-3-data-tools-migration.md
-- phase-3-utility-tools-migration.md
-- phase-3-system-tools-migration.md
-- phase-3-media-tools-migration.md
-- phase-3-api-web-tools-migration.md
-
-**Created:**
-- `docs/in-progress/phase03-tools-migration.md` - Single comprehensive migration guide
-- Organized by tool category
-- Complete parameter mapping for all 26 tools
-- Examples for each tool
-- Common patterns and best practices
-- Deleted the 6 individual files
-
----
-
-### Task 3.0.13: Update Lua Examples for Parameter Standardization ✅
-**Completed**: 2025-07-12  
-**Priority**: HIGH  
-**Time Taken**: 16 hours  
-
-**Description**: Updated all Lua example files to work with standardized tool parameters and ResponseBuilder pattern.
-
-**Files Updated:**
-- `tools-utility.lua` - 22 parameter updates 
-- `tools-workflow.lua` - 6 parameter updates
-
-**Parameter Changes Applied:**
-1. **HashCalculatorTool**: `data` → `input` (3 occurrences)
-2. **TextManipulatorTool**: `text` → `input` (4 occurrences)  
-3. **CalculatorTool**: `expression` → `input` (8 occurrences)
-4. **TemplateEngineTool**: `template` → `input` (2 occurrences)
-5. **DataValidationTool**: `data` → `input` (2 occurrences)
-
-**Additional Updates:**
-- Added operation parameter where missing (e.g., calculator evaluate operation)
-- Updated comments to reflect migration status
-- Added clear documentation showing which tools have been migrated
-- Maintained backward compatibility comments for reference
-
-**Documentation Created:**
-- `docs/in-progress/phase-3-lua-examples-update.md` - Summary of all Lua example updates
-- Clear migration status comments in each example file
-- Examples now serve as reference implementation for v0.3.0
-
-**Status:**
-- All utility tool examples updated to use standardized parameters
-- Workflow examples updated to match new parameter names
-- Ready for testing once runtime environment is configured
-- Examples accurately reflect the v0.3.0 parameter standardization
-
----
-
-### Phase 3.1: External Integration Tools
-
-### Task 3.1.1: WebSearchTool Enhancement ✅
-**Completed**: 2025-07-12  
-**Priority**: CRITICAL  
-**Time Taken**: 24 hours  
-
-**Description**: Enhanced WebSearchTool with real API implementations following Phase 3.0 standards.
-
-**Acceptance Criteria Completed:**
-- ✅ DuckDuckGo API integration (no key required)
-- ✅ Google Custom Search API support  
-- ✅ Brave Search API implementation (replaced deprecated Bing)
-- ✅ serpapi.com implementation
-- ✅ serper.dev implementation
-- ✅ Rate limiting and retry logic
-- ✅ ResponseBuilder pattern used
-
-**Implementation Details:**
-1. **Provider Abstraction Layer**: Created `SearchProvider` trait with standardized interface
-2. **Providers Implemented**:
-   - DuckDuckGo: Instant Answer API (no key required)
-   - Google: Custom Search API with engine ID support
-   - Brave: Search API (replaced Bing due to deprecation)
-   - SerpApi: Multiple search engine support
-   - SerperDev: Modern Google Search API with 2,500/month free tier
-3. **Rate Limiting**: Implemented per-provider rate limits using RateLimiterBuilder
-4. **Fallback Chain**: Automatic fallback to alternative providers on failure
-5. **Configuration**: Environment variable support for API keys
-6. **Error Handling**: Network errors properly categorized using LLMSpellError::Network
-
-**Files Created/Modified:**
-- `llmspell-tools/src/search/providers/mod.rs` - Provider abstraction layer
-- `llmspell-tools/src/search/providers/duckduckgo.rs` - DuckDuckGo provider
-- `llmspell-tools/src/search/providers/google.rs` - Google Custom Search provider
-- `llmspell-tools/src/search/providers/brave.rs` - Brave Search provider
-- `llmspell-tools/src/search/providers/serpapi.rs` - SerpApi provider
-- `llmspell-tools/src/search/providers/serperdev.rs` - SerperDev provider
-- `llmspell-tools/src/search/web_search.rs` - Refactored to use provider system
-- `llmspell-tools/tests/web_search_real_integration.rs` - Real network integration tests
-
-**Key Features:**
-- Provider-agnostic search interface
-- Automatic API key detection from environment
-- Rate limiting enforcement per provider
-- Comprehensive error handling and fallback
-- Support for web, news, and image search types
-- ResponseBuilder pattern integration
-
-**Test Results:**
-- 5 tests passing (including real network calls)
-- Parameter standardization fixed (nested "parameters" structure)
-- DuckDuckGo provider works with real API calls
-- Phase 3.0 compliance verified
-- All quality checks passing (formatting, clippy, documentation)
-
----
-
-### Task 3.2.8: File Upload Security ✅
-**Completed**: 2025-07-17  
-**Priority**: HIGH  
-**Time Taken**: 2 hours  
-
-**Description**: Implemented secure file upload handling for media processing tools.
-
-**Acceptance Criteria Completed:**
-- ✅ File type validation with allowed extensions configuration
-- ✅ Magic number verification for 20+ file types
-- ✅ Content scanning for malicious patterns
-- ✅ Processing sandbox with isolated temp directory
-- ✅ Size and resource limits enforcement
-
-**Implementation Details:**
-1. **FileUploadValidator**: Comprehensive validation framework
-   - Configurable allowed file extensions and MIME types
-   - Maximum file size enforcement (default 100MB)
-   - Filename sanitization and length validation
-   
-2. **Magic Number Verification**:
-   - Images: PNG, JPEG, GIF
-   - Documents: PDF, DOC, DOCX
-   - Archives: ZIP, RAR, 7Z
-   - Executables: EXE, ELF, Mach-O (blocked)
-   - Scripts: Shell scripts with shebang (blocked)
-   
-3. **Content Scanning**:
-   - Script injection patterns (XSS prevention)
-   - PHP code detection
-   - Shell command patterns
-   - Warnings for suspicious content
-   
-4. **FileProcessingSandbox**:
-   - Isolated temporary directory per operation
-   - Automatic cleanup on drop
-   - Copy files to sandbox for safe processing
-   - Configurable processing time and memory limits
-   
-5. **Security Features**:
-   - Directory traversal prevention in filenames
-   - Control character and null byte filtering
-   - Special character replacement
-   - Timestamp-based unique filenames
-   - Extension validation against magic numbers
-
-**Files Created/Modified:**
-- `llmspell-utils/src/security/file_upload_security.rs` - Complete implementation
-- `llmspell-utils/src/security.rs` - Module exports
-- Tests cover all validation scenarios
-
-**Test Results:**
-- All 307 llmspell-utils tests passing
-- File size validation test
-- Filename sanitization test  
-- Magic number detection test
-- Malicious content detection test
-- Sandbox lifecycle test
-
-**Integration Status:**
-- Ready for integration with media processing tools
-- Can be used by any tool handling file uploads
-- Provides both validation and sandboxing capabilities
-
----
-
-### Phase Documentation Reorganization ✅
-**Completed**: 2025-07-17
-**Task**: Reorganize implementation phases in docs/in-progress/implementation-phases.md
-
-**Changes Made**:
-1. Replaced Phase 3.3 "Workflow Orchestration" with "Agent Infrastructure"
-2. Reordered phases 4-10 as follows:
-   - Phase 4: Hook and Event System (was Phase 5)
-   - Phase 5: Persistent State Management (was Phase 8)
-   - Phase 6: Session and Artifact Management (NEW)
-   - Phase 7: Vector Storage (was Phase 4)
-   - Phase 8: Workflow Orchestration (moved from Phase 3.3)
-   - Phase 9: Multimodal Tools (was Phase 6)
-   - Phase 10: REPL Interactive Mode (was Phase 7)
-3. Updated all subsequent phase numbers (11-21)
-4. Fixed all dependencies and week ranges
-5. Updated MVP definition to reflect new Phase 3.3 content
-6. Updated priority order and timeline estimates
-7. Updated phase categories to reflect new organization
-
-**Result**: 21 total phases with better logical flow and dependencies
-
----
-
-### TODO.md Phase 3.3 Update ✅
-**Completed**: 2025-07-17
-**Task**: Replace Phase 3.3 Workflow Orchestration with Agent Infrastructure in TODO.md
-
-**Changes Made**:
-1. Updated Phase 3 title from "Tool Enhancement & Workflow Orchestration" to "Tool Enhancement & Agent Infrastructure"
-2. Updated overview goal to reflect agent infrastructure instead of workflow orchestration
-3. Updated Phase 3.3 sub-phase description to "Agent Infrastructure - Factory, Registry, Lifecycle, Templates, Communication, and Composition"
-4. Replaced all 11 workflow tasks (3.3.1-3.3.11) with new agent infrastructure tasks:
-   - Task 3.3.1: Agent Factory Implementation
-   - Task 3.3.2: Agent Registry System
-   - Task 3.3.3: Agent Lifecycle Management
-   - Task 3.3.4: Agent Templates System
-   - Task 3.3.5: Enhanced ExecutionContext
-   - Task 3.3.6: Agent Communication Protocols
-   - Task 3.3.7: Agent Composition Patterns
-   - Task 3.3.8: Agent Monitoring & Observability
-   - Task 3.3.9: Agent Examples and Use Cases
-   - Task 3.3.10: Agent Testing Framework
-   - Task 3.3.11: Phase 3 Final Integration
-5. Updated success criteria to reflect agent infrastructure goals
-6. Updated Phase 3 Completion Validation section with Agent Infrastructure Metrics
-7. Updated Handoff to Phase 4 deliverables to mention agent infrastructure
-
-**Result**: TODO.md now accurately reflects the new Phase 3.3 focus on Agent Infrastructure
 ## Phase 3.0: Critical Tool Fixes (Weeks 9-10) ✅ COMPLETE
 
 ### Task 3.0.1: Tool Signature Analysis and Planning ✅
@@ -2412,5 +1678,757 @@
 
 **Deliverable**: `PHASE_3_2_SECURITY_AUDIT.md` - Complete security audit report
 
+---
+
+## Phase 3.3: Agent Infrastructure & Basic Multi-Agent Coordination (Weeks 15-16)
+
+### Task 3.3.1: Agent Factory Implementation ✅
+**Priority**: CRITICAL  
+**Estimated Time**: 16 hours  
+**Assignee**: Architecture Team Lead
+**Status**: Completed
+**Started**: 2025-07-18
+**Completed**: 2025-07-18
+
+**Description**: Implement a flexible Agent Factory system for creating and configuring agents.
+
+**Acceptance Criteria:**
+- [x] Agent factory pattern implementation ✅ (AgentFactory trait, DefaultAgentFactory)
+- [x] Configuration builder support ✅ (AgentBuilder with fluent API)
+- [x] Default agent templates ✅ (8 templates: basic, tool-orchestrator, research, etc.)
+- [x] Dependency injection support ✅ (DIContainer with type-safe service registry)
+- [x] Agent creation hooks ✅ (ValidationHook, LoggingHook, MetricsHook, SecurityHook)
+
+**Implementation Steps:**
+1. [x] Design AgentFactory trait and interface in `llmspell-agents/src/factory.rs` ✅
+2. [x] Implement AgentBuilder with fluent API in `llmspell-agents/src/builder.rs` ✅
+3. [x] Create default agent configurations in `llmspell-agents/src/config.rs` ✅
+4. [x] Add dependency injection container in `llmspell-agents/src/di.rs` ✅
+5. [x] Implement creation lifecycle hooks in `llmspell-agents/src/lifecycle/hooks.rs` ✅
+6. [x] Add factory registry system in `llmspell-agents/src/factory_registry.rs` ✅
+7. [x] Document factory patterns with comprehensive example in `examples/factory_example.rs` ✅
+8. [x] Update `llmspell-agents/src/lib.rs` to export all factory components ✅
+
+**Notes:**
+- Implemented complete agent factory infrastructure with BasicAgent as initial implementation
+- Builder pattern supports fluent API for easy agent configuration
+- 8 default templates created (basic, tool-orchestrator, research, code-assistant, etc.)
+- DI container supports tools, services, and named instances with type safety
+- 5 lifecycle hooks implemented with composable CompositeHook
+- Factory registry enables managing multiple factory implementations
+- Comprehensive example demonstrates all features
+- All quality checks passing (formatting, clippy, tests)
+
+**Definition of Done:**
+- [x] Factory implemented ✅ (AgentFactory trait and DefaultAgentFactory)
+- [x] Builder pattern working ✅ (AgentBuilder with convenience methods)
+- [x] Templates available ✅ (8 pre-configured templates)
+- [x] DI system functional ✅ (Full dependency injection container)
+- [x] Documentation complete ✅ (Example and inline docs)
+
+### Task 3.3.2: Agent Registry System ✅ COMPLETE 2025-07-18
+**Priority**: CRITICAL  
+**Estimated Time**: 20 hours  
+**Assignee**: Infrastructure Team
+
+**Description**: Implement a centralized Agent Registry for managing agent instances and metadata.
+
+**Implementation Note**: During implementation, the need for a unified storage abstraction emerged, leading to the creation of `llmspell-storage` as a foundational crate. This provides backend-agnostic persistence with Memory, Sled, and future RocksDB implementations, along with type-safe serialization abstractions.
+
+**Acceptance Criteria:**
+- [x] Agent registration and discovery ✅ (InMemoryAgentRegistry and PersistentAgentRegistry)
+- [x] Metadata management system ✅ (AgentMetadata with ExtendedAgentMetadata)
+- [x] Agent categorization and tagging ✅ (CategoryManager with hierarchical categories and flexible tagging)
+- [x] Query and search capabilities ✅ (AgentQuery with advanced SearchEngine and discovery)
+- [x] Registry persistence options ✅ (llmspell-storage with Memory, Sled backends)
+
+**Implementation Steps:**
+1. ✅ Design AgentRegistry interface in `llmspell-agents/src/registry/types.rs` (moved to types.rs for better organization)
+2. ✅ Implement registration mechanism in `llmspell-agents/src/registry/registration.rs`
+3. ✅ Add metadata storage system in `llmspell-agents/src/registry/metadata.rs`
+4. ✅ Create categorization scheme in `llmspell-agents/src/registry/categories.rs`
+5. ✅ Implement search and query API in `llmspell-agents/src/registry/discovery.rs`
+6. ✅ Add persistence backends in `llmspell-agents/src/registry/persistence.rs` (uses llmspell-storage)
+7. ✅ Write comprehensive tests in `llmspell-agents/tests/registry_basic.rs`
+8. ✅ Update `llmspell-agents/src/lib.rs` to export registry components
+
+**Definition of Done:**
+- [x] Registry operational ✅ (AgentRegistry trait with InMemory and Persistent implementations)
+- [x] Metadata system working ✅ (Full metadata lifecycle with versioning and capabilities)
+- [x] Search functional ✅ (Advanced discovery with relevance scoring and filtering)
+- [x] Persistence tested ✅ (Comprehensive test suite with storage backend integration)
+- [x] API documented ✅ (Full documentation in design docs and code comments)
+
+### Task 3.3.3: BaseAgent Tool Integration Infrastructure
+**Priority**: CRITICAL  
+**Estimated Time**: 20 hours  
+**Assignee**: Core Team
+
+**Description**: Implement foundational tool discovery, registration, and invocation capabilities in BaseAgent to enable tool composition across all component types.
+
+**Acceptance Criteria:**
+- [ ] BaseAgent trait extended with tool management methods
+- [ ] Tool discovery and registration mechanisms
+- [ ] Tool invocation with parameter validation
+- [ ] Tool execution context propagation
+- [ ] Agent-as-tool wrapping support
+- [ ] Tool composition patterns (tools calling tools)
+- [ ] Integration with existing tool ecosystem (33+ tools)
+- [ ] Error handling and result processing
+- [ ] Performance optimization for tool invocation
+
+**Implementation Steps:**
+1. Extend BaseAgent trait with tool management methods in `llmspell-core/src/traits/base_agent.rs`
+2. Implement ToolManager in `llmspell-agents/src/tool_manager.rs`
+3. Create tool discovery and registration APIs in `llmspell-agents/src/tool_discovery.rs`
+4. Build tool invocation wrapper with validation in `llmspell-agents/src/tool_invocation.rs`
+5. Add tool execution context integration in `llmspell-agents/src/tool_context.rs`
+6. Implement AgentWrappedTool in `llmspell-agents/src/agent_wrapped_tool.rs`
+7. Add tool composition patterns in `llmspell-agents/src/composition/tool_composition.rs`
+8. Update `llmspell-tools/src/lib.rs` to expose tool registry for agent access
+9. Add error handling in `llmspell-agents/src/tool_errors.rs`
+10. Create performance tests in `llmspell-agents/tests/tool_integration_tests.rs`
+
+**Definition of Done:**
+- [ ] BaseAgent trait extended with tool methods
+- [ ] Tool discovery and registration working
+- [ ] Tool invocation with validation functional
+- [ ] Agent-as-tool wrapping operational
+- [ ] Tool composition patterns demonstrated
+- [ ] Integration with 33+ tools validated
+- [ ] Error handling comprehensive
+- [ ] Performance acceptable (<5ms overhead)
+- [ ] Documentation complete
+
+### Task 3.3.4: Script-to-Agent Integration
+**Priority**: CRITICAL  
+**Estimated Time**: 16 hours  
+**Assignee**: Bridge Team
+
+**Description**: Implement bridge infrastructure for scripts to discover, invoke, and manage agents through llmspell-bridge.
+
+**Acceptance Criteria:**
+- [ ] AgentBridge for script-to-agent communication
+- [ ] Agent discovery API for scripts
+- [ ] Parameter conversion between script and agent types
+- [ ] Result transformation and error handling
+- [ ] Integration with existing bridge architecture
+- [ ] Support for all agent types (BaseAgent implementations)
+- [ ] Script API consistency with tool APIs
+- [ ] Performance optimization for bridge operations
+
+**Implementation Steps:**
+1. Extend llmspell-bridge with agent discovery in `llmspell-bridge/src/agents.rs`
+2. Implement AgentBridge in `llmspell-bridge/src/agent_bridge.rs`
+3. Create parameter conversion system in `llmspell-bridge/src/agent_conversion.rs`
+4. Add result transformation in `llmspell-bridge/src/agent_results.rs`
+5. Update `llmspell-bridge/src/lua/agent_api.rs` for Lua agent access
+6. Update `llmspell-bridge/src/javascript/agent_api.rs` for JS agent access
+7. Implement agent registry integration in `llmspell-bridge/src/agent_registry_bridge.rs`
+8. Add tests in `llmspell-bridge/tests/agent_bridge_tests.rs`
+9. Update `llmspell-bridge/src/lib.rs` to export agent bridge components
+
+**Definition of Done:**
+- [ ] AgentBridge implemented and functional
+- [ ] Agent discovery working from scripts
+- [ ] Parameter conversion bidirectional
+- [ ] Error handling comprehensive
+- [ ] Integration with bridge architecture complete
+- [ ] Performance acceptable (<10ms overhead)
+- [ ] Script APIs consistent with existing patterns
+- [ ] Documentation complete
+
+### Task 3.3.5: Agent Lifecycle Management
+**Priority**: CRITICAL  
+**Estimated Time**: 24 hours  
+**Assignee**: Core Team
+
+**Description**: Implement comprehensive agent lifecycle management including initialization, running, pausing, and termination.
+
+**Acceptance Criteria:**
+- [ ] Agent state machine implementation
+- [ ] Lifecycle event system
+- [ ] Resource management hooks
+- [ ] Graceful shutdown support
+- [ ] Health monitoring integration
+
+**Implementation Steps:**
+ensure it's certain implementations are consisten with what should go in `llmspell-hooks` look at `docs/technical/rs-llmspell-final-architecture.md` and `docs/in-progress/implementation-phases.md` e.g. hooks, health etc..
+1. Design agent state machine in `llmspell-agents/src/lifecycle/state_machine.rs`
+2. Implement lifecycle event system in `llmspell-agents/src/lifecycle/events.rs`
+3. Add resource allocation/deallocation hooks in `llmspell-agents/src/lifecycle/resources.rs`
+4. Create graceful shutdown mechanism in `llmspell-agents/src/lifecycle/shutdown.rs`
+5. Integrate health monitoring in `llmspell-agents/src/health.rs`
+6. Add lifecycle middleware support in `llmspell-agents/src/lifecycle/middleware.rs`
+7. Write state transition tests in `llmspell-agents/tests/lifecycle_tests.rs`
+8. Update `llmspell-agents/src/lifecycle/mod.rs` to coordinate all lifecycle components
+
+**Definition of Done:**
+- [ ] State machine working
+- [ ] Events firing correctly
+- [ ] Resources managed
+- [ ] Shutdown graceful
+- [ ] Monitoring active
+
+### Task 3.3.6: Agent Templates System
+**Priority**: HIGH  
+**Estimated Time**: 20 hours  
+**Assignee**: Developer Experience Team
+
+**Description**: Create a comprehensive agent template system with pre-configured agent patterns.
+
+**Acceptance Criteria:**
+- [ ] Template definition framework
+- [ ] Common agent templates (Tool Agent, Orchestrator Agent, Monitor Agent, etc.)
+- [ ] Template customization support
+- [ ] Template validation system
+- [ ] Template marketplace preparation
+- [ ] Templates can specify tool dependencies
+- [ ] Tool integration patterns in templates
+
+**Implementation Steps:**
+1. Design template definition schema in `llmspell-agents/src/templates/schema.rs`
+2. Create base template trait in `llmspell-agents/src/templates/base.rs`
+3. Implement Tool Agent template in `llmspell-agents/src/templates/tool_agent.rs`
+4. Implement Orchestrator Agent template in `llmspell-agents/src/templates/orchestrator_agent.rs`
+5. Implement Monitor Agent template in `llmspell-agents/src/templates/monitor_agent.rs`
+6. Add template customization API in `llmspell-agents/src/templates/customization.rs`
+7. Build template validation in `llmspell-agents/src/templates/validation.rs`
+8. Create template examples in `llmspell-agents/examples/template_usage.rs`
+9. Update `llmspell-agents/src/templates/mod.rs` to export all templates
+
+**Definition of Done:**
+- [ ] Templates defined
+- [ ] Common patterns implemented
+- [ ] Customization working
+- [ ] Validation complete
+- [ ] Examples ready
+
+### Task 3.3.7: Enhanced ExecutionContext
+**Priority**: HIGH  
+**Estimated Time**: 24 hours  
+**Assignee**: Core Team
+
+**Description**: Enhance ExecutionContext to support advanced agent features and inter-agent communication.
+
+**Acceptance Criteria:**
+- [ ] Hierarchical context support
+- [ ] Context inheritance mechanisms
+- [ ] Shared memory regions
+- [ ] Event bus integration
+- [ ] Distributed context support
+
+**Implementation Steps:**
+1. Enhance ExecutionContext structure in `llmspell-core/src/execution_context.rs`
+2. Implement context hierarchy in `llmspell-agents/src/context/hierarchy.rs`
+3. Add context inheritance rules in `llmspell-agents/src/context/inheritance.rs`
+4. Create shared memory system in `llmspell-agents/src/context/shared_memory.rs`
+5. Integrate event bus in `llmspell-agents/src/context/event_integration.rs`
+6. Add distributed context sync in `llmspell-agents/src/context/distributed.rs`
+7. Create context examples in `llmspell-agents/examples/context_usage.rs`
+8. Update `llmspell-agents/src/context/mod.rs` to coordinate context features
+
+**Definition of Done:**
+- [ ] Hierarchy working
+- [ ] Inheritance functional
+- [ ] Memory shared safely
+- [ ] Events propagated
+- [ ] Distribution ready
+
+### Task 3.3.8: Agent Composition Patterns
+**Priority**: CRITICAL  
+**Estimated Time**: 16 hours  
+**Assignee**: Architecture Team
+
+**Description**: Implement agent composition patterns enabling agents to be composed into higher-level agents.
+
+**Acceptance Criteria:**
+- [ ] Hierarchical agent composition
+- [ ] Agent delegation patterns
+- [ ] Capability aggregation
+- [ ] Composite agent lifecycle
+- [ ] Performance optimization
+- [ ] Tool-to-tool composition patterns
+- [ ] Agent-tool hybrid compositions
+
+**Implementation Steps:**
+1. Design composition interfaces in `llmspell-agents/src/composition/traits.rs`
+2. Implement hierarchical agents in `llmspell-agents/src/composition/hierarchical.rs`
+3. Create delegation mechanisms in `llmspell-agents/src/composition/delegation.rs`
+4. Build capability aggregation in `llmspell-agents/src/composition/capabilities.rs`
+5. Handle composite lifecycle in `llmspell-agents/src/composition/lifecycle.rs`
+6. Add tool composition patterns in `llmspell-agents/src/composition/tool_composition.rs`
+7. Create composition examples in `llmspell-agents/examples/composition_patterns.rs`
+8. Update `llmspell-agents/src/composition/mod.rs` to export all patterns
+
+**Definition of Done:**
+- [ ] Composition working
+- [ ] Delegation functional
+- [ ] Capabilities aggregated
+- [ ] Lifecycle managed
+- [ ] Performance acceptable
+
+### Task 3.3.9: Agent Monitoring & Observability
+**Priority**: HIGH  
+**Estimated Time**: 12 hours  
+**Assignee**: Reliability Team
+
+**Description**: Implement comprehensive monitoring and observability for agent infrastructure.
+
+**Acceptance Criteria:**
+- [ ] Agent health metrics
+- [ ] Performance monitoring
+- [ ] Distributed tracing
+- [ ] Event logging system
+- [ ] Alerting framework
+
+**Implementation Steps:**
+1. Define agent metrics schema in `llmspell-agents/src/monitoring/metrics.rs`
+2. Implement health monitoring in `llmspell-agents/src/monitoring/health.rs`
+3. Add performance tracking in `llmspell-agents/src/monitoring/performance.rs`
+4. Create distributed tracing in `llmspell-agents/src/monitoring/tracing.rs`
+5. Build event logging in `llmspell-agents/src/monitoring/logging.rs`
+6. Add alerting rules in `llmspell-agents/src/monitoring/alerts.rs`
+7. Create monitoring examples in `llmspell-agents/examples/monitoring_setup.rs`
+8. Update `llmspell-agents/src/monitoring/mod.rs` to coordinate monitoring
+
+**Definition of Done:**
+- [ ] Metrics collected
+- [ ] Health monitored
+- [ ] Tracing active
+- [ ] Logs structured
+- [ ] Alerts configured
+
+### Task 3.3.10: Agent Examples and Use Cases
+**Priority**: HIGH  
+**Estimated Time**: 16 hours  
+**Assignee**: Developer Experience Team
+
+**Description**: Create comprehensive agent examples demonstrating various agent patterns and use cases.
+
+**Acceptance Criteria:**
+- [ ] 10+ agent examples
+- [ ] All patterns demonstrated
+- [ ] Real-world use cases
+- [ ] Performance showcases
+- [ ] Example library
+
+**Implementation Steps:**
+1. Design example scenarios in `llmspell-agents/examples/README.md`
+2. Implement tool orchestrator agent in `llmspell-agents/examples/tool_orchestrator.rs`
+3. Create multi-agent coordinator in `llmspell-agents/examples/multi_agent_coordinator.rs`
+4. Build monitoring agent example in `llmspell-agents/examples/monitoring_agent.rs`
+5. Add data pipeline agent in `llmspell-agents/examples/data_pipeline_agent.rs`
+6. Create research agent example in `llmspell-agents/examples/research_agent.rs`
+7. Add code generation agent in `llmspell-agents/examples/code_gen_agent.rs`
+8. Implement decision-making agent in `llmspell-agents/examples/decision_agent.rs`
+9. Create agent library catalog in `llmspell-agents/examples/agent_library.rs`
+10. Document all examples in `llmspell-agents/examples/GUIDE.md`
+
+**Definition of Done:**
+- [ ] Examples complete
+- [ ] All patterns shown
+- [ ] Use cases clear
+- [ ] Library ready
+- [ ] Documentation done
+
+### Task 3.3.11: Agent Testing Framework
+**Priority**: CRITICAL  
+**Estimated Time**: 16 hours  
+**Assignee**: QA Team
+
+**Description**: Create comprehensive testing framework for agent infrastructure.
+
+**Acceptance Criteria:**
+- [ ] Agent test utilities
+- [ ] Mock agent support
+- [ ] Lifecycle testing
+- [ ] Communication testing
+- [ ] Integration tests
+
+**Implementation Steps:**
+1. Create test framework in `llmspell-agents/src/testing/framework.rs`
+2. Add mock agent support in `llmspell-agents/src/testing/mocks.rs`
+3. Implement lifecycle tests in `llmspell-agents/tests/lifecycle_tests.rs`
+4. Add communication tests in `llmspell-agents/tests/communication_tests.rs`
+5. Create integration tests in `llmspell-agents/tests/integration/`
+6. Build test scenarios in `llmspell-agents/src/testing/scenarios.rs`
+7. Create test utilities in `llmspell-agents/src/testing/utils.rs`
+8. Document testing in `llmspell-agents/tests/README.md`
+
+**Definition of Done:**
+- [ ] Framework ready
+- [ ] Mocks working
+- [ ] Lifecycle tested
+- [ ] Communication verified
+- [ ] Tests automated
+
+### Task 3.3.12: Basic Sequential Workflow
+**Priority**: CRITICAL  
+**Estimated Time**: 16 hours  
+**Assignee**: Workflow Team
+
+**Description**: Implement basic sequential workflow pattern that works with current Phase 3 infrastructure (no persistent state required).
+
+**Acceptance Criteria:**
+- [ ] BasicSequentialWorkflow trait implementation
+- [ ] Step execution using tools and agents
+- [ ] Basic error handling strategies (fail, continue, retry)
+- [ ] Memory-based state management
+- [ ] Integration with agent infrastructure
+- [ ] Tool composition through workflow steps
+- [ ] Agent composition through workflow steps
+- [ ] Performance acceptable (<50ms workflow creation)
+
+**Implementation Steps:**
+1. Define BasicWorkflow trait in `llmspell-workflows/src/basic/traits.rs`
+2. Define WorkflowInput/Output types in `llmspell-workflows/src/basic/types.rs`
+3. Implement BasicSequentialWorkflow in `llmspell-workflows/src/basic/sequential.rs`
+4. Add step execution logic in `llmspell-workflows/src/basic/step_executor.rs`
+5. Implement error handling strategies in `llmspell-workflows/src/basic/error_handling.rs`
+6. Add memory-based state in `llmspell-workflows/src/basic/state.rs`
+7. Create workflow-tool integration in `llmspell-workflows/src/basic/tool_integration.rs`
+8. Create workflow-agent integration in `llmspell-workflows/src/basic/agent_integration.rs`
+9. Add examples in `llmspell-workflows/examples/sequential_workflow.rs`
+10. Write tests in `llmspell-workflows/tests/sequential_tests.rs`
+
+**Definition of Done:**
+- [ ] BasicSequentialWorkflow implemented and functional
+- [ ] Can execute tool steps using 33+ standardized tools
+- [ ] Can execute agent steps using agent infrastructure
+- [ ] Error handling strategies working
+- [ ] Memory-based state management functional
+- [ ] Integration with Phase 3 infrastructure complete
+- [ ] Performance requirements met
+- [ ] Comprehensive test coverage
+- [ ] Documentation complete
+
+### Task 3.3.13: Basic Conditional Workflow
+**Priority**: CRITICAL  
+**Estimated Time**: 16 hours  
+**Assignee**: Workflow Team
+
+**Description**: Implement basic conditional workflow pattern with memory-based branching logic.
+
+**Acceptance Criteria:**
+- [ ] BasicConditionalWorkflow implementation
+- [ ] Memory-based condition evaluation
+- [ ] Branching logic for workflow steps
+- [ ] Integration with tools and agents
+- [ ] Condition types (value comparisons, result status, custom)
+- [ ] Step navigation based on conditions
+- [ ] Error handling for invalid conditions
+- [ ] Performance optimized condition evaluation
+
+**Implementation Steps:**
+1. Design conditional step structures in `llmspell-workflows/src/basic/conditional/types.rs`
+2. Implement BasicCondition evaluation in `llmspell-workflows/src/basic/conditional/conditions.rs`
+3. Add BasicConditionalWorkflow in `llmspell-workflows/src/basic/conditional.rs`
+4. Create branch navigation logic in `llmspell-workflows/src/basic/conditional/navigation.rs`
+5. Integrate with step results in `llmspell-workflows/src/basic/conditional/evaluation.rs`
+6. Implement custom condition support in `llmspell-workflows/src/basic/conditional/custom.rs`
+7. Add error handling in `llmspell-workflows/src/basic/conditional/errors.rs`
+8. Create examples in `llmspell-workflows/examples/conditional_workflow.rs`
+9. Write tests in `llmspell-workflows/tests/conditional_tests.rs`
+
+**Definition of Done:**
+- [ ] BasicConditionalWorkflow operational
+- [ ] Condition evaluation system working
+- [ ] Branching logic functional
+- [ ] Integration with tools/agents complete
+- [ ] Custom conditions supported
+- [ ] Error handling comprehensive
+- [ ] Performance acceptable
+- [ ] Test coverage complete
+- [ ] Documentation ready
+
+### Task 3.3.14: Basic Loop Workflow
+**Priority**: CRITICAL  
+**Estimated Time**: 16 hours  
+**Assignee**: Workflow Team
+
+**Description**: Implement basic loop workflow pattern for iterative processing without persistent state.
+
+**Acceptance Criteria:**
+- [ ] BasicLoopWorkflow implementation
+- [ ] Iterator support (collection, range, while-condition)
+- [ ] Loop body execution with tools/agents
+- [ ] Break condition evaluation
+- [ ] Maximum iteration limits
+- [ ] Memory-efficient iteration
+- [ ] Error handling within loops
+- [ ] Result aggregation from iterations
+
+**Implementation Steps:**
+1. Define BasicIterator types in `llmspell-workflows/src/basic/loop/iterators.rs`
+2. Implement BasicLoopWorkflow in `llmspell-workflows/src/basic/loop.rs`
+3. Add collection iteration in `llmspell-workflows/src/basic/loop/collection_iterator.rs`
+4. Add range iteration in `llmspell-workflows/src/basic/loop/range_iterator.rs`
+5. Implement while-condition in `llmspell-workflows/src/basic/loop/while_iterator.rs`
+6. Add break conditions in `llmspell-workflows/src/basic/loop/break_conditions.rs`
+7. Create loop body executor in `llmspell-workflows/src/basic/loop/body_executor.rs`
+8. Add result aggregation in `llmspell-workflows/src/basic/loop/aggregation.rs`
+9. Create examples in `llmspell-workflows/examples/loop_workflow.rs`
+10. Write tests in `llmspell-workflows/tests/loop_tests.rs`
+
+**Definition of Done:**
+- [ ] BasicLoopWorkflow functional
+- [ ] All iterator types working
+- [ ] Loop body execution with tools/agents operational
+- [ ] Break conditions evaluated correctly
+- [ ] Maximum iterations enforced
+- [ ] Memory usage optimized
+- [ ] Error handling within loops working
+- [ ] Result aggregation functional
+- [ ] Documentation complete
+
+### Task 3.3.15: Workflow-Agent Integration
+**Priority**: CRITICAL  
+**Estimated Time**: 12 hours  
+**Assignee**: Integration Team
+
+**Description**: Implement bidirectional integration between workflows and agents.
+
+**Acceptance Criteria:**
+- [ ] WorkflowAgent implementation (agents can execute workflows)
+- [ ] Workflow step execution using agents
+- [ ] Agent parameter passing to/from workflows
+- [ ] Basic workflow registry system
+- [ ] Workflow discovery from agent context
+- [ ] Integration with existing agent infrastructure
+- [ ] Performance optimization for agent-workflow calls
+- [ ] Error handling for agent-workflow interactions
+
+**Implementation Steps:**
+1. Implement WorkflowAgent in `llmspell-workflows/src/agent_integration/workflow_agent.rs`
+2. Add agent step execution in `llmspell-workflows/src/basic/agent_step.rs`
+3. Create BasicWorkflowRegistry in `llmspell-workflows/src/registry.rs`
+4. Add workflow discovery in `llmspell-agents/src/context/workflow_discovery.rs`
+5. Implement parameter conversion in `llmspell-workflows/src/agent_integration/conversion.rs`
+6. Add error handling in `llmspell-workflows/src/agent_integration/errors.rs`
+7. Optimize performance in `llmspell-workflows/src/agent_integration/optimization.rs`
+8. Create integration examples in `llmspell-workflows/examples/agent_workflow_integration.rs`
+9. Update `llmspell-workflows/src/lib.rs` to export agent integration
+
+**Definition of Done:**
+- [ ] WorkflowAgent implemented and operational
+- [ ] Workflows can execute agent steps
+- [ ] BasicWorkflowRegistry functional
+- [ ] Workflow discovery working
+- [ ] Parameter conversion bidirectional
+- [ ] Error handling comprehensive
+- [ ] Performance acceptable
+- [ ] Integration examples working
+- [ ] Documentation complete
+
+### Task 3.3.16: Workflow Examples and Testing
+**Priority**: HIGH  
+**Estimated Time**: 12 hours  
+**Assignee**: QA Team
+
+**Description**: Create comprehensive workflow examples and testing framework for basic workflow patterns.
+
+**Acceptance Criteria:**
+- [ ] 5+ workflow examples covering all patterns
+- [ ] Real-world use case demonstrations
+- [ ] Tool integration examples
+- [ ] Agent integration examples
+- [ ] Performance benchmarking
+- [ ] Error scenario testing
+- [ ] Documentation with step-by-step guides
+- [ ] Integration with existing example library
+
+**Implementation Steps:**
+1. Create data pipeline example in `llmspell-workflows/examples/data_pipeline.rs`
+2. Create conditional decision example in `llmspell-workflows/examples/decision_workflow.rs`
+3. Create iterative processing example in `llmspell-workflows/examples/iterative_processing.rs`
+4. Create agent coordination example in `llmspell-workflows/examples/agent_coordination.rs`
+5. Create tool orchestration example in `llmspell-workflows/examples/tool_orchestration.rs`
+6. Add testing framework in `llmspell-workflows/src/testing/framework.rs`
+7. Add performance benchmarks in `llmspell-workflows/benches/workflow_benchmarks.rs`
+8. Create error scenarios in `llmspell-workflows/tests/error_scenarios.rs`
+9. Document examples in `llmspell-workflows/examples/WORKFLOW_GUIDE.md`
+
+**Definition of Done:**
+- [ ] 5 comprehensive workflow examples created
+- [ ] All workflow patterns demonstrated
+- [ ] Real-world use cases covered
+- [ ] Tool and agent integration shown
+- [ ] Performance benchmarking complete
+- [ ] Error scenario testing finished
+- [ ] Documentation comprehensive
+- [ ] Examples integrated with library
+
+### Task 3.3.17: Lua Agent and Workflow Examples
+**Priority**: HIGH  
+**Estimated Time**: 12 hours  
+**Assignee**: Bridge Team
+
+**Description**: Create comprehensive Lua examples demonstrating agent and workflow usage from scripts, building on the script-to-agent integration and basic workflow patterns.
+
+**Acceptance Criteria:**
+- [ ] 7+ comprehensive Lua examples (agents and workflows)
+- [ ] Cover all major agent patterns (tool orchestrator, monitor, data processor, coordinator)
+- [ ] **Demonstrate all workflow patterns** (sequential, conditional, loop)
+- [ ] **Show workflow-agent integration** from Lua
+- [ ] Demonstrate agent discovery and invocation from scripts
+- [ ] Show parameter passing and result handling
+- [ ] Include error handling and timeout patterns
+- [ ] Integration with existing Lua tool examples
+- [ ] Performance optimization examples
+- [ ] Real-world use case scenarios
+
+**Implementation Steps:**
+1. Create agent-orchestrator.lua in `examples/lua/agents/agent-orchestrator.lua`
+2. Create agent-monitor.lua in `examples/lua/agents/agent-monitor.lua`
+3. Create agent-processor.lua in `examples/lua/agents/agent-processor.lua`
+4. Create agent-coordinator.lua in `examples/lua/agents/agent-coordinator.lua`
+5. Create workflow-sequential.lua in `examples/lua/workflows/workflow-sequential.lua`
+6. Create workflow-conditional.lua in `examples/lua/workflows/workflow-conditional.lua`
+7. Create workflow-loop.lua in `examples/lua/workflows/workflow-loop.lua`
+8. Create workflow-agent-integration.lua in `examples/lua/workflows/workflow-agent-integration.lua`
+9. Update `llmspell-bridge/src/lua/agent_api.rs` to expose agent functions
+10. Update `llmspell-bridge/src/lua/workflow_api.rs` to expose workflow functions
+11. Create Lua API documentation in `examples/lua/AGENT_WORKFLOW_API.md`
+
+**Definition of Done:**
+- [ ] 7 comprehensive Lua examples created
+- [ ] All agent patterns demonstrated
+- [ ] **All workflow patterns demonstrated**
+- [ ] **Workflow-agent integration shown**
+- [ ] Agent/workflow discovery working from Lua
+- [ ] Parameter conversion validated
+- [ ] Error handling comprehensive
+- [ ] Performance acceptable
+- [ ] Integration with bridge complete
+- [ ] Documentation complete
+
+### Task 3.3.18: Phase 3 Final Integration
+**Priority**: CRITICAL  
+**Estimated Time**: 16 hours  
+**Assignee**: Integration Lead
+
+**Description**: Final integration and validation of entire Phase 3.
+
+**Acceptance Criteria:**
+- [ ] All 33 tools standardized and secured
+- [ ] Agent infrastructure fully functional
+- [ ] **Basic workflow patterns operational**
+- [ ] **Workflow-agent integration functional**
+- [ ] **Multi-agent coordination via workflows demonstrated**
+- [ ] Script-to-agent integration operational
+- [ ] Lua agent and workflow examples working
+- [ ] Performance targets met
+- [ ] Documentation complete
+- [ ] Ready for production
+
+**Implementation Steps:**
+1. Run full integration tests in `tests/phase3_integration.rs`
+2. Verify tool standardization in `llmspell-tools/tests/standardization_tests.rs`
+3. Test agent infrastructure in `llmspell-agents/tests/integration/`
+4. Validate basic workflow patterns in `llmspell-workflows/tests/integration/`
+5. Test workflow-agent integration in `llmspell-workflows/tests/agent_integration_tests.rs`
+6. Verify multi-agent coordination in `tests/multi_agent_scenarios.rs`
+7. Validate script-to-agent bridge in `llmspell-bridge/tests/agent_bridge_tests.rs`
+8. Test Lua examples in `examples/lua/test_all_examples.sh`
+9. Measure performance in `benches/phase3_benchmarks.rs`
+10. Review documentation in `docs/phase3_checklist.md`
+11. Create handoff package in `docs/phase3_handoff/`
+12. Conduct final review using `scripts/phase3_validation.sh`
+
+**Definition of Done:**
+- [ ] Integration complete
+- [ ] All tests passing
+- [ ] **Basic workflow patterns validated**
+- [ ] **Workflow-agent integration working**
+- [ ] **Multi-agent coordination functional**
+- [ ] Script-to-agent bridge validated
+- [ ] Lua examples functional
+- [ ] Performance verified
+- [ ] Documentation ready
+- [ ] Handoff prepared
 
 ---
+
+## Phase 3 Completion Validation
+
+### Final System Test
+**Priority**: CRITICAL  
+**Estimated Time**: 8 hours  
+**Assignee**: QA Lead
+
+**Description**: Comprehensive validation that Phase 3 meets all success criteria.
+
+**Acceptance Criteria:**
+- [ ] 95% parameter consistency achieved
+- [ ] 95% DRY compliance verified
+- [ ] All security vulnerabilities addressed
+- [ ] 33+ tools production ready
+- [ ] Agent infrastructure operational
+
+**System Test Steps:**
+1. Tool consistency audit
+2. DRY compliance check
+3. Security validation
+4. Agent infrastructure tests
+5. Performance verification
+6. Documentation review
+
+**Phase 3 Success Metrics:**
+- [ ] **Tool Metrics**:
+  - 33+ tools implemented and standardized
+  - 95% parameter consistency (from 60%)
+  - 95% DRY compliance (from 80%)
+  - 100% ResponseBuilder adoption
+  - Zero known security vulnerabilities
+
+- [ ] **Agent Infrastructure & Multi-Agent Coordination Metrics**:
+  - Agent Factory operational
+  - Registry system functional
+  - Lifecycle management working
+  - Templates available
+  - BaseAgent tool integration functional
+  - Script-to-agent bridge operational
+  - **Basic workflow patterns functional** (Sequential, Conditional, Loop)
+  - **Workflow-agent integration operational**
+  - **Multi-agent coordination via workflows demonstrated**
+  - Composition patterns implemented
+  - Lua agent examples working
+
+- [ ] **Performance Metrics**:
+  - 52,600x performance target maintained
+  - <10ms tool initialization
+  - <50ms agent creation overhead
+  - Memory usage optimized
+  - Resource limits enforced
+
+- [ ] **Quality Metrics**:
+  - 100% test coverage for new code
+  - All tools have updated documentation
+  - Security audit passed
+  - Documentation complete
+  - Examples for all patterns
+
+---
+
+## Handoff to Phase 4
+
+### Deliverables Package
+- [ ] 33+ standardized production tools
+- [ ] Complete agent infrastructure system
+- [ ] Comprehensive security measures
+- [ ] Breaking changes documentation
+- [ ] Performance benchmarks
+- [ ] Full documentation set
+- [ ] Example library
+- [ ] Test suite
+
+### Knowledge Transfer Session
+- [ ] Tool standardization walkthrough
+- [ ] Security measures review
+- [ ] Agent infrastructure demonstration
+- [ ] Performance optimization review
+- [ ] Update strategy explanation
+- [ ] Q&A with Phase 4 team
+
+**Phase 3 Completion**: Tool enhancement and agent infrastructure complete, ready for Phase 4 vector storage implementation.

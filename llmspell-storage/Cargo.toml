@@ -12,6 +12,11 @@ llmspell-core = { path = "../llmspell-core" }
 tokio.workspace = true
 async-trait.workspace = true
 serde.workspace = true
+serde_json.workspace = true
 anyhow.workspace = true
 tracing.workspace = true
 sled.workspace = true
+tempfile = { workspace = true, optional = true }
+
+[dev-dependencies]
+tempfile.workspace = true

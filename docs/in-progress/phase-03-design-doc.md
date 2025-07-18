@@ -840,6 +840,8 @@ impl ToolCache {
 ### Goal
 Implement comprehensive agent infrastructure including factory patterns, registry system, lifecycle management, and pre-configured templates that leverage all 41+ standardized and secured tools.
 
+**Note**: During implementation, the need for a unified storage abstraction emerged for agent registry persistence. This led to the creation of `llmspell-storage` as a foundational crate providing backend-agnostic persistence with support for memory (testing), Sled (embedded database), and future RocksDB backends. This storage layer follows the same design principles as the tool standardization efforts and provides type-safe serialization abstractions.
+
 ### 1. Agent Factory Pattern
 
 ```rust
@@ -950,6 +952,169 @@ pub struct RegistryMetadata {
     pub tags: Vec<String>,
     pub capabilities: Vec<AgentCapability>,
 }
+
+#### 2.2 Storage Backend Integration
+
+During implementation, a unified storage abstraction layer was discovered to be essential for agent registry persistence. This led to the creation of `llmspell-storage` as a foundational crate providing backend-agnostic persistence.
+
+##### 2.2.1 Storage Architecture
+
+```rust
+// llmspell-storage/src/traits.rs
+#[async_trait]
+pub trait StorageBackend: Send + Sync {
+    /// Get a value by key
+    async fn get(&self, key: &str) -> Result<Option<Vec<u8>>>;
+    
+    /// Set a key-value pair
+    async fn set(&self, key: &str, value: Vec<u8>) -> Result<()>;
+    
+    /// Delete a key
+    async fn delete(&self, key: &str) -> Result<()>;
+    
+    /// Check if a key exists
+    async fn exists(&self, key: &str) -> Result<bool>;
+    
+    /// List all keys with a given prefix
+    async fn list_keys(&self, prefix: &str) -> Result<Vec<String>>;
+    
+    /// Get multiple values by keys (batch operation)
+    async fn get_batch(&self, keys: &[String]) -> Result<HashMap<String, Vec<u8>>>;
+    
+    /// Set multiple key-value pairs (batch operation)
+    async fn set_batch(&self, items: HashMap<String, Vec<u8>>) -> Result<()>;
+    
+    /// Delete multiple keys (batch operation)
+    async fn delete_batch(&self, keys: &[String]) -> Result<()>;
+    
+    /// Clear all data (use with caution)
+    async fn clear(&self) -> Result<()>;
+    
+    /// Get the backend type
+    fn backend_type(&self) -> StorageBackendType;
+    
+    /// Get backend characteristics
+    fn characteristics(&self) -> StorageCharacteristics;
+}
+
+/// Helper trait for serialization/deserialization
+pub trait StorageSerialize: Sized {
+    fn to_storage_bytes(&self) -> Result<Vec<u8>>;
+    fn from_storage_bytes(bytes: &[u8]) -> Result<Self>;
+}
+
+/// Default implementation for serde types
+impl<T> StorageSerialize for T
+where
+    T: Serialize + for<'de> Deserialize<'de>,
+{
+    fn to_storage_bytes(&self) -> Result<Vec<u8>> {
+        Ok(serde_json::to_vec(self)?)
+    }
+    
+    fn from_storage_bytes(bytes: &[u8]) -> Result<Self> {
+        Ok(serde_json::from_slice(bytes)?)
+    }
+}
+```
+
+##### 2.2.2 Storage Backend Implementations
+
+```rust
+// llmspell-storage/src/backends/memory.rs
+pub struct MemoryBackend {
+    data: Arc<RwLock<HashMap<String, Vec<u8>>>>,
+}
+
+impl MemoryBackend {
+    pub fn new() -> Self {
+        Self {
+            data: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+}
+
+// llmspell-storage/src/backends/sled_backend.rs  
+pub struct SledBackend {
+    db: sled::Db,
+    path: PathBuf,
+}
+
+impl SledBackend {
+    pub async fn new(path: impl AsRef<Path>) -> Result<Self> {
+        let path = path.as_ref().to_path_buf();
+        let db = sled::open(&path)?;
+        
+        Ok(Self { db, path })
+    }
+}
+
+// Future: RocksDB backend for high-performance scenarios
+// llmspell-storage/src/backends/rocksdb_backend.rs
+```
+
+##### 2.2.3 Registry Persistence Integration
+
+```rust
+// llmspell-agents/src/registry/persistence.rs
+pub struct PersistentAgentRegistry {
+    /// Storage backend from llmspell-storage
+    storage: Arc<dyn StorageBackend>,
+    
+    /// Runtime agents (not persisted)
+    runtime_agents: Arc<RwLock<HashMap<String, Arc<dyn Agent>>>>,
+    
+    /// Metadata cache for performance
+    metadata_cache: Arc<RwLock<HashMap<String, AgentMetadata>>>,
+}
+
+impl PersistentAgentRegistry {
+    pub async fn new(storage: Arc<dyn StorageBackend>) -> Result<Self> {
+        // Load existing metadata from storage
+        let metadata = Self::load_all_metadata(&storage).await?;
+        
+        Ok(Self {
+            storage,
+            runtime_agents: Arc::new(RwLock::new(HashMap::new())),
+            metadata_cache: Arc::new(RwLock::new(metadata)),
+        })
+    }
+    
+    /// Persist current state to storage
+    pub async fn persist(&self) -> Result<()> {
+        let cache = self.metadata_cache.read().await;
+        
+        // Save individual metadata entries
+        for (id, metadata) in cache.iter() {
+            let key = format!("agent:metadata:{}", id);
+            let data = metadata.to_storage_bytes()?;
+            self.storage.set(&key, data).await?;
+        }
+        
+        // Also save a snapshot for faster loading
+        let snapshot_data = cache.to_storage_bytes()?;
+        self.storage.set("registry:snapshot", snapshot_data).await?;
+        
+        Ok(())
+    }
+}
+```
+
+##### 2.2.4 Storage Benefits and Design Rationale
+
+**Key Benefits:**
+- **Backend Agnostic**: Registry works with memory, disk, or future cloud storage
+- **Performance Optimized**: Batch operations and caching for high throughput
+- **Type Safe**: StorageSerialize trait provides compile-time serialization guarantees
+- **Test Friendly**: MemoryBackend enables fast, isolated testing
+- **Production Ready**: SledBackend provides ACID persistence
+
+**Design Decisions:**
+- **Trait-Based**: StorageBackend trait allows swapping implementations
+- **Async First**: All operations are async for non-blocking I/O
+- **Batch Operations**: Optimized for bulk operations (registry snapshots)
+- **Key Namespacing**: Prefix-based key organization prevents collisions
+- **Serialization Abstraction**: Generic over serde types with fallback to JSON
 
 impl AgentRegistry {
     pub async fn new(factory: Arc<AgentFactory>, config: RegistryConfig) -> Result<Self> {

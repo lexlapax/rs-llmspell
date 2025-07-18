@@ -9,6 +9,7 @@ license.workspace = true
 
 [dependencies]
 llmspell-core = { path = "../llmspell-core" }
+llmspell-storage = { path = "../llmspell-storage" }
 tokio.workspace = true
 async-trait.workspace = true
 serde.workspace = true
@@ -16,6 +17,8 @@ serde_json.workspace = true
 anyhow.workspace = true
 tracing.workspace = true
 once_cell.workspace = true
+chrono.workspace = true
+uuid.workspace = true
 
 [dev-dependencies]
 tracing-subscriber.workspace = true
