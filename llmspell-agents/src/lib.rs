@@ -12,6 +12,7 @@ pub mod factory_registry;
 pub mod health;
 pub mod lifecycle;
 pub mod registry;
+pub mod templates;
 pub mod tool_context;
 pub mod tool_discovery;
 pub mod tool_errors;

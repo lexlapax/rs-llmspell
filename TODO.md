@@ -175,11 +175,11 @@
 **Description**: Implement comprehensive agent lifecycle management including initialization, running, pausing, and termination.
 
 **Acceptance Criteria:**
-- [ ] Agent state machine implementation
-- [ ] Lifecycle event system
-- [ ] Resource management hooks
-- [ ] Graceful shutdown support
-- [ ] Health monitoring integration
+- [x] Agent state machine implementation ✅ (Complete with 9 states and deterministic transitions)
+- [x] Lifecycle event system ✅ (Pub/sub system with typed events and filtering)
+- [x] Resource management hooks ✅ (Allocation/deallocation with limits and cleanup)
+- [x] Graceful shutdown support ✅ (Priority-based shutdown with timeout handling)
+- [x] Health monitoring integration ✅ (State machine, resource, and responsiveness checks)
 
 **Implementation Steps:**
 ensure it's certain implementations are consisten with what should go in `llmspell-hooks` look at `docs/technical/rs-llmspell-final-architecture.md` and `docs/in-progress/implementation-phases.md` e.g. hooks, health etc..
@@ -193,45 +193,48 @@ ensure it's certain implementations are consisten with what should go in `llmspe
 8. Update `llmspell-agents/src/lifecycle/mod.rs` to coordinate all lifecycle components
 
 **Definition of Done:**
-- [ ] State machine working
-- [ ] Events firing correctly
-- [ ] Resources managed
-- [ ] Shutdown graceful
-- [ ] Monitoring active
+- [x] State machine working ✅ (All state transitions and lifecycle methods functional)
+- [x] Events firing correctly ✅ (Event system with listeners and metrics working)
+- [x] Resources managed ✅ (Resource allocation, limits, and cleanup operational)
+- [x] Shutdown graceful ✅ (Priority-based shutdown with hooks and timeout handling)
+- [x] Monitoring active ✅ (Health checks for state machine, resources, and responsiveness)
 
-### Task 3.3.5: Agent Templates System
+### Task 3.3.5: Agent Templates System ✅
 **Priority**: HIGH  
 **Estimated Time**: 20 hours  
 **Assignee**: Developer Experience Team
+**Status**: Completed
+**Started**: 2025-07-18
+**Completed**: 2025-07-18
 
 **Description**: Create a comprehensive agent template system with pre-configured agent patterns.
 
 **Acceptance Criteria:**
-- [ ] Template definition framework
-- [ ] Common agent templates (Tool Agent, Orchestrator Agent, Monitor Agent, etc.)
-- [ ] Template customization support
-- [ ] Template validation system
+- [x] Template definition framework ✅ (schema.rs with comprehensive metadata and validation)
+- [x] Common agent templates (Tool Agent, Orchestrator Agent, Monitor Agent, etc.) ✅ (3 templates implemented)
+- [x] Template customization support ✅ (customization.rs with builders and mixins)
+- [x] Template validation system ✅ (comprehensive validation.rs with rules and analyzers)
 - [ ] Template marketplace preparation
-- [ ] Templates can specify tool dependencies
-- [ ] Tool integration patterns in templates
+- [x] Templates can specify tool dependencies ✅ (ToolDependency in schema)
+- [x] Tool integration patterns in templates ✅ (each template defines required/optional tools)
 
 **Implementation Steps:**
-1. Design template definition schema in `llmspell-agents/src/templates/schema.rs`
-2. Create base template trait in `llmspell-agents/src/templates/base.rs`
-3. Implement Tool Agent template in `llmspell-agents/src/templates/tool_agent.rs`
-4. Implement Orchestrator Agent template in `llmspell-agents/src/templates/orchestrator_agent.rs`
-5. Implement Monitor Agent template in `llmspell-agents/src/templates/monitor_agent.rs`
-6. Add template customization API in `llmspell-agents/src/templates/customization.rs`
-7. Build template validation in `llmspell-agents/src/templates/validation.rs`
-8. Create template examples in `llmspell-agents/examples/template_usage.rs`
-9. Update `llmspell-agents/src/templates/mod.rs` to export all templates
+1. [x] Design template definition schema in `llmspell-agents/src/templates/schema.rs` ✅ 2025-07-18
+2. [x] Create base template trait in `llmspell-agents/src/templates/base.rs` ✅ 2025-07-18
+3. [x] Implement Tool Agent template in `llmspell-agents/src/templates/tool_agent.rs` ✅ 2025-07-18
+4. [x] Implement Orchestrator Agent template in `llmspell-agents/src/templates/orchestrator_agent.rs` ✅ 2025-07-18
+5. [x] Implement Monitor Agent template in `llmspell-agents/src/templates/monitor_agent.rs` ✅ 2025-07-18
+6. [x] Add template customization API in `llmspell-agents/src/templates/customization.rs` ✅ 2025-07-18
+7. [x] Build template validation in `llmspell-agents/src/templates/validation.rs` ✅ 2025-07-18
+8. [x] Create template examples in `llmspell-agents/examples/template_usage.rs` ✅ 2025-07-18
+9. [x] Update `llmspell-agents/src/templates/mod.rs` to export all templates ✅ 2025-07-18
 
 **Definition of Done:**
-- [ ] Templates defined
-- [ ] Common patterns implemented
-- [ ] Customization working
-- [ ] Validation complete
-- [ ] Examples ready
+- [x] Templates defined ✅
+- [x] Common patterns implemented ✅
+- [x] Customization working ✅
+- [x] Validation complete ✅
+- [x] Examples ready ✅
 
 ### Task 3.3.6: Enhanced ExecutionContext
 **Priority**: HIGH  

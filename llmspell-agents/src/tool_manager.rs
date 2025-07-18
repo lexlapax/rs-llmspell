@@ -37,6 +37,7 @@ use tokio::sync::RwLock;
 /// use llmspell_tools::registry::ToolRegistry;
 /// use llmspell_core::traits::tool_capable::ToolQuery;
 /// use serde_json::json;
+/// use std::sync::Arc;
 ///
 /// # async fn example() -> llmspell_core::Result<()> {
 /// let registry = Arc::new(ToolRegistry::new());
@@ -503,9 +504,7 @@ impl ToolManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use llmspell_core::traits::tool_capable::{
-        ContextMode, ErrorStrategy, ToolComposition, ToolCompositionStep, ToolQuery,
-    };
+    use llmspell_core::traits::tool_capable::{ToolComposition, ToolQuery};
     use llmspell_tools::registry::ToolRegistry;
     use serde_json::json;
 

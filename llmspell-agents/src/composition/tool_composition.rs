@@ -22,14 +22,14 @@ use std::time::{Duration, Instant};
 ///
 /// // Add steps to the composition
 /// composition.add_step(CompositionStep::new("step1", "file_reader")
-///     .with_input_mapping("file_path", DataFlow::Parameter("input_file")));
+///     .with_input_mapping("file_path", DataFlow::Parameter("input_file".to_string())));
 ///
 /// composition.add_step(CompositionStep::new("step2", "text_processor")
-///     .with_input_mapping("text", DataFlow::StepOutput("step1", "content")));
+///     .with_input_mapping("text", DataFlow::StepOutput("step1".to_string(), "content".to_string())));
 ///
 /// composition.add_step(CompositionStep::new("step3", "file_writer")
-///     .with_input_mapping("content", DataFlow::StepOutput("step2", "processed_text"))
-///     .with_input_mapping("output_path", DataFlow::Parameter("output_file")));
+///     .with_input_mapping("content", DataFlow::StepOutput("step2".to_string(), "processed_text".to_string()))
+///     .with_input_mapping("output_path", DataFlow::Parameter("output_file".to_string())));
 ///
 /// // Execute the composition
 /// let initial_params = json!({"input_file": "/path/to/input.txt", "output_file": "/path/to/output.txt"});

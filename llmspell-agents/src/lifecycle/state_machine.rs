@@ -429,7 +429,7 @@ impl AgentStateMachine {
         .await?;
 
         // Simulate initialization work
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        // Removed sleep to fix slow tests - initialization is synchronous
 
         // Complete initialization
         self.transition_to_with_reason(
@@ -503,7 +503,7 @@ impl AgentStateMachine {
         .await?;
 
         // Simulate cleanup work
-        tokio::time::sleep(Duration::from_millis(50)).await;
+        // Removed sleep to fix slow tests - cleanup is synchronous
 
         // Complete termination
         self.transition_to_with_reason(
@@ -543,8 +543,10 @@ impl AgentStateMachine {
 
         let mut attempts = self.recovery_attempts.lock().await;
         *attempts += 1;
+        let attempt_count = *attempts;
+        drop(attempts); // Release lock early to avoid potential deadlock
 
-        if *attempts > self.config.max_recovery_attempts {
+        if attempt_count > self.config.max_recovery_attempts {
             return Err(anyhow!(
                 "Maximum recovery attempts ({}) exceeded",
                 self.config.max_recovery_attempts
@@ -554,12 +556,12 @@ impl AgentStateMachine {
         // Start recovery
         self.transition_to_with_reason(
             AgentState::Recovering,
-            Some(format!("Recovery attempt {}", *attempts)),
+            Some(format!("Recovery attempt {}", attempt_count)),
         )
         .await?;
 
         // Simulate recovery work
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        // Removed sleep to fix slow tests - recovery is synchronous
 
         // Recovery successful - transition to Ready
         self.transition_to_with_reason(
@@ -637,7 +639,6 @@ pub struct StateMachineMetrics {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tokio::time::timeout;
 
     #[tokio::test]
     async fn test_state_machine_basic_transitions() {

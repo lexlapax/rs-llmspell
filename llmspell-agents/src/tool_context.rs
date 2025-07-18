@@ -573,7 +573,7 @@ mod tests {
         let manager = ToolContextManager::new();
         let base_context = ExecutionContext::new();
 
-        let context = manager.create_context("test_context", base_context).await;
+        let _context = manager.create_context("test_context", base_context).await;
         assert_eq!(manager.context_count().await, 1);
 
         let retrieved = manager.get_context("test_context").await;
