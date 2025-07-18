@@ -5,10 +5,8 @@ use super::traits::{
     Capability, CapabilityCategory, Composable, CompositionMetadata, CompositionType,
 };
 use async_trait::async_trait;
-use llmspell_core::{
-    BaseAgent, ComponentMetadata, ExecutionContext, LLMSpellError, Result,
-};
 use llmspell_core::types::{AgentInput, AgentOutput};
+use llmspell_core::{BaseAgent, ComponentMetadata, ExecutionContext, LLMSpellError, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -145,16 +143,16 @@ impl DelegatingAgent {
     /// Register an agent for delegation
     pub async fn register_agent(&self, agent: Arc<dyn BaseAgent>) -> Result<()> {
         let agent_id = agent.metadata().id.to_string();
-        
+
         // Store the agent
         let mut agents = self.agents.write().await;
         agents.insert(agent_id.clone(), agent.clone());
-        
+
         // Index capabilities if caching is enabled
         if self.config.cache_capabilities {
             self.index_agent_capabilities(&agent_id, agent).await?;
         }
-        
+
         Ok(())
     }
 
@@ -162,13 +160,13 @@ impl DelegatingAgent {
     pub async fn unregister_agent(&self, agent_id: &str) -> Result<()> {
         let mut agents = self.agents.write().await;
         agents.remove(agent_id);
-        
+
         // Remove from capabilities index
         let mut index = self.capabilities_index.write().await;
         for agents in index.values_mut() {
             agents.retain(|id| id != agent_id);
         }
-        
+
         Ok(())
     }
 
@@ -179,25 +177,23 @@ impl DelegatingAgent {
         _agent: Arc<dyn BaseAgent>,
     ) -> Result<()> {
         let mut index = self.capabilities_index.write().await;
-        
+
         // In a real implementation, we would query the agent's capabilities
         // For now, we'll add some default capabilities
-        let capabilities = vec![
-            Capability {
-                name: "general-processing".to_string(),
-                category: CapabilityCategory::DataProcessing,
-                version: None,
-                metadata: HashMap::new(),
-            },
-        ];
-        
+        let capabilities = vec![Capability {
+            name: "general-processing".to_string(),
+            category: CapabilityCategory::DataProcessing,
+            version: None,
+            metadata: HashMap::new(),
+        }];
+
         for capability in capabilities {
             index
                 .entry(capability.name)
-                .or_insert_with(Vec::new)
+                .or_default()
                 .push(agent_id.to_string());
         }
-        
+
         Ok(())
     }
 
@@ -206,7 +202,7 @@ impl DelegatingAgent {
         if self.config.cache_capabilities {
             let index = self.capabilities_index.read().await;
             let mut matching_agents = Vec::new();
-            
+
             for capability in capabilities {
                 if let Some(agents) = index.get(&capability.name) {
                     for agent in agents {
@@ -216,7 +212,7 @@ impl DelegatingAgent {
                     }
                 }
             }
-            
+
             matching_agents
         } else {
             // Without caching, return all agents
@@ -238,37 +234,35 @@ impl DelegatingAgent {
         let strategy = self.strategy.read().unwrap().clone();
         match strategy {
             DelegationStrategy::FirstMatch => matching_agents.into_iter().next(),
-            
+
             DelegationStrategy::BestMatch => {
                 // In a real implementation, we would score agents
                 // For now, just return the first
                 matching_agents.into_iter().next()
             }
-            
+
             DelegationStrategy::RoundRobin => {
                 let mut index = self.round_robin_index.write().unwrap();
                 let selected = matching_agents[*index % matching_agents.len()].clone();
                 *index += 1;
                 Some(selected)
             }
-            
+
             DelegationStrategy::Random => {
                 use rand::Rng;
                 let mut rng = rand::thread_rng();
                 let index = rng.gen_range(0..matching_agents.len());
                 Some(matching_agents[index].clone())
             }
-            
+
             DelegationStrategy::LoadBalanced => {
                 // Select agent with fewest delegations
                 let metrics = self.metrics.read().unwrap();
                 matching_agents
                     .into_iter()
-                    .min_by_key(|agent| {
-                        metrics.agent_delegations.get(agent).copied().unwrap_or(0)
-                    })
+                    .min_by_key(|agent| metrics.agent_delegations.get(agent).copied().unwrap_or(0))
             }
-            
+
             DelegationStrategy::Custom(_) => {
                 // Custom strategy would be implemented by extending this
                 matching_agents.into_iter().next()
@@ -279,10 +273,12 @@ impl DelegatingAgent {
     /// Delegate a request to an appropriate agent
     pub async fn delegate(&self, request: DelegationRequest) -> Result<DelegationResult> {
         let start_time = std::time::Instant::now();
-        
+
         // Find matching agents
-        let matching_agents = self.find_matching_agents(&request.required_capabilities).await;
-        
+        let matching_agents = self
+            .find_matching_agents(&request.required_capabilities)
+            .await;
+
         // Select an agent
         let selected_agent = self
             .select_agent(matching_agents, &request)
@@ -291,7 +287,7 @@ impl DelegatingAgent {
                 message: "No matching agent found for delegation".to_string(),
                 source: None,
             })?;
-        
+
         // Update metrics
         {
             let mut metrics = self.metrics.write().unwrap();
@@ -301,7 +297,7 @@ impl DelegatingAgent {
                 .entry(selected_agent.clone())
                 .or_insert(0) += 1;
         }
-        
+
         // Get the agent and delegate
         let agents = self.agents.read().await;
         let agent = agents
@@ -310,21 +306,21 @@ impl DelegatingAgent {
                 message: format!("Agent not found: {}", selected_agent),
                 source: None,
             })?;
-        
+
         // Execute with timeout
         let timeout = request.timeout.unwrap_or(self.config.default_timeout);
         let input = AgentInput::text(request.input.to_string());
         let context = ExecutionContext::new();
-        
+
         let result = tokio::time::timeout(timeout, agent.execute(input, context))
             .await
             .map_err(|_| LLMSpellError::Component {
                 message: "Delegation timeout".to_string(),
                 source: None,
             })?;
-        
+
         let duration = start_time.elapsed();
-        
+
         // Update metrics and create result
         match result {
             Ok(output) => {
@@ -335,7 +331,7 @@ impl DelegatingAgent {
                         + duration.as_secs())
                         / metrics.successful_delegations,
                 );
-                
+
                 Ok(DelegationResult {
                     task_id: request.task_id,
                     delegated_to: selected_agent,
@@ -348,11 +344,11 @@ impl DelegatingAgent {
             Err(e) => {
                 let mut metrics = self.metrics.write().unwrap();
                 metrics.failed_delegations += 1;
-                
+
                 if self.config.retry_on_failure && request.priority > 5 {
                     // Could implement retry logic here
                 }
-                
+
                 Ok(DelegationResult {
                     task_id: request.task_id,
                     delegated_to: selected_agent,
@@ -385,10 +381,10 @@ impl BaseAgent for DelegatingAgent {
     async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
         // Parse the input as a delegation request
         let request: DelegationRequest = serde_json::from_str(&input.text)?;
-        
+
         // Delegate the request
         let result = self.delegate(request).await?;
-        
+
         // Return the result
         Ok(AgentOutput::text(serde_json::to_string(&result)?))
     }
@@ -499,12 +495,12 @@ impl DelegatingAgentBuilder {
     pub async fn build(self) -> Result<DelegatingAgent> {
         let agent = DelegatingAgent::new(self.name, self.config);
         agent.set_strategy(self.strategy);
-        
+
         // Register initial agents
         for initial_agent in self.initial_agents {
             agent.register_agent(initial_agent).await?;
         }
-        
+
         Ok(agent)
     }
 }
@@ -522,37 +518,44 @@ mod tests {
     #[tokio::test]
     async fn test_agent_registration() {
         let delegator = DelegatingAgent::new("delegator", DelegationConfig::default());
-        
+
         // Create a mock agent
         struct MockAgent {
             metadata: ComponentMetadata,
         }
-        
+
         #[async_trait]
         impl BaseAgent for MockAgent {
             fn metadata(&self) -> &ComponentMetadata {
                 &self.metadata
             }
-            
-            async fn execute(&self, _input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+
+            async fn execute(
+                &self,
+                _input: AgentInput,
+                _context: ExecutionContext,
+            ) -> Result<AgentOutput> {
                 Ok(AgentOutput::text("Mock response"))
             }
-            
+
             async fn validate_input(&self, _input: &AgentInput) -> Result<()> {
                 Ok(())
             }
-            
+
             async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
                 Ok(AgentOutput::text(format!("Error: {}", error)))
             }
         }
-        
+
         let mock = Arc::new(MockAgent {
-            metadata: ComponentMetadata::new("mock-agent".to_string(), "Mock agent for testing".to_string()),
+            metadata: ComponentMetadata::new(
+                "mock-agent".to_string(),
+                "Mock agent for testing".to_string(),
+            ),
         });
-        
+
         delegator.register_agent(mock).await.unwrap();
-        
+
         let agents = delegator.agents.read().await;
         assert_eq!(agents.len(), 1);
     }
@@ -567,7 +570,7 @@ mod tests {
             DelegationStrategy::LoadBalanced,
             DelegationStrategy::Custom("test".to_string()),
         ];
-        
+
         for strategy in strategies {
             match strategy {
                 DelegationStrategy::FirstMatch => assert!(true),
@@ -595,7 +598,7 @@ mod tests {
             timeout: Some(std::time::Duration::from_secs(10)),
             metadata: HashMap::new(),
         };
-        
+
         assert_eq!(request.task_id, "task-123");
         assert_eq!(request.priority, 8);
         assert_eq!(request.required_capabilities.len(), 1);

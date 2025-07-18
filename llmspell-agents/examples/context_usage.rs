@@ -161,10 +161,12 @@ fn inheritance_example() -> Result<()> {
     );
 
     // Apply inheritance rules
-    rules.apply(&parent, &mut child).map_err(|e| LLMSpellError::Component {
-        message: e,
-        source: None,
-    })?;
+    rules
+        .apply(&parent, &mut child)
+        .map_err(|e| LLMSpellError::Component {
+            message: e,
+            source: None,
+        })?;
 
     println!("  Parent task_id: {:?}", parent.get("task_id"));
     println!("  Child task_id: {:?}", child.get("task_id"));
@@ -217,8 +219,7 @@ async fn shared_memory_example() -> Result<()> {
         if let Ok(change) = receiver.try_recv() {
             println!(
                 "  Received change notification: {} changed {}",
-                change.changed_by,
-                change.key
+                change.changed_by, change.key
             );
         }
     }

@@ -385,12 +385,12 @@ impl ToolSchema {
 ///
 /// ```
 /// use llmspell_core::{
-///     ComponentMetadata, Result, LLMSpellError,
+///     ComponentMetadata, Result, LLMSpellError, ExecutionContext,
 ///     traits::{
 ///         base_agent::BaseAgent,
 ///         tool::{Tool, ToolCategory, SecurityLevel, ToolSchema, ParameterDef, ParameterType}
 ///     },
-///     types::{AgentInput, AgentOutput, ExecutionContext}
+///     types::{AgentInput, AgentOutput}
 /// };
 /// use async_trait::async_trait;
 /// use serde_json::json;

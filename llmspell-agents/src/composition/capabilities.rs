@@ -81,7 +81,7 @@ impl CapabilityScorer for DefaultCapabilityScorer {
         if stats.invocations == 0 {
             return 0.5; // Neutral score for unused capabilities
         }
-        
+
         let success_rate = stats.successes as f64 / stats.invocations as f64;
         let recency_score = if let Some(last) = stats.last_invocation {
             let hours_ago = (chrono::Utc::now() - last).num_hours();
@@ -89,9 +89,9 @@ impl CapabilityScorer for DefaultCapabilityScorer {
         } else {
             0.0
         };
-        
+
         // Weighted average of success rate and recency
-        (success_rate * 0.7 + recency_score * 0.3).min(1.0).max(0.0)
+        (success_rate * 0.7 + recency_score * 0.3).clamp(0.0, 1.0)
     }
 }
 
@@ -132,10 +132,12 @@ impl CapabilityAggregator {
     ) -> Result<()> {
         let provider_id = provider_id.into();
         let capability_id = format!("{}::{}", provider_id, capability.name);
-        
+
         // Calculate initial score
-        let score = self.scorer.score(&capability, &CapabilityUsageStats::default());
-        
+        let score = self
+            .scorer
+            .score(&capability, &CapabilityUsageStats::default());
+
         let entry = CapabilityEntry {
             capability: capability.clone(),
             provider_id,
@@ -143,25 +145,25 @@ impl CapabilityAggregator {
             available: true,
             usage_stats: CapabilityUsageStats::default(),
         };
-        
+
         // Add to main registry
         let mut capabilities = self.capabilities.write().unwrap();
         capabilities.insert(capability_id.clone(), entry);
-        
+
         // Update category index
         let mut index = self.category_index.write().unwrap();
         index
             .entry(capability.category.clone())
-            .or_insert_with(HashSet::new)
+            .or_default()
             .insert(capability_id);
-        
+
         Ok(())
     }
 
     /// Unregister a capability
     pub fn unregister_capability(&self, provider_id: &str, capability_name: &str) -> Result<()> {
         let capability_id = format!("{}::{}", provider_id, capability_name);
-        
+
         let mut capabilities = self.capabilities.write().unwrap();
         if let Some(entry) = capabilities.remove(&capability_id) {
             // Remove from category index
@@ -170,7 +172,7 @@ impl CapabilityAggregator {
                 set.remove(&capability_id);
             }
         }
-        
+
         Ok(())
     }
 
@@ -191,16 +193,16 @@ impl CapabilityAggregator {
         let capabilities = self.capabilities.read().unwrap();
         let requirements = self.requirements.read().unwrap();
         let mut matches = Vec::new();
-        
+
         for (_cap_id, entry) in capabilities.iter() {
             if !entry.available {
                 continue;
             }
-            
+
             let mut satisfied = Vec::new();
             let mut total_score = 0.0;
             let mut requirement_count = 0;
-            
+
             for (idx, req) in requirements.iter().enumerate() {
                 if self.matches_requirement(&entry.capability, req) {
                     satisfied.push(format!("req-{}", idx));
@@ -208,14 +210,14 @@ impl CapabilityAggregator {
                     requirement_count += 1;
                 }
             }
-            
+
             if !satisfied.is_empty() {
                 let avg_score = if requirement_count > 0 {
                     total_score / requirement_count as f64
                 } else {
                     entry.score
                 };
-                
+
                 matches.push(CapabilityMatch {
                     capability: entry.capability.clone(),
                     provider_id: entry.provider_id.clone(),
@@ -224,26 +226,30 @@ impl CapabilityAggregator {
                 });
             }
         }
-        
+
         // Sort by score descending
         matches.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap());
         matches
     }
 
     /// Check if a capability matches a requirement
-    fn matches_requirement(&self, capability: &Capability, requirement: &CapabilityRequirement) -> bool {
+    fn matches_requirement(
+        &self,
+        capability: &Capability,
+        requirement: &CapabilityRequirement,
+    ) -> bool {
         // Check name pattern
         if !self.matches_pattern(&capability.name, &requirement.name_pattern) {
             return false;
         }
-        
+
         // Check category
         if let Some(ref req_category) = requirement.category {
             if &capability.category != req_category {
                 return false;
             }
         }
-        
+
         // Check version (simplified)
         if let Some(ref min_version) = requirement.min_version {
             if let Some(ref cap_version) = capability.version {
@@ -254,14 +260,14 @@ impl CapabilityAggregator {
                 return false;
             }
         }
-        
+
         // Check metadata
         for (key, value) in &requirement.required_metadata {
             if capability.metadata.get(key) != Some(value) {
                 return false;
             }
         }
-        
+
         // Check score
         if let Some(min_score) = requirement.min_score {
             let cap_id = format!("{}::{}", "unknown", capability.name);
@@ -271,7 +277,7 @@ impl CapabilityAggregator {
                 }
             }
         }
-        
+
         true
     }
 
@@ -280,28 +286,28 @@ impl CapabilityAggregator {
         if pattern == "*" {
             return true;
         }
-        
+
         if pattern.contains('*') {
             // Simple wildcard matching
             let parts: Vec<&str> = pattern.split('*').collect();
             if parts.is_empty() {
                 return true;
             }
-            
+
             let mut text_pos = 0;
             for (i, part) in parts.iter().enumerate() {
                 if part.is_empty() {
                     continue;
                 }
-                
+
                 if i == 0 && !text.starts_with(part) {
                     return false;
                 }
-                
+
                 if i == parts.len() - 1 && !pattern.ends_with('*') && !text.ends_with(part) {
                     return false;
                 }
-                
+
                 if let Some(pos) = text[text_pos..].find(part) {
                     text_pos += pos + part.len();
                 } else {
@@ -323,7 +329,7 @@ impl CapabilityAggregator {
         duration: std::time::Duration,
     ) -> Result<()> {
         let capability_id = format!("{}::{}", provider_id, capability_name);
-        
+
         let mut capabilities = self.capabilities.write().unwrap();
         if let Some(entry) = capabilities.get_mut(&capability_id) {
             let stats = &mut entry.usage_stats;
@@ -333,17 +339,18 @@ impl CapabilityAggregator {
             } else {
                 stats.failures += 1;
             }
-            
+
             // Update average execution time
-            let total_time = stats.avg_execution_time.as_secs() * stats.invocations
-                + duration.as_secs();
-            stats.avg_execution_time = std::time::Duration::from_secs(total_time / (stats.invocations + 1));
-            
+            let total_time =
+                stats.avg_execution_time.as_secs() * stats.invocations + duration.as_secs();
+            stats.avg_execution_time =
+                std::time::Duration::from_secs(total_time / (stats.invocations + 1));
+
             stats.last_invocation = Some(chrono::Utc::now());
-            
+
             // Recalculate score
             entry.score = self.scorer.score(&entry.capability, stats);
-            
+
             Ok(())
         } else {
             Err(LLMSpellError::Component {
@@ -367,7 +374,7 @@ impl CapabilityAggregator {
     pub fn get_by_category(&self, category: &CapabilityCategory) -> Vec<Capability> {
         let index = self.category_index.read().unwrap();
         let capabilities = self.capabilities.read().unwrap();
-        
+
         if let Some(cap_ids) = index.get(category) {
             cap_ids
                 .iter()
@@ -387,7 +394,7 @@ impl CapabilityAggregator {
         available: bool,
     ) -> Result<()> {
         let capability_id = format!("{}::{}", provider_id, capability_name);
-        
+
         let mut capabilities = self.capabilities.write().unwrap();
         if let Some(entry) = capabilities.get_mut(&capability_id) {
             entry.available = available;
@@ -405,18 +412,20 @@ impl CapabilityAggregator {
         let capabilities = self.capabilities.read().unwrap();
         let total = capabilities.len();
         let available = capabilities.values().filter(|e| e.available).count();
-        
+
         let mut by_category = HashMap::new();
         for entry in capabilities.values() {
-            *by_category.entry(entry.capability.category.clone()).or_insert(0) += 1;
+            *by_category
+                .entry(entry.capability.category.clone())
+                .or_insert(0) += 1;
         }
-        
+
         let avg_score = if total > 0 {
             capabilities.values().map(|e| e.score).sum::<f64>() / total as f64
         } else {
             0.0
         };
-        
+
         CapabilityStatistics {
             total_capabilities: total,
             available_capabilities: available,
@@ -479,7 +488,9 @@ impl CapabilityRequirementBuilder {
 
     /// Add required metadata
     pub fn metadata(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
-        self.requirement.required_metadata.insert(key.into(), value.into());
+        self.requirement
+            .required_metadata
+            .insert(key.into(), value.into());
         self
     }
 
@@ -508,7 +519,7 @@ mod tests {
     #[test]
     fn test_capability_aggregator() {
         let aggregator = CapabilityAggregator::new();
-        
+
         // Register a capability
         let cap = Capability {
             name: "text-processing".to_string(),
@@ -516,9 +527,11 @@ mod tests {
             version: Some("1.0.0".to_string()),
             metadata: HashMap::new(),
         };
-        
-        aggregator.register_capability(cap.clone(), "agent-1").unwrap();
-        
+
+        aggregator
+            .register_capability(cap.clone(), "agent-1")
+            .unwrap();
+
         // Check it was registered
         let provider_caps = aggregator.get_provider_capabilities("agent-1");
         assert_eq!(provider_caps.len(), 1);
@@ -528,7 +541,7 @@ mod tests {
     #[test]
     fn test_pattern_matching() {
         let aggregator = CapabilityAggregator::new();
-        
+
         assert!(aggregator.matches_pattern("text-processing", "text-processing"));
         assert!(aggregator.matches_pattern("text-processing", "text-*"));
         assert!(aggregator.matches_pattern("text-processing", "*-processing"));
@@ -539,7 +552,7 @@ mod tests {
     #[test]
     fn test_capability_matching() {
         let aggregator = CapabilityAggregator::new();
-        
+
         // Register capabilities
         let cap1 = Capability {
             name: "text-analysis".to_string(),
@@ -547,25 +560,25 @@ mod tests {
             version: Some("2.0.0".to_string()),
             metadata: HashMap::new(),
         };
-        
+
         let cap2 = Capability {
             name: "image-analysis".to_string(),
             category: CapabilityCategory::DataProcessing,
             version: Some("1.0.0".to_string()),
             metadata: HashMap::new(),
         };
-        
+
         aggregator.register_capability(cap1, "agent-1").unwrap();
         aggregator.register_capability(cap2, "agent-2").unwrap();
-        
+
         // Add requirement
         let requirement = CapabilityRequirementBuilder::new("*-analysis")
             .category(CapabilityCategory::DataProcessing)
             .min_version("1.5.0")
             .build();
-        
+
         aggregator.add_requirement(requirement);
-        
+
         // Find matches
         let matches = aggregator.find_matches();
         assert_eq!(matches.len(), 1);
@@ -575,24 +588,26 @@ mod tests {
     #[test]
     fn test_usage_statistics() {
         let aggregator = CapabilityAggregator::new();
-        
+
         let cap = Capability {
             name: "test-cap".to_string(),
             category: CapabilityCategory::Custom("test".to_string()),
             version: None,
             metadata: HashMap::new(),
         };
-        
+
         aggregator.register_capability(cap, "provider-1").unwrap();
-        
+
         // Update usage
-        aggregator.update_usage(
-            "provider-1",
-            "test-cap",
-            true,
-            std::time::Duration::from_secs(1),
-        ).unwrap();
-        
+        aggregator
+            .update_usage(
+                "provider-1",
+                "test-cap",
+                true,
+                std::time::Duration::from_secs(1),
+            )
+            .unwrap();
+
         // Check statistics
         let stats = aggregator.get_statistics();
         assert_eq!(stats.total_capabilities, 1);

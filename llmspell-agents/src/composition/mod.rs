@@ -27,7 +27,7 @@ pub use capabilities::{
     DefaultCapabilityScorer,
 };
 pub use delegation::{
-    DelegatingAgent, DelegatingAgentBuilder, DelegationConfig, DelegationRequest,
-    DelegationResult, DelegationStrategy,
+    DelegatingAgent, DelegatingAgentBuilder, DelegationConfig, DelegationRequest, DelegationResult,
+    DelegationStrategy,
 };
 pub use hierarchical::{HierarchicalAgentBuilder, HierarchicalCompositeAgent, HierarchicalConfig};

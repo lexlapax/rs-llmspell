@@ -12,8 +12,9 @@
 //! ```rust,no_run
 //! use llmspell_testing::mocks::MockBaseAgent;
 //! use llmspell_core::{
+//!     ExecutionContext,
 //!     traits::base_agent::BaseAgent,
-//!     types::{AgentInput, AgentOutput, ExecutionContext}
+//!     types::{AgentInput, AgentOutput}
 //! };
 //!
 //! # async fn test_example() {

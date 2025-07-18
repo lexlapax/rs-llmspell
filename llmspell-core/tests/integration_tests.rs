@@ -10,8 +10,7 @@ use llmspell_core::{
         tool::{ParameterDef, ParameterType, SecurityLevel, Tool, ToolCategory, ToolSchema},
     },
     types::{AgentInput, AgentOutput},
-    ExecutionContext,
-    ComponentMetadata, LLMSpellError, Result, Version,
+    ComponentMetadata, ExecutionContext, LLMSpellError, Result, Version,
 };
 use std::sync::{Arc, Mutex};
 

@@ -22,8 +22,8 @@ use async_trait::async_trait;
 ///
 /// ```
 /// use llmspell_core::{
-///     ComponentMetadata, Result, LLMSpellError,
-///     types::{AgentInput, AgentOutput, ExecutionContext},
+///     ComponentMetadata, Result, LLMSpellError, ExecutionContext,
+///     types::{AgentInput, AgentOutput},
 ///     traits::base_agent::BaseAgent
 /// };
 /// use async_trait::async_trait;

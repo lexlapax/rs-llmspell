@@ -9,8 +9,7 @@ use llmspell_core::{
         base_agent::BaseAgent,
     },
     types::{AgentInput, AgentOutput},
-    ExecutionContext,
-    ComponentId, ComponentMetadata, Result,
+    ComponentId, ComponentMetadata, ExecutionContext, Result,
 };
 use std::sync::{
     atomic::{AtomicUsize, Ordering},

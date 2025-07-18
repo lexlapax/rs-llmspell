@@ -28,12 +28,12 @@
 //!
 //! ```
 //! use llmspell_core::{
-//!     ComponentMetadata, Result,
+//!     ComponentMetadata, Result, ExecutionContext,
 //!     traits::{
 //!         base_agent::BaseAgent,
 //!         agent::{Agent, AgentConfig, ConversationMessage}
 //!     },
-//!     types::{AgentInput, AgentOutput, ExecutionContext}
+//!     types::{AgentInput, AgentOutput}
 //! };
 //! use async_trait::async_trait;
 //!

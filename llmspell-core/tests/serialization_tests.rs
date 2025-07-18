@@ -9,8 +9,7 @@ use llmspell_core::{
         workflow::{RetryPolicy, StepResult, WorkflowStatus, WorkflowStep},
     },
     types::{AgentInput, AgentOutput},
-    ExecutionContext,
-    ComponentId, ComponentMetadata, Version,
+    ComponentId, ComponentMetadata, ExecutionContext, Version,
 };
 
 #[test]

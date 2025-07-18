@@ -299,12 +299,12 @@ impl Default for ToolComposition {
 ///
 /// ```
 /// use llmspell_core::{
-///     ComponentMetadata, Result,
+///     ComponentMetadata, Result, ExecutionContext,
 ///     traits::{
 ///         base_agent::BaseAgent,
-///         tool_capable::{ToolCapable, ToolQuery, ToolInfo}
+///         tool_capable::{ToolCapable, ToolQuery, ToolInfo, ToolComposition}
 ///     },
-///     types::{AgentInput, AgentOutput, ExecutionContext}
+///     types::{AgentInput, AgentOutput}
 /// };
 /// use async_trait::async_trait;
 /// use serde_json::json;

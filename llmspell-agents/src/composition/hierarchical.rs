@@ -6,12 +6,11 @@ use super::traits::{
     CompositionMetadata, CompositionType, ExecutionPattern, HierarchicalAgent, HierarchyEvent,
 };
 use async_trait::async_trait;
+use llmspell_core::types::{AgentInput, AgentOutput};
 use llmspell_core::{
     traits::tool_capable::{ToolInfo, ToolQuery},
-    BaseAgent, ComponentMetadata, ExecutionContext, LLMSpellError, Result, Tool,
-    ToolCapable,
+    BaseAgent, ComponentMetadata, ExecutionContext, LLMSpellError, Result, Tool, ToolCapable,
 };
-use llmspell_core::types::{AgentInput, AgentOutput};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -142,7 +141,10 @@ impl HierarchicalCompositeAgent {
                 if Arc::ptr_eq(&parent, child) {
                     return true;
                 }
-                current = parent.parent().and_then(|p| p.parent()).map(|p| Arc::downgrade(&p));
+                current = parent
+                    .parent()
+                    .and_then(|p| p.parent())
+                    .map(|p| Arc::downgrade(&p));
             } else {
                 break;
             }
@@ -210,7 +212,10 @@ impl BaseAgent for HierarchicalCompositeAgent {
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
-        Ok(AgentOutput::text(format!("Hierarchical agent error: {}", error)))
+        Ok(AgentOutput::text(format!(
+            "Hierarchical agent error: {}",
+            error
+        )))
     }
 }
 
@@ -219,7 +224,7 @@ impl ToolCapable for HierarchicalCompositeAgent {
     async fn discover_tools(&self, query: &ToolQuery) -> Result<Vec<ToolInfo>> {
         let tools = self.tools.read().await;
         let mut infos = Vec::new();
-        
+
         for (name, tool) in tools.iter() {
             // Simple filtering based on text search
             if let Some(ref text) = query.text_search {
@@ -227,7 +232,7 @@ impl ToolCapable for HierarchicalCompositeAgent {
                     continue;
                 }
             }
-            
+
             let info = ToolInfo::new(
                 name.clone(),
                 tool.metadata().description.clone(),
@@ -236,7 +241,7 @@ impl ToolCapable for HierarchicalCompositeAgent {
             );
             infos.push(info);
         }
-        
+
         Ok(infos)
     }
 
@@ -307,10 +312,12 @@ impl CompositeAgent for HierarchicalCompositeAgent {
 
     async fn remove_component(&mut self, component_id: &str) -> Result<()> {
         let mut components = self.components.write().await;
-        components.remove(component_id).ok_or_else(|| LLMSpellError::Component {
-            message: format!("Component not found: {}", component_id),
-            source: None,
-        })?;
+        components
+            .remove(component_id)
+            .ok_or_else(|| LLMSpellError::Component {
+                message: format!("Component not found: {}", component_id),
+                source: None,
+            })?;
         Ok(())
     }
 
@@ -335,9 +342,9 @@ impl CompositeAgent for HierarchicalCompositeAgent {
             let mut metrics = self.metrics.write().unwrap();
             metrics.total_delegations += 1;
         }
-        
+
         let components = self.components.read().await;
-        
+
         if let Some(component) = components.get(component_id) {
             let agent_input = AgentInput::text(input.to_string());
             match component.execute(agent_input, context.clone()).await {
@@ -375,31 +382,31 @@ impl CompositeAgent for HierarchicalCompositeAgent {
             ExecutionPattern::Sequential => {
                 let mut result = input;
                 let components = self.components.read().await;
-                
+
                 for (_, component) in components.iter() {
                     let agent_input = AgentInput::text(result.to_string());
                     let output = component.execute(agent_input, context.clone()).await?;
                     result = serde_json::to_value(&output)?;
                 }
-                
+
                 Ok(result)
             }
             ExecutionPattern::Parallel => {
                 let components = self.components.read().await;
                 let mut handles = Vec::new();
-                
+
                 for (_, component) in components.iter() {
                     let comp = component.clone();
                     let inp = input.clone();
                     let ctx = context.clone();
-                    
+
                     handles.push(tokio::spawn(async move {
                         let agent_input = AgentInput::text(inp.to_string());
                         let output = comp.execute(agent_input, ctx).await?;
                         Ok::<Value, LLMSpellError>(serde_json::to_value(&output)?)
                     }));
                 }
-                
+
                 let mut results = Vec::new();
                 for handle in handles {
                     results.push(handle.await.map_err(|e| LLMSpellError::Component {
@@ -407,7 +414,7 @@ impl CompositeAgent for HierarchicalCompositeAgent {
                         source: None,
                     })??);
                 }
-                
+
                 Ok(Value::Array(results))
             }
             _ => Err(LLMSpellError::Component {
@@ -556,14 +563,14 @@ impl HierarchicalAgentBuilder {
     pub fn build(self) -> HierarchicalCompositeAgent {
         let name = self.name.clone();
         let mut agent = HierarchicalCompositeAgent::new(self.name, self.config);
-        
+
         if let Some(desc) = self.description {
             agent.metadata = ComponentMetadata::new(name, desc);
         }
-        
+
         *agent.execution_pattern.write().unwrap() = self.initial_pattern;
         *agent.capabilities.write().unwrap() = self.capabilities;
-        
+
         agent
     }
 }
@@ -571,8 +578,8 @@ impl HierarchicalAgentBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use llmspell_core::{ComponentMetadata, LLMSpellError};
     use llmspell_core::types::{AgentInput, AgentOutput};
+    use llmspell_core::{ComponentMetadata, LLMSpellError};
 
     #[tokio::test]
     async fn test_hierarchical_agent_creation() {
@@ -587,40 +594,44 @@ mod tests {
     #[tokio::test]
     async fn test_component_management() {
         let mut agent = HierarchicalCompositeAgent::new("parent", HierarchicalConfig::default());
-        
+
         // Create a mock component
         struct MockAgent {
             metadata: ComponentMetadata,
         }
-        
+
         #[async_trait]
         impl BaseAgent for MockAgent {
             fn metadata(&self) -> &ComponentMetadata {
                 &self.metadata
             }
-            
-            async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+
+            async fn execute(
+                &self,
+                input: AgentInput,
+                _context: ExecutionContext,
+            ) -> Result<AgentOutput> {
                 Ok(AgentOutput::text(format!("Processed: {}", input.text)))
             }
-            
+
             async fn validate_input(&self, _input: &AgentInput) -> Result<()> {
                 Ok(())
             }
-            
+
             async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
                 Ok(AgentOutput::text(format!("Error: {}", error)))
             }
         }
-        
+
         let mock = Arc::new(MockAgent {
             metadata: ComponentMetadata::new(
                 "mock-1".to_string(),
                 "Mock agent for testing".to_string(),
             ),
         });
-        
+
         agent.add_component(mock.clone()).await.unwrap();
-        
+
         // Check that component was added by verifying the component count
         let components = agent.components.read().await;
         assert_eq!(components.len(), 1);

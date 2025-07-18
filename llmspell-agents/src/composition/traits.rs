@@ -187,10 +187,7 @@ pub enum HierarchyEvent {
     /// Error event
     Error(String),
     /// Custom event
-    Custom {
-        event_type: String,
-        data: Value,
-    },
+    Custom { event_type: String, data: Value },
 }
 
 /// Builder for creating composite agents
@@ -317,7 +314,9 @@ mod tests {
             custom: HashMap::new(),
         };
 
-        metadata.custom.insert("test".to_string(), Value::Bool(true));
+        metadata
+            .custom
+            .insert("test".to_string(), Value::Bool(true));
         assert_eq!(metadata.composition_type, CompositionType::Hierarchical);
         assert_eq!(metadata.max_components, Some(10));
     }
@@ -351,6 +350,9 @@ mod tests {
 
         assert_eq!(builder.name, "test-composite");
         assert_eq!(builder.description, "A test composite agent");
-        assert!(matches!(builder.execution_pattern, ExecutionPattern::Parallel));
+        assert!(matches!(
+            builder.execution_pattern,
+            ExecutionPattern::Parallel
+        ));
     }
 }
