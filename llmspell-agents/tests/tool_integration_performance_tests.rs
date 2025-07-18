@@ -11,8 +11,8 @@ use llmspell_core::{
         base_agent::BaseAgent,
         tool::{ParameterDef, ParameterType, SecurityLevel, Tool, ToolCategory, ToolSchema},
     },
-    types::{AgentInput, AgentOutput, ExecutionContext},
-    ComponentMetadata, Result,
+    types::{AgentInput, AgentOutput},
+    ComponentMetadata, ExecutionContext, Result,
 };
 use llmspell_tools::{CalculatorTool, ToolRegistry};
 use serde_json::json;

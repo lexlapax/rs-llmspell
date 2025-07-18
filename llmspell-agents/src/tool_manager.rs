@@ -6,8 +6,8 @@ use llmspell_core::{
     traits::tool_capable::{
         ContextMode, ErrorStrategy, ToolComposition, ToolCompositionStep, ToolInfo, ToolQuery,
     },
-    types::{AgentInput, AgentOutput, ExecutionContext},
-    LLMSpellError, Result,
+    types::{AgentInput, AgentOutput},
+    ExecutionContext, LLMSpellError, Result,
 };
 use llmspell_tools::registry::{CapabilityMatcher, ToolInfo as RegistryToolInfo, ToolRegistry};
 use serde_json::{Map, Value as JsonValue};
@@ -49,7 +49,7 @@ use tokio::sync::RwLock;
 ///
 /// // Invoke a tool
 /// let params = json!({"pattern": "*.txt"});
-/// let context = llmspell_core::types::ExecutionContext::new();
+/// let context = llmspell_core::ExecutionContext::new();
 /// let result = manager.invoke_tool("file_search", params, context).await?;
 /// # Ok(())
 /// # }

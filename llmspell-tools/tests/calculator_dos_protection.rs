@@ -3,10 +3,7 @@
 
 //! Security tests for CalculatorTool DoS protection
 
-use llmspell_core::{
-    traits::base_agent::BaseAgent,
-    types::{AgentInput, ExecutionContext},
-};
+use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
 use llmspell_tools::util::CalculatorTool;
 use serde_json::{json, Value};
 use std::time::Instant;

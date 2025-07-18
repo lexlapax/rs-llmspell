@@ -7,8 +7,8 @@ use llmspell_core::{
         base_agent::BaseAgent,
         tool::{ParameterDef, ParameterType, SecurityLevel, Tool, ToolCategory, ToolSchema},
     },
-    types::{AgentInput, AgentOutput, ExecutionContext},
-    ComponentMetadata, Result,
+    types::{AgentInput, AgentOutput},
+    ComponentMetadata, ExecutionContext, Result,
 };
 use llmspell_utils::{
     error_builders::llmspell::validation_error,

@@ -10,8 +10,8 @@ use llmspell_core::{
         agent::{Agent, AgentConfig, ConversationMessage},
         base_agent::BaseAgent,
     },
-    types::{AgentInput, AgentOutput, ExecutionContext},
-    ComponentMetadata, Result,
+    types::{AgentInput, AgentOutput},
+    ComponentMetadata, ExecutionContext, Result,
 };
 use llmspell_providers::{ModelSpecifier, ProviderInstance};
 use mlua::{Lua, Table, UserData, UserDataMethods};

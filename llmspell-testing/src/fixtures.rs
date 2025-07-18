@@ -24,12 +24,13 @@
 //! ```
 
 use llmspell_core::{
+    execution_context::ExecutionContext,
     traits::{
         agent::{AgentConfig, ConversationMessage},
         tool::ToolSchema,
         workflow::{RetryPolicy, WorkflowConfig, WorkflowStep},
     },
-    types::{AgentInput, ExecutionContext},
+    types::AgentInput,
     ComponentId, ComponentMetadata, Version,
 };
 

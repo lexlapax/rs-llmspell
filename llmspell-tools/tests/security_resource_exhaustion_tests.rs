@@ -1,10 +1,7 @@
 // ABOUTME: Resource exhaustion tests for Task 2.10.2
 // ABOUTME: Tests that tools cannot consume excessive resources
 
-use llmspell_core::{
-    traits::base_agent::BaseAgent,
-    types::{AgentInput, ExecutionContext},
-};
+use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
 use llmspell_tools::{
     data::{CsvAnalyzerTool, JsonProcessorTool},
     fs::ArchiveHandlerTool,

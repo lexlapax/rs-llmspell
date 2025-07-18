@@ -10,8 +10,8 @@ use llmspell_core::{
             ToolCategory, ToolSchema,
         },
     },
-    types::{AgentInput, AgentOutput, ExecutionContext},
-    ComponentMetadata, LLMSpellError, Result,
+    types::{AgentInput, AgentOutput},
+    ComponentMetadata, ExecutionContext, LLMSpellError, Result,
 };
 use llmspell_security::sandbox::{FileSandbox, SandboxContext};
 use llmspell_utils::{

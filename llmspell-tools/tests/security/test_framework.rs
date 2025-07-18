@@ -3,8 +3,8 @@
 
 use llmspell_core::{
     traits::tool::Tool,
-    types::{AgentInput, AgentOutput, ExecutionContext},
-    BaseAgent, Result,
+    types::{AgentInput, AgentOutput},
+    BaseAgent, ExecutionContext, Result,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};

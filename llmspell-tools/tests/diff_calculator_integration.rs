@@ -1,10 +1,7 @@
 // ABOUTME: Integration tests for the diff calculator tool
 // ABOUTME: Tests text diff, JSON diff, file comparison, and various output formats
 
-use llmspell_core::{
-    traits::base_agent::BaseAgent,
-    types::{AgentInput, ExecutionContext},
-};
+use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
 use llmspell_tools::util::DiffCalculatorTool;
 use serde_json::{json, Value};
 use std::fs;

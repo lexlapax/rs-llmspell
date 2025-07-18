@@ -3,8 +3,8 @@
 
 use llmspell_core::{
     traits::tool::Tool,
-    types::{AgentInput, AgentOutput, ExecutionContext},
-    LLMSpellError, Result,
+    types::{AgentInput, AgentOutput},
+    ExecutionContext, LLMSpellError, Result,
 };
 use serde_json::Value as JsonValue;
 use std::sync::Arc;
@@ -21,7 +21,7 @@ use tokio::time::timeout;
 ///
 /// ```
 /// use llmspell_agents::tool_invocation::{ToolInvoker, InvocationConfig};
-/// use llmspell_core::types::ExecutionContext;
+/// use llmspell_core::ExecutionContext;
 /// use serde_json::json;
 ///
 /// # async fn example() -> llmspell_core::Result<()> {

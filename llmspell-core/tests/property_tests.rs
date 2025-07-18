@@ -8,8 +8,8 @@ use llmspell_core::{
         agent::{AgentConfig, ConversationMessage, MessageRole},
         workflow::{RetryPolicy, WorkflowStep},
     },
-    types::{AgentInput, AgentOutput, ExecutionContext},
-    ComponentId, ComponentMetadata, Version,
+    types::{AgentInput, AgentOutput},
+    ComponentId, ComponentMetadata, ExecutionContext, Version,
 };
 use proptest::prelude::*;
 

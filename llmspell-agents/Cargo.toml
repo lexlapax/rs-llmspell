@@ -16,12 +16,14 @@ async-trait.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 anyhow.workspace = true
+thiserror.workspace = true
 tracing.workspace = true
 once_cell.workspace = true
 chrono.workspace = true
 uuid.workspace = true
 futures.workspace = true
 regex = "1.11"
+rand = "0.8"
 
 [dev-dependencies]
 tracing-subscriber.workspace = true

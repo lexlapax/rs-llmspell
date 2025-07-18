@@ -2,10 +2,7 @@
 // ABOUTME: Measures tool execution performance for common operations
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use llmspell_core::{
-    traits::base_agent::BaseAgent,
-    types::{AgentInput, ExecutionContext},
-};
+use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
 use llmspell_tools::{
     data::JsonProcessorTool,
     util::{

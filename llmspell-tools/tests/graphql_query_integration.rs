@@ -2,7 +2,8 @@
 
 use llmspell_core::{
     traits::{base_agent::BaseAgent, tool::Tool},
-    types::{AgentInput, ExecutionContext},
+    types::AgentInput,
+    ExecutionContext,
 };
 use llmspell_tools::GraphQLQueryTool;
 use serde_json::json;

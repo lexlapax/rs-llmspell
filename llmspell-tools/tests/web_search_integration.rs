@@ -3,8 +3,8 @@
 
 use llmspell_core::{
     traits::{base_agent::BaseAgent, tool::Tool},
-    types::{AgentInput, ExecutionContext},
-    LLMSpellError,
+    types::AgentInput,
+    ExecutionContext, LLMSpellError,
 };
 use llmspell_tools::search::{WebSearchConfig, WebSearchTool};
 use serde_json::Value;

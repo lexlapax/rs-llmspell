@@ -1,9 +1,6 @@
 //! Integration tests for llmspell-tools
 
-use llmspell_core::{
-    traits::tool::ToolCategory,
-    types::{AgentInput, ExecutionContext},
-};
+use llmspell_core::{traits::tool::ToolCategory, types::AgentInput, ExecutionContext};
 use llmspell_tools::{search::web_search::WebSearchConfig, ToolRegistry, WebSearchTool};
 use std::collections::HashMap;
 

@@ -9,11 +9,8 @@ use super::schema::{
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use llmspell_core::{
-    types::{
-        AgentInput, AgentOutput, ComponentId, ComponentMetadata, ExecutionContext, OutputMetadata,
-        Version,
-    },
-    BaseAgent, LLMSpellError,
+    types::{AgentInput, AgentOutput, ComponentId, ComponentMetadata, OutputMetadata, Version},
+    BaseAgent, ExecutionContext, LLMSpellError,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

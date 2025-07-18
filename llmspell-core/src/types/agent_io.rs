@@ -2,44 +2,11 @@
 //! ABOUTME: Provides AgentInput, AgentOutput, and related types for agent communication
 
 use super::{ComponentId, MediaContent, MediaType};
+use crate::execution_context::ExecutionContext;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::fmt;
-
-/// Execution context for agent operations
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct ExecutionContext {
-    /// Current conversation ID
-    pub conversation_id: Option<String>,
-    /// User ID if applicable
-    pub user_id: Option<String>,
-    /// Session ID for tracking
-    pub session_id: Option<String>,
-    /// Additional context data
-    pub data: HashMap<String, Value>,
-}
-
-impl ExecutionContext {
-    /// Create a new empty execution context
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    /// Create with conversation ID
-    pub fn with_conversation(conversation_id: String) -> Self {
-        Self {
-            conversation_id: Some(conversation_id),
-            ..Default::default()
-        }
-    }
-
-    /// Add a data field
-    pub fn with_data(mut self, key: String, value: Value) -> Self {
-        self.data.insert(key, value);
-        self
-    }
-}
 
 /// Represents a tool call made during agent execution
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -2,7 +2,8 @@
 //! ABOUTME: Separate trait to maintain clean architecture and avoid trait cyclicity
 
 use super::base_agent::BaseAgent;
-use crate::types::{AgentOutput, ExecutionContext};
+use crate::execution_context::ExecutionContext;
+use crate::types::AgentOutput;
 use crate::{LLMSpellError, Result};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -520,8 +521,9 @@ pub trait ToolCapable: BaseAgent {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{AgentInput, AgentOutput, ExecutionContext};
+    use crate::types::{AgentInput, AgentOutput};
     use crate::ComponentMetadata;
+    use crate::ExecutionContext;
     use serde_json::json;
 
     // Mock implementation for testing

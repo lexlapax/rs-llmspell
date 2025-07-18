@@ -2,7 +2,8 @@
 // ABOUTME: Validates consistent response format and error handling
 
 use llmspell_core::traits::base_agent::BaseAgent;
-use llmspell_core::types::{AgentInput, ExecutionContext};
+use llmspell_core::types::AgentInput;
+use llmspell_core::ExecutionContext;
 use llmspell_tools::util::*;
 use serde_json::{json, Value};
 use std::collections::HashMap;

@@ -2,8 +2,8 @@
 //! ABOUTME: Provides standardized test context creation and validation helpers
 
 use llmspell_core::{
-    types::{AgentInput, AgentOutput, ExecutionContext},
-    LLMSpellError,
+    types::{AgentInput, AgentOutput},
+    ExecutionContext, LLMSpellError,
 };
 use serde_json::{json, Value};
 

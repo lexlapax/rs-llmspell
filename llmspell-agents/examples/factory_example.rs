@@ -58,7 +58,7 @@ async fn main() -> Result<()> {
 
             // Test the agent
             let input = llmspell_core::types::AgentInput::text("Hello from factory example!");
-            let context = llmspell_core::types::ExecutionContext::default();
+            let context = llmspell_core::ExecutionContext::default();
 
             match agent.execute(input, context).await {
                 Ok(output) => println!("Agent response: {}", output.text),
@@ -81,7 +81,7 @@ async fn main() -> Result<()> {
 
             // Test the templated agent
             let input = llmspell_core::types::AgentInput::text("Hello from template!");
-            let context = llmspell_core::types::ExecutionContext::default();
+            let context = llmspell_core::ExecutionContext::default();
 
             match agent.execute(input, context).await {
                 Ok(output) => println!("Template agent response: {}", output.text),
@@ -133,7 +133,7 @@ async fn main() -> Result<()> {
 
             // Test registry agent
             let input = llmspell_core::types::AgentInput::text("Hello from registry!");
-            let context = llmspell_core::types::ExecutionContext::default();
+            let context = llmspell_core::ExecutionContext::default();
 
             match agent.execute(input, context).await {
                 Ok(output) => println!("Registry agent response: {}", output.text),

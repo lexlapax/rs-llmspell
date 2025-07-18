@@ -8,8 +8,8 @@ use llmspell_core::{
         base_agent::BaseAgent,
         tool::{ParameterDef, ParameterType, SecurityLevel, Tool, ToolCategory, ToolSchema},
     },
-    types::{AgentInput, AgentOutput, ExecutionContext},
-    ComponentMetadata, LLMSpellError, Result,
+    types::{AgentInput, AgentOutput},
+    ComponentMetadata, ExecutionContext, LLMSpellError, Result,
 };
 use llmspell_utils::{
     error_builders::llmspell::{tool_error, validation_error},

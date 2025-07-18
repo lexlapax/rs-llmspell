@@ -33,13 +33,14 @@
 
 use async_trait::async_trait;
 use llmspell_core::{
+    execution_context::ExecutionContext,
     traits::{
         agent::{Agent, AgentConfig, ConversationMessage},
         base_agent::BaseAgent,
         tool::{SecurityLevel, Tool, ToolCategory, ToolSchema},
         workflow::{StepResult, Workflow, WorkflowConfig, WorkflowStatus, WorkflowStep},
     },
-    types::{AgentInput, AgentOutput, AgentStream, ExecutionContext, MediaType},
+    types::{AgentInput, AgentOutput, AgentStream, MediaType},
     ComponentId, ComponentMetadata, LLMSpellError, Result,
 };
 use mockall::*;

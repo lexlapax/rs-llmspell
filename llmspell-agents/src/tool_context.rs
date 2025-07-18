@@ -1,7 +1,7 @@
 //! ABOUTME: Tool execution context integration for enhanced context propagation
 //! ABOUTME: Provides context enrichment, inheritance, and tool-specific context handling
 
-use llmspell_core::{types::ExecutionContext, Result};
+use llmspell_core::{ExecutionContext, Result};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -17,7 +17,7 @@ use tokio::sync::RwLock;
 ///
 /// ```
 /// use llmspell_agents::tool_context::{ToolExecutionContext, ContextInheritanceRule};
-/// use llmspell_core::types::ExecutionContext;
+/// use llmspell_core::ExecutionContext;
 /// use serde_json::json;
 ///
 /// # async fn example() -> llmspell_core::Result<()> {
@@ -472,7 +472,7 @@ impl<'de> serde::Deserialize<'de> for ContextInheritanceRule {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use llmspell_core::types::ExecutionContext;
+    use llmspell_core::ExecutionContext;
     use serde_json::json;
 
     #[tokio::test]

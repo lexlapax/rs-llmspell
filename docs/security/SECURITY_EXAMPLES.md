@@ -490,7 +490,8 @@ pub async fn fetch_url(url: &str) -> Result<String> {
 
 ```rust
 use llmspell_core::{BaseAgent, Tool, Result, LLMSpellError};
-use llmspell_core::types::{AgentInput, AgentOutput, ExecutionContext};
+use llmspell_core::types::{AgentInput, AgentOutput};
+use llmspell_core::ExecutionContext;
 use llmspell_utils::security::{
     validation::{InputValidator, PathValidator},
     output::OutputSanitizer,

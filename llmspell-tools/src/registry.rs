@@ -370,8 +370,8 @@ mod tests {
             base_agent::BaseAgent,
             tool::{ParameterDef, ParameterType, ToolSchema},
         },
-        types::{AgentInput, AgentOutput, ExecutionContext},
-        ComponentMetadata,
+        types::{AgentInput, AgentOutput},
+        ComponentMetadata, ExecutionContext,
     };
 
     // Mock tool for testing

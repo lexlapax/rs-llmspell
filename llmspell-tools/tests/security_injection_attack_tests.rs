@@ -1,10 +1,7 @@
 // ABOUTME: Injection attack tests for Task 2.10.2
 // ABOUTME: Tests that tools are protected against various injection attacks
 
-use llmspell_core::{
-    traits::base_agent::BaseAgent,
-    types::{AgentInput, ExecutionContext},
-};
+use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
 use llmspell_tools::{
     data::JsonProcessorTool,
     system::{EnvironmentReaderTool, ProcessExecutorTool},

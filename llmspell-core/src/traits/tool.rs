@@ -494,7 +494,7 @@ pub trait Tool: BaseAgent {
     async fn stream_execute(
         &self,
         input: AgentInput,
-        context: crate::types::ExecutionContext,
+        context: crate::execution_context::ExecutionContext,
     ) -> Result<AgentStream> {
         // Default implementation: execute normally and convert to a single chunk stream
         let output = self.execute(input, context).await?;
@@ -573,8 +573,9 @@ pub trait Tool: BaseAgent {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{AgentInput, AgentOutput, ExecutionContext};
+    use crate::types::{AgentInput, AgentOutput};
     use crate::ComponentMetadata;
+    use crate::ExecutionContext;
 
     #[test]
     fn test_tool_category_display() {

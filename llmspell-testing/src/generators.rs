@@ -25,12 +25,13 @@
 //! ```
 
 use llmspell_core::{
+    execution_context::ExecutionContext,
     traits::{
         agent::{AgentConfig, ConversationMessage, MessageRole},
         tool::{SecurityLevel, ToolCategory, ToolSchema},
         workflow::{RetryPolicy, WorkflowConfig, WorkflowStatus, WorkflowStep},
     },
-    types::{AgentInput, AgentOutput, ExecutionContext},
+    types::{AgentInput, AgentOutput},
     ComponentId, ComponentMetadata, Version,
 };
 use proptest::prelude::*;

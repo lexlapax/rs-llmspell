@@ -18,8 +18,8 @@ use llmspell_core::{
             ToolCategory, ToolSchema,
         },
     },
-    types::{AgentInput, AgentOutput, ExecutionContext},
-    ComponentMetadata, LLMSpellError, Result,
+    types::{AgentInput, AgentOutput},
+    ComponentMetadata, ExecutionContext, LLMSpellError, Result,
 };
 use llmspell_utils::{
     encoding::{base64_decode, base64_decode_url_safe, base64_encode, base64_encode_url_safe},

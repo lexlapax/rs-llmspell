@@ -2,7 +2,8 @@
 //! Tests all 6 tools: WebScraper, UrlAnalyzer, ApiTester, WebhookCaller, WebpageMonitor, SitemapCrawler
 
 use llmspell_core::traits::base_agent::BaseAgent;
-use llmspell_core::types::{AgentInput, ExecutionContext};
+use llmspell_core::types::AgentInput;
+use llmspell_core::ExecutionContext;
 use llmspell_tools::{
     ApiTesterTool, SitemapCrawlerTool, UrlAnalyzerTool, WebScraperTool, WebhookCallerTool,
     WebpageMonitorTool,

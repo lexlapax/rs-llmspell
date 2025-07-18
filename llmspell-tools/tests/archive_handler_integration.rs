@@ -6,7 +6,8 @@ use llmspell_core::{
         base_agent::BaseAgent,
         tool::{ResourceLimits, SecurityLevel, SecurityRequirements},
     },
-    types::{AgentInput, ExecutionContext},
+    types::AgentInput,
+    ExecutionContext,
 };
 use llmspell_security::sandbox::{FileSandbox, SandboxContext};
 use llmspell_tools::fs::{ArchiveHandlerConfig, ArchiveHandlerTool};

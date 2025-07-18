@@ -18,8 +18,8 @@ use llmspell_core::{
             ToolCategory, ToolSchema,
         },
     },
-    types::{AgentInput, AgentOutput, ExecutionContext},
-    ComponentMetadata, Result,
+    types::{AgentInput, AgentOutput},
+    ComponentMetadata, ExecutionContext, Result,
 };
 use llmspell_utils::{
     encoding::{from_hex_string, hash_file, hash_string, to_hex_string, HashAlgorithm},

@@ -1,10 +1,7 @@
 // ABOUTME: Tests to verify DRY principle - that similar operations produce consistent results across tools
 // ABOUTME: Ensures tools using shared utilities from llmspell-utils behave consistently
 
-use llmspell_core::{
-    traits::base_agent::BaseAgent,
-    types::{AgentInput, ExecutionContext},
-};
+use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
 use llmspell_tools::{
     data::JsonProcessorTool,
     util::{Base64EncoderTool, DateTimeHandlerTool, HashCalculatorTool, UuidGeneratorTool},

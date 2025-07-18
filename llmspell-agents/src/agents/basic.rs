@@ -9,8 +9,8 @@ use llmspell_core::{
         agent::{Agent, AgentConfig as CoreAgentConfig, ConversationMessage},
         base_agent::BaseAgent,
     },
-    types::{AgentInput, AgentOutput, ExecutionContext},
-    ComponentMetadata, LLMSpellError,
+    types::{AgentInput, AgentOutput},
+    ComponentMetadata, ExecutionContext, LLMSpellError,
 };
 use std::sync::{Arc, Mutex};
 

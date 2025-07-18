@@ -1,10 +1,7 @@
 // ABOUTME: Sandbox escape attempt tests for Task 2.10.2
 // ABOUTME: Tests that tools cannot escape their security sandboxes
 
-use llmspell_core::{
-    traits::base_agent::BaseAgent,
-    types::{AgentInput, ExecutionContext},
-};
+use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
 use llmspell_security::sandbox::{FileSandbox, SandboxContext};
 use llmspell_tools::fs::{FileOperationsTool, FileSearchTool};
 use llmspell_tools::system::{ProcessExecutorTool, SystemMonitorTool};

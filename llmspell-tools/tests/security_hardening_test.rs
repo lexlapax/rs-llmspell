@@ -6,10 +6,7 @@
 //! This test suite validates the security hardening measures implemented
 //! in Phase 3.0.12, specifically for Calculator DoS protection
 
-use llmspell_core::{
-    types::{AgentInput, ExecutionContext},
-    BaseAgent,
-};
+use llmspell_core::{types::AgentInput, BaseAgent, ExecutionContext};
 use llmspell_tools::util::calculator::CalculatorTool;
 use serde_json::{json, Value as JsonValue};
 

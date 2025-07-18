@@ -195,7 +195,9 @@ impl Default for DIContainerBuilder {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use llmspell_core::{traits::base_agent::BaseAgent, types::*, ComponentMetadata};
+    use llmspell_core::{
+        traits::base_agent::BaseAgent, types::*, ComponentMetadata, ExecutionContext,
+    };
 
     // Mock tool for testing
     #[derive(Clone)]

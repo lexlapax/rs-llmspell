@@ -112,6 +112,7 @@
 //! ```
 
 pub mod error;
+pub mod execution_context;
 pub mod logging;
 pub mod types;
 
@@ -125,7 +126,8 @@ pub mod traits {
 
 // Re-export commonly used types
 pub use error::{LLMSpellError, Result};
+pub use execution_context::{ContextScope, ExecutionContext, InheritancePolicy};
 pub use traits::{
     agent::Agent, base_agent::BaseAgent, tool::Tool, tool_capable::ToolCapable, workflow::Workflow,
 };
-pub use types::{ComponentId, ComponentMetadata, Version};
+pub use types::{ComponentId, ComponentMetadata, EventMetadata, Version};

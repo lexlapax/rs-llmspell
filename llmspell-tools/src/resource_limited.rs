@@ -10,8 +10,8 @@ use llmspell_core::{
             ToolCategory, ToolSchema,
         },
     },
-    types::{AgentInput, AgentOutput, ExecutionContext},
-    ComponentMetadata, LLMSpellError, Result as LLMResult,
+    types::{AgentInput, AgentOutput},
+    ComponentMetadata, ExecutionContext, LLMSpellError, Result as LLMResult,
 };
 use llmspell_utils::resource_limits::{ResourceLimits, ResourceTracker};
 use serde_json::json;

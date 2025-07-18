@@ -1,10 +1,7 @@
 //! ABOUTME: Integration tests for CsvAnalyzerTool with real-world CSV scenarios
 //! ABOUTME: Tests complex workflows, large file handling, and error cases
 
-use llmspell_core::{
-    traits::base_agent::BaseAgent,
-    types::{AgentInput, ExecutionContext},
-};
+use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
 use llmspell_tools::CsvAnalyzerTool;
 use serde_json::json;
 

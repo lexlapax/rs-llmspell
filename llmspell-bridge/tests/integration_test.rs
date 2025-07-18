@@ -299,7 +299,8 @@ async fn test_bridge_performance_overhead() {
 async fn test_component_registration_integration() {
     use async_trait::async_trait;
     use llmspell_core::error::LLMSpellError;
-    use llmspell_core::types::{AgentInput, AgentOutput, ExecutionContext};
+    use llmspell_core::types::{AgentInput, AgentOutput};
+    use llmspell_core::ExecutionContext;
     use llmspell_core::{BaseAgent, ComponentMetadata};
 
     // Create a mock agent

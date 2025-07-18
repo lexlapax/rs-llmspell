@@ -1,7 +1,7 @@
 //! ABOUTME: Tool composition patterns for chaining and combining tool operations
 //! ABOUTME: Enables complex workflows through tool orchestration and dependency management
 
-use llmspell_core::{types::ExecutionContext, LLMSpellError, Result};
+use llmspell_core::{ExecutionContext, LLMSpellError, Result};
 use serde_json::{Map, Value as JsonValue};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};

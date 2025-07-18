@@ -1,9 +1,6 @@
 //! Separate test for HTTP timeout functionality
 
-use llmspell_core::{
-    traits::base_agent::BaseAgent,
-    types::{AgentInput, ExecutionContext},
-};
+use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
 use llmspell_tools::api::http_request::{HttpRequestConfig, HttpRequestTool};
 use serde_json::json;
 

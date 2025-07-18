@@ -334,7 +334,7 @@ mod tests {
             async fn execute(
                 &self,
                 _input: llmspell_core::types::AgentInput,
-                _context: llmspell_core::types::ExecutionContext,
+                _context: llmspell_core::ExecutionContext,
             ) -> llmspell_core::Result<llmspell_core::types::AgentOutput> {
                 panic!("Not implemented for test")
             }
@@ -447,7 +447,7 @@ mod tests {
                 async fn execute(
                     &self,
                     _input: llmspell_core::types::AgentInput,
-                    _context: llmspell_core::types::ExecutionContext,
+                    _context: llmspell_core::ExecutionContext,
                 ) -> llmspell_core::Result<llmspell_core::types::AgentOutput> {
                     panic!("Not implemented for test")
                 }

@@ -6,6 +6,7 @@ pub mod agents;
 pub mod builder;
 pub mod composition;
 pub mod config;
+pub mod context;
 pub mod di;
 pub mod factory;
 pub mod factory_registry;

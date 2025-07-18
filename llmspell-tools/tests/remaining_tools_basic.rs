@@ -2,7 +2,8 @@
 // ABOUTME: Tests tool creation, schema access, and basic execution
 
 use llmspell_core::traits::{base_agent::BaseAgent, tool::Tool};
-use llmspell_core::types::{AgentInput, ExecutionContext};
+use llmspell_core::types::AgentInput;
+use llmspell_core::ExecutionContext;
 use llmspell_security::sandbox::file_sandbox::FileSandbox;
 use llmspell_security::sandbox::SandboxContext;
 use llmspell_tools::{

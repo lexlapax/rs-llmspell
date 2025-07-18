@@ -9,7 +9,8 @@ use llmspell_core::{
         base_agent::BaseAgent,
         tool::{ParameterDef, ParameterType, SecurityLevel, Tool, ToolCategory, ToolSchema},
     },
-    types::{AgentInput, AgentOutput, ExecutionContext},
+    types::{AgentInput, AgentOutput},
+    ExecutionContext,
     ComponentMetadata, LLMSpellError, Result, Version,
 };
 use std::sync::{Arc, Mutex};

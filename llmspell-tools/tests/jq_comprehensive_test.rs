@@ -1,9 +1,6 @@
 //! Comprehensive tests for jq syntax support
 
-use llmspell_core::{
-    traits::base_agent::BaseAgent,
-    types::{AgentInput, ExecutionContext},
-};
+use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
 use llmspell_tools::JsonProcessorTool;
 use serde_json::json;
 

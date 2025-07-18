@@ -16,8 +16,8 @@ use llmspell_core::{
             ToolCategory, ToolSchema,
         },
     },
-    types::{AgentInput, AgentOutput, ExecutionContext},
-    ComponentMetadata, LLMSpellError, Result,
+    types::{AgentInput, AgentOutput},
+    ComponentMetadata, ExecutionContext, LLMSpellError, Result,
 };
 use llmspell_utils::{
     extract_optional_string, extract_parameters, extract_required_string, response::ResponseBuilder,
