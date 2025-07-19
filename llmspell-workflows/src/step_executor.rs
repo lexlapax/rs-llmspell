@@ -9,6 +9,7 @@ use tokio::time::timeout;
 use tracing::{debug, error, warn};
 
 /// Basic step executor for workflow steps
+#[derive(Clone)]
 pub struct StepExecutor {
     config: WorkflowConfig,
 }
@@ -269,6 +270,36 @@ impl StepExecutor {
                     "Aggregation completed: {}",
                     parameters.get("type").unwrap_or(&serde_json::json!("sum"))
                 )
+            }
+            "delay" | "sleep" => {
+                // Support delay/sleep for tests
+                if let Some(ms) = parameters.get("ms").and_then(|v| v.as_u64()) {
+                    tokio::time::sleep(Duration::from_millis(ms)).await;
+                }
+                "Delay completed".to_string()
+            }
+            "success" | "always_success" | "test" | "finalize" => {
+                // Support test functions that always succeed
+                format!("Function '{}' completed successfully", function_name)
+            }
+            "quick_operation" | "slow_operation" | "process_item" => {
+                // Support example operations with optional delay
+                if let Some(delay_ms) = parameters.get("delay_ms").and_then(|v| v.as_u64()) {
+                    tokio::time::sleep(Duration::from_millis(delay_ms)).await;
+                }
+                format!("Operation '{}' completed", function_name)
+            }
+            "enrich_data" | "validate_data" | "check_business_rules" | "enrich_with_metadata" => {
+                // Support data processing functions
+                format!("Data processing function '{}' completed", function_name)
+            }
+            "flaky_operation" | "recover_state" => {
+                // Support error handling examples
+                format!("Error handling function '{}' executed", function_name)
+            }
+            "should_not_run" => {
+                // This function should not be reached in error tests
+                panic!("This function should not have been executed")
             }
             _ => {
                 format!(

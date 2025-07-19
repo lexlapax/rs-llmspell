@@ -7,6 +7,7 @@ use std::time::Duration;
 use tracing::{debug, error, warn};
 
 /// Error handler for basic workflows
+#[derive(Clone)]
 pub struct ErrorHandler {
     default_strategy: ErrorStrategy,
 }
