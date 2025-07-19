@@ -342,51 +342,148 @@ ensure it's certain implementations are consisten with what should go in `llmspe
 - All timestamps updated to use `DateTime<Utc>` for serialization
 - Working example demonstrating all monitoring features
 
-### Task 3.3.9: Script-to-Agent Integration ✅ COMPLETE 2025-07-18
+### Task 3.3.9: Script-to-Agent Integration ⚠️ PARTIAL 2025-07-18
 **Priority**: CRITICAL  
-**Estimated Time**: 16 hours  
+**Estimated Time**: 16 hours (8 hours completed, 8 hours remaining)
 **Assignee**: Bridge Team
 
 **Description**: Implement bridge infrastructure for scripts to discover, invoke, and manage agents through llmspell-bridge.
 
 **Acceptance Criteria:**
-- [x] AgentBridge for script-to-agent communication
+- [x] AgentBridge for script-to-agent communication (basic version)
 - [x] Agent discovery API for scripts
-- [x] Parameter conversion between script and agent types
-- [x] Result transformation and error handling
-- [x] Integration with existing bridge architecture
-- [x] Support for all agent types (BaseAgent implementations)
-- [x] Script API consistency with tool APIs
-- [x] Performance optimization for bridge operations
+- [⚠️] Parameter conversion between script and agent types (basic types only)
+- [⚠️] Result transformation and error handling (limited to text output)
+- [⚠️] Integration with existing bridge architecture (partial - missing key features)
+- [❌] Support for all agent types (only BasicAgent, no composition/monitoring/lifecycle)
+- [❌] Script API consistency with tool APIs (different patterns, no tool access)
+- [❌] Performance optimization for bridge operations
+
+**Additional Missing Criteria:**
+- [❌] Agent-to-tool invocation through bridge
+- [❌] Monitoring & observability access from scripts
+- [❌] Lifecycle management beyond create/delete
+- [❌] Enhanced ExecutionContext support
+- [❌] Composition patterns (hierarchical, delegation, pipeline)
+- [❌] Workflow integration
+- [❌] Streaming and callback support
 
 **Implementation Steps:**
 1. ✅ Extend llmspell-bridge with agent discovery in `llmspell-bridge/src/agents.rs`
-2. ✅ Implement AgentBridge in `llmspell-bridge/src/agent_bridge.rs`
-3. ✅ Create parameter conversion system in `llmspell-bridge/src/agent_conversion.rs`
-4. ✅ Add result transformation (integrated into conversion system)
-5. ✅ Update `llmspell-bridge/src/lua/api/agent.rs` for enhanced Lua agent access
-6. ⏳ Update `llmspell-bridge/src/javascript/agent_api.rs` for JS agent access (deferred)
-7. ✅ Implement agent registry integration (integrated into AgentBridge)
+2. ⚠️ Implement AgentBridge in `llmspell-bridge/src/agent_bridge.rs` (basic only)
+3. ⚠️ Create parameter conversion system in `llmspell-bridge/src/agent_conversion.rs` (basic only)
+4. ⚠️ Add result transformation (text only, no multimodal/streaming)
+5. ⚠️ Update `llmspell-bridge/src/lua/api/agent.rs` (basic API only)
+6. ❌ Update `llmspell-bridge/src/javascript/agent_api.rs` for JS agent access
+7. ⚠️ Implement agent registry integration (basic registration only)
 8. ✅ Add tests in `llmspell-bridge/tests/agent_bridge_test.rs`
 9. ✅ Update `llmspell-bridge/src/lib.rs` to export agent bridge components
 
-**Definition of Done:**
-- [x] AgentBridge implemented and functional
-- [x] Agent discovery working from scripts
-- [x] Parameter conversion bidirectional
-- [x] Error handling comprehensive
-- [x] Integration with bridge architecture complete
-- [x] Performance acceptable (<10ms overhead)
-- [x] Script APIs consistent with existing patterns
-- [x] Documentation complete
+**Remaining Implementation Steps:**
+10. ❌ Add agent-to-tool discovery and invocation APIs
+11. ❌ Implement monitoring bridge (metrics, events, alerts)
+12. ❌ Add lifecycle state machine access
+13. ❌ Implement enhanced ExecutionContext bridge
+14. ❌ Add composition pattern APIs (compose, delegate, pipeline)
+15. ❌ Create workflow bridge integration
+16. ❌ Add streaming/callback mechanisms
+17. ❌ Implement performance optimizations
+18. ❌ Add comprehensive integration tests
 
-**Achievement Summary:**
-- Successfully implemented comprehensive agent bridge infrastructure
-- Created agent discovery service with factory integration
-- Implemented bidirectional parameter conversion between Lua/Agent types
-- Extended Lua API with Agent.list(), Agent.listTemplates(), Agent.get(), Agent.createFromTemplate()
-- Integrated with existing bridge patterns for consistency
-- All tests passing with agent bridge functionality
+**Definition of Done:**
+- [⚠️] AgentBridge implemented and functional (basic version only)
+- [x] Agent discovery working from scripts
+- [⚠️] Parameter conversion bidirectional (basic types only)
+- [⚠️] Error handling comprehensive (limited error types)
+- [❌] Integration with bridge architecture complete
+- [❌] Performance acceptable (<10ms overhead)
+- [❌] Script APIs consistent with existing patterns
+- [⚠️] Documentation complete (needs major updates)
+
+**Current Limitations:**
+- Agents created via bridge cannot discover or invoke tools
+- No access to monitoring, lifecycle, or composition features
+- Limited to text I/O, no multimodal support
+- No workflow integration
+- Missing 80% of Phase 3.3 infrastructure capabilities
+- Performance not optimized
+
+### Task 3.3.9a: Complete Script-to-Agent Bridge - Tool Integration
+**Priority**: CRITICAL  
+**Estimated Time**: 8 hours  
+**Assignee**: Bridge Team
+
+**Description**: Complete the Script-to-Agent bridge by adding tool discovery and invocation capabilities.
+
+**Acceptance Criteria:**
+- [ ] Agents can discover available tools through bridge
+- [ ] Agents can invoke tools with proper parameter conversion
+- [ ] Tool results flow back through agents to scripts
+- [ ] Error handling preserves full context
+- [ ] Performance overhead < 10ms per operation
+
+**Implementation Steps:**
+1. Extend AgentBridge with ToolRegistry access
+2. Add Lua methods: discoverTools(), invokeTool(), useTools()
+3. Implement parameter conversion for tool I/O
+4. Add integration tests for agent-tool flows
+
+### Task 3.3.9b: Complete Script-to-Agent Bridge - Monitoring & Lifecycle  
+**Priority**: HIGH  
+**Estimated Time**: 8 hours  
+**Assignee**: Bridge Team
+
+**Description**: Add monitoring, observability, and lifecycle management to the bridge.
+
+**Acceptance Criteria:**
+- [ ] Full monitoring visibility from scripts
+- [ ] Lifecycle management operational beyond create/delete
+- [ ] Performance tracking and metrics access
+- [ ] Event subscription and alerting
+
+**Implementation Steps:**
+1. Create monitoring bridge components
+2. Add Lua methods: getMetrics(), getState(), onEvent()
+3. Implement lifecycle hooks and state machine access
+4. Add performance tracking and alerts
+
+### Task 3.3.9c: Complete Script-to-Agent Bridge - Context & Communication
+**Priority**: MEDIUM  
+**Estimated Time**: 8 hours  
+**Assignee**: Bridge Team
+
+**Description**: Add enhanced context support and bidirectional communication patterns.
+
+**Acceptance Criteria:**
+- [ ] Enhanced context features working
+- [ ] Streaming and callbacks functional
+- [ ] Multimodal input/output support
+- [ ] Shared memory regions accessible
+
+**Implementation Steps:**
+1. Create context builder API
+2. Implement streaming and callbacks
+3. Add multimodal support
+4. Enable shared memory regions
+
+### Task 3.3.9d: Complete Script-to-Agent Bridge - Composition & Workflows
+**Priority**: MEDIUM  
+**Estimated Time**: 12 hours  
+**Assignee**: Bridge Team
+
+**Description**: Add composition patterns and workflow integration to the bridge.
+
+**Acceptance Criteria:**
+- [ ] All composition patterns accessible
+- [ ] Workflow bridge operational
+- [ ] Multi-agent coordination demonstrated
+- [ ] Performance optimized across all operations
+
+**Implementation Steps:**
+1. Expose composition patterns
+2. Create workflow bridge (WorkflowBridge)
+3. Enable multi-agent coordination
+4. Add comprehensive examples
 
 ### Task 3.3.10: Agent Examples and Use Cases
 **Priority**: HIGH  
