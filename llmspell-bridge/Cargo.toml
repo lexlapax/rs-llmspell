@@ -13,6 +13,7 @@ llmspell-providers = { path = "../llmspell-providers" }
 llmspell-utils = { path = "../llmspell-utils" }
 llmspell-tools = { path = "../llmspell-tools" }
 llmspell-security = { path = "../llmspell-security" }
+llmspell-agents = { path = "../llmspell-agents" }
 tokio.workspace = true
 tokio-stream.workspace = true
 async-trait.workspace = true

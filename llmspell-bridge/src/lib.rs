@@ -98,6 +98,11 @@ pub mod registry;
 pub mod runtime;
 pub mod tools;
 
+// Agent bridge modules
+pub mod agent_bridge;
+pub mod agent_conversion;
+pub mod agents;
+
 // Language-specific implementations (feature-gated)
 #[cfg(feature = "lua")]
 pub mod lua;

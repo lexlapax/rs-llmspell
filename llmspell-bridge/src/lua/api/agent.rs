@@ -1,6 +1,10 @@
 //! ABOUTME: Lua Agent API implementation providing Agent.create() and agent methods
 //! ABOUTME: Bridges between Lua scripts and Rust Agent implementations
 
+use crate::agent_bridge::AgentBridge;
+use crate::agent_conversion::{
+    agent_output_to_lua_table, lua_table_to_agent_input, lua_value_to_json,
+};
 use crate::engine::types::AgentApiDefinition;
 use crate::{ComponentRegistry, ProviderManager};
 use async_trait::async_trait;
@@ -15,6 +19,7 @@ use llmspell_core::{
 };
 use llmspell_providers::{ModelSpecifier, ProviderInstance};
 use mlua::{Lua, Table, UserData, UserDataMethods};
+use std::collections::HashMap;
 use std::sync::Arc;
 
 /// Inject the Agent API into the Lua environment
@@ -29,6 +34,9 @@ pub fn inject_agent_api(
         message: format!("Failed to create Agent table: {}", e),
         source: None,
     })?;
+
+    // Create agent bridge
+    let bridge = Arc::new(AgentBridge::new(registry.clone()));
 
     // Clone Arc for the closure
     let registry_clone = registry.clone();
@@ -117,7 +125,7 @@ pub fn inject_agent_api(
                 };
 
                 // Create a simple agent wrapper
-                let agent: Box<dyn Agent> = Box::new(SimpleProviderAgent::new(
+                let agent: Arc<dyn Agent> = Arc::new(SimpleProviderAgent::new(
                     agent_config,
                     provider,
                     "default".to_string(), // This will be overridden by the provider's model
@@ -125,7 +133,7 @@ pub fn inject_agent_api(
 
                 // Create the Lua wrapper
                 let wrapper = LuaAgentWrapper {
-                    agent: Arc::new(agent),
+                    agent,
                     _registry: registry,
                     _providers: providers,
                 };
@@ -146,6 +154,176 @@ pub fn inject_agent_api(
             source: None,
         })?;
 
+    // Add Agent.list() function to list available agent types
+    let bridge_for_list = bridge.clone();
+    let list_fn = lua
+        .create_async_function(move |lua, _: ()| {
+            let bridge = bridge_for_list.clone();
+            async move {
+                let types = bridge.list_agent_types().await;
+                let list_table = lua.create_table()?;
+                for (i, agent_type) in types.iter().enumerate() {
+                    list_table.set(i + 1, agent_type.clone())?;
+                }
+                Ok(list_table)
+            }
+        })
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to create Agent.list function: {}", e),
+            source: None,
+        })?;
+
+    agent_table
+        .set("list", list_fn)
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to set Agent.list: {}", e),
+            source: None,
+        })?;
+
+    // Add Agent.listTemplates() function
+    let bridge_for_templates = bridge.clone();
+    let list_templates_fn = lua
+        .create_async_function(move |lua, _: ()| {
+            let bridge = bridge_for_templates.clone();
+            async move {
+                let templates = bridge.list_templates().await;
+                let list_table = lua.create_table()?;
+                for (i, template) in templates.iter().enumerate() {
+                    list_table.set(i + 1, template.clone())?;
+                }
+                Ok(list_table)
+            }
+        })
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to create Agent.listTemplates function: {}", e),
+            source: None,
+        })?;
+
+    agent_table
+        .set("listTemplates", list_templates_fn)
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to set Agent.listTemplates: {}", e),
+            source: None,
+        })?;
+
+    // Add Agent.get() function to get an existing agent instance
+    let bridge_for_get = bridge.clone();
+    let registry_for_get = registry.clone();
+    let providers_for_get = providers.clone();
+    let get_fn = lua
+        .create_async_function(move |_lua, name: String| {
+            let bridge = bridge_for_get.clone();
+            let registry = registry_for_get.clone();
+            let providers = providers_for_get.clone();
+            async move {
+                if let Some(agent) = bridge.get_agent(&name).await {
+                    let wrapper = LuaAgentWrapper {
+                        agent,
+                        _registry: registry,
+                        _providers: providers,
+                    };
+                    Ok(Some(wrapper))
+                } else {
+                    Ok(None)
+                }
+            }
+        })
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to create Agent.get function: {}", e),
+            source: None,
+        })?;
+
+    agent_table
+        .set("get", get_fn)
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to set Agent.get: {}", e),
+            source: None,
+        })?;
+
+    // Add Agent.createFromTemplate() function
+    let bridge_for_template = bridge.clone();
+    let registry_for_template = registry.clone();
+    let providers_for_template = providers.clone();
+    let create_from_template_fn = lua
+        .create_async_function(
+            move |_lua, (instance_name, template_name, params): (String, String, Table)| {
+                let bridge = bridge_for_template.clone();
+                let registry = registry_for_template.clone();
+                let providers = providers_for_template.clone();
+                async move {
+                    // Convert Lua table to HashMap
+                    let mut parameters = HashMap::new();
+                    for (key, value) in params.pairs::<String, mlua::Value>().flatten() {
+                        if let Ok(json_value) = lua_value_to_json(value) {
+                            parameters.insert(key, json_value);
+                        }
+                    }
+
+                    // Create from template
+                    bridge
+                        .create_from_template(&instance_name, &template_name, parameters)
+                        .await
+                        .map_err(|e| {
+                            mlua::Error::RuntimeError(format!(
+                                "Failed to create agent from template: {}",
+                                e
+                            ))
+                        })?;
+
+                    // Return the created agent
+                    if let Some(agent) = bridge.get_agent(&instance_name).await {
+                        let wrapper = LuaAgentWrapper {
+                            agent,
+                            _registry: registry,
+                            _providers: providers,
+                        };
+                        Ok(wrapper)
+                    } else {
+                        Err(mlua::Error::RuntimeError(
+                            "Failed to retrieve created agent".to_string(),
+                        ))
+                    }
+                }
+            },
+        )
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to create Agent.createFromTemplate function: {}", e),
+            source: None,
+        })?;
+
+    agent_table
+        .set("createFromTemplate", create_from_template_fn)
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to set Agent.createFromTemplate: {}", e),
+            source: None,
+        })?;
+
+    // Add Agent.listInstances() function
+    let bridge_for_instances = bridge.clone();
+    let list_instances_fn = lua
+        .create_async_function(move |lua, _: ()| {
+            let bridge = bridge_for_instances.clone();
+            async move {
+                let instances = bridge.list_instances().await;
+                let list_table = lua.create_table()?;
+                for (i, instance) in instances.iter().enumerate() {
+                    list_table.set(i + 1, instance.clone())?;
+                }
+                Ok(list_table)
+            }
+        })
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to create Agent.listInstances function: {}", e),
+            source: None,
+        })?;
+
+    agent_table
+        .set("listInstances", list_instances_fn)
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to set Agent.listInstances: {}", e),
+            source: None,
+        })?;
+
     // Set the Agent table as a global
     lua.globals()
         .set(&api_def.global_name[..], agent_table)
@@ -160,7 +338,7 @@ pub fn inject_agent_api(
 /// Wrapper around Agent for Lua
 #[derive(Clone)]
 struct LuaAgentWrapper {
-    agent: Arc<Box<dyn Agent>>,
+    agent: Arc<dyn Agent>,
     _registry: Arc<ComponentRegistry>,
     _providers: Arc<ProviderManager>,
 }
@@ -170,9 +348,7 @@ impl UserData for LuaAgentWrapper {
         // execute method
         methods.add_async_method("execute", |lua, this, input: Table| async move {
             // Convert Lua table to AgentInput
-            let text: String = input.get("text")?;
-
-            let agent_input = AgentInput::text(text);
+            let agent_input = lua_table_to_agent_input(lua, input)?;
             let context = ExecutionContext::new();
 
             // Execute the agent
@@ -183,8 +359,7 @@ impl UserData for LuaAgentWrapper {
                 .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
 
             // Convert AgentOutput to Lua table
-            let output_table = lua.create_table()?;
-            output_table.set("text", result.text)?;
+            let output_table = agent_output_to_lua_table(lua, result)?;
 
             Ok(output_table)
         });

@@ -1,1 +1,3 @@
 reminders for me
+does the bridge cover all the other aspects like monitoring & observability, composition patterns, enhanced ExecutionContext, template system, lifecycle management, tool integration w agents, agent registry system that we've done in this phase? analyze 
+and think hard and report back.                                                                                                 │

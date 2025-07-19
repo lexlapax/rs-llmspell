@@ -119,7 +119,7 @@ Three levels of quality validation are available:
 - **Follow TODO.md**: Stick to task hierarchy, don't jump ahead
 - **Zero Warnings**: Maintain compilation without warnings
 - **Update Progress**: Keep TODO.md timestamps current
-- 
+- **No shortcuts/skips just to pass tests**: Complete the implementation or redo it properly
 
 ## Primary Documentation
 
