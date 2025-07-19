@@ -4,6 +4,7 @@
 pub mod conditional;
 pub mod conditions;
 pub mod error_handling;
+pub mod r#loop;
 pub mod sequential;
 pub mod state;
 pub mod step_executor;
@@ -31,3 +32,7 @@ pub use error_handling::{
 };
 pub use state::{ExecutionStats, StateManager};
 pub use step_executor::StepExecutor;
+
+pub use r#loop::{
+    BreakCondition, LoopConfig, LoopIterator, LoopWorkflow, LoopWorkflowBuilder, ResultAggregation,
+};
