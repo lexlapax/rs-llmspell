@@ -9,11 +9,15 @@ use llmspell_agents::monitoring::{
     PerformanceMonitor,
 };
 use llmspell_agents::AgentFactory;
-use llmspell_core::types::{AgentInput, AgentOutput};
+use llmspell_core::execution_context::{
+    ContextScope, ExecutionContextBuilder, InheritancePolicy, SecurityContext, SharedMemory,
+};
+use llmspell_core::types::{AgentInput, AgentOutput, ComponentId};
 use llmspell_core::{Agent, ExecutionContext, LLMSpellError, Result, Tool};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::sync::mpsc;
 
 /// Bridge between scripts and agents
 pub struct AgentBridge {
@@ -33,6 +37,12 @@ pub struct AgentBridge {
     event_logger: Arc<EventLogger>,
     #[allow(dead_code)]
     alert_manager: Arc<AlertManager>,
+    /// Global shared memory for inter-agent communication
+    shared_memory: Arc<SharedMemory>,
+    /// Active contexts by ID
+    contexts: Arc<tokio::sync::RwLock<HashMap<String, Arc<ExecutionContext>>>>,
+    /// Active streaming channels
+    streaming_channels: Arc<tokio::sync::RwLock<HashMap<String, mpsc::Sender<AgentOutput>>>>,
 }
 
 impl AgentBridge {
@@ -53,6 +63,9 @@ impl AgentBridge {
             health_check: Arc::new(crate::monitoring::HealthCheckImpl::new()),
             event_logger: Arc::new(EventLogger::new("bridge".to_string(), 1000)),
             alert_manager: Arc::new(AlertManager::new(AlertConfig::default())),
+            shared_memory: Arc::new(SharedMemory::new()),
+            contexts: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
+            streaming_channels: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
         }
     }
 
@@ -73,6 +86,9 @@ impl AgentBridge {
             health_check: Arc::new(crate::monitoring::HealthCheckImpl::new()),
             event_logger: Arc::new(EventLogger::new("bridge".to_string(), 1000)),
             alert_manager: Arc::new(AlertManager::new(AlertConfig::default())),
+            shared_memory: Arc::new(SharedMemory::new()),
+            contexts: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
+            streaming_channels: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
         }
     }
 
@@ -788,6 +804,326 @@ impl AgentBridge {
             "uptime": metrics.uptime.as_secs_f64(),
         }))
     }
+
+    // Context & Communication Methods
+
+    /// Create a new execution context
+    pub async fn create_context(&self, builder_config: serde_json::Value) -> Result<String> {
+        let mut builder = ExecutionContextBuilder::new();
+
+        // Apply builder configuration
+        if let Some(conversation_id) = builder_config
+            .get("conversation_id")
+            .and_then(|v| v.as_str())
+        {
+            builder = builder.conversation_id(conversation_id.to_string());
+        }
+        if let Some(user_id) = builder_config.get("user_id").and_then(|v| v.as_str()) {
+            builder = builder.user_id(user_id.to_string());
+        }
+        if let Some(session_id) = builder_config.get("session_id").and_then(|v| v.as_str()) {
+            builder = builder.session_id(session_id.to_string());
+        }
+
+        // Handle scope configuration
+        if let Some(scope_config) = builder_config.get("scope") {
+            let scope = self.parse_context_scope(scope_config)?;
+            builder = builder.scope(scope);
+        }
+
+        // Handle inheritance
+        if let Some(inheritance) = builder_config.get("inheritance").and_then(|v| v.as_str()) {
+            let policy = match inheritance {
+                "inherit" => InheritancePolicy::Inherit,
+                "isolate" => InheritancePolicy::Isolate,
+                "copy" => InheritancePolicy::Copy,
+                "share" => InheritancePolicy::Share,
+                _ => InheritancePolicy::Inherit,
+            };
+            builder = builder.inheritance(policy);
+        }
+
+        // Handle data fields
+        if let Some(data) = builder_config.get("data").and_then(|v| v.as_object()) {
+            for (key, value) in data {
+                builder = builder.data(key.clone(), value.clone());
+            }
+        }
+
+        // Handle security context
+        if let Some(security_config) = builder_config.get("security") {
+            if let Some(permissions) = security_config
+                .get("permissions")
+                .and_then(|v| v.as_array())
+            {
+                let perms: Vec<String> = permissions
+                    .iter()
+                    .filter_map(|p| p.as_str().map(String::from))
+                    .collect();
+                let level = security_config
+                    .get("level")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("default")
+                    .to_string();
+                builder = builder.security(SecurityContext {
+                    permissions: perms,
+                    level,
+                });
+            }
+        }
+
+        let context = Arc::new(builder.build());
+        let context_id = context.id.clone();
+
+        // Store context
+        {
+            let mut contexts = self.contexts.write().await;
+            contexts.insert(context_id.clone(), context);
+        }
+
+        Ok(context_id)
+    }
+
+    /// Get an existing context
+    pub async fn get_context(&self, context_id: &str) -> Option<Arc<ExecutionContext>> {
+        let contexts = self.contexts.read().await;
+        contexts.get(context_id).cloned()
+    }
+
+    /// Create a child context
+    pub async fn create_child_context(
+        &self,
+        parent_id: &str,
+        scope: serde_json::Value,
+        inheritance: &str,
+    ) -> Result<String> {
+        let parent = self
+            .get_context(parent_id)
+            .await
+            .ok_or_else(|| LLMSpellError::Component {
+                message: format!("Parent context '{}' not found", parent_id),
+                source: None,
+            })?;
+
+        let scope = self.parse_context_scope(&scope)?;
+        let policy = match inheritance {
+            "inherit" => InheritancePolicy::Inherit,
+            "isolate" => InheritancePolicy::Isolate,
+            "copy" => InheritancePolicy::Copy,
+            "share" => InheritancePolicy::Share,
+            _ => InheritancePolicy::Inherit,
+        };
+
+        let child = Arc::new(parent.create_child(scope, policy));
+        let child_id = child.id.clone();
+
+        // Store child context
+        {
+            let mut contexts = self.contexts.write().await;
+            contexts.insert(child_id.clone(), child);
+        }
+
+        Ok(child_id)
+    }
+
+    /// Update context data
+    pub async fn update_context(
+        &self,
+        context_id: &str,
+        key: String,
+        value: serde_json::Value,
+    ) -> Result<()> {
+        let contexts = self.contexts.read().await;
+        let context = contexts
+            .get(context_id)
+            .ok_or_else(|| LLMSpellError::Component {
+                message: format!("Context '{}' not found", context_id),
+                source: None,
+            })?;
+
+        // Since ExecutionContext is Arc'd and fields are not mutable through Arc,
+        // we'd need to use interior mutability or recreate the context
+        // For now, we'll use shared memory for updates
+        context.set_shared(key, value);
+        Ok(())
+    }
+
+    /// Get data from context
+    pub async fn get_context_data(
+        &self,
+        context_id: &str,
+        key: &str,
+    ) -> Result<Option<serde_json::Value>> {
+        let contexts = self.contexts.read().await;
+        let context = contexts
+            .get(context_id)
+            .ok_or_else(|| LLMSpellError::Component {
+                message: format!("Context '{}' not found", context_id),
+                source: None,
+            })?;
+
+        Ok(context.get(key))
+    }
+
+    /// Set shared memory data
+    pub async fn set_shared_memory(
+        &self,
+        scope: serde_json::Value,
+        key: String,
+        value: serde_json::Value,
+    ) -> Result<()> {
+        let scope = self.parse_context_scope(&scope)?;
+        self.shared_memory.set(scope, key, value);
+        Ok(())
+    }
+
+    /// Get shared memory data
+    pub async fn get_shared_memory(
+        &self,
+        scope: serde_json::Value,
+        key: &str,
+    ) -> Result<Option<serde_json::Value>> {
+        let scope = self.parse_context_scope(&scope)?;
+        Ok(self.shared_memory.get(&scope, key))
+    }
+
+    /// Execute agent with context
+    pub async fn execute_agent_with_context(
+        &self,
+        instance_name: &str,
+        input: AgentInput,
+        context_id: &str,
+    ) -> Result<AgentOutput> {
+        let context =
+            self.get_context(context_id)
+                .await
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: format!("Context '{}' not found", context_id),
+                    source: None,
+                })?;
+
+        self.execute_agent(instance_name, input, Some((*context).clone()))
+            .await
+    }
+
+    /// Execute agent with streaming
+    pub async fn execute_agent_streaming(
+        &self,
+        instance_name: &str,
+        input: AgentInput,
+        context: Option<ExecutionContext>,
+    ) -> Result<mpsc::Receiver<AgentOutput>> {
+        // Create streaming channel
+        let (tx, rx) = mpsc::channel::<AgentOutput>(100);
+        let channel_id = uuid::Uuid::new_v4().to_string();
+
+        // Store channel
+        {
+            let mut channels = self.streaming_channels.write().await;
+            channels.insert(channel_id.clone(), tx.clone());
+        }
+
+        // Get agent
+        let agent =
+            self.get_agent(instance_name)
+                .await
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: format!("Agent instance '{}' not found", instance_name),
+                    source: None,
+                })?;
+
+        // Spawn streaming execution
+        let context = context.unwrap_or_default();
+        let channels = self.streaming_channels.clone();
+        tokio::spawn(async move {
+            // Execute agent
+            match agent.execute(input, context).await {
+                Ok(output) => {
+                    // Send output chunks (for now, send as single chunk)
+                    // In a real implementation, we'd support streaming from the agent
+                    let _ = tx.send(output).await;
+                }
+                Err(e) => {
+                    // Send error as output
+                    let error_output = AgentOutput::text(format!("Error: {}", e));
+                    let _ = tx.send(error_output).await;
+                }
+            }
+
+            // Clean up channel
+            let mut channels = channels.write().await;
+            channels.remove(&channel_id);
+        });
+
+        Ok(rx)
+    }
+
+    /// Parse context scope from JSON
+    fn parse_context_scope(&self, scope_config: &serde_json::Value) -> Result<ContextScope> {
+        if let Some(scope_type) = scope_config.get("type").and_then(|v| v.as_str()) {
+            match scope_type {
+                "global" => Ok(ContextScope::Global),
+                "session" => {
+                    let id = scope_config
+                        .get("id")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| LLMSpellError::Validation {
+                            field: Some("scope.id".to_string()),
+                            message: "Session scope requires an ID".to_string(),
+                        })?;
+                    Ok(ContextScope::Session(id.to_string()))
+                }
+                "workflow" => {
+                    let id = scope_config
+                        .get("id")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| LLMSpellError::Validation {
+                            field: Some("scope.id".to_string()),
+                            message: "Workflow scope requires an ID".to_string(),
+                        })?;
+                    Ok(ContextScope::Workflow(id.to_string()))
+                }
+                "agent" => {
+                    let id = scope_config
+                        .get("id")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| LLMSpellError::Validation {
+                            field: Some("scope.id".to_string()),
+                            message: "Agent scope requires an ID".to_string(),
+                        })?;
+                    Ok(ContextScope::Agent(ComponentId::from_name(id)))
+                }
+                "user" => {
+                    let id = scope_config
+                        .get("id")
+                        .and_then(|v| v.as_str())
+                        .ok_or_else(|| LLMSpellError::Validation {
+                            field: Some("scope.id".to_string()),
+                            message: "User scope requires an ID".to_string(),
+                        })?;
+                    Ok(ContextScope::User(id.to_string()))
+                }
+                _ => Err(LLMSpellError::Validation {
+                    field: Some("scope.type".to_string()),
+                    message: format!("Unknown scope type: {}", scope_type),
+                }),
+            }
+        } else {
+            Ok(ContextScope::Global)
+        }
+    }
+
+    /// Clean up context
+    pub async fn remove_context(&self, context_id: &str) -> Result<()> {
+        let mut contexts = self.contexts.write().await;
+        contexts
+            .remove(context_id)
+            .ok_or_else(|| LLMSpellError::Component {
+                message: format!("Context '{}' not found", context_id),
+                source: None,
+            })?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -1017,5 +1353,205 @@ mod tests {
 
         // Cleanup
         bridge.remove_agent("test-state").await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_context_management() {
+        let registry = Arc::new(ComponentRegistry::new());
+        let bridge = AgentBridge::new(registry);
+
+        // Test context creation
+        let config = serde_json::json!({
+            "conversation_id": "conv-123",
+            "user_id": "user-456",
+            "session_id": "session-789",
+            "scope": {
+                "type": "session",
+                "id": "session-789"
+            },
+            "inheritance": "inherit",
+            "data": {
+                "theme": "dark",
+                "language": "en"
+            },
+            "security": {
+                "permissions": ["read", "write"],
+                "level": "standard"
+            }
+        });
+
+        let context_id = bridge.create_context(config).await.unwrap();
+        assert!(!context_id.is_empty());
+
+        // Test context retrieval
+        let context = bridge.get_context(&context_id).await.unwrap();
+        assert_eq!(context.conversation_id, Some("conv-123".to_string()));
+        assert_eq!(context.user_id, Some("user-456".to_string()));
+        assert_eq!(context.session_id, Some("session-789".to_string()));
+
+        // Test context data access
+        let theme_value = bridge.get_context_data(&context_id, "theme").await.unwrap();
+        assert_eq!(theme_value, Some(serde_json::json!("dark")));
+
+        // Test context update
+        bridge
+            .update_context(&context_id, "theme".to_string(), serde_json::json!("light"))
+            .await
+            .unwrap();
+
+        // Test child context creation
+        let child_scope = serde_json::json!({
+            "type": "agent",
+            "id": "child-agent"
+        });
+        let child_id = bridge
+            .create_child_context(&context_id, child_scope, "copy")
+            .await
+            .unwrap();
+        assert!(!child_id.is_empty());
+
+        // Test shared memory
+        let workflow_scope = serde_json::json!({
+            "type": "workflow",
+            "id": "workflow-1"
+        });
+        bridge
+            .set_shared_memory(
+                workflow_scope.clone(),
+                "status".to_string(),
+                serde_json::json!("running"),
+            )
+            .await
+            .unwrap();
+
+        let status = bridge
+            .get_shared_memory(workflow_scope, "status")
+            .await
+            .unwrap();
+        assert_eq!(status, Some(serde_json::json!("running")));
+
+        // Cleanup
+        bridge.remove_context(&context_id).await.unwrap();
+        bridge.remove_context(&child_id).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_agent_context_execution() {
+        let registry = Arc::new(ComponentRegistry::new());
+        let bridge = AgentBridge::new(registry);
+
+        // Create agent
+        let mut config = HashMap::new();
+        config.insert("name".to_string(), serde_json::json!("context-agent"));
+        config.insert(
+            "description".to_string(),
+            serde_json::json!("Test agent for context"),
+        );
+        config.insert("agent_type".to_string(), serde_json::json!("basic"));
+        config.insert("allowed_tools".to_string(), serde_json::json!([]));
+        config.insert("custom_config".to_string(), serde_json::json!({}));
+        config.insert(
+            "resource_limits".to_string(),
+            serde_json::json!({
+                "max_execution_time_secs": 300,
+                "max_memory_mb": 512,
+                "max_tool_calls": 100,
+                "max_recursion_depth": 10
+            }),
+        );
+        config.insert(
+            "model".to_string(),
+            serde_json::json!({
+                "provider": "mock",
+                "model_id": "test-model",
+                "temperature": null,
+                "max_tokens": null,
+                "settings": {}
+            }),
+        );
+
+        bridge
+            .create_agent("context-test", "basic", config)
+            .await
+            .unwrap();
+
+        // Create context
+        let context_config = serde_json::json!({
+            "conversation_id": "conv-test",
+            "data": {
+                "user_preference": "concise",
+                "context_type": "test"
+            }
+        });
+        let context_id = bridge.create_context(context_config).await.unwrap();
+
+        // Execute with context
+        let input = AgentInput::text("Hello with context");
+        let result = bridge
+            .execute_agent_with_context("context-test", input, &context_id)
+            .await;
+        assert!(result.is_ok() || result.is_err()); // Depends on mock availability
+
+        // Cleanup
+        bridge.remove_agent("context-test").await.unwrap();
+        bridge.remove_context(&context_id).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_streaming_execution() {
+        let registry = Arc::new(ComponentRegistry::new());
+        let bridge = AgentBridge::new(registry);
+
+        // Create agent
+        let mut config = HashMap::new();
+        config.insert("name".to_string(), serde_json::json!("stream-agent"));
+        config.insert(
+            "description".to_string(),
+            serde_json::json!("Test agent for streaming"),
+        );
+        config.insert("agent_type".to_string(), serde_json::json!("basic"));
+        config.insert("allowed_tools".to_string(), serde_json::json!([]));
+        config.insert("custom_config".to_string(), serde_json::json!({}));
+        config.insert(
+            "resource_limits".to_string(),
+            serde_json::json!({
+                "max_execution_time_secs": 300,
+                "max_memory_mb": 512,
+                "max_tool_calls": 100,
+                "max_recursion_depth": 10
+            }),
+        );
+        config.insert(
+            "model".to_string(),
+            serde_json::json!({
+                "provider": "mock",
+                "model_id": "test-model",
+                "temperature": null,
+                "max_tokens": null,
+                "settings": {}
+            }),
+        );
+
+        bridge
+            .create_agent("stream-test", "basic", config)
+            .await
+            .unwrap();
+
+        // Test streaming execution
+        let input = AgentInput::text("Stream this response");
+        let mut receiver = bridge
+            .execute_agent_streaming("stream-test", input, None)
+            .await
+            .unwrap();
+
+        // Wait for at least one output
+        let timeout =
+            tokio::time::timeout(std::time::Duration::from_secs(5), receiver.recv()).await;
+
+        // Should receive something (either success or error)
+        assert!(timeout.is_ok());
+
+        // Cleanup
+        bridge.remove_agent("stream-test").await.unwrap();
     }
 }

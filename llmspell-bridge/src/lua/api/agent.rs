@@ -332,6 +332,223 @@ pub fn inject_agent_api(
             source: None,
         })?;
 
+    // Context Management Functions
+
+    // Add Agent.createContext() function
+    let bridge_for_context = bridge.clone();
+    let create_context_fn = lua
+        .create_async_function(move |_lua, config: Table| {
+            let bridge = bridge_for_context.clone();
+            async move {
+                // Convert Lua table to JSON
+                let config_json = lua_value_to_json(mlua::Value::Table(config))?;
+
+                match bridge.create_context(config_json).await {
+                    Ok(context_id) => Ok(context_id),
+                    Err(e) => Err(mlua::Error::RuntimeError(format!(
+                        "Failed to create context: {}",
+                        e
+                    ))),
+                }
+            }
+        })
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to create Agent.createContext function: {}", e),
+            source: None,
+        })?;
+
+    agent_table
+        .set("createContext", create_context_fn)
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to set Agent.createContext: {}", e),
+            source: None,
+        })?;
+
+    // Add Agent.createChildContext() function
+    let bridge_for_child = bridge.clone();
+    let create_child_context_fn = lua
+        .create_async_function(
+            move |_lua, (parent_id, scope, inheritance): (String, Table, String)| {
+                let bridge = bridge_for_child.clone();
+                async move {
+                    let scope_json = lua_value_to_json(mlua::Value::Table(scope))?;
+
+                    match bridge
+                        .create_child_context(&parent_id, scope_json, &inheritance)
+                        .await
+                    {
+                        Ok(child_id) => Ok(child_id),
+                        Err(e) => Err(mlua::Error::RuntimeError(format!(
+                            "Failed to create child context: {}",
+                            e
+                        ))),
+                    }
+                }
+            },
+        )
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to create Agent.createChildContext function: {}", e),
+            source: None,
+        })?;
+
+    agent_table
+        .set("createChildContext", create_child_context_fn)
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to set Agent.createChildContext: {}", e),
+            source: None,
+        })?;
+
+    // Add Agent.updateContext() function
+    let bridge_for_update = bridge.clone();
+    let update_context_fn = lua
+        .create_async_function(
+            move |_lua, (context_id, key, value): (String, String, mlua::Value)| {
+                let bridge = bridge_for_update.clone();
+                async move {
+                    let value_json = lua_value_to_json(value)?;
+
+                    match bridge.update_context(&context_id, key, value_json).await {
+                        Ok(()) => Ok(()),
+                        Err(e) => Err(mlua::Error::RuntimeError(format!(
+                            "Failed to update context: {}",
+                            e
+                        ))),
+                    }
+                }
+            },
+        )
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to create Agent.updateContext function: {}", e),
+            source: None,
+        })?;
+
+    agent_table
+        .set("updateContext", update_context_fn)
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to set Agent.updateContext: {}", e),
+            source: None,
+        })?;
+
+    // Add Agent.getContextData() function
+    let bridge_for_get = bridge.clone();
+    let get_context_data_fn = lua
+        .create_async_function(move |lua, (context_id, key): (String, String)| {
+            let bridge = bridge_for_get.clone();
+            async move {
+                match bridge.get_context_data(&context_id, &key).await {
+                    Ok(Some(value)) => {
+                        // Convert JSON to Lua value
+                        json_to_lua_value(lua, &value)
+                    }
+                    Ok(None) => Ok(mlua::Value::Nil),
+                    Err(e) => Err(mlua::Error::RuntimeError(format!(
+                        "Failed to get context data: {}",
+                        e
+                    ))),
+                }
+            }
+        })
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to create Agent.getContextData function: {}", e),
+            source: None,
+        })?;
+
+    agent_table
+        .set("getContextData", get_context_data_fn)
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to set Agent.getContextData: {}", e),
+            source: None,
+        })?;
+
+    // Add Agent.setSharedMemory() function
+    let bridge_for_shared_set = bridge.clone();
+    let set_shared_memory_fn = lua
+        .create_async_function(
+            move |_lua, (scope, key, value): (Table, String, mlua::Value)| {
+                let bridge = bridge_for_shared_set.clone();
+                async move {
+                    let scope_json = lua_value_to_json(mlua::Value::Table(scope))?;
+                    let value_json = lua_value_to_json(value)?;
+
+                    match bridge.set_shared_memory(scope_json, key, value_json).await {
+                        Ok(()) => Ok(()),
+                        Err(e) => Err(mlua::Error::RuntimeError(format!(
+                            "Failed to set shared memory: {}",
+                            e
+                        ))),
+                    }
+                }
+            },
+        )
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to create Agent.setSharedMemory function: {}", e),
+            source: None,
+        })?;
+
+    agent_table
+        .set("setSharedMemory", set_shared_memory_fn)
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to set Agent.setSharedMemory: {}", e),
+            source: None,
+        })?;
+
+    // Add Agent.getSharedMemory() function
+    let bridge_for_shared_get = bridge.clone();
+    let get_shared_memory_fn = lua
+        .create_async_function(move |lua, (scope, key): (Table, String)| {
+            let bridge = bridge_for_shared_get.clone();
+            async move {
+                let scope_json = lua_value_to_json(mlua::Value::Table(scope))?;
+
+                match bridge.get_shared_memory(scope_json, &key).await {
+                    Ok(Some(value)) => json_to_lua_value(lua, &value),
+                    Ok(None) => Ok(mlua::Value::Nil),
+                    Err(e) => Err(mlua::Error::RuntimeError(format!(
+                        "Failed to get shared memory: {}",
+                        e
+                    ))),
+                }
+            }
+        })
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to create Agent.getSharedMemory function: {}", e),
+            source: None,
+        })?;
+
+    agent_table
+        .set("getSharedMemory", get_shared_memory_fn)
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to set Agent.getSharedMemory: {}", e),
+            source: None,
+        })?;
+
+    // Add Agent.removeContext() function
+    let bridge_for_remove = bridge.clone();
+    let remove_context_fn = lua
+        .create_async_function(move |_lua, context_id: String| {
+            let bridge = bridge_for_remove.clone();
+            async move {
+                match bridge.remove_context(&context_id).await {
+                    Ok(()) => Ok(()),
+                    Err(e) => Err(mlua::Error::RuntimeError(format!(
+                        "Failed to remove context: {}",
+                        e
+                    ))),
+                }
+            }
+        })
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to create Agent.removeContext function: {}", e),
+            source: None,
+        })?;
+
+    agent_table
+        .set("removeContext", remove_context_fn)
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to set Agent.removeContext: {}", e),
+            source: None,
+        })?;
+
     // Set the Agent table as a global
     lua.globals()
         .set(&api_def.global_name[..], agent_table)
@@ -341,6 +558,41 @@ pub fn inject_agent_api(
         })?;
 
     Ok(())
+}
+
+/// Convert JSON value to Lua value
+fn json_to_lua_value<'lua>(
+    lua: &'lua Lua,
+    value: &serde_json::Value,
+) -> mlua::Result<mlua::Value<'lua>> {
+    match value {
+        serde_json::Value::Null => Ok(mlua::Value::Nil),
+        serde_json::Value::Bool(b) => Ok(mlua::Value::Boolean(*b)),
+        serde_json::Value::Number(n) => {
+            if let Some(i) = n.as_i64() {
+                Ok(mlua::Value::Integer(i))
+            } else if let Some(f) = n.as_f64() {
+                Ok(mlua::Value::Number(f))
+            } else {
+                Ok(mlua::Value::Nil)
+            }
+        }
+        serde_json::Value::String(s) => Ok(mlua::Value::String(lua.create_string(s)?)),
+        serde_json::Value::Array(arr) => {
+            let table = lua.create_table()?;
+            for (i, v) in arr.iter().enumerate() {
+                table.set(i + 1, json_to_lua_value(lua, v)?)?;
+            }
+            Ok(mlua::Value::Table(table))
+        }
+        serde_json::Value::Object(obj) => {
+            let table = lua.create_table()?;
+            for (k, v) in obj {
+                table.set(k.as_str(), json_to_lua_value(lua, v)?)?;
+            }
+            Ok(mlua::Value::Table(table))
+        }
+    }
 }
 
 /// Wrapper around Agent for Lua
@@ -861,6 +1113,25 @@ impl UserData for LuaAgentWrapper {
                 Err(e) => Err(mlua::Error::ExternalError(Arc::new(e))),
             }
         });
+
+        // Context & Communication Methods
+
+        // executeWithContext method - Execute agent with a specific context
+        methods.add_async_method(
+            "executeWithContext",
+            |lua, this, (input, context_id): (Table, String)| async move {
+                let agent_input = lua_table_to_agent_input(lua, input)?;
+
+                let result = this
+                    .bridge
+                    .execute_agent_with_context(&this.agent_instance_name, agent_input, &context_id)
+                    .await
+                    .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+
+                let output_table = agent_output_to_lua_table(lua, result)?;
+                Ok(output_table)
+            },
+        );
     }
 }
 

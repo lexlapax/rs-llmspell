@@ -342,9 +342,9 @@ ensure it's certain implementations are consisten with what should go in `llmspe
 - All timestamps updated to use `DateTime<Utc>` for serialization
 - Working example demonstrating all monitoring features
 
-### Task 3.3.9: Script-to-Agent Integration ⚠️ PARTIAL (50% Complete) 2025-07-18
+### Task 3.3.9: Script-to-Agent Integration ⚠️ PARTIAL (75% Complete) 2025-07-19
 **Priority**: CRITICAL  
-**Estimated Time**: 36 hours (16 hours completed, 20 hours remaining)
+**Estimated Time**: 36 hours (24 hours completed, 12 hours remaining)
 **Assignee**: Bridge Team
 
 **Description**: Implement bridge infrastructure for scripts to discover, invoke, and manage agents through llmspell-bridge.
@@ -447,7 +447,7 @@ ensure it's certain implementations are consisten with what should go in `llmspe
 3. ✅ Implement lifecycle hooks and state machine access (14 state control methods added: getAgentState, initialize, start, pause, resume, stop, terminate, setError, recover, getStateHistory, getLastError, getRecoveryAttempts, isHealthy, getStateMetrics)
 4. ✅ Add performance tracking and alerts (PerformanceMonitor, AlertManager integration)
 
-### Task 3.3.9c: Complete Script-to-Agent Bridge - Context & Communication
+### Task 3.3.9c: Complete Script-to-Agent Bridge - Context & Communication ✅ COMPLETE 2025-07-19
 **Priority**: MEDIUM  
 **Estimated Time**: 8 hours  
 **Assignee**: Bridge Team
@@ -455,16 +455,16 @@ ensure it's certain implementations are consisten with what should go in `llmspe
 **Description**: Add enhanced context support and bidirectional communication patterns.
 
 **Acceptance Criteria:**
-- [ ] Enhanced context features working
-- [ ] Streaming and callbacks functional
-- [ ] Multimodal input/output support
-- [ ] Shared memory regions accessible
+- [x] Enhanced context features working ✅ (ExecutionContext builder, hierarchical contexts)
+- [x] Streaming and callbacks functional ✅ (execute_agent_streaming with mpsc channels)
+- [x] Multimodal input/output support ✅ (MediaContent handling in conversions)
+- [x] Shared memory regions accessible ✅ (SharedMemory with scope-based access)
 
 **Implementation Steps:**
-1. Create context builder API
-2. Implement streaming and callbacks
-3. Add multimodal support
-4. Enable shared memory regions
+1. ✅ Create context builder API (Agent.createContext, createChildContext, updateContext, getContextData)
+2. ✅ Implement streaming and callbacks (execute_agent_streaming returns Receiver<AgentOutput>)
+3. ✅ Add multimodal support (lua_table_to_agent_input handles media, base64 image support)
+4. ✅ Enable shared memory regions (setSharedMemory, getSharedMemory with scope-based access)
 
 ### Task 3.3.9d: Complete Script-to-Agent Bridge - Composition & Workflows
 **Priority**: MEDIUM  

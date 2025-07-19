@@ -9,6 +9,7 @@ use std::collections::HashMap;
 
 /// Convert Lua table to AgentInput
 pub fn lua_table_to_agent_input(_lua: &Lua, table: Table) -> mlua::Result<AgentInput> {
+    use llmspell_core::types::ColorSpace;
     // Extract text (required)
     let text: String = table.get("text").unwrap_or_default();
 
@@ -41,11 +42,55 @@ pub fn lua_table_to_agent_input(_lua: &Lua, table: Table) -> mlua::Result<AgentI
         }
     }
 
+    // Extract media content (optional)
+    let mut media = Vec::new();
+    if let Ok(media_table) = table.get::<_, Table>("media") {
+        for media_item in media_table.sequence_values::<Table>().flatten() {
+            if let Ok(media_type) = media_item.get::<_, String>("type") {
+                match media_type.as_str() {
+                    "text" => {
+                        if let Ok(content) = media_item.get::<_, String>("content") {
+                            media.push(MediaContent::Text(content));
+                        }
+                    }
+                    "image" => {
+                        // For now, we'll create a placeholder image
+                        // In a real implementation, we'd handle base64 data or file paths
+                        if let Ok(data) = media_item.get::<_, String>("data") {
+                            // Assume data is base64 encoded
+                            use base64::Engine as _;
+                            if let Ok(bytes) =
+                                base64::engine::general_purpose::STANDARD.decode(&data)
+                            {
+                                media.push(MediaContent::Image {
+                                    data: bytes,
+                                    format: llmspell_core::types::ImageFormat::Png,
+                                    metadata: llmspell_core::types::ImageMetadata {
+                                        width: media_item.get("width").unwrap_or(0),
+                                        height: media_item.get("height").unwrap_or(0),
+                                        color_space: ColorSpace::RGB, // Default to RGB
+                                        has_transparency: media_item
+                                            .get("has_transparency")
+                                            .unwrap_or(false),
+                                        dpi: media_item.get("dpi").ok(),
+                                    },
+                                });
+                            }
+                        }
+                    }
+                    // Add more media types as needed
+                    _ => {}
+                }
+            }
+        }
+    }
+
     // Create AgentInput
     let mut input = AgentInput::text(text);
     input.parameters = parameters;
     input.context = context;
     input.output_modalities = output_modalities;
+    input.media = media;
 
     Ok(input)
 }
