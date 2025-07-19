@@ -698,43 +698,46 @@ ensure it's certain implementations are consisten with what should go in `llmspe
 - [ ] Result aggregation functional
 - [ ] Documentation complete
 
-### Task 3.3.15: Workflow-Agent Integration
+### Task 3.3.15: Basic Parallel Workflow
 **Priority**: CRITICAL  
 **Estimated Time**: 12 hours  
-**Assignee**: Integration Team
+**Assignee**: Workflow Team
 
-**Description**: Implement bidirectional integration between workflows and agents.
+**Description**: Implement basic parallel workflow pattern for concurrent execution without advanced features (Phase 8 adds enterprise features).
 
 **Acceptance Criteria:**
-- [ ] WorkflowAgent implementation (agents can execute workflows)
-- [ ] Workflow step execution using agents
-- [ ] Agent parameter passing to/from workflows
-- [ ] Basic workflow registry system
-- [ ] Workflow discovery from agent context
-- [ ] Integration with existing agent infrastructure
-- [ ] Performance optimization for agent-workflow calls
-- [ ] Error handling for agent-workflow interactions
+- [ ] Fork-join pattern implementation
+- [ ] Fixed concurrency limits
+- [ ] Simple result collection (all branches complete)
+- [ ] Fail-fast error handling
+- [ ] Memory-based coordination
+- [ ] Integration with agent infrastructure
+- [ ] Integration with 33+ tools
+- [ ] Performance acceptable (<50ms workflow creation)
 
 **Implementation Steps:**
-1. Implement WorkflowAgent in `llmspell-workflows/src/agent_integration/workflow_agent.rs`
-2. Add agent step execution in `llmspell-workflows/src/basic/agent_step.rs`
-3. Create BasicWorkflowRegistry in `llmspell-workflows/src/registry.rs`
-4. Add workflow discovery in `llmspell-agents/src/context/workflow_discovery.rs`
-5. Implement parameter conversion in `llmspell-workflows/src/agent_integration/conversion.rs`
-6. Add error handling in `llmspell-workflows/src/agent_integration/errors.rs`
-7. Optimize performance in `llmspell-workflows/src/agent_integration/optimization.rs`
-8. Create integration examples in `llmspell-workflows/examples/agent_workflow_integration.rs`
-9. Update `llmspell-workflows/src/lib.rs` to export agent integration
+1. Create BasicParallelWorkflow struct in `llmspell-workflows/src/basic/parallel.rs`
+2. Implement ParallelBranch structure for branch definition
+3. Add concurrent execution using tokio::spawn
+4. Implement basic concurrency control (fixed limits)
+5. Create simple result aggregation (wait for all)
+6. Add fail-fast error handling
+7. Integrate with workflow registry
+8. Create parallel workflow tests
+9. Add examples in `llmspell-workflows/examples/parallel_workflow.rs`
+10. Write tests in `llmspell-workflows/tests/parallel_tests.rs`
 
 **Definition of Done:**
-- [ ] WorkflowAgent implemented and operational
-- [ ] Workflows can execute agent steps
-- [ ] BasicWorkflowRegistry functional
-- [ ] Workflow discovery working
-- [ ] Parameter conversion bidirectional
-- [ ] Error handling comprehensive
-- [ ] Performance acceptable
-- [ ] Integration examples working
+- [ ] BasicParallelWorkflow implemented and functional
+- [ ] Fork-join execution pattern working
+- [ ] All branches complete before return
+- [ ] Results collected properly from all branches
+- [ ] Errors propagate correctly (fail-fast)
+- [ ] Fixed concurrency limits enforced
+- [ ] Can execute tool branches using 33+ tools
+- [ ] Can execute agent branches using agent infrastructure
+- [ ] Performance requirements met
+- [ ] Comprehensive test coverage
 - [ ] Documentation complete
 
 ### Task 3.3.16: Script-to-Workflow Integration & Multi-Agent Coordination
@@ -781,45 +784,283 @@ ensure it's certain implementations are consisten with what should go in `llmspe
 - [ ] Script APIs consistent with existing patterns
 - [ ] Documentation complete
 
-### Task 3.3.17: Workflow Examples and Testing
-**Priority**: HIGH  
-**Estimated Time**: 12 hours  
-**Assignee**: QA Team
+### Task 3.3.17: Global Object Injection Infrastructure
+**Priority**: CRITICAL  
+**Estimated Time**: 20 hours  
+**Assignee**: Bridge Team
 
-**Description**: Create comprehensive workflow examples and testing framework for basic workflow patterns.
+**Description**: Implement the global object injection system for comprehensive script integration, providing all rs-llmspell functionality through pre-injected globals without require() statements.
 
 **Acceptance Criteria:**
-- [ ] 5+ workflow examples covering all patterns
-- [ ] Real-world use case demonstrations
-- [ ] Tool integration examples
-- [ ] Agent integration examples
-- [ ] Performance benchmarking
-- [ ] Error scenario testing
-- [ ] Documentation with step-by-step guides
-- [ ] Integration with existing example library
+- [ ] All globals available without require() in scripts
+- [ ] Agent, Tool, Tools, Workflow globals functional
+- [ ] Hook, Event, State globals functional
+- [ ] Logger, Config, Security, Utils, JSON globals functional
+- [ ] Type conversion system for script-to-native translation
+- [ ] Performance optimized (<5ms global injection)
+- [ ] Cross-engine consistency (Lua/JavaScript)
+- [ ] Memory efficient global management
 
 **Implementation Steps:**
-1. Create data pipeline example in `llmspell-workflows/examples/data_pipeline.rs`
-2. Create conditional decision example in `llmspell-workflows/examples/decision_workflow.rs`
-3. Create iterative processing example in `llmspell-workflows/examples/iterative_processing.rs`
-4. Create agent coordination example in `llmspell-workflows/examples/agent_coordination.rs`
-5. Create tool orchestration example in `llmspell-workflows/examples/tool_orchestration.rs`
-6. Add testing framework in `llmspell-workflows/src/testing/framework.rs`
-7. Add performance benchmarks in `llmspell-workflows/benches/workflow_benchmarks.rs`
-8. Create error scenarios in `llmspell-workflows/tests/error_scenarios.rs`
-9. Document examples in `llmspell-workflows/examples/WORKFLOW_GUIDE.md`
+1. Create global injection framework in `llmspell-bridge/src/globals/`
+2. Implement Agent global in `llmspell-bridge/src/globals/agent_global.rs`
+3. Implement Tool and Tools globals in `llmspell-bridge/src/globals/tool_global.rs`
+4. Implement Workflow global in `llmspell-bridge/src/globals/workflow_global.rs`
+5. Implement Hook global in `llmspell-bridge/src/globals/hook_global.rs`
+6. Implement Event global in `llmspell-bridge/src/globals/event_global.rs`
+7. Implement State global in `llmspell-bridge/src/globals/state_global.rs`
+8. Implement Logger, Config, Security, Utils globals
+9. Implement JSON global for parsing/stringifying
+10. Add type conversion system in `llmspell-bridge/src/conversion/`
+11. Integrate with script engines (Lua, JavaScript)
+12. Performance optimization and benchmarking
+13. Add comprehensive tests for all globals
+14. Create global injection examples
 
 **Definition of Done:**
-- [ ] 5 comprehensive workflow examples created
-- [ ] All workflow patterns demonstrated
-- [ ] Real-world use cases covered
-- [ ] Tool and agent integration shown
-- [ ] Performance benchmarking complete
-- [ ] Error scenario testing finished
-- [ ] Documentation comprehensive
-- [ ] Examples integrated with library
+- [ ] All globals inject properly into script engines
+- [ ] Agent.create(), Tool.get(), Workflow.sequential() work in scripts
+- [ ] Hook.register(), Event.emit(), State.get() work in scripts
+- [ ] Logger.info(), Config.get(), JSON.parse() work in scripts
+- [ ] Type conversion handles all basic types bidirectionally
+- [ ] Performance requirements met (<5ms injection)
+- [ ] Memory usage optimized
+- [ ] Cross-engine consistency verified
+- [ ] Comprehensive test coverage
+- [ ] Documentation complete
 
-### Task 3.3.18: Lua Agent, Workflow and other Examples
+### Task 3.3.18: Hook and Event Integration for Workflows  
+**Priority**: CRITICAL  
+**Estimated Time**: 16 hours
+**Assignee**: Infrastructure Team
+
+**Description**: Integrate Hook and Event systems with workflows for lifecycle management, enabling script-accessible hooks and events for workflow monitoring and coordination.
+
+**Acceptance Criteria:**
+- [ ] Workflow lifecycle hooks (before_start, after_step, on_complete, on_error)
+- [ ] Event emission from workflow steps and state changes
+- [ ] Script access to Hook.register() and Event.emit()
+- [ ] All four workflow patterns support hooks/events
+- [ ] Performance optimized (<2ms hook overhead)
+- [ ] Memory efficient event handling
+
+**Implementation Steps:**
+1. Define workflow lifecycle hooks in `llmspell-workflows/src/hooks/lifecycle.rs`
+2. Implement hook registration system in `llmspell-workflows/src/hooks/registry.rs`
+3. Add event emission from workflow steps in `llmspell-workflows/src/events/emitter.rs`
+4. Create script-accessible Hook API in global Hook object
+5. Create script-accessible Event API in global Event object
+6. Integrate hooks with BasicSequentialWorkflow
+7. Integrate hooks with BasicConditionalWorkflow
+8. Integrate hooks with BasicLoopWorkflow
+9. Integrate hooks with BasicParallelWorkflow
+10. Add workflow monitoring examples
+11. Performance optimization
+12. Add comprehensive tests
+13. Create hook/event integration examples
+
+**Definition of Done:**
+- [ ] Hook.register() works from scripts for workflow events
+- [ ] Event.emit() works from scripts within workflow steps
+- [ ] All workflow lifecycle events properly hooked
+- [ ] Workflow monitoring examples functional
+- [ ] Performance requirements met (<2ms overhead)
+- [ ] Memory usage optimized
+- [ ] Integration with all four workflow patterns complete
+- [ ] Comprehensive test coverage
+- [ ] Documentation complete
+
+### Task 3.3.19: State Management Integration for Workflows
+**Priority**: CRITICAL  
+**Estimated Time**: 14 hours
+**Assignee**: Infrastructure Team
+
+**Description**: Integrate State management system with workflows for shared memory between workflow steps and cross-workflow communication.
+
+**Acceptance Criteria:**
+- [ ] Shared state between workflow steps
+- [ ] State persistence during workflow execution
+- [ ] Script access to State.get(), State.set(), State.remove()
+- [ ] Memory-based implementation (Phase 5 adds persistence)
+- [ ] Thread-safe state access for parallel workflows
+- [ ] Performance optimized (<1ms state access)
+
+**Implementation Steps:**
+1. Create workflow state integration layer in `llmspell-workflows/src/state/`
+2. Implement shared state access in `llmspell-workflows/src/state/shared.rs`
+3. Add state persistence during execution in `llmspell-workflows/src/state/persistence.rs`
+4. Create script-accessible State API in global State object
+5. Add thread-safe state access for parallel workflows
+6. Integrate state access with all four workflow patterns
+7. Add state-based workflow coordination examples
+8. Performance optimization
+9. Add comprehensive tests
+10. Create state management examples
+
+**Definition of Done:**
+- [ ] State.get(), State.set(), State.remove() work from scripts
+- [ ] Shared state accessible across workflow steps
+- [ ] State persists during workflow execution
+- [ ] Thread-safe for parallel workflow branches
+- [ ] Performance requirements met (<1ms access)
+- [ ] Memory usage optimized
+- [ ] Integration with all four workflow patterns complete
+- [ ] Comprehensive test coverage
+- [ ] Documentation complete
+
+### Task 3.3.20: Comprehensive Script Integration (Enhanced from 3.3.16)
+**Priority**: CRITICAL  
+**Estimated Time**: 24 hours  
+**Assignee**: Bridge Team
+
+**Description**: Implement comprehensive script-to-workflow integration using the global object injection infrastructure, providing full Lua API for all four workflow patterns with Hook, Event, and State integration.
+
+**Acceptance Criteria:**
+- [ ] Complete Workflow.sequential(), .conditional(), .loop(), .parallel() API
+- [ ] Full integration with global Agent, Tool, Hook, Event, State objects
+- [ ] Advanced workflow composition and nesting examples
+- [ ] Performance optimized bridge architecture (<10ms overhead)
+- [ ] Script error handling and debugging support
+- [ ] Cross-workflow coordination patterns
+
+**Implementation Steps:**
+1. Implement Workflow.sequential() constructor in global Workflow object
+2. Implement Workflow.conditional() constructor with condition functions
+3. Implement Workflow.loop() constructor with iteration control
+4. Implement Workflow.parallel() constructor with branch definition
+5. Add workflow registry integration (Workflow.register(), .list(), .get())
+6. Add workflow discovery (.info(), .types())
+7. Integrate with Hook global for workflow lifecycle hooks
+8. Integrate with Event global for workflow event emission
+9. Integrate with State global for workflow state management
+10. Add advanced workflow composition examples
+11. Add nested workflow examples  
+12. Add cross-workflow coordination examples
+13. Performance optimization and benchmarking
+14. Add comprehensive error handling
+15. Create extensive Lua workflow examples
+16. Add debugging and introspection capabilities
+
+**Definition of Done:**
+- [ ] All four workflow patterns creatable from Lua scripts
+- [ ] Workflow.sequential({steps = {...}}) functional
+- [ ] Workflow.parallel({branches = {...}}) functional
+- [ ] Workflow.conditional({condition = ..., branches = {...}}) functional
+- [ ] Workflow.loop({condition = ..., body = ...}) functional
+- [ ] Hook integration working (workflow lifecycle hooks from scripts)
+- [ ] Event integration working (event emission from workflow steps)
+- [ ] State integration working (shared state between steps)
+- [ ] Advanced composition examples functional
+- [ ] Performance requirements met (<10ms overhead)
+- [ ] Error handling comprehensive
+- [ ] Comprehensive test coverage
+- [ ] Documentation complete
+
+### Task 3.3.21: Tool Integration Verification (33+ Tools)
+**Priority**: HIGH  
+**Estimated Time**: 12 hours
+**Assignee**: QA Team
+
+**Description**: Verify all 33+ tools from Phases 3.0-3.2 work properly with the workflow system and are accessible through script integration.
+
+**Acceptance Criteria:**
+- [ ] All tools accessible from workflows via Tools.get()
+- [ ] Tool composition patterns work in workflow steps
+- [ ] Performance requirements met for tool invocation
+- [ ] Error handling verified for tool failures
+- [ ] Tool timeouts respected in workflow context
+- [ ] Tool resource limits enforced
+
+**Implementation Steps:**
+1. Test file system tools (8 tools) with workflows
+2. Test data processing tools (4 tools) with workflows  
+3. Test utility tools (9 tools) with workflows
+4. Test system integration tools (4 tools) with workflows
+5. Test API/web tools (8 tools) with workflows
+6. Verify tool composition patterns in workflow steps
+7. Test error handling and timeout behavior
+8. Performance benchmarking for tool invocation
+9. Create tool integration examples for each category
+10. Add comprehensive tests
+
+**Definition of Done:**
+- [ ] All 33+ tools verified working in workflow context
+- [ ] Tool composition patterns functional
+- [ ] Error handling verified for all tool categories
+- [ ] Performance requirements met
+- [ ] Timeout behavior verified
+- [ ] Resource limits enforced
+- [ ] Tool integration examples created
+- [ ] Comprehensive test coverage
+- [ ] Documentation complete
+
+### Task 3.3.22: Workflow Examples and Testing (Enhanced from 3.3.17)
+**Priority**: HIGH  
+**Estimated Time**: 16 hours  
+**Assignee**: QA Team
+
+**Description**: Create comprehensive workflow examples and test suite demonstrating all four patterns (Sequential, Conditional, Loop, Parallel) with full script integration using global objects.
+
+**Acceptance Criteria:**
+- [ ] Examples for all four workflow patterns from Lua scripts
+- [ ] Tool integration examples using Tools.get() and 33+ tools
+- [ ] Agent integration examples using Agent.create()
+- [ ] Hook/Event integration examples using Hook.register() and Event.emit()
+- [ ] State management examples using State.get()/set()
+- [ ] Multi-agent coordination examples via workflows
+- [ ] Advanced workflow composition and nesting examples
+- [ ] Performance benchmarks for all patterns
+- [ ] Error handling and debugging examples
+- [ ] Cross-workflow coordination patterns
+
+**Implementation Steps:**
+1. Create sequential workflow examples in `llmspell-workflows/examples/sequential/`
+   - Basic sequential steps with tools
+   - Sequential with agent steps
+   - Sequential with state management
+   - Lua script examples using Workflow.sequential()
+2. Create conditional workflow examples in `llmspell-workflows/examples/conditional/`
+   - Condition-based branching with tools
+   - Agent-based decision making
+   - State-based conditions
+   - Lua script examples using Workflow.conditional()
+3. Create loop workflow examples in `llmspell-workflows/examples/loop/`
+   - Collection iteration with tools
+   - Agent-based processing loops
+   - State accumulation patterns
+   - Lua script examples using Workflow.loop()
+4. Create parallel workflow examples in `llmspell-workflows/examples/parallel/`
+   - Fork-join patterns with tools
+   - Concurrent agent execution
+   - Parallel state management
+   - Lua script examples using Workflow.parallel()
+5. Add comprehensive tool integration examples using all 33+ tools
+6. Add agent integration examples with workflow coordination
+7. Add Hook/Event integration examples for workflow lifecycle
+8. Add State management examples for cross-step communication
+9. Create advanced composition examples (nested workflows)
+10. Add multi-agent coordination examples via workflows
+11. Add performance benchmarks in `llmspell-workflows/benches/`
+12. Create error handling and debugging examples
+13. Document all examples in `llmspell-workflows/examples/README.md`
+14. Add comprehensive test suite covering all patterns and integrations
+
+**Definition of Done:**
+- [ ] All four workflow patterns working from Lua scripts
+- [ ] Workflow.sequential(), .conditional(), .loop(), .parallel() examples functional
+- [ ] Tool integration examples using Tools.get() operational
+- [ ] Agent integration examples using Agent.create() working
+- [ ] Hook.register() and Event.emit() examples functional
+- [ ] State.get()/set() examples operational
+- [ ] Advanced composition and nesting examples working
+- [ ] Multi-agent coordination via workflows demonstrated
+- [ ] Performance benchmarks baseline established for all patterns
+- [ ] Error handling and debugging patterns documented
+- [ ] Cross-workflow coordination examples functional
+- [ ] Documentation complete with comprehensive examples
+- [ ] Test coverage comprehensive across all integrations
+
+### Task 3.3.23: Lua Agent, Workflow and other Examples
 **Priority**: HIGH  
 **Estimated Time**: 12 hours  
 **Assignee**: Bridge Team
@@ -829,7 +1070,7 @@ ensure it's certain implementations are consisten with what should go in `llmspe
 **Acceptance Criteria:**
 - [ ] 8+ comprehensive Lua examples (agents and workflows)
 - [ ] Cover all major agent patterns (tool orchestrator, monitor, data processor, coordinator)
-- [ ] **Demonstrate all workflow patterns** (sequential, conditional, loop)
+- [ ] **Demonstrate all workflow patterns** (sequential, conditional, loop, parallel)
 - [ ] **Show workflow-agent integration** from Lua
 - [ ] Demonstrate agent discovery and invocation from scripts
 - [ ] Demonstrate workflow discovery and invocation from scripts
@@ -847,12 +1088,13 @@ ensure it's certain implementations are consisten with what should go in `llmspe
 5. Create workflow-sequential.lua in `examples/lua/workflows/workflow-sequential.lua`
 6. Create workflow-conditional.lua in `examples/lua/workflows/workflow-conditional.lua`
 7. Create workflow-loop.lua in `examples/lua/workflows/workflow-loop.lua`
-8. Create workflow-agent-integration.lua in `examples/lua/workflows/workflow-agent-integration.lua`
-9. Create Lua API documentation in `examples/lua/AGENT_WORKFLOW_API.md`
-10. Create comprehensive tutorial in `examples/lua/TUTORIAL.md`
+8. Create workflow-parallel.lua in `examples/lua/workflows/workflow-parallel.lua`
+9. Create workflow-agent-integration.lua in `examples/lua/workflows/workflow-agent-integration.lua`
+10. Create Lua API documentation in `examples/lua/AGENT_WORKFLOW_API.md`
+11. Create comprehensive tutorial in `examples/lua/TUTORIAL.md`
 
 **Definition of Done:**
-- [ ] 8 comprehensive Lua examples created
+- [ ] 9 comprehensive Lua examples created (including parallel workflow)
 - [ ] All agent patterns demonstrated
 - [ ] **All workflow patterns demonstrated**
 - [ ] **Workflow-agent integration shown**
@@ -863,7 +1105,7 @@ ensure it's certain implementations are consisten with what should go in `llmspe
 - [ ] Integration with bridge complete
 - [ ] Documentation complete
 
-### Task 3.3.19: Phase 3 Final Integration
+### Task 3.3.24: Phase 3 Final Integration
 **Priority**: CRITICAL  
 **Estimated Time**: 16 hours  
 **Assignee**: Integration Lead

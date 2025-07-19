@@ -5,7 +5,7 @@
 **Status**: Design Document (Updated from Basic Workflows)  
 **Timeline**: Weeks 25-26  
 
-> **📋 Note**: This document builds on the basic workflow patterns implemented in Phase 3.3 and focuses on enterprise-grade workflow features that leverage the complete infrastructure stack.
+> **📋 Note**: This document describes ADVANCED workflow features that build on the basic workflow patterns from Phase 3.3 (Sequential, Conditional, Loop, Parallel). The focus here is on enterprise features like dynamic concurrency, complex aggregation strategies, distributed execution, persistent state, and advanced error handling. Phase 3.3 provides fully functional basic workflows accessible via comprehensive Lua scripting APIs.
 
 ---
 
@@ -20,11 +20,12 @@ Transform basic workflows into enterprise-grade workflow orchestration with full
 ## Phase 3.3 Foundation
 
 **What Phase 3.3 Delivered**:
-- Basic Sequential, Conditional, and Loop workflows
+- Basic Sequential, Conditional, Loop, and Parallel workflows
 - Memory-based state management
 - Tool and agent integration
 - Simple error handling
 - Basic workflow registry
+- Comprehensive Lua workflow API with global object injection
 
 **What Phase 8 Adds**:
 - Persistent state across sessions
@@ -37,7 +38,7 @@ Transform basic workflows into enterprise-grade workflow orchestration with full
 ## Dependencies
 
 **Critical Dependencies**:
-- **Phase 3.3**: Basic workflow patterns (Sequential, Conditional, Loop)
+- **Phase 3.3**: Basic workflow patterns (Sequential, Conditional, Loop, Parallel)
 - **Phase 4**: Hook System for advanced workflow lifecycle events
 - **Phase 5**: Persistent State Management for workflow state persistence
 - **Phase 6**: Session Management for multi-session workflow execution
@@ -581,17 +582,23 @@ impl StreamingWorkflow {
 }
 ```
 
-### 2.5 ParallelWorkflow
+### 2.5 AdvancedParallelWorkflow (Builds on Phase 3.3 BasicParallelWorkflow)
 
-Execute multiple workflow steps concurrently with configurable parallelism and result aggregation.
+Execute multiple workflow steps concurrently with advanced enterprise features including dynamic concurrency, complex aggregation strategies, distributed execution, and sophisticated error handling. This builds upon the basic parallel workflow pattern from Phase 3.3.
 
 ```rust
-pub struct ParallelWorkflow {
+// Advanced parallel workflow with enterprise features
+pub struct AdvancedParallelWorkflow {
     id: String,
     name: String,
-    branches: Vec<ParallelBranch>,
+    branches: Vec<AdvancedParallelBranch>,
+    
+    // Phase 8 Advanced Features
+    dynamic_concurrency: bool,  // NEW: Adjust concurrency based on load
     max_concurrency: usize,
-    aggregation_strategy: AggregationStrategy,
+    priority_scheduler: Option<PriorityScheduler>,  // NEW: Priority-based execution
+    distributed_execution: bool,  // NEW: Cross-node execution
+    aggregation_strategy: AdvancedAggregationStrategy,  // Enhanced from basic
     error_mode: ParallelErrorMode,
     timeout: Option<Duration>,
 }
@@ -630,9 +637,9 @@ pub struct BranchResult {
     pub duration: Duration,
 }
 
-impl ParallelWorkflow {
-    pub fn builder(name: &str) -> ParallelWorkflowBuilder {
-        ParallelWorkflowBuilder::new(name)
+impl AdvancedParallelWorkflow {
+    pub fn builder(name: &str) -> AdvancedParallelWorkflowBuilder {
+        AdvancedParallelWorkflowBuilder::new(name)
     }
     
     async fn execute(&self, input: WorkflowInput, context: ExecutionContext) -> Result<WorkflowOutput> {
@@ -816,8 +823,8 @@ impl ParallelWorkflow {
     }
 }
 
-// Builder pattern for ParallelWorkflow
-pub struct ParallelWorkflowBuilder {
+// Builder pattern for AdvancedParallelWorkflow
+pub struct AdvancedParallelWorkflowBuilder {
     name: String,
     branches: Vec<ParallelBranch>,
     max_concurrency: usize,
@@ -826,7 +833,7 @@ pub struct ParallelWorkflowBuilder {
     timeout: Option<Duration>,
 }
 
-impl ParallelWorkflowBuilder {
+impl AdvancedParallelWorkflowBuilder {
     pub fn new(name: &str) -> Self {
         Self {
             name: name.to_string(),
@@ -880,8 +887,8 @@ impl ParallelWorkflowBuilder {
         self
     }
     
-    pub fn build(self) -> ParallelWorkflow {
-        ParallelWorkflow {
+    pub fn build(self) -> AdvancedParallelWorkflow {
+        AdvancedParallelWorkflow {
             id: Uuid::new_v4().to_string(),
             name: self.name,
             branches: self.branches,
@@ -1013,7 +1020,7 @@ let etl_workflow = StreamingWorkflow::builder("etl_pipeline")
 
 ```rust
 // Example: Enrich user data from multiple sources in parallel
-let enrichment_workflow = ParallelWorkflow::builder("user_enrichment")
+let enrichment_workflow = AdvancedParallelWorkflow::builder("user_enrichment")
     .add_branch("social", Box::new(
         SequentialWorkflow::builder("social_lookup")
             .add_step("twitter", "api_tester", json!({
@@ -1061,7 +1068,7 @@ let enrichment_workflow = ParallelWorkflow::builder("user_enrichment")
 
 ```rust
 // Example: Search multiple sources in parallel and aggregate results
-let search_workflow = ParallelWorkflow::builder("multi_search")
+let search_workflow = AdvancedParallelWorkflow::builder("multi_search")
     .add_required_branch("google", Box::new(
         SequentialWorkflow::builder("google_search")
             .add_step("search", "web_search", json!({
@@ -1139,7 +1146,7 @@ let search_workflow = ParallelWorkflow::builder("multi_search")
 
 ```rust
 // Example: Validate data against multiple rules in parallel
-let validation_workflow = ParallelWorkflow::builder("data_validation")
+let validation_workflow = AdvancedParallelWorkflow::builder("data_validation")
     .add_required_branch("schema", Box::new(
         SequentialWorkflow::builder("schema_validation")
             .add_step("validate", "data_validator", json!({
@@ -1157,7 +1164,7 @@ let validation_workflow = ParallelWorkflow::builder("data_validation")
             .build()
     ))
     .add_branch("external", Box::new(
-        ParallelWorkflow::builder("external_validation")
+        AdvancedParallelWorkflow::builder("external_validation")
             .add_branch("email", Box::new(
                 SequentialWorkflow::builder("email_check")
                     .add_step("verify", "email_validator", json!({
@@ -1190,14 +1197,14 @@ let validation_workflow = ParallelWorkflow::builder("data_validation")
 - [ ] Implement Workflow trait system
 - [ ] Create SequentialWorkflow
 - [ ] Create ConditionalWorkflow
-- [ ] Create ParallelWorkflow with concurrency control
+- [ ] Create AdvancedParallelWorkflow with enterprise concurrency control
 - [ ] Implement workflow state management
 - [ ] Create workflow builder patterns
 
 ### Week 26 Tasks:
 - [ ] Implement LoopWorkflow
 - [ ] Create StreamingWorkflow
-- [ ] Implement aggregation strategies for ParallelWorkflow
+- [ ] Implement advanced aggregation strategies for AdvancedParallelWorkflow
 - [ ] Build workflow examples including parallel patterns
 - [ ] Integration testing with all 41+ tools
 - [ ] Performance benchmarking

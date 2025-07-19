@@ -2917,7 +2917,206 @@ impl BasicWorkflow for BasicLoopWorkflow {
 }
 ```
 
-#### 10.5 Workflow-Agent Integration
+#### 10.5 Basic Parallel Workflow
+
+```rust
+// Simple parallel execution without advanced features
+pub struct BasicParallelWorkflow {
+    id: String,
+    name: String,
+    branches: Vec<ParallelBranch>,
+    max_concurrency: usize,  // Fixed at creation
+    error_handling: BasicErrorStrategy,
+}
+
+#[derive(Debug, Clone)]
+pub struct ParallelBranch {
+    pub id: String,
+    pub name: String,
+    pub step_type: StepType,
+    pub required: bool,  // If true, failure fails the entire workflow
+}
+
+#[async_trait]
+impl BasicWorkflow for BasicParallelWorkflow {
+    async fn execute(&self, input: WorkflowInput, context: &ExecutionContext) -> Result<WorkflowOutput> {
+        let mut branch_handles = Vec::new();
+        
+        // Fork: Start all branches concurrently
+        for branch in &self.branches {
+            let branch_context = context.clone();
+            let branch_input = input.clone();
+            
+            let handle = tokio::spawn(async move {
+                Self::execute_branch(branch, branch_input, &branch_context).await
+            });
+            
+            branch_handles.push((branch.id.clone(), branch.required, handle));
+        }
+        
+        // Join: Wait for all branches to complete
+        let mut results = Vec::new();
+        let mut errors = Vec::new();
+        
+        for (branch_id, required, handle) in branch_handles {
+            match handle.await {
+                Ok(Ok(result)) => {
+                    results.push(StepResult {
+                        step_id: branch_id,
+                        success: true,
+                        output: Some(result),
+                        error: None,
+                        execution_time: Duration::from_millis(0), // Simplified
+                    });
+                }
+                Ok(Err(e)) | Err(e) => {
+                    let error = format!("Branch {} failed: {:?}", branch_id, e);
+                    errors.push(error.clone());
+                    
+                    results.push(StepResult {
+                        step_id: branch_id.clone(),
+                        success: false,
+                        output: None,
+                        error: Some(error),
+                        execution_time: Duration::from_millis(0),
+                    });
+                    
+                    // Fail-fast on required branch failure
+                    if required {
+                        return Err(LLMSpellError::WorkflowExecutionFailed(
+                            format!("Required branch {} failed", branch_id)
+                        ));
+                    }
+                }
+            }
+        }
+        
+        // Aggregate results (simple concatenation for basic implementation)
+        let final_result = Self::aggregate_results(&results)?;
+        
+        Ok(WorkflowOutput {
+            final_result,
+            step_results: results,
+            metadata: json!({
+                "workflow_type": "parallel",
+                "total_branches": self.branches.len(),
+                "successful_branches": results.iter().filter(|r| r.success).count(),
+                "failed_branches": errors.len()
+            }),
+            execution_path: vec![], // Simplified for basic implementation
+        })
+    }
+}
+
+impl BasicParallelWorkflow {
+    pub fn builder(name: &str) -> BasicParallelWorkflowBuilder {
+        BasicParallelWorkflowBuilder::new(name)
+    }
+    
+    async fn execute_branch(
+        branch: &ParallelBranch,
+        input: WorkflowInput,
+        context: &ExecutionContext
+    ) -> Result<Value> {
+        match &branch.step_type {
+            StepType::Agent(agent_name) => {
+                // Execute agent step
+                let agent_input = AgentInput {
+                    message: input.initial_data.to_string(),
+                    context: context.clone(),
+                    parameters: input.parameters,
+                };
+                
+                // This would use the agent registry to get and execute the agent
+                // Simplified for basic implementation
+                Ok(json!({"agent_result": format!("Executed agent: {}", agent_name)}))
+            }
+            StepType::Tool(tool_name) => {
+                // Execute tool step
+                // This would use the tool registry
+                Ok(json!({"tool_result": format!("Executed tool: {}", tool_name)}))
+            }
+            StepType::Workflow(workflow_name) => {
+                // Execute nested workflow
+                Ok(json!({"workflow_result": format!("Executed workflow: {}", workflow_name)}))
+            }
+        }
+    }
+    
+    fn aggregate_results(results: &[StepResult]) -> Result<Value> {
+        let mut aggregated = json!({});
+        
+        for result in results {
+            if let Some(output) = &result.output {
+                aggregated[&result.step_id] = output.clone();
+            }
+        }
+        
+        Ok(aggregated)
+    }
+}
+
+// Builder pattern for BasicParallelWorkflow
+pub struct BasicParallelWorkflowBuilder {
+    name: String,
+    branches: Vec<ParallelBranch>,
+    max_concurrency: usize,
+    error_handling: BasicErrorStrategy,
+}
+
+impl BasicParallelWorkflowBuilder {
+    pub fn new(name: &str) -> Self {
+        Self {
+            name: name.to_string(),
+            branches: Vec::new(),
+            max_concurrency: 10,  // Reasonable default
+            error_handling: BasicErrorStrategy::FailOnAnyError,
+        }
+    }
+    
+    pub fn add_agent_branch(mut self, id: &str, agent_name: &str, required: bool) -> Self {
+        self.branches.push(ParallelBranch {
+            id: id.to_string(),
+            name: id.to_string(),
+            step_type: StepType::Agent(agent_name.to_string()),
+            required,
+        });
+        self
+    }
+    
+    pub fn add_tool_branch(mut self, id: &str, tool_name: &str, required: bool) -> Self {
+        self.branches.push(ParallelBranch {
+            id: id.to_string(),
+            name: id.to_string(),
+            step_type: StepType::Tool(tool_name.to_string()),
+            required,
+        });
+        self
+    }
+    
+    pub fn with_max_concurrency(mut self, max: usize) -> Self {
+        self.max_concurrency = max;
+        self
+    }
+    
+    pub fn with_error_handling(mut self, strategy: BasicErrorStrategy) -> Self {
+        self.error_handling = strategy;
+        self
+    }
+    
+    pub fn build(self) -> BasicParallelWorkflow {
+        BasicParallelWorkflow {
+            id: uuid::Uuid::new_v4().to_string(),
+            name: self.name,
+            branches: self.branches,
+            max_concurrency: self.max_concurrency,
+            error_handling: self.error_handling,
+        }
+    }
+}
+```
+
+#### 10.6 Workflow-Agent Integration
 
 ```rust
 // Agents can execute workflows
@@ -3026,320 +3225,771 @@ impl BasicWorkflowRegistry {
 }
 ```
 
-### 11. Script-to-Workflow Integration
+### 11. Comprehensive Script Integration for Workflows
 
-#### 11.1 Workflow Bridge Architecture
+This section describes the complete script integration layer that provides comprehensive workflow capabilities through pre-injected global objects, following the rs-llmspell architecture vision.
+
+#### 11.1 Global Workflow Object Injection
+
+Following the global injection pattern, the `Workflow` object provides all workflow functionality without requiring imports:
 
 ```rust
-// llmspell-bridge/src/workflow_bridge.rs
-pub struct WorkflowBridge {
+// llmspell-bridge/src/globals/workflow_global.rs
+pub struct WorkflowGlobal {
     workflow_registry: Arc<BasicWorkflowRegistry>,
-    script_engine: Arc<dyn ScriptEngineBridge>,
-    parameter_converter: WorkflowParameterConverter,
-    result_handler: WorkflowResultHandler,
+    workflow_factory: Arc<WorkflowFactory>,
+    state_manager: Arc<StateManager>,
+    hook_manager: Arc<HookManager>,
 }
 
-impl WorkflowBridge {
+impl WorkflowGlobal {
     pub fn new(
         workflow_registry: Arc<BasicWorkflowRegistry>,
-        script_engine: Arc<dyn ScriptEngineBridge>
+        workflow_factory: Arc<WorkflowFactory>,
+        state_manager: Arc<StateManager>,
+        hook_manager: Arc<HookManager>,
     ) -> Self {
         Self {
             workflow_registry,
-            script_engine,
-            parameter_converter: WorkflowParameterConverter::new(),
-            result_handler: WorkflowResultHandler::new(),
+            workflow_factory,
+            state_manager,
+            hook_manager,
         }
     }
     
-    pub async fn register_workflows_with_script(&self) -> Result<()> {
-        let workflows = self.workflow_registry.list_all();
+    // Register the global Workflow object with the script engine
+    pub fn inject_into_lua(&self, lua: &Lua) -> Result<()> {
+        let workflow_table = lua.create_table()?;
         
-        for workflow_id in workflows {
-            let script_callable = self.create_workflow_callable(&workflow_id)?;
-            self.script_engine.register_function(
-                &format!("workflow_{}", workflow_id),
-                script_callable
-            ).await?;
-        }
+        // Workflow creation methods
+        workflow_table.set("sequential", self.create_sequential_constructor(lua)?)?;
+        workflow_table.set("parallel", self.create_parallel_constructor(lua)?)?;
+        workflow_table.set("conditional", self.create_conditional_constructor(lua)?)?;
+        workflow_table.set("loop", self.create_loop_constructor(lua)?)?;
+        
+        // Workflow management methods
+        workflow_table.set("list", self.create_list_function(lua)?)?;
+        workflow_table.set("get", self.create_get_function(lua)?)?;
+        workflow_table.set("register", self.create_register_function(lua)?)?;
+        workflow_table.set("execute", self.create_execute_function(lua)?)?;
+        
+        // Discovery and introspection
+        workflow_table.set("types", self.create_types_function(lua)?)?;
+        workflow_table.set("info", self.create_info_function(lua)?)?;
+        
+        lua.globals().set("Workflow", workflow_table)?;
+        
         Ok(())
     }
-    
-    pub async fn call_workflow_from_script(
-        &self,
-        workflow_id: &str,
-        script_params: ScriptValue,
-        script_context: ScriptExecutionContext
-    ) -> Result<ScriptValue> {
-        // Convert script parameters to workflow input
-        let workflow_input = self.parameter_converter.script_to_workflow(script_params)?;
-        
-        // Convert script execution context 
-        let execution_context = self.parameter_converter.script_context_to_execution_context(script_context)?;
-        
-        // Get workflow from registry
-        let workflow = self.workflow_registry.get(workflow_id)
-            .ok_or_else(|| LLMSpellError::NotFound(format!("Workflow: {}", workflow_id)))?;
-        
-        // Execute workflow
-        let start = std::time::Instant::now();
-        let result = workflow.execute(workflow_input, &execution_context).await;
-        let duration = start.elapsed();
-        
-        // Convert result back to script value
-        let script_result = match result {
-            Ok(output) => self.result_handler.success_to_script(output, duration)?,
-            Err(error) => self.result_handler.error_to_script(error, duration)?,
-        };
-        
-        Ok(script_result)
-    }
-    
-    fn create_workflow_callable(&self, workflow_id: &str) -> Result<ScriptCallable> {
-        let bridge = Arc::clone(&self);
-        let workflow_id = workflow_id.to_string();
-        
-        Ok(ScriptCallable::new(move |params, context| {
-            let bridge = Arc::clone(&bridge);
-            let workflow_id = workflow_id.clone();
-            
-            async move {
-                bridge.call_workflow_from_script(&workflow_id, params, context).await
-            }
-        }))
-    }
-}
-
-// Workflow parameter conversion
-pub struct WorkflowParameterConverter {
-    type_converter: TypeConverter,
-}
-
-impl WorkflowParameterConverter {
-    pub fn new() -> Self {
-        Self {
-            type_converter: TypeConverter::new(),
-        }
-    }
-    
-    pub fn script_to_workflow(&self, script_value: ScriptValue) -> Result<WorkflowInput> {
-        let data = self.type_converter.script_to_json(script_value)?;
-        Ok(WorkflowInput {
-            data,
-            metadata: HashMap::new(),
-        })
-    }
-    
-    pub fn script_context_to_execution_context(&self, script_context: ScriptExecutionContext) -> Result<ExecutionContext> {
-        let mut context = ExecutionContext::new();
-        
-        // Transfer relevant context data
-        if let Some(user_id) = script_context.user_id {
-            context.set_user_id(user_id);
-        }
-        
-        if let Some(session_id) = script_context.session_id {
-            context.set_session_id(session_id);
-        }
-        
-        // Add script-specific metadata
-        context.set_metadata("script_initiated", true);
-        context.set_metadata("script_engine", script_context.engine_type);
-        
-        Ok(context)
-    }
-}
-
-// Workflow result handling
-pub struct WorkflowResultHandler {
-    format_config: ResultFormatConfig,
-}
-
-impl WorkflowResultHandler {
-    pub fn new() -> Self {
-        Self {
-            format_config: ResultFormatConfig::default(),
-        }
-    }
-    
-    pub fn success_to_script(&self, output: WorkflowOutput, duration: Duration) -> Result<ScriptValue> {
-        let mut result = serde_json::Map::new();
-        
-        result.insert("success".to_string(), serde_json::Value::Bool(true));
-        result.insert("data".to_string(), output.data);
-        result.insert("metadata".to_string(), serde_json::to_value(output.metadata)?);
-        
-        if self.format_config.include_timing {
-            result.insert("execution_time_ms".to_string(), 
-                serde_json::Value::Number(serde_json::Number::from(duration.as_millis() as u64)));
-        }
-        
-        self.json_to_script(serde_json::Value::Object(result))
-    }
-    
-    pub fn error_to_script(&self, error: LLMSpellError, duration: Duration) -> Result<ScriptValue> {
-        let mut result = serde_json::Map::new();
-        
-        result.insert("success".to_string(), serde_json::Value::Bool(false));
-        result.insert("error".to_string(), serde_json::Value::String(error.to_string()));
-        result.insert("error_type".to_string(), serde_json::Value::String(error.error_type()));
-        
-        if self.format_config.include_timing {
-            result.insert("execution_time_ms".to_string(), 
-                serde_json::Value::Number(serde_json::Number::from(duration.as_millis() as u64)));
-        }
-        
-        self.json_to_script(serde_json::Value::Object(result))
-    }
-    
-    fn json_to_script(&self, value: serde_json::Value) -> Result<ScriptValue> {
-        match value {
-            serde_json::Value::String(s) => Ok(ScriptValue::String(s)),
-            serde_json::Value::Number(n) => {
-                if let Some(i) = n.as_i64() {
-                    Ok(ScriptValue::Integer(i))
-                } else if let Some(f) = n.as_f64() {
-                    Ok(ScriptValue::Float(f))
-                } else {
-                    Ok(ScriptValue::Float(0.0))
-                }
-            },
-            serde_json::Value::Bool(b) => Ok(ScriptValue::Boolean(b)),
-            serde_json::Value::Array(arr) => {
-                let script_array: Result<Vec<_>> = arr.into_iter()
-                    .map(|v| self.json_to_script(v))
-                    .collect();
-                Ok(ScriptValue::Array(script_array?))
-            },
-            serde_json::Value::Object(obj) => {
-                let script_map: Result<std::collections::HashMap<String, ScriptValue>> = obj.into_iter()
-                    .map(|(k, v)| Ok((k, self.json_to_script(v)?)))
-                    .collect();
-                Ok(ScriptValue::Map(script_map?))
-            },
-            serde_json::Value::Null => Ok(ScriptValue::Nil),
-        }
-    }
-}
-
-// Workflow discovery from scripts
-pub trait WorkflowDiscovery {
-    async fn discover_workflows(&self) -> Result<Vec<WorkflowMetadata>>;
-    async fn get_workflow_info(&self, id: &str) -> Result<WorkflowInfo>;
-    async fn list_workflow_types(&self) -> Result<Vec<WorkflowTypeInfo>>;
-}
-
-impl WorkflowDiscovery for WorkflowBridge {
-    async fn discover_workflows(&self) -> Result<Vec<WorkflowMetadata>> {
-        let workflow_ids = self.workflow_registry.list_all();
-        let mut workflows = Vec::new();
-        
-        for id in workflow_ids {
-            if let Some(workflow) = self.workflow_registry.get(&id) {
-                workflows.push(WorkflowMetadata {
-                    id: workflow.id().to_string(),
-                    name: workflow.name().to_string(),
-                    description: workflow.description().to_string(),
-                    workflow_type: workflow.workflow_type(),
-                    parameters: workflow.expected_parameters(),
-                    outputs: workflow.expected_outputs(),
-                });
-            }
-        }
-        
-        Ok(workflows)
-    }
-    
-    async fn get_workflow_info(&self, id: &str) -> Result<WorkflowInfo> {
-        let workflow = self.workflow_registry.get(id)
-            .ok_or_else(|| LLMSpellError::NotFound(format!("Workflow: {}", id)))?;
-        
-        Ok(WorkflowInfo {
-            id: workflow.id().to_string(),
-            name: workflow.name().to_string(),
-            description: workflow.description().to_string(),
-            workflow_type: workflow.workflow_type(),
-            parameters: workflow.expected_parameters(),
-            outputs: workflow.expected_outputs(),
-            examples: workflow.usage_examples(),
-            capabilities: workflow.capabilities(),
-            status: workflow.status(),
-        })
-    }
-    
-    async fn list_workflow_types(&self) -> Result<Vec<WorkflowTypeInfo>> {
-        Ok(vec![
-            WorkflowTypeInfo {
-                name: "sequential".to_string(),
-                description: "Execute steps in sequence".to_string(),
-                use_cases: vec!["Data processing".to_string(), "Multi-step analysis".to_string()],
-            },
-            WorkflowTypeInfo {
-                name: "conditional".to_string(),
-                description: "Execute steps based on conditions".to_string(),
-                use_cases: vec!["Decision making".to_string(), "Branching logic".to_string()],
-            },
-            WorkflowTypeInfo {
-                name: "loop".to_string(),
-                description: "Execute steps iteratively".to_string(),
-                use_cases: vec!["Batch processing".to_string(), "Iterative analysis".to_string()],
-            },
-        ])
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct WorkflowMetadata {
-    pub id: String,
-    pub name: String,
-    pub description: String,
-    pub workflow_type: String,
-    pub parameters: Vec<ParameterInfo>,
-    pub outputs: Vec<OutputInfo>,
-}
-
-#[derive(Debug, Clone)]
-pub struct WorkflowInfo {
-    pub id: String,
-    pub name: String,
-    pub description: String,
-    pub workflow_type: String,
-    pub parameters: Vec<ParameterInfo>,
-    pub outputs: Vec<OutputInfo>,
-    pub examples: Vec<String>,
-    pub capabilities: Vec<String>,
-    pub status: String,
-}
-
-#[derive(Debug, Clone)]
-pub struct WorkflowTypeInfo {
-    pub name: String,
-    pub description: String,
-    pub use_cases: Vec<String>,
 }
 ```
 
-#### 11.2 Unified Bridge Integration Pattern
+#### 11.2 Complete Lua Workflow API
 
-The script-to-workflow integration follows the same pattern as script-to-tool and script-to-agent integration, ensuring consistency across all component types:
+The Lua API provides full workflow creation and management capabilities:
 
-**Bridge Pattern Consistency:**
+```lua
+-- Pre-injected global: Workflow
+-- No require() needed - always available
+
+-- 1. Sequential Workflow Creation
+local data_pipeline = Workflow.sequential({
+    name = "data_processing_pipeline",
+    description = "Multi-stage data processing workflow",
+    
+    steps = {
+        {
+            name = "extract_data",
+            component = Tools.get("csv_analyzer"),
+            input = function(context)
+                return {
+                    file_path = context.input.file_path,
+                    headers = true,
+                    delimiter = ","
+                }
+            end,
+            output = "raw_data",
+            error_strategy = "continue" -- or "abort", "retry"
+        },
+        
+        {
+            name = "clean_data",
+            component = Agent.get("data_cleaner"),
+            input = function(context)
+                return {
+                    data = context.raw_data,
+                    remove_nulls = true,
+                    standardize_formats = true
+                }
+            end,
+            output = "clean_data"
+        },
+        
+        {
+            name = "analyze_patterns",
+            component = Agent.get("pattern_analyzer"),
+            input = function(context)
+                return {
+                    data = context.clean_data,
+                    analysis_type = "trend_detection",
+                    confidence_threshold = 0.85
+                }
+            end,
+            output = "analysis_results"
+        },
+        
+        {
+            name = "generate_report",
+            component = Tools.get("template_engine"),
+            input = function(context)
+                return {
+                    template = "analysis_report.html",
+                    data = {
+                        raw_data_summary = context.raw_data.summary,
+                        analysis = context.analysis_results,
+                        timestamp = os.time()
+                    }
+                }
+            end,
+            output = "final_report"
+        }
+    },
+    
+    -- Error handling configuration
+    error_strategy = {
+        default = "abort",
+        retries = 3,
+        retry_delay = 1000, -- milliseconds
+        on_error = function(step_name, error, context)
+            Logger.error("Step failed: " .. step_name .. " - " .. error)
+            -- Optional: cleanup or notification logic
+        end
+    },
+    
+    -- Hooks integration
+    hooks = {
+        before_start = function(context)
+            Logger.info("Starting data pipeline for: " .. context.input.file_path)
+            State.set("workflow_start_time", os.time())
+        end,
+        
+        after_step = function(step_name, result, context)
+            Logger.debug("Completed step: " .. step_name)
+            State.set("last_completed_step", step_name)
+        end,
+        
+        on_complete = function(result, context)
+            local duration = os.time() - State.get("workflow_start_time")
+            Logger.info("Data pipeline completed in " .. duration .. " seconds")
+            Event.emit("workflow_completed", {
+                workflow_name = "data_processing_pipeline",
+                duration = duration,
+                success = true
+            })
+        end
+    }
+})
+
+-- 2. Parallel Workflow Creation
+local multi_source_analysis = Workflow.parallel({
+    name = "multi_source_analysis",
+    description = "Analyze data from multiple sources simultaneously",
+    
+    branches = {
+        {
+            name = "social_media_analysis",
+            component = Agent.get("social_media_analyst"),
+            input = function(context)
+                return {
+                    topic = context.input.topic,
+                    platforms = {"twitter", "reddit", "linkedin"},
+                    time_range = "7d"
+                }
+            end,
+            required = true, -- Failure of this branch fails the entire workflow
+            timeout = 30000 -- 30 seconds
+        },
+        
+        {
+            name = "news_analysis", 
+            component = Agent.get("news_analyst"),
+            input = function(context)
+                return {
+                    topic = context.input.topic,
+                    sources = {"reuters", "ap", "bloomberg"},
+                    time_range = "7d"
+                }
+            end,
+            required = true,
+            timeout = 45000
+        },
+        
+        {
+            name = "academic_analysis",
+            component = Agent.get("academic_researcher"),
+            input = function(context)
+                return {
+                    topic = context.input.topic,
+                    databases = {"pubmed", "arxiv", "scholar"},
+                    time_range = "30d"
+                }
+            end,
+            required = false, -- Optional - failures don't fail workflow
+            timeout = 60000
+        }
+    },
+    
+    -- Parallel execution configuration
+    max_concurrency = 3,
+    wait_for_all = true, -- or false to return as soon as required branches complete
+    
+    -- Result aggregation
+    aggregation = {
+        strategy = "merge", -- "merge", "array", "custom"
+        merge_key = "source_type",
+        custom_aggregator = function(results)
+            local merged = {
+                social_data = results.social_media_analysis,
+                news_data = results.news_analysis,
+                academic_data = results.academic_analysis,
+                analysis_timestamp = os.time(),
+                total_sources = 0
+            }
+            
+            -- Count total sources across all analyses
+            for _, result in pairs(results) do
+                if result and result.source_count then
+                    merged.total_sources = merged.total_sources + result.source_count
+                end
+            end
+            
+            return merged
+        end
+    },
+    
+    -- Error handling for parallel execution
+    error_strategy = {
+        required_failure = "abort", -- Abort if any required branch fails
+        optional_failure = "continue", -- Continue if optional branches fail
+        timeout_action = "continue_partial" -- Continue with successful branches on timeout
+    }
+})
+
+-- 3. Conditional Workflow Creation
+local adaptive_content_processor = Workflow.conditional({
+    name = "adaptive_content_processor",
+    description = "Process content with different strategies based on characteristics",
+    
+    condition = function(context)
+        local content = context.input.content
+        local content_length = string.len(content)
+        local complexity_score = Agent.get("complexity_analyzer"):quick_score(content)
+        
+        return {
+            is_complex = content_length > 5000 and complexity_score > 0.7,
+            content_type = context.input.content_type or "text",
+            priority = context.input.priority or "normal"
+        }
+    end,
+    
+    branches = {
+        -- Complex content branch
+        complex_processing = {
+            condition = function(ctx) return ctx.condition_result.is_complex end,
+            workflow = Workflow.sequential({
+                name = "complex_content_processing",
+                steps = {
+                    {
+                        name = "deep_analysis",
+                        component = Agent.get("deep_content_analyzer"),
+                        input = function(ctx) return {content = ctx.input.content, mode = "comprehensive"} end
+                    },
+                    {
+                        name = "expert_review",
+                        component = Agent.get("expert_reviewer"),
+                        input = function(ctx) return {content = ctx.input.content, analysis = ctx.deep_analysis} end
+                    },
+                    {
+                        name = "detailed_summary",
+                        component = Agent.get("detailed_summarizer"),
+                        input = function(ctx) return {content = ctx.input.content, expert_notes = ctx.expert_review} end
+                    }
+                }
+            })
+        },
+        
+        -- Simple content branch  
+        simple_processing = {
+            condition = function(ctx) return not ctx.condition_result.is_complex end,
+            workflow = Workflow.sequential({
+                name = "simple_content_processing",
+                steps = {
+                    {
+                        name = "basic_analysis",
+                        component = Agent.get("basic_content_analyzer"),
+                        input = function(ctx) return {content = ctx.input.content, mode = "quick"} end
+                    },
+                    {
+                        name = "quick_summary",
+                        component = Agent.get("quick_summarizer"),
+                        input = function(ctx) return {content = ctx.input.content, analysis = ctx.basic_analysis} end
+                    }
+                }
+            })
+        },
+        
+        -- High priority branch (can override complexity)
+        priority_processing = {
+            condition = function(ctx) return ctx.condition_result.priority == "high" end,
+            workflow = Workflow.parallel({
+                name = "priority_content_processing",
+                branches = {
+                    {name = "fast_analysis", component = Agent.get("fast_analyzer")},
+                    {name = "priority_summary", component = Agent.get("priority_summarizer")}
+                }
+            })
+        }
+    },
+    
+    -- Default branch if no conditions match
+    default_branch = "simple_processing"
+})
+
+-- 4. Loop Workflow Creation
+local iterative_refinement = Workflow.loop({
+    name = "iterative_content_refinement",
+    description = "Iteratively refine content until quality threshold is met",
+    
+    -- Loop condition
+    condition = function(context, iteration)
+        if iteration >= 5 then
+            return false -- Max 5 iterations
+        end
+        
+        if iteration == 0 then
+            return true -- Always run at least once
+        end
+        
+        -- Continue if quality score is below threshold
+        local quality_score = context.last_result.quality_score or 0
+        return quality_score < 0.9
+    end,
+    
+    -- Loop body
+    body = Workflow.sequential({
+        name = "refinement_iteration",
+        steps = {
+            {
+                name = "analyze_quality",
+                component = Agent.get("quality_analyzer"),
+                input = function(context)
+                    local content = context.iteration == 0 and context.input.content or context.last_result.refined_content
+                    return {
+                        content = content,
+                        quality_metrics = {"clarity", "completeness", "accuracy", "engagement"}
+                    }
+                end,
+                output = "quality_analysis"
+            },
+            
+            {
+                name = "identify_improvements",
+                component = Agent.get("improvement_identifier"),
+                input = function(context)
+                    return {
+                        content = context.iteration == 0 and context.input.content or context.last_result.refined_content,
+                        quality_analysis = context.quality_analysis,
+                        previous_improvements = context.improvement_history or {}
+                    }
+                end,
+                output = "improvement_suggestions"
+            },
+            
+            {
+                name = "apply_refinements",
+                component = Agent.get("content_refiner"),
+                input = function(context)
+                    return {
+                        content = context.iteration == 0 and context.input.content or context.last_result.refined_content,
+                        improvements = context.improvement_suggestions,
+                        style_guide = context.input.style_guide
+                    }
+                end,
+                output = "refined_content"
+            },
+            
+            {
+                name = "validate_improvements",
+                component = Agent.get("improvement_validator"),
+                input = function(context)
+                    return {
+                        original_content = context.iteration == 0 and context.input.content or context.last_result.refined_content,
+                        refined_content = context.refined_content,
+                        quality_analysis = context.quality_analysis
+                    }
+                end,
+                output = "validation_result"
+            }
+        }
+    }),
+    
+    -- Iteration state management
+    state_management = {
+        preserve_between_iterations = {"improvement_history", "quality_trend"},
+        update_on_iteration = function(context, iteration_result)
+            -- Track improvement history
+            if not context.improvement_history then
+                context.improvement_history = {}
+            end
+            table.insert(context.improvement_history, iteration_result.improvement_suggestions)
+            
+            -- Track quality trend
+            if not context.quality_trend then
+                context.quality_trend = {}
+            end
+            table.insert(context.quality_trend, iteration_result.validation_result.quality_score)
+            
+            return context
+        end
+    },
+    
+    -- Loop completion handling
+    on_complete = function(context, iterations, final_result)
+        Logger.info("Content refinement completed after " .. iterations .. " iterations")
+        
+        return {
+            final_content = final_result.refined_content,
+            quality_score = final_result.validation_result.quality_score,
+            iterations_performed = iterations,
+            improvement_history = context.improvement_history,
+            quality_progression = context.quality_trend
+        }
+    end
+})
+
+-- 5. Workflow Execution and Management
+
+-- Execute workflows
+local pipeline_result = data_pipeline:execute({
+    file_path = "data/customer_feedback.csv",
+    output_format = "html"
+})
+
+local analysis_result = multi_source_analysis:execute({
+    topic = "sustainable energy trends",
+    region = "global"
+})
+
+local processed_content = adaptive_content_processor:execute({
+    content = "Long technical document content...",
+    content_type = "technical",
+    priority = "normal"
+})
+
+local refined_content = iterative_refinement:execute({
+    content = "Draft content to be improved...",
+    style_guide = "academic",
+    target_quality = 0.95
+})
+
+-- Workflow registry management
+Workflow.register("my_data_pipeline", data_pipeline)
+Workflow.register("multi_analysis", multi_source_analysis)
+
+-- List and discover workflows
+local available_workflows = Workflow.list()
+for _, workflow_info in ipairs(available_workflows) do
+    print("Available workflow: " .. workflow_info.name .. " - " .. workflow_info.description)
+end
+
+-- Get workflow information
+local workflow_info = Workflow.info("my_data_pipeline")
+print("Workflow type: " .. workflow_info.workflow_type)
+print("Expected parameters: " .. JSON.stringify(workflow_info.parameters))
+
+-- List workflow types
+local workflow_types = Workflow.types()
+for _, type_info in ipairs(workflow_types) do
+    print("Workflow type: " .. type_info.name .. " - " .. type_info.description)
+end
+```
+
+#### 11.3 State and Hook Integration
+
+Workflows integrate seamlessly with the global State and Hook systems:
+
+```lua
+-- State management in workflows
+local stateful_workflow = Workflow.sequential({
+    name = "stateful_processing",
+    steps = {
+        {
+            name = "load_state",
+            component = function(context)
+                -- Access shared state
+                local previous_results = State.get("workflow_cache") or {}
+                local user_preferences = State.get("user_prefs") or {}
+                
+                return {
+                    cached_data = previous_results,
+                    preferences = user_preferences
+                }
+            end
+        },
+        
+        {
+            name = "process_with_state",
+            component = Agent.get("processor"),
+            input = function(context)
+                return {
+                    data = context.input.data,
+                    cached_results = context.load_state.cached_data,
+                    user_preferences = context.load_state.preferences
+                }
+            end
+        },
+        
+        {
+            name = "save_state",
+            component = function(context)
+                -- Update shared state
+                State.set("workflow_cache", context.process_with_state.results)
+                State.set("last_execution", os.time())
+                
+                return {success = true}
+            end
+        }
+    }
+})
+
+-- Hook integration with workflows
+Hook.register("before_workflow_execution", function(event)
+    local workflow_name = event.data.workflow_name
+    Logger.info("Starting workflow: " .. workflow_name)
+    
+    -- Set up monitoring
+    State.set("workflow_start_time_" .. workflow_name, os.time())
+    
+    -- Check resource availability
+    if not System.check_resources() then
+        error("Insufficient resources to start workflow")
+    end
+end)
+
+Hook.register("after_workflow_step", function(event)
+    local step_name = event.data.step_name
+    local workflow_name = event.data.workflow_name
+    local success = event.data.success
+    
+    -- Update step tracking
+    local step_history = State.get("step_history") or {}
+    table.insert(step_history, {
+        workflow = workflow_name,
+        step = step_name,
+        success = success,
+        timestamp = os.time()
+    })
+    State.set("step_history", step_history)
+    
+    -- Emit custom events for monitoring
+    Event.emit("step_completed", {
+        workflow = workflow_name,
+        step = step_name,
+        success = success
+    })
+end)
+
+Hook.register("workflow_error", function(event)
+    local workflow_name = event.data.workflow_name
+    local error_message = event.data.error
+    
+    Logger.error("Workflow failed: " .. workflow_name .. " - " .. error_message)
+    
+    -- Cleanup resources
+    State.remove("workflow_start_time_" .. workflow_name)
+    
+    -- Send notification
+    Event.emit("workflow_failure", {
+        workflow = workflow_name,
+        error = error_message,
+        timestamp = os.time()
+    })
+end)
+```
+
+#### 11.4 Advanced Workflow Composition
+
+Workflows can be composed and nested for complex orchestrations:
+
+```lua
+-- Compose workflows into larger orchestrations
+local master_research_workflow = Workflow.sequential({
+    name = "comprehensive_research_pipeline",
+    description = "Complete research pipeline with data gathering, analysis, and reporting",
+    
+    steps = {
+        -- Step 1: Data gathering using parallel workflow
+        {
+            name = "data_gathering",
+            component = multi_source_analysis, -- Reuse the parallel workflow
+            input = function(context)
+                return {
+                    topic = context.input.research_topic,
+                    depth = "comprehensive"
+                }
+            end,
+            output = "gathered_data"
+        },
+        
+        -- Step 2: Quality assessment using conditional workflow
+        {
+            name = "quality_assessment",
+            component = adaptive_content_processor, -- Reuse conditional workflow
+            input = function(context)
+                return {
+                    content = JSON.stringify(context.gathered_data),
+                    content_type = "research_data",
+                    priority = context.input.priority or "normal"
+                }
+            end,
+            output = "quality_report"
+        },
+        
+        -- Step 3: Iterative refinement if needed
+        {
+            name = "data_refinement", 
+            component = function(context)
+                local quality_score = context.quality_report.quality_score or 0
+                
+                if quality_score < 0.8 then
+                    -- Use iterative refinement workflow
+                    return iterative_refinement:execute({
+                        content = JSON.stringify(context.gathered_data),
+                        style_guide = "research",
+                        target_quality = 0.9
+                    })
+                else
+                    -- Data is already good quality
+                    return {
+                        final_content = context.gathered_data,
+                        quality_score = quality_score,
+                        iterations_performed = 0
+                    }
+                end
+            end,
+            output = "refined_data"
+        },
+        
+        -- Step 4: Final analysis and report generation
+        {
+            name = "generate_final_report",
+            component = Agent.get("research_report_generator"),
+            input = function(context)
+                return {
+                    research_data = context.refined_data.final_content,
+                    quality_metrics = context.quality_report,
+                    research_topic = context.input.research_topic,
+                    target_audience = context.input.target_audience,
+                    format = context.input.output_format or "comprehensive"
+                }
+            end,
+            output = "final_report"
+        }
+    },
+    
+    -- Master workflow hooks
+    hooks = {
+        before_start = function(context)
+            Logger.info("Starting comprehensive research for: " .. context.input.research_topic)
+            Event.emit("research_started", {
+                topic = context.input.research_topic,
+                requester = context.input.requester
+            })
+        end,
+        
+        on_complete = function(result, context)
+            Logger.info("Research completed for: " .. context.input.research_topic)
+            Event.emit("research_completed", {
+                topic = context.input.research_topic,
+                quality_score = result.quality_metrics.overall_score,
+                data_sources = result.source_count
+            })
+        end
+    }
+})
+
+-- Execute the master workflow
+local research_result = master_research_workflow:execute({
+    research_topic = "Impact of quantum computing on cybersecurity",
+    target_audience = "enterprise_security_teams",
+    priority = "high",
+    output_format = "executive_briefing",
+    requester = "security_team"
+})
+
+print("Research completed!")
+print("Final report length: " .. string.len(research_result.final_report.content))
+print("Quality score: " .. research_result.quality_metrics.overall_score)
+print("Sources analyzed: " .. research_result.source_count)
+```
+
+#### 11.5 Performance and Bridge Architecture
+
+The workflow bridge maintains the same performance characteristics as other bridges:
+
 ```rust
-// Unified pattern across all bridges
-pub trait ComponentBridge<T> {
-    async fn register_components_with_script(&self) -> Result<()>;
-    async fn call_component_from_script(&self, id: &str, params: ScriptValue) -> Result<ScriptValue>;
-    async fn discover_components(&self) -> Result<Vec<ComponentMetadata>>;
+// Performance-optimized workflow bridge implementation
+pub struct WorkflowBridge {
+    workflow_registry: Arc<BasicWorkflowRegistry>,
+    workflow_factory: Arc<WorkflowFactory>,
+    state_manager: Arc<StateManager>,
+    hook_manager: Arc<HookManager>,
+    execution_cache: Arc<ExecutionCache>,
+    performance_monitor: Arc<PerformanceMonitor>,
 }
 
-// Implemented by:
-// - ToolBridge (existing)
-// - AgentBridge (Task 3.3.9) 
-// - WorkflowBridge (Task 3.3.16)
+impl WorkflowBridge {
+    // Performance Requirements:
+    // - <10ms overhead for workflow creation
+    // - <5ms overhead for workflow execution initiation  
+    // - <2ms for workflow discovery operations
+    // - Memory efficient parameter conversion
+    // - Proper error handling with script error formatting
+    
+    pub async fn execute_workflow_from_script(
+        &self,
+        workflow_def: ScriptValue,
+        input: ScriptValue,
+        context: ScriptExecutionContext
+    ) -> Result<ScriptValue> {
+        let start = Instant::now();
+        
+        // Convert script workflow definition to native workflow
+        let workflow = self.convert_script_workflow(workflow_def)?;
+        
+        // Convert input parameters
+        let workflow_input = self.convert_script_input(input)?;
+        let execution_context = self.convert_execution_context(context)?;
+        
+        // Execute workflow
+        let result = workflow.execute(workflow_input, &execution_context).await?;
+        
+        // Convert result back to script
+        let script_result = self.convert_workflow_output(result)?;
+        
+        // Record performance metrics
+        let duration = start.elapsed();
+        self.performance_monitor.record_workflow_execution(duration);
+        
+        Ok(script_result)
+    }
+}
 ```
 
 **Performance Requirements:**
 - **<10ms overhead** for workflow bridge operations
+- **<5ms overhead** for workflow execution initiation
+- **<2ms** for workflow discovery operations  
 - **Consistent API** patterns across all bridge types
 - **Memory efficient** parameter conversion
 - **Error handling** with proper script error formatting

@@ -239,8 +239,9 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 - ✅ Agent-as-tool wrapping support (infrastructure exists)
 - ✅ Tool composition patterns (infrastructure exists)
 - ✅ Agent composition patterns (Task 3.3.6)
-- ❌ **Basic Workflow Patterns** (Sequential, Conditional, Loop)
+- ❌ **Basic Workflow Patterns** (Sequential, Conditional, Loop, Parallel)
 - ❌ **Workflow-Agent Integration**
+- ❌ **CLI Integration for Agents and Workflows**
 - ⚠️ Lua agent examples and documentation (basic only)
 - ✅ Multi-agent coordination primitives (Task 3.3.7)
 
@@ -263,8 +264,9 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 - [x] Agent-as-tool wrapping works seamlessly (infrastructure only)
 - [x] Tool composition patterns demonstrated (infrastructure only)
 - [x] Agent composition patterns demonstrated (Task 3.3.6)
-- [❌] **Basic workflow patterns functional** (Sequential, Conditional, Loop)
+- [❌] **Basic workflow patterns functional** (Sequential, Conditional, Loop, Parallel)
 - [❌] **Workflow-agent integration operational**
+- [❌] **CLI updated with agent and workflow commands**
 - [❌] **Multi-agent coordination via workflows demonstrated**
 - [⚠️] Agents accessible from scripts via bridges (basic access only)
 - [⚠️] Script-to-agent calling mechanism functional (limited to text I/O)
@@ -272,6 +274,7 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 - [❌] **Workflow discovery from scripts functional**
 - [⚠️] Lua agent examples working and documented (basic examples only)
 - [⚠️] Agent and workflow discovery from scripts operational (agents yes, workflows no)
+- [❌] **All four basic workflow patterns accessible from Lua**
 
 **Current Bridge Limitations (Task 3.3.9)**:
 - Only ~20% of agent infrastructure exposed to scripts
