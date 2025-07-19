@@ -1,4 +1,14 @@
 //! ABOUTME: llmspell-workflows implementation crate
-//! ABOUTME: Foundation stub for future implementation
+//! ABOUTME: Provides workflow patterns for orchestrating agents and tools
 
-// Module stub - to be implemented in later phases
+pub mod basic;
+
+// Re-export main functionality for convenience
+pub use basic::{
+    BasicErrorStrategy, BasicSequentialWorkflow, BasicStepResult, BasicStepType,
+    BasicWorkflowConfig, BasicWorkflowInput, BasicWorkflowOutput, BasicWorkflowState,
+    BasicWorkflowStatus, BasicWorkflowStep,
+};
+
+// Re-export traits
+pub use basic::traits::BasicWorkflow;
