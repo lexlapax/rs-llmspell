@@ -265,6 +265,37 @@ pub fn llmspell_error_to_script(error: LLMSpellError) -> String {
     format!("Agent error: {}", error)
 }
 
+/// Convert Lua table to ToolInput (using AgentInput for tools)
+pub fn lua_table_to_tool_input(_lua: &Lua, table: Table) -> mlua::Result<AgentInput> {
+    // For tools, we convert the Lua table to AgentInput
+    // The main difference is that tool parameters go into the `parameters` field
+    let mut parameters = std::collections::HashMap::new();
+
+    // Convert all table entries to parameters
+    for pair in table.pairs::<LuaValue, LuaValue>().flatten() {
+        let key = match pair.0 {
+            LuaValue::String(s) => s.to_str()?.to_string(),
+            LuaValue::Integer(i) => i.to_string(),
+            LuaValue::Number(n) => n.to_string(),
+            _ => continue,
+        };
+        let value = lua_value_to_json(pair.1)?;
+        parameters.insert(key, value);
+    }
+
+    // Create AgentInput with parameters
+    let mut agent_input = AgentInput::text(""); // Tools typically don't need text
+    agent_input.parameters = parameters;
+
+    Ok(agent_input)
+}
+
+/// Convert ToolOutput to Lua table (using AgentOutput for tools)
+pub fn tool_output_to_lua_table(lua: &Lua, output: AgentOutput) -> mlua::Result<Table> {
+    // Tools use AgentOutput, so we just reuse the existing conversion
+    agent_output_to_lua_table(lua, output)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

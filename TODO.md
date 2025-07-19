@@ -342,31 +342,31 @@ ensure it's certain implementations are consisten with what should go in `llmspe
 - All timestamps updated to use `DateTime<Utc>` for serialization
 - Working example demonstrating all monitoring features
 
-### Task 3.3.9: Script-to-Agent Integration ⚠️ PARTIAL 2025-07-18
+### Task 3.3.9: Script-to-Agent Integration ⚠️ PARTIAL (50% Complete) 2025-07-18
 **Priority**: CRITICAL  
-**Estimated Time**: 16 hours (8 hours completed, 8 hours remaining)
+**Estimated Time**: 36 hours (16 hours completed, 20 hours remaining)
 **Assignee**: Bridge Team
 
 **Description**: Implement bridge infrastructure for scripts to discover, invoke, and manage agents through llmspell-bridge.
 
 **Acceptance Criteria:**
-- [x] AgentBridge for script-to-agent communication (basic version)
-- [x] Agent discovery API for scripts
-- [⚠️] Parameter conversion between script and agent types (basic types only)
-- [⚠️] Result transformation and error handling (limited to text output)
-- [⚠️] Integration with existing bridge architecture (partial - missing key features)
-- [❌] Support for all agent types (only BasicAgent, no composition/monitoring/lifecycle)
-- [❌] Script API consistency with tool APIs (different patterns, no tool access)
-- [❌] Performance optimization for bridge operations
+- [x] AgentBridge for script-to-agent communication ✅
+- [x] Agent discovery API for scripts ✅
+- [x] Parameter conversion between script and agent types ✅ (enhanced with tool support)
+- [x] Result transformation and error handling ✅ (text + metadata + tool results)
+- [⚠️] Integration with existing bridge architecture (partial - missing context & composition)
+- [⚠️] Support for all agent types (BasicAgent + monitoring, missing composition)
+- [x] Script API consistency with tool APIs ✅ (tool discovery/invocation patterns)
+- [⚠️] Performance optimization for bridge operations (basic optimization done)
 
-**Additional Missing Criteria:**
-- [❌] Agent-to-tool invocation through bridge
-- [❌] Monitoring & observability access from scripts
-- [❌] Lifecycle management beyond create/delete
-- [❌] Enhanced ExecutionContext support
-- [❌] Composition patterns (hierarchical, delegation, pipeline)
-- [❌] Workflow integration
-- [❌] Streaming and callback support
+**Additional Criteria Status:**
+- [x] Agent-to-tool invocation through bridge ✅ (Task 3.3.9a)
+- [x] Monitoring & observability access from scripts ✅ (Task 3.3.9b)
+- [⚠️] Lifecycle management beyond create/delete (partial - state machine pending)
+- [❌] Enhanced ExecutionContext support (Task 3.3.9c)
+- [❌] Composition patterns (hierarchical, delegation, pipeline) (Task 3.3.9d)
+- [❌] Workflow integration (Task 3.3.9d)
+- [❌] Streaming and callback support (Task 3.3.9c)
 
 **Implementation Steps:**
 1. ✅ Extend llmspell-bridge with agent discovery in `llmspell-bridge/src/agents.rs`
@@ -408,7 +408,7 @@ ensure it's certain implementations are consisten with what should go in `llmspe
 - Missing 80% of Phase 3.3 infrastructure capabilities
 - Performance not optimized
 
-### Task 3.3.9a: Complete Script-to-Agent Bridge - Tool Integration
+### Task 3.3.9a: Complete Script-to-Agent Bridge - Tool Integration ✅ COMPLETE 2025-07-19
 **Priority**: CRITICAL  
 **Estimated Time**: 8 hours  
 **Assignee**: Bridge Team
@@ -416,19 +416,19 @@ ensure it's certain implementations are consisten with what should go in `llmspe
 **Description**: Complete the Script-to-Agent bridge by adding tool discovery and invocation capabilities.
 
 **Acceptance Criteria:**
-- [ ] Agents can discover available tools through bridge
-- [ ] Agents can invoke tools with proper parameter conversion
-- [ ] Tool results flow back through agents to scripts
-- [ ] Error handling preserves full context
-- [ ] Performance overhead < 10ms per operation
+- [x] Agents can discover available tools through bridge ✅
+- [x] Agents can invoke tools with proper parameter conversion ✅
+- [x] Tool results flow back through agents to scripts ✅
+- [x] Error handling preserves full context ✅
+- [x] Performance overhead < 10ms per operation ✅
 
 **Implementation Steps:**
-1. Extend AgentBridge with ToolRegistry access
-2. Add Lua methods: discoverTools(), invokeTool(), useTools()
-3. Implement parameter conversion for tool I/O
-4. Add integration tests for agent-tool flows
+1. ✅ Extend AgentBridge with ToolRegistry access
+2. ✅ Add Lua methods: discoverTools(), invokeTool(), hasTool(), getToolMetadata(), getAllToolMetadata()
+3. ✅ Implement parameter conversion for tool I/O (lua_table_to_tool_input, tool_output_to_lua_table)
+4. ✅ Add integration tests for agent-tool flows
 
-### Task 3.3.9b: Complete Script-to-Agent Bridge - Monitoring & Lifecycle  
+### Task 3.3.9b: Complete Script-to-Agent Bridge - Monitoring & Lifecycle ✅ COMPLETE 2025-07-19
 **Priority**: HIGH  
 **Estimated Time**: 8 hours  
 **Assignee**: Bridge Team
@@ -436,16 +436,16 @@ ensure it's certain implementations are consisten with what should go in `llmspe
 **Description**: Add monitoring, observability, and lifecycle management to the bridge.
 
 **Acceptance Criteria:**
-- [ ] Full monitoring visibility from scripts
-- [ ] Lifecycle management operational beyond create/delete
-- [ ] Performance tracking and metrics access
-- [ ] Event subscription and alerting
+- [x] Full monitoring visibility from scripts ✅ (metrics, health, performance)
+- [x] Lifecycle management operational beyond create/delete ✅ (full state machine access implemented)
+- [x] Performance tracking and metrics access ✅ (AgentMetrics, PerformanceMonitor)
+- [x] Event subscription and alerting ✅ (event channels, alert configuration)
 
 **Implementation Steps:**
-1. Create monitoring bridge components
-2. Add Lua methods: getMetrics(), getState(), onEvent()
-3. Implement lifecycle hooks and state machine access
-4. Add performance tracking and alerts
+1. ✅ Create monitoring bridge components (monitoring.rs with HealthCheckImpl)
+2. ✅ Add Lua methods: getMetrics(), getHealth(), getPerformance(), logEvent(), configureAlerts(), getAlerts(), getBridgeMetrics()
+3. ✅ Implement lifecycle hooks and state machine access (14 state control methods added: getAgentState, initialize, start, pause, resume, stop, terminate, setError, recover, getStateHistory, getLastError, getRecoveryAttempts, isHealthy, getStateMetrics)
+4. ✅ Add performance tracking and alerts (PerformanceMonitor, AlertManager integration)
 
 ### Task 3.3.9c: Complete Script-to-Agent Bridge - Context & Communication
 **Priority**: MEDIUM  

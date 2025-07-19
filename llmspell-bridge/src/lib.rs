@@ -102,6 +102,7 @@ pub mod tools;
 pub mod agent_bridge;
 pub mod agent_conversion;
 pub mod agents;
+pub mod monitoring;
 
 // Language-specific implementations (feature-gated)
 #[cfg(feature = "lua")]

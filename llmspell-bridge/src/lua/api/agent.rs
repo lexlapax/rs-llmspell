@@ -3,7 +3,8 @@
 
 use crate::agent_bridge::AgentBridge;
 use crate::agent_conversion::{
-    agent_output_to_lua_table, lua_table_to_agent_input, lua_value_to_json,
+    agent_output_to_lua_table, lua_table_to_agent_input, lua_table_to_tool_input,
+    lua_value_to_json, tool_output_to_lua_table,
 };
 use crate::engine::types::AgentApiDefinition;
 use crate::{ComponentRegistry, ProviderManager};
@@ -131,9 +132,12 @@ pub fn inject_agent_api(
                     "default".to_string(), // This will be overridden by the provider's model
                 ));
 
-                // Create the Lua wrapper
+                // Create the Lua wrapper with bridge access
+                let bridge = Arc::new(AgentBridge::new(registry.clone()));
                 let wrapper = LuaAgentWrapper {
                     agent,
+                    bridge,
+                    agent_instance_name: "anonymous_agent".to_string(), // For Agent.create(), no instance name
                     _registry: registry,
                     _providers: providers,
                 };
@@ -219,6 +223,8 @@ pub fn inject_agent_api(
                 if let Some(agent) = bridge.get_agent(&name).await {
                     let wrapper = LuaAgentWrapper {
                         agent,
+                        bridge: bridge.clone(),
+                        agent_instance_name: name,
                         _registry: registry,
                         _providers: providers,
                     };
@@ -274,6 +280,8 @@ pub fn inject_agent_api(
                     if let Some(agent) = bridge.get_agent(&instance_name).await {
                         let wrapper = LuaAgentWrapper {
                             agent,
+                            bridge: bridge.clone(),
+                            agent_instance_name: instance_name,
                             _registry: registry,
                             _providers: providers,
                         };
@@ -339,6 +347,8 @@ pub fn inject_agent_api(
 #[derive(Clone)]
 struct LuaAgentWrapper {
     agent: Arc<dyn Agent>,
+    bridge: Arc<AgentBridge>,
+    agent_instance_name: String,
     _registry: Arc<ComponentRegistry>,
     _providers: Arc<ProviderManager>,
 }
@@ -393,6 +403,463 @@ impl UserData for LuaAgentWrapper {
         methods.add_method("setState", |_lua, _this, _state: Table| {
             // TODO: Implement state setting on agent
             Ok(())
+        });
+
+        // Tool Integration Methods
+
+        // discoverTools method
+        methods.add_method("discoverTools", |lua, this, ()| {
+            let tools = this.bridge.list_tools();
+            let tools_table = lua.create_table()?;
+            for (i, tool_name) in tools.iter().enumerate() {
+                tools_table.set(i + 1, tool_name.clone())?;
+            }
+            Ok(tools_table)
+        });
+
+        // getToolMetadata method
+        methods.add_method("getToolMetadata", |lua, this, tool_name: String| {
+            if let Some(metadata) = this.bridge.get_tool_metadata(&tool_name) {
+                // Convert JSON to Lua table
+                let metadata_table = lua.create_table()?;
+                if let Some(name) = metadata.get("name").and_then(|v| v.as_str()) {
+                    metadata_table.set("name", name)?;
+                }
+                if let Some(desc) = metadata.get("description").and_then(|v| v.as_str()) {
+                    metadata_table.set("description", desc)?;
+                }
+                if let Some(version) = metadata.get("version").and_then(|v| v.as_str()) {
+                    metadata_table.set("version", version)?;
+                }
+                Ok(Some(metadata_table))
+            } else {
+                Ok(None)
+            }
+        });
+
+        // invokeTool method
+        methods.add_async_method(
+            "invokeTool",
+            |lua, this, (tool_name, input_table): (String, Table)| async move {
+                // Convert Lua table to AgentInput (for tool execution)
+                let tool_input = lua_table_to_tool_input(lua, input_table)?;
+
+                // Invoke the tool through the bridge
+                let result = this
+                    .bridge
+                    .invoke_tool_for_agent(&this.agent_instance_name, &tool_name, tool_input, None)
+                    .await
+                    .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+
+                // Convert AgentOutput to Lua table
+                let output_table = tool_output_to_lua_table(lua, result)?;
+                Ok(output_table)
+            },
+        );
+
+        // hasTool method
+        methods.add_method("hasTool", |_lua, this, tool_name: String| {
+            Ok(this.bridge.has_tool(&tool_name))
+        });
+
+        // getAllToolMetadata method
+        methods.add_method("getAllToolMetadata", |lua, this, ()| {
+            let all_metadata = this.bridge.get_all_tool_metadata();
+            let metadata_table = lua.create_table()?;
+
+            for (tool_name, metadata) in all_metadata {
+                let tool_metadata_table = lua.create_table()?;
+                if let Some(name) = metadata.get("name").and_then(|v| v.as_str()) {
+                    tool_metadata_table.set("name", name)?;
+                }
+                if let Some(desc) = metadata.get("description").and_then(|v| v.as_str()) {
+                    tool_metadata_table.set("description", desc)?;
+                }
+                if let Some(version) = metadata.get("version").and_then(|v| v.as_str()) {
+                    tool_metadata_table.set("version", version)?;
+                }
+                metadata_table.set(tool_name, tool_metadata_table)?;
+            }
+
+            Ok(metadata_table)
+        });
+
+        // Monitoring & Lifecycle Methods
+
+        // getMetrics method
+        methods.add_async_method("getMetrics", |lua, this, ()| async move {
+            match this
+                .bridge
+                .get_agent_metrics(&this.agent_instance_name)
+                .await
+            {
+                Ok(metrics) => {
+                    let metrics_table = lua.create_table()?;
+                    metrics_table.set("agent_id", metrics.agent_id.clone())?;
+                    metrics_table.set("requests_total", metrics.requests_total.get() as f64)?;
+                    metrics_table.set("requests_failed", metrics.requests_failed.get() as f64)?;
+                    metrics_table.set("requests_active", metrics.requests_active.get())?;
+                    metrics_table.set("tool_invocations", metrics.tool_invocations.get() as f64)?;
+                    metrics_table.set("memory_bytes", metrics.memory_bytes.get())?;
+                    metrics_table.set("cpu_percent", metrics.cpu_percent.get())?;
+                    Ok(Some(metrics_table))
+                }
+                Err(_) => Ok(None),
+            }
+        });
+
+        // getHealth method
+        methods.add_async_method("getHealth", |lua, this, ()| async move {
+            match this
+                .bridge
+                .get_agent_health(&this.agent_instance_name)
+                .await
+            {
+                Ok(health_json) => {
+                    // Convert JSON to Lua table
+                    let health_table = lua.create_table()?;
+                    if let Some(status) = health_json.get("status").and_then(|v| v.as_str()) {
+                        health_table.set("status", status)?;
+                    }
+                    if let Some(message) = health_json.get("message").and_then(|v| v.as_str()) {
+                        health_table.set("message", message)?;
+                    }
+                    if let Some(timestamp) = health_json.get("timestamp").and_then(|v| v.as_str()) {
+                        health_table.set("timestamp", timestamp)?;
+                    }
+                    Ok(Some(health_table))
+                }
+                Err(_) => Ok(None),
+            }
+        });
+
+        // getPerformance method
+        methods.add_async_method("getPerformance", |lua, this, ()| async move {
+            match this
+                .bridge
+                .get_agent_performance(&this.agent_instance_name)
+                .await
+            {
+                Ok(perf_json) => {
+                    let perf_table = lua.create_table()?;
+                    if let Some(total_executions) =
+                        perf_json.get("total_executions").and_then(|v| v.as_u64())
+                    {
+                        perf_table.set("total_executions", total_executions as f64)?;
+                    }
+                    if let Some(avg_time) = perf_json
+                        .get("avg_execution_time_ms")
+                        .and_then(|v| v.as_f64())
+                    {
+                        perf_table.set("avg_execution_time_ms", avg_time)?;
+                    }
+                    if let Some(success_rate) =
+                        perf_json.get("success_rate").and_then(|v| v.as_f64())
+                    {
+                        perf_table.set("success_rate", success_rate)?;
+                    }
+                    if let Some(error_rate) = perf_json.get("error_rate").and_then(|v| v.as_f64()) {
+                        perf_table.set("error_rate", error_rate)?;
+                    }
+                    Ok(Some(perf_table))
+                }
+                Err(_) => Ok(None),
+            }
+        });
+
+        // logEvent method
+        methods.add_async_method(
+            "logEvent",
+            |_lua, this, (event_type, message): (String, String)| async move {
+                this.bridge
+                    .log_agent_event(&this.agent_instance_name, &event_type, &message)
+                    .await
+                    .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+                Ok(())
+            },
+        );
+
+        // configureAlerts method
+        methods.add_async_method(
+            "configureAlerts",
+            |_lua, this, config_table: Table| async move {
+                // Convert Lua table to JSON for alert configuration
+                let config_json = lua_value_to_json(mlua::Value::Table(config_table))?;
+                this.bridge
+                    .configure_agent_alerts(&this.agent_instance_name, config_json)
+                    .await
+                    .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+                Ok(())
+            },
+        );
+
+        // getAlerts method
+        methods.add_async_method("getAlerts", |lua, this, ()| async move {
+            match this
+                .bridge
+                .get_agent_alerts(&this.agent_instance_name)
+                .await
+            {
+                Ok(alerts) => {
+                    let alerts_table = lua.create_table()?;
+                    for (i, alert) in alerts.iter().enumerate() {
+                        let alert_table = lua.create_table()?;
+                        if let Some(severity) = alert.get("severity").and_then(|v| v.as_str()) {
+                            alert_table.set("severity", severity)?;
+                        }
+                        if let Some(message) = alert.get("message").and_then(|v| v.as_str()) {
+                            alert_table.set("message", message)?;
+                        }
+                        if let Some(timestamp) = alert.get("timestamp").and_then(|v| v.as_str()) {
+                            alert_table.set("timestamp", timestamp)?;
+                        }
+                        alerts_table.set(i + 1, alert_table)?;
+                    }
+                    Ok(alerts_table)
+                }
+                Err(e) => Err(mlua::Error::ExternalError(Arc::new(e))),
+            }
+        });
+
+        // getBridgeMetrics method (static bridge-wide metrics)
+        methods.add_method("getBridgeMetrics", |lua, this, ()| {
+            let bridge_metrics = this.bridge.get_bridge_metrics();
+            let metrics_table = lua.create_table()?;
+
+            for (key, value) in bridge_metrics {
+                match value {
+                    serde_json::Value::Number(n) => {
+                        if let Some(f) = n.as_f64() {
+                            metrics_table.set(key, f)?;
+                        }
+                    }
+                    serde_json::Value::String(s) => {
+                        metrics_table.set(key, s)?;
+                    }
+                    serde_json::Value::Object(obj) => {
+                        let obj_table = lua.create_table()?;
+                        for (obj_key, obj_value) in obj {
+                            if let Some(num) = obj_value.as_f64() {
+                                obj_table.set(obj_key, num)?;
+                            } else if let Some(str_val) = obj_value.as_str() {
+                                obj_table.set(obj_key, str_val)?;
+                            }
+                        }
+                        metrics_table.set(key, obj_table)?;
+                    }
+                    _ => {} // Skip other types
+                }
+            }
+
+            Ok(metrics_table)
+        });
+
+        // State Machine Methods
+
+        // getState method - Get current agent state
+        methods.add_async_method("getAgentState", |_lua, this, ()| async move {
+            match this.bridge.get_agent_state(&this.agent_instance_name).await {
+                Ok(state) => Ok(format!("{:?}", state)),
+                Err(e) => Err(mlua::Error::ExternalError(Arc::new(e))),
+            }
+        });
+
+        // initialize method - Initialize agent state machine
+        methods.add_async_method("initialize", |_lua, this, ()| async move {
+            this.bridge
+                .initialize_agent(&this.agent_instance_name)
+                .await
+                .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+            Ok(())
+        });
+
+        // start method - Start agent execution
+        methods.add_async_method("start", |_lua, this, ()| async move {
+            this.bridge
+                .start_agent(&this.agent_instance_name)
+                .await
+                .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+            Ok(())
+        });
+
+        // pause method - Pause agent execution
+        methods.add_async_method("pause", |_lua, this, ()| async move {
+            this.bridge
+                .pause_agent(&this.agent_instance_name)
+                .await
+                .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+            Ok(())
+        });
+
+        // resume method - Resume agent execution
+        methods.add_async_method("resume", |_lua, this, ()| async move {
+            this.bridge
+                .resume_agent(&this.agent_instance_name)
+                .await
+                .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+            Ok(())
+        });
+
+        // stop method - Stop agent execution
+        methods.add_async_method("stop", |_lua, this, ()| async move {
+            this.bridge
+                .stop_agent(&this.agent_instance_name)
+                .await
+                .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+            Ok(())
+        });
+
+        // terminate method - Terminate agent
+        methods.add_async_method("terminate", |_lua, this, ()| async move {
+            this.bridge
+                .terminate_agent(&this.agent_instance_name)
+                .await
+                .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+            Ok(())
+        });
+
+        // setError method - Put agent in error state
+        methods.add_async_method("setError", |_lua, this, error_message: String| async move {
+            this.bridge
+                .error_agent(&this.agent_instance_name, error_message)
+                .await
+                .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+            Ok(())
+        });
+
+        // recover method - Attempt to recover from error
+        methods.add_async_method("recover", |_lua, this, ()| async move {
+            this.bridge
+                .recover_agent(&this.agent_instance_name)
+                .await
+                .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+            Ok(())
+        });
+
+        // getStateHistory method - Get state transition history
+        methods.add_async_method("getStateHistory", |lua, this, ()| async move {
+            match this
+                .bridge
+                .get_agent_state_history(&this.agent_instance_name)
+                .await
+            {
+                Ok(history) => {
+                    let history_table = lua.create_table()?;
+                    for (i, transition) in history.iter().enumerate() {
+                        let transition_table = lua.create_table()?;
+                        if let Some(from) = transition.get("from").and_then(|v| v.as_str()) {
+                            transition_table.set("from", from)?;
+                        }
+                        if let Some(to) = transition.get("to").and_then(|v| v.as_str()) {
+                            transition_table.set("to", to)?;
+                        }
+                        if let Some(timestamp) =
+                            transition.get("timestamp").and_then(|v| v.as_str())
+                        {
+                            transition_table.set("timestamp", timestamp)?;
+                        }
+                        if let Some(elapsed) = transition.get("elapsed").and_then(|v| v.as_f64()) {
+                            transition_table.set("elapsed", elapsed)?;
+                        }
+                        if let Some(reason) = transition.get("reason").and_then(|v| v.as_str()) {
+                            transition_table.set("reason", reason)?;
+                        }
+                        history_table.set(i + 1, transition_table)?;
+                    }
+                    Ok(history_table)
+                }
+                Err(e) => Err(mlua::Error::ExternalError(Arc::new(e))),
+            }
+        });
+
+        // getLastError method - Get last error message
+        methods.add_async_method("getLastError", |_lua, this, ()| async move {
+            match this
+                .bridge
+                .get_agent_last_error(&this.agent_instance_name)
+                .await
+            {
+                Ok(error) => Ok(error),
+                Err(e) => Err(mlua::Error::ExternalError(Arc::new(e))),
+            }
+        });
+
+        // getRecoveryAttempts method - Get recovery attempt count
+        methods.add_async_method("getRecoveryAttempts", |_lua, this, ()| async move {
+            match this
+                .bridge
+                .get_agent_recovery_attempts(&this.agent_instance_name)
+                .await
+            {
+                Ok(attempts) => Ok(attempts),
+                Err(e) => Err(mlua::Error::ExternalError(Arc::new(e))),
+            }
+        });
+
+        // isHealthy method - Check if agent is in healthy state
+        methods.add_async_method("isHealthy", |_lua, this, ()| async move {
+            match this
+                .bridge
+                .is_agent_healthy(&this.agent_instance_name)
+                .await
+            {
+                Ok(healthy) => Ok(healthy),
+                Err(e) => Err(mlua::Error::ExternalError(Arc::new(e))),
+            }
+        });
+
+        // getStateMetrics method - Get state machine metrics
+        methods.add_async_method("getStateMetrics", |lua, this, ()| async move {
+            match this
+                .bridge
+                .get_agent_state_metrics(&this.agent_instance_name)
+                .await
+            {
+                Ok(metrics_json) => {
+                    let metrics_table = lua.create_table()?;
+                    if let Some(state) = metrics_json.get("current_state").and_then(|v| v.as_str())
+                    {
+                        metrics_table.set("current_state", state)?;
+                    }
+                    if let Some(transitions) = metrics_json
+                        .get("total_transitions")
+                        .and_then(|v| v.as_u64())
+                    {
+                        metrics_table.set("total_transitions", transitions as f64)?;
+                    }
+                    if let Some(errors) = metrics_json.get("error_count").and_then(|v| v.as_u64()) {
+                        metrics_table.set("error_count", errors as f64)?;
+                    }
+                    if let Some(attempts) = metrics_json
+                        .get("recovery_attempts")
+                        .and_then(|v| v.as_u64())
+                    {
+                        metrics_table.set("recovery_attempts", attempts as f64)?;
+                    }
+                    if let Some(uptime) = metrics_json.get("uptime").and_then(|v| v.as_f64()) {
+                        metrics_table.set("uptime", uptime)?;
+                    }
+                    if let Some(last_transition) =
+                        metrics_json.get("last_transition").and_then(|v| v.as_str())
+                    {
+                        metrics_table.set("last_transition", last_transition)?;
+                    }
+                    if let Some(state_dist) = metrics_json
+                        .get("state_time_distribution")
+                        .and_then(|v| v.as_object())
+                    {
+                        let dist_table = lua.create_table()?;
+                        for (state, time) in state_dist {
+                            if let Some(time_val) = time.as_f64() {
+                                dist_table.set(state.as_str(), time_val)?;
+                            }
+                        }
+                        metrics_table.set("state_time_distribution", dist_table)?;
+                    }
+                    Ok(metrics_table)
+                }
+                Err(e) => Err(mlua::Error::ExternalError(Arc::new(e))),
+            }
         });
     }
 }

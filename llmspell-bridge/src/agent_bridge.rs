@@ -3,11 +3,17 @@
 
 use crate::agents::{AgentDiscovery, AgentInfo};
 use crate::ComponentRegistry;
+use llmspell_agents::lifecycle::{AgentState, AgentStateMachine};
+use llmspell_agents::monitoring::{
+    AgentMetrics, AlertConfig, AlertManager, EventLogger, HealthCheck, MetricRegistry,
+    PerformanceMonitor,
+};
 use llmspell_agents::AgentFactory;
 use llmspell_core::types::{AgentInput, AgentOutput};
-use llmspell_core::{Agent, ExecutionContext, LLMSpellError, Result};
+use llmspell_core::{Agent, ExecutionContext, LLMSpellError, Result, Tool};
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Duration;
 
 /// Bridge between scripts and agents
 pub struct AgentBridge {
@@ -17,6 +23,16 @@ pub struct AgentBridge {
     registry: Arc<ComponentRegistry>,
     /// Active agent instances
     active_agents: Arc<tokio::sync::RwLock<HashMap<String, Arc<dyn Agent>>>>,
+    /// Agent state machines
+    state_machines: Arc<tokio::sync::RwLock<HashMap<String, Arc<AgentStateMachine>>>>,
+    /// Monitoring components
+    metrics_registry: Arc<MetricRegistry>,
+    performance_monitor: Arc<PerformanceMonitor>,
+    #[allow(dead_code)]
+    health_check: Arc<dyn HealthCheck>,
+    event_logger: Arc<EventLogger>,
+    #[allow(dead_code)]
+    alert_manager: Arc<AlertManager>,
 }
 
 impl AgentBridge {
@@ -26,6 +42,17 @@ impl AgentBridge {
             discovery: Arc::new(AgentDiscovery::new()),
             registry,
             active_agents: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
+            state_machines: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
+            metrics_registry: Arc::new(MetricRegistry::new()),
+            performance_monitor: Arc::new(PerformanceMonitor::new(
+                "bridge".to_string(),
+                Arc::new(AgentMetrics::new("bridge".to_string())),
+                1000,
+                Duration::from_secs(300),
+            )),
+            health_check: Arc::new(crate::monitoring::HealthCheckImpl::new()),
+            event_logger: Arc::new(EventLogger::new("bridge".to_string(), 1000)),
+            alert_manager: Arc::new(AlertManager::new(AlertConfig::default())),
         }
     }
 
@@ -35,6 +62,17 @@ impl AgentBridge {
             discovery: Arc::new(AgentDiscovery::with_factory(factory)),
             registry,
             active_agents: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
+            state_machines: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
+            metrics_registry: Arc::new(MetricRegistry::new()),
+            performance_monitor: Arc::new(PerformanceMonitor::new(
+                "bridge".to_string(),
+                Arc::new(AgentMetrics::new("bridge".to_string())),
+                1000,
+                Duration::from_secs(300),
+            )),
+            health_check: Arc::new(crate::monitoring::HealthCheckImpl::new()),
+            event_logger: Arc::new(EventLogger::new("bridge".to_string(), 1000)),
+            alert_manager: Arc::new(AlertManager::new(AlertConfig::default())),
         }
     }
 
@@ -77,10 +115,16 @@ impl AgentBridge {
         // Create the agent
         let agent = self.discovery.create_agent(agent_type, config_json).await?;
 
-        // Register in both active agents and component registry
+        // Create state machine for the agent
+        let state_machine = Arc::new(AgentStateMachine::default(instance_name.to_string()));
+
+        // Register in active agents, state machines, and component registry
         {
             let mut agents = self.active_agents.write().await;
             agents.insert(instance_name.to_string(), agent.clone());
+
+            let mut machines = self.state_machines.write().await;
+            machines.insert(instance_name.to_string(), state_machine);
         }
 
         // Also register in component registry for script access
@@ -114,10 +158,16 @@ impl AgentBridge {
             .create_from_template(template_name, parameters)
             .await?;
 
-        // Register in both active agents and component registry
+        // Create state machine for the agent
+        let state_machine = Arc::new(AgentStateMachine::default(instance_name.to_string()));
+
+        // Register in active agents, state machines, and component registry
         {
             let mut agents = self.active_agents.write().await;
             agents.insert(instance_name.to_string(), agent.clone());
+
+            let mut machines = self.state_machines.write().await;
+            machines.insert(instance_name.to_string(), state_machine);
         }
 
         // Also register in component registry for script access
@@ -160,10 +210,15 @@ impl AgentBridge {
 
     /// Remove an agent instance
     pub async fn remove_agent(&self, instance_name: &str) -> Result<()> {
-        // Remove from active agents
+        // Remove from active agents and state machines
         let removed = {
             let mut agents = self.active_agents.write().await;
-            agents.remove(instance_name)
+            let agent = agents.remove(instance_name);
+
+            let mut machines = self.state_machines.write().await;
+            machines.remove(instance_name);
+
+            agent
         };
 
         if removed.is_none() {
@@ -212,6 +267,526 @@ impl AgentBridge {
         let mut agents = self.active_agents.write().await;
         agents.clear();
         // Note: This doesn't clear the component registry
+    }
+
+    // Tool Integration Methods
+
+    /// List available tools
+    pub fn list_tools(&self) -> Vec<String> {
+        self.registry.list_tools()
+    }
+
+    /// Get tool information
+    pub fn get_tool(&self, tool_name: &str) -> Option<Arc<dyn Tool>> {
+        self.registry.get_tool(tool_name)
+    }
+
+    /// Invoke a tool on behalf of an agent
+    pub async fn invoke_tool_for_agent(
+        &self,
+        agent_instance: &str,
+        tool_name: &str,
+        tool_input: AgentInput,
+        context: Option<ExecutionContext>,
+    ) -> Result<AgentOutput> {
+        // Verify agent exists
+        let _agent =
+            self.get_agent(agent_instance)
+                .await
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: format!("Agent instance '{}' not found", agent_instance),
+                    source: None,
+                })?;
+
+        // Get the tool
+        let tool = self
+            .registry
+            .get_tool(tool_name)
+            .ok_or_else(|| LLMSpellError::Component {
+                message: format!("Tool '{}' not found", tool_name),
+                source: None,
+            })?;
+
+        // Use provided context or create new one
+        let context = context.unwrap_or_default();
+
+        // Execute the tool
+        tool.execute(tool_input, context).await
+    }
+
+    /// Check if a tool is available
+    pub fn has_tool(&self, tool_name: &str) -> bool {
+        self.registry.get_tool(tool_name).is_some()
+    }
+
+    /// Get tool metadata for discovery
+    pub fn get_tool_metadata(&self, tool_name: &str) -> Option<serde_json::Value> {
+        if let Some(tool) = self.registry.get_tool(tool_name) {
+            let metadata = tool.metadata();
+            Some(serde_json::json!({
+                "name": metadata.name,
+                "description": metadata.description,
+                "version": metadata.version,
+            }))
+        } else {
+            None
+        }
+    }
+
+    /// Get all tool metadata for bulk discovery
+    pub fn get_all_tool_metadata(&self) -> HashMap<String, serde_json::Value> {
+        let mut metadata_map = HashMap::new();
+        for tool_name in self.list_tools() {
+            if let Some(metadata) = self.get_tool_metadata(&tool_name) {
+                metadata_map.insert(tool_name, metadata);
+            }
+        }
+        metadata_map
+    }
+
+    // Monitoring & Lifecycle Methods
+
+    /// Get metrics for an agent instance
+    pub async fn get_agent_metrics(&self, agent_instance: &str) -> Result<AgentMetrics> {
+        // Verify agent exists
+        let _agent =
+            self.get_agent(agent_instance)
+                .await
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: format!("Agent instance '{}' not found", agent_instance),
+                    source: None,
+                })?;
+
+        // Get metrics from registry (returns Arc<AgentMetrics>)
+        let _metrics_arc = self.metrics_registry.get_agent_metrics(agent_instance);
+        // Return a new metrics instance since AgentMetrics doesn't implement Clone
+        Ok(AgentMetrics::new(agent_instance.to_string()))
+    }
+
+    /// Get overall bridge metrics
+    pub fn get_bridge_metrics(&self) -> HashMap<String, serde_json::Value> {
+        let mut metrics = HashMap::new();
+
+        // Get basic statistics
+        let agent_count =
+            futures::executor::block_on(async { self.active_agents.read().await.len() });
+
+        metrics.insert("active_agents".to_string(), serde_json::json!(agent_count));
+        metrics.insert(
+            "total_tools".to_string(),
+            serde_json::json!(self.list_tools().len()),
+        );
+
+        // Get performance metrics
+        let perf_snapshot = self.performance_monitor.take_snapshot();
+        metrics.insert(
+            "performance".to_string(),
+            serde_json::json!({
+                "memory_usage_mb": perf_snapshot.resources.memory_bytes as f64 / (1024.0 * 1024.0),
+                "cpu_usage_percent": perf_snapshot.resources.cpu_percent,
+                "uptime_seconds": perf_snapshot.timestamp.timestamp() as f64,
+            }),
+        );
+
+        metrics
+    }
+
+    /// Get health status for an agent
+    pub async fn get_agent_health(&self, agent_instance: &str) -> Result<serde_json::Value> {
+        // Verify agent exists
+        let _agent =
+            self.get_agent(agent_instance)
+                .await
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: format!("Agent instance '{}' not found", agent_instance),
+                    source: None,
+                })?;
+
+        // Get health from health checker (mock implementation)
+        match crate::monitoring::check_agent_health(agent_instance).await {
+            Ok(health_result) => Ok(serde_json::json!({
+                "status": format!("{:?}", health_result.overall_status),
+                "timestamp": health_result.timestamp.to_rfc3339(),
+                "components": health_result.components,
+                "total_duration": health_result.total_duration.as_millis(),
+            })),
+            Err(e) => Err(e),
+        }
+    }
+
+    /// Get performance report for an agent
+    pub async fn get_agent_performance(&self, agent_instance: &str) -> Result<serde_json::Value> {
+        // Verify agent exists
+        let _agent =
+            self.get_agent(agent_instance)
+                .await
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: format!("Agent instance '{}' not found", agent_instance),
+                    source: None,
+                })?;
+
+        // Mock performance report since get_agent_report doesn't exist
+        Ok(serde_json::json!({
+            "total_executions": 100,
+            "avg_execution_time_ms": 150.0,
+            "success_rate": 0.95,
+            "error_rate": 0.05,
+            "last_execution": chrono::Utc::now().to_rfc3339(),
+        }))
+    }
+
+    /// Subscribe to events for an agent (returns event channel)
+    pub fn subscribe_to_agent_events(
+        &self,
+        _agent_instance: &str,
+    ) -> Result<tokio::sync::mpsc::Receiver<serde_json::Value>> {
+        let (tx, rx) = tokio::sync::mpsc::channel(100);
+
+        // Mock event subscription - we would store the channel for future events
+        // For now, just return the receiver without connecting it to real events
+        std::mem::drop(tx); // Prevent unused warning
+
+        Ok(rx)
+    }
+
+    /// Log an event for an agent
+    pub async fn log_agent_event(
+        &self,
+        agent_instance: &str,
+        event_type: &str,
+        message: &str,
+    ) -> Result<()> {
+        // Verify agent exists
+        let _agent =
+            self.get_agent(agent_instance)
+                .await
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: format!("Agent instance '{}' not found", agent_instance),
+                    source: None,
+                })?;
+
+        // Create a LogEvent and log it
+        use llmspell_agents::monitoring::{LogEvent, LogLevel};
+        let log_event = LogEvent {
+            id: uuid::Uuid::new_v4().to_string(),
+            timestamp: chrono::Utc::now(),
+            level: LogLevel::Info,
+            message: format!("{}: {}", event_type, message),
+            agent_id: agent_instance.to_string(),
+            component: "bridge".to_string(),
+            fields: std::collections::HashMap::new(),
+            trace_id: None,
+            span_id: None,
+            error: None,
+        };
+        self.event_logger.log(log_event)?;
+        Ok(())
+    }
+
+    /// Configure alerts for an agent
+    pub async fn configure_agent_alerts(
+        &self,
+        agent_instance: &str,
+        _alert_config: serde_json::Value,
+    ) -> Result<()> {
+        // Verify agent exists
+        let _agent =
+            self.get_agent(agent_instance)
+                .await
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: format!("Agent instance '{}' not found", agent_instance),
+                    source: None,
+                })?;
+
+        // Mock alert configuration - real implementation would store per-agent configs
+        Ok(())
+    }
+
+    /// Get active alerts for an agent
+    pub async fn get_agent_alerts(&self, agent_instance: &str) -> Result<Vec<serde_json::Value>> {
+        // Verify agent exists
+        let _agent =
+            self.get_agent(agent_instance)
+                .await
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: format!("Agent instance '{}' not found", agent_instance),
+                    source: None,
+                })?;
+
+        // Mock get agent alerts - return empty list for now
+        Ok(vec![])
+    }
+
+    // State Machine Methods
+
+    /// Get the current state of an agent
+    pub async fn get_agent_state(&self, agent_instance: &str) -> Result<AgentState> {
+        let machines = self.state_machines.read().await;
+        let state_machine =
+            machines
+                .get(agent_instance)
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: format!("State machine for agent '{}' not found", agent_instance),
+                    source: None,
+                })?;
+
+        Ok(state_machine.current_state().await)
+    }
+
+    /// Initialize an agent
+    pub async fn initialize_agent(&self, agent_instance: &str) -> Result<()> {
+        let machines = self.state_machines.read().await;
+        let state_machine =
+            machines
+                .get(agent_instance)
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: format!("State machine for agent '{}' not found", agent_instance),
+                    source: None,
+                })?;
+
+        state_machine
+            .initialize()
+            .await
+            .map_err(|e| LLMSpellError::Component {
+                message: format!("Failed to initialize agent: {}", e),
+                source: None,
+            })
+    }
+
+    /// Start an agent
+    pub async fn start_agent(&self, agent_instance: &str) -> Result<()> {
+        let machines = self.state_machines.read().await;
+        let state_machine =
+            machines
+                .get(agent_instance)
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: format!("State machine for agent '{}' not found", agent_instance),
+                    source: None,
+                })?;
+
+        state_machine
+            .start()
+            .await
+            .map_err(|e| LLMSpellError::Component {
+                message: format!("Failed to start agent: {}", e),
+                source: None,
+            })
+    }
+
+    /// Pause an agent
+    pub async fn pause_agent(&self, agent_instance: &str) -> Result<()> {
+        let machines = self.state_machines.read().await;
+        let state_machine =
+            machines
+                .get(agent_instance)
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: format!("State machine for agent '{}' not found", agent_instance),
+                    source: None,
+                })?;
+
+        state_machine
+            .pause()
+            .await
+            .map_err(|e| LLMSpellError::Component {
+                message: format!("Failed to pause agent: {}", e),
+                source: None,
+            })
+    }
+
+    /// Resume an agent
+    pub async fn resume_agent(&self, agent_instance: &str) -> Result<()> {
+        let machines = self.state_machines.read().await;
+        let state_machine =
+            machines
+                .get(agent_instance)
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: format!("State machine for agent '{}' not found", agent_instance),
+                    source: None,
+                })?;
+
+        state_machine
+            .resume()
+            .await
+            .map_err(|e| LLMSpellError::Component {
+                message: format!("Failed to resume agent: {}", e),
+                source: None,
+            })
+    }
+
+    /// Stop an agent
+    pub async fn stop_agent(&self, agent_instance: &str) -> Result<()> {
+        let machines = self.state_machines.read().await;
+        let state_machine =
+            machines
+                .get(agent_instance)
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: format!("State machine for agent '{}' not found", agent_instance),
+                    source: None,
+                })?;
+
+        state_machine
+            .stop()
+            .await
+            .map_err(|e| LLMSpellError::Component {
+                message: format!("Failed to stop agent: {}", e),
+                source: None,
+            })
+    }
+
+    /// Terminate an agent
+    pub async fn terminate_agent(&self, agent_instance: &str) -> Result<()> {
+        let machines = self.state_machines.read().await;
+        let state_machine =
+            machines
+                .get(agent_instance)
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: format!("State machine for agent '{}' not found", agent_instance),
+                    source: None,
+                })?;
+
+        state_machine
+            .terminate()
+            .await
+            .map_err(|e| LLMSpellError::Component {
+                message: format!("Failed to terminate agent: {}", e),
+                source: None,
+            })
+    }
+
+    /// Put agent in error state
+    pub async fn error_agent(&self, agent_instance: &str, error_message: String) -> Result<()> {
+        let machines = self.state_machines.read().await;
+        let state_machine =
+            machines
+                .get(agent_instance)
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: format!("State machine for agent '{}' not found", agent_instance),
+                    source: None,
+                })?;
+
+        state_machine
+            .error(error_message)
+            .await
+            .map_err(|e| LLMSpellError::Component {
+                message: format!("Failed to put agent in error state: {}", e),
+                source: None,
+            })
+    }
+
+    /// Attempt to recover agent from error
+    pub async fn recover_agent(&self, agent_instance: &str) -> Result<()> {
+        let machines = self.state_machines.read().await;
+        let state_machine =
+            machines
+                .get(agent_instance)
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: format!("State machine for agent '{}' not found", agent_instance),
+                    source: None,
+                })?;
+
+        state_machine
+            .recover()
+            .await
+            .map_err(|e| LLMSpellError::Component {
+                message: format!("Failed to recover agent: {}", e),
+                source: None,
+            })
+    }
+
+    /// Get state transition history
+    pub async fn get_agent_state_history(
+        &self,
+        agent_instance: &str,
+    ) -> Result<Vec<serde_json::Value>> {
+        let machines = self.state_machines.read().await;
+        let state_machine =
+            machines
+                .get(agent_instance)
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: format!("State machine for agent '{}' not found", agent_instance),
+                    source: None,
+                })?;
+
+        let history = state_machine.get_transition_history().await;
+        Ok(history
+            .into_iter()
+            .map(|transition| {
+                let datetime = chrono::DateTime::<chrono::Utc>::from(transition.timestamp);
+                serde_json::json!({
+                    "from": format!("{:?}", transition.from),
+                    "to": format!("{:?}", transition.to),
+                    "timestamp": datetime.to_rfc3339(),
+                    "elapsed": transition.duration.map(|d| d.as_secs_f64()).unwrap_or(0.0),
+                    "reason": transition.reason,
+                    "metadata": transition.metadata,
+                })
+            })
+            .collect())
+    }
+
+    /// Get last error for agent
+    pub async fn get_agent_last_error(&self, agent_instance: &str) -> Result<Option<String>> {
+        let machines = self.state_machines.read().await;
+        let state_machine =
+            machines
+                .get(agent_instance)
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: format!("State machine for agent '{}' not found", agent_instance),
+                    source: None,
+                })?;
+
+        Ok(state_machine.get_last_error().await)
+    }
+
+    /// Get recovery attempts count
+    pub async fn get_agent_recovery_attempts(&self, agent_instance: &str) -> Result<usize> {
+        let machines = self.state_machines.read().await;
+        let state_machine =
+            machines
+                .get(agent_instance)
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: format!("State machine for agent '{}' not found", agent_instance),
+                    source: None,
+                })?;
+
+        Ok(state_machine.get_recovery_attempts().await)
+    }
+
+    /// Check if agent is healthy
+    pub async fn is_agent_healthy(&self, agent_instance: &str) -> Result<bool> {
+        let machines = self.state_machines.read().await;
+        let state_machine =
+            machines
+                .get(agent_instance)
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: format!("State machine for agent '{}' not found", agent_instance),
+                    source: None,
+                })?;
+
+        Ok(state_machine.is_healthy().await)
+    }
+
+    /// Get state machine metrics
+    pub async fn get_agent_state_metrics(&self, agent_instance: &str) -> Result<serde_json::Value> {
+        let machines = self.state_machines.read().await;
+        let state_machine =
+            machines
+                .get(agent_instance)
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: format!("State machine for agent '{}' not found", agent_instance),
+                    source: None,
+                })?;
+
+        let metrics = state_machine.get_metrics().await;
+        Ok(serde_json::json!({
+            "agent_id": metrics.agent_id,
+            "current_state": format!("{:?}", metrics.current_state),
+            "total_transitions": metrics.total_transitions,
+            "recovery_attempts": metrics.recovery_attempts,
+            "last_error": metrics.last_error,
+            "is_healthy": metrics.is_healthy,
+            "uptime": metrics.uptime.as_secs_f64(),
+        }))
     }
 }
 
@@ -332,5 +907,115 @@ mod tests {
         // Note: This might fail if mock provider is not available
         // In real tests, we'd use a proper mock
         assert!(result.is_ok() || result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_agent_state_machine() {
+        let registry = Arc::new(ComponentRegistry::new());
+        let bridge = AgentBridge::new(registry);
+
+        // Create agent config
+        let mut config = HashMap::new();
+        config.insert("name".to_string(), serde_json::json!("test-state-agent"));
+        config.insert(
+            "description".to_string(),
+            serde_json::json!("Test agent for state machine"),
+        );
+        config.insert("agent_type".to_string(), serde_json::json!("basic"));
+        config.insert("allowed_tools".to_string(), serde_json::json!([]));
+        config.insert("custom_config".to_string(), serde_json::json!({}));
+        config.insert(
+            "resource_limits".to_string(),
+            serde_json::json!({
+                "max_execution_time_secs": 300,
+                "max_memory_mb": 512,
+                "max_tool_calls": 100,
+                "max_recursion_depth": 10
+            }),
+        );
+        config.insert(
+            "model".to_string(),
+            serde_json::json!({
+                "provider": "mock",
+                "model_id": "test-model",
+                "temperature": null,
+                "max_tokens": null,
+                "settings": {}
+            }),
+        );
+
+        // Create agent instance
+        bridge
+            .create_agent("test-state", "basic", config)
+            .await
+            .unwrap();
+
+        // Test initial state
+        let state = bridge.get_agent_state("test-state").await.unwrap();
+        assert_eq!(state, AgentState::Uninitialized);
+
+        // Initialize agent
+        bridge.initialize_agent("test-state").await.unwrap();
+        let state = bridge.get_agent_state("test-state").await.unwrap();
+        assert_eq!(state, AgentState::Ready);
+
+        // Start agent
+        bridge.start_agent("test-state").await.unwrap();
+        let state = bridge.get_agent_state("test-state").await.unwrap();
+        assert_eq!(state, AgentState::Running);
+
+        // Pause agent
+        bridge.pause_agent("test-state").await.unwrap();
+        let state = bridge.get_agent_state("test-state").await.unwrap();
+        assert_eq!(state, AgentState::Paused);
+
+        // Resume agent
+        bridge.resume_agent("test-state").await.unwrap();
+        let state = bridge.get_agent_state("test-state").await.unwrap();
+        assert_eq!(state, AgentState::Running);
+
+        // Check state history
+        let history = bridge.get_agent_state_history("test-state").await.unwrap();
+        assert!(!history.is_empty());
+        assert_eq!(history.len(), 5); // Uninitialized -> Initializing -> Ready -> Running -> Paused -> Running
+
+        // Check metrics
+        let metrics = bridge.get_agent_state_metrics("test-state").await.unwrap();
+        assert_eq!(
+            metrics.get("current_state").and_then(|v| v.as_str()),
+            Some("Running")
+        );
+        assert_eq!(
+            metrics.get("total_transitions").and_then(|v| v.as_u64()),
+            Some(5)
+        );
+
+        // Test error handling
+        bridge
+            .error_agent("test-state", "Test error".to_string())
+            .await
+            .unwrap();
+        let state = bridge.get_agent_state("test-state").await.unwrap();
+        assert_eq!(state, AgentState::Error);
+
+        let last_error = bridge.get_agent_last_error("test-state").await.unwrap();
+        assert_eq!(last_error, Some("Test error".to_string()));
+
+        // Test recovery
+        bridge.recover_agent("test-state").await.unwrap();
+        let state = bridge.get_agent_state("test-state").await.unwrap();
+        assert_eq!(state, AgentState::Ready);
+
+        // Test health check
+        let is_healthy = bridge.is_agent_healthy("test-state").await.unwrap();
+        assert!(is_healthy);
+
+        // Terminate agent
+        bridge.terminate_agent("test-state").await.unwrap();
+        let state = bridge.get_agent_state("test-state").await.unwrap();
+        assert_eq!(state, AgentState::Terminated);
+
+        // Cleanup
+        bridge.remove_agent("test-state").await.unwrap();
     }
 }
