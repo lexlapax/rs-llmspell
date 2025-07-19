@@ -1,26 +1,25 @@
-//! ABOUTME: Basic workflow traits for foundational workflow patterns
-//! ABOUTME: Defines simplified workflow interfaces for memory-based execution
+//! ABOUTME: Workflow traits for foundational workflow patterns
+//! ABOUTME: Defines workflow interfaces for memory-based execution
 
 use async_trait::async_trait;
 use llmspell_core::{ComponentId, Result};
 use serde::{Deserialize, Serialize};
 use std::time::Duration;
 
-/// Basic workflow step for simplified workflow patterns.
+/// Workflow step for workflow patterns.
 ///
-/// Unlike the full WorkflowStep from core, BasicWorkflowStep is designed
-/// for simple sequential patterns without complex dependency management.
+/// Workflow step is designed for workflow patterns with memory-based state management.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BasicWorkflowStep {
+pub struct WorkflowStep {
     pub id: ComponentId,
     pub name: String,
-    pub step_type: BasicStepType,
+    pub step_type: StepType,
     pub timeout: Option<Duration>,
     pub retry_attempts: u32,
 }
 
-impl BasicWorkflowStep {
-    pub fn new(name: String, step_type: BasicStepType) -> Self {
+impl WorkflowStep {
+    pub fn new(name: String, step_type: StepType) -> Self {
         Self {
             id: ComponentId::new(),
             name,
@@ -41,9 +40,9 @@ impl BasicWorkflowStep {
     }
 }
 
-/// Types of basic workflow steps
+/// Types of workflow steps
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum BasicStepType {
+pub enum StepType {
     /// Execute a tool with given parameters
     Tool {
         tool_name: String,
@@ -61,9 +60,9 @@ pub enum BasicStepType {
     },
 }
 
-/// Basic workflow execution result
+/// Workflow execution result
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BasicStepResult {
+pub struct StepResult {
     pub step_id: ComponentId,
     pub step_name: String,
     pub success: bool,
@@ -73,7 +72,7 @@ pub struct BasicStepResult {
     pub retry_count: u32,
 }
 
-impl BasicStepResult {
+impl StepResult {
     pub fn success(
         step_id: ComponentId,
         step_name: String,
@@ -110,9 +109,9 @@ impl BasicStepResult {
     }
 }
 
-/// Basic workflow status
+/// Workflow status
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-pub enum BasicWorkflowStatus {
+pub enum WorkflowStatus {
     Pending,
     Running,
     Completed,
@@ -120,9 +119,9 @@ pub enum BasicWorkflowStatus {
     Cancelled,
 }
 
-/// Error handling strategies for basic workflows
+/// Error handling strategies for workflows
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum BasicErrorStrategy {
+pub enum ErrorStrategy {
     /// Stop execution on first error
     FailFast,
     /// Continue executing remaining steps
@@ -131,39 +130,37 @@ pub enum BasicErrorStrategy {
     Retry { max_attempts: u32, backoff_ms: u64 },
 }
 
-impl Default for BasicErrorStrategy {
+impl Default for ErrorStrategy {
     fn default() -> Self {
         Self::FailFast
     }
 }
 
-/// Basic workflow trait for simple workflow patterns.
+/// Workflow trait for workflow patterns.
 ///
-/// This trait provides a simplified interface for basic workflow execution
-/// without the complexity of dependency management and advanced features.
-/// It's designed for memory-based state management and sequential execution.
+/// This trait provides an interface for workflow execution with memory-based state management.
 #[async_trait]
-pub trait BasicWorkflow: Send + Sync {
+pub trait Workflow: Send + Sync {
     /// Get workflow name
     fn name(&self) -> &str;
 
     /// Get workflow status
-    async fn status(&self) -> Result<BasicWorkflowStatus>;
+    async fn status(&self) -> Result<WorkflowStatus>;
 
     /// Add a step to the workflow
-    async fn add_step(&mut self, step: BasicWorkflowStep) -> Result<()>;
+    async fn add_step(&mut self, step: WorkflowStep) -> Result<()>;
 
     /// Remove a step from the workflow
     async fn remove_step(&mut self, step_id: ComponentId) -> Result<()>;
 
     /// Get all steps
-    async fn get_steps(&self) -> Result<Vec<BasicWorkflowStep>>;
+    async fn get_steps(&self) -> Result<Vec<WorkflowStep>>;
 
     /// Execute the workflow
-    async fn execute(&mut self) -> Result<Vec<BasicStepResult>>;
+    async fn execute(&mut self) -> Result<Vec<StepResult>>;
 
     /// Get execution results
-    async fn get_results(&self) -> Result<Vec<BasicStepResult>>;
+    async fn get_results(&self) -> Result<Vec<StepResult>>;
 
     /// Reset workflow to initial state
     async fn reset(&mut self) -> Result<()>;

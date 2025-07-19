@@ -1,18 +1,225 @@
-//! ABOUTME: Condition evaluation engine for conditional workflows
-//! ABOUTME: Handles evaluation of various condition types with performance optimization
+//! ABOUTME: Condition evaluation engine for workflows
+//! ABOUTME: Defines reusable condition types and evaluation logic
 
-use super::types::{BasicCondition, ConditionEvaluationContext, ConditionResult};
+use super::traits::StepResult;
 use llmspell_core::{ComponentId, Result};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::time::{Duration, Instant};
 use tracing::{debug, warn};
 
-/// Basic condition evaluator for conditional workflows
-pub struct BasicConditionEvaluator {
+/// Condition types for workflows
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Condition {
+    /// Always true condition (for default branches)
+    Always,
+    /// Always false condition
+    Never,
+    /// Compare a shared data value to a target value
+    SharedDataEquals {
+        key: String,
+        expected_value: serde_json::Value,
+    },
+    /// Check if shared data key exists
+    SharedDataExists { key: String },
+    /// Compare step result output to expected value
+    StepResultEquals {
+        step_id: ComponentId,
+        expected_output: String,
+    },
+    /// Check if previous step was successful
+    StepSucceeded { step_id: ComponentId },
+    /// Check if previous step failed
+    StepFailed { step_id: ComponentId },
+    /// Logical AND of multiple conditions
+    And { conditions: Vec<Condition> },
+    /// Logical OR of multiple conditions
+    Or { conditions: Vec<Condition> },
+    /// Logical NOT of a condition
+    Not { condition: Box<Condition> },
+    /// Custom condition with JavaScript-like expression
+    Custom {
+        expression: String,
+        description: String,
+    },
+}
+
+impl Condition {
+    /// Create a shared data equals condition
+    pub fn shared_data_equals(key: String, expected_value: serde_json::Value) -> Self {
+        Self::SharedDataEquals {
+            key,
+            expected_value,
+        }
+    }
+
+    /// Create a shared data exists condition
+    pub fn shared_data_exists(key: String) -> Self {
+        Self::SharedDataExists { key }
+    }
+
+    /// Create a step result equals condition
+    pub fn step_result_equals(step_id: ComponentId, expected_output: String) -> Self {
+        Self::StepResultEquals {
+            step_id,
+            expected_output,
+        }
+    }
+
+    /// Create a step succeeded condition
+    pub fn step_succeeded(step_id: ComponentId) -> Self {
+        Self::StepSucceeded { step_id }
+    }
+
+    /// Create a step failed condition
+    pub fn step_failed(step_id: ComponentId) -> Self {
+        Self::StepFailed { step_id }
+    }
+
+    /// Create an AND condition
+    pub fn and(conditions: Vec<Condition>) -> Self {
+        Self::And { conditions }
+    }
+
+    /// Create an OR condition  
+    pub fn or(conditions: Vec<Condition>) -> Self {
+        Self::Or { conditions }
+    }
+
+    /// Create a NOT condition
+    pub fn not_condition(condition: Condition) -> Self {
+        Self::Not {
+            condition: Box::new(condition),
+        }
+    }
+
+    /// Create a custom condition with expression
+    pub fn custom(expression: String, description: String) -> Self {
+        Self::Custom {
+            expression,
+            description,
+        }
+    }
+}
+
+/// Result of condition evaluation
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ConditionResult {
+    /// Whether the condition evaluated to true
+    pub is_true: bool,
+    /// Optional error message if evaluation failed
+    pub error: Option<String>,
+    /// Human-readable description of what was evaluated
+    pub description: String,
+}
+
+impl ConditionResult {
+    /// Create a successful true result
+    pub fn success_true(description: String) -> Self {
+        Self {
+            is_true: true,
+            error: None,
+            description,
+        }
+    }
+
+    /// Create a successful false result
+    pub fn success_false(description: String) -> Self {
+        Self {
+            is_true: false,
+            error: None,
+            description,
+        }
+    }
+
+    /// Create an error result
+    pub fn error(description: String, error: String) -> Self {
+        Self {
+            is_true: false,
+            error: Some(error),
+            description,
+        }
+    }
+
+    /// Check if evaluation was successful (no error)
+    pub fn is_success(&self) -> bool {
+        self.error.is_none()
+    }
+
+    /// Check if evaluation failed
+    pub fn is_error(&self) -> bool {
+        self.error.is_some()
+    }
+}
+
+/// Context for condition evaluation
+#[derive(Debug, Clone)]
+pub struct ConditionEvaluationContext {
+    /// Shared data from workflow state
+    pub shared_data: HashMap<String, serde_json::Value>,
+    /// Step outputs from completed steps
+    pub step_outputs: HashMap<ComponentId, serde_json::Value>,
+    /// Step results from completed steps
+    pub step_results: HashMap<ComponentId, StepResult>,
+    /// Current workflow execution ID
+    pub execution_id: ComponentId,
+}
+
+impl ConditionEvaluationContext {
+    /// Create a new condition evaluation context
+    pub fn new(execution_id: ComponentId) -> Self {
+        Self {
+            shared_data: HashMap::new(),
+            step_outputs: HashMap::new(),
+            step_results: HashMap::new(),
+            execution_id,
+        }
+    }
+
+    /// Add shared data to context
+    pub fn with_shared_data(mut self, shared_data: HashMap<String, serde_json::Value>) -> Self {
+        self.shared_data = shared_data;
+        self
+    }
+
+    /// Add step outputs to context
+    pub fn with_step_outputs(
+        mut self,
+        step_outputs: HashMap<ComponentId, serde_json::Value>,
+    ) -> Self {
+        self.step_outputs = step_outputs;
+        self
+    }
+
+    /// Add step results to context
+    pub fn with_step_results(mut self, step_results: HashMap<ComponentId, StepResult>) -> Self {
+        self.step_results = step_results;
+        self
+    }
+
+    /// Get shared data value by key
+    pub fn get_shared_data(&self, key: &str) -> Option<&serde_json::Value> {
+        self.shared_data.get(key)
+    }
+
+    /// Get step output by step ID
+    pub fn get_step_output(&self, step_id: ComponentId) -> Option<&serde_json::Value> {
+        self.step_outputs.get(&step_id)
+    }
+
+    /// Get step result by step ID
+    pub fn get_step_result(&self, step_id: ComponentId) -> Option<&StepResult> {
+        self.step_results.get(&step_id)
+    }
+}
+
+/// Condition evaluator for workflows
+pub struct ConditionEvaluator {
     /// Timeout for condition evaluation
     evaluation_timeout: Duration,
 }
 
-impl BasicConditionEvaluator {
+impl ConditionEvaluator {
     /// Create a new condition evaluator
     pub fn new(evaluation_timeout: Duration) -> Self {
         Self { evaluation_timeout }
@@ -21,7 +228,7 @@ impl BasicConditionEvaluator {
     /// Evaluate a condition with the given context
     pub async fn evaluate(
         &self,
-        condition: &BasicCondition,
+        condition: &Condition,
         context: &ConditionEvaluationContext,
     ) -> Result<ConditionResult> {
         let start_time = Instant::now();
@@ -57,49 +264,41 @@ impl BasicConditionEvaluator {
     /// Internal condition evaluation logic
     async fn evaluate_internal(
         &self,
-        condition: &BasicCondition,
+        condition: &Condition,
         context: &ConditionEvaluationContext,
     ) -> Result<ConditionResult> {
         match condition {
-            BasicCondition::Always => Ok(ConditionResult::success_true(
+            Condition::Always => Ok(ConditionResult::success_true(
                 "Always true condition".to_string(),
             )),
-            BasicCondition::Never => Ok(ConditionResult::success_false(
+            Condition::Never => Ok(ConditionResult::success_false(
                 "Always false condition".to_string(),
             )),
-            BasicCondition::SharedDataEquals {
+            Condition::SharedDataEquals {
                 key,
                 expected_value,
             } => {
                 self.evaluate_shared_data_equals(key, expected_value, context)
                     .await
             }
-            BasicCondition::SharedDataExists { key } => {
+            Condition::SharedDataExists { key } => {
                 self.evaluate_shared_data_exists(key, context).await
             }
-            BasicCondition::StepResultEquals {
+            Condition::StepResultEquals {
                 step_id,
                 expected_output,
             } => {
                 self.evaluate_step_result_equals(*step_id, expected_output, context)
                     .await
             }
-            BasicCondition::StepSucceeded { step_id } => {
+            Condition::StepSucceeded { step_id } => {
                 self.evaluate_step_succeeded(*step_id, context).await
             }
-            BasicCondition::StepFailed { step_id } => {
-                self.evaluate_step_failed(*step_id, context).await
-            }
-            BasicCondition::And { conditions } => {
-                self.evaluate_and_condition(conditions, context).await
-            }
-            BasicCondition::Or { conditions } => {
-                self.evaluate_or_condition(conditions, context).await
-            }
-            BasicCondition::Not { condition } => {
-                self.evaluate_not_condition(condition, context).await
-            }
-            BasicCondition::Custom {
+            Condition::StepFailed { step_id } => self.evaluate_step_failed(*step_id, context).await,
+            Condition::And { conditions } => self.evaluate_and_condition(conditions, context).await,
+            Condition::Or { conditions } => self.evaluate_or_condition(conditions, context).await,
+            Condition::Not { condition } => self.evaluate_not_condition(condition, context).await,
+            Condition::Custom {
                 expression,
                 description,
             } => {
@@ -238,7 +437,7 @@ impl BasicConditionEvaluator {
     /// Evaluate AND condition (all must be true)
     async fn evaluate_and_condition(
         &self,
-        conditions: &[BasicCondition],
+        conditions: &[Condition],
         context: &ConditionEvaluationContext,
     ) -> Result<ConditionResult> {
         let description = format!("AND of {} conditions", conditions.len());
@@ -277,7 +476,7 @@ impl BasicConditionEvaluator {
     /// Evaluate OR condition (at least one must be true)
     async fn evaluate_or_condition(
         &self,
-        conditions: &[BasicCondition],
+        conditions: &[Condition],
         context: &ConditionEvaluationContext,
     ) -> Result<ConditionResult> {
         let description = format!("OR of {} conditions", conditions.len());
@@ -326,7 +525,7 @@ impl BasicConditionEvaluator {
     /// Evaluate NOT condition (inverse of inner condition)
     async fn evaluate_not_condition(
         &self,
-        condition: &BasicCondition,
+        condition: &Condition,
         context: &ConditionEvaluationContext,
     ) -> Result<ConditionResult> {
         let result = Box::pin(self.evaluate_internal(condition, context)).await?;
@@ -517,9 +716,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_always_condition() {
-        let evaluator = BasicConditionEvaluator::new(Duration::from_secs(1));
+        let evaluator = ConditionEvaluator::new(Duration::from_secs(1));
         let context = ConditionEvaluationContext::new(ComponentId::new());
-        let condition = BasicCondition::Always;
+        let condition = Condition::Always;
 
         let result = evaluator.evaluate(&condition, &context).await.unwrap();
         assert!(result.is_true);
@@ -528,9 +727,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_never_condition() {
-        let evaluator = BasicConditionEvaluator::new(Duration::from_secs(1));
+        let evaluator = ConditionEvaluator::new(Duration::from_secs(1));
         let context = ConditionEvaluationContext::new(ComponentId::new());
-        let condition = BasicCondition::Never;
+        let condition = Condition::Never;
 
         let result = evaluator.evaluate(&condition, &context).await.unwrap();
         assert!(!result.is_true);
@@ -539,7 +738,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_shared_data_equals_condition() {
-        let evaluator = BasicConditionEvaluator::new(Duration::from_secs(1));
+        let evaluator = ConditionEvaluator::new(Duration::from_secs(1));
         let mut shared_data = std::collections::HashMap::new();
         shared_data.insert("test_key".to_string(), serde_json::json!("test_value"));
 
@@ -547,15 +746,13 @@ mod tests {
             ConditionEvaluationContext::new(ComponentId::new()).with_shared_data(shared_data);
 
         // Test matching condition
-        let condition = BasicCondition::shared_data_equals(
-            "test_key".to_string(),
-            serde_json::json!("test_value"),
-        );
+        let condition =
+            Condition::shared_data_equals("test_key".to_string(), serde_json::json!("test_value"));
         let result = evaluator.evaluate(&condition, &context).await.unwrap();
         assert!(result.is_true);
 
         // Test non-matching condition
-        let condition = BasicCondition::shared_data_equals(
+        let condition = Condition::shared_data_equals(
             "test_key".to_string(),
             serde_json::json!("different_value"),
         );
@@ -565,63 +762,63 @@ mod tests {
 
     #[tokio::test]
     async fn test_and_condition() {
-        let evaluator = BasicConditionEvaluator::new(Duration::from_secs(1));
+        let evaluator = ConditionEvaluator::new(Duration::from_secs(1));
         let context = ConditionEvaluationContext::new(ComponentId::new());
 
         // All true conditions
-        let condition = BasicCondition::and(vec![BasicCondition::Always, BasicCondition::Always]);
+        let condition = Condition::and(vec![Condition::Always, Condition::Always]);
         let result = evaluator.evaluate(&condition, &context).await.unwrap();
         assert!(result.is_true);
 
         // Mixed conditions (one false)
-        let condition = BasicCondition::and(vec![BasicCondition::Always, BasicCondition::Never]);
+        let condition = Condition::and(vec![Condition::Always, Condition::Never]);
         let result = evaluator.evaluate(&condition, &context).await.unwrap();
         assert!(!result.is_true);
     }
 
     #[tokio::test]
     async fn test_or_condition() {
-        let evaluator = BasicConditionEvaluator::new(Duration::from_secs(1));
+        let evaluator = ConditionEvaluator::new(Duration::from_secs(1));
         let context = ConditionEvaluationContext::new(ComponentId::new());
 
         // At least one true condition
-        let condition = BasicCondition::or(vec![BasicCondition::Never, BasicCondition::Always]);
+        let condition = Condition::or(vec![Condition::Never, Condition::Always]);
         let result = evaluator.evaluate(&condition, &context).await.unwrap();
         assert!(result.is_true);
 
         // All false conditions
-        let condition = BasicCondition::or(vec![BasicCondition::Never, BasicCondition::Never]);
+        let condition = Condition::or(vec![Condition::Never, Condition::Never]);
         let result = evaluator.evaluate(&condition, &context).await.unwrap();
         assert!(!result.is_true);
     }
 
     #[tokio::test]
     async fn test_not_condition() {
-        let evaluator = BasicConditionEvaluator::new(Duration::from_secs(1));
+        let evaluator = ConditionEvaluator::new(Duration::from_secs(1));
         let context = ConditionEvaluationContext::new(ComponentId::new());
 
         // NOT true = false
-        let condition = BasicCondition::not_condition(BasicCondition::Always);
+        let condition = Condition::not_condition(Condition::Always);
         let result = evaluator.evaluate(&condition, &context).await.unwrap();
         assert!(!result.is_true);
 
         // NOT false = true
-        let condition = BasicCondition::not_condition(BasicCondition::Never);
+        let condition = Condition::not_condition(Condition::Never);
         let result = evaluator.evaluate(&condition, &context).await.unwrap();
         assert!(result.is_true);
     }
 
     #[tokio::test]
     async fn test_custom_condition_simple() {
-        let evaluator = BasicConditionEvaluator::new(Duration::from_secs(1));
+        let evaluator = ConditionEvaluator::new(Duration::from_secs(1));
         let context = ConditionEvaluationContext::new(ComponentId::new());
 
         // Simple boolean literals
-        let condition = BasicCondition::custom("true".to_string(), "Always true".to_string());
+        let condition = Condition::custom("true".to_string(), "Always true".to_string());
         let result = evaluator.evaluate(&condition, &context).await.unwrap();
         assert!(result.is_true);
 
-        let condition = BasicCondition::custom("false".to_string(), "Always false".to_string());
+        let condition = Condition::custom("false".to_string(), "Always false".to_string());
         let result = evaluator.evaluate(&condition, &context).await.unwrap();
         assert!(!result.is_true);
     }

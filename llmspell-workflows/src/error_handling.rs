@@ -1,32 +1,32 @@
 //! ABOUTME: Error handling strategies for basic workflows
 //! ABOUTME: Provides retry logic, error recovery, and failure management
 
-use super::traits::{BasicErrorStrategy, BasicStepResult};
+use super::traits::{ErrorStrategy, StepResult};
 use llmspell_core::{LLMSpellError, Result};
 use std::time::Duration;
 use tracing::{debug, error, warn};
 
 /// Error handler for basic workflows
-pub struct BasicErrorHandler {
-    default_strategy: BasicErrorStrategy,
+pub struct ErrorHandler {
+    default_strategy: ErrorStrategy,
 }
 
-impl BasicErrorHandler {
+impl ErrorHandler {
     /// Create a new error handler with default strategy
-    pub fn new(default_strategy: BasicErrorStrategy) -> Self {
+    pub fn new(default_strategy: ErrorStrategy) -> Self {
         Self { default_strategy }
     }
 
     /// Handle a step failure and determine next action
     pub async fn handle_step_failure(
         &self,
-        step_result: &BasicStepResult,
-        strategy: Option<&BasicErrorStrategy>,
+        step_result: &StepResult,
+        strategy: Option<&ErrorStrategy>,
     ) -> Result<ErrorAction> {
         let strategy = strategy.unwrap_or(&self.default_strategy);
 
         match strategy {
-            BasicErrorStrategy::FailFast => {
+            ErrorStrategy::FailFast => {
                 error!(
                     "Step '{}' failed with FailFast strategy: {}",
                     step_result.step_name,
@@ -37,7 +37,7 @@ impl BasicErrorHandler {
                 );
                 Ok(ErrorAction::StopWorkflow)
             }
-            BasicErrorStrategy::Continue => {
+            ErrorStrategy::Continue => {
                 warn!(
                     "Step '{}' failed, continuing with next step: {}",
                     step_result.step_name,
@@ -48,7 +48,7 @@ impl BasicErrorHandler {
                 );
                 Ok(ErrorAction::ContinueToNext)
             }
-            BasicErrorStrategy::Retry { max_attempts, .. } => {
+            ErrorStrategy::Retry { max_attempts, .. } => {
                 if step_result.retry_count < *max_attempts {
                     debug!(
                         "Step '{}' failed, will retry (attempt {}/{})",
@@ -72,7 +72,7 @@ impl BasicErrorHandler {
     pub async fn analyze_workflow_error(
         &self,
         error: &LLMSpellError,
-        completed_steps: &[BasicStepResult],
+        completed_steps: &[StepResult],
         remaining_steps: usize,
     ) -> Result<WorkflowErrorAnalysis> {
         let error_type = match error {
@@ -117,12 +117,12 @@ impl BasicErrorHandler {
     /// Calculate retry delay based on strategy and attempt count
     pub fn calculate_retry_delay(
         &self,
-        strategy: &BasicErrorStrategy,
+        strategy: &ErrorStrategy,
         attempt: u32,
         exponential_backoff: bool,
     ) -> Duration {
         match strategy {
-            BasicErrorStrategy::Retry { backoff_ms, .. } => {
+            ErrorStrategy::Retry { backoff_ms, .. } => {
                 if exponential_backoff {
                     Duration::from_millis(backoff_ms * 2_u64.pow(attempt))
                 } else {
@@ -245,9 +245,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_fail_fast_strategy() {
-        let handler = BasicErrorHandler::new(BasicErrorStrategy::FailFast);
+        let handler = ErrorHandler::new(ErrorStrategy::FailFast);
 
-        let failed_result = BasicStepResult::failure(
+        let failed_result = StepResult::failure(
             ComponentId::new(),
             "test_step".to_string(),
             "Test failure".to_string(),
@@ -264,9 +264,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_continue_strategy() {
-        let handler = BasicErrorHandler::new(BasicErrorStrategy::Continue);
+        let handler = ErrorHandler::new(ErrorStrategy::Continue);
 
-        let failed_result = BasicStepResult::failure(
+        let failed_result = StepResult::failure(
             ComponentId::new(),
             "test_step".to_string(),
             "Test failure".to_string(),
@@ -283,13 +283,13 @@ mod tests {
 
     #[tokio::test]
     async fn test_retry_strategy() {
-        let handler = BasicErrorHandler::new(BasicErrorStrategy::Retry {
+        let handler = ErrorHandler::new(ErrorStrategy::Retry {
             max_attempts: 3,
             backoff_ms: 1000,
         });
 
         // First failure - should retry
-        let failed_result_retry = BasicStepResult::failure(
+        let failed_result_retry = StepResult::failure(
             ComponentId::new(),
             "test_step".to_string(),
             "Test failure".to_string(),
@@ -304,7 +304,7 @@ mod tests {
         assert_eq!(action, ErrorAction::RetryStep);
 
         // Max retries reached - should stop
-        let failed_result_max = BasicStepResult::failure(
+        let failed_result_max = StepResult::failure(
             ComponentId::new(),
             "test_step".to_string(),
             "Test failure".to_string(),
@@ -321,8 +321,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_retry_delay_calculation() {
-        let handler = BasicErrorHandler::new(BasicErrorStrategy::FailFast);
-        let strategy = BasicErrorStrategy::Retry {
+        let handler = ErrorHandler::new(ErrorStrategy::FailFast);
+        let strategy = ErrorStrategy::Retry {
             max_attempts: 3,
             backoff_ms: 1000,
         };
@@ -343,7 +343,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_workflow_error_analysis() {
-        let handler = BasicErrorHandler::new(BasicErrorStrategy::FailFast);
+        let handler = ErrorHandler::new(ErrorStrategy::FailFast);
 
         let timeout_error = LLMSpellError::Timeout {
             message: "Workflow timed out".to_string(),
@@ -351,13 +351,13 @@ mod tests {
         };
 
         let completed_steps = vec![
-            BasicStepResult::success(
+            StepResult::success(
                 ComponentId::new(),
                 "step1".to_string(),
                 "success".to_string(),
                 Duration::from_secs(1),
             ),
-            BasicStepResult::failure(
+            StepResult::failure(
                 ComponentId::new(),
                 "step2".to_string(),
                 "failure".to_string(),

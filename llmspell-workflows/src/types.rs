@@ -1,14 +1,14 @@
-//! ABOUTME: Basic workflow types for input/output and state management
-//! ABOUTME: Provides simplified types for memory-based workflow execution
+//! ABOUTME: Workflow types for input/output and state management
+//! ABOUTME: Provides types for memory-based workflow execution
 
 use llmspell_core::ComponentId;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
 
-/// Basic workflow input containing initial data and configuration
+/// Workflow input containing initial data and configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BasicWorkflowInput {
+pub struct WorkflowInput {
     /// Initial input data for the workflow
     pub input: serde_json::Value,
     /// Optional context variables
@@ -17,7 +17,7 @@ pub struct BasicWorkflowInput {
     pub timeout: Option<Duration>,
 }
 
-impl BasicWorkflowInput {
+impl WorkflowInput {
     pub fn new(input: serde_json::Value) -> Self {
         Self {
             input,
@@ -37,9 +37,9 @@ impl BasicWorkflowInput {
     }
 }
 
-/// Basic workflow output containing results and metadata
+/// Workflow output containing results and metadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BasicWorkflowOutput {
+pub struct WorkflowOutput {
     /// Final output data from the workflow
     pub output: serde_json::Value,
     /// Success status
@@ -56,7 +56,7 @@ pub struct BasicWorkflowOutput {
     pub error: Option<String>,
 }
 
-impl BasicWorkflowOutput {
+impl WorkflowOutput {
     pub fn success(
         output: serde_json::Value,
         duration: Duration,
@@ -93,9 +93,9 @@ impl BasicWorkflowOutput {
     }
 }
 
-/// Memory-based workflow state for basic workflows
+/// Memory-based workflow state
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BasicWorkflowState {
+pub struct WorkflowState {
     /// Workflow execution ID
     pub execution_id: ComponentId,
     /// Current step index
@@ -112,7 +112,7 @@ pub struct BasicWorkflowState {
     pub last_update: Instant,
 }
 
-impl BasicWorkflowState {
+impl WorkflowState {
     pub fn new() -> Self {
         Self {
             execution_id: ComponentId::new(),
@@ -166,7 +166,7 @@ impl BasicWorkflowState {
     }
 }
 
-impl Default for BasicWorkflowState {
+impl Default for WorkflowState {
     fn default() -> Self {
         Self {
             execution_id: ComponentId::new(),
@@ -179,9 +179,9 @@ impl Default for BasicWorkflowState {
     }
 }
 
-/// Basic workflow configuration
+/// Workflow configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BasicWorkflowConfig {
+pub struct WorkflowConfig {
     /// Maximum execution time for the entire workflow
     pub max_execution_time: Option<Duration>,
     /// Default timeout for individual steps
@@ -194,9 +194,11 @@ pub struct BasicWorkflowConfig {
     pub exponential_backoff: bool,
     /// Whether to continue execution after step failures
     pub continue_on_error: bool,
+    /// Default error handling strategy
+    pub default_error_strategy: crate::traits::ErrorStrategy,
 }
 
-impl Default for BasicWorkflowConfig {
+impl Default for WorkflowConfig {
     fn default() -> Self {
         Self {
             max_execution_time: Some(Duration::from_secs(300)), // 5 minutes
@@ -205,6 +207,7 @@ impl Default for BasicWorkflowConfig {
             retry_delay_ms: 1000, // 1 second base delay
             exponential_backoff: true,
             continue_on_error: false,
+            default_error_strategy: crate::traits::ErrorStrategy::FailFast,
         }
     }
 }
@@ -213,7 +216,7 @@ impl Default for BasicWorkflowConfig {
 #[derive(Debug, Clone)]
 pub struct StepExecutionContext {
     /// Reference to workflow state
-    pub workflow_state: BasicWorkflowState,
+    pub workflow_state: WorkflowState,
     /// Step-specific timeout
     pub timeout: Option<Duration>,
     /// Current retry attempt (0 for first attempt)
@@ -223,7 +226,7 @@ pub struct StepExecutionContext {
 }
 
 impl StepExecutionContext {
-    pub fn new(workflow_state: BasicWorkflowState, timeout: Option<Duration>) -> Self {
+    pub fn new(workflow_state: WorkflowState, timeout: Option<Duration>) -> Self {
         Self {
             workflow_state,
             timeout,

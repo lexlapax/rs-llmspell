@@ -1,14 +1,33 @@
 //! ABOUTME: llmspell-workflows implementation crate
 //! ABOUTME: Provides workflow patterns for orchestrating agents and tools
 
-pub mod basic;
+pub mod conditional;
+pub mod conditions;
+pub mod error_handling;
+pub mod sequential;
+pub mod state;
+pub mod step_executor;
+pub mod traits;
+pub mod types;
 
 // Re-export main functionality for convenience
-pub use basic::{
-    BasicErrorStrategy, BasicSequentialWorkflow, BasicStepResult, BasicStepType,
-    BasicWorkflowConfig, BasicWorkflowInput, BasicWorkflowOutput, BasicWorkflowState,
-    BasicWorkflowStatus, BasicWorkflowStep,
+pub use types::{
+    StepExecutionContext, WorkflowConfig, WorkflowInput, WorkflowOutput, WorkflowState,
 };
 
-// Re-export traits
-pub use basic::traits::BasicWorkflow;
+pub use traits::{ErrorStrategy, StepResult, StepType, WorkflowStatus, WorkflowStep};
+
+pub use sequential::{SequentialWorkflow, SequentialWorkflowBuilder, SequentialWorkflowResult};
+
+pub use conditional::{
+    BranchExecutionResult, ConditionalBranch, ConditionalWorkflow, ConditionalWorkflowBuilder,
+    ConditionalWorkflowConfig, ConditionalWorkflowResult,
+};
+
+pub use conditions::{Condition, ConditionEvaluationContext, ConditionEvaluator, ConditionResult};
+
+pub use error_handling::{
+    ErrorAction, ErrorHandler, RecoveryAction, WorkflowErrorAnalysis, WorkflowErrorType,
+};
+pub use state::{ExecutionStats, StateManager};
+pub use step_executor::StepExecutor;

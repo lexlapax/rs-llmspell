@@ -1,8 +1,8 @@
-//! ABOUTME: Memory-based state management for basic workflows
+//! ABOUTME: Memory-based state management for workflows
 //! ABOUTME: Provides in-memory state storage and step coordination
 
-use super::traits::{BasicStepResult, BasicWorkflowStatus};
-use super::types::{BasicWorkflowConfig, BasicWorkflowState};
+use super::traits::{StepResult, WorkflowStatus};
+use super::types::{WorkflowConfig, WorkflowState};
 use llmspell_core::{ComponentId, LLMSpellError, Result};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -10,23 +10,23 @@ use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 use tracing::{debug, warn};
 
-/// Memory-based state manager for basic workflows
+/// Memory-based state manager for workflows
 #[derive(Debug, Clone)]
-pub struct BasicStateManager {
-    state: Arc<RwLock<BasicWorkflowState>>,
-    config: BasicWorkflowConfig,
-    execution_history: Arc<RwLock<Vec<BasicStepResult>>>,
-    workflow_status: Arc<RwLock<BasicWorkflowStatus>>,
+pub struct StateManager {
+    state: Arc<RwLock<WorkflowState>>,
+    config: WorkflowConfig,
+    execution_history: Arc<RwLock<Vec<StepResult>>>,
+    workflow_status: Arc<RwLock<WorkflowStatus>>,
 }
 
-impl BasicStateManager {
+impl StateManager {
     /// Create a new state manager
-    pub fn new(config: BasicWorkflowConfig) -> Self {
+    pub fn new(config: WorkflowConfig) -> Self {
         Self {
-            state: Arc::new(RwLock::new(BasicWorkflowState::new())),
+            state: Arc::new(RwLock::new(WorkflowState::new())),
             config,
             execution_history: Arc::new(RwLock::new(Vec::new())),
-            workflow_status: Arc::new(RwLock::new(BasicWorkflowStatus::Pending)),
+            workflow_status: Arc::new(RwLock::new(WorkflowStatus::Pending)),
         }
     }
 
@@ -52,7 +52,7 @@ impl BasicStateManager {
                     step: None,
                     source: None,
                 })?;
-            *status = BasicWorkflowStatus::Running;
+            *status = WorkflowStatus::Running;
         }
 
         Ok(())
@@ -72,9 +72,9 @@ impl BasicStateManager {
             })?;
 
         *status = if success {
-            BasicWorkflowStatus::Completed
+            WorkflowStatus::Completed
         } else {
-            BasicWorkflowStatus::Failed
+            WorkflowStatus::Failed
         };
 
         Ok(())
@@ -93,13 +93,13 @@ impl BasicStateManager {
                 source: None,
             })?;
 
-        *status = BasicWorkflowStatus::Cancelled;
+        *status = WorkflowStatus::Cancelled;
 
         Ok(())
     }
 
     /// Get current workflow status
-    pub async fn get_status(&self) -> Result<BasicWorkflowStatus> {
+    pub async fn get_status(&self) -> Result<WorkflowStatus> {
         let status = self
             .workflow_status
             .read()
@@ -199,7 +199,7 @@ impl BasicStateManager {
     }
 
     /// Record step execution result
-    pub async fn record_step_result(&self, result: BasicStepResult) -> Result<()> {
+    pub async fn record_step_result(&self, result: StepResult) -> Result<()> {
         // Store step output if successful
         if result.success {
             let output_value = serde_json::json!(result.output);
@@ -229,7 +229,7 @@ impl BasicStateManager {
     }
 
     /// Get execution history
-    pub async fn get_execution_history(&self) -> Result<Vec<BasicStepResult>> {
+    pub async fn get_execution_history(&self) -> Result<Vec<StepResult>> {
         let history = self
             .execution_history
             .read()
@@ -345,14 +345,14 @@ impl BasicStateManager {
                     step: None,
                     source: None,
                 })?;
-            *status = BasicWorkflowStatus::Pending;
+            *status = WorkflowStatus::Pending;
         }
 
         Ok(())
     }
 
     /// Get a snapshot of the current state
-    pub async fn get_state_snapshot(&self) -> Result<BasicWorkflowState> {
+    pub async fn get_state_snapshot(&self) -> Result<WorkflowState> {
         let state = self.state.read().map_err(|e| LLMSpellError::Workflow {
             message: format!("Failed to acquire state lock: {}", e),
             step: None,
@@ -423,35 +423,29 @@ mod tests {
 
     #[tokio::test]
     async fn test_state_manager_lifecycle() {
-        let config = BasicWorkflowConfig::default();
-        let manager = BasicStateManager::new(config);
+        let config = WorkflowConfig::default();
+        let manager = StateManager::new(config);
 
         // Initial state
-        assert_eq!(
-            manager.get_status().await.unwrap(),
-            BasicWorkflowStatus::Pending
-        );
+        assert_eq!(manager.get_status().await.unwrap(), WorkflowStatus::Pending);
         assert_eq!(manager.get_current_step().await.unwrap(), 0);
 
         // Start execution
         manager.start_execution().await.unwrap();
-        assert_eq!(
-            manager.get_status().await.unwrap(),
-            BasicWorkflowStatus::Running
-        );
+        assert_eq!(manager.get_status().await.unwrap(), WorkflowStatus::Running);
 
         // Complete execution
         manager.complete_execution(true).await.unwrap();
         assert_eq!(
             manager.get_status().await.unwrap(),
-            BasicWorkflowStatus::Completed
+            WorkflowStatus::Completed
         );
     }
 
     #[tokio::test]
     async fn test_shared_data_management() {
-        let config = BasicWorkflowConfig::default();
-        let manager = BasicStateManager::new(config);
+        let config = WorkflowConfig::default();
+        let manager = StateManager::new(config);
 
         // Set shared data
         let test_value = serde_json::json!({"test": "value"});
@@ -476,11 +470,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_step_execution_tracking() {
-        let config = BasicWorkflowConfig::default();
-        let manager = BasicStateManager::new(config);
+        let config = WorkflowConfig::default();
+        let manager = StateManager::new(config);
 
         let step_id = ComponentId::new();
-        let result = BasicStepResult::success(
+        let result = StepResult::success(
             step_id,
             "test_step".to_string(),
             "test output".to_string(),
@@ -503,18 +497,18 @@ mod tests {
 
     #[tokio::test]
     async fn test_execution_statistics() {
-        let config = BasicWorkflowConfig::default();
-        let manager = BasicStateManager::new(config);
+        let config = WorkflowConfig::default();
+        let manager = StateManager::new(config);
 
         // Record some results
-        let step1 = BasicStepResult::success(
+        let step1 = StepResult::success(
             ComponentId::new(),
             "step1".to_string(),
             "output1".to_string(),
             Duration::from_secs(1),
         );
 
-        let step2 = BasicStepResult::failure(
+        let step2 = StepResult::failure(
             ComponentId::new(),
             "step2".to_string(),
             "error".to_string(),
@@ -537,8 +531,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_state_reset() {
-        let config = BasicWorkflowConfig::default();
-        let manager = BasicStateManager::new(config);
+        let config = WorkflowConfig::default();
+        let manager = StateManager::new(config);
 
         // Set some state
         manager.start_execution().await.unwrap();
@@ -548,7 +542,7 @@ mod tests {
             .await
             .unwrap();
 
-        let result = BasicStepResult::success(
+        let result = StepResult::success(
             ComponentId::new(),
             "test".to_string(),
             "output".to_string(),
@@ -560,10 +554,7 @@ mod tests {
         manager.reset().await.unwrap();
 
         // Check everything is reset
-        assert_eq!(
-            manager.get_status().await.unwrap(),
-            BasicWorkflowStatus::Pending
-        );
+        assert_eq!(manager.get_status().await.unwrap(), WorkflowStatus::Pending);
         assert_eq!(manager.get_current_step().await.unwrap(), 0);
         assert!(manager.get_all_shared_data().await.unwrap().is_empty());
         assert!(manager.get_execution_history().await.unwrap().is_empty());

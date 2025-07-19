@@ -1,30 +1,30 @@
 //! ABOUTME: Step execution engine for basic workflows
 //! ABOUTME: Handles individual step execution with timeout, retry, and error handling
 
-use super::traits::{BasicErrorStrategy, BasicStepResult, BasicStepType, BasicWorkflowStep};
-use super::types::{BasicWorkflowConfig, StepExecutionContext};
+use super::traits::{ErrorStrategy, StepResult, StepType, WorkflowStep};
+use super::types::{StepExecutionContext, WorkflowConfig};
 use llmspell_core::{ComponentId, LLMSpellError, Result};
 use std::time::{Duration, Instant};
 use tokio::time::timeout;
 use tracing::{debug, error, warn};
 
 /// Basic step executor for workflow steps
-pub struct BasicStepExecutor {
-    config: BasicWorkflowConfig,
+pub struct StepExecutor {
+    config: WorkflowConfig,
 }
 
-impl BasicStepExecutor {
+impl StepExecutor {
     /// Create a new step executor with configuration
-    pub fn new(config: BasicWorkflowConfig) -> Self {
+    pub fn new(config: WorkflowConfig) -> Self {
         Self { config }
     }
 
     /// Execute a single step with retry logic
     pub async fn execute_step(
         &self,
-        step: &BasicWorkflowStep,
+        step: &WorkflowStep,
         context: StepExecutionContext,
-    ) -> Result<BasicStepResult> {
+    ) -> Result<StepResult> {
         let start_time = Instant::now();
         let step_timeout = step.timeout.unwrap_or(self.config.default_step_timeout);
 
@@ -44,7 +44,7 @@ impl BasicStepExecutor {
                     "Step '{}' completed successfully in {:?}",
                     step.name, duration
                 );
-                Ok(BasicStepResult::success(
+                Ok(StepResult::success(
                     step.id,
                     step.name.clone(),
                     output,
@@ -56,7 +56,7 @@ impl BasicStepExecutor {
                     "Step '{}' failed: {} (duration: {:?})",
                     step.name, err, duration
                 );
-                Ok(BasicStepResult::failure(
+                Ok(StepResult::failure(
                     step.id,
                     step.name.clone(),
                     err.to_string(),
@@ -66,7 +66,7 @@ impl BasicStepExecutor {
             }
             Err(_) => {
                 error!("Step '{}' timed out after {:?}", step.name, step_timeout);
-                Ok(BasicStepResult::failure(
+                Ok(StepResult::failure(
                     step.id,
                     step.name.clone(),
                     format!("Step timed out after {:?}", step_timeout),
@@ -80,12 +80,12 @@ impl BasicStepExecutor {
     /// Execute a step with retry logic
     pub async fn execute_step_with_retry(
         &self,
-        step: &BasicWorkflowStep,
+        step: &WorkflowStep,
         mut context: StepExecutionContext,
-        error_strategy: &BasicErrorStrategy,
-    ) -> Result<BasicStepResult> {
+        error_strategy: &ErrorStrategy,
+    ) -> Result<StepResult> {
         let max_attempts = match error_strategy {
-            BasicErrorStrategy::Retry { max_attempts, .. } => *max_attempts,
+            ErrorStrategy::Retry { max_attempts, .. } => *max_attempts,
             _ => 1, // No retry for other strategies
         };
 
@@ -111,7 +111,7 @@ impl BasicStepExecutor {
 
             // Don't wait after the last attempt
             if attempt < max_attempts - 1 {
-                if let BasicErrorStrategy::Retry { backoff_ms, .. } = error_strategy {
+                if let ErrorStrategy::Retry { backoff_ms, .. } = error_strategy {
                     let delay = if self.config.exponential_backoff {
                         Duration::from_millis(backoff_ms * 2_u64.pow(attempt))
                     } else {
@@ -134,18 +134,18 @@ impl BasicStepExecutor {
     /// Internal step execution logic
     async fn execute_step_internal(
         &self,
-        step: &BasicWorkflowStep,
+        step: &WorkflowStep,
         context: &StepExecutionContext,
     ) -> Result<String> {
         match &step.step_type {
-            BasicStepType::Tool {
+            StepType::Tool {
                 tool_name,
                 parameters,
             } => self.execute_tool_step(tool_name, parameters, context).await,
-            BasicStepType::Agent { agent_id, input } => {
+            StepType::Agent { agent_id, input } => {
                 self.execute_agent_step(*agent_id, input, context).await
             }
-            BasicStepType::Custom {
+            StepType::Custom {
                 function_name,
                 parameters,
             } => {
@@ -288,22 +288,22 @@ impl BasicStepExecutor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::basic::types::BasicWorkflowState;
+    use crate::types::WorkflowState;
 
     #[tokio::test]
     async fn test_step_executor_tool_execution() {
-        let config = BasicWorkflowConfig::default();
-        let executor = BasicStepExecutor::new(config);
+        let config = WorkflowConfig::default();
+        let executor = StepExecutor::new(config);
 
-        let step = BasicWorkflowStep::new(
+        let step = WorkflowStep::new(
             "calculator_test".to_string(),
-            BasicStepType::Tool {
+            StepType::Tool {
                 tool_name: "calculator".to_string(),
                 parameters: serde_json::json!({"expression": "2 + 2"}),
             },
         );
 
-        let context = StepExecutionContext::new(BasicWorkflowState::new(), None);
+        let context = StepExecutionContext::new(WorkflowState::new(), None);
         let result = executor.execute_step(&step, context).await.unwrap();
 
         assert!(result.success);
@@ -313,19 +313,19 @@ mod tests {
 
     #[tokio::test]
     async fn test_step_executor_agent_execution() {
-        let config = BasicWorkflowConfig::default();
-        let executor = BasicStepExecutor::new(config);
+        let config = WorkflowConfig::default();
+        let executor = StepExecutor::new(config);
 
         let agent_id = ComponentId::new();
-        let step = BasicWorkflowStep::new(
+        let step = WorkflowStep::new(
             "agent_test".to_string(),
-            BasicStepType::Agent {
+            StepType::Agent {
                 agent_id,
                 input: "Process this data".to_string(),
             },
         );
 
-        let context = StepExecutionContext::new(BasicWorkflowState::new(), None);
+        let context = StepExecutionContext::new(WorkflowState::new(), None);
         let result = executor.execute_step(&step, context).await.unwrap();
 
         assert!(result.success);
@@ -335,18 +335,18 @@ mod tests {
 
     #[tokio::test]
     async fn test_step_executor_custom_execution() {
-        let config = BasicWorkflowConfig::default();
-        let executor = BasicStepExecutor::new(config);
+        let config = WorkflowConfig::default();
+        let executor = StepExecutor::new(config);
 
-        let step = BasicWorkflowStep::new(
+        let step = WorkflowStep::new(
             "custom_test".to_string(),
-            BasicStepType::Custom {
+            StepType::Custom {
                 function_name: "data_transform".to_string(),
                 parameters: serde_json::json!({"type": "normalize"}),
             },
         );
 
-        let context = StepExecutionContext::new(BasicWorkflowState::new(), None);
+        let context = StepExecutionContext::new(WorkflowState::new(), None);
         let result = executor.execute_step(&step, context).await.unwrap();
 
         assert!(result.success);
@@ -355,21 +355,21 @@ mod tests {
 
     #[tokio::test]
     async fn test_step_executor_with_retry() {
-        let mut config = BasicWorkflowConfig::default();
+        let mut config = WorkflowConfig::default();
         config.exponential_backoff = false; // Use fixed delay for faster test
-        let executor = BasicStepExecutor::new(config);
+        let executor = StepExecutor::new(config);
 
         // Create a step that will fail (empty tool name)
-        let step = BasicWorkflowStep::new(
+        let step = WorkflowStep::new(
             "failing_test".to_string(),
-            BasicStepType::Tool {
+            StepType::Tool {
                 tool_name: "".to_string(), // This will cause failure
                 parameters: serde_json::json!({}),
             },
         );
 
-        let context = StepExecutionContext::new(BasicWorkflowState::new(), None);
-        let error_strategy = BasicErrorStrategy::Retry {
+        let context = StepExecutionContext::new(WorkflowState::new(), None);
+        let error_strategy = ErrorStrategy::Retry {
             max_attempts: 3,
             backoff_ms: 10, // Short delay for test
         };
@@ -386,19 +386,19 @@ mod tests {
 
     #[tokio::test]
     async fn test_step_executor_timeout() {
-        let config = BasicWorkflowConfig::default();
-        let executor = BasicStepExecutor::new(config);
+        let config = WorkflowConfig::default();
+        let executor = StepExecutor::new(config);
 
-        let step = BasicWorkflowStep::new(
+        let step = WorkflowStep::new(
             "timeout_test".to_string(),
-            BasicStepType::Custom {
+            StepType::Custom {
                 function_name: "slow_function".to_string(),
                 parameters: serde_json::json!({}),
             },
         )
         .with_timeout(Duration::from_millis(1)); // Very short timeout
 
-        let context = StepExecutionContext::new(BasicWorkflowState::new(), None);
+        let context = StepExecutionContext::new(WorkflowState::new(), None);
         let result = executor.execute_step(&step, context).await.unwrap();
 
         assert!(!result.success);

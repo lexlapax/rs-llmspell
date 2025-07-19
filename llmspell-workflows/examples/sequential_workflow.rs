@@ -1,14 +1,10 @@
-//! Basic sequential workflow example
+//! Sequential workflow example
 //!
-//! This example demonstrates how to create and execute a basic sequential workflow
+//! This example demonstrates how to create and execute a sequential workflow
 //! that processes data through multiple steps in order.
 
 use llmspell_workflows::{
-    basic::{
-        BasicErrorStrategy, BasicSequentialWorkflow, BasicStepType, BasicWorkflowConfig,
-        BasicWorkflowStep,
-    },
-    BasicWorkflow,
+    ErrorStrategy, SequentialWorkflow, StepType, WorkflowConfig, WorkflowStep,
 };
 use std::time::Duration;
 
@@ -17,23 +13,20 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize tracing for logging
     tracing_subscriber::fmt::init();
 
-    println!("🚀 Starting Basic Sequential Workflow Example");
+    println!("🚀 Starting Sequential Workflow Example");
 
     // Create workflow configuration
-    let mut config = BasicWorkflowConfig::default();
+    let mut config = WorkflowConfig::default();
     config.max_execution_time = Some(Duration::from_secs(60));
     config.default_step_timeout = Duration::from_secs(10);
     config.continue_on_error = false; // Fail fast for this example
 
-    // Create the workflow
-    let mut workflow = BasicSequentialWorkflow::new("data_processing_pipeline".to_string(), config);
-
     println!("📋 Creating workflow steps...");
 
     // Step 1: Load data
-    let load_step = BasicWorkflowStep::new(
+    let load_step = WorkflowStep::new(
         "load_data".to_string(),
-        BasicStepType::Tool {
+        StepType::Tool {
             tool_name: "file_operations".to_string(),
             parameters: serde_json::json!({
                 "operation": "read",
@@ -44,9 +37,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .with_timeout(Duration::from_secs(5));
 
     // Step 2: Validate data
-    let validate_step = BasicWorkflowStep::new(
+    let validate_step = WorkflowStep::new(
         "validate_data".to_string(),
-        BasicStepType::Custom {
+        StepType::Custom {
             function_name: "validation".to_string(),
             parameters: serde_json::json!({
                 "schema": "data_schema.json",
@@ -57,9 +50,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .with_retry(2);
 
     // Step 3: Transform data
-    let transform_step = BasicWorkflowStep::new(
+    let transform_step = WorkflowStep::new(
         "transform_data".to_string(),
-        BasicStepType::Tool {
+        StepType::Tool {
             tool_name: "json_processor".to_string(),
             parameters: serde_json::json!({
                 "operation": "transform",
@@ -70,9 +63,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     .with_timeout(Duration::from_secs(15));
 
     // Step 4: Aggregate results
-    let aggregate_step = BasicWorkflowStep::new(
+    let aggregate_step = WorkflowStep::new(
         "aggregate_results".to_string(),
-        BasicStepType::Custom {
+        StepType::Custom {
             function_name: "aggregation".to_string(),
             parameters: serde_json::json!({
                 "type": "sum",
@@ -82,9 +75,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
 
     // Step 5: Save results
-    let save_step = BasicWorkflowStep::new(
+    let save_step = WorkflowStep::new(
         "save_results".to_string(),
-        BasicStepType::Tool {
+        StepType::Tool {
             tool_name: "file_operations".to_string(),
             parameters: serde_json::json!({
                 "operation": "write",
@@ -93,19 +86,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
     );
 
-    // Add all steps to the workflow
-    workflow.add_step(load_step).await?;
-    workflow.add_step(validate_step).await?;
-    workflow.add_step(transform_step).await?;
-    workflow.add_step(aggregate_step).await?;
-    workflow.add_step(save_step).await?;
+    // Create the workflow with all steps
+    let workflow = SequentialWorkflow::builder("data_processing_pipeline".to_string())
+        .with_config(config)
+        .add_step(load_step)
+        .add_step(validate_step)
+        .add_step(transform_step)
+        .add_step(aggregate_step)
+        .add_step(save_step)
+        .build();
 
     println!("✅ Added {} steps to workflow", workflow.step_count());
-
-    // Validate the workflow before execution
-    println!("🔍 Validating workflow...");
-    workflow.validate().await?;
-    println!("✅ Workflow validation passed");
 
     // Set some initial shared data
     workflow
@@ -123,62 +114,61 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let start_time = std::time::Instant::now();
 
     match workflow.execute().await {
-        Ok(results) => {
+        Ok(result) => {
             let execution_time = start_time.elapsed();
             println!("🎉 Workflow completed successfully in {:?}", execution_time);
-            println!("📊 Step Results:");
+            println!("📊 Workflow Report:");
+            println!("{}", result.generate_report());
 
-            for (index, result) in results.iter().enumerate() {
-                let status = if result.success { "✅" } else { "❌" };
+            println!("\n📋 Step Details:");
+            for (index, step_result) in result.successful_steps.iter().enumerate() {
                 println!(
-                    "  {}. {} {} - Duration: {:?}",
+                    "  {}. ✅ {} - Duration: {:?}",
                     index + 1,
-                    status,
-                    result.step_name,
-                    result.duration
+                    step_result.step_name,
+                    step_result.duration
                 );
+            }
 
-                if !result.success {
-                    if let Some(error) = &result.error {
-                        println!("     Error: {}", error);
-                    }
-                    if result.retry_count > 0 {
-                        println!("     Retries: {}", result.retry_count);
-                    }
+            for (index, step_result) in result.failed_steps.iter().enumerate() {
+                println!(
+                    "  {}. ❌ {} - Duration: {:?}",
+                    index + 1 + result.successful_steps.len(),
+                    step_result.step_name,
+                    step_result.duration
+                );
+                if let Some(error) = &step_result.error {
+                    println!("     Error: {}", error);
+                }
+                if step_result.retry_count > 0 {
+                    println!("     Retries: {}", step_result.retry_count);
                 }
             }
 
             // Show execution statistics
             println!("\n📈 Execution Statistics:");
-            let stats = workflow.get_stats().await?;
+            let stats = workflow.get_execution_stats().await?;
             println!("{}", stats.generate_report());
 
             // Show final shared data
             println!("\n💾 Final Shared Data:");
-            let state_snapshot = workflow.get_state_snapshot().await?;
-            for (key, value) in &state_snapshot.shared_data {
-                println!("  {}: {}", key, value);
+            let batch_id = workflow.get_shared_data("batch_id").await?;
+            let timestamp = workflow.get_shared_data("timestamp").await?;
+            if let Some(id) = batch_id {
+                println!("  batch_id: {}", id);
+            }
+            if let Some(ts) = timestamp {
+                println!("  timestamp: {}", ts);
             }
         }
         Err(error) => {
             let execution_time = start_time.elapsed();
             println!("❌ Workflow failed after {:?}: {}", execution_time, error);
 
-            // Show partial results
-            let results = workflow.get_results().await?;
-            if !results.is_empty() {
-                println!("\n📊 Partial Results (before failure):");
-                for (index, result) in results.iter().enumerate() {
-                    let status = if result.success { "✅" } else { "❌" };
-                    println!(
-                        "  {}. {} {} - Duration: {:?}",
-                        index + 1,
-                        status,
-                        result.step_name,
-                        result.duration
-                    );
-                }
-            }
+            // Show execution statistics even on failure
+            let stats = workflow.get_execution_stats().await?;
+            println!("\n📈 Partial Execution Statistics:");
+            println!("{}", stats.generate_report());
 
             return Err(error.into());
         }
@@ -193,22 +183,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 async fn example_with_retry_strategy() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n🔄 Example: Workflow with Retry Strategy");
 
-    let config = BasicWorkflowConfig::default();
-    let error_strategy = BasicErrorStrategy::Retry {
+    let config = WorkflowConfig::default();
+    let error_strategy = ErrorStrategy::Retry {
         max_attempts: 3,
         backoff_ms: 1000,
     };
 
-    let mut workflow = BasicSequentialWorkflow::with_error_strategy(
-        "retry_example".to_string(),
-        config,
-        error_strategy,
-    );
-
     // Add a potentially failing step
-    let unstable_step = BasicWorkflowStep::new(
+    let unstable_step = WorkflowStep::new(
         "unstable_operation".to_string(),
-        BasicStepType::Tool {
+        StepType::Tool {
             tool_name: "unreliable_service".to_string(),
             parameters: serde_json::json!({
                 "operation": "fetch_data",
@@ -218,14 +202,21 @@ async fn example_with_retry_strategy() -> Result<(), Box<dyn std::error::Error>>
     )
     .with_retry(3);
 
-    workflow.add_step(unstable_step).await?;
+    let workflow = SequentialWorkflow::builder("retry_example".to_string())
+        .with_config(config)
+        .with_error_strategy(error_strategy)
+        .add_step(unstable_step)
+        .build();
 
     match workflow.execute().await {
-        Ok(results) => {
+        Ok(result) => {
             println!("✅ Workflow with retry completed");
-            if let Some(result) = results.first() {
-                if result.retry_count > 0 {
-                    println!("🔄 Step succeeded after {} retries", result.retry_count);
+            if let Some(step_result) = result.successful_steps.first() {
+                if step_result.retry_count > 0 {
+                    println!(
+                        "🔄 Step succeeded after {} retries",
+                        step_result.retry_count
+                    );
                 }
             }
         }
@@ -242,10 +233,8 @@ async fn example_with_retry_strategy() -> Result<(), Box<dyn std::error::Error>>
 async fn example_with_continue_strategy() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n🚧 Example: Workflow with Continue-on-Error Strategy");
 
-    let mut config = BasicWorkflowConfig::default();
+    let mut config = WorkflowConfig::default();
     config.continue_on_error = true;
-
-    let mut workflow = BasicSequentialWorkflow::new("resilient_workflow".to_string(), config);
 
     // Add steps, some of which might fail
     let steps = vec![
@@ -262,23 +251,33 @@ async fn example_with_continue_strategy() -> Result<(), Box<dyn std::error::Erro
         ),
     ];
 
+    let mut workflow_builder = SequentialWorkflow::builder("resilient_workflow".to_string())
+        .with_config(config)
+        .with_error_strategy(ErrorStrategy::Continue);
+
     for (name, tool, params) in steps {
-        let step = BasicWorkflowStep::new(
+        let step = WorkflowStep::new(
             name.to_string(),
-            BasicStepType::Tool {
+            StepType::Tool {
                 tool_name: tool.to_string(),
                 parameters: params,
             },
         );
-        workflow.add_step(step).await?;
+        workflow_builder = workflow_builder.add_step(step);
     }
 
-    let results = workflow.execute().await?;
-    let successful = results.iter().filter(|r| r.success).count();
-    let failed = results.len() - successful;
+    let workflow = workflow_builder.build();
+    let result = workflow.execute().await?;
 
-    println!("📊 Results: {} successful, {} failed", successful, failed);
-    println!("🎯 Workflow completed despite {} failures", failed);
+    println!(
+        "📊 Results: {} successful, {} failed",
+        result.successful_steps.len(),
+        result.failed_steps.len()
+    );
+    println!(
+        "🎯 Workflow completed despite {} failures",
+        result.failed_steps.len()
+    );
 
     Ok(())
 }

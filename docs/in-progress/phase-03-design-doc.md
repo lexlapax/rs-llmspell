@@ -2579,23 +2579,38 @@ let data_pipeline = PipelineComposition {
 
 Basic workflow patterns that leverage current Phase 3 infrastructure without requiring persistent state, hooks, or sessions from later phases.
 
-#### 10.1 Basic Workflow Traits
+#### 10.1 Workflow Architecture (Flat Structure)
 
+**File Structure** (Refactored to flat hierarchy):
+```
+llmspell-workflows/src/
+├── lib.rs               # Public API exports
+├── traits.rs            # Core traits (ErrorStrategy, StepResult, etc.)
+├── types.rs             # Workflow types (WorkflowConfig, WorkflowState, etc.)
+├── state.rs             # Memory-based state management
+├── step_executor.rs     # Step execution engine
+├── error_handling.rs    # Error strategies and recovery
+├── conditions.rs        # Condition evaluation for workflows
+├── sequential.rs        # Sequential workflow implementation
+└── conditional.rs       # Conditional workflow implementation
+```
+
+**Core Workflow Traits**:
 ```rust
-// llmspell-workflows/src/basic.rs
+// llmspell-workflows/src/traits.rs
 #[async_trait]
-pub trait BasicWorkflow: Send + Sync {
-    /// Unique identifier for the workflow
-    fn id(&self) -> &str;
-    
-    /// Human-readable name
+pub trait Workflow: Send + Sync {
+    /// Get workflow name
     fn name(&self) -> &str;
     
-    /// Execute workflow with current infrastructure
-    async fn execute(&self, input: WorkflowInput, context: &ExecutionContext) -> Result<WorkflowOutput>;
+    /// Get workflow status
+    async fn status(&self) -> Result<WorkflowStatus>;
     
-    /// Validate workflow configuration
-    fn validate(&self) -> Result<()>;
+    /// Execute workflow
+    async fn execute(&self) -> Result<WorkflowOutput>;
+    
+    /// Reset workflow state
+    async fn reset(&self) -> Result<()>;
 }
 
 #[derive(Debug, Clone)]
@@ -2631,11 +2646,11 @@ pub enum StepStatus {
 
 ```rust
 // Simple sequential execution using tools and agents
-pub struct BasicSequentialWorkflow {
+pub struct SequentialWorkflow {
     id: String,
     name: String,
     steps: Vec<WorkflowStep>,
-    error_handling: BasicErrorStrategy,
+    error_handling: ErrorStrategy,
 }
 
 #[derive(Debug, Clone)]
@@ -2653,14 +2668,14 @@ pub enum StepType {
 }
 
 #[derive(Debug, Clone)]
-pub enum BasicErrorStrategy {
+pub enum ErrorStrategy {
     Fail,                      // Stop on first error
     Continue,                  // Skip failed steps
     Retry(usize),             // Retry failed steps
 }
 
 #[async_trait]
-impl BasicWorkflow for BasicSequentialWorkflow {
+impl Workflow for SequentialWorkflow {
     async fn execute(&self, input: WorkflowInput, context: &ExecutionContext) -> Result<WorkflowOutput> {
         let mut current_data = input.initial_data;
         let mut step_results = Vec::new();
@@ -2704,9 +2719,9 @@ impl BasicWorkflow for BasicSequentialWorkflow {
                     });
                     
                     match &self.error_handling {
-                        BasicErrorStrategy::Fail => return Err(e),
-                        BasicErrorStrategy::Continue => continue,
-                        BasicErrorStrategy::Retry(attempts) => {
+                        ErrorStrategy::Fail => return Err(e),
+                        ErrorStrategy::Continue => continue,
+                        ErrorStrategy::Retry(attempts) => {
                             // Implement basic retry logic
                             for attempt in 1..=*attempts {
                                 tokio::time::sleep(Duration::from_millis(100 * attempt as u64)).await;
@@ -2734,12 +2749,12 @@ impl BasicWorkflow for BasicSequentialWorkflow {
 
 ```rust
 // Simple conditional logic using memory-based conditions
-pub struct BasicConditionalWorkflow {
+pub struct ConditionalWorkflow {
     id: String,
     name: String,
     initial_step: String,
     steps: HashMap<String, ConditionalStep>,
-    conditions: HashMap<String, BasicCondition>,
+    conditions: HashMap<String, Condition>,
 }
 
 #[derive(Debug, Clone)]
@@ -2757,7 +2772,7 @@ pub struct ConditionalBranch {
 }
 
 #[derive(Debug, Clone)]
-pub enum BasicCondition {
+pub enum Condition {
     ValueEquals(String, Value),          // data.field == value
     ValueGreaterThan(String, f64),       // data.field > value
     ValueContains(String, String),       // data.field contains string
@@ -2765,14 +2780,14 @@ pub enum BasicCondition {
     Custom(String),                      // custom condition function
 }
 
-impl BasicCondition {
+impl Condition {
     pub fn evaluate(&self, data: &Value, step_result: &StepResult) -> Result<bool> {
         match self {
-            BasicCondition::ValueEquals(path, expected) => {
+            Condition::ValueEquals(path, expected) => {
                 let actual = self.extract_value(data, path)?;
                 Ok(actual == *expected)
             }
-            BasicCondition::ValueGreaterThan(path, threshold) => {
+            Condition::ValueGreaterThan(path, threshold) => {
                 let actual = self.extract_value(data, path)?;
                 if let Some(num) = actual.as_f64() {
                     Ok(num > *threshold)
@@ -2780,7 +2795,7 @@ impl BasicCondition {
                     Ok(false)
                 }
             }
-            BasicCondition::ValueContains(path, substring) => {
+            Condition::ValueContains(path, substring) => {
                 let actual = self.extract_value(data, path)?;
                 if let Some(text) = actual.as_str() {
                     Ok(text.contains(substring))
@@ -2788,10 +2803,10 @@ impl BasicCondition {
                     Ok(false)
                 }
             }
-            BasicCondition::ResultSuccess => {
+            Condition::ResultSuccess => {
                 Ok(matches!(step_result.status, StepStatus::Success))
             }
-            BasicCondition::Custom(func_name) => {
+            Condition::Custom(func_name) => {
                 // Custom condition evaluation
                 self.evaluate_custom_condition(func_name, data, step_result)
             }
@@ -2804,24 +2819,24 @@ impl BasicCondition {
 
 ```rust
 // Simple iteration patterns without persistent state
-pub struct BasicLoopWorkflow {
+pub struct LoopWorkflow {
     id: String,
     name: String,
-    iterator: BasicIterator,
+    iterator: Iterator,
     body_steps: Vec<WorkflowStep>,
     max_iterations: usize,
-    break_condition: Option<BasicCondition>,
+    break_condition: Option<Condition>,
 }
 
 #[derive(Debug, Clone)]
-pub enum BasicIterator {
+pub enum Iterator {
     Collection(Vec<Value>),              // Iterate over in-memory collection
     Range(usize, usize),                // Iterate over numeric range
-    WhileCondition(BasicCondition),     // While condition is true
+    WhileCondition(Condition),     // While condition is true
 }
 
 #[async_trait]
-impl BasicWorkflow for BasicLoopWorkflow {
+impl Workflow for LoopWorkflow {
     async fn execute(&self, input: WorkflowInput, context: &ExecutionContext) -> Result<WorkflowOutput> {
         let mut iterations = 0;
         let mut all_results = Vec::new();
@@ -2835,14 +2850,14 @@ impl BasicWorkflow for BasicLoopWorkflow {
             
             // Get next item
             let (should_continue, item) = match &self.iterator {
-                BasicIterator::Collection(items) => {
+                Iterator::Collection(items) => {
                     if iterations < items.len() {
                         (true, items[iterations].clone())
                     } else {
                         (false, Value::Null)
                     }
                 }
-                BasicIterator::Range(start, end) => {
+                Iterator::Range(start, end) => {
                     let current = start + iterations;
                     if current < *end {
                         (true, Value::Number(current.into()))
@@ -2850,7 +2865,7 @@ impl BasicWorkflow for BasicLoopWorkflow {
                         (false, Value::Null)
                     }
                 }
-                BasicIterator::WhileCondition(condition) => {
+                Iterator::WhileCondition(condition) => {
                     // Evaluate condition with current context
                     if iterations == 0 {
                         (true, input.initial_data.clone())
@@ -2921,12 +2936,12 @@ impl BasicWorkflow for BasicLoopWorkflow {
 
 ```rust
 // Simple parallel execution without advanced features
-pub struct BasicParallelWorkflow {
+pub struct ParallelWorkflow {
     id: String,
     name: String,
     branches: Vec<ParallelBranch>,
     max_concurrency: usize,  // Fixed at creation
-    error_handling: BasicErrorStrategy,
+    error_handling: ErrorStrategy,
 }
 
 #[derive(Debug, Clone)]
@@ -2938,7 +2953,7 @@ pub struct ParallelBranch {
 }
 
 #[async_trait]
-impl BasicWorkflow for BasicParallelWorkflow {
+impl Workflow for ParallelWorkflow {
     async fn execute(&self, input: WorkflowInput, context: &ExecutionContext) -> Result<WorkflowOutput> {
         let mut branch_handles = Vec::new();
         
@@ -3008,9 +3023,9 @@ impl BasicWorkflow for BasicParallelWorkflow {
     }
 }
 
-impl BasicParallelWorkflow {
-    pub fn builder(name: &str) -> BasicParallelWorkflowBuilder {
-        BasicParallelWorkflowBuilder::new(name)
+impl ParallelWorkflow {
+    pub fn builder(name: &str) -> ParallelWorkflowBuilder {
+        ParallelWorkflowBuilder::new(name)
     }
     
     async fn execute_branch(
@@ -3056,21 +3071,21 @@ impl BasicParallelWorkflow {
     }
 }
 
-// Builder pattern for BasicParallelWorkflow
-pub struct BasicParallelWorkflowBuilder {
+// Builder pattern for ParallelWorkflow
+pub struct ParallelWorkflowBuilder {
     name: String,
     branches: Vec<ParallelBranch>,
     max_concurrency: usize,
-    error_handling: BasicErrorStrategy,
+    error_handling: ErrorStrategy,
 }
 
-impl BasicParallelWorkflowBuilder {
+impl ParallelWorkflowBuilder {
     pub fn new(name: &str) -> Self {
         Self {
             name: name.to_string(),
             branches: Vec::new(),
             max_concurrency: 10,  // Reasonable default
-            error_handling: BasicErrorStrategy::FailOnAnyError,
+            error_handling: ErrorStrategy::Fail,
         }
     }
     
@@ -3104,8 +3119,8 @@ impl BasicParallelWorkflowBuilder {
         self
     }
     
-    pub fn build(self) -> BasicParallelWorkflow {
-        BasicParallelWorkflow {
+    pub fn build(self) -> ParallelWorkflow {
+        ParallelWorkflow {
             id: uuid::Uuid::new_v4().to_string(),
             name: self.name,
             branches: self.branches,
@@ -3161,7 +3176,7 @@ impl Agent for WorkflowAgent {
 }
 
 // Workflows can use agents as steps
-impl BasicSequentialWorkflow {
+impl SequentialWorkflow {
     async fn execute_agent(
         &self,
         agent_name: &str,
