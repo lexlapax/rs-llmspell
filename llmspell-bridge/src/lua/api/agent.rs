@@ -19,6 +19,7 @@ use llmspell_core::{
     ComponentMetadata, ExecutionContext, Result,
 };
 use llmspell_providers::{ModelSpecifier, ProviderInstance};
+use mlua::Value as LuaValue;
 use mlua::{Lua, Table, UserData, UserDataMethods};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -546,6 +547,204 @@ pub fn inject_agent_api(
         .set("removeContext", remove_context_fn)
         .map_err(|e| LLMSpellError::Component {
             message: format!("Failed to set Agent.removeContext: {}", e),
+            source: None,
+        })?;
+
+    // Composition Pattern Functions
+
+    // Add Agent.wrapAsTool() function
+    let bridge_for_wrap = bridge.clone();
+    let wrap_as_tool_fn = lua
+        .create_async_function(move |_lua, args: (String, Option<Table>)| {
+            let bridge = bridge_for_wrap.clone();
+            async move {
+                let (agent_name, config_table) = args;
+
+                // Convert config table to JSON
+                let config = if let Some(table) = config_table {
+                    crate::agent_conversion::lua_value_to_json(LuaValue::Table(table))?
+                } else {
+                    serde_json::json!({})
+                };
+
+                // Wrap agent as tool
+                let tool_name = bridge
+                    .wrap_agent_as_tool(&agent_name, config)
+                    .await
+                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                Ok(tool_name)
+            }
+        })
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to create Agent.wrapAsTool function: {}", e),
+            source: None,
+        })?;
+
+    agent_table
+        .set("wrapAsTool", wrap_as_tool_fn)
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to set Agent.wrapAsTool: {}", e),
+            source: None,
+        })?;
+
+    // Add Agent.listCapabilities() function
+    let bridge_for_caps = bridge.clone();
+    let list_capabilities_fn = lua
+        .create_async_function(move |lua, _args: ()| {
+            let bridge = bridge_for_caps.clone();
+            async move {
+                let capabilities = bridge
+                    .list_agent_capabilities()
+                    .await
+                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+
+                // Convert JSON to Lua
+                let lua_value = json_to_lua_value(lua, &capabilities)?;
+                Ok(lua_value)
+            }
+        })
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to create Agent.listCapabilities function: {}", e),
+            source: None,
+        })?;
+
+    agent_table
+        .set("listCapabilities", list_capabilities_fn)
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to set Agent.listCapabilities: {}", e),
+            source: None,
+        })?;
+
+    // Add Agent.getInfo() function
+    let bridge_for_info = bridge.clone();
+    let get_info_fn = lua
+        .create_async_function(move |lua, agent_name: String| {
+            let bridge = bridge_for_info.clone();
+            async move {
+                let info = bridge
+                    .get_agent_details(&agent_name)
+                    .await
+                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+
+                // Convert JSON to Lua
+                let lua_value = json_to_lua_value(lua, &info)?;
+                Ok(lua_value)
+            }
+        })
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to create Agent.getInfo function: {}", e),
+            source: None,
+        })?;
+
+    agent_table
+        .set("getInfo", get_info_fn)
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to set Agent.getInfo: {}", e),
+            source: None,
+        })?;
+
+    // Add Agent.createComposite() function
+    let bridge_for_composite = bridge.clone();
+    let create_composite_fn = lua
+        .create_async_function(move |_lua, args: (String, Table, Option<Table>)| {
+            let bridge = bridge_for_composite.clone();
+            async move {
+                let (composite_name, delegates_table, routing_table) = args;
+
+                // Extract delegate agent names
+                let mut delegates = Vec::new();
+                for i in 1..=delegates_table.len()? {
+                    if let Ok(agent_name) = delegates_table.get::<_, String>(i) {
+                        delegates.push(agent_name);
+                    }
+                }
+
+                // Convert routing config
+                let routing_config = if let Some(table) = routing_table {
+                    crate::agent_conversion::lua_value_to_json(LuaValue::Table(table))?
+                } else {
+                    serde_json::json!({})
+                };
+
+                // Create composite agent
+                bridge
+                    .create_composite_agent(composite_name, delegates, routing_config)
+                    .await
+                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+                Ok(())
+            }
+        })
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to create Agent.createComposite function: {}", e),
+            source: None,
+        })?;
+
+    agent_table
+        .set("createComposite", create_composite_fn)
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to set Agent.createComposite: {}", e),
+            source: None,
+        })?;
+
+    // Add Agent.discoverByCapability() function
+    let bridge_for_discover = bridge.clone();
+    let discover_by_capability_fn = lua
+        .create_async_function(move |lua, capability: String| {
+            let bridge = bridge_for_discover.clone();
+            async move {
+                let agents = bridge
+                    .discover_agents_by_capability(&capability)
+                    .await
+                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+
+                // Convert to Lua table
+                let table = lua.create_table()?;
+                for (i, agent_name) in agents.iter().enumerate() {
+                    table.set(i + 1, agent_name.clone())?;
+                }
+                Ok(table)
+            }
+        })
+        .map_err(|e| LLMSpellError::Component {
+            message: format!(
+                "Failed to create Agent.discoverByCapability function: {}",
+                e
+            ),
+            source: None,
+        })?;
+
+    agent_table
+        .set("discoverByCapability", discover_by_capability_fn)
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to set Agent.discoverByCapability: {}", e),
+            source: None,
+        })?;
+
+    // Add Agent.getHierarchy() function
+    let bridge_for_hierarchy = bridge.clone();
+    let get_hierarchy_fn = lua
+        .create_async_function(move |lua, agent_name: String| {
+            let bridge = bridge_for_hierarchy.clone();
+            async move {
+                let hierarchy = bridge
+                    .get_composition_hierarchy(&agent_name)
+                    .await
+                    .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
+
+                // Convert JSON to Lua
+                let lua_value = json_to_lua_value(lua, &hierarchy)?;
+                Ok(lua_value)
+            }
+        })
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to create Agent.getHierarchy function: {}", e),
+            source: None,
+        })?;
+
+    agent_table
+        .set("getHierarchy", get_hierarchy_fn)
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to set Agent.getHierarchy: {}", e),
             source: None,
         })?;
 

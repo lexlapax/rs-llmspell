@@ -4,6 +4,7 @@
 use crate::agents::{AgentDiscovery, AgentInfo};
 use crate::ComponentRegistry;
 use llmspell_agents::lifecycle::{AgentState, AgentStateMachine};
+use llmspell_agents::monitoring::metrics::MetricAccess;
 use llmspell_agents::monitoring::{
     AgentMetrics, AlertConfig, AlertManager, EventLogger, HealthCheck, MetricRegistry,
     PerformanceMonitor,
@@ -1124,6 +1125,246 @@ impl AgentBridge {
             })?;
         Ok(())
     }
+
+    // Composition Pattern Methods
+
+    /// Wrap an agent as a tool for composition
+    pub async fn wrap_agent_as_tool(
+        &self,
+        agent_name: &str,
+        wrapper_config: serde_json::Value,
+    ) -> Result<String> {
+        // Get the agent instance
+        let agent = self
+            .get_agent(agent_name)
+            .await
+            .ok_or_else(|| LLMSpellError::Component {
+                message: format!("Agent '{}' not found", agent_name),
+                source: None,
+            })?;
+
+        // Create a unique tool name
+        let tool_name = wrapper_config
+            .get("tool_name")
+            .and_then(|v| v.as_str())
+            .unwrap_or(&format!("{}_tool", agent_name))
+            .to_string();
+
+        // Create the agent-wrapped tool
+        use llmspell_agents::agent_wrapped_tool::AgentWrappedTool;
+        use llmspell_core::traits::tool::{SecurityLevel, ToolCategory};
+
+        let wrapped_tool = AgentWrappedTool::new(
+            agent.clone(),
+            ToolCategory::Utility,
+            SecurityLevel::Restricted,
+        );
+
+        // Register the wrapped tool
+        self.registry
+            .register_tool(tool_name.clone(), Arc::new(wrapped_tool))?;
+
+        Ok(tool_name)
+    }
+
+    /// List all agents with their capabilities
+    pub async fn list_agent_capabilities(&self) -> Result<serde_json::Value> {
+        let agents = self.active_agents.read().await;
+        let mut capabilities = serde_json::Map::new();
+
+        for (name, agent) in agents.iter() {
+            let agent_info = serde_json::json!({
+                "id": agent.metadata().id.to_string(),
+                "name": agent.metadata().name.clone(),
+                "description": agent.metadata().description,
+                "config": {
+                    "system_prompt": agent.config().system_prompt,
+                    "temperature": agent.config().temperature,
+                    "max_tokens": agent.config().max_tokens,
+                },
+                "capabilities": {
+                    "supports_streaming": true,
+                    "supports_tools": true,
+                    "supports_context": true,
+                    "supports_multimodal": false, // Can be extended
+                },
+            });
+            capabilities.insert(name.clone(), agent_info);
+        }
+
+        Ok(serde_json::Value::Object(capabilities))
+    }
+
+    /// Get detailed agent information including composition metadata
+    pub async fn get_agent_details(&self, agent_name: &str) -> Result<serde_json::Value> {
+        let agent = self
+            .get_agent(agent_name)
+            .await
+            .ok_or_else(|| LLMSpellError::Component {
+                message: format!("Agent '{}' not found", agent_name),
+                source: None,
+            })?;
+
+        // Get agent's state if available
+        let state = {
+            let machines = self.state_machines.read().await;
+            if let Some(machine) = machines.get(agent_name) {
+                let current_state = machine.current_state().await;
+                Some(format!("{:?}", current_state))
+            } else {
+                None
+            }
+        };
+
+        // Get agent metrics and convert to serializable format
+        let metrics = if let Ok(agent_metrics) = self.get_agent_metrics(agent_name).await {
+            Some(serde_json::json!({
+                "agent_id": agent_metrics.agent_id,
+                "requests_total": agent_metrics.requests_total.value(),
+                "requests_failed": agent_metrics.requests_failed.value(),
+                "requests_active": agent_metrics.requests_active.value(),
+                "tool_invocations": agent_metrics.tool_invocations.value(),
+                "memory_bytes": agent_metrics.memory_bytes.value(),
+                "cpu_percent": agent_metrics.cpu_percent.value(),
+            }))
+        } else {
+            None
+        };
+
+        let info = serde_json::json!({
+            "id": agent.metadata().id.to_string(),
+            "name": agent.metadata().name.clone(),
+            "description": agent.metadata().description,
+            "state": state.unwrap_or_else(|| "Unknown".to_string()),
+            "metrics": metrics,
+            "config": {
+                "system_prompt": agent.config().system_prompt,
+                "temperature": agent.config().temperature,
+                "max_tokens": agent.config().max_tokens,
+                "max_conversation_length": agent.config().max_conversation_length,
+            },
+            "composition": {
+                "can_be_wrapped": true,
+                "supports_delegation": true,
+                "supports_nesting": true,
+            },
+        });
+
+        Ok(info)
+    }
+
+    /// Create a composite agent that delegates to multiple agents
+    pub async fn create_composite_agent(
+        &self,
+        composite_name: String,
+        delegate_agents: Vec<String>,
+        routing_config: serde_json::Value,
+    ) -> Result<()> {
+        // Verify all delegate agents exist
+        let agents = self.active_agents.read().await;
+        for agent_name in &delegate_agents {
+            if !agents.contains_key(agent_name) {
+                return Err(LLMSpellError::Component {
+                    message: format!("Delegate agent '{}' not found", agent_name),
+                    source: None,
+                });
+            }
+        }
+        drop(agents);
+
+        // For now, create a composite agent as a regular agent with metadata
+        // Full composite agent implementation will come with workflow patterns
+        let composite_config = serde_json::json!({
+            "name": composite_name.clone(),
+            "description": format!("Composite agent coordinating: {}", delegate_agents.join(", ")),
+            "agent_type": "basic",
+            "system_prompt": format!("You are a composite agent that coordinates between: {}", delegate_agents.join(", ")),
+            "delegates": delegate_agents,
+            "routing": routing_config,
+            "composite": true,
+            "allowed_tools": [],
+            "custom_config": {},
+            "resource_limits": {
+                "max_execution_time_secs": 300,
+                "max_memory_mb": 512,
+                "max_tool_calls": 100,
+                "max_recursion_depth": 10
+            }
+        });
+
+        // Create the composite agent using regular agent creation
+        // Convert config to HashMap
+        let mut config_map = HashMap::new();
+        if let Some(obj) = composite_config.as_object() {
+            for (k, v) in obj {
+                config_map.insert(k.clone(), v.clone());
+            }
+        }
+
+        self.create_agent(
+            &composite_name,
+            "basic", // Use basic agent type for now
+            config_map,
+        )
+        .await?;
+
+        Ok(())
+    }
+
+    /// Enable dynamic agent discovery by type or capability
+    pub async fn discover_agents_by_capability(&self, capability: &str) -> Result<Vec<String>> {
+        let agents = self.active_agents.read().await;
+        let mut matching_agents = Vec::new();
+
+        for (name, agent) in agents.iter() {
+            // Check various capabilities
+            match capability {
+                "streaming" => matching_agents.push(name.clone()),
+                "tools" => matching_agents.push(name.clone()),
+                "context" => matching_agents.push(name.clone()),
+                "composite" => {
+                    // Check if agent is a composite type
+                    let desc = &agent.metadata().description;
+                    if desc.contains("composite") || desc.contains("delegate") {
+                        matching_agents.push(name.clone());
+                    }
+                }
+                _ => {
+                    // Check if capability is in description or name
+                    let metadata = agent.metadata();
+                    let desc = &metadata.description;
+                    if desc.contains(capability) || metadata.name.contains(capability) {
+                        matching_agents.push(name.clone());
+                    }
+                }
+            }
+        }
+
+        Ok(matching_agents)
+    }
+
+    /// Get composition hierarchy for nested agents
+    pub async fn get_composition_hierarchy(&self, agent_name: &str) -> Result<serde_json::Value> {
+        let agent = self
+            .get_agent(agent_name)
+            .await
+            .ok_or_else(|| LLMSpellError::Component {
+                message: format!("Agent '{}' not found", agent_name),
+                source: None,
+            })?;
+
+        // Build hierarchy structure
+        let hierarchy = serde_json::json!({
+            "root": {
+                "name": agent_name,
+                "type": "agent",
+                "id": agent.metadata().id.to_string(),
+                "children": [] // Would be populated if agent has delegates
+            }
+        });
+
+        Ok(hierarchy)
+    }
 }
 
 #[cfg(test)]
@@ -1553,5 +1794,118 @@ mod tests {
 
         // Cleanup
         bridge.remove_agent("stream-test").await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_composition_patterns() {
+        let registry = Arc::new(ComponentRegistry::new());
+        let bridge = AgentBridge::new(registry);
+
+        // Create two basic agents
+        let mut config1 = HashMap::new();
+        config1.insert("name".to_string(), serde_json::json!("agent1"));
+        config1.insert("description".to_string(), serde_json::json!("Test agent 1"));
+        config1.insert("agent_type".to_string(), serde_json::json!("basic"));
+        config1.insert("allowed_tools".to_string(), serde_json::json!([]));
+        config1.insert("custom_config".to_string(), serde_json::json!({}));
+        config1.insert(
+            "resource_limits".to_string(),
+            serde_json::json!({
+                "max_execution_time_secs": 300,
+                "max_memory_mb": 512,
+                "max_tool_calls": 100,
+                "max_recursion_depth": 10
+            }),
+        );
+
+        bridge
+            .create_agent("agent1", "mock", config1)
+            .await
+            .unwrap();
+
+        let mut config2 = HashMap::new();
+        config2.insert("name".to_string(), serde_json::json!("agent2"));
+        config2.insert("description".to_string(), serde_json::json!("Test agent 2"));
+        config2.insert("agent_type".to_string(), serde_json::json!("basic"));
+        config2.insert("allowed_tools".to_string(), serde_json::json!([]));
+        config2.insert("custom_config".to_string(), serde_json::json!({}));
+        config2.insert(
+            "resource_limits".to_string(),
+            serde_json::json!({
+                "max_execution_time_secs": 300,
+                "max_memory_mb": 512,
+                "max_tool_calls": 100,
+                "max_recursion_depth": 10
+            }),
+        );
+
+        bridge
+            .create_agent("agent2", "mock", config2)
+            .await
+            .unwrap();
+
+        // Test agent capabilities listing
+        let capabilities = bridge.list_agent_capabilities().await.unwrap();
+        assert!(capabilities.is_object());
+        let caps_obj = capabilities.as_object().unwrap();
+        assert!(caps_obj.contains_key("agent1"));
+        assert!(caps_obj.contains_key("agent2"));
+
+        // Test agent info
+        let info = bridge.get_agent_details("agent1").await.unwrap();
+        assert!(info.is_object());
+        let info_obj = info.as_object().unwrap();
+        assert!(info_obj.contains_key("id"));
+        assert!(info_obj.contains_key("name"));
+        assert!(info_obj.contains_key("composition"));
+
+        // Test wrapping agent as tool
+        let tool_name = bridge
+            .wrap_agent_as_tool(
+                "agent1",
+                serde_json::json!({
+                    "tool_name": "agent1_tool",
+                    "description": "Agent 1 wrapped as tool"
+                }),
+            )
+            .await
+            .unwrap();
+        assert_eq!(tool_name, "agent1_tool");
+
+        // Verify tool was registered
+        let tools = bridge.list_tools();
+        assert!(tools.contains(&"agent1_tool".to_string()));
+
+        // Test discovery by capability
+        let streaming_agents = bridge
+            .discover_agents_by_capability("streaming")
+            .await
+            .unwrap();
+        assert_eq!(streaming_agents.len(), 2); // Both agents support streaming
+
+        // Test composite agent creation
+        bridge
+            .create_composite_agent(
+                "composite1".to_string(),
+                vec!["agent1".to_string(), "agent2".to_string()],
+                serde_json::json!({
+                    "routing_strategy": "round_robin"
+                }),
+            )
+            .await
+            .unwrap();
+
+        // Verify composite agent exists
+        let instances = bridge.list_instances().await;
+        assert!(instances.contains(&"composite1".to_string()));
+
+        // Test hierarchy retrieval
+        let hierarchy = bridge.get_composition_hierarchy("agent1").await.unwrap();
+        assert!(hierarchy.get("root").is_some());
+
+        // Cleanup
+        bridge.remove_agent("agent1").await.unwrap();
+        bridge.remove_agent("agent2").await.unwrap();
+        bridge.remove_agent("composite1").await.unwrap();
     }
 }
