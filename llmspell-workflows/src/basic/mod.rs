@@ -1,6 +1,7 @@
 //! ABOUTME: Basic workflow implementations module
 //! ABOUTME: Contains foundational workflow patterns with memory-based state management
 
+pub mod conditional;
 pub mod error_handling;
 pub mod sequential;
 pub mod state;
@@ -9,6 +10,7 @@ pub mod traits;
 pub mod types;
 
 // Re-export main types and traits for convenience
+pub use conditional::BasicConditionalWorkflow;
 pub use error_handling::{BasicErrorHandler, ErrorAction, WorkflowErrorAnalysis};
 pub use sequential::BasicSequentialWorkflow;
 pub use state::{BasicStateManager, ExecutionStats};
@@ -20,4 +22,13 @@ pub use traits::{
 pub use types::{
     BasicWorkflowConfig, BasicWorkflowInput, BasicWorkflowOutput, BasicWorkflowState,
     StepExecutionContext,
+};
+
+// Re-export conditional workflow types
+pub use conditional::{
+    conditions::BasicConditionEvaluator,
+    types::{
+        BasicCondition, BranchExecutionResult, ConditionEvaluationContext, ConditionResult,
+        ConditionalBranch, ConditionalWorkflowConfig,
+    },
 };
