@@ -59,11 +59,13 @@ async fn test_duckduckgo_real_search() {
 #[tokio::test]
 #[ignore = "external,integration"]
 async fn test_provider_fallback() {
-    let mut config = WebSearchConfig::default();
-    // Set a non-existent provider as default
-    config.default_provider = "nonexistent".to_string();
-    // Ensure DuckDuckGo is in the fallback chain
-    config.fallback_chain = vec!["nonexistent".to_string(), "duckduckgo".to_string()];
+    let config = WebSearchConfig {
+        // Set a non-existent provider as default
+        default_provider: "nonexistent".to_string(),
+        // Ensure DuckDuckGo is in the fallback chain
+        fallback_chain: vec!["nonexistent".to_string(), "duckduckgo".to_string()],
+        ..Default::default()
+    };
 
     let tool = WebSearchTool::new(config).expect("Failed to create WebSearchTool");
 

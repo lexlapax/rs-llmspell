@@ -275,7 +275,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_retry_handler_success() {
-        let handler = RetryHandler::default();
+        let handler = RetryHandler;
         let attempts = Arc::new(AtomicU32::new(0));
         let attempts_clone = Arc::clone(&attempts);
 
@@ -308,7 +308,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_retry_handler_exhausted() {
-        let handler = RetryHandler::default();
+        let handler = RetryHandler;
         let attempts = Arc::new(AtomicU32::new(0));
         let attempts_clone = Arc::clone(&attempts);
 

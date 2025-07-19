@@ -607,7 +607,7 @@ mod tests {
 
         // Create a file larger than the limit
         let mut file = NamedTempFile::new().unwrap();
-        file.write_all(&vec![0u8; 200]).unwrap();
+        file.write_all(&[0u8; 200]).unwrap();
 
         let result = validator.validate_file(file.path()).unwrap();
         assert!(!result.is_valid);

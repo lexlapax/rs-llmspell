@@ -1,7 +1,6 @@
 //! ABOUTME: Pre-defined test scenarios for common agent testing patterns
 //! ABOUTME: Provides reusable scenarios for testing agent behaviors and interactions
 
-use crate::{AgentConfig, ResourceLimits};
 use llmspell_core::{
     types::{AgentInput, AgentOutput},
     ExecutionContext,
@@ -66,7 +65,7 @@ impl TestScenarios {
             name: "Performance Scenario".to_string(),
             description: "Tests agent performance under load".to_string(),
             inputs: (0..100)
-                .map(|i| AgentInput::text(&format!("Request {}", i)))
+                .map(|i| AgentInput::text(format!("Request {}", i)))
                 .collect(),
             expected_outputs: (0..100).map(|_| ExpectedOutput::Success).collect(),
             timeout: Duration::from_secs(30),
@@ -145,13 +144,10 @@ pub struct ScenarioRunner;
 
 impl ScenarioRunner {
     /// Run a scenario against an agent
-    pub async fn run_scenario<A>(
-        agent: &A,
+    pub async fn run_scenario(
+        agent: &dyn llmspell_core::BaseAgent,
         scenario: &ScenarioConfig,
-    ) -> Result<ScenarioResult, anyhow::Error>
-    where
-        A: llmspell_core::BaseAgent,
-    {
+    ) -> Result<ScenarioResult, anyhow::Error> {
         let start = std::time::Instant::now();
         let mut results = Vec::new();
         let mut all_passed = true;

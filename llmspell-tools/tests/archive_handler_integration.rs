@@ -312,12 +312,8 @@ async fn test_archive_formats() -> Result<()> {
     for (filename, expected_format) in formats {
         let archive_path = temp_dir.path().join(filename);
 
-        // For GZ, we need array with single file
-        let files = if filename.ends_with(".gz") && !filename.contains(".tar") {
-            vec![test_file.to_str().unwrap()]
-        } else {
-            vec![test_file.to_str().unwrap()]
-        };
+        // For all archive types, we need array with single file
+        let files = vec![test_file.to_str().unwrap()];
 
         let create_params = json!({
             "operation": "create",
@@ -356,8 +352,10 @@ async fn test_compression_levels() -> Result<()> {
     let mut sizes = Vec::new();
 
     for level in [0, 5, 9] {
-        let mut config = ArchiveHandlerConfig::default();
-        config.compression_level = level;
+        let config = ArchiveHandlerConfig {
+            compression_level: level,
+            ..Default::default()
+        };
 
         let tool = ArchiveHandlerTool::with_config(config);
 

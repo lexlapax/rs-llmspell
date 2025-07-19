@@ -70,8 +70,8 @@ async fn test_parameter_standardization_compliance() {
         );
 
         let output = result.unwrap();
-        let parsed: Value = serde_json::from_str(&output.text)
-            .expect(&format!("Tool {} should return valid JSON", name));
+        let error_msg = format!("Tool {} should return valid JSON", name);
+        let parsed: Value = serde_json::from_str(&output.text).expect(&error_msg);
 
         // Validate ResponseBuilder pattern
         assert!(
@@ -227,8 +227,8 @@ async fn test_response_builder_consistency() {
         assert!(result.is_ok(), "Tool {} should execute successfully", name);
 
         let output = result.unwrap();
-        let parsed: Value = serde_json::from_str(&output.text)
-            .expect(&format!("Tool {} should return valid JSON", name));
+        let error_msg = format!("Tool {} should return valid JSON", name);
+        let parsed: Value = serde_json::from_str(&output.text).expect(&error_msg);
 
         // Validate consistent ResponseBuilder structure
         assert!(

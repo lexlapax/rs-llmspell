@@ -643,9 +643,11 @@ mod tests {
     }
 
     fn create_test_tool_with_custom_config() -> ProcessExecutorTool {
-        let mut config = ProcessExecutorConfig::default();
-        config.max_execution_time_seconds = 5;
-        config.max_output_size = 1024;
+        let config = ProcessExecutorConfig {
+            max_execution_time_seconds: 5,
+            max_output_size: 1024,
+            ..Default::default()
+        };
         ProcessExecutorTool::new(config)
     }
 
@@ -905,8 +907,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_arbitrary_commands_disabled() {
-        let mut config = ProcessExecutorConfig::default();
-        config.allow_arbitrary_commands = false;
+        let config = ProcessExecutorConfig {
+            allow_arbitrary_commands: false,
+            ..Default::default()
+        };
         let tool = ProcessExecutorTool::new(config);
 
         // Should not allow arbitrary commands
@@ -915,8 +919,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_arbitrary_commands_enabled() {
-        let mut config = ProcessExecutorConfig::default();
-        config.allow_arbitrary_commands = true;
+        let config = ProcessExecutorConfig {
+            allow_arbitrary_commands: true,
+            ..Default::default()
+        };
         let tool = ProcessExecutorTool::new(config);
 
         // Should allow arbitrary commands (unless blocked)

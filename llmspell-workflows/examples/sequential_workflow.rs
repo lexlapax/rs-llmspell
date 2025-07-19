@@ -16,10 +16,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("🚀 Starting Sequential Workflow Example");
 
     // Create workflow configuration
-    let mut config = WorkflowConfig::default();
-    config.max_execution_time = Some(Duration::from_secs(60));
-    config.default_step_timeout = Duration::from_secs(10);
-    config.continue_on_error = false; // Fail fast for this example
+    let config = WorkflowConfig {
+        max_execution_time: Some(Duration::from_secs(60)),
+        default_step_timeout: Duration::from_secs(10),
+        continue_on_error: false, // Fail fast for this example
+        ..Default::default()
+    };
 
     println!("📋 Creating workflow steps...");
 
@@ -233,8 +235,10 @@ async fn example_with_retry_strategy() -> Result<(), Box<dyn std::error::Error>>
 async fn example_with_continue_strategy() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n🚧 Example: Workflow with Continue-on-Error Strategy");
 
-    let mut config = WorkflowConfig::default();
-    config.continue_on_error = true;
+    let config = WorkflowConfig {
+        continue_on_error: true,
+        ..Default::default()
+    };
 
     // Add steps, some of which might fail
     let steps = vec![

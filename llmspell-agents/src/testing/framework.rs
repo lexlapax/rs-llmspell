@@ -2,15 +2,17 @@
 //! ABOUTME: Includes test harness, assertions, mocking support, and test execution utilities
 
 use crate::{
-    AgentConfig, AgentFactory, AgentState, DIContainer, DefaultAgentFactory, LifecycleEvent,
-    LifecycleEventType, ResourceLimits,
+    factory::{AgentConfig, AgentFactory, DefaultAgentFactory, ResourceLimits},
+    lifecycle::{
+        events::{LifecycleEvent, LifecycleEventType},
+        state_machine::AgentState,
+    },
 };
 use anyhow::Result;
-use async_trait::async_trait;
 use llmspell_core::{
     traits::agent::Agent,
-    types::{AgentInput, AgentOutput, ComponentId, ComponentMetadata, OutputMetadata, Version},
-    BaseAgent, ExecutionContext, LLMSpellError,
+    types::{AgentInput, AgentOutput},
+    ExecutionContext, LLMSpellError,
 };
 use std::{
     collections::HashMap,
@@ -50,7 +52,7 @@ impl Default for TestConfig {
 }
 
 /// Test result capturing execution details
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct TestResult {
     /// Whether the test passed
     pub passed: bool,
@@ -58,7 +60,7 @@ pub struct TestResult {
     pub duration: Duration,
     /// Error message if failed
     pub error: Option<String>,
-    /// Recorded interactions
+    /// Recorded interactions (moved out of test harness)
     pub interactions: Vec<TestInteraction>,
     /// Performance metrics
     pub metrics: TestMetrics,
@@ -67,7 +69,7 @@ pub struct TestResult {
 }
 
 /// Recorded interaction during testing
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct TestInteraction {
     /// Timestamp of interaction
     pub timestamp: Instant,
@@ -121,8 +123,7 @@ pub struct TestHarness {
 impl TestHarness {
     /// Create new test harness with default factory
     pub fn new(config: TestConfig) -> Self {
-        let di_container = Arc::new(DIContainer::new());
-        let factory = Arc::new(DefaultAgentFactory::new_with_container(di_container));
+        let factory = Arc::new(DefaultAgentFactory::new());
 
         Self {
             config,
@@ -172,8 +173,11 @@ impl TestHarness {
             Ok(Ok(())) => None,
         };
 
-        // Get recorded data
-        let interactions = self.interactions.lock().unwrap().clone();
+        // Get recorded data - move out of lock instead of cloning
+        let interactions = {
+            let mut guard = self.interactions.lock().unwrap();
+            std::mem::take(&mut *guard)
+        };
         let metrics = self.metrics.lock().unwrap().clone();
         let resource_usage = self.resource_usage.lock().unwrap().clone();
 
@@ -203,11 +207,19 @@ impl TestHarness {
 
         // Record interaction
         if self.config.record_interactions {
+            let output_record = match &result {
+                Ok(output) => Ok(output.clone()),
+                Err(e) => Err(LLMSpellError::Component {
+                    message: e.to_string(),
+                    source: None,
+                }),
+            };
+
             let mut interactions = self.interactions.lock().unwrap();
             interactions.push(TestInteraction {
                 timestamp: Instant::now(),
                 input,
-                output: result.clone(),
+                output: output_record,
                 context,
             });
         }
@@ -325,11 +337,9 @@ impl AgentAssertions {
     ) -> Result<()> {
         // Find state transition in events
         for window in events.windows(2) {
-            if let (Some(from_event), Some(to_event)) = (window.get(0), window.get(1)) {
-                if matches!(
-                    from_event.event_type,
-                    LifecycleEventType::StateChanged { .. }
-                ) && matches!(to_event.event_type, LifecycleEventType::StateChanged { .. })
+            if let (Some(from_event), Some(to_event)) = (window.first(), window.get(1)) {
+                if matches!(from_event.event_type, LifecycleEventType::StateChanged)
+                    && matches!(to_event.event_type, LifecycleEventType::StateChanged)
                 {
                     // Check if this is our expected transition
                     // In a real implementation, we'd extract states from events
@@ -346,15 +356,22 @@ impl AgentAssertions {
     }
 }
 
+/// Type alias for output validator function
+type OutputValidator = Box<dyn Fn(&AgentOutput) -> Result<()> + Send + Sync>;
+
+/// Type alias for setup/teardown function
+type SetupTeardownFn = Box<dyn Fn() -> Result<()> + Send + Sync>;
+
 /// Test builder for constructing test scenarios
 pub struct TestScenarioBuilder {
+    #[allow(dead_code)]
     name: String,
     description: String,
     agent_config: Option<AgentConfig>,
     inputs: Vec<(AgentInput, ExecutionContext)>,
-    expected_outputs: Vec<Box<dyn Fn(&AgentOutput) -> Result<()> + Send + Sync>>,
-    setup: Option<Box<dyn Fn() -> Result<()> + Send + Sync>>,
-    teardown: Option<Box<dyn Fn() -> Result<()> + Send + Sync>>,
+    expected_outputs: Vec<OutputValidator>,
+    setup: Option<SetupTeardownFn>,
+    teardown: Option<SetupTeardownFn>,
 }
 
 impl TestScenarioBuilder {
@@ -463,13 +480,16 @@ pub struct LifecycleEventRecorder {
 
 impl LifecycleEventRecorder {
     /// Create new event recorder
-    pub fn new(mut receiver: broadcast::Receiver<LifecycleEvent>) -> Self {
+    pub fn new(receiver: broadcast::Receiver<LifecycleEvent>) -> Self {
         let events = Arc::new(Mutex::new(Vec::new()));
         let events_clone = events.clone();
 
+        // Clone receiver for the spawned task
+        let mut receiver_clone = receiver.resubscribe();
+
         // Spawn task to record events
         tokio::spawn(async move {
-            while let Ok(event) = receiver.recv().await {
+            while let Ok(event) = receiver_clone.recv().await {
                 events_clone.lock().unwrap().push(event);
             }
         });
@@ -521,7 +541,7 @@ mod tests {
             text: "Hello, world!".to_string(),
             media: vec![],
             tool_calls: vec![],
-            metadata: OutputMetadata::default(),
+            metadata: Default::default(),
             transfer_to: None,
         };
 

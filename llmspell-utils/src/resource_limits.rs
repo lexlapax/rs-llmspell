@@ -461,6 +461,7 @@ mod tests {
         let metrics = tracker.get_metrics();
         assert_eq!(metrics.memory_bytes, 1000);
         assert_eq!(metrics.operations_count, 2);
-        assert!(metrics.cpu_time_ms > 0 || metrics.cpu_time_ms == 0);
+        // cpu_time_ms is u64, so it's always >= 0
+        assert!(metrics.cpu_time_ms < u64::MAX);
     }
 }

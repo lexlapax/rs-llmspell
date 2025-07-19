@@ -1,12 +1,12 @@
 //! ABOUTME: Utility functions and helpers for agent testing
 //! ABOUTME: Provides common utilities for test setup, assertions, and data generation
 
-use crate::{AgentConfig, ResourceLimits};
+use crate::factory::{AgentConfig, ResourceLimits};
 use llmspell_core::{
-    types::{AgentInput, MediaContent, MediaType},
+    types::{AgentInput, ColorSpace, ImageFormat, ImageMetadata, MediaContent, MediaType},
     ExecutionContext,
 };
-use std::{collections::HashMap, time::Duration};
+use std::time::Duration;
 
 /// Test data generators
 pub struct TestDataGenerator;
@@ -14,7 +14,7 @@ pub struct TestDataGenerator;
 impl TestDataGenerator {
     /// Generate random agent input
     pub fn random_input() -> AgentInput {
-        let texts = vec![
+        let texts = [
             "Hello, how are you?",
             "What's the weather like?",
             "Can you help me with a task?",
@@ -30,10 +30,16 @@ impl TestDataGenerator {
     pub fn input_with_media() -> AgentInput {
         AgentInput::builder()
             .text("Analyze this image")
-            .add_media(MediaContent {
-                media_type: MediaType::Image,
+            .add_media(MediaContent::Image {
                 data: vec![0, 1, 2, 3], // Mock image data
-                metadata: HashMap::new(),
+                format: ImageFormat::Png,
+                metadata: ImageMetadata {
+                    width: 100,
+                    height: 100,
+                    color_space: ColorSpace::RGB,
+                    has_transparency: false,
+                    dpi: Some(72),
+                },
             })
             .build()
     }
@@ -50,18 +56,10 @@ impl TestDataGenerator {
 
     /// Generate execution context with metadata
     pub fn context_with_metadata() -> ExecutionContext {
-        let mut context = ExecutionContext::default();
-        context.metadata.insert(
-            "request_id".to_string(),
-            serde_json::json!(uuid::Uuid::new_v4().to_string()),
-        );
-        context.metadata.insert(
-            "timestamp".to_string(),
-            serde_json::json!(chrono::Utc::now().to_rfc3339()),
-        );
-        context
-            .metadata
-            .insert("source".to_string(), serde_json::json!("test"));
+        let mut context = ExecutionContext::new();
+        context.conversation_id = Some(uuid::Uuid::new_v4().to_string());
+        context.user_id = Some("test_user".to_string());
+        context.session_id = Some(uuid::Uuid::new_v4().to_string());
         context
     }
 }
@@ -161,7 +159,7 @@ impl TestEnvironment {
     /// Set up test environment
     pub fn setup() {
         // Initialize logging for tests
-        let _ = env_logger::builder().is_test(true).try_init();
+        // Note: logging initialization handled by test framework
     }
 
     /// Clean up test environment
@@ -199,30 +197,31 @@ impl PerformanceMeasure {
     /// End measurement and log
     pub fn end(self) -> Duration {
         let duration = self.start.elapsed();
-        log::debug!("{} took {:?}", self.name, duration);
+        tracing::debug!("{} took {:?}", self.name, duration);
         duration
     }
 }
 
 /// Test report generator
+#[derive(Default)]
 pub struct TestReport {
     results: Vec<TestReportEntry>,
 }
 
 #[derive(Debug)]
 struct TestReportEntry {
+    #[allow(dead_code)]
     test_name: String,
     passed: bool,
     duration: Duration,
+    #[allow(dead_code)]
     error: Option<String>,
 }
 
 impl TestReport {
     /// Create new report
     pub fn new() -> Self {
-        Self {
-            results: Vec::new(),
-        }
+        Self::default()
     }
 
     /// Add test result

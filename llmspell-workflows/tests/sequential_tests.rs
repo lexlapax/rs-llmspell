@@ -121,8 +121,10 @@ async fn test_workflow_shared_data() {
 /// Test workflow continue-on-error strategy
 #[tokio::test]
 async fn test_workflow_continue_strategy() {
-    let mut config = WorkflowConfig::default();
-    config.continue_on_error = true; // Continue on error
+    let config = WorkflowConfig {
+        continue_on_error: true,
+        ..Default::default()
+    };
     let error_strategy = ErrorStrategy::Continue;
 
     // Add multiple steps - even if one fails, others should continue

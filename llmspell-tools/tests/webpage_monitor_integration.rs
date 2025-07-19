@@ -68,7 +68,7 @@ async fn test_webpage_monitor_with_selector() {
             // Should indicate the selector was used (if supported)
             assert!(
                 result.get("selector_used").is_some()
-                    || result["current_content"].as_str().unwrap().len() > 0
+                    || !result["current_content"].as_str().unwrap().is_empty()
             );
         }
         Err(e) => {

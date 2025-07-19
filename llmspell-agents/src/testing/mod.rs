@@ -17,8 +17,14 @@ pub use mocks::{
 
 /// Prelude for convenient imports in tests
 pub mod prelude {
-    pub use super::framework::*;
-    pub use super::mocks::*;
+    // Re-export without conflicts
+    pub use super::framework::{
+        AgentAssertions, LifecycleEventRecorder, TestConfig, TestHarness, TestMetrics,
+        TestScenarioBuilder,
+    };
+    pub use super::mocks::{
+        MockAgent, MockAgentBuilder, MockAgentConfig, MockResponse, MockTool, TestDoubles,
+    };
     pub use super::scenarios::*;
     pub use super::utils::*;
 }

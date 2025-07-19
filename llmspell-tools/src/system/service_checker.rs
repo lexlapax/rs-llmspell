@@ -683,10 +683,12 @@ mod tests {
     }
 
     fn create_test_tool_with_custom_config() -> ServiceCheckerTool {
-        let mut config = ServiceCheckerConfig::default();
-        config.default_timeout_seconds = 2;
-        config.max_timeout_seconds = 10;
-        config.allow_any_domain = true;
+        let config = ServiceCheckerConfig {
+            default_timeout_seconds: 2,
+            max_timeout_seconds: 10,
+            allow_any_domain: true,
+            ..Default::default()
+        };
         ServiceCheckerTool::new(config)
     }
 
@@ -920,8 +922,10 @@ mod tests {
         assert!(!tool.is_domain_allowed("example.com")); // Not in allowed list
 
         // Test with allow_any_domain enabled
-        let mut config = ServiceCheckerConfig::default();
-        config.allow_any_domain = true;
+        let config = ServiceCheckerConfig {
+            allow_any_domain: true,
+            ..Default::default()
+        };
         let tool_permissive = ServiceCheckerTool::new(config);
         assert!(tool_permissive.is_domain_allowed("example.com"));
     }

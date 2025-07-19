@@ -1,8 +1,7 @@
 //! ABOUTME: Integration tests for agent communication patterns and message passing
 //! ABOUTME: Tests agent-to-agent communication, tool invocation, and coordination protocols
 
-#[path = "../src/testing/mocks.rs"]
-mod mocks;
+use llmspell_agents::testing::mocks;
 
 use llmspell_agents::AgentState;
 use llmspell_core::{
@@ -10,7 +9,7 @@ use llmspell_core::{
     types::{AgentInput, ToolCall},
     BaseAgent, ExecutionContext,
 };
-use mocks::{MockAgent, MockAgentBuilder, MockTool, TestDoubles};
+use mocks::{MockAgentBuilder, TestDoubles};
 use std::{collections::HashMap, sync::Arc, time::Duration};
 use tokio::sync::{broadcast, mpsc, RwLock};
 
@@ -382,25 +381,15 @@ async fn test_shared_state_communication() {
 async fn test_communication_resilience() {
     // Create agent that fails intermittently
     let agent = Arc::new(MockAgentBuilder::new("resilient_agent").build());
-    let failure_counter = Arc::new(RwLock::new(0));
 
-    // Set up alternating success/failure pattern
-    let agent_clone = agent.clone();
-    let counter_clone = failure_counter.clone();
-    tokio::spawn(async move {
-        loop {
-            let count = *counter_clone.read().await;
-            agent_clone.set_failure(count % 2 == 0, "Intermittent failure");
-            tokio::time::sleep(Duration::from_millis(100)).await;
-        }
-    });
-
-    // Test retry logic
+    // Test alternating success/failure pattern
     let mut success_count = 0;
     for i in 0..10 {
-        let mut counter = failure_counter.write().await;
-        *counter = i;
-        drop(counter);
+        // Set failure state before each attempt
+        agent.set_failure(i % 2 == 0, "Intermittent failure");
+
+        // Small delay to ensure state is set
+        tokio::time::sleep(Duration::from_millis(10)).await;
 
         let input = AgentInput::text(&format!("attempt {}", i));
         let result = agent.execute(input, ExecutionContext::default()).await;
@@ -411,7 +400,11 @@ async fn test_communication_resilience() {
     }
 
     // Should have roughly 50% success rate
-    assert!(success_count >= 4 && success_count <= 6);
+    assert!(
+        success_count == 5,
+        "Expected 50% success rate (5 successes), got {} successes out of 10",
+        success_count
+    );
 }
 
 /// Test communication with context propagation
@@ -421,29 +414,18 @@ async fn test_context_propagation() {
         .with_response(None, "Processed with context")
         .build();
 
-    // Create context with metadata
-    let mut context = ExecutionContext::default();
-    context
-        .metadata
-        .insert("trace_id".to_string(), serde_json::json!("12345"));
-    context
-        .metadata
-        .insert("user_id".to_string(), serde_json::json!("user123"));
-    context
-        .metadata
-        .insert("session_id".to_string(), serde_json::json!("session456"));
+    // Create context with IDs
+    let mut context = ExecutionContext::new();
+    context.conversation_id = Some("conv123".to_string());
+    context.user_id = Some("user123".to_string());
+    context.session_id = Some("session456".to_string());
 
     let input = AgentInput::text("process with context");
     let _output = agent.execute(input, context.clone()).await.unwrap();
 
     // Verify context was received
     let last_context = agent.last_context().unwrap();
-    assert_eq!(
-        last_context.metadata.get("trace_id"),
-        Some(&serde_json::json!("12345"))
-    );
-    assert_eq!(
-        last_context.metadata.get("user_id"),
-        Some(&serde_json::json!("user123"))
-    );
+    assert_eq!(last_context.conversation_id, Some("conv123".to_string()));
+    assert_eq!(last_context.user_id, Some("user123".to_string()));
+    assert_eq!(last_context.session_id, Some("session456".to_string()));
 }

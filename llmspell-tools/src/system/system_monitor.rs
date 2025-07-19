@@ -676,10 +676,12 @@ mod tests {
     }
 
     fn create_test_tool_with_custom_config() -> SystemMonitorTool {
-        let mut config = SystemMonitorConfig::default();
-        config.max_disk_mounts = 5;
-        config.cpu_sample_duration_ms = 500;
-        config.include_disk_details = false;
+        let config = SystemMonitorConfig {
+            max_disk_mounts: 5,
+            cpu_sample_duration_ms: 500,
+            include_disk_details: false,
+            ..Default::default()
+        };
         SystemMonitorTool::new(config)
     }
 
@@ -885,10 +887,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_selective_collection() {
-        let mut config = SystemMonitorConfig::default();
-        config.collect_cpu_stats = false;
-        config.collect_disk_stats = false;
-        config.collect_process_stats = false;
+        let config = SystemMonitorConfig {
+            collect_cpu_stats: false,
+            collect_disk_stats: false,
+            collect_process_stats: false,
+            ..Default::default()
+        };
         let tool = SystemMonitorTool::new(config);
 
         let stats = tool.collect_system_stats().await.unwrap();
@@ -903,7 +907,7 @@ mod tests {
         assert!(stats.process_count.is_none());
 
         // Memory stats should still be collected
-        assert!(stats.total_memory_bytes > 0 || stats.total_memory_bytes == 0); // Handle test environments
+        // total_memory_bytes is u64, so it's always >= 0
     }
 
     #[cfg(unix)]

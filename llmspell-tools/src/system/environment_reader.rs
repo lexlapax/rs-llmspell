@@ -665,9 +665,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_set_variable_enabled() {
-        let mut config = EnvironmentReaderConfig::default();
-        config.allow_set_variables = true;
-        config.allowed_patterns.push("TEST_*".to_string());
+        let allowed_patterns = vec!["TEST_*".to_string()];
+        let config = EnvironmentReaderConfig {
+            allow_set_variables: true,
+            allowed_patterns,
+            ..Default::default()
+        };
         let tool = EnvironmentReaderTool::new(config);
 
         let input = create_test_input(

@@ -538,8 +538,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_size_limits() {
-        let mut config = TemplateEngineConfig::default();
-        config.max_template_size = 100; // Very small limit for testing
+        let config = TemplateEngineConfig {
+            max_template_size: 100, // Very small limit for testing
+            ..Default::default()
+        };
         let tool = TemplateEngineTool::with_config(config);
 
         let params = serde_json::json!({

@@ -426,7 +426,7 @@ mod tests {
 
         for expr in &safe_expressions {
             let result = analyzer.analyze(expr);
-            assert!(result.is_safe, "Expression '{}' should be safe", expr);
+            assert!(result.is_safe, "Expression '{expr}' should be safe");
         }
     }
 

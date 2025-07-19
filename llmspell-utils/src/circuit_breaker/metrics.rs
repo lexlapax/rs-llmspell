@@ -265,7 +265,7 @@ mod tests {
         assert_eq!(metrics.total_rejected, 1);
         assert_eq!(metrics.total_successes, 1);
         assert_eq!(metrics.total_failures, 1);
-        assert_eq!(metrics.success_rate(), 50.0);
+        assert!((metrics.success_rate() - 50.0).abs() < f64::EPSILON);
         assert!((metrics.rejection_rate() - 33.333_333).abs() < 0.001);
     }
 
@@ -291,12 +291,13 @@ mod tests {
 
     #[test]
     fn test_alert_levels() {
-        let mut metrics = CircuitMetrics::default();
-
         // Healthy state
-        metrics.current_state = CircuitState::Closed;
-        metrics.total_successes = 95;
-        metrics.total_failures = 5;
+        let mut metrics = CircuitMetrics {
+            current_state: CircuitState::Closed,
+            total_successes: 95,
+            total_failures: 5,
+            ..Default::default()
+        };
         assert_eq!(AlertLevel::from(&metrics), AlertLevel::Healthy);
 
         // Warning state

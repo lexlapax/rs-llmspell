@@ -251,9 +251,8 @@ async fn test_expression_validation_operation() {
         .unwrap();
     let output: JsonValue = serde_json::from_str(&result.text).unwrap();
     assert_eq!(output["success"], true);
-    assert_eq!(
-        output["result"]["valid"].as_bool().unwrap(),
-        false,
+    assert!(
+        !output["result"]["valid"].as_bool().unwrap(),
         "Long expression should be invalid"
     );
 

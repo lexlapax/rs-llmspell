@@ -417,7 +417,7 @@ mod tests {
             for _ in 0..i {
                 tracker.track_operation().unwrap();
             }
-            monitor.register_component(format!("component_{}", i), tracker);
+            monitor.register_component(format!("component_{i}"), tracker);
         }
 
         let stats = monitor.get_statistics();

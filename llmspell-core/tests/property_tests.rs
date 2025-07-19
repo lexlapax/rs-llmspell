@@ -125,7 +125,7 @@ proptest! {
     fn test_version_ordering_properties(v1 in arb_version(), v2 in arb_version()) {
         // Property: Version ordering is transitive
         if v1 < v2 {
-            prop_assert!(!(v2 < v1)); // Antisymmetry
+            prop_assert!(v2 >= v1); // Antisymmetry
         }
         if v1 == v2 {
             prop_assert!(v1.is_compatible_with(&v2));

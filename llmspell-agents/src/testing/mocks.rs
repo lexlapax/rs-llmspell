@@ -1,12 +1,10 @@
 //! ABOUTME: Mock implementations for testing agent infrastructure
 //! ABOUTME: Provides configurable mock agents, tools, and providers for unit and integration testing
 
-use crate::{
-    lifecycle::{
-        events::{LifecycleEvent, LifecycleEventData, LifecycleEventType},
-        state_machine::{AgentState, AgentStateMachine},
-    },
-    AgentConfig, ResourceLimits,
+use crate::factory::{AgentConfig, ResourceLimits};
+use crate::lifecycle::{
+    events::{LifecycleEvent, LifecycleEventData, LifecycleEventType},
+    state_machine::{AgentState, AgentStateMachine},
 };
 use anyhow::Result;
 use async_trait::async_trait;
@@ -115,11 +113,10 @@ impl MockAgent {
             AgentStateMachine::new(config.agent_config.name.clone(), Default::default());
 
         let core_config = CoreAgentConfig {
-            max_input_length: Some(10000),
-            max_output_length: Some(10000),
             max_conversation_length: Some(100),
-            enable_streaming: false,
-            custom_config: config.agent_config.custom_config.clone(),
+            system_prompt: None,
+            temperature: Some(0.7),
+            max_tokens: Some(2000),
         };
 
         Self {
@@ -232,7 +229,7 @@ impl BaseAgent for MockAgent {
                 self.metadata.id.to_string(),
                 LifecycleEventData::StateTransition {
                     from: from_state,
-                    to: state.clone(),
+                    to: *state,
                     duration: None,
                     reason: None,
                 },
@@ -247,7 +244,7 @@ impl BaseAgent for MockAgent {
 
         // Check if should fail
         if config.should_fail {
-            return Err(LLMSpellError::Execution {
+            return Err(LLMSpellError::Component {
                 message: config.failure_message.clone(),
                 source: None,
             });
@@ -421,7 +418,7 @@ impl BaseAgent for MockTool {
         // Check failure mode
         if self.should_fail {
             return Err(LLMSpellError::Tool {
-                tool_name: self.metadata.name.clone(),
+                tool_name: Some(self.metadata.name.clone()),
                 message: "Mock tool failure".to_string(),
                 source: None,
             });

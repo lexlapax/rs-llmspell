@@ -499,20 +499,20 @@ mod tests {
         let sanitizer = InputSanitizer::new();
 
         // Test script tag removal
-        let input = "Hello <script>alert('xss')</script> World";
-        let sanitized = sanitizer.sanitize_html(input);
-        assert!(!sanitized.contains("<script"));
-        assert!(!sanitized.contains("alert"));
+        let script_input = "Hello <script>alert('xss')</script> World";
+        let script_sanitized = sanitizer.sanitize_html(script_input);
+        assert!(!script_sanitized.contains("<script"));
+        assert!(!script_sanitized.contains("alert"));
 
         // Test event handler removal
-        let input = "<img src=x onerror='alert(1)'>";
-        let sanitized = sanitizer.sanitize_html(input);
-        assert!(!sanitized.contains("onerror"));
+        let event_input = "<img src=x onerror='alert(1)'>";
+        let event_sanitized = sanitizer.sanitize_html(event_input);
+        assert!(!event_sanitized.contains("onerror"));
 
         // Test javascript: protocol removal
-        let input = "<a href='javascript:alert(1)'>Click</a>";
-        let sanitized = sanitizer.sanitize_html(input);
-        assert!(!sanitized.contains("javascript:"));
+        let js_input = "<a href='javascript:alert(1)'>Click</a>";
+        let js_sanitized = sanitizer.sanitize_html(js_input);
+        assert!(!js_sanitized.contains("javascript:"));
     }
 
     #[test]
@@ -520,20 +520,20 @@ mod tests {
         let sanitizer = InputSanitizer::new();
 
         // Test SQL comment removal
-        let input = "'; DROP TABLE users; --";
-        let sanitized = sanitizer.sanitize_sql(input);
-        assert!(!sanitized.contains("--"));
+        let sql_drop_input = "'; DROP TABLE users; --";
+        let sql_drop_sanitized = sanitizer.sanitize_sql(sql_drop_input);
+        assert!(!sql_drop_sanitized.contains("--"));
 
         // Test quote escaping
-        let input = "O'Brien";
-        let sanitized = sanitizer.sanitize_sql(input);
-        assert_eq!(sanitized, "O''Brien");
+        let quote_input = "O'Brien";
+        let quote_sanitized = sanitizer.sanitize_sql(quote_input);
+        assert_eq!(quote_sanitized, "O''Brien");
 
         // Test union select removal
-        let input = "' UNION SELECT * FROM passwords; --";
-        let sanitized = sanitizer.sanitize_sql(input);
-        assert!(!sanitized.contains("UNION"));
-        assert!(!sanitized.contains("SELECT"));
+        let union_input = "' UNION SELECT * FROM passwords; --";
+        let union_sanitized = sanitizer.sanitize_sql(union_input);
+        assert!(!union_sanitized.contains("UNION"));
+        assert!(!union_sanitized.contains("SELECT"));
     }
 
     #[test]
@@ -541,19 +541,19 @@ mod tests {
         let sanitizer = InputSanitizer::new();
 
         // Test command substitution removal
-        let input = "echo $(cat /etc/passwd)";
-        let sanitized = sanitizer.sanitize_command(input);
-        assert!(!sanitized.contains("$("));
+        let cmd_sub_input = "echo $(cat /etc/passwd)";
+        let cmd_sub_sanitized = sanitizer.sanitize_command(cmd_sub_input);
+        assert!(!cmd_sub_sanitized.contains("$("));
 
         // Test backtick removal
-        let input = "echo `whoami`";
-        let sanitized = sanitizer.sanitize_command(input);
-        assert!(!sanitized.contains("`"));
+        let backtick_input = "echo `whoami`";
+        let backtick_sanitized = sanitizer.sanitize_command(backtick_input);
+        assert!(!backtick_sanitized.contains("`"));
 
         // Test metacharacter escaping
-        let input = "file.txt; rm -rf /";
-        let sanitized = sanitizer.sanitize_command(input);
-        assert!(sanitized.contains("\\;"));
+        let meta_input = "file.txt; rm -rf /";
+        let meta_sanitized = sanitizer.sanitize_command(meta_input);
+        assert!(meta_sanitized.contains("\\;"));
     }
 
     #[test]
@@ -561,16 +561,16 @@ mod tests {
         let sanitizer = InputSanitizer::new();
 
         // Test dangerous format specifier removal
-        let input = "Hello %n%s World";
-        let sanitized = sanitizer.sanitize_format_string(input);
-        assert!(!sanitized.contains("%n"));
-        assert!(!sanitized.contains("%s"));
+        let danger_fmt_input = "Hello %n%s World";
+        let danger_fmt_sanitized = sanitizer.sanitize_format_string(danger_fmt_input);
+        assert!(!danger_fmt_sanitized.contains("%n"));
+        assert!(!danger_fmt_sanitized.contains("%s"));
 
         // Test safe format specifiers preserved
-        let input = "Value: %d, Float: %.2f";
-        let sanitized = sanitizer.sanitize_format_string(input);
-        assert!(sanitized.contains("%d"));
-        assert!(sanitized.contains("%.2f"));
+        let safe_fmt_input = "Value: %d, Float: %.2f";
+        let safe_fmt_sanitized = sanitizer.sanitize_format_string(safe_fmt_input);
+        assert!(safe_fmt_sanitized.contains("%d"));
+        assert!(safe_fmt_sanitized.contains("%.2f"));
     }
 
     #[test]
@@ -578,15 +578,15 @@ mod tests {
         let sanitizer = InputSanitizer::new();
 
         // Test DOCTYPE removal
-        let input = "<!DOCTYPE foo SYSTEM 'file:///etc/passwd'><root/>";
-        let sanitized = sanitizer.sanitize_xml(input);
-        assert!(!sanitized.contains("DOCTYPE"));
-        assert!(!sanitized.contains("SYSTEM"));
+        let doctype_input = "<!DOCTYPE foo SYSTEM 'file:///etc/passwd'><root/>";
+        let doctype_sanitized = sanitizer.sanitize_xml(doctype_input);
+        assert!(!doctype_sanitized.contains("DOCTYPE"));
+        assert!(!doctype_sanitized.contains("SYSTEM"));
 
         // Test ENTITY removal
-        let input = "<!ENTITY xxe SYSTEM 'http://evil.com'><root>&xxe;</root>";
-        let sanitized = sanitizer.sanitize_xml(input);
-        assert!(!sanitized.contains("ENTITY"));
+        let entity_input = "<!ENTITY xxe SYSTEM 'http://evil.com'><root>&xxe;</root>";
+        let entity_sanitized = sanitizer.sanitize_xml(entity_input);
+        assert!(!entity_sanitized.contains("ENTITY"));
     }
 
     #[test]

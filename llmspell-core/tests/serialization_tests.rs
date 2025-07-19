@@ -73,10 +73,12 @@ fn test_agent_input_json_roundtrip() {
 
 #[test]
 fn test_agent_output_json_roundtrip() {
-    let mut metadata = llmspell_core::types::OutputMetadata::default();
-    metadata.confidence = Some(0.95);
-    metadata.token_count = Some(150);
-    metadata.model = Some("gpt-4".to_string());
+    let metadata = llmspell_core::types::OutputMetadata {
+        confidence: Some(0.95),
+        token_count: Some(150),
+        model: Some("gpt-4".to_string()),
+        ..Default::default()
+    };
     let output = AgentOutput::text("result content".to_string()).with_metadata(metadata);
 
     let json = serde_json::to_string(&output).unwrap();

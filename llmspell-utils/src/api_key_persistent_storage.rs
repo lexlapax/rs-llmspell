@@ -155,7 +155,7 @@ mod tests {
 
     fn create_test_metadata(service: &str) -> ApiKeyMetadata {
         ApiKeyMetadata {
-            key_id: format!("{}_key", service),
+            key_id: format!("{service}_key"),
             service: service.to_string(),
             created_at: Utc::now(),
             last_used: None,

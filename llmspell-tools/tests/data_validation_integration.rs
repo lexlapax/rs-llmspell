@@ -524,8 +524,10 @@ async fn test_custom_validators() {
 
 #[tokio::test]
 async fn test_fail_fast_configuration() {
-    let mut config = DataValidationConfig::default();
-    config.fail_fast = true;
+    let config = DataValidationConfig {
+        fail_fast: true,
+        ..Default::default()
+    };
     let tool = DataValidationTool::with_config(config);
 
     let params = json!({
@@ -622,7 +624,7 @@ async fn test_validation_error_details() {
     assert!(!validation_result.valid);
 
     // We should have at least 1 error (missing name field stops further validation)
-    assert!(validation_result.errors.len() >= 1);
+    assert!(!validation_result.errors.is_empty());
     assert!(validation_result.errors[0]
         .message
         .contains("Missing required field"));

@@ -21,7 +21,6 @@ pub mod tool_errors;
 pub mod tool_invocation;
 pub mod tool_manager;
 
-#[cfg(test)]
 pub mod testing;
 
 // Re-export main types and traits

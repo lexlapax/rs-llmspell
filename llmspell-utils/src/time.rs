@@ -285,7 +285,7 @@ mod tests {
 
     #[test]
     fn test_parse_timestamp() {
-        let timestamp = 1705315800; // 2024-01-15 10:30:00 UTC
+        let timestamp = 1_705_315_800; // 2024-01-15 10:30:00 UTC
         let result = parse_datetime(&timestamp.to_string()).unwrap();
         assert_eq!(result.year(), 2024);
         assert_eq!(result.month(), 1);

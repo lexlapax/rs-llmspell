@@ -460,24 +460,24 @@ mod tests {
         let sanitizer = ErrorSanitizer::new();
 
         // Test credential removal
-        let error = "Failed to connect with api_key=sk-12345";
-        let sanitized = sanitizer.sanitize(error);
-        assert!(sanitized.contains("[REDACTED]"));
+        let cred_error = "Failed to connect with api_key=sk-12345";
+        let cred_sanitized = sanitizer.sanitize(cred_error);
+        assert!(cred_sanitized.contains("[REDACTED]"));
 
         // Test path removal
-        let error = "File not found: /home/username/secret.txt";
-        let sanitized = sanitizer.sanitize(error);
-        assert!(sanitized.contains("[PATH]"));
+        let path_error = "File not found: /home/username/secret.txt";
+        let path_sanitized = sanitizer.sanitize(path_error);
+        assert!(path_sanitized.contains("[PATH]"));
 
         // Test email removal
-        let error = "Invalid email: user@example.com";
-        let sanitized = sanitizer.sanitize(error);
-        assert!(sanitized.contains("[EMAIL]"));
+        let email_error = "Invalid email: user@example.com";
+        let email_sanitized = sanitizer.sanitize(email_error);
+        assert!(email_sanitized.contains("[EMAIL]"));
 
         // Test IP removal
-        let error = "Connection failed to 192.168.1.1";
-        let sanitized = sanitizer.sanitize(error);
-        assert!(sanitized.contains("[IP]"));
+        let ip_error = "Connection failed to 192.168.1.1";
+        let ip_sanitized = sanitizer.sanitize(ip_error);
+        assert!(ip_sanitized.contains("[IP]"));
     }
 
     #[test]
