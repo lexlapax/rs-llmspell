@@ -35,7 +35,8 @@ pub use state::{ExecutionStats, StateManager};
 pub use step_executor::StepExecutor;
 
 pub use r#loop::{
-    BreakCondition, LoopConfig, LoopIterator, LoopWorkflow, LoopWorkflowBuilder, ResultAggregation,
+    BreakCondition, LoopConfig, LoopIterator, LoopWorkflow, LoopWorkflowBuilder,
+    LoopWorkflowResult, ResultAggregation,
 };
 
 pub use parallel::{

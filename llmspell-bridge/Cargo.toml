@@ -14,6 +14,7 @@ llmspell-utils = { path = "../llmspell-utils" }
 llmspell-tools = { path = "../llmspell-tools" }
 llmspell-security = { path = "../llmspell-security" }
 llmspell-agents = { path = "../llmspell-agents" }
+llmspell-workflows = { path = "../llmspell-workflows" }
 tokio.workspace = true
 tokio-stream.workspace = true
 async-trait.workspace = true
@@ -27,12 +28,20 @@ lazy_static.workspace = true
 parking_lot.workspace = true
 uuid = { workspace = true }
 base64 = "0.22"
+lru = "0.12"
 
 # Script engine dependencies (feature-gated)
 mlua = { workspace = true, optional = true }
 boa_engine = { workspace = true, optional = true }
 
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports"] }
+
 [features]
 default = ["lua"]
 lua = ["dep:mlua"]
 javascript = ["dep:boa_engine"]
+
+[[bench]]
+name = "workflow_bridge_bench"
+harness = false

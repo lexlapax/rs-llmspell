@@ -104,6 +104,17 @@ pub mod agent_conversion;
 pub mod agents;
 pub mod monitoring;
 
+// Workflow bridge modules
+pub mod multi_agent_workflow;
+pub mod workflow_bridge;
+pub mod workflow_conversion;
+pub mod workflow_conversion_core;
+pub mod workflow_orchestration;
+pub mod workflow_performance;
+pub mod workflow_registry_bridge;
+pub mod workflow_results;
+pub mod workflows;
+
 // Language-specific implementations (feature-gated)
 #[cfg(feature = "lua")]
 pub mod lua;

@@ -166,8 +166,8 @@ mod tests {
                 workflowExists = workflowExists,
                 seqType = seq and seq.type or nil,
                 parType = par and par.type or nil,
-                seqHasExecute = seq and type(seq.execute) == "function",
-                parHasExecute = par and type(par.execute) == "function"
+                seqHasExecute = type(Workflow.execute) == "function",
+                parHasExecute = type(Workflow.execute) == "function"
             }
         "#;
 

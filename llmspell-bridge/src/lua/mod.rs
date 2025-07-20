@@ -3,5 +3,7 @@
 
 pub mod api;
 pub mod engine;
+pub mod workflow_conversion;
+pub mod workflow_results;
 
 pub use engine::LuaEngine;
