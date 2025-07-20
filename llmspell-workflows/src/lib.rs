@@ -8,6 +8,7 @@ pub mod hooks;
 pub mod r#loop;
 pub mod parallel;
 pub mod sequential;
+pub mod shared_state;
 pub mod state;
 pub mod step_executor;
 pub mod traits;

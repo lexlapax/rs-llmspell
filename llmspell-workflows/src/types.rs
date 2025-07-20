@@ -1,6 +1,7 @@
 //! ABOUTME: Workflow types for input/output and state management
 //! ABOUTME: Provides types for memory-based workflow execution
 
+use crate::shared_state::WorkflowStateAccessor;
 use llmspell_core::ComponentId;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -217,6 +218,8 @@ impl Default for WorkflowConfig {
 pub struct StepExecutionContext {
     /// Reference to workflow state
     pub workflow_state: WorkflowState,
+    /// Shared state accessor for this workflow
+    pub state_accessor: Option<WorkflowStateAccessor>,
     /// Step-specific timeout
     pub timeout: Option<Duration>,
     /// Current retry attempt (0 for first attempt)
@@ -229,10 +232,17 @@ impl StepExecutionContext {
     pub fn new(workflow_state: WorkflowState, timeout: Option<Duration>) -> Self {
         Self {
             workflow_state,
+            state_accessor: None,
             timeout,
             retry_attempt: 0,
             is_final_retry: false,
         }
+    }
+
+    /// Add state accessor to the context
+    pub fn with_state_accessor(mut self, accessor: WorkflowStateAccessor) -> Self {
+        self.state_accessor = Some(accessor);
+        self
     }
 
     pub fn with_retry(mut self, attempt: u32, max_attempts: u32) -> Self {
