@@ -66,7 +66,7 @@ impl WorkflowHooks {
     /// Register a hook (placeholder - full implementation in Phase 4)
     pub fn register(&mut self, point: HookPoint, hook: HookFn) {
         info!("Hook registered for {:?} (placeholder - Phase 4)", point);
-        self.hooks.entry(point).or_insert_with(Vec::new).push(hook);
+        self.hooks.entry(point).or_default().push(hook);
     }
 
     /// Execute hooks for a given point (placeholder implementation)
