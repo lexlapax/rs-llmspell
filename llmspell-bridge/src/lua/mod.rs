@@ -2,8 +2,8 @@
 //! ABOUTME: Provides Lua 5.4 scripting with coroutine-based streaming
 
 pub mod api;
+pub mod conversion;
 pub mod engine;
-pub mod workflow_conversion;
-pub mod workflow_results;
+pub mod globals;
 
 pub use engine::LuaEngine;

@@ -7,9 +7,8 @@
 //! 3. Following Lua's data-oriented patterns rather than object-oriented
 
 use crate::engine::types::WorkflowApiDefinition;
-use crate::lua::workflow_conversion::lua_table_to_workflow_params;
-use crate::lua::workflow_results::script_result_to_lua_table;
-use crate::workflow_bridge::WorkflowBridge;
+use crate::lua::conversion::{lua_table_to_workflow_params, script_workflow_result_to_lua_table};
+use crate::workflows::WorkflowBridge;
 use crate::ComponentRegistry;
 use llmspell_core::error::LLMSpellError;
 use mlua::{Lua, Table, Value as LuaValue};
@@ -155,7 +154,7 @@ pub fn inject_workflow_api(
             };
 
             // Convert result
-            let result: crate::workflow_results::ScriptWorkflowResult =
+            let result: crate::conversion::ScriptWorkflowResult =
                 serde_json::from_value(result_json).map_err(|e| {
                     mlua::Error::ExternalError(Arc::new(llmspell_core::LLMSpellError::Component {
                         message: format!("Failed to deserialize workflow result: {}", e),
@@ -163,7 +162,7 @@ pub fn inject_workflow_api(
                     }))
                 })?;
 
-            script_result_to_lua_table(lua, result)
+            script_workflow_result_to_lua_table(lua, result)
                 .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))
         })
         .map_err(|e| LLMSpellError::Component {

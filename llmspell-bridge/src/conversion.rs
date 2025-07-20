@@ -1,9 +1,256 @@
-//! ABOUTME: Workflow result transformation and formatting
-//! ABOUTME: Handles conversion of workflow execution results for script consumption
+//! ABOUTME: Common type conversion traits for script-to-native translations
+//! ABOUTME: Defines core traits used by all language-specific conversions
 
 use llmspell_core::Result;
+use llmspell_workflows::ErrorStrategy;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::HashMap;
+
+/// Trait for converting Rust types to script values
+pub trait ToScriptValue<T> {
+    /// Convert this Rust type to a script value
+    fn to_script_value(&self) -> Result<T>;
+}
+
+/// Trait for converting script values to Rust types
+pub trait FromScriptValue<T>: Sized {
+    /// Convert a script value to this Rust type
+    fn from_script_value(value: T) -> Result<Self>;
+}
+
+/// Common script value representation for cross-language support
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ScriptValue {
+    /// Null/nil value
+    Null,
+    /// Boolean value
+    Bool(bool),
+    /// Numeric value (all numbers as f64)
+    Number(f64),
+    /// String value
+    String(String),
+    /// Array of values
+    Array(Vec<ScriptValue>),
+    /// Object/table with string keys
+    Object(HashMap<String, ScriptValue>),
+    /// Binary data
+    Bytes(Vec<u8>),
+}
+
+impl ScriptValue {
+    /// Convert to JSON value
+    pub fn to_json(&self) -> serde_json::Value {
+        match self {
+            ScriptValue::Null => serde_json::Value::Null,
+            ScriptValue::Bool(b) => serde_json::Value::Bool(*b),
+            ScriptValue::Number(n) => serde_json::json!(n),
+            ScriptValue::String(s) => serde_json::Value::String(s.clone()),
+            ScriptValue::Array(arr) => {
+                serde_json::Value::Array(arr.iter().map(|v| v.to_json()).collect())
+            }
+            ScriptValue::Object(obj) => {
+                let map: serde_json::Map<String, serde_json::Value> =
+                    obj.iter().map(|(k, v)| (k.clone(), v.to_json())).collect();
+                serde_json::Value::Object(map)
+            }
+            ScriptValue::Bytes(bytes) => {
+                // Encode bytes as base64 string
+                serde_json::Value::String(base64::Engine::encode(
+                    &base64::engine::general_purpose::STANDARD,
+                    bytes,
+                ))
+            }
+        }
+    }
+
+    /// Convert from JSON value
+    pub fn from_json(value: &serde_json::Value) -> Self {
+        match value {
+            serde_json::Value::Null => ScriptValue::Null,
+            serde_json::Value::Bool(b) => ScriptValue::Bool(*b),
+            serde_json::Value::Number(n) => ScriptValue::Number(n.as_f64().unwrap_or(0.0)),
+            serde_json::Value::String(s) => ScriptValue::String(s.clone()),
+            serde_json::Value::Array(arr) => {
+                ScriptValue::Array(arr.iter().map(Self::from_json).collect())
+            }
+            serde_json::Value::Object(obj) => {
+                let map = obj
+                    .iter()
+                    .map(|(k, v)| (k.clone(), Self::from_json(v)))
+                    .collect();
+                ScriptValue::Object(map)
+            }
+        }
+    }
+}
+
+// Implement conversions for primitive types
+impl From<bool> for ScriptValue {
+    fn from(b: bool) -> Self {
+        ScriptValue::Bool(b)
+    }
+}
+
+impl From<i32> for ScriptValue {
+    fn from(n: i32) -> Self {
+        ScriptValue::Number(n as f64)
+    }
+}
+
+impl From<i64> for ScriptValue {
+    fn from(n: i64) -> Self {
+        ScriptValue::Number(n as f64)
+    }
+}
+
+impl From<f32> for ScriptValue {
+    fn from(n: f32) -> Self {
+        ScriptValue::Number(n as f64)
+    }
+}
+
+impl From<f64> for ScriptValue {
+    fn from(n: f64) -> Self {
+        ScriptValue::Number(n)
+    }
+}
+
+impl From<String> for ScriptValue {
+    fn from(s: String) -> Self {
+        ScriptValue::String(s)
+    }
+}
+
+impl From<&str> for ScriptValue {
+    fn from(s: &str) -> Self {
+        ScriptValue::String(s.to_string())
+    }
+}
+
+impl<T> From<Option<T>> for ScriptValue
+where
+    T: Into<ScriptValue>,
+{
+    fn from(opt: Option<T>) -> Self {
+        match opt {
+            Some(val) => val.into(),
+            None => ScriptValue::Null,
+        }
+    }
+}
+
+impl<T> From<Vec<T>> for ScriptValue
+where
+    T: Into<ScriptValue>,
+{
+    fn from(vec: Vec<T>) -> Self {
+        ScriptValue::Array(vec.into_iter().map(|v| v.into()).collect())
+    }
+}
+
+impl From<Vec<u8>> for ScriptValue {
+    fn from(bytes: Vec<u8>) -> Self {
+        ScriptValue::Bytes(bytes)
+    }
+}
+
+/// Conversion utilities
+pub struct ConversionUtils;
+
+impl ConversionUtils {
+    /// Check if a ScriptValue is truthy (for conditional evaluation)
+    pub fn is_truthy(value: &ScriptValue) -> bool {
+        match value {
+            ScriptValue::Null => false,
+            ScriptValue::Bool(b) => *b,
+            ScriptValue::Number(n) => *n != 0.0,
+            ScriptValue::String(s) => !s.is_empty(),
+            ScriptValue::Array(arr) => !arr.is_empty(),
+            ScriptValue::Object(obj) => !obj.is_empty(),
+            ScriptValue::Bytes(bytes) => !bytes.is_empty(),
+        }
+    }
+
+    /// Get a nested value from an object by dot-separated path
+    pub fn get_nested<'a>(value: &'a ScriptValue, path: &str) -> Option<&'a ScriptValue> {
+        let parts: Vec<&str> = path.split('.').collect();
+        let mut current = value;
+
+        for part in parts {
+            match current {
+                ScriptValue::Object(obj) => {
+                    current = obj.get(part)?;
+                }
+                _ => return None,
+            }
+        }
+
+        Some(current)
+    }
+}
+
+// ===== Workflow conversions =====
+
+/// Convert error strategy from string
+pub fn parse_error_strategy(strategy: &str) -> ErrorStrategy {
+    match strategy.to_lowercase().as_str() {
+        "stop" | "fail_fast" => ErrorStrategy::FailFast,
+        "continue" => ErrorStrategy::Continue,
+        "retry" => ErrorStrategy::Retry {
+            max_attempts: 3,
+            backoff_ms: 1000,
+        },
+        _ => ErrorStrategy::FailFast,
+    }
+}
+
+/// Generic workflow parameter structure
+#[derive(Debug, Clone)]
+pub struct WorkflowParams {
+    pub name: String,
+    pub workflow_type: String,
+    pub config: serde_json::Value,
+}
+
+/// Convert JSON value to workflow parameters
+pub fn json_to_workflow_params(value: serde_json::Value) -> Result<WorkflowParams> {
+    let obj = value
+        .as_object()
+        .ok_or_else(|| llmspell_core::LLMSpellError::Component {
+            message: "Workflow params must be an object".to_string(),
+            source: None,
+        })?;
+
+    let name = obj
+        .get("name")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| llmspell_core::LLMSpellError::Component {
+            message: "Missing workflow name".to_string(),
+            source: None,
+        })?
+        .to_string();
+
+    let workflow_type = obj
+        .get("type")
+        .and_then(|v| v.as_str())
+        .ok_or_else(|| llmspell_core::LLMSpellError::Component {
+            message: "Missing workflow type".to_string(),
+            source: None,
+        })?
+        .to_string();
+
+    Ok(WorkflowParams {
+        name,
+        workflow_type,
+        config: value,
+    })
+}
+
+// =====================================================================
+// Workflow Result Types and Conversions
+// (Moved from workflow_results.rs for consolidation)
+// =====================================================================
 
 /// Unified workflow result format for scripts
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -342,7 +589,7 @@ pub fn transform_generic_result(
 }
 
 #[cfg(test)]
-mod tests {
+mod workflow_result_tests {
     use super::*;
 
     #[test]

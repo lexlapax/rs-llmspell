@@ -229,9 +229,7 @@ impl ScriptEngineBridge for LuaEngine {
             super::api::inject_tool_api(&lua, &api_surface.tool_api, registry.clone())?;
 
             // Create WorkflowBridge
-            let workflow_bridge = Arc::new(crate::workflow_bridge::WorkflowBridge::new(
-                registry.clone(),
-            ));
+            let workflow_bridge = Arc::new(crate::workflows::WorkflowBridge::new(registry.clone()));
 
             // Inject Workflow API
             super::api::inject_workflow_api(

@@ -78,7 +78,7 @@ fn benchmark_workflow_discovery(c: &mut Criterion) {
 }
 
 fn benchmark_parameter_conversion(c: &mut Criterion) {
-    use llmspell_bridge::workflow_conversion_core::json_to_workflow_params;
+    use llmspell_bridge::conversion::json_to_workflow_params;
 
     c.bench_function("json_to_workflow_params", |b| {
         let json_params = json!({

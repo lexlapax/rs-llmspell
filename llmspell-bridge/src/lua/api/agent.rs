@@ -2,11 +2,10 @@
 //! ABOUTME: Bridges between Lua scripts and Rust Agent implementations
 
 use crate::agent_bridge::AgentBridge;
-use crate::agent_conversion::{
-    agent_output_to_lua_table, lua_table_to_agent_input, lua_table_to_tool_input,
-    lua_value_to_json, tool_output_to_lua_table,
-};
 use crate::engine::types::AgentApiDefinition;
+use crate::lua::conversion::{
+    agent_output_to_lua_table, lua_table_to_agent_input, lua_table_to_tool_input, lua_value_to_json,
+};
 use crate::{ComponentRegistry, ProviderManager};
 use async_trait::async_trait;
 use llmspell_core::error::LLMSpellError;
@@ -562,7 +561,7 @@ pub fn inject_agent_api(
 
                 // Convert config table to JSON
                 let config = if let Some(table) = config_table {
-                    crate::agent_conversion::lua_value_to_json(LuaValue::Table(table))?
+                    crate::lua::conversion::lua_value_to_json(LuaValue::Table(table))?
                 } else {
                     serde_json::json!({})
                 };
@@ -661,7 +660,7 @@ pub fn inject_agent_api(
 
                 // Convert routing config
                 let routing_config = if let Some(table) = routing_table {
-                    crate::agent_conversion::lua_value_to_json(LuaValue::Table(table))?
+                    crate::lua::conversion::lua_value_to_json(LuaValue::Table(table))?
                 } else {
                     serde_json::json!({})
                 };
@@ -892,18 +891,27 @@ impl UserData for LuaAgentWrapper {
         methods.add_async_method(
             "invokeTool",
             |lua, this, (tool_name, input_table): (String, Table)| async move {
-                // Convert Lua table to AgentInput (for tool execution)
-                let tool_input = lua_table_to_tool_input(lua, input_table)?;
+                // Convert Lua table to JSON for tool input
+                let tool_input_json = lua_table_to_tool_input(lua, input_table)?;
+
+                // Create AgentInput with the tool input as parameters
+                let agent_input = llmspell_core::types::AgentInput {
+                    text: format!("Invoking tool: {}", tool_name),
+                    media: vec![],
+                    context: None,
+                    parameters: serde_json::from_value(tool_input_json).unwrap_or_default(),
+                    output_modalities: vec![],
+                };
 
                 // Invoke the tool through the bridge
                 let result = this
                     .bridge
-                    .invoke_tool_for_agent(&this.agent_instance_name, &tool_name, tool_input, None)
+                    .invoke_tool_for_agent(&this.agent_instance_name, &tool_name, agent_input, None)
                     .await
                     .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
 
                 // Convert AgentOutput to Lua table
-                let output_table = tool_output_to_lua_table(lua, result)?;
+                let output_table = agent_output_to_lua_table(lua, result)?;
                 Ok(output_table)
             },
         );

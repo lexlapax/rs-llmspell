@@ -92,28 +92,26 @@
 //! ```
 
 // Core modules
+pub mod conversion;
 pub mod engine;
 pub mod providers;
 pub mod registry;
 pub mod runtime;
 pub mod tools;
 
+// Global injection infrastructure
+pub mod globals;
+
 // Agent bridge modules
 pub mod agent_bridge;
-pub mod agent_conversion;
 pub mod agents;
 pub mod monitoring;
 
-// Workflow bridge modules
-pub mod multi_agent_workflow;
-pub mod workflow_bridge;
-pub mod workflow_conversion;
-pub mod workflow_conversion_core;
-pub mod workflow_orchestration;
+// Workflow modules (consolidated)
+pub mod multi_agent;
+pub mod orchestration;
 pub mod workflow_performance;
-pub mod workflow_registry_bridge;
-pub mod workflow_results;
-pub mod workflows;
+pub mod workflows; // Includes WorkflowBridge and WorkflowRegistry (merged from workflow_bridge.rs and workflow_registry_bridge.rs)
 
 // Language-specific implementations (feature-gated)
 #[cfg(feature = "lua")]
