@@ -4,6 +4,7 @@
 pub mod conditional;
 pub mod conditions;
 pub mod error_handling;
+pub mod hooks;
 pub mod r#loop;
 pub mod parallel;
 pub mod sequential;
