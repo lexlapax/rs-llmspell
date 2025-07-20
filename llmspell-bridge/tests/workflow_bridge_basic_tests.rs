@@ -1,7 +1,7 @@
 //! ABOUTME: Basic integration tests for workflow bridge functionality
 //! ABOUTME: Tests script-to-workflow communication without tool dependencies
 
-use llmspell_bridge::workflow_bridge::WorkflowBridge;
+use llmspell_bridge::workflows::WorkflowBridge;
 use llmspell_bridge::ComponentRegistry;
 use std::sync::Arc;
 

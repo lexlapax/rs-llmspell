@@ -1,7 +1,7 @@
 //! ABOUTME: Tests for multi-agent workflow coordination patterns
 //! ABOUTME: Verifies pipeline, parallel, and consensus agent coordination
 
-use llmspell_bridge::multi_agent_workflow::{
+use llmspell_bridge::multi_agent::{
     create_consensus_workflow, create_fork_join_workflow, create_pipeline_workflow,
 };
 use serde_json::json;
@@ -91,7 +91,7 @@ async fn test_consensus_coordination() {
 
 #[tokio::test]
 async fn test_multi_agent_integration() {
-    use llmspell_bridge::{workflow_bridge::WorkflowBridge, ComponentRegistry};
+    use llmspell_bridge::{workflows::WorkflowBridge, ComponentRegistry};
     use std::sync::Arc;
 
     let registry = Arc::new(ComponentRegistry::new());
@@ -112,7 +112,7 @@ async fn test_multi_agent_integration() {
 
 #[test]
 fn test_coordination_pattern_serialization() {
-    use llmspell_bridge::multi_agent_workflow::{CoordinationPattern, MultiAgentConfig};
+    use llmspell_bridge::multi_agent::{CoordinationPattern, MultiAgentConfig};
 
     let config = MultiAgentConfig {
         pattern: CoordinationPattern::Pipeline,
@@ -131,7 +131,7 @@ fn test_coordination_pattern_serialization() {
 
 #[test]
 fn test_all_coordination_patterns() {
-    use llmspell_bridge::multi_agent_workflow::CoordinationPattern;
+    use llmspell_bridge::multi_agent::CoordinationPattern;
 
     // Verify all patterns are defined
     let patterns = vec![

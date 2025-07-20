@@ -863,7 +863,7 @@ ensure it's certain implementations are consisten with what should go in `llmspe
 **Assignee**: Bridge Team
 **Status**: In Progress
 **Started**: 2025-07-20
-**Progress**: ~75% Complete
+**Progress**: ~85% Complete
 
 **Description**: Implement the global object injection system for comprehensive script integration, providing all rs-llmspell functionality through pre-injected globals without require() statements.
 
@@ -897,13 +897,15 @@ ensure it's certain implementations are consisten with what should go in `llmspe
 11. [x] Analyze llmspell-bridge/src for engine-specific code - DONE 2025-07-20
     - Analysis complete: All engine-specific code is properly contained in lua/ and javascript/ subdirectories
     - No refactoring needed for engine-specific code
-12. [ ] Consolidate workflow files in llmspell-bridge/src - ANALYZED 2025-07-20
-    - Current: 7 workflow files totaling 3,130 lines with significant overlap
-    - Recommendation: Consolidate to 3 files for better maintainability
-    - Merge: workflows.rs + workflow_bridge.rs → workflows.rs (~1,000 lines)
-    - Merge: workflow_results.rs → conversion.rs (consistent with agent result handling)
-    - Merge: workflow_registry_bridge.rs → into main workflows.rs
-    - Keep separate: workflow_performance.rs, workflow_orchestration.rs → orchestration.rs, multi_agent_workflow.rs → multi_agent.rs
+12. [x] Consolidate workflow files in llmspell-bridge/src - COMPLETED 2025-07-20
+    - Successfully consolidated from 7 files to 3 files as planned:
+    - Merged: workflow_bridge.rs + workflow_registry_bridge.rs → workflows.rs (1,484 lines)
+    - Merged: workflow_results.rs + workflow_conversion_core.rs → conversion.rs
+    - Renamed: workflow_orchestration.rs → orchestration.rs
+    - Renamed: multi_agent_workflow.rs → multi_agent.rs
+    - Deleted: workflow_conversion.rs, workflow_bridge.rs, workflow_registry_bridge.rs, workflow_results.rs, workflow_conversion_core.rs
+    - Updated all imports and fixed test imports
+    - All tests passing, quality checks passing
 13. [ ] Implement Hook global in `llmspell-bridge/src/globals/hook_global.rs`
 14. [ ] Implement Event global in `llmspell-bridge/src/globals/event_global.rs`
 15. [ ] Implement State global in `llmspell-bridge/src/globals/state_global.rs`
