@@ -3,8 +3,12 @@
 
 pub mod agent_global;
 pub mod core;
+pub mod event_global;
+pub mod hook_global;
 pub mod injection;
+pub mod json_global;
 pub mod registry;
+pub mod state_global;
 pub mod tool_global;
 pub mod types;
 pub mod workflow_global;
@@ -22,16 +26,18 @@ pub fn create_standard_registry(context: Arc<GlobalContext>) -> Result<GlobalReg
     let mut builder = GlobalRegistryBuilder::new();
 
     // Register core globals in dependency order
-    // TODO: Add JSON global when implemented
+    builder.register(Arc::new(json_global::JsonGlobal::new()));
     builder.register(Arc::new(core::LoggerGlobal::new()));
     builder.register(Arc::new(core::ConfigGlobal::new(serde_json::json!({}))));
-    // TODO: Add State global when implemented
+    builder.register(Arc::new(state_global::StateGlobal::new()));
     builder.register(Arc::new(core::UtilsGlobal::new()));
     // TODO: Add Security global when implemented
-    // TODO: Add Event global when implemented
-    // TODO: Add Hook global when implemented
-    builder.register(Arc::new(core::ToolGlobal::new(context.registry.clone())));
-    builder.register(Arc::new(core::AgentGlobal::new(
+    builder.register(Arc::new(event_global::EventGlobal::new()));
+    builder.register(Arc::new(hook_global::HookGlobal::new()));
+    builder.register(Arc::new(tool_global::ToolGlobal::new(
+        context.registry.clone(),
+    )));
+    builder.register(Arc::new(agent_global::AgentGlobal::new(
         context.registry.clone(),
         context.providers.clone(),
     )));

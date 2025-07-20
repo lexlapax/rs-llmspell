@@ -306,4 +306,182 @@ mod lua_globals {
 
         Ok(())
     }
+
+    #[test]
+    fn test_json_global_lua() -> Result<()> {
+        let lua = Lua::new();
+        let context = setup_test_context();
+        let registry = create_standard_registry(context.clone())?;
+        let injector = GlobalInjector::new(Arc::new(registry));
+
+        injector.inject_lua(&lua, &context)?;
+
+        // Test JSON global functions
+        lua.load(
+            r#"
+            -- Test JSON.parse()
+            local json_str = '{"name": "test", "value": 42, "active": true}'
+            local obj = JSON.parse(json_str)
+            assert(obj.name == "test", "JSON.parse() name field incorrect")
+            assert(obj.value == 42, "JSON.parse() value field incorrect")
+            assert(obj.active == true, "JSON.parse() active field incorrect")
+            
+            -- Test JSON.stringify()
+            local data = {
+                message = "hello",
+                count = 10,
+                nested = {
+                    flag = false
+                }
+            }
+            local str = JSON.stringify(data)
+            assert(type(str) == "string", "JSON.stringify() should return a string")
+            
+            -- Test round-trip
+            local parsed = JSON.parse(str)
+            assert(parsed.message == "hello", "Round-trip message incorrect")
+            assert(parsed.count == 10, "Round-trip count incorrect")
+            assert(parsed.nested.flag == false, "Round-trip nested flag incorrect")
+            
+            -- Test error handling
+            local success, err = pcall(JSON.parse, "invalid json")
+            assert(not success, "JSON.parse() should fail on invalid JSON")
+        "#,
+        )
+        .exec()
+        .map_err(|e| llmspell_core::LLMSpellError::Component {
+            message: format!("JSON Lua test failed: {}", e),
+            source: None,
+        })?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_hook_global_lua() -> Result<()> {
+        let lua = Lua::new();
+        let context = setup_test_context();
+        let registry = create_standard_registry(context.clone())?;
+        let injector = GlobalInjector::new(Arc::new(registry));
+
+        injector.inject_lua(&lua, &context)?;
+
+        // Test Hook global placeholder functions
+        lua.load(
+            r#"
+            -- Test Hook.register() placeholder
+            local result = Hook.register("test_hook", function() end)
+            assert(type(result) == "string", "Hook.register() should return a string")
+            assert(result:find("placeholder") ~= nil, "Hook.register() should indicate it's a placeholder")
+            
+            -- Test Hook.list()
+            local hooks = Hook.list()
+            assert(type(hooks) == "table", "Hook.list() should return a table")
+        "#,
+        )
+        .exec()
+        .map_err(|e| llmspell_core::LLMSpellError::Component {
+            message: format!("Hook Lua test failed: {}", e),
+            source: None,
+        })?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_event_global_lua() -> Result<()> {
+        let lua = Lua::new();
+        let context = setup_test_context();
+        let registry = create_standard_registry(context.clone())?;
+        let injector = GlobalInjector::new(Arc::new(registry));
+
+        injector.inject_lua(&lua, &context)?;
+
+        // Test Event global placeholder functions
+        lua.load(
+            r#"
+            -- Test Event.emit() placeholder
+            local result = Event.emit("test_event", {data = "test"})
+            assert(type(result) == "string", "Event.emit() should return a string")
+            assert(result:find("placeholder") ~= nil, "Event.emit() should indicate it's a placeholder")
+            
+            -- Test Event.subscribe() placeholder
+            result = Event.subscribe("test_event", function() end)
+            assert(type(result) == "string", "Event.subscribe() should return a string")
+            assert(result:find("placeholder") ~= nil, "Event.subscribe() should indicate it's a placeholder")
+            
+            -- Test Event.unsubscribe()
+            local success = Event.unsubscribe("test_subscription")
+            assert(success == true, "Event.unsubscribe() should return true")
+        "#,
+        )
+        .exec()
+        .map_err(|e| llmspell_core::LLMSpellError::Component {
+            message: format!("Event Lua test failed: {}", e),
+            source: None,
+        })?;
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_state_global_lua() -> Result<()> {
+        let lua = Lua::new();
+        let context = setup_test_context();
+        let registry = create_standard_registry(context.clone())?;
+        let injector = GlobalInjector::new(Arc::new(registry));
+
+        injector.inject_lua(&lua, &context)?;
+
+        // Test State global functions (in-memory implementation)
+        lua.load(
+            r#"
+            -- Test State.set() and State.get()
+            State.set("test_key", "test_value")
+            local value = State.get("test_key")
+            assert(value == "test_value", "State.get() should return stored value")
+            
+            -- Test complex data
+            State.set("complex", {
+                name = "test",
+                count = 42,
+                nested = {
+                    flag = true
+                }
+            })
+            local complex = State.get("complex")
+            assert(complex.name == "test", "Complex state name incorrect")
+            assert(complex.count == 42, "Complex state count incorrect")
+            assert(complex.nested.flag == true, "Complex state nested flag incorrect")
+            
+            -- Test State.list()
+            local keys = State.list()
+            assert(type(keys) == "table", "State.list() should return a table")
+            local found_test_key = false
+            local found_complex = false
+            for _, key in ipairs(keys) do
+                if key == "test_key" then found_test_key = true end
+                if key == "complex" then found_complex = true end
+            end
+            assert(found_test_key, "State.list() should include test_key")
+            assert(found_complex, "State.list() should include complex")
+            
+            -- Test State.delete()
+            State.delete("test_key")
+            value = State.get("test_key")
+            assert(value == nil, "State.get() should return nil after delete")
+            
+            -- Test non-existent key
+            value = State.get("non_existent")
+            assert(value == nil, "State.get() should return nil for non-existent key")
+        "#,
+        )
+        .exec()
+        .map_err(|e| llmspell_core::LLMSpellError::Component {
+            message: format!("State Lua test failed: {}", e),
+            source: None,
+        })?;
+
+        Ok(())
+    }
 }
