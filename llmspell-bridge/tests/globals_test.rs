@@ -223,55 +223,92 @@ mod lua_globals {
         lua.load(
             r#"
             -- Test Workflow.sequential()
-            local seq = Workflow.sequential("test_seq", "A test sequential workflow")
+            local seq = Workflow.sequential({
+                name = "test_seq",
+                description = "A test sequential workflow",
+                steps = {
+                    {
+                        name = "step1",
+                        type = "tool",
+                        tool = "dummy_tool",
+                        input = { message = "test" }
+                    }
+                }
+            })
             assert(seq ~= nil, "Sequential workflow creation failed")
             local info = seq:getInfo()
             assert(info.name == "test_seq", "Sequential workflow name mismatch")
             assert(info.type == "sequential", "Sequential workflow type mismatch")
             
             -- Test Workflow.conditional()
-            local cond = Workflow.conditional("test_cond", "A test conditional workflow")
+            local cond = Workflow.conditional({
+                name = "test_cond",
+                description = "A test conditional workflow",
+                branches = {
+                    {
+                        name = "branch1",
+                        condition = { type = "always" },
+                        steps = {
+                            {
+                                name = "step1",
+                                type = "tool",
+                                tool = "dummy_tool",
+                                input = {}
+                            }
+                        }
+                    }
+                }
+            })
             assert(cond ~= nil, "Conditional workflow creation failed")
             info = cond:getInfo()
             assert(info.type == "conditional", "Conditional workflow type mismatch")
             
             -- Test Workflow.loop()
-            -- Note: Loop workflow would need additional configuration to work properly
-            -- Skip for now as it requires iterator configuration
+            local loop_wf = Workflow.loop({
+                name = "test_loop",
+                description = "A test loop workflow",
+                iterator = "range",
+                start = 1,
+                ["end"] = 5,
+                step = 1,
+                body = {
+                    {
+                        name = "loop_step",
+                        type = "tool",
+                        tool = "dummy_tool",
+                        input = {}
+                    }
+                }
+            })
+            assert(loop_wf ~= nil, "Loop workflow creation failed")
+            info = loop_wf:getInfo()
+            assert(info.type == "loop", "Loop workflow type mismatch")
             
             -- Test Workflow.parallel()
-            -- Note: Parallel workflow would need branches to work properly
-            -- Skip for now as it requires branch configuration
-            
-            -- Test Workflow.create()
-            local wf = Workflow.create({
-                type = "sequential",
-                name = "test_create",
-                description = "Created with create()"
+            local par = Workflow.parallel({
+                name = "test_parallel",
+                description = "A test parallel workflow",
+                branches = {
+                    {
+                        name = "branch1",
+                        steps = {
+                            {
+                                name = "step1",
+                                type = "tool",
+                                tool = "dummy_tool",
+                                input = {}
+                            }
+                        }
+                    }
+                }
             })
-            assert(wf ~= nil, "Workflow.create() failed")
-            info = wf:getInfo()
-            assert(info.name == "test_create", "Created workflow name mismatch")
+            assert(par ~= nil, "Parallel workflow creation failed")
+            info = par:getInfo()
+            assert(info.type == "parallel", "Parallel workflow type mismatch")
             
-            -- Test that loop workflow would fail without proper configuration
-            local success, err = pcall(function()
-                return Workflow.create({
-                    type = "loop",
-                    name = "test_loop_fail",
-                    description = "Should fail without iterator"
-                })
-            end)
-            assert(not success, "Loop workflow should fail without iterator configuration")
-            
-            -- Test that parallel workflow would also fail without branches
-            success, err = pcall(function()
-                return Workflow.create({
-                    type = "parallel",
-                    name = "test_parallel_fail",
-                    description = "Should fail without branches"
-                })
-            end)
-            assert(not success, "Parallel workflow should fail without branch configuration")
+            -- Test Workflow types listing
+            local types = Workflow.types()
+            assert(#types >= 4, "Should have at least 4 workflow types")
         "#,
         )
         .exec()
