@@ -52,12 +52,9 @@ print("\n=== Testing Tool.exists() ===")
 print("calculator exists: " .. tostring(Tool.exists("calculator")))
 print("nonexistent exists: " .. tostring(Tool.exists("nonexistent")))
 
--- Test categories
-print("\n=== Testing Tool.categories() ===")
-local cats = Tool.categories()
-print("Found " .. #cats .. " categories:")
-for i, cat in ipairs(cats) do
-    print("  " .. i .. ". " .. tostring(cat))
-end
+-- Tool.categories() is not available in current API
+print("\n=== Tool Summary ===")
+print("Tool.categories() is not available in current API")
+print("Total tools available: " .. #Tool.list())
 
 print("\n=== Test Complete ===")

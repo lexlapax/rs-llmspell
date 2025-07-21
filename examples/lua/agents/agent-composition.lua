@@ -1,7 +1,6 @@
 -- ABOUTME: Example demonstrating agent composition patterns in LLMSpell
 -- ABOUTME: Shows how to wrap agents as tools, create composite agents, and discover agents by capability
 
-local llmspell = require("llmspell")
 
 -- Helper function to print results
 local function print_result(name, result)
@@ -23,7 +22,7 @@ end
 print("\n=== Creating Agents ===")
 
 -- Create a research agent
-local research_agent = Agent.create({
+local research_agent = Agent.createAsync({
     name = "research_agent",
     system_prompt = "You are a research assistant. Focus on finding and summarizing information.",
     temperature = 0.3
@@ -31,7 +30,7 @@ local research_agent = Agent.create({
 print("Created research agent")
 
 -- Create an analysis agent
-local analysis_agent = Agent.create({
+local analysis_agent = Agent.createAsync({
     name = "analysis_agent", 
     system_prompt = "You are a data analyst. Focus on analyzing patterns and providing insights.",
     temperature = 0.5
@@ -39,7 +38,7 @@ local analysis_agent = Agent.create({
 print("Created analysis agent")
 
 -- Create a writer agent
-local writer_agent = Agent.create({
+local writer_agent = Agent.createAsync({
     name = "writer_agent",
     system_prompt = "You are a creative writer. Focus on producing well-written content.",
     temperature = 0.8
@@ -115,7 +114,7 @@ print(result.text)
 
 -- Use an agent that leverages the wrapped tool
 print("\n=== Using Agent with Wrapped Tool ===")
-local enhanced_writer = Agent.create({
+local enhanced_writer = Agent.createAsync({
     name = "enhanced_writer",
     system_prompt = "You are a writer who can use research tools to create well-informed content.",
     temperature = 0.7

@@ -5,14 +5,14 @@
 -- Agents analyze data and determine which branch to execute
 
 -- Create specialized agents for different scenarios
-local risk_analyzer = Agent.create({
+local risk_analyzer = Agent.createAsync({
     name = "risk_analyzer",
     model = "gpt-4",
     system_prompt = "You are a risk assessment expert. Analyze data and identify risk levels (low, medium, high).",
     temperature = 0.3  -- Lower temperature for consistent analysis
 })
 
-local opportunity_finder = Agent.create({
+local opportunity_finder = Agent.createAsync({
     name = "opportunity_finder",
     model = "gpt-4",
     system_prompt = "You are a business opportunity analyst. Identify growth opportunities in data.",
@@ -110,7 +110,7 @@ Recommended Investment: ${{investment}}
                 {
                     name = "analyze_balance",
                     type = "agent",
-                    agent = Agent.create({
+                    agent = Agent.createAsync({
                         name = "balance_advisor",
                         model = "gpt-3.5-turbo",
                         system_prompt = "Provide balanced business advice for medium-risk scenarios"
@@ -193,7 +193,7 @@ local sentiment_workflow = Workflow.conditional({
             name = "positive_response",
             condition = {
                 type = "agent_evaluates_true",
-                agent = Agent.create({
+                agent = Agent.createAsync({
                     name = "sentiment_analyzer",
                     model = "gpt-3.5-turbo",
                     system_prompt = "Analyze sentiment. Respond only with: positive, negative, or neutral"
@@ -204,7 +204,7 @@ local sentiment_workflow = Workflow.conditional({
                 {
                     name = "thank_customer",
                     type = "agent",
-                    agent = Agent.create({
+                    agent = Agent.createAsync({
                         name = "responder",
                         model = "gpt-3.5-turbo",
                         system_prompt = "Write friendly, appreciative responses"
@@ -230,7 +230,7 @@ local sentiment_workflow = Workflow.conditional({
             name = "recovery_response",
             condition = {
                 type = "agent_evaluates_true",
-                agent = Agent.create({
+                agent = Agent.createAsync({
                     name = "sentiment_analyzer",
                     model = "gpt-3.5-turbo",
                     system_prompt = "Analyze sentiment. Respond only with: positive, negative, or neutral"
@@ -241,7 +241,7 @@ local sentiment_workflow = Workflow.conditional({
                 {
                     name = "apologize",
                     type = "agent",
-                    agent = Agent.create({
+                    agent = Agent.createAsync({
                         name = "support_agent",
                         model = "gpt-4",
                         system_prompt = "Write empathetic customer service responses"
@@ -278,7 +278,7 @@ local sentiment_workflow = Workflow.conditional({
                 {
                     name = "request_clarification",
                     type = "agent",
-                    agent = Agent.create({
+                    agent = Agent.createAsync({
                         name = "clarifier",
                         model = "gpt-3.5-turbo",
                         system_prompt = "Ask clarifying questions politely"

@@ -9,28 +9,28 @@ This example shows parallel agent coordination for comprehensive document analys
 ]]
 
 -- Create specialized analysis agents
-local sentiment_agent = Agent.create({
+local sentiment_agent = Agent.createAsync({
     name = "sentiment_analyzer",
     model = "mock/sentiment-v1",
     capabilities = {"sentiment_analysis", "emotion_detection"},
     system_prompt = "Analyze emotional tone and sentiment in text."
 })
 
-local fact_checker = Agent.create({
+local fact_checker = Agent.createAsync({
     name = "fact_checker", 
     model = "mock/factcheck-v1",
     capabilities = {"fact_verification", "source_validation"},
     system_prompt = "Verify facts and check sources for accuracy."
 })
 
-local style_analyzer = Agent.create({
+local style_analyzer = Agent.createAsync({
     name = "style_analyzer",
     model = "mock/style-v1", 
     capabilities = {"writing_style_analysis", "readability_scoring"},
     system_prompt = "Analyze writing style, clarity, and readability."
 })
 
-local topic_extractor = Agent.create({
+local topic_extractor = Agent.createAsync({
     name = "topic_extractor",
     model = "mock/topics-v1",
     capabilities = {"topic_modeling", "keyword_extraction"},
@@ -38,7 +38,7 @@ local topic_extractor = Agent.create({
 })
 
 -- Coordinator agent to synthesize results
-local coordinator = Agent.create({
+local coordinator = Agent.createAsync({
     name = "analysis_coordinator",
     model = "mock/coordinator-v1",
     capabilities = {"result_synthesis", "report_generation"},

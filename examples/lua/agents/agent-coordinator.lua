@@ -10,11 +10,11 @@ print("=== Agent Coordinator Example ===\n")
 local agents = {}
 
 -- Research Agent
-agents.researcher = Agent.create({
+agents.researcher = Agent.createAsync({
     name = "research_agent",
     description = "Gathers and analyzes information",
     provider = "openai",
-    model = "gpt-4",
+    model = "gpt-4o-mini",
     system_prompt = [[
 You are a research specialist. You:
 1. Gather relevant information on topics
@@ -27,11 +27,11 @@ You are a research specialist. You:
 })
 
 -- Analysis Agent
-agents.analyst = Agent.create({
+agents.analyst = Agent.createAsync({
     name = "analysis_agent",
     description = "Performs deep analysis on data",
     provider = "openai",
-    model = "gpt-4",
+    model = "gpt-4o-mini",
     system_prompt = [[
 You are a data analyst. You:
 1. Identify patterns and trends
@@ -44,11 +44,11 @@ You are a data analyst. You:
 })
 
 -- Decision Agent
-agents.decision_maker = Agent.create({
+agents.decision_maker = Agent.createAsync({
     name = "decision_agent",
     description = "Makes recommendations based on analysis",
     provider = "openai",
-    model = "gpt-4",
+    model = "gpt-4o-mini",
     system_prompt = [[
 You are a decision-making specialist. You:
 1. Evaluate multiple options
@@ -61,11 +61,11 @@ You are a decision-making specialist. You:
 })
 
 -- Coordinator Agent (orchestrates others)
-agents.coordinator = Agent.create({
+agents.coordinator = Agent.createAsync({
     name = "coordinator_agent",
     description = "Coordinates multiple agents to achieve complex goals",
     provider = "openai",
-    model = "gpt-4",
+    model = "gpt-4o-mini",
     system_prompt = [[
 You are a multi-agent coordinator. You:
 1. Break down complex tasks into sub-tasks

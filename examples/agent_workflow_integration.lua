@@ -8,14 +8,14 @@ State.set("results", {})
 print("=== Multi-Agent Workflow Example ===")
 
 -- Step 1: Create specialized agents
-local analyst_agent = Agent.create({
+local analyst_agent = Agent.createAsync({
     name = "data_analyst",
     provider = "mock",
     model = "mock-model",
     system_prompt = "You are a data analyst. Analyze data and provide insights."
 })
 
-local writer_agent = Agent.create({
+local writer_agent = Agent.createAsync({
     name = "content_writer", 
     provider = "mock",
     model = "mock-model",

@@ -43,9 +43,10 @@ print("All state keys:", JSON.stringify(keys))
 
 -- Example 3: Using the Tool global
 print("\n=== Tool Global Demo ===")
--- List available tool categories
-local categories = Tool.categories()
-print("Tool categories available:", JSON.stringify(categories))
+-- Tool.categories() is not available in current API
+-- Instead, list all tools
+local tools = Tool.list()
+print("Total tools available:", #tools)
 
 -- Get a specific tool
 local calculator = Tool.get("calculator")
@@ -68,7 +69,7 @@ print("Total tools available:", #all_tools)
 -- Example 4: Using the Agent global
 print("\n=== Agent Global Demo ===")
 -- Create a simple agent
-local my_agent = Agent.create({
+local my_agent = Agent.createAsync({
     name = "demo_agent",
     provider = "mock",  -- Using mock provider for demo
     model = "mock-model",
@@ -144,7 +145,7 @@ State.set("agent_config", {
 
 -- Create an agent with config from state
 local config = State.get("agent_config")
-local smart_agent = Agent.create({
+local smart_agent = Agent.createAsync({
     name = "smart_demo",
     provider = "mock",
     model = "mock-model",

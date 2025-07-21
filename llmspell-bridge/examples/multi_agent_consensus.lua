@@ -9,28 +9,28 @@ This example shows a decision-making scenario where multiple expert agents:
 ]]
 
 -- Create expert evaluator agents with different specializations
-local financial_expert = Agent.create({
+local financial_expert = Agent.createAsync({
     name = "financial_analyst",
     model = "mock/finance-v1",
     capabilities = {"financial_analysis", "risk_assessment"},
     system_prompt = "Evaluate investments from a financial perspective, focusing on ROI and risk."
 })
 
-local market_expert = Agent.create({
+local market_expert = Agent.createAsync({
     name = "market_analyst",
     model = "mock/market-v1",
     capabilities = {"market_analysis", "trend_prediction"},
     system_prompt = "Evaluate investments based on market trends and competitive positioning."
 })
 
-local technical_expert = Agent.create({
+local technical_expert = Agent.createAsync({
     name = "technical_analyst",
     model = "mock/tech-v1",
     capabilities = {"technical_evaluation", "innovation_assessment"},
     system_prompt = "Evaluate investments based on technical merit and innovation potential."
 })
 
-local sustainability_expert = Agent.create({
+local sustainability_expert = Agent.createAsync({
     name = "sustainability_analyst",
     model = "mock/sustainability-v1",
     capabilities = {"esg_analysis", "sustainability_scoring"},

@@ -181,13 +181,11 @@ if JSON then
 end
 
 -- Part 5: Tool Categories
-print("\n8. TOOL CATEGORIES")
+print("\n8. TOOL SUMMARY")
 print("------------------")
-local categories = Tool.categories()
-print("Available tool categories: " .. #categories)
-for _, cat in ipairs(categories) do
-    print("  - " .. cat)
-end
+-- Tool.categories() is not available in current API
+print("Total tools available: " .. #Tool.list())
+print("Use Tool.list() to see all available tools")
 
 print("\n=== Example Complete ===")
 print("This example demonstrated LLMSpell's core functionality")

@@ -5,7 +5,7 @@ print("Testing new agent creation syntax...")
 
 -- Test 1: New syntax with provider/model
 print("Test 1: Creating agent with 'openai/gpt-4' syntax...")
-local agent1 = Agent.create({
+local agent1 = Agent.createAsync({
     model = "openai/gpt-4",
     system_prompt = "You are a helpful assistant.",
     temperature = 0.7,
@@ -14,7 +14,7 @@ local agent1 = Agent.create({
 
 -- Test 2: New syntax with base URL override
 print("Test 2: Creating agent with base URL override...")
-local agent2 = Agent.create({
+local agent2 = Agent.createAsync({
     model = "anthropic/claude-3",
     base_url = "https://api.custom.com/v1",
     system_prompt = "You are a coding assistant.",
@@ -23,7 +23,7 @@ local agent2 = Agent.create({
 
 -- Test 3: Legacy syntax compatibility
 print("Test 3: Testing legacy syntax compatibility...")
-local agent3 = Agent.create({
+local agent3 = Agent.createAsync({
     provider = "openai",
     model_name = "gpt-3.5-turbo",
     system_prompt = "You are a creative writer.",
@@ -32,7 +32,7 @@ local agent3 = Agent.create({
 
 -- Test 4: Model only (should use default provider)
 print("Test 4: Testing model-only syntax...")
-local agent4 = Agent.create({
+local agent4 = Agent.createAsync({
     model = "gpt-4",
     system_prompt = "You are a data analyst."
 })

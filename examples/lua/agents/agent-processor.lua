@@ -7,11 +7,11 @@
 print("=== Agent Data Processor Example ===\n")
 
 -- Create a data processing agent
-local processor = Agent.create({
+local processor = Agent.createAsync({
     name = "data_processor_agent",
     description = "Processes and transforms data with intelligent analysis",
     provider = "openai",
-    model = "gpt-4",
+    model = "gpt-4o-mini",
     system_prompt = [[
 You are a data processing expert. You excel at:
 1. Extracting insights from raw data

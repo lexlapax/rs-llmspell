@@ -27,8 +27,12 @@ if calc then
     
     -- Try a calculation
     print("\nCalculating 2 + 2 * 3:")
-    local result = calc({ input = "2 + 2 * 3" })
-    print("Result: " .. tostring(result.output or result.text or "no output"))
+    local result = calc:execute({ operation = "evaluate", input = "2 + 2 * 3" })
+    if result then
+        print("Result: " .. tostring(result.output or result.text or "no output"))
+    else
+        print("Result: calculation failed")
+    end
 else
     print("✗ Calculator not found")
 end

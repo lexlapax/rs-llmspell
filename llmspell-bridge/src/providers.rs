@@ -69,7 +69,8 @@ impl ProviderManager {
             // Get the provider config to determine the actual provider name
             let provider_config = &self.config.providers[default];
             let provider_name = match provider_config.provider_type.as_str() {
-                "openai" | "anthropic" | "cohere" => "rig",
+                "openai" | "anthropic" | "cohere" | "groq" | "perplexity" | "together"
+                | "gemini" | "mistral" | "replicate" | "fireworks" => "rig",
                 other => other,
             };
 
@@ -93,7 +94,8 @@ impl ProviderManager {
     ) -> Result<ProviderInstanceConfig, LLMSpellError> {
         // Map provider_type to the actual provider name
         let provider_name = match config.provider_type.as_str() {
-            "openai" | "anthropic" | "cohere" => "rig",
+            "openai" | "anthropic" | "cohere" | "groq" | "perplexity" | "together" | "gemini"
+            | "mistral" | "replicate" | "fireworks" => "rig",
             other => other,
         };
 

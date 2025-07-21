@@ -8,10 +8,10 @@
 print("=== Agent Orchestrator Example ===\n")
 
 -- Create an orchestrator agent that can manage tools
-local orchestrator = Agent.create({
+local orchestrator = Agent.createAsync({
     name = "tool_orchestrator",
     description = "Orchestrates multiple tools to accomplish complex tasks",
-    provider_model = "openai/gpt-4",
+    provider_model = "openai/gpt-4o-mini",
     system_prompt = [[
 You are a tool orchestration specialist. You coordinate multiple tools to accomplish complex tasks efficiently.
 When given a task:

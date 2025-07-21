@@ -6,28 +6,28 @@
 
 -- Create specialized analysis agents
 local agents = {
-    financial = Agent.create({
+    financial = Agent.createAsync({
         name = "financial_analyst",
         model = "gpt-4",
         system_prompt = "You are a financial analyst. Analyze data from a financial perspective, focusing on costs, ROI, and profitability.",
         temperature = 0.3
     }),
     
-    technical = Agent.create({
+    technical = Agent.createAsync({
         name = "technical_analyst",
         model = "gpt-4",
         system_prompt = "You are a technical architect. Analyze feasibility, technical requirements, and implementation complexity.",
         temperature = 0.4
     }),
     
-    market = Agent.create({
+    market = Agent.createAsync({
         name = "market_analyst",
         model = "gpt-4",
         system_prompt = "You are a market research expert. Analyze market fit, competition, and growth potential.",
         temperature = 0.5
     }),
     
-    risk = Agent.create({
+    risk = Agent.createAsync({
         name = "risk_analyst",
         model = "gpt-4",
         system_prompt = "You are a risk assessment specialist. Identify potential risks, vulnerabilities, and mitigation strategies.",
@@ -225,7 +225,7 @@ List top 5 risks with:
         {
             name = "synthesize_results",
             type = "agent",
-            agent = Agent.create({
+            agent = Agent.createAsync({
                 name = "synthesizer",
                 model = "gpt-4",
                 system_prompt = "You synthesize multiple expert analyses into actionable recommendations.",
@@ -322,7 +322,7 @@ local content_workflow = Workflow.parallel({
                 {
                     name = "write_blog",
                     type = "agent",
-                    agent = Agent.create({
+                    agent = Agent.createAsync({
                         name = "blog_writer",
                         model = "gpt-4",
                         system_prompt = "You are a technical blog writer. Create engaging, informative content.",
@@ -335,7 +335,7 @@ local content_workflow = Workflow.parallel({
                 {
                     name = "optimize_seo",
                     type = "agent",
-                    agent = Agent.create({
+                    agent = Agent.createAsync({
                         name = "seo_optimizer",
                         model = "gpt-3.5-turbo",
                         system_prompt = "You optimize content for SEO. Add keywords and meta descriptions.",
@@ -355,7 +355,7 @@ local content_workflow = Workflow.parallel({
                 {
                     name = "create_tweets",
                     type = "agent",
-                    agent = Agent.create({
+                    agent = Agent.createAsync({
                         name = "social_media_writer",
                         model = "gpt-3.5-turbo",
                         system_prompt = "Create engaging social media content. Be concise and use relevant hashtags.",
@@ -368,7 +368,7 @@ local content_workflow = Workflow.parallel({
                 {
                     name = "create_linkedin",
                     type = "agent",
-                    agent = Agent.create({
+                    agent = Agent.createAsync({
                         name = "linkedin_writer",
                         model = "gpt-3.5-turbo",
                         system_prompt = "Write professional LinkedIn posts for B2B audience.",
@@ -388,7 +388,7 @@ local content_workflow = Workflow.parallel({
                 {
                     name = "write_email",
                     type = "agent",
-                    agent = Agent.create({
+                    agent = Agent.createAsync({
                         name = "email_writer",
                         model = "gpt-4",
                         system_prompt = "Write compelling marketing emails with clear CTAs.",
@@ -401,7 +401,7 @@ local content_workflow = Workflow.parallel({
                 {
                     name = "create_subject_lines",
                     type = "agent",
-                    agent = Agent.create({
+                    agent = Agent.createAsync({
                         name = "subject_writer",
                         model = "gpt-3.5-turbo",
                         system_prompt = "Create attention-grabbing email subject lines.",

@@ -8,7 +8,7 @@
 -- Demonstrates intelligent processing using LLM agents
 
 -- Create an analysis agent
-local analyzer = Agent.create({
+local analyzer = Agent.createAsync({
     name = "data_analyzer",
     model = "gpt-4",
     system_prompt = "You are a data analysis expert. Analyze the provided data and give insights.",
@@ -16,7 +16,7 @@ local analyzer = Agent.create({
 })
 
 -- Create a decision agent
-local decision_maker = Agent.create({
+local decision_maker = Agent.createAsync({
     name = "decision_maker", 
     model = "gpt-4",
     system_prompt = "You are a decision-making assistant. Based on analysis, recommend next actions.",
@@ -169,7 +169,7 @@ local content_workflow = Workflow.sequential({
         {
             name = "research",
             type = "agent",
-            agent = Agent.create({
+            agent = Agent.createAsync({
                 name = "researcher",
                 model = "gpt-4",
                 system_prompt = "You are a research assistant. Gather and summarize information on the given topic."
@@ -183,7 +183,7 @@ local content_workflow = Workflow.sequential({
         {
             name = "create_outline",
             type = "agent",
-            agent = Agent.create({
+            agent = Agent.createAsync({
                 name = "outliner",
                 model = "gpt-3.5-turbo",
                 system_prompt = "You are an expert at creating structured outlines for articles."
@@ -197,7 +197,7 @@ local content_workflow = Workflow.sequential({
         {
             name = "write_content",
             type = "agent",
-            agent = Agent.create({
+            agent = Agent.createAsync({
                 name = "writer",
                 model = "gpt-4",
                 system_prompt = "You are a technical writer. Write clear, engaging content based on the provided outline.",
@@ -212,7 +212,7 @@ local content_workflow = Workflow.sequential({
         {
             name = "edit_content",
             type = "agent",
-            agent = Agent.create({
+            agent = Agent.createAsync({
                 name = "editor",
                 model = "gpt-4",
                 system_prompt = "You are a professional editor. Review and improve the content for clarity and correctness.",

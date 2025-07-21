@@ -1,7 +1,7 @@
 -- Example Lua script showing provider integration
 
 -- Create an agent with default provider
-local agent = Agent.create({
+local agent = Agent.createAsync({
     system_prompt = "You are a helpful AI assistant",
     temperature = 0.7,
     max_tokens = 100
@@ -15,7 +15,7 @@ local result = agent:execute({
 print("Agent response: " .. result.text)
 
 -- Create an agent with specific provider
-local custom_agent = Agent.create({
+local custom_agent = Agent.createAsync({
     provider = "openai",
     model = "gpt-4",
     system_prompt = "You are an expert programmer",

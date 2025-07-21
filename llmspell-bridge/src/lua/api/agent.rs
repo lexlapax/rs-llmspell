@@ -142,14 +142,15 @@ pub fn inject_agent_api(
                 ));
 
                 // Create the Lua wrapper with bridge access
-                let core_providers_inner = tokio::runtime::Handle::current()
-                    .block_on(providers.create_core_manager_arc())
-                    .map_err(|e| {
-                        mlua::Error::RuntimeError(format!(
-                            "Failed to create core provider manager: {}",
-                            e
-                        ))
-                    })?;
+                let core_providers_inner = futures::executor::block_on(
+                    providers.create_core_manager_arc(),
+                )
+                .map_err(|e| {
+                    mlua::Error::RuntimeError(format!(
+                        "Failed to create core provider manager: {}",
+                        e
+                    ))
+                })?;
                 let bridge = Arc::new(AgentBridge::new(registry.clone(), core_providers_inner));
                 let wrapper = LuaAgentWrapper {
                     agent,
@@ -761,6 +762,54 @@ pub fn inject_agent_api(
         .set("getHierarchy", get_hierarchy_fn)
         .map_err(|e| LLMSpellError::Component {
             message: format!("Failed to set Agent.getHierarchy: {}", e),
+            source: None,
+        })?;
+
+    // Add createAsync helper for coroutine context
+    let create_async_code = r#"
+        -- Helper to create agents within a coroutine context
+        function(config)
+            -- Create coroutine for async execution
+            local co = coroutine.create(function()
+                return Agent.create(config)
+            end)
+            
+            -- Execute the coroutine with safety checks
+            local success, result = coroutine.resume(co)
+            local resume_count = 0
+            local max_resumes = 1000  -- Prevent infinite loops (increased for complex async operations)
+            
+            -- Handle async operations that yield
+            while success and coroutine.status(co) ~= "dead" and resume_count < max_resumes do
+                resume_count = resume_count + 1
+                success, result = coroutine.resume(co, result)
+            end
+            
+            -- Check for infinite loop
+            if resume_count >= max_resumes then
+                error("Agent creation timed out - possible infinite loop in async operation")
+            end
+            
+            if not success then
+                error(tostring(result))
+            end
+            
+            return result
+        end
+    "#;
+
+    let create_async_fn = lua
+        .load(create_async_code)
+        .eval::<mlua::Function>()
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to create Agent.createAsync helper: {}", e),
+            source: None,
+        })?;
+
+    agent_table
+        .set("createAsync", create_async_fn)
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to set Agent.createAsync: {}", e),
             source: None,
         })?;
 

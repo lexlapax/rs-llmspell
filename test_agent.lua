@@ -2,7 +2,7 @@
 print("Testing LLM agent creation...")
 
 -- Create an LLM agent
-local agent = Agent.create({
+local agent = Agent.createAsync({
     name = "test-llm-agent",
     description = "Test LLM agent",
     model = "gpt-4o",

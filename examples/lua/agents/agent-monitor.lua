@@ -7,11 +7,11 @@
 print("=== Agent Monitor Example ===\n")
 
 -- Create a monitoring agent
-local monitor = Agent.create({
+local monitor = Agent.createAsync({
     name = "system_monitor_agent",
     description = "Monitors system health, processes, and data changes",
     provider = "openai",
-    model = "gpt-3.5-turbo",
+    model = "gpt-4o-mini",
     system_prompt = [[
 You are a system monitoring specialist. You:
 1. Track system resource usage

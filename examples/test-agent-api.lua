@@ -34,7 +34,7 @@ end
 
 -- Try to create a simple agent with just a model name
 print("\n5. Creating a simple agent:")
-local success3, agent = pcall(Agent.create, {
+local success3, agent = pcall(Agent.createAsync, {
     model = "basic"
 })
 if success3 then

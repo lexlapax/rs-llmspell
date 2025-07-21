@@ -237,6 +237,38 @@ pub fn inject_agent_global(
     agent_table.set("list", list_fn)?;
     agent_table.set("discover", discover_fn)?;
 
+    // Add coroutine wrapper helper for async Agent.create
+    let create_async_code = r#"
+        -- Helper to create agents within a coroutine context
+        function(config)
+            -- Create coroutine for async execution
+            local co = coroutine.create(function()
+                return Agent.create(config)
+            end)
+            
+            -- Execute the coroutine
+            local success, result = coroutine.resume(co)
+            
+            -- Handle async operations that yield
+            while success and coroutine.status(co) ~= "dead" do
+                success, result = coroutine.resume(co, result)
+            end
+            
+            if not success then
+                error(tostring(result))
+            end
+            
+            return result
+        end
+    "#;
+
+    let create_async_fn = lua
+        .load(create_async_code)
+        .eval::<mlua::Function>()
+        .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+
+    agent_table.set("createAsync", create_async_fn)?;
+
     // Set Agent as global
     lua.globals().set("Agent", agent_table)?;
 

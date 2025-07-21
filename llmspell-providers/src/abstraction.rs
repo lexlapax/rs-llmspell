@@ -115,7 +115,26 @@ impl ProviderConfig {
     pub fn from_env(name: &str) -> Result<Self, LLMSpellError> {
         let env_prefix = format!("LLMSPELL_{}_", name.to_uppercase());
 
-        let api_key = std::env::var(format!("{}API_KEY", env_prefix)).ok();
+        // Try LLMSPELL_<PROVIDER>_API_KEY first, then fall back to standard env vars
+        let api_key = std::env::var(format!("{}API_KEY", env_prefix))
+            .ok()
+            .or_else(|| {
+                // Fall back to standard environment variable names
+                match name.to_lowercase().as_str() {
+                    "openai" => std::env::var("OPENAI_API_KEY").ok(),
+                    "anthropic" => std::env::var("ANTHROPIC_API_KEY").ok(),
+                    "cohere" => std::env::var("COHERE_API_KEY").ok(),
+                    "groq" => std::env::var("GROQ_API_KEY").ok(),
+                    "perplexity" => std::env::var("PERPLEXITY_API_KEY").ok(),
+                    "together" => std::env::var("TOGETHER_API_KEY").ok(),
+                    "gemini" => std::env::var("GEMINI_API_KEY").ok(),
+                    "mistral" => std::env::var("MISTRAL_API_KEY").ok(),
+                    "replicate" => std::env::var("REPLICATE_API_TOKEN").ok(),
+                    "fireworks" => std::env::var("FIREWORKS_API_KEY").ok(),
+                    _ => None,
+                }
+            });
+
         let endpoint = std::env::var(format!("{}ENDPOINT", env_prefix)).ok();
         let model =
             std::env::var(format!("{}MODEL", env_prefix)).unwrap_or_else(|_| "default".to_string());
@@ -360,9 +379,11 @@ impl ProviderManager {
                 // If no provider specified, try to use default
                 let default = self.default_provider.read().await;
                 if let Some(default_provider) = default.as_ref() {
-                    // Extract provider name from "provider:model" format
-                    if let Some(colon_pos) = default_provider.find(':') {
-                        default_provider[..colon_pos].to_string()
+                    // Extract provider name from hierarchical format "name/provider_type/model"
+                    // We want the provider_type (second part)
+                    let parts: Vec<&str> = default_provider.split('/').collect();
+                    if parts.len() >= 2 {
+                        parts[1].to_string() // Return the provider_type
                     } else {
                         return Err(LLMSpellError::Configuration {
                             message:
@@ -381,8 +402,17 @@ impl ProviderManager {
             }
         };
 
-        // Create provider configuration
-        let mut config = ProviderConfig::new(&provider_name, &spec.model);
+        // Map provider types to implementation names
+        // These are all the providers that could potentially be supported by rig
+        let implementation_name = match provider_name.as_str() {
+            "openai" | "anthropic" | "cohere" | "groq" | "perplexity" | "together" | "gemini"
+            | "mistral" | "replicate" | "fireworks" => "rig",
+            other => other,
+        };
+
+        // Create provider configuration with implementation name but preserve provider type
+        let mut config =
+            ProviderConfig::new_with_type(implementation_name, &provider_name, &spec.model);
 
         // Apply base URL override with precedence:
         // 1. Function parameter (highest priority)

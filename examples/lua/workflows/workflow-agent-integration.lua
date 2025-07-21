@@ -10,7 +10,7 @@ print("=== Workflow-Agent Integration Example ===\n")
 local agents = {}
 
 -- Data Analysis Agent
-agents.analyzer = Agent.create({
+agents.analyzer = Agent.createAsync({
     name = "data_analyzer",
     model = "gpt-4",
     system_prompt = [[
@@ -25,7 +25,7 @@ Be concise and data-driven.
 })
 
 -- Decision Making Agent
-agents.decision_maker = Agent.create({
+agents.decision_maker = Agent.createAsync({
     name = "decision_agent",
     model = "gpt-4",
     system_prompt = [[
@@ -40,7 +40,7 @@ Be decisive and practical.
 })
 
 -- Report Generator Agent
-agents.reporter = Agent.create({
+agents.reporter = Agent.createAsync({
     name = "report_generator",
     model = "gpt-3.5-turbo",
     system_prompt = [[
@@ -269,7 +269,7 @@ local support_workflow = Workflow.conditional({
         {
             name = "analyze_ticket",
             type = "agent",
-            agent = Agent.create({
+            agent = Agent.createAsync({
                 name = "ticket_analyzer",
                 model = "gpt-3.5-turbo",
                 system_prompt = "Analyze support tickets and categorize them as: technical, billing, feature_request, or general"
@@ -303,7 +303,7 @@ Respond with just the category: technical, billing, feature_request, or general
                 {
                     name = "diagnose_issue",
                     type = "agent",
-                    agent = Agent.create({
+                    agent = Agent.createAsync({
                         name = "tech_support_agent",
                         model = "gpt-4",
                         system_prompt = "You are a technical support specialist. Diagnose issues and provide solutions."
@@ -410,7 +410,7 @@ local research_workflow = Workflow.parallel({
                 {
                     name = "analyze_competition",
                     type = "agent",
-                    agent = Agent.create({
+                    agent = Agent.createAsync({
                         name = "competitive_analyst",
                         model = "gpt-4",
                         system_prompt = "You are a competitive analysis expert."
@@ -529,7 +529,7 @@ local feedback_workflow = Workflow.loop({
         {
             name = "analyze_sentiment",
             type = "agent",
-            agent = Agent.create({
+            agent = Agent.createAsync({
                 name = "sentiment_analyzer",
                 model = "gpt-3.5-turbo",
                 system_prompt = "Analyze sentiment as positive, negative, or neutral. Respond with just the sentiment.",
@@ -630,7 +630,7 @@ local document_pipeline = Workflow.sequential({
                         steps = {{
                             name = "compliance_check",
                             type = "agent",
-                            agent = Agent.create({
+                            agent = Agent.createAsync({
                                 name = "compliance_checker",
                                 model = "gpt-4",
                                 system_prompt = "Check documents for compliance issues."

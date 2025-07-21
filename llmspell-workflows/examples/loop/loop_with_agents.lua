@@ -5,7 +5,7 @@
 -- Process multiple documents with AI analysis
 
 -- Create content analysis agent
-local analyzer = Agent.create({
+local analyzer = Agent.createAsync({
     name = "content_analyzer",
     model = "gpt-4",
     system_prompt = "You are a content analyst. Analyze text and provide insights on quality, sentiment, and key topics.",
@@ -13,7 +13,7 @@ local analyzer = Agent.create({
 })
 
 -- Create summary agent
-local summarizer = Agent.create({
+local summarizer = Agent.createAsync({
     name = "summarizer",
     model = "gpt-3.5-turbo",
     system_prompt = "Create concise summaries of content, highlighting key points.",
@@ -141,7 +141,7 @@ for id, analysis in pairs(analyses) do
 end
 
 -- Iterative improvement loop with AI feedback
-local improver = Agent.create({
+local improver = Agent.createAsync({
     name = "content_improver",
     model = "gpt-4",
     system_prompt = "You improve text based on feedback. Make specific enhancements.",
@@ -275,7 +275,7 @@ local feedback_processor = Workflow.loop({
         {
             name = "categorize",
             type = "agent",
-            agent = Agent.create({
+            agent = Agent.createAsync({
                 name = "categorizer",
                 model = "gpt-3.5-turbo",
                 system_prompt = "Categorize feedback into: praise, complaint, feature_request, or bug_report"
@@ -289,7 +289,7 @@ local feedback_processor = Workflow.loop({
         {
             name = "analyze_sentiment",
             type = "agent",
-            agent = Agent.create({
+            agent = Agent.createAsync({
                 name = "sentiment_analyzer",
                 model = "gpt-3.5-turbo",
                 system_prompt = "Analyze sentiment as positive, negative, or neutral"
@@ -303,7 +303,7 @@ local feedback_processor = Workflow.loop({
         {
             name = "generate_response",
             type = "agent",
-            agent = Agent.create({
+            agent = Agent.createAsync({
                 name = "responder",
                 model = "gpt-4",
                 system_prompt = "Generate appropriate customer responses"

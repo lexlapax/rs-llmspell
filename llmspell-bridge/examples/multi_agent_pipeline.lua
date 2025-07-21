@@ -9,21 +9,21 @@ This example shows a research pipeline where multiple specialized agents work to
 ]]
 
 -- Create specialized agents (mock agents for demonstration)
-local research_agent = Agent.create({
+local research_agent = Agent.createAsync({
     name = "research_agent",
     model = "mock/research-v1",
     capabilities = {"web_search", "data_gathering"},
     system_prompt = "You are a research specialist focused on gathering comprehensive information."
 })
 
-local analysis_agent = Agent.create({
+local analysis_agent = Agent.createAsync({
     name = "analysis_agent", 
     model = "mock/analyzer-v1",
     capabilities = {"data_analysis", "pattern_recognition"},
     system_prompt = "You are an analysis expert who identifies patterns and insights in data."
 })
 
-local summary_agent = Agent.create({
+local summary_agent = Agent.createAsync({
     name = "summary_agent",
     model = "mock/summarizer-v1", 
     capabilities = {"summarization", "key_point_extraction"},

@@ -58,7 +58,7 @@ end
 print("\nTest 4: Agent API")
 -- Note: Agent creation might fail without proper provider config
 local success, agent_or_err = pcall(function()
-    return Agent.create({
+    return Agent.createAsync({
         name = "test_agent",
         model = "gpt-3.5-turbo",
         system_prompt = "Test agent"
@@ -66,9 +66,9 @@ local success, agent_or_err = pcall(function()
 end)
 
 if success and agent_or_err then
-    print("✓ Agent.create() works")
+    print("✓ Agent.createAsync() works")
 else
-    print("✗ Agent.create() failed (likely needs provider config)")
+    print("✗ Agent.createAsync() failed (likely needs provider config)")
     print("  Error: " .. tostring(agent_or_err))
 end
 
