@@ -15,8 +15,11 @@ async fn main() -> Result<()> {
         .with_max_level(tracing::Level::DEBUG)
         .init();
 
+    // Create provider manager
+    let provider_manager = Arc::new(llmspell_providers::ProviderManager::new());
+
     // Create a factory with hooks
-    let mut factory = DefaultAgentFactory::new();
+    let mut factory = DefaultAgentFactory::new(provider_manager);
 
     // Add validation hook
     let validation_hook = ValidationHook::new()

@@ -41,6 +41,10 @@ pub struct ProviderConfig {
     /// Provider name (e.g., "openai", "anthropic", "local")
     pub name: String,
 
+    /// Provider type (e.g., "openai", "anthropic", "cohere")
+    /// This is used to determine which provider implementation to use
+    pub provider_type: String,
+
     /// API endpoint URL (if applicable)
     pub endpoint: Option<String>,
 
@@ -63,8 +67,16 @@ pub struct ProviderConfig {
 impl ProviderConfig {
     /// Create a new provider configuration
     pub fn new(name: impl Into<String>, model: impl Into<String>) -> Self {
+        let name_str = name.into();
+        // For backward compatibility, use name as provider_type if it's a known provider
+        let provider_type = match name_str.as_str() {
+            "openai" | "anthropic" | "cohere" => name_str.clone(),
+            _ => name_str.clone(), // Default to name for unknown providers
+        };
+
         Self {
-            name: name.into(),
+            name: name_str,
+            provider_type,
             model: model.into(),
             endpoint: None,
             api_key: None,
@@ -72,6 +84,31 @@ impl ProviderConfig {
             max_retries: Some(3),
             custom_config: HashMap::new(),
         }
+    }
+
+    /// Create a new provider configuration with explicit provider type
+    pub fn new_with_type(
+        name: impl Into<String>,
+        provider_type: impl Into<String>,
+        model: impl Into<String>,
+    ) -> Self {
+        Self {
+            name: name.into(),
+            provider_type: provider_type.into(),
+            model: model.into(),
+            endpoint: None,
+            api_key: None,
+            timeout_secs: Some(30),
+            max_retries: Some(3),
+            custom_config: HashMap::new(),
+        }
+    }
+
+    /// Generate hierarchical provider instance name
+    /// Format: "{name}/{provider_type}/{model}"
+    /// Example: "rig/openai/gpt-4"
+    pub fn instance_name(&self) -> String {
+        format!("{}/{}/{}", self.name, self.provider_type, self.model)
     }
 
     /// Load configuration from environment variables
@@ -83,8 +120,13 @@ impl ProviderConfig {
         let model =
             std::env::var(format!("{}MODEL", env_prefix)).unwrap_or_else(|_| "default".to_string());
 
+        // Try to get provider_type from env, or use name as default
+        let provider_type = std::env::var(format!("{}PROVIDER_TYPE", env_prefix))
+            .unwrap_or_else(|_| name.to_string());
+
         Ok(Self {
             name: name.to_string(),
+            provider_type,
             endpoint,
             api_key,
             model,
@@ -218,7 +260,8 @@ impl ProviderManager {
 
     /// Initialize a provider instance
     pub async fn init_provider(&self, config: ProviderConfig) -> Result<(), LLMSpellError> {
-        let instance_name = format!("{}:{}", config.name, config.model);
+        // Use hierarchical naming: name/provider_type/model
+        let instance_name = config.instance_name();
 
         let registry = self.registry.read().await;
         let provider = registry.create(config)?;

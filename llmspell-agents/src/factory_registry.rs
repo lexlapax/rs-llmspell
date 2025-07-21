@@ -203,11 +203,16 @@ mod tests {
     use crate::factory::DefaultAgentFactory;
     use crate::ResourceLimits;
 
+    fn create_test_provider_manager() -> Arc<llmspell_providers::ProviderManager> {
+        Arc::new(llmspell_providers::ProviderManager::new())
+    }
+
     #[tokio::test]
     async fn test_factory_registry() {
         let registry = FactoryRegistry::new();
-        let factory1 = Arc::new(DefaultAgentFactory::new());
-        let factory2 = Arc::new(DefaultAgentFactory::new());
+        let provider_manager = create_test_provider_manager();
+        let factory1 = Arc::new(DefaultAgentFactory::new(provider_manager.clone()));
+        let factory2 = Arc::new(DefaultAgentFactory::new(provider_manager.clone()));
 
         // Register factories
         registry
@@ -236,7 +241,7 @@ mod tests {
             .unwrap();
 
         // Duplicate registration should fail
-        let factory3 = Arc::new(DefaultAgentFactory::new());
+        let factory3 = Arc::new(DefaultAgentFactory::new(provider_manager.clone()));
         let result = registry
             .register_factory("factory1".to_string(), factory3)
             .await;
@@ -252,7 +257,8 @@ mod tests {
 
     #[test]
     fn test_custom_factory() {
-        let base = Arc::new(DefaultAgentFactory::new());
+        let provider_manager = create_test_provider_manager();
+        let base = Arc::new(DefaultAgentFactory::new(provider_manager));
         let custom = CustomAgentFactory::new(base)
             .with_customizer(|config| {
                 config.resource_limits.max_execution_time_secs = 1000;
@@ -268,7 +274,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_custom_factory_customization() {
-        let base = Arc::new(DefaultAgentFactory::new());
+        let provider_manager = create_test_provider_manager();
+        let base = Arc::new(DefaultAgentFactory::new(provider_manager));
         let custom = Arc::new(CustomAgentFactory::new(base).with_customizer(|config| {
             config.resource_limits.max_execution_time_secs = 1000;
             config.description = format!("{} (customized)", config.description);
@@ -300,7 +307,8 @@ mod tests {
         assert!(result.is_err());
 
         // Register and set default
-        let factory = Arc::new(DefaultAgentFactory::new());
+        let provider_manager = create_test_provider_manager();
+        let factory = Arc::new(DefaultAgentFactory::new(provider_manager));
         registry
             .register_factory("default".to_string(), factory)
             .await
@@ -319,8 +327,9 @@ mod tests {
     async fn test_registry_specific_factory() {
         let registry = FactoryRegistry::new();
 
-        let factory1 = Arc::new(DefaultAgentFactory::new());
-        let factory2 = Arc::new(DefaultAgentFactory::new());
+        let provider_manager = create_test_provider_manager();
+        let factory1 = Arc::new(DefaultAgentFactory::new(provider_manager.clone()));
+        let factory2 = Arc::new(DefaultAgentFactory::new(provider_manager.clone()));
 
         registry
             .register_factory("factory1".to_string(), factory1)

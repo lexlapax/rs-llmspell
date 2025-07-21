@@ -47,10 +47,13 @@ pub struct AgentBridge {
 }
 
 impl AgentBridge {
-    /// Create a new agent bridge
-    pub fn new(registry: Arc<ComponentRegistry>) -> Self {
+    /// Create a new agent bridge with provider manager
+    pub fn new(
+        registry: Arc<ComponentRegistry>,
+        provider_manager: Arc<llmspell_providers::ProviderManager>,
+    ) -> Self {
         Self {
-            discovery: Arc::new(AgentDiscovery::new()),
+            discovery: Arc::new(AgentDiscovery::new(provider_manager)),
             registry,
             active_agents: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
             state_machines: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
@@ -1374,7 +1377,8 @@ mod tests {
     #[tokio::test]
     async fn test_agent_bridge_creation() {
         let registry = Arc::new(ComponentRegistry::new());
-        let bridge = AgentBridge::new(registry);
+        let provider_manager = Arc::new(llmspell_providers::ProviderManager::new());
+        let bridge = AgentBridge::new(registry, provider_manager);
 
         // List available types
         let types = bridge.list_agent_types().await;
@@ -1384,7 +1388,8 @@ mod tests {
     #[tokio::test]
     async fn test_agent_instance_management() {
         let registry = Arc::new(ComponentRegistry::new());
-        let bridge = AgentBridge::new(registry);
+        let provider_manager = Arc::new(llmspell_providers::ProviderManager::new());
+        let bridge = AgentBridge::new(registry, provider_manager);
 
         // Create agent config
         let mut config = HashMap::new();
@@ -1440,7 +1445,8 @@ mod tests {
     #[tokio::test]
     async fn test_agent_execution() {
         let registry = Arc::new(ComponentRegistry::new());
-        let bridge = AgentBridge::new(registry);
+        let provider_manager = Arc::new(llmspell_providers::ProviderManager::new());
+        let bridge = AgentBridge::new(registry, provider_manager);
 
         // Create agent
         let mut config = HashMap::new();
@@ -1489,7 +1495,8 @@ mod tests {
     #[tokio::test]
     async fn test_agent_state_machine() {
         let registry = Arc::new(ComponentRegistry::new());
-        let bridge = AgentBridge::new(registry);
+        let provider_manager = Arc::new(llmspell_providers::ProviderManager::new());
+        let bridge = AgentBridge::new(registry, provider_manager);
 
         // Create agent config
         let mut config = HashMap::new();
@@ -1599,7 +1606,8 @@ mod tests {
     #[tokio::test]
     async fn test_context_management() {
         let registry = Arc::new(ComponentRegistry::new());
-        let bridge = AgentBridge::new(registry);
+        let provider_manager = Arc::new(llmspell_providers::ProviderManager::new());
+        let bridge = AgentBridge::new(registry, provider_manager);
 
         // Test context creation
         let config = serde_json::json!({
@@ -1679,7 +1687,8 @@ mod tests {
     #[tokio::test]
     async fn test_agent_context_execution() {
         let registry = Arc::new(ComponentRegistry::new());
-        let bridge = AgentBridge::new(registry);
+        let provider_manager = Arc::new(llmspell_providers::ProviderManager::new());
+        let bridge = AgentBridge::new(registry, provider_manager);
 
         // Create agent
         let mut config = HashMap::new();
@@ -1741,7 +1750,8 @@ mod tests {
     #[tokio::test]
     async fn test_streaming_execution() {
         let registry = Arc::new(ComponentRegistry::new());
-        let bridge = AgentBridge::new(registry);
+        let provider_manager = Arc::new(llmspell_providers::ProviderManager::new());
+        let bridge = AgentBridge::new(registry, provider_manager);
 
         // Create agent
         let mut config = HashMap::new();
@@ -1799,7 +1809,8 @@ mod tests {
     #[tokio::test]
     async fn test_composition_patterns() {
         let registry = Arc::new(ComponentRegistry::new());
-        let bridge = AgentBridge::new(registry);
+        let provider_manager = Arc::new(llmspell_providers::ProviderManager::new());
+        let bridge = AgentBridge::new(registry, provider_manager);
 
         // Create two basic agents
         let mut config1 = HashMap::new();

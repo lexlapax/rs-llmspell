@@ -122,8 +122,10 @@ pub struct TestHarness {
 
 impl TestHarness {
     /// Create new test harness with default factory
-    pub fn new(config: TestConfig) -> Self {
-        let factory = Arc::new(DefaultAgentFactory::new());
+    pub async fn new(config: TestConfig) -> Self {
+        // Create a mock provider manager for testing
+        let provider_manager = Arc::new(llmspell_providers::ProviderManager::new());
+        let factory = Arc::new(DefaultAgentFactory::new(provider_manager));
 
         Self {
             config,
@@ -531,7 +533,7 @@ mod tests {
     #[tokio::test]
     async fn test_harness_creation() {
         let config = TestConfig::default();
-        let harness = TestHarness::new(config);
+        let harness = TestHarness::new(config).await;
         assert!(harness.interactions.lock().unwrap().is_empty());
     }
 

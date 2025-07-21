@@ -101,6 +101,9 @@ pub struct DefaultAgentFactory {
 
     /// Creation hooks
     creation_hooks: Vec<Arc<dyn CreationHook>>,
+
+    /// Provider manager for LLM agents
+    provider_manager: Option<Arc<llmspell_providers::ProviderManager>>,
 }
 
 /// Hook that runs during agent creation
@@ -114,16 +117,36 @@ pub trait CreationHook: Send + Sync {
 }
 
 impl DefaultAgentFactory {
-    /// Create a new agent factory
-    pub fn new() -> Self {
+    /// Create a new agent factory with provider manager
+    pub fn new(provider_manager: Arc<llmspell_providers::ProviderManager>) -> Self {
         let mut templates = std::collections::HashMap::new();
 
-        // Add default templates
+        // LLM agent is now the default template
+        templates.insert(
+            "llm".to_string(),
+            AgentConfig {
+                name: "llm-agent".to_string(),
+                description: "LLM-powered agent for intelligent interactions".to_string(),
+                agent_type: "llm".to_string(),
+                model: Some(ModelConfig {
+                    provider: String::new(),              // Will be set from model_id
+                    model_id: "openai/gpt-4".to_string(), // Default model
+                    temperature: Some(0.7),
+                    max_tokens: Some(2000),
+                    settings: serde_json::Map::new(),
+                }),
+                allowed_tools: vec![],
+                custom_config: serde_json::Map::new(),
+                resource_limits: ResourceLimits::default(),
+            },
+        );
+
+        // Basic agent for testing only
         templates.insert(
             "basic".to_string(),
             AgentConfig {
                 name: "basic-agent".to_string(),
-                description: "Basic agent with no special capabilities".to_string(),
+                description: "Basic echo agent for testing".to_string(),
                 agent_type: "basic".to_string(),
                 model: None,
                 allowed_tools: vec![],
@@ -136,9 +159,15 @@ impl DefaultAgentFactory {
             "tool-orchestrator".to_string(),
             AgentConfig {
                 name: "tool-orchestrator".to_string(),
-                description: "Agent that orchestrates tool execution".to_string(),
-                agent_type: "tool-orchestrator".to_string(),
-                model: None,
+                description: "LLM agent that orchestrates tool execution".to_string(),
+                agent_type: "llm".to_string(), // Changed to LLM type
+                model: Some(ModelConfig {
+                    provider: String::new(),
+                    model_id: "openai/gpt-4".to_string(),
+                    temperature: Some(0.3), // Lower temperature for tool use
+                    max_tokens: Some(2000),
+                    settings: serde_json::Map::new(),
+                }),
                 allowed_tools: vec!["*".to_string()], // Access to all tools
                 custom_config: serde_json::Map::new(),
                 resource_limits: ResourceLimits::default(),
@@ -148,6 +177,7 @@ impl DefaultAgentFactory {
         Self {
             templates,
             creation_hooks: vec![],
+            provider_manager: Some(provider_manager),
         }
     }
 
@@ -178,11 +208,7 @@ impl DefaultAgentFactory {
     }
 }
 
-impl Default for DefaultAgentFactory {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+// Removed Default impl - factory now requires provider manager
 
 #[async_trait]
 impl AgentFactory for DefaultAgentFactory {
@@ -195,12 +221,21 @@ impl AgentFactory for DefaultAgentFactory {
 
         // Create agent based on type
         let agent: Arc<dyn Agent> = match config.agent_type.as_str() {
-            "basic" => Arc::new(crate::agents::BasicAgent::new(config)?),
-            "tool-orchestrator" => {
-                // ToolOrchestratorAgent will be implemented in a future task
-                anyhow::bail!("ToolOrchestratorAgent not yet implemented")
+            "llm" => {
+                // LLM agents require provider manager
+                let provider_manager = self
+                    .provider_manager
+                    .as_ref()
+                    .ok_or_else(|| anyhow::anyhow!("Provider manager required for LLM agents"))?;
+                Arc::new(crate::agents::LLMAgent::new(config, provider_manager.clone()).await?)
             }
-            _ => anyhow::bail!("Unknown agent type: {}", config.agent_type),
+            "basic" => {
+                // Basic agent for testing only
+                Arc::new(crate::agents::BasicAgent::new(config)?)
+            }
+            _ => {
+                return Err(anyhow::anyhow!("Unknown agent type: {}", config.agent_type));
+            }
         };
 
         // Run after hooks
@@ -264,17 +299,22 @@ mod tests {
         assert_eq!(limits.max_recursion_depth, 10);
     }
 
-    #[test]
-    fn test_factory_templates() {
-        let factory = DefaultAgentFactory::new();
-        let templates = factory.list_templates();
-        assert!(templates.contains(&"basic"));
-        assert!(templates.contains(&"tool-orchestrator"));
+    async fn create_test_factory() -> DefaultAgentFactory {
+        let provider_manager = Arc::new(llmspell_providers::ProviderManager::new());
+        DefaultAgentFactory::new(provider_manager)
     }
 
-    #[test]
-    fn test_config_validation() {
-        let factory = DefaultAgentFactory::new();
+    #[tokio::test]
+    async fn test_factory_templates() {
+        let factory = create_test_factory().await;
+        let templates = factory.list_templates();
+        assert!(templates.contains(&"basic"));
+        assert!(templates.contains(&"llm"));
+    }
+
+    #[tokio::test]
+    async fn test_config_validation() {
+        let factory = create_test_factory().await;
 
         // Valid config
         let valid_config = AgentConfig {
@@ -331,7 +371,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_agent_creation() {
-        let factory = DefaultAgentFactory::new();
+        let factory = create_test_factory().await;
 
         let config = AgentConfig {
             name: "test-basic".to_string(),
@@ -349,7 +389,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_agent_creation_unknown_type() {
-        let factory = DefaultAgentFactory::new();
+        let factory = create_test_factory().await;
 
         let config = AgentConfig {
             name: "test-unknown".to_string(),
@@ -369,7 +409,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_create_from_template() {
-        let factory = DefaultAgentFactory::new();
+        let factory = create_test_factory().await;
 
         let agent = factory.create_from_template("basic").await.unwrap();
         assert_eq!(agent.metadata().name, "basic-agent");
@@ -401,7 +441,7 @@ mod tests {
             }
         }
 
-        let mut factory = DefaultAgentFactory::new();
+        let mut factory = create_test_factory().await;
         let before_called = Arc::new(AtomicBool::new(false));
         let after_called = Arc::new(AtomicBool::new(false));
 
@@ -428,9 +468,9 @@ mod tests {
         assert!(after_called.load(Ordering::SeqCst));
     }
 
-    #[test]
-    fn test_add_custom_template() {
-        let mut factory = DefaultAgentFactory::new();
+    #[tokio::test]
+    async fn test_add_custom_template() {
+        let mut factory = create_test_factory().await;
 
         let custom_config = AgentConfig {
             name: "custom-agent".to_string(),

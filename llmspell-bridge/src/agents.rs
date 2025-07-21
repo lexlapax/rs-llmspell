@@ -15,10 +15,10 @@ pub struct AgentDiscovery {
 }
 
 impl AgentDiscovery {
-    /// Create a new agent discovery service
-    pub fn new() -> Self {
+    /// Create a new agent discovery service with provider manager
+    pub fn new(provider_manager: Arc<llmspell_providers::ProviderManager>) -> Self {
         Self {
-            factory: Arc::new(DefaultAgentFactory::new()),
+            factory: Arc::new(DefaultAgentFactory::new(provider_manager)),
             agent_cache: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
         }
     }
@@ -165,19 +165,20 @@ pub struct AgentInfo {
     pub optional_parameters: Vec<String>,
 }
 
-impl Default for AgentDiscovery {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+// Removed Default impl - AgentDiscovery now requires provider manager
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
+    async fn create_test_provider_manager() -> Arc<llmspell_providers::ProviderManager> {
+        Arc::new(llmspell_providers::ProviderManager::new())
+    }
+
     #[tokio::test]
     async fn test_agent_discovery() {
-        let discovery = AgentDiscovery::new();
+        let provider_manager = create_test_provider_manager().await;
+        let discovery = AgentDiscovery::new(provider_manager);
 
         // List agent types
         let types = discovery.list_agent_types().await;
@@ -190,7 +191,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_agent_caching() {
-        let discovery = AgentDiscovery::new();
+        let provider_manager = create_test_provider_manager().await;
+        let discovery = AgentDiscovery::new(provider_manager);
 
         let config = serde_json::json!({
             "name": "test-agent",
@@ -203,13 +205,6 @@ mod tests {
                 "max_memory_mb": 512,
                 "max_tool_calls": 100,
                 "max_recursion_depth": 10
-            },
-            "model": {
-                "provider": "mock",
-                "model_id": "test-model",
-                "temperature": null,
-                "max_tokens": null,
-                "settings": {}
             }
         });
 
@@ -217,6 +212,9 @@ mod tests {
         let agent1 = discovery
             .get_or_create_agent("test", "basic", config.clone())
             .await;
+        if let Err(e) = &agent1 {
+            eprintln!("Agent creation failed: {:?}", e);
+        }
         assert!(agent1.is_ok());
 
         // Get from cache

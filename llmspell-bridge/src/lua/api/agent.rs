@@ -6,7 +6,8 @@ use crate::engine::types::AgentApiDefinition;
 use crate::lua::conversion::{
     agent_output_to_lua_table, lua_table_to_agent_input, lua_table_to_tool_input, lua_value_to_json,
 };
-use crate::{ComponentRegistry, ProviderManager};
+use crate::ComponentRegistry;
+use crate::ProviderManager;
 use async_trait::async_trait;
 use llmspell_core::error::LLMSpellError;
 use llmspell_core::{
@@ -36,8 +37,16 @@ pub fn inject_agent_api(
         source: None,
     })?;
 
-    // Create agent bridge
-    let bridge = Arc::new(AgentBridge::new(registry.clone()));
+    // Create agent bridge with core provider manager
+    // Use futures::executor for synchronous context
+    let core_providers =
+        futures::executor::block_on(providers.create_core_manager_arc()).map_err(|e| {
+            LLMSpellError::Component {
+                message: format!("Failed to create core provider manager: {}", e),
+                source: None,
+            }
+        })?;
+    let bridge = Arc::new(AgentBridge::new(registry.clone(), core_providers));
 
     // Clone Arc for the closure
     let registry_clone = registry.clone();
@@ -133,7 +142,15 @@ pub fn inject_agent_api(
                 ));
 
                 // Create the Lua wrapper with bridge access
-                let bridge = Arc::new(AgentBridge::new(registry.clone()));
+                let core_providers_inner = tokio::runtime::Handle::current()
+                    .block_on(providers.create_core_manager_arc())
+                    .map_err(|e| {
+                        mlua::Error::RuntimeError(format!(
+                            "Failed to create core provider manager: {}",
+                            e
+                        ))
+                    })?;
+                let bridge = Arc::new(AgentBridge::new(registry.clone(), core_providers_inner));
                 let wrapper = LuaAgentWrapper {
                     agent,
                     bridge,

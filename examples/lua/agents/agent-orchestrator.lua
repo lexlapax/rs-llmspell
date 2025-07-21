@@ -11,8 +11,7 @@ print("=== Agent Orchestrator Example ===\n")
 local orchestrator = Agent.create({
     name = "tool_orchestrator",
     description = "Orchestrates multiple tools to accomplish complex tasks",
-    provider = "openai",
-    model = "gpt-4",
+    provider_model = "openai/gpt-4",
     system_prompt = [[
 You are a tool orchestration specialist. You coordinate multiple tools to accomplish complex tasks efficiently.
 When given a task:
@@ -27,7 +26,8 @@ When given a task:
 
 -- Register the orchestrator globally for reuse
 if orchestrator then
-    Agent.register("orchestrator", orchestrator)
+    -- Agent.register("orchestrator", orchestrator)  -- TODO: Implement Agent.register
+    print("Orchestrator agent created successfully")
 else
     print("Failed to create orchestrator agent - check API keys")
     return

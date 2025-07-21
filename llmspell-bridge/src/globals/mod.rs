@@ -22,7 +22,7 @@ use llmspell_core::Result;
 use std::sync::Arc;
 
 /// Initialize the standard global registry with all core globals
-pub fn create_standard_registry(context: Arc<GlobalContext>) -> Result<GlobalRegistry> {
+pub async fn create_standard_registry(context: Arc<GlobalContext>) -> Result<GlobalRegistry> {
     let mut builder = GlobalRegistryBuilder::new();
 
     // Register core globals in dependency order
@@ -37,10 +37,12 @@ pub fn create_standard_registry(context: Arc<GlobalContext>) -> Result<GlobalReg
     builder.register(Arc::new(tool_global::ToolGlobal::new(
         context.registry.clone(),
     )));
-    builder.register(Arc::new(agent_global::AgentGlobal::new(
-        context.registry.clone(),
-        context.providers.clone(),
-    )));
+
+    // Create agent global asynchronously
+    let agent_global =
+        agent_global::AgentGlobal::new(context.registry.clone(), context.providers.clone()).await?;
+    builder.register(Arc::new(agent_global));
+
     builder.register(Arc::new(workflow_global::WorkflowGlobal::new(
         context.registry.clone(),
     )));

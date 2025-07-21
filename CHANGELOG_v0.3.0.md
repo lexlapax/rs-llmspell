@@ -37,6 +37,40 @@ All tools now return standardized responses:
 - Symlink attack prevention
 - Resource limit enforcement
 
+### 4. Agent-Provider Integration (Phase 3.3)
+
+Major changes to agent and provider architecture:
+
+#### Provider Configuration
+- Added `provider_type` field to ProviderConfig for clean separation
+- Provider naming now follows hierarchical scheme (e.g., `rig/openai/gpt-4`)
+- Bridge layer correctly preserves provider type information
+
+#### Agent Factory Changes
+- **BREAKING**: DefaultAgentFactory no longer implements `Default` trait - requires ProviderManager
+- **BREAKING**: Default agent type is now "llm" not "basic"
+- **BREAKING**: Factory returns error for unknown agent types instead of defaulting to basic agent
+- Agent creation requires provider manager injection
+
+#### LLM Agent Implementation
+- New LLM agent type that uses actual language model providers
+- Supports conversation management and system prompts
+- Parses "provider/model" syntax from Lua (e.g., "openai/gpt-4")
+- Basic agent relegated to test-only usage
+
+#### Lua API Changes
+```lua
+-- OLD: Basic echo agent by default
+local agent = Agent.create("my-agent", {})
+
+-- NEW: LLM agent by default, requires model specification
+local agent = Agent.create("my-agent", {
+    model = "openai/gpt-4",  -- or separate provider/model fields
+    temperature = 0.7,
+    max_tokens = 1000
+})
+```
+
 ## Tool-by-Tool Breaking Changes
 
 ### File Operations Tools

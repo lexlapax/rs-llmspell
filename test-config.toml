@@ -1,0 +1,35 @@
+# LLMSpell Configuration
+
+# Default engine (lua, javascript, python)
+default_engine = "lua"
+
+# Provider configurations
+[providers]
+default_provider = "openai"
+
+[providers.providers.openai]
+provider_type = "openai"
+api_key_env = "OPENAI_API_KEY"
+model = "gpt-4"
+
+[providers.providers.anthropic]
+provider_type = "anthropic"
+api_key_env = "ANTHROPIC_API_KEY"
+model = "claude-3-opus"
+max_tokens = 4096
+
+# Global runtime settings
+[runtime]
+memory_limit_mb = 256
+max_execution_time_ms = 60000
+allow_file_access = true
+allowed_paths = ["examples", "tmp", "/tmp"]
+
+# Engine-specific configurations
+[engines.lua]
+memory_limit_mb = 128
+execution_timeout_ms = 30000
+
+[engines.javascript]
+memory_limit_mb = 256
+execution_timeout_ms = 60000

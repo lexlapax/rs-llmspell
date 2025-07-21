@@ -11,10 +11,14 @@ use llmspell_agents::{
 use llmspell_core::{types::AgentInput, BaseAgent, ExecutionContext};
 use std::{sync::Arc, time::Duration};
 
+fn create_test_provider_manager() -> Arc<llmspell_providers::ProviderManager> {
+    Arc::new(llmspell_providers::ProviderManager::new())
+}
+
 /// Test agent factory creation
 #[tokio::test]
 async fn test_agent_factory_creation() {
-    let factory = DefaultAgentFactory::new();
+    let factory = DefaultAgentFactory::new(create_test_provider_manager());
 
     let config = AgentConfig {
         name: "test_agent".to_string(),
@@ -40,7 +44,7 @@ async fn test_agent_builder() {
         .build()
         .unwrap();
 
-    let factory = DefaultAgentFactory::new();
+    let factory = DefaultAgentFactory::new(create_test_provider_manager());
     let agent = factory.create_agent(config).await.unwrap();
 
     let metadata = agent.metadata();
@@ -88,7 +92,8 @@ async fn test_agent_lifecycle() {
 #[tokio::test]
 async fn test_agent_templates() {
     let template = OrchestratorAgentTemplate::default();
-    let _factory = Arc::new(DefaultAgentFactory::new());
+    let provider_manager = Arc::new(llmspell_providers::ProviderManager::new());
+    let _factory = Arc::new(DefaultAgentFactory::new(provider_manager));
 
     use llmspell_agents::templates::base::TemplateInstantiationParams;
 

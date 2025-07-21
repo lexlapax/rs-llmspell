@@ -66,8 +66,19 @@ impl ProviderManager {
                     field: Some("model".to_string()),
                     message: format!("Model not specified for provider '{}'", default),
                 })?;
+            // Get the provider config to determine the actual provider name
+            let provider_config = &self.config.providers[default];
+            let provider_name = match provider_config.provider_type.as_str() {
+                "openai" | "anthropic" | "cohere" => "rig",
+                other => other,
+            };
+
+            // Use hierarchical naming: name/provider_type/model
             self.core_manager
-                .set_default_provider(format!("{}:{}", default, model))
+                .set_default_provider(format!(
+                    "{}/{}/{}",
+                    provider_name, provider_config.provider_type, model
+                ))
                 .await?;
         }
 
@@ -94,7 +105,9 @@ impl ProviderManager {
                 message: format!("Model not specified for provider '{}'", name),
             })?;
 
-        let mut provider_config = ProviderInstanceConfig::new(provider_name, model);
+        // Use new_with_type to preserve provider_type information
+        let mut provider_config =
+            ProviderInstanceConfig::new_with_type(provider_name, &config.provider_type, model);
 
         // Set API key from environment if specified
         if let Some(ref api_key_env) = config.api_key_env {
@@ -111,6 +124,13 @@ impl ProviderManager {
         // Set other configuration
         if let Some(ref base_url) = config.base_url {
             provider_config.endpoint = Some(base_url.clone());
+        }
+
+        // Add max_tokens to custom config if specified
+        if let Some(max_tokens) = config.max_tokens {
+            provider_config
+                .custom_config
+                .insert("max_tokens".to_string(), serde_json::json!(max_tokens));
         }
 
         // Add extra configuration
@@ -194,6 +214,55 @@ impl ProviderManager {
         } else {
             false
         }
+    }
+
+    /// Get the core provider manager
+    pub fn core_manager(&self) -> &CoreProviderManager {
+        &self.core_manager
+    }
+
+    /// Create an Arc to a new core provider manager with the same configuration
+    /// This is needed for components that require ownership of the core manager
+    pub async fn create_core_manager_arc(&self) -> Result<Arc<CoreProviderManager>, LLMSpellError> {
+        // Create a new core manager
+        let core_manager = CoreProviderManager::new();
+
+        // Register the rig provider factory
+        core_manager
+            .register_provider("rig", llmspell_providers::create_rig_provider)
+            .await;
+
+        // Initialize providers from our configuration
+        for (name, config) in &self.config.providers {
+            let provider_config = self.create_provider_config(name, config)?;
+            core_manager.init_provider(provider_config).await?;
+        }
+
+        // Set default provider if specified
+        if let Some(ref default) = self.config.default_provider {
+            if let Some(provider_config) = self.config.providers.get(default) {
+                let model =
+                    provider_config
+                        .model
+                        .as_ref()
+                        .ok_or_else(|| LLMSpellError::Validation {
+                            field: Some("model".to_string()),
+                            message: format!("Model not specified for provider '{}'", default),
+                        })?;
+                let provider_name = match provider_config.provider_type.as_str() {
+                    "openai" | "anthropic" | "cohere" => "rig",
+                    other => other,
+                };
+                core_manager
+                    .set_default_provider(format!(
+                        "{}/{}/{}",
+                        provider_name, provider_config.provider_type, model
+                    ))
+                    .await?;
+            }
+        }
+
+        Ok(Arc::new(core_manager))
     }
 }
 

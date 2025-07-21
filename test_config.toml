@@ -1,0 +1,30 @@
+default_engine = "lua"
+
+[engines.lua]
+stdlib_level = "standard"
+sandbox_mode = false
+module_path = ["./?.lua", "./?/init.lua"]
+
+[engines.javascript]
+stdlib_level = "minimal"
+sandbox_mode = true
+module_resolution = "node"
+
+[providers]
+default_provider = "default"
+
+[providers.providers.default]
+provider_type = "openai"
+model = "gpt-4o"
+api_key_env = "OPENAI_API_KEY"
+base_url = "https://api.openai.com/v1"
+
+[runtime]
+max_concurrent_scripts = 10
+script_timeout_seconds = 300
+enable_streaming = true
+
+[runtime.security]
+allow_file_access = true
+allow_network_access = true
+allow_process_spawn = false

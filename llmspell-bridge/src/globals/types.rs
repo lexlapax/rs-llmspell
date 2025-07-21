@@ -1,9 +1,8 @@
 //! ABOUTME: Core types and traits for the global object injection system
 //! ABOUTME: Defines GlobalObject trait and supporting types
 
-use crate::ComponentRegistry;
+use crate::{ComponentRegistry, ProviderManager};
 use llmspell_core::Result;
-use llmspell_providers::ProviderManager;
 use std::any::Any;
 use std::collections::HashMap;
 use std::sync::Arc;

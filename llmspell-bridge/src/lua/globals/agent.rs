@@ -5,6 +5,7 @@ use crate::agent_bridge::AgentBridge;
 use crate::globals::GlobalContext;
 use crate::lua::conversion::{agent_output_to_lua_table, lua_table_to_agent_input};
 use mlua::{Lua, Table, UserData, UserDataMethods};
+use std::collections::HashMap;
 use std::sync::Arc;
 
 /// Lua userdata representing an agent instance
@@ -90,57 +91,110 @@ pub fn inject_agent_global(
 
         async move {
             // Extract configuration from Lua table
+            let name: String = args.get("name").unwrap_or_else(|_| {
+                format!(
+                    "agent_{}",
+                    uuid::Uuid::new_v4()
+                        .to_string()
+                        .chars()
+                        .take(8)
+                        .collect::<String>()
+                )
+            });
+            let description: String = args
+                .get("description")
+                .unwrap_or_else(|_| "LLM-powered agent".to_string());
             let system_prompt: Option<String> = args.get("system_prompt").ok();
             let temperature: Option<f32> = args.get("temperature").ok();
-            let max_tokens: Option<usize> = args.get("max_tokens").ok();
+            let max_tokens: Option<u32> = args.get("max_tokens").ok().map(|v: usize| v as u32);
             let max_conversation_length: Option<usize> = args.get("max_conversation_length").ok();
             let base_url: Option<String> = args.get("base_url").ok();
             let api_key: Option<String> = args.get("api_key").ok();
 
-            // Get model specification
+            // Get model specification - support both "model" and "provider_model" fields
             let model_str = args
                 .get::<_, Option<String>>("model")
                 .ok()
                 .flatten()
+                .or_else(|| {
+                    args.get::<_, Option<String>>("provider_model")
+                        .ok()
+                        .flatten()
+                })
                 .ok_or_else(|| {
-                    mlua::Error::RuntimeError("Model specification required".to_string())
+                    mlua::Error::RuntimeError(
+                        "Model specification required (use 'model' field)".to_string(),
+                    )
                 })?;
 
-            // Create unique instance name
-            let instance_name = format!(
-                "agent_{}",
-                uuid::Uuid::new_v4()
-                    .to_string()
-                    .chars()
-                    .take(8)
-                    .collect::<String>()
-            );
+            // Parse provider/model syntax (e.g., "openai/gpt-4")
+            let (provider, model_id) = if model_str.contains('/') {
+                let parts: Vec<&str> = model_str.splitn(2, '/').collect();
+                (parts[0].to_string(), parts[1].to_string())
+            } else {
+                // Default to openai if no provider specified
+                ("openai".to_string(), model_str)
+            };
 
-            // Create agent configuration
-            let mut config = std::collections::HashMap::new();
-            config.insert("model".to_string(), serde_json::json!(model_str));
-            config.insert("base_url".to_string(), serde_json::json!(base_url));
-            config.insert("api_key".to_string(), serde_json::json!(api_key));
-            config.insert(
-                "system_prompt".to_string(),
-                serde_json::json!(system_prompt),
-            );
-            config.insert("temperature".to_string(), serde_json::json!(temperature));
-            config.insert("max_tokens".to_string(), serde_json::json!(max_tokens));
-            config.insert(
-                "max_conversation_length".to_string(),
-                serde_json::json!(max_conversation_length),
-            );
+            // Create model configuration
+            let model_config = serde_json::json!({
+                "provider": provider,
+                "model_id": model_id,
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+                "settings": {
+                    "base_url": base_url,
+                    "api_key": api_key
+                }
+            });
 
-            // Create the agent with bridge
+            // Create custom config for agent
+            let mut custom_config = serde_json::Map::new();
+            if let Some(prompt) = system_prompt {
+                custom_config.insert("system_prompt".to_string(), serde_json::json!(prompt));
+            }
+            if let Some(len) = max_conversation_length {
+                custom_config.insert(
+                    "max_conversation_length".to_string(),
+                    serde_json::json!(len),
+                );
+            }
+
+            // Create full agent configuration
+            let agent_config = serde_json::json!({
+                "name": name.clone(),
+                "description": description,
+                "agent_type": "llm",  // Default to LLM agent type
+                "model": model_config,
+                "allowed_tools": [],  // Can be extended later
+                "custom_config": custom_config,
+                "resource_limits": {
+                    "max_execution_time_secs": 300,
+                    "max_memory_mb": 512,
+                    "max_tool_calls": 100,
+                    "max_recursion_depth": 10
+                }
+            });
+
+            // Convert JSON value to HashMap for bridge
+            let config_map: HashMap<String, serde_json::Value> = match agent_config {
+                serde_json::Value::Object(map) => map.into_iter().collect(),
+                _ => {
+                    return Err(mlua::Error::RuntimeError(
+                        "Invalid agent configuration format".to_string(),
+                    ))
+                }
+            };
+
+            // Create the agent through discovery
             bridge
-                .create_agent(&instance_name, "llm", config)
+                .create_agent(&name, "llm", config_map)
                 .await
                 .map_err(|e| mlua::Error::RuntimeError(format!("Failed to create agent: {}", e)))?;
 
             // Create Lua agent instance
             let agent_instance = LuaAgentInstance {
-                agent_instance_name: instance_name,
+                agent_instance_name: name,
                 bridge: bridge.clone(),
             };
 

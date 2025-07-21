@@ -4,8 +4,8 @@
 use super::types::{GlobalContext, GlobalMetadata, GlobalObject};
 use crate::agent_bridge::AgentBridge;
 use crate::ComponentRegistry;
+use crate::ProviderManager;
 use llmspell_core::Result;
-use llmspell_providers::ProviderManager;
 use std::sync::Arc;
 
 /// Agent global object for script engines
@@ -19,13 +19,18 @@ pub struct AgentGlobal {
 
 impl AgentGlobal {
     /// Create a new Agent global
-    pub fn new(registry: Arc<ComponentRegistry>, providers: Arc<ProviderManager>) -> Self {
-        let bridge = Arc::new(AgentBridge::new(registry.clone()));
-        Self {
+    pub async fn new(
+        registry: Arc<ComponentRegistry>,
+        providers: Arc<ProviderManager>,
+    ) -> Result<Self> {
+        // Create a core provider manager for the agent bridge
+        let core_providers = providers.create_core_manager_arc().await?;
+        let bridge = Arc::new(AgentBridge::new(registry.clone(), core_providers));
+        Ok(Self {
             registry,
             providers,
             bridge,
-        }
+        })
     }
 
     /// Get the agent bridge

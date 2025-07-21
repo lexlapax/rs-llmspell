@@ -9,6 +9,7 @@ license.workspace = true
 
 [dependencies]
 llmspell-core = { path = "../llmspell-core" }
+llmspell-providers = { path = "../llmspell-providers" }
 llmspell-storage = { path = "../llmspell-storage" }
 llmspell-tools = { path = "../llmspell-tools" }
 tokio.workspace = true

@@ -4,22 +4,23 @@
 #[cfg(feature = "lua")]
 mod lua_globals {
     use llmspell_bridge::globals::{create_standard_registry, GlobalContext, GlobalInjector};
-    use llmspell_bridge::ComponentRegistry;
+    use llmspell_bridge::{ComponentRegistry, ProviderManager, ProviderManagerConfig};
     use llmspell_core::Result;
-    use llmspell_providers::ProviderManager;
     use mlua::Lua;
     use std::sync::Arc;
 
-    fn setup_test_context() -> Arc<GlobalContext> {
+    async fn setup_test_context() -> Arc<GlobalContext> {
         let registry = Arc::new(ComponentRegistry::new());
-        let providers = Arc::new(ProviderManager::new());
+        // Create a default provider manager config for tests
+        let config = ProviderManagerConfig::default();
+        let providers = Arc::new(ProviderManager::new(config).await.unwrap());
         Arc::new(GlobalContext::new(registry, providers))
     }
 
-    #[test]
-    fn test_global_registry_creation() -> Result<()> {
-        let context = setup_test_context();
-        let registry = create_standard_registry(context)?;
+    #[tokio::test]
+    async fn test_global_registry_creation() -> Result<()> {
+        let context = setup_test_context().await;
+        let registry = create_standard_registry(context).await?;
 
         // Check that core globals are registered
         assert!(registry.get("Agent").is_some());
@@ -32,11 +33,11 @@ mod lua_globals {
         Ok(())
     }
 
-    #[test]
-    fn test_global_injection_lua() -> Result<()> {
+    #[tokio::test]
+    async fn test_global_injection_lua() -> Result<()> {
         let lua = Lua::new();
-        let context = setup_test_context();
-        let registry = create_standard_registry(context.clone())?;
+        let context = setup_test_context().await;
+        let registry = create_standard_registry(context.clone()).await?;
         let injector = GlobalInjector::new(Arc::new(registry));
 
         // Inject globals into Lua
@@ -65,8 +66,8 @@ mod lua_globals {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_agent_global_lua() -> Result<()> {
         let lua = Lua::new();
-        let context = setup_test_context();
-        let registry = create_standard_registry(context.clone())?;
+        let context = setup_test_context().await;
+        let registry = create_standard_registry(context.clone()).await?;
         let injector = GlobalInjector::new(Arc::new(registry));
 
         injector.inject_lua(&lua, &context)?;
@@ -98,7 +99,7 @@ mod lua_globals {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_tool_global_lua() -> Result<()> {
         let lua = Lua::new();
-        let context = setup_test_context();
+        let context = setup_test_context().await;
 
         // Register a test tool
         use async_trait::async_trait;
@@ -163,7 +164,7 @@ mod lua_globals {
             .registry
             .register_tool("test_tool".to_string(), Arc::new(TestTool))?;
 
-        let registry = create_standard_registry(context.clone())?;
+        let registry = create_standard_registry(context.clone()).await?;
         let injector = GlobalInjector::new(Arc::new(registry));
 
         injector.inject_lua(&lua, &context)?;
@@ -213,8 +214,8 @@ mod lua_globals {
     #[tokio::test(flavor = "multi_thread")]
     async fn test_workflow_global_lua() -> Result<()> {
         let lua = Lua::new();
-        let context = setup_test_context();
-        let registry = create_standard_registry(context.clone())?;
+        let context = setup_test_context().await;
+        let registry = create_standard_registry(context.clone()).await?;
         let injector = GlobalInjector::new(Arc::new(registry));
 
         injector.inject_lua(&lua, &context)?;
@@ -320,13 +321,13 @@ mod lua_globals {
         Ok(())
     }
 
-    #[test]
-    fn test_global_injection_performance() -> Result<()> {
+    #[tokio::test]
+    async fn test_global_injection_performance() -> Result<()> {
         use std::time::Instant;
 
         let lua = Lua::new();
-        let context = setup_test_context();
-        let registry = create_standard_registry(context.clone())?;
+        let context = setup_test_context().await;
+        let registry = create_standard_registry(context.clone()).await?;
         let injector = GlobalInjector::new(Arc::new(registry));
 
         // Measure injection time
@@ -344,11 +345,11 @@ mod lua_globals {
         Ok(())
     }
 
-    #[test]
-    fn test_json_global_lua() -> Result<()> {
+    #[tokio::test]
+    async fn test_json_global_lua() -> Result<()> {
         let lua = Lua::new();
-        let context = setup_test_context();
-        let registry = create_standard_registry(context.clone())?;
+        let context = setup_test_context().await;
+        let registry = create_standard_registry(context.clone()).await?;
         let injector = GlobalInjector::new(Arc::new(registry));
 
         injector.inject_lua(&lua, &context)?;
@@ -394,11 +395,11 @@ mod lua_globals {
         Ok(())
     }
 
-    #[test]
-    fn test_hook_global_lua() -> Result<()> {
+    #[tokio::test]
+    async fn test_hook_global_lua() -> Result<()> {
         let lua = Lua::new();
-        let context = setup_test_context();
-        let registry = create_standard_registry(context.clone())?;
+        let context = setup_test_context().await;
+        let registry = create_standard_registry(context.clone()).await?;
         let injector = GlobalInjector::new(Arc::new(registry));
 
         injector.inject_lua(&lua, &context)?;
@@ -425,11 +426,11 @@ mod lua_globals {
         Ok(())
     }
 
-    #[test]
-    fn test_event_global_lua() -> Result<()> {
+    #[tokio::test]
+    async fn test_event_global_lua() -> Result<()> {
         let lua = Lua::new();
-        let context = setup_test_context();
-        let registry = create_standard_registry(context.clone())?;
+        let context = setup_test_context().await;
+        let registry = create_standard_registry(context.clone()).await?;
         let injector = GlobalInjector::new(Arc::new(registry));
 
         injector.inject_lua(&lua, &context)?;
@@ -461,11 +462,11 @@ mod lua_globals {
         Ok(())
     }
 
-    #[test]
-    fn test_state_global_lua() -> Result<()> {
+    #[tokio::test]
+    async fn test_state_global_lua() -> Result<()> {
         let lua = Lua::new();
-        let context = setup_test_context();
-        let registry = create_standard_registry(context.clone())?;
+        let context = setup_test_context().await;
+        let registry = create_standard_registry(context.clone()).await?;
         let injector = GlobalInjector::new(Arc::new(registry));
 
         injector.inject_lua(&lua, &context)?;
