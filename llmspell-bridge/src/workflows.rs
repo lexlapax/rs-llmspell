@@ -251,34 +251,106 @@ async fn create_conditional_workflow(params: serde_json::Value) -> Result<impl W
 
     let mut builder = ConditionalWorkflowBuilder::new(name.clone());
 
-    // Parse branches
-    if let Some(branches) = params.get("branches").and_then(|v| v.as_object()) {
-        for (branch_name, branch_data) in branches {
-            let steps = branch_data
-                .get("steps")
-                .and_then(|v| v.as_array())
-                .ok_or_else(|| llmspell_core::LLMSpellError::Configuration {
-                    message: format!("Branch '{}' requires 'steps' array", branch_name),
-                    source: None,
-                })?;
+    // Configure to execute default branch if no conditions match
+    let config = llmspell_workflows::ConditionalWorkflowConfig {
+        execute_default_on_no_match: true,
+        ..Default::default()
+    };
+    builder = builder.with_conditional_config(config);
 
-            // Parse condition for the branch
-            let condition = if let Some(condition_json) = branch_data.get("condition") {
-                parse_condition(condition_json)?
-            } else {
-                // Default to always true for branches without explicit conditions
-                llmspell_workflows::Condition::Always
-            };
+    // Parse branches - support both array and object formats
+    if let Some(branches_value) = params.get("branches") {
+        if let Some(branches_array) = branches_value.as_array() {
+            // Handle array format (our test case)
+            for branch_data in branches_array {
+                let branch_name = branch_data
+                    .get("name")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| llmspell_core::LLMSpellError::Configuration {
+                        message: "Branch requires 'name' field".to_string(),
+                        source: None,
+                    })?;
 
-            let mut branch = ConditionalBranch::new(branch_name.clone(), condition);
+                let steps = branch_data
+                    .get("steps")
+                    .and_then(|v| v.as_array())
+                    .ok_or_else(|| llmspell_core::LLMSpellError::Configuration {
+                        message: format!("Branch '{}' requires 'steps' array", branch_name),
+                        source: None,
+                    })?;
 
-            for step_json in steps {
-                let step = parse_workflow_step(step_json)?;
-                branch = branch.with_step(step);
+                // Parse condition for the branch
+                let condition = if let Some(condition_json) = branch_data.get("condition") {
+                    parse_condition(condition_json)?
+                } else {
+                    // Default to always true for branches without explicit conditions
+                    llmspell_workflows::Condition::Always
+                };
+
+                let mut branch = ConditionalBranch::new(branch_name.to_string(), condition);
+
+                for step_json in steps {
+                    let step = parse_workflow_step(step_json)?;
+                    branch = branch.with_step(step);
+                }
+
+                builder = builder.add_branch(branch);
             }
+        } else if let Some(branches_object) = branches_value.as_object() {
+            // Handle object format (backward compatibility)
+            for (branch_name, branch_data) in branches_object {
+                let steps = branch_data
+                    .get("steps")
+                    .and_then(|v| v.as_array())
+                    .ok_or_else(|| llmspell_core::LLMSpellError::Configuration {
+                        message: format!("Branch '{}' requires 'steps' array", branch_name),
+                        source: None,
+                    })?;
 
-            builder = builder.add_branch(branch);
+                // Parse condition for the branch
+                let condition = if let Some(condition_json) = branch_data.get("condition") {
+                    parse_condition(condition_json)?
+                } else {
+                    // Default to always true for branches without explicit conditions
+                    llmspell_workflows::Condition::Always
+                };
+
+                let mut branch = ConditionalBranch::new(branch_name.clone(), condition);
+
+                for step_json in steps {
+                    let step = parse_workflow_step(step_json)?;
+                    branch = branch.with_step(step);
+                }
+
+                builder = builder.add_branch(branch);
+            }
         }
+    }
+
+    // Parse default branch if provided
+    if let Some(default_branch_data) = params.get("default_branch") {
+        let default_branch_name = default_branch_data
+            .get("name")
+            .and_then(|v| v.as_str())
+            .unwrap_or("default");
+
+        let steps = default_branch_data
+            .get("steps")
+            .and_then(|v| v.as_array())
+            .ok_or_else(|| llmspell_core::LLMSpellError::Configuration {
+                message: "Default branch requires 'steps' array".to_string(),
+                source: None,
+            })?;
+
+        // Use the default() constructor which marks the branch as default
+        let mut default_branch = ConditionalBranch::default(default_branch_name.to_string());
+
+        for step_json in steps {
+            let step = parse_workflow_step(step_json)?;
+            default_branch = default_branch.with_step(step);
+        }
+
+        builder = builder.add_branch(default_branch);
     }
 
     let workflow = builder.build();
