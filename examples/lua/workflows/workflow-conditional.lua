@@ -1,0 +1,558 @@
+-- ABOUTME: Conditional workflow example demonstrating branch-based execution
+-- ABOUTME: Shows how to use Workflow.conditional() for decision-based processing
+
+-- Conditional Workflow Example
+-- Demonstrates branching logic and condition-based execution
+
+print("=== Conditional Workflow Example ===\n")
+
+-- Example 1: Simple Conditional Workflow
+print("Example 1: Simple Conditional Workflow")
+print("-" .. string.rep("-", 38))
+
+-- Set up test data (State will be available in Phase 5)
+local test_data = {
+    user_type = "premium",
+    account_balance = 1500
+}
+
+local simple_conditional = Workflow.conditional({
+    name = "user_type_handler",
+    description = "Different processing based on user type",
+    
+    branches = {
+        -- Premium user branch
+        {
+            name = "premium_branch",
+            condition = {
+                type = "custom",
+                evaluate = function()
+                    return test_data.user_type == "premium"
+                end
+            },
+            steps = {
+                {
+                    name = "premium_welcome",
+                    type = "tool",
+                    tool = "template_engine",
+                    input = {
+                        template = "Welcome Premium User! Your balance: ${{balance}}",
+                        variables = {
+                            balance = test_data.account_balance
+                        }
+                    }
+                },
+                {
+                    name = "apply_discount",
+                    type = "tool",
+                    tool = "calculator",
+                    input = { input = tostring(test_data.account_balance) .. " * 0.20" }  -- 20% discount
+                }
+            }
+        },
+        -- Regular user branch
+        {
+            name = "regular_branch",
+            condition = {
+                type = "custom",
+                evaluate = function()
+                    return test_data.user_type == "regular"
+                end
+            },
+            steps = {
+                {
+                    name = "regular_welcome",
+                    type = "tool",
+                    tool = "template_engine",
+                    input = {
+                        template = "Welcome! Consider upgrading to premium.",
+                        variables = {}
+                    }
+                },
+                {
+                    name = "standard_processing",
+                    type = "tool",
+                    tool = "calculator",
+                    input = { input = tostring(test_data.account_balance) .. " * 0.05" }  -- 5% discount
+                }
+            }
+        },
+        -- Default branch (always executes if no other conditions match)
+        {
+            name = "default_branch",
+            condition = { type = "always" },
+            steps = {
+                {
+                    name = "default_message",
+                    type = "tool",
+                    tool = "text_manipulator",
+                    input = {
+                        input = "Unknown user type - applying standard processing",
+                        operation = "uppercase"
+                    }
+                }
+            }
+        }
+    },
+    
+    execute_default_on_no_match = true
+})
+
+print("Executing simple conditional workflow...")
+local simple_result = simple_conditional:execute()
+
+print("Result:")
+print("- Executed branches: " .. simple_result.data.executed_branches)
+print("- Success: " .. tostring(simple_result.success))
+
+-- Example 2: Multi-Condition Workflow
+print("\n\nExample 2: Multi-Condition Workflow")
+print("-" .. string.rep("-", 35))
+
+-- Set up complex conditions
+local environment_data = {
+    temperature = 75,
+    humidity = 65,
+    time_of_day = "afternoon"
+}
+
+local multi_condition = Workflow.conditional({
+    name = "environment_controller",
+    description = "Complex environmental control logic",
+    
+    branches = {
+        -- Hot and humid conditions
+        {
+            name = "cooling_mode",
+            condition = {
+                type = "and",
+                conditions = {
+                    {
+                        type = "custom",
+                        evaluate = function()
+                            return environment_data.temperature > 70
+                        end
+                    },
+                    {
+                        type = "custom",
+                        evaluate = function()
+                            return environment_data.humidity > 60
+                        end
+                    }
+                }
+            },
+            steps = {
+                {
+                    name = "activate_cooling",
+                    type = "tool",
+                    tool = "template_engine",
+                    input = {
+                        template = [[
+Climate Control: COOLING MODE
+Temperature: {{temp}}°F
+Humidity: {{humidity}}%
+Action: AC on, Dehumidifier on
+]],
+                        variables = {
+                            temp = environment_data.temperature,
+                            humidity = environment_data.humidity
+                        }
+                    }
+                }
+            }
+        },
+        -- Cold conditions
+        {
+            name = "heating_mode",
+            condition = {
+                type = "custom",
+                evaluate = function()
+                    return environment_data.temperature < 60
+                end
+            },
+            steps = {
+                {
+                    name = "activate_heating",
+                    type = "tool",
+                    tool = "template_engine",
+                    input = {
+                        template = "Climate Control: HEATING MODE - Temp: {{temp}}°F",
+                        variables = { temp = environment_data.temperature }
+                    }
+                }
+            }
+        },
+        -- Night mode
+        {
+            name = "night_mode",
+            condition = {
+                type = "or",
+                conditions = {
+                    {
+                        type = "custom",
+                        evaluate = function()
+                            return environment_data.time_of_day == "night"
+                        end
+                    },
+                    {
+                        type = "custom",
+                        evaluate = function()
+                            return environment_data.time_of_day == "late_evening"
+                        end
+                    }
+                }
+            },
+            steps = {
+                {
+                    name = "night_settings",
+                    type = "tool",
+                    tool = "text_manipulator",
+                    input = {
+                        input = "Activating night mode: Lower fan speed, dim lights",
+                        operation = "lowercase"
+                    }
+                }
+            }
+        },
+        -- Comfortable conditions (default)
+        {
+            name = "comfort_mode",
+            condition = { type = "always" },
+            steps = {
+                {
+                    name = "maintain_comfort",
+                    type = "tool",
+                    tool = "template_engine",
+                    input = {
+                        template = "Climate Control: COMFORT MODE - Maintaining current settings",
+                        variables = {}
+                    }
+                }
+            }
+        }
+    },
+    
+    -- Execute all matching branches
+    execute_all_matching = true
+})
+
+print("Executing multi-condition workflow...")
+local multi_result = multi_condition:execute()
+
+print("Results:")
+print("- Matched branches: " .. multi_result.data.matched_branches)
+print("- Total branches evaluated: " .. multi_result.data.total_branches)
+
+-- Example 3: Dynamic Condition Workflow
+print("\n\nExample 3: Dynamic Condition Workflow")
+print("-" .. string.rep("-", 37))
+
+-- Function to create dynamic conditions
+local function create_price_workflow(threshold)
+    return Workflow.conditional({
+        name = "dynamic_pricing",
+        description = "Dynamic pricing based on threshold",
+        
+        branches = {
+            -- High value order
+            {
+                name = "high_value",
+                condition = {
+                    type = "custom",
+                    evaluate = function()
+                        return current_order_total >= threshold
+                    end
+                },
+                steps = {
+                    {
+                        name = "apply_vip_discount",
+                        type = "tool",
+                        tool = "calculator",
+                        input = { input = string.format("%d * 0.15", current_order_total) }
+                    },
+                    {
+                        name = "add_gift",
+                        type = "tool",
+                        tool = "template_engine",
+                        input = {
+                            template = "VIP Order: ${{total}} - Free gift included!",
+                            variables = { total = current_order_total }
+                        }
+                    }
+                }
+            },
+            -- Standard order
+            {
+                name = "standard_value",
+                condition = { type = "always" },
+                steps = {
+                    {
+                        name = "standard_discount",
+                        type = "tool",
+                        tool = "calculator",
+                        input = { input = string.format("%d * 0.05", current_order_total) }
+                    }
+                }
+            }
+        }
+    })
+end
+
+-- Test with different order values
+local test_orders = {500, 1500, 2500}
+local current_order_total = 0
+
+for _, amount in ipairs(test_orders) do
+    current_order_total = amount
+    
+    -- Create workflow with dynamic threshold
+    local threshold = 1000
+    local pricing_workflow = create_price_workflow(threshold)
+    
+    print(string.format("\nProcessing order of $%d (threshold: $%d)", amount, threshold))
+    local result = pricing_workflow:execute()
+    
+    if result.success then
+        print("- Branch executed: " .. (result.data.executed_branches > 0 and "found" or "none"))
+    end
+end
+
+-- Example 4: Nested Conditional Logic
+print("\n\nExample 4: Nested Conditional Logic")
+print("-" .. string.rep("-", 35))
+
+-- Complex scenario data
+local request_data = {
+    request_type = "data_processing",
+    data_size = "large",
+    priority = "high",
+    user_tier = "enterprise"
+}
+
+local nested_conditional = Workflow.conditional({
+    name = "request_router",
+    description = "Route requests based on multiple factors",
+    
+    branches = {
+        -- Data processing requests
+        {
+            name = "data_processing_branch",
+            condition = {
+                type = "custom",
+                evaluate = function()
+                    return request_data.request_type == "data_processing"
+                end
+            },
+            steps = {
+                -- First, check data size
+                {
+                    name = "route_by_size",
+                    type = "conditional",
+                    workflow = Workflow.conditional({
+                        name = "size_router",
+                        branches = {
+                            {
+                                name = "large_data",
+                                condition = {
+                                    type = "custom",
+                                    evaluate = function()
+                                        return request_data.data_size == "large"
+                                    end
+                                },
+                                steps = {
+                                    {
+                                        name = "queue_batch",
+                                        type = "tool",
+                                        tool = "template_engine",
+                                        input = {
+                                            template = "Queued for batch processing: {{tier}} tier, {{priority}} priority",
+                                            variables = {
+                                                tier = request_data.user_tier,
+                                                priority = request_data.priority
+                                            }
+                                        }
+                                    }
+                                }
+                            },
+                            {
+                                name = "small_data",
+                                condition = { type = "always" },
+                                steps = {
+                                    {
+                                        name = "process_immediate",
+                                        type = "tool",
+                                        tool = "text_manipulator",
+                                        input = {
+                                            input = "Processing immediately",
+                                            operation = "uppercase"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    })
+                }
+            }
+        },
+        -- API requests
+        {
+            name = "api_request_branch",
+            condition = {
+                type = "custom",
+                evaluate = function()
+                    return request_data.request_type == "api"
+                end
+            },
+            steps = {
+                {
+                    name = "rate_limit_check",
+                    type = "tool",
+                    tool = "template_engine",
+                    input = {
+                        template = "API request from {{tier}} tier - checking rate limits",
+                        variables = { tier = request_data.user_tier }
+                    }
+                }
+            }
+        }
+    }
+})
+
+print("Executing nested conditional workflow...")
+local nested_result = nested_conditional:execute()
+print("Nested routing completed: " .. (nested_result.success and "Success" or "Failed"))
+
+-- Example 5: Condition with Step Output
+print("\n\nExample 5: Condition Based on Step Output")
+print("-" .. string.rep("-", 41))
+
+local step_output_workflow = Workflow.conditional({
+    name = "validation_workflow",
+    description = "Branch based on validation results",
+    
+    -- Pre-steps that run before condition evaluation
+    pre_steps = {
+        {
+            name = "validate_input",
+            type = "tool",
+            tool = "data_validation",
+            input = {
+                input = { username = "john_doe", email = "john@example.com" },
+                schema = {
+                    type = "object",
+                    required = {"username", "email"},
+                    properties = {
+                        username = { type = "string", minLength = 3 },
+                        email = { type = "string", format = "email" }
+                    }
+                }
+            }
+        }
+    },
+    
+    branches = {
+        -- Valid data branch
+        {
+            name = "valid_data",
+            condition = {
+                type = "step_output_contains",
+                step_name = "validate_input",
+                substring = "valid"
+            },
+            steps = {
+                {
+                    name = "process_valid",
+                    type = "tool",
+                    tool = "template_engine",
+                    input = {
+                        template = "✓ Validation passed - Processing user registration",
+                        variables = {}
+                    }
+                },
+                {
+                    name = "create_account",
+                    type = "tool",
+                    tool = "uuid_generator",
+                    input = { version = "v4" }
+                }
+            }
+        },
+        -- Invalid data branch
+        {
+            name = "invalid_data",
+            condition = {
+                type = "not",
+                condition = {
+                    type = "step_output_contains",
+                    step_name = "validate_input",
+                    substring = "valid"
+                }
+            },
+            steps = {
+                {
+                    name = "handle_invalid",
+                    type = "tool",
+                    tool = "text_manipulator",
+                    input = {
+                        input = "✗ Validation failed - Please check your input",
+                        operation = "uppercase"
+                    }
+                }
+            }
+        }
+    }
+})
+
+print("Executing step output conditional workflow...")
+local step_output_result = step_output_workflow:execute()
+print("Validation workflow completed")
+
+-- Performance test
+print("\n\n=== Conditional Workflow Performance ===")
+
+local perf_workflow = Workflow.conditional({
+    name = "performance_test",
+    branches = {
+        {
+            name = "fast_branch",
+            condition = { type = "always" },
+            steps = {
+                {
+                    name = "quick_op",
+                    type = "tool",
+                    tool = "calculator",
+                    input = { input = "42 * 2" }
+                }
+            }
+        }
+    }
+})
+
+-- Benchmark
+local iterations = 20
+local total_time = 0
+
+for i = 1, iterations do
+    local start = os.clock()
+    perf_workflow:execute()
+    total_time = total_time + (os.clock() - start) * 1000
+end
+
+print(string.format("Average execution time: %.2f ms", total_time / iterations))
+
+-- Summary
+print("\n=== Conditional Workflow Summary ===")
+print("Examples demonstrated:")
+print("1. Simple user type branching")
+print("2. Multi-condition logic (AND/OR)")
+print("3. Dynamic condition creation")
+print("4. Nested conditional workflows")
+print("5. Conditions based on step output")
+print("\nKey features:")
+print("- Multiple condition types")
+print("- Execute all matching branches option")
+print("- Default branch support")
+print("- Custom condition evaluation")
+print("- Pre-step execution")
+
+print("\n=== Conditional Workflow Example Complete ===")

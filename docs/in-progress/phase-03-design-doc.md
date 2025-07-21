@@ -840,7 +840,14 @@ impl ToolCache {
 ### Goal
 Implement comprehensive agent infrastructure including factory patterns, registry system, lifecycle management, and pre-configured templates that leverage all 41+ standardized and secured tools.
 
-**Note**: During implementation, the need for a unified storage abstraction emerged for agent registry persistence. This led to the creation of `llmspell-storage` as a foundational crate providing backend-agnostic persistence with support for memory (testing), Sled (embedded database), and future RocksDB backends. This storage layer follows the same design principles as the tool standardization efforts and provides type-safe serialization abstractions.
+**Key Architectural Updates**:
+1. **Storage Abstraction**: During implementation, the need for a unified storage abstraction emerged for agent registry persistence. This led to the creation of `llmspell-storage` as a foundational crate providing backend-agnostic persistence with support for memory (testing), Sled (embedded database), and future RocksDB backends.
+
+2. **Provider Architecture Enhancement** (Task 3.3.23): To resolve provider initialization issues, the ProviderConfig architecture requires enhancement:
+   - Add `provider_type` field to separate provider implementation from provider name
+   - Implement hierarchical provider naming scheme (e.g., `rig/openai/gpt-4`, `rig/anthropic/claude-3`)
+   - Fix the "Unsupported provider: rig" error caused by lost type information
+   - Enable better provider identification and debugging
 
 ### 1. Agent Factory Pattern
 
@@ -879,8 +886,9 @@ impl AgentFactory {
             agent.add_tool(tool_name, tool)?;
         }
         
-        // Configure LLM provider
+        // Configure LLM provider with enhanced provider architecture
         if let Some(provider_spec) = &spec.llm_provider {
+            // Provider naming follows hierarchical scheme: rig/openai/gpt-4
             let provider = self.llm_providers.create(provider_spec)?;
             agent.set_llm_provider(provider)?;
         }
@@ -918,6 +926,62 @@ pub trait AgentBuilder: Send + Sync {
     fn build(&self, spec: &AgentSpec) -> Result<Box<dyn Agent>>;
     fn supported_features(&self) -> Vec<AgentFeature>;
     fn validate_spec(&self, spec: &AgentSpec) -> Result<()>;
+}
+```
+
+#### 1.1 Provider Architecture Enhancement
+
+The provider configuration requires architectural enhancement to support proper type separation and hierarchical naming:
+
+```rust
+// Enhanced ProviderConfig with type separation
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProviderConfig {
+    /// Provider implementation name (e.g., "rig")
+    pub name: String,
+    
+    /// Provider type (e.g., "openai", "anthropic", "cohere")
+    pub provider_type: String,  // NEW FIELD
+    
+    /// Model identifier
+    pub model: String,
+    
+    /// API key environment variable
+    pub api_key_env: Option<String>,
+    
+    /// Custom endpoint URL
+    pub endpoint: Option<String>,
+    
+    /// Additional configuration
+    pub custom_config: HashMap<String, serde_json::Value>,
+}
+
+// Hierarchical provider naming for better identification
+impl ProviderConfig {
+    /// Generate hierarchical provider instance name
+    /// Format: "{implementation}/{type}/{model}"
+    /// Example: "rig/openai/gpt-4"
+    pub fn instance_name(&self) -> String {
+        format!("{}/{}/{}", self.name, self.provider_type, self.model)
+    }
+}
+
+// Bridge layer provider configuration
+impl ProviderManager {
+    fn create_provider_config(&self, name: &str, config: &BridgeProviderConfig) 
+        -> Result<ProviderConfig> {
+        // Preserve provider type information
+        let provider_config = ProviderConfig {
+            name: "rig".to_string(),
+            provider_type: config.provider_type.clone(),  // Preserve original type
+            model: config.model.clone(),
+            api_key_env: config.api_key_env.clone(),
+            endpoint: config.base_url.clone(),
+            custom_config: config.extra.clone(),
+        };
+        
+        Ok(provider_config)
+    }
 }
 ```
 

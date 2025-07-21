@@ -228,7 +228,7 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 
 #### **Phase 3.3: Agent Infrastructure & Basic Workflows (Weeks 15-16)**
 **Goal**: Implement agent infrastructure and basic multi-agent coordination patterns
-**Status**: IN PROGRESS - Core infrastructure complete, bridge integration partial
+**Status**: IN PROGRESS - Core infrastructure complete, bridge integration partial, provider architecture enhancement added
 
 **Scope**:
 - ✅ Enhanced agent lifecycle management (Tasks 3.3.3-3.3.4)
@@ -244,6 +244,10 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 - ❌ **CLI Integration for Agents and Workflows**
 - ⚠️ Lua agent examples and documentation (basic only)
 - ✅ Multi-agent coordination primitives (Task 3.3.7)
+- 🆕 **Provider Architecture Enhancement** (Task 3.3.23)
+  - Add `provider_type` field to ProviderConfig
+  - Implement hierarchical provider naming (e.g., `rig/openai/gpt-4`)
+  - Fix "Unsupported provider: rig" error
 
 **Bridge Integration Strategy**:
 1. **Tool Bridge**: Pre-existing infrastructure ✅
@@ -275,6 +279,8 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 - [⚠️] Lua agent examples working and documented (basic examples only)
 - [⚠️] Agent and workflow discovery from scripts operational (agents yes, workflows no)
 - [❌] **All four basic workflow patterns accessible from Lua**
+- [ ] **Provider architecture supports type separation** (Task 3.3.23)
+- [ ] **Hierarchical provider naming implemented** (e.g., `rig/openai/gpt-4`)
 
 **Current Bridge Limitations (Task 3.3.9)**:
 - Only ~20% of agent infrastructure exposed to scripts

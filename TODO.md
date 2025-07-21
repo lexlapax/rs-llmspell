@@ -1291,7 +1291,109 @@ ensure it's certain implementations are consisten with what should go in `llmspe
 - Implemented cross-workflow coordination patterns (producer-consumer, pipeline, event-driven, saga)
 - Created detailed README.md documentation for all examples
 
-### Task 3.3.23: Lua Agent, Workflow and other Examples
+### Task 3.3.23: Add Provider Type Field to ProviderConfig Architecture
+**Priority**: CRITICAL  
+**Estimated Time**: 16 hours  
+**Assignee**: Architecture Team Lead  
+**Status**: Pending  
+
+**Description**: Implement a clean separation between provider name and provider type by adding a `provider_type` field to the ProviderConfig struct. This resolves the current "Unsupported provider: rig" error by preserving provider type information through the entire initialization flow. Provider naming will follow a hierarchical scheme: `rig/openai/gpt-4`, `rig/anthropic/claude-3`, etc.
+
+**Context**: Currently, the bridge layer maps provider types (openai/anthropic/cohere) to "rig" as the provider name, losing the original type information needed by the RigProvider to select the correct implementation. This architectural change provides explicit separation of concerns and enables better provider identification.
+
+**Acceptance Criteria:**
+- [ ] ProviderConfig struct has new `provider_type` field
+- [ ] All provider implementations updated to use provider_type
+- [ ] Bridge layer correctly populates both name and provider_type
+- [ ] RigProvider uses provider_type for implementation selection
+- [ ] Provider naming follows hierarchical scheme (e.g., `rig/openai/gpt-4`)
+- [ ] All existing tests pass with new structure
+- [ ] Provider initialization works correctly for all providers
+- [ ] Lua examples run successfully with llmspell CLI
+- [ ] Documentation updated with new configuration format
+- [ ] Breaking changes documented in CHANGELOG
+
+**Implementation Steps:**
+
+1. **Update Core Abstraction (2 hours)**
+   - [ ] Add `provider_type: String` field to ProviderConfig in `llmspell-providers/src/abstraction.rs`
+   - [ ] Update ProviderConfig::new() to accept provider_type parameter
+   - [ ] Update ProviderConfig::from_env() to handle provider_type
+   - [ ] Add provider_type to serialization/deserialization
+   - [ ] Design hierarchical naming scheme for provider instances
+
+2. **Update RigProvider Implementation (2 hours)**
+   - [ ] Modify RigProvider::new() to use `config.provider_type` instead of `config.name`
+   - [ ] Update capability detection to use provider_type
+   - [ ] Update all match statements to check provider_type
+   - [ ] Ensure provider name follows format: `rig/{provider_type}/{model}`
+
+3. **Update Bridge Layer Provider Manager (3 hours)**
+   - [ ] Modify create_provider_config() in `llmspell-bridge/src/providers.rs`
+   - [ ] Set provider_config.name = "rig" for rig-based providers
+   - [ ] Set provider_config.provider_type = config.provider_type
+   - [ ] Remove the provider_type mapping logic
+   - [ ] Update provider instance naming to hierarchical format (e.g., `rig/openai/gpt-4`)
+
+4. **Update Configuration Structures (2 hours)**
+   - [ ] Add provider_type to ProviderManagerConfig if needed
+   - [ ] Update TOML parsing to handle provider_type correctly
+   - [ ] Ensure backward compatibility or document breaking change
+   - [ ] Update default configurations to use new format
+
+5. **Update Tests (3 hours)**
+   - [ ] Update all RigProvider tests to use new structure
+   - [ ] Update provider manager tests
+   - [ ] Add specific tests for provider_type handling
+   - [ ] Test hierarchical naming scheme
+   - [ ] Test all three providers (openai, anthropic, cohere)
+   - [ ] Add integration tests for configuration loading
+
+6. **Update Examples and Documentation (2 hours)**
+   - [ ] Update all Lua agent examples to use correct configuration
+   - [ ] Update all workflow examples
+   - [ ] Update example TOML files with comments explaining provider_type
+   - [ ] Document hierarchical naming convention
+   - [ ] Update README files with new configuration format
+   - [ ] Create migration guide for users
+
+7. **Integration Testing (2 hours)**
+   - [ ] Test all Lua examples with llmspell CLI
+   - [ ] Verify each provider works correctly
+   - [ ] Test error cases (missing provider_type, invalid types)
+   - [ ] Verify hierarchical names in logs and error messages
+   - [ ] Performance validation (no regression)
+
+**Definition of Done:**
+- [ ] Code changes complete and reviewed
+- [ ] All unit tests passing
+- [ ] All integration tests passing
+- [ ] All Lua examples run successfully
+- [ ] Hierarchical naming scheme implemented
+- [ ] Documentation updated
+- [ ] Breaking changes documented
+- [ ] No clippy warnings
+- [ ] Code formatted with rustfmt
+- [ ] CI/CD pipeline green
+
+**Risk Mitigation:**
+- This is a breaking change to the provider abstraction
+- Consider adding temporary backward compatibility layer
+- Ensure clear migration documentation
+- Test thoroughly with all provider types
+
+**Dependencies:**
+- Must be completed before testing Lua examples (now Task 3.3.24)
+- Blocks completion of Phase 3.3
+
+**Notes:**
+- Hierarchical naming (e.g., `rig/openai/gpt-4`) provides clear provider identification
+- This change improves architectural clarity
+- Enables future provider extensions
+- Provides better debugging information
+- Sets foundation for multi-provider support
+
+### Task 3.3.24: Lua Agent, Workflow and other Examples
 **Priority**: HIGH  
 **Estimated Time**: 12 hours  
 **Assignee**: Bridge Team
@@ -1340,7 +1442,7 @@ ensure it's certain implementations are consisten with what should go in `llmspe
 - [ ] Run llmspell binary against each example above and manually check output for successful runs.
 - [ ] Documentation complete
 
-### Task 3.3.24: Phase 3 Final Integration
+### Task 3.3.25: Phase 3 Final Integration
 **Priority**: CRITICAL  
 **Estimated Time**: 16 hours  
 **Assignee**: Integration Lead
