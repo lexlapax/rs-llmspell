@@ -216,7 +216,7 @@ async fn aggregation_strategies_example() -> Result<(), Box<dyn std::error::Erro
 
         let result = workflow.execute().await?;
         info!("  Results: {} keys", result.aggregated_results.len());
-        for (key, _) in &result.aggregated_results {
+        for key in result.aggregated_results.keys() {
             info!("    - {}", key);
         }
     }

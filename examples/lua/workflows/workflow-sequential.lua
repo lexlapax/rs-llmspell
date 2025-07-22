@@ -4,6 +4,11 @@
 -- Sequential Workflow Example
 -- Demonstrates step-by-step workflow execution with dependencies
 
+-- Load workflow helpers for async execution
+local helpers = dofile("examples/lua/workflows/workflow-helpers.lua")
+-- Load tool helpers for async tool invocation
+local tool_helpers = dofile("examples/lua/tools/tool-helpers.lua")
+
 print("=== Sequential Workflow Example ===\n")
 
 -- Example 1: Basic Sequential Workflow
@@ -70,14 +75,16 @@ Status: Active
 
 -- Execute the workflow
 print("Executing basic sequential workflow...")
-local basic_result = basic_workflow:execute()
+local basic_result, err = helpers.executeWorkflow(basic_workflow)
 
-if basic_result.success then
+if basic_result and basic_result.success then
     print("✓ Workflow completed successfully!")
     print("Steps executed: " .. basic_result.data.steps_executed)
     print("Duration: " .. basic_result.duration_ms .. "ms")
-else
+elseif basic_result then
     print("✗ Workflow failed: " .. (basic_result.error and basic_result.error.message or "Unknown error"))
+else
+    print("✗ Workflow execution error: " .. tostring(err))
 end
 
 -- Example 2: Data Processing Pipeline
@@ -94,7 +101,7 @@ David,78,active
 Eve,88,inactive
 ]]
 
-Tools.get("file_operations"):execute({
+tool_helpers.invokeTool("file_operations", {
     operation = "write",
     path = "/tmp/students.csv",
     content = raw_data
@@ -193,13 +200,17 @@ Generated: {{timestamp}}
 })
 
 print("Executing data processing pipeline...")
-local pipeline_result = pipeline_workflow:execute()
+local pipeline_result, err = helpers.executeWorkflow(pipeline_workflow)
 
-print("Pipeline completed:")
-print("- Success: " .. tostring(pipeline_result.success))
-print("- Steps completed: " .. pipeline_result.metadata.steps_executed)
-if pipeline_result.data.final_output then
-    print("- Report saved to: /tmp/student_analysis_report.txt")
+if pipeline_result then
+    print("Pipeline completed:")
+    print("- Success: " .. tostring(pipeline_result.success))
+    print("- Steps completed: " .. (pipeline_result.metadata and pipeline_result.metadata.steps_executed or "N/A"))
+    if pipeline_result.data and pipeline_result.data.final_output then
+        print("- Report saved to: /tmp/student_analysis_report.txt")
+    end
+else
+    print("Pipeline execution error: " .. tostring(err))
 end
 
 -- Example 3: Sequential with State Management
@@ -303,14 +314,18 @@ local stateful_workflow = Workflow.sequential({
 })
 
 print("Executing stateful sequential workflow...")
-local stateful_result = stateful_workflow:execute()
+local stateful_result, err = helpers.executeWorkflow(stateful_workflow)
 
--- Display final state
-local final_context = workflow_context
-print("\nFinal State:")
-print("- Project: " .. final_context.project_name)
-print("- Files Processed: " .. final_context.processed_files)
-print("- Duration: " .. (final_context.duration or 0) .. " seconds")
+if stateful_result then
+    -- Display final state
+    local final_context = workflow_context
+    print("\nFinal State:")
+    print("- Project: " .. final_context.project_name)
+    print("- Files Processed: " .. final_context.processed_files)
+    print("- Duration: " .. (final_context.duration or 0) .. " seconds")
+else
+    print("Stateful workflow execution error: " .. tostring(err))
+end
 
 -- Example 4: Complex Sequential with Error Recovery
 print("\n\nExample 4: Complex Sequential with Error Recovery")
@@ -391,13 +406,17 @@ local recovery_workflow = Workflow.sequential({
 })
 
 print("Executing error recovery workflow...")
-local recovery_result = recovery_workflow:execute()
+local recovery_result, err = helpers.executeWorkflow(recovery_workflow)
 
-print("\nRecovery workflow result:")
-print("- Success: " .. tostring(recovery_result.success))
-print("- Total steps: " .. (recovery_result.metadata.steps_executed or 0))
-if recovery_result.error then
-    print("- Error: " .. recovery_result.error.message)
+if recovery_result then
+    print("\nRecovery workflow result:")
+    print("- Success: " .. tostring(recovery_result.success))
+    print("- Total steps: " .. (recovery_result.metadata and recovery_result.metadata.steps_executed or 0))
+    if recovery_result.error then
+        print("- Error: " .. recovery_result.error.message)
+    end
+else
+    print("Recovery workflow execution error: " .. tostring(err))
 end
 
 -- Example 5: Performance Optimized Sequential
@@ -444,12 +463,14 @@ print("Running performance benchmark (" .. iterations .. " iterations)...")
 
 for i = 1, iterations do
     local iter_start = os.clock()
-    local result = optimized_workflow:execute()
+    local result, err = helpers.executeWorkflow(optimized_workflow)
     local iter_time = (os.clock() - iter_start) * 1000
     total_time = total_time + iter_time
     
-    if i == 1 then
-        print("First execution: " .. result.data.final_output)
+    if i == 1 and result then
+        print("First execution: " .. (result.data and result.data.final_output or "N/A"))
+    elseif i == 1 then
+        print("First execution failed: " .. tostring(err))
     end
 end
 

@@ -58,9 +58,9 @@ pub fn get_test_statistics() -> SecurityTestStats {
     let mut by_category = std::collections::HashMap::new();
 
     for test in &tests {
-        *by_severity.entry(test.severity.clone()).or_insert(0) += 1;
+        *by_severity.entry(test.severity).or_insert(0) += 1;
         for category in &test.categories {
-            *by_category.entry(category.clone()).or_insert(0) += 1;
+            *by_category.entry(*category).or_insert(0) += 1;
         }
     }
 

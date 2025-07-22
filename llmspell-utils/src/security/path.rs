@@ -579,7 +579,7 @@ mod tests {
 
         for path in dangerous_paths {
             let result = validator.validate(Path::new(path));
-            assert!(result.is_err(), "Path '{}' should be rejected", path);
+            assert!(result.is_err(), "Path '{path}' should be rejected");
         }
     }
 
@@ -627,7 +627,7 @@ mod tests {
 
         for path in system_paths {
             let result = validator.validate(Path::new(path));
-            assert!(result.is_err(), "System path '{}' should be rejected", path);
+            assert!(result.is_err(), "System path '{path}' should be rejected");
         }
     }
 
@@ -678,7 +678,7 @@ mod tests {
         // Test Windows invalid characters
         let invalid_chars = ["<", ">", ":", "\"", "|", "?", "*"];
         for &ch in &invalid_chars {
-            let bad_path_string = format!("/tmp/file{}.txt", ch);
+            let bad_path_string = format!("/tmp/file{ch}.txt");
             let bad_path = Path::new(&bad_path_string);
             assert!(validator.validate(bad_path).is_err());
         }
@@ -686,7 +686,7 @@ mod tests {
         // Test reserved Windows names
         let reserved_names = ["CON", "PRN", "AUX", "NUL", "COM1", "LPT1"];
         for &name in &reserved_names {
-            let bad_path_string = format!("/tmp/{}.txt", name);
+            let bad_path_string = format!("/tmp/{name}.txt");
             let bad_path = Path::new(&bad_path_string);
             assert!(validator.validate(bad_path).is_err());
         }
@@ -725,8 +725,7 @@ mod tests {
         let result = validator.validate(&safe_path);
         assert!(
             result.is_ok(),
-            "Safe path within jail should be valid: {:?}",
-            result
+            "Safe path within jail should be valid: {result:?}"
         );
 
         // Path outside jail should fail
@@ -769,8 +768,7 @@ mod tests {
             // In strict mode, these should all fail validation
             assert!(
                 result.is_err(),
-                "Path {:?} should be rejected in strict mode",
-                path
+                "Path {path:?} should be rejected in strict mode"
             );
         }
     }
@@ -787,8 +785,7 @@ mod tests {
             // In relaxed mode, these should pass (unless they have other issues)
             assert!(
                 result.is_ok() || result.is_err(),
-                "Path {:?} validation completed",
-                path
+                "Path {path:?} validation completed"
             );
         }
     }

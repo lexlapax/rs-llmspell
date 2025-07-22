@@ -4,6 +4,11 @@
 -- Workflow-Agent Integration Example
 -- Demonstrates how to combine agents and workflows for intelligent automation
 
+-- Load workflow helpers for async execution
+local helpers = dofile("examples/lua/workflows/workflow-helpers.lua")
+-- Load tool helpers for async tool invocation
+local tool_helpers = dofile("examples/lua/tools/tool-helpers.lua")
+
 print("=== Workflow-Agent Integration Example ===\n")
 
 -- Create specialized agents for the workflow
@@ -85,17 +90,18 @@ local business_data = {
 }
 
 -- Save data
-Tools.get("json_processor"):execute({
+local json_result = tool_helpers.invokeTool("json_processor", {
     operation = "stringify",
     input = business_data,
     pretty = true
-}):chain(function(result)
-    return Tools.get("file_operations"):execute({
+})
+if json_result and json_result.output then
+    tool_helpers.invokeTool("file_operations", {
         operation = "write",
         path = "/tmp/business_data.json",
-        content = result.output
+        content = json_result.output
     })
-end)
+end
 
 -- Create integrated workflow
 local analysis_workflow = Workflow.sequential({
@@ -233,13 +239,15 @@ Format as a professional business report.
 })
 
 print("Executing business analysis workflow...")
-local analysis_result = analysis_workflow:execute()
+local analysis_result, err = helpers.executeWorkflow(analysis_workflow)
 
-if analysis_result.success then
+if analysis_result and analysis_result.success then
     print("✓ Analysis completed successfully!")
     print("Report saved to: /tmp/business_analysis_report.md")
-else
+elseif analysis_result then
     print("✗ Analysis failed: " .. (analysis_result.error and analysis_result.error.message or "Unknown"))
+else
+    print("✗ Execution error: " .. tostring(err))
 end
 
 -- Example 2: Conditional Workflow with Agent Decisions
@@ -379,8 +387,12 @@ Technical Support Team
 })
 
 print("Executing intelligent support workflow...")
-local support_result = support_workflow:execute()
-print("Support ticket routed and processed")
+local support_result, err = helpers.executeWorkflow(support_workflow)
+if support_result then
+    print("Support ticket routed and processed")
+else
+    print("Execution error: " .. tostring(err))
+end
 
 -- Example 3: Parallel Workflow with Multiple Agents
 print("\n\nExample 3: Parallel Workflow with Multiple Agents")
@@ -497,8 +509,12 @@ Create an executive summary with key recommendations.
 })
 
 print("Executing parallel market research...")
-local research_result = research_workflow:execute()
-print("Market research completed with " .. research_result.data.successful_branches .. " analyses")
+local research_result, err = helpers.executeWorkflow(research_workflow)
+if research_result then
+    print("Market research completed with " .. (research_result.data and research_result.data.successful_branches or "N/A") .. " analyses")
+else
+    print("Execution error: " .. tostring(err))
+end
 
 -- Example 4: Loop Workflow with Agent Processing
 print("\n\nExample 4: Loop Workflow with Agent Processing")
@@ -596,7 +612,7 @@ Identify:
 })
 
 print("Processing customer feedback...")
-local feedback_result = feedback_workflow:execute()
+local feedback_result, err = helpers.executeWorkflow(feedback_workflow)
 
 -- Example 5: Complex Integration - Multi-Stage Pipeline
 print("\n\nExample 5: Complex Multi-Stage Pipeline")
@@ -685,8 +701,12 @@ local document_pipeline = Workflow.sequential({
 })
 
 print("Executing complex document pipeline...")
-local pipeline_result = document_pipeline:execute()
-print("Document pipeline completed")
+local pipeline_result, err = helpers.executeWorkflow(document_pipeline)
+if pipeline_result then
+    print("Document pipeline completed")
+else
+    print("Execution error: " .. tostring(err))
+end
 
 -- Performance and Summary
 print("\n\n=== Workflow-Agent Integration Summary ===")

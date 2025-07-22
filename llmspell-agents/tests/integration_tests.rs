@@ -181,7 +181,7 @@ async fn test_concurrent_agent_execution() {
     for i in 0..10 {
         let agent_clone = agent.clone();
         let handle = tokio::spawn(async move {
-            let input = AgentInput::text(&format!("Request {}", i));
+            let input = AgentInput::text(format!("Request {}", i));
             agent_clone
                 .execute(input, ExecutionContext::default())
                 .await

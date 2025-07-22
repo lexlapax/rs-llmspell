@@ -217,27 +217,42 @@ impl ScriptEngineBridge for LuaEngine {
             // Get the API surface definition
             let api_surface = ApiSurface::standard();
 
-            // Inject Agent API
-            super::api::inject_agent_api(
-                &lua,
-                &api_surface.agent_api,
-                registry.clone(),
-                providers.clone(),
-            )?;
+            // TODO: Phase 3.3 - Using new globals system instead of old API injection
+            // The old inject_agent_api is commented out as it conflicts with the new
+            // inject_agent_global which provides more functionality
 
-            // Inject Tool API
-            super::api::inject_tool_api(&lua, &api_surface.tool_api, registry.clone())?;
+            // OLD API - Commented out to use new globals system
+            // super::api::inject_agent_api(
+            //     &lua,
+            //     &api_surface.agent_api,
+            //     registry.clone(),
+            //     providers.clone(),
+            // )?;
 
-            // Create WorkflowBridge
-            let workflow_bridge = Arc::new(crate::workflows::WorkflowBridge::new(registry.clone()));
+            // NEW: Inject globals using the new system
+            use crate::globals::{create_standard_registry, GlobalContext, GlobalInjector};
+            let global_context = Arc::new(GlobalContext::new(registry.clone(), providers.clone()));
+            let global_registry =
+                futures::executor::block_on(create_standard_registry(global_context.clone()))
+                    .map_err(|e| LLMSpellError::Component {
+                        message: format!("Failed to create global registry: {}", e),
+                        source: None,
+                    })?;
+            let injector = GlobalInjector::new(Arc::new(global_registry));
+            injector.inject_lua(&lua, &global_context)?;
 
-            // Inject Workflow API
-            super::api::inject_workflow_api(
-                &lua,
-                &api_surface.workflow_api,
-                registry.clone(),
-                workflow_bridge,
-            )?;
+            // OLD APIs - Commented out to use new globals system
+            // Tool and Workflow APIs are now injected via the globals system above
+
+            // super::api::inject_tool_api(&lua, &api_surface.tool_api, registry.clone())?;
+
+            // let workflow_bridge = Arc::new(crate::workflows::WorkflowBridge::new(registry.clone()));
+            // super::api::inject_workflow_api(
+            //     &lua,
+            //     &api_surface.workflow_api,
+            //     registry.clone(),
+            //     workflow_bridge,
+            // )?;
 
             // Inject Streaming API
             super::api::inject_streaming_api(&lua, &api_surface.streaming_api)?;

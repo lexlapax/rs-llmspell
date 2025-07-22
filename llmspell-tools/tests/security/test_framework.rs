@@ -266,7 +266,7 @@ impl SecurityTestRunner {
         result = result.with_execution_time(start.elapsed());
 
         // Update statistics
-        self.update_stats(&result, &test_case).await;
+        self.update_stats(&result, test_case).await;
 
         result
     }

@@ -548,7 +548,7 @@ mod tests {
         // Test backtick removal
         let backtick_input = "echo `whoami`";
         let backtick_sanitized = sanitizer.sanitize_command(backtick_input);
-        assert!(!backtick_sanitized.contains("`"));
+        assert!(!backtick_sanitized.contains('`'));
 
         // Test metacharacter escaping
         let meta_input = "file.txt; rm -rf /";

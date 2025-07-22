@@ -3,8 +3,10 @@
 
 use crate::agent_bridge::AgentBridge;
 use crate::globals::GlobalContext;
-use crate::lua::conversion::{agent_output_to_lua_table, lua_table_to_agent_input};
-use mlua::{Lua, Table, UserData, UserDataMethods};
+use crate::lua::conversion::{
+    agent_output_to_lua_table, json_to_lua_value, lua_table_to_agent_input, lua_table_to_json,
+};
+use mlua::{Lua, Table, UserData, UserDataMethods, Value};
 use std::collections::HashMap;
 use std::sync::Arc;
 
@@ -232,10 +234,204 @@ pub fn inject_agent_global(
         Ok(discover_table)
     })?;
 
+    // Create Agent.wrapAsTool() function
+    let bridge_clone = bridge.clone();
+    let wrap_as_tool_fn = lua.create_function(move |_lua, args: (String, Table)| {
+        let (agent_name, config) = args;
+        let bridge = bridge_clone.clone();
+
+        // Convert Lua table to JSON
+        let config_value = lua_table_to_json(config)
+            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert config: {}", e)))?;
+
+        // Use sync wrapper to call async method
+        let tool_name = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current()
+                .block_on(bridge.wrap_agent_as_tool(&agent_name, config_value))
+        })
+        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to wrap agent as tool: {}", e)))?;
+
+        Ok(tool_name)
+    })?;
+
+    // Create Agent.getInfo() function
+    let bridge_clone = bridge.clone();
+    let get_info_fn = lua.create_function(move |lua, agent_name: String| {
+        let bridge = bridge_clone.clone();
+
+        // Use sync wrapper to call async method
+        let agent_info = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(bridge.get_agent_info(&agent_name))
+        })
+        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to get agent info: {}", e)))?;
+
+        // Convert AgentInfo to JSON, then to Lua table
+        let info_json = serde_json::to_value(&agent_info).map_err(|e| {
+            mlua::Error::RuntimeError(format!("Failed to serialize agent info: {}", e))
+        })?;
+        let info_table = json_to_lua_value(lua, &info_json)?;
+        match info_table {
+            Value::Table(table) => Ok(table),
+            _ => Err(mlua::Error::RuntimeError(
+                "Invalid agent info format".to_string(),
+            )),
+        }
+    })?;
+
+    // Create Agent.listCapabilities() function
+    let bridge_clone = bridge.clone();
+    let list_capabilities_fn = lua.create_function(move |lua, ()| {
+        let bridge = bridge_clone.clone();
+
+        // Use sync wrapper to call async method
+        let capabilities_json = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(bridge.list_agent_capabilities())
+        })
+        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to list capabilities: {}", e)))?;
+
+        // Convert JSON to Lua table
+        let capabilities_table = json_to_lua_value(lua, &capabilities_json)?;
+        match capabilities_table {
+            Value::Table(table) => Ok(table),
+            _ => Err(mlua::Error::RuntimeError(
+                "Invalid capabilities format".to_string(),
+            )),
+        }
+    })?;
+
+    // Create Agent.createComposite() function
+    let bridge_clone = bridge.clone();
+    let create_composite_fn = lua.create_function(move |_lua, args: (String, Table, Table)| {
+        let (name, agents_table, config) = args;
+        let bridge = bridge_clone.clone();
+
+        // Convert agents table to Vec<String>
+        let mut agents = Vec::new();
+        for pair in agents_table.pairs::<mlua::Integer, String>() {
+            let (_, agent_name) = pair?;
+            agents.push(agent_name);
+        }
+
+        // Convert config to JSON
+        let config_json = lua_table_to_json(config)
+            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert config: {}", e)))?;
+
+        // Use sync wrapper to call async method
+        tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(bridge.create_composite_agent(
+                name,
+                agents,
+                config_json,
+            ))
+        })
+        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to create composite: {}", e)))?;
+
+        Ok(())
+    })?;
+
+    // Create Agent.discoverByCapability() function
+    let bridge_clone = bridge.clone();
+    let discover_by_capability_fn = lua.create_function(move |lua, capability: String| {
+        let bridge = bridge_clone.clone();
+
+        // Use sync wrapper to call async method
+        let agents = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current()
+                .block_on(bridge.discover_agents_by_capability(&capability))
+        })
+        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to discover agents: {}", e)))?;
+
+        // Convert to Lua table
+        let agents_table = lua.create_table()?;
+        for (i, agent_name) in agents.into_iter().enumerate() {
+            agents_table.set(i + 1, agent_name)?;
+        }
+        Ok(agents_table)
+    })?;
+
+    // Create Agent.register() function - alias for create
+    let bridge_clone = bridge.clone();
+    let register_fn = lua.create_function(move |_lua, args: Table| {
+        let bridge = bridge_clone.clone();
+
+        // Extract configuration from Lua table
+        let name: String = args.get("name").unwrap_or_else(|_| {
+            format!(
+                "agent_{}",
+                uuid::Uuid::new_v4()
+                    .to_string()
+                    .chars()
+                    .take(8)
+                    .collect::<String>()
+            )
+        });
+
+        // Get agent type - default to "llm"
+        let agent_type: String = args.get("agent_type").unwrap_or_else(|_| "llm".to_string());
+
+        // Convert entire args table to JSON for config
+        let config_json = lua_table_to_json(args)
+            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert config: {}", e)))?;
+
+        // Convert JSON to HashMap for bridge
+        let config_map: HashMap<String, serde_json::Value> = match config_json {
+            serde_json::Value::Object(map) => map.into_iter().collect(),
+            _ => {
+                return Err(mlua::Error::RuntimeError(
+                    "Invalid agent configuration format".to_string(),
+                ))
+            }
+        };
+
+        // Use sync wrapper to call async method
+        tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(bridge.create_agent(
+                &name,
+                &agent_type,
+                config_map,
+            ))
+        })
+        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to register agent: {}", e)))?;
+
+        // Return the agent name
+        Ok(name)
+    })?;
+
+    // Create Agent.get() function
+    let bridge_clone = bridge.clone();
+    let get_fn = lua.create_function(move |_lua, agent_name: String| {
+        let bridge = bridge_clone.clone();
+        let name = agent_name.clone();
+
+        // Use sync wrapper to call async method
+        let agent_exists = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(bridge.get_agent(&name))
+        })
+        .is_some();
+
+        if agent_exists {
+            // Create Lua agent instance
+            let agent_instance = LuaAgentInstance {
+                agent_instance_name: agent_name,
+                bridge: bridge.clone(),
+            };
+            Ok(Some(agent_instance))
+        } else {
+            Ok(None)
+        }
+    })?;
+
     // Set functions on Agent table
     agent_table.set("create", create_fn)?;
     agent_table.set("list", list_fn)?;
     agent_table.set("discover", discover_fn)?;
+    agent_table.set("wrapAsTool", wrap_as_tool_fn)?;
+    agent_table.set("getInfo", get_info_fn)?;
+    agent_table.set("listCapabilities", list_capabilities_fn)?;
+    agent_table.set("createComposite", create_composite_fn)?;
+    agent_table.set("discoverByCapability", discover_by_capability_fn)?;
+    agent_table.set("register", register_fn)?;
+    agent_table.set("get", get_fn)?;
 
     // Add coroutine wrapper helper for async Agent.create
     let create_async_code = r#"

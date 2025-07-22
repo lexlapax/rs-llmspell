@@ -422,12 +422,7 @@ mod tests {
 
         for (input, expected) in test_cases {
             let result = preventer.mask_sensitive_data(input);
-            assert!(
-                result.contains(expected),
-                "Input: {}, Got: {}",
-                input,
-                result
-            );
+            assert!(result.contains(expected), "Input: {input}, Got: {result}");
         }
     }
 
@@ -445,12 +440,7 @@ mod tests {
 
         for (input, expected) in test_cases {
             let result = preventer.sanitize_paths(input);
-            assert!(
-                result.contains(expected),
-                "Input: {}, Got: {}",
-                input,
-                result
-            );
+            assert!(result.contains(expected), "Input: {input}, Got: {result}");
         }
     }
 

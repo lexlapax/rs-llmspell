@@ -2,7 +2,6 @@
 // ABOUTME: Tests Tool.executeAsync, coroutine-based execution, and concurrent tool calls
 
 use llmspell_bridge::runtime::{RuntimeConfig, ScriptRuntime};
-use tokio;
 
 #[tokio::test]
 async fn test_basic_async_tool_execution() {

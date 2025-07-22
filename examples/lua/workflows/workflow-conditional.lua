@@ -4,6 +4,9 @@
 -- Conditional Workflow Example
 -- Demonstrates branching logic and condition-based execution
 
+-- Load workflow helpers for async execution
+local helpers = dofile("examples/lua/workflows/workflow-helpers.lua")
+
 print("=== Conditional Workflow Example ===\n")
 
 -- Example 1: Simple Conditional Workflow
@@ -99,11 +102,15 @@ local simple_conditional = Workflow.conditional({
 })
 
 print("Executing simple conditional workflow...")
-local simple_result = simple_conditional:execute()
+local simple_result, err = helpers.executeWorkflow(simple_conditional)
 
-print("Result:")
-print("- Executed branches: " .. simple_result.data.executed_branches)
-print("- Success: " .. tostring(simple_result.success))
+if simple_result then
+    print("Result:")
+    print("- Executed branches: " .. (simple_result.data and simple_result.data.executed_branches or "N/A"))
+    print("- Success: " .. tostring(simple_result.success))
+else
+    print("Execution error: " .. tostring(err))
+end
 
 -- Example 2: Multi-Condition Workflow
 print("\n\nExample 2: Multi-Condition Workflow")
@@ -237,11 +244,15 @@ Action: AC on, Dehumidifier on
 })
 
 print("Executing multi-condition workflow...")
-local multi_result = multi_condition:execute()
+local multi_result, err = helpers.executeWorkflow(multi_condition)
 
-print("Results:")
-print("- Matched branches: " .. multi_result.data.matched_branches)
-print("- Total branches evaluated: " .. multi_result.data.total_branches)
+if multi_result then
+    print("Results:")
+    print("- Matched branches: " .. (multi_result.data and multi_result.data.matched_branches or "N/A"))
+    print("- Total branches evaluated: " .. (multi_result.data and multi_result.data.total_branches or "N/A"))
+else
+    print("Execution error: " .. tostring(err))
+end
 
 -- Example 3: Dynamic Condition Workflow
 print("\n\nExample 3: Dynamic Condition Workflow")
@@ -310,10 +321,14 @@ for _, amount in ipairs(test_orders) do
     local pricing_workflow = create_price_workflow(threshold)
     
     print(string.format("\nProcessing order of $%d (threshold: $%d)", amount, threshold))
-    local result = pricing_workflow:execute()
+    local result, err = helpers.executeWorkflow(pricing_workflow)
     
-    if result.success then
-        print("- Branch executed: " .. (result.data.executed_branches > 0 and "found" or "none"))
+    if result and result.success then
+        print("- Branch executed: " .. (result.data and result.data.executed_branches > 0 and "found" or "none"))
+    elseif result then
+        print("- Workflow failed")
+    else
+        print("- Execution error: " .. tostring(err))
     end
 end
 
@@ -419,8 +434,12 @@ local nested_conditional = Workflow.conditional({
 })
 
 print("Executing nested conditional workflow...")
-local nested_result = nested_conditional:execute()
-print("Nested routing completed: " .. (nested_result.success and "Success" or "Failed"))
+local nested_result, err = helpers.executeWorkflow(nested_conditional)
+if nested_result then
+    print("Nested routing completed: " .. (nested_result.success and "Success" or "Failed"))
+else
+    print("Execution error: " .. tostring(err))
+end
 
 -- Example 5: Condition with Step Output
 print("\n\nExample 5: Condition Based on Step Output")
@@ -504,8 +523,12 @@ local step_output_workflow = Workflow.conditional({
 })
 
 print("Executing step output conditional workflow...")
-local step_output_result = step_output_workflow:execute()
-print("Validation workflow completed")
+local step_output_result, err = helpers.executeWorkflow(step_output_workflow)
+if step_output_result then
+    print("Validation workflow completed")
+else
+    print("Execution error: " .. tostring(err))
+end
 
 -- Performance test
 print("\n\n=== Conditional Workflow Performance ===")
@@ -534,7 +557,7 @@ local total_time = 0
 
 for i = 1, iterations do
     local start = os.clock()
-    perf_workflow:execute()
+    helpers.executeWorkflow(perf_workflow)
     total_time = total_time + (os.clock() - start) * 1000
 end
 

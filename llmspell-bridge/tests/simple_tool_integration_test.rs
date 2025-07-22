@@ -69,7 +69,7 @@ async fn test_simple_tool_integration() {
     match engine.execute_script(test_script).await {
         Ok(result) => {
             let obj = result.output.as_object().expect("Expected object result");
-            assert_eq!(obj.get("success").unwrap().as_bool().unwrap(), true);
+            assert!(obj.get("success").unwrap().as_bool().unwrap());
             assert_eq!(
                 obj.get("encoded").unwrap().as_str().unwrap(),
                 "SGVsbG8sIFdvcmxkIQ=="

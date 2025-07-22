@@ -4,14 +4,18 @@
 -- Agent Data Processor Example
 -- Demonstrates intelligent data processing, transformation, and analysis
 
+-- Load agent helpers
+local helpers = dofile("examples/lua/agents/agent-helpers.lua")
+-- Load tool helpers
+local tool_helpers = dofile("examples/lua/tools/tool-helpers.lua")
+
 print("=== Agent Data Processor Example ===\n")
 
--- Create a data processing agent
-local processor = Agent.create({
+-- Register a data processing agent
+local processor_name, err = helpers.registerAgent({
     name = "data_processor_agent",
     description = "Processes and transforms data with intelligent analysis",
-    provider = "openai",
-    model = "gpt-4o-mini",
+    model = "openai/gpt-4o-mini",
     system_prompt = [[
 You are a data processing expert. You excel at:
 1. Extracting insights from raw data
@@ -22,12 +26,23 @@ You are a data processing expert. You excel at:
 
 Always ensure data quality and provide clear transformations.
 ]],
-    temperature = 0.3
+    temperature = 0.3,
+    allowed_tools = {"json_processor", "csv_analyzer", "data_validation"},
+    max_tokens = 500
 })
 
--- Check if processor was created successfully
+-- Check if processor was registered successfully
+if not processor_name then
+    print("Failed to register processor agent: " .. tostring(err))
+    return
+end
+
+print("Registered processor agent: " .. processor_name)
+
+-- Get the agent instance
+local processor = Agent.get(processor_name)
 if not processor then
-    print("Failed to create processor agent - check API keys")
+    print("Failed to get processor agent instance")
     return
 end
 
@@ -48,14 +63,14 @@ date,product,category,quantity,price,region
 2024-01-18,Keyboard Mech,Electronics,15,89.99,South
 ]]
 
-Tool.executeAsync("file_operations", {
+tool_helpers.invokeTool("file_operations", {
     operation = "write",
     path = "/tmp/sales_data.csv",
     input = sales_csv
 })
 
 -- Process CSV data
-local csv_result = processor:execute({
+local csv_result = helpers.invokeAgent(processor, {
     prompt = [[
 Process this sales CSV data:
 1. Read /tmp/sales_data.csv
@@ -114,20 +129,20 @@ local user_data = {
 }
 
 -- Save JSON data
-local json_result = Tool.get("json_processor"):execute({
+local json_result = tool_helpers.invokeTool("json_processor", {
     operation = "stringify",
     input = user_data,
     pretty = true
 })
 
-Tool.get("file_operations"):execute({
+tool_helpers.invokeTool("file_operations", {
     operation = "write",
     path = "/tmp/user_orders.json",
     content = json_result.output
 })
 
 -- Transform JSON data
-local transform_result = processor:execute({
+local transform_result = helpers.invokeAgent(processor, {
     prompt = [[
 Transform this user order data:
 1. Read /tmp/user_orders.json
@@ -159,14 +174,14 @@ Charlie Davis,charlie@test.com,+1 (555) 987-6543,35,USA
  Emily Jones ,emily@email.com  ,555.012.3456,30,usa
 ]]
 
-Tool.executeAsync("file_operations", {
+tool_helpers.invokeTool("file_operations", {
     operation = "write",
     path = "/tmp/messy_data.csv",
     input = messy_data
 })
 
 -- Clean and validate data
-local cleaning_result = processor:execute({
+local cleaning_result = helpers.invokeAgent(processor, {
     prompt = [[
 Clean and validate this messy dataset:
 1. Read /tmp/messy_data.csv
@@ -204,14 +219,14 @@ timestamp,cpu_usage,memory_usage,requests_per_second
 2024-01-21T10:45:00,62.1,71.2,221
 ]]
 
-Tool.executeAsync("file_operations", {
+tool_helpers.invokeTool("file_operations", {
     operation = "write",
     path = "/tmp/metrics_timeseries.csv",
     input = metrics_data
 })
 
 -- Analyze time series
-local timeseries_result = processor:execute({
+local timeseries_result = helpers.invokeAgent(processor, {
     prompt = [[
 Analyze this system metrics time series:
 1. Read /tmp/metrics_timeseries.csv
@@ -251,14 +266,14 @@ local store_data = {
 
 -- Save regional data
 for region, data in pairs(store_data) do
-    local json_data = Tool.executeAsync("json_processor", {
+    local json_data = tool_helpers.invokeTool("json_processor", {
         operation = "stringify",
         input = data,
         pretty = true
     })
     
     if json_data and json_data.output then
-        Tool.executeAsync("file_operations", {
+        tool_helpers.invokeTool("file_operations", {
             operation = "write",
             path = string.format("/tmp/sales_%s.json", region),
             input = json_data.output
@@ -267,7 +282,7 @@ for region, data in pairs(store_data) do
 end
 
 -- Aggregate data
-local aggregation_result = processor:execute({
+local aggregation_result = helpers.invokeAgent(processor, {
     prompt = [[
 Create a data aggregation pipeline:
 1. Read all regional sales files: /tmp/sales_*.json
@@ -313,14 +328,14 @@ local xml_data = [[
 </products>
 ]]
 
-Tool.executeAsync("file_operations", {
+tool_helpers.invokeTool("file_operations", {
     operation = "write",
     path = "/tmp/products.xml",
     input = xml_data
 })
 
 -- Convert between formats
-local conversion_result = processor:execute({
+local conversion_result = helpers.invokeAgent(processor, {
     prompt = [[
 Convert this product data between formats:
 1. Read the XML data from /tmp/products.xml
@@ -356,14 +371,14 @@ s009,71,73,75,78,74
 s010,89,91,90,93,91
 ]]
 
-Tool.executeAsync("file_operations", {
+tool_helpers.invokeTool("file_operations", {
     operation = "write",
     path = "/tmp/student_grades.csv",
     input = grades_data
 })
 
 -- Perform statistical analysis
-local stats_result = processor:execute({
+local stats_result = helpers.invokeAgent(processor, {
     prompt = [[
 Perform statistical analysis on student grades:
 1. Read /tmp/student_grades.csv

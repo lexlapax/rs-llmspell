@@ -362,7 +362,7 @@ mod tests {
 
     #[test]
     fn test_stack_trace_removal() {
-        let error_with_stack = r#"
+        let error_with_stack = r"
 Error: Something went wrong
    at src/main.rs:42:15
    at src/lib.rs:100:20
@@ -372,7 +372,7 @@ stack backtrace:
 note: run with `RUST_BACKTRACE=1` for a backtrace
 
 This is the actual error message.
-        "#;
+        ";
 
         let cleaned = StackTraceRemover::remove_stack_traces(error_with_stack);
         assert!(!cleaned.contains("at src/"));

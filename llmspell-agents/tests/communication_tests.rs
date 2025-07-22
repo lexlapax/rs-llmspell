@@ -241,7 +241,7 @@ async fn test_concurrent_communication() {
     for i in 0..10 {
         let agent_clone = agent.clone();
         let handle = tokio::spawn(async move {
-            let input = AgentInput::text(&format!("Task {}", i));
+            let input = AgentInput::text(format!("Task {}", i));
             agent_clone
                 .execute(input, ExecutionContext::default())
                 .await
@@ -391,7 +391,7 @@ async fn test_communication_resilience() {
         // Small delay to ensure state is set
         tokio::time::sleep(Duration::from_millis(10)).await;
 
-        let input = AgentInput::text(&format!("attempt {}", i));
+        let input = AgentInput::text(format!("attempt {}", i));
         let result = agent.execute(input, ExecutionContext::default()).await;
 
         if result.is_ok() {

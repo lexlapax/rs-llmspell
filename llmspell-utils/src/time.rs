@@ -279,7 +279,7 @@ mod tests {
 
         for date_str in test_dates {
             let result = parse_datetime(date_str);
-            assert!(result.is_ok(), "Failed to parse: {}", date_str);
+            assert!(result.is_ok(), "Failed to parse: {date_str}");
         }
     }
 

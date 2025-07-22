@@ -419,15 +419,15 @@ mod tests {
     fn test_secure_string() {
         let secret = SecureString::from("my-secret-value");
         assert_eq!(secret.expose_secret(), "my-secret-value");
-        assert_eq!(format!("{:?}", secret), "SecureString[REDACTED]");
-        assert_eq!(format!("{}", secret), "[REDACTED]");
+        assert_eq!(format!("{secret:?}"), "SecureString[REDACTED]");
+        assert_eq!(format!("{secret}"), "[REDACTED]");
     }
 
     #[test]
     fn test_secure_credential() {
         let cred = SecureCredential::new(CredentialType::ApiKey, "sk-1234567890abcdef".to_string());
         assert_eq!(cred.expose_secret(), "sk-1234567890abcdef");
-        assert!(format!("{:?}", cred).contains("[REDACTED]"));
+        assert!(format!("{cred:?}").contains("[REDACTED]"));
     }
 
     #[test]

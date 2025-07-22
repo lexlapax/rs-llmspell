@@ -3,7 +3,6 @@
 
 use llmspell_bridge::providers::ProviderManagerConfig;
 use llmspell_bridge::runtime::{RuntimeConfig, ScriptRuntime};
-use tokio;
 
 // Helper to create a runtime without any provider configuration
 fn create_test_runtime_config() -> RuntimeConfig {

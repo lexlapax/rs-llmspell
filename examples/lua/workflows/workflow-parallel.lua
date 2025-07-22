@@ -4,6 +4,11 @@
 -- Parallel Workflow Example
 -- Demonstrates concurrent execution and result aggregation
 
+-- Load workflow helpers for async execution
+local helpers = dofile("examples/lua/workflows/workflow-helpers.lua")
+-- Load tool helpers for async tool invocation
+local tool_helpers = dofile("examples/lua/tools/tool-helpers.lua")
+
 print("=== Parallel Workflow Example ===\n")
 
 -- Example 1: Basic Parallel Execution
@@ -93,14 +98,18 @@ local basic_parallel = Workflow.parallel({
 
 print("Executing basic parallel workflow...")
 local start_time = os.clock()
-local basic_result = basic_parallel:execute()
+local basic_result, err = helpers.executeWorkflow(basic_parallel)
 local elapsed = (os.clock() - start_time) * 1000
 
-print("Results:")
-print("- Success: " .. tostring(basic_result.success))
-print("- Branches executed: " .. basic_result.data.successful_branches)
-print("- Execution time: " .. string.format("%.2f ms", elapsed))
-print("- Speedup vs sequential: ~3x (estimated)")
+if basic_result then
+    print("Results:")
+    print("- Success: " .. tostring(basic_result.success))
+    print("- Branches executed: " .. (basic_result.data and basic_result.data.successful_branches or "N/A"))
+    print("- Execution time: " .. string.format("%.2f ms", elapsed))
+    print("- Speedup vs sequential: ~3x (estimated)")
+else
+    print("Execution error: " .. tostring(err))
+end
 
 -- Example 2: Fork-Join Pattern
 print("\n\nExample 2: Fork-Join Pattern")
@@ -185,13 +194,17 @@ local fork_join = Workflow.parallel({
 })
 
 print("Executing fork-join pattern...")
-local fork_join_result = fork_join:execute()
+local fork_join_result, err = helpers.executeWorkflow(fork_join)
 
-print("Fork-Join Results:")
-print("- Chunks processed: " .. #data_chunks)
-if fork_join_result_data then
-    print("- Total sum: " .. fork_join_result_data.total_sum)
-    print("- Overall average: " .. string.format("%.2f", fork_join_result_data.average))
+if fork_join_result then
+    print("Fork-Join Results:")
+    print("- Chunks processed: " .. #data_chunks)
+    if fork_join_result_data then
+        print("- Total sum: " .. fork_join_result_data.total_sum)
+        print("- Overall average: " .. string.format("%.2f", fork_join_result_data.average))
+    end
+else
+    print("Execution error: " .. tostring(err))
 end
 
 -- Example 3: Parallel with Dependencies
@@ -272,14 +285,18 @@ local dependency_parallel = Workflow.parallel({
 })
 
 print("Executing parallel workflow with dependencies...")
-local dep_result = dependency_parallel:execute()
+local dep_result, err = helpers.executeWorkflow(dependency_parallel)
 
-print("Results:")
-print("- Overall success: " .. tostring(dep_result.success))
-print("- Successful branches: " .. dep_result.data.successful_branches .. "/" .. 
-      #dependency_parallel.branches)
-if dep_result.data.failed_branches > 0 then
-    print("- Failed branches: " .. dep_result.data.failed_branches)
+if dep_result then
+    print("Results:")
+    print("- Overall success: " .. tostring(dep_result.success))
+    print("- Successful branches: " .. (dep_result.data and dep_result.data.successful_branches or "N/A") .. "/" .. 
+          #dependency_parallel.branches)
+    if dep_result.data and dep_result.data.failed_branches and dep_result.data.failed_branches > 0 then
+        print("- Failed branches: " .. dep_result.data.failed_branches)
+    end
+else
+    print("Execution error: " .. tostring(err))
 end
 
 -- Example 4: Resource-Limited Parallel Execution
@@ -328,12 +345,16 @@ local rate_limited = Workflow.parallel({
 
 print("Executing rate-limited parallel workflow (10 tasks, max 3 concurrent)...")
 local rate_start = os.clock()
-local rate_result = rate_limited:execute()
+local rate_result, err = helpers.executeWorkflow(rate_limited)
 local rate_elapsed = (os.clock() - rate_start) * 1000
 
-print("\nRate-limited execution completed:")
-print(string.format("- Total time: %.2f ms", rate_elapsed))
-print("- All tasks completed: " .. tostring(rate_result.success))
+if rate_result then
+    print("\nRate-limited execution completed:")
+    print(string.format("- Total time: %.2f ms", rate_elapsed))
+    print("- All tasks completed: " .. tostring(rate_result.success))
+else
+    print("Execution error: " .. tostring(err))
+end
 
 -- Example 5: Map-Reduce Pattern
 print("\n\nExample 5: Map-Reduce Pattern")
@@ -422,15 +443,19 @@ local map_reduce = Workflow.parallel({
 })
 
 print("Executing map-reduce word count...")
-local mapreduce_result = map_reduce:execute()
+local mapreduce_result, err = helpers.executeWorkflow(map_reduce)
 
-print("Map-Reduce Results:")
-print("- Documents processed: " .. #documents)
-if word_count_results then
-    print("- Unique words: " .. word_count_results.total_words)
-end
-print("- Top words:")
-for i, word_data in ipairs(word_results.top_words or {}) do
+if mapreduce_result then
+    print("Map-Reduce Results:")
+    print("- Documents processed: " .. #documents)
+    if word_count_results then
+        print("- Unique words: " .. word_count_results.total_words)
+    end
+    print("- Top words:")
+    for i, word_data in ipairs(word_results.top_words or {}) do
+else
+    print("Execution error: " .. tostring(err))
+    for i, word_data in ipairs({}) do
     print(string.format("  %d. '%s' - %d occurrences", 
                         i, word_data.word, word_data.count))
 end
@@ -441,9 +466,9 @@ print("\n\n=== Parallel Performance Analysis ===")
 -- Sequential baseline
 local seq_start = os.clock()
 for i = 1, 3 do
-    Tools.get("calculator"):execute({ input = "100 * 2" })
-    Tools.get("uuid_generator"):execute({ version = "v4" })
-    Tools.get("text_manipulator"):execute({ 
+    tool_helpers.invokeTool("calculator", { input = "100 * 2" })
+    tool_helpers.invokeTool("uuid_generator", { version = "v4" })
+    tool_helpers.invokeTool("text_manipulator", { 
         input = "test", 
         operation = "uppercase" 
     })
@@ -460,7 +485,7 @@ local par_workflow = Workflow.parallel({
 })
 
 local par_start = os.clock()
-par_workflow:execute()
+helpers.executeWorkflow(par_workflow)
 local par_time = (os.clock() - par_start) * 1000
 
 print(string.format("Sequential time: %.2f ms", seq_time))

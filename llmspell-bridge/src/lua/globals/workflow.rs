@@ -4,7 +4,6 @@
 use crate::globals::GlobalContext;
 use crate::lua::conversion::{json_to_lua_value, lua_value_to_json};
 use crate::workflows::WorkflowBridge;
-use crate::ComponentRegistry;
 use llmspell_core::ComponentId;
 use llmspell_workflows::{Condition, ErrorStrategy, StepType, WorkflowStep};
 use mlua::{Lua, Table, UserData, UserDataMethods, Value};
@@ -429,10 +428,8 @@ impl UserData for WorkflowInstance {
 pub fn inject_workflow_global(
     lua: &Lua,
     _context: &GlobalContext,
-    registry: Arc<ComponentRegistry>,
+    workflow_bridge: Arc<WorkflowBridge>,
 ) -> mlua::Result<()> {
-    let workflow_bridge = Arc::new(WorkflowBridge::new(registry));
-
     let workflow_table = lua.create_table()?;
 
     // Workflow.sequential() - accepts full configuration
@@ -854,6 +851,54 @@ pub fn inject_workflow_global(
                 })?;
                 Ok(())
             }
+        })?,
+    )?;
+
+    // Workflow.register() - register a workflow (alias for create_workflow)
+    let bridge_clone = workflow_bridge.clone();
+    workflow_table.set(
+        "register",
+        lua.create_function(move |_lua, (workflow_type, params): (String, Table)| {
+            let bridge = bridge_clone.clone();
+
+            // Convert Lua table to JSON
+            let params_json = lua_value_to_json(Value::Table(params)).map_err(|e| {
+                mlua::Error::RuntimeError(format!("Failed to convert params: {}", e))
+            })?;
+
+            // Use sync wrapper to call async method
+            let workflow_id = tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current()
+                    .block_on(bridge.create_workflow(&workflow_type, params_json))
+            })
+            .map_err(|e| {
+                mlua::Error::RuntimeError(format!("Failed to register workflow: {}", e))
+            })?;
+
+            Ok(workflow_id)
+        })?,
+    )?;
+
+    // Workflow.clear() - remove all workflows
+    let bridge_clone = workflow_bridge.clone();
+    workflow_table.set(
+        "clear",
+        lua.create_function(move |_lua, ()| {
+            let bridge = bridge_clone.clone();
+
+            // Get all workflow IDs first
+            let workflows = tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(bridge.list_workflows())
+            });
+
+            // Remove each workflow
+            for (workflow_id, _) in workflows {
+                let _ = tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(bridge.remove_workflow(&workflow_id))
+                });
+            }
+
+            Ok(())
         })?,
     )?;
 

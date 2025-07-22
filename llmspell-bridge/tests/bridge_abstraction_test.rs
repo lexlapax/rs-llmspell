@@ -281,10 +281,10 @@ fn assert_engine_compliance(engine: &dyn ScriptEngineBridge) {
     assert!(!name.is_empty(), "Engine name should not be empty");
 
     let supports_streaming = engine.supports_streaming();
-    assert!(supports_streaming == true || supports_streaming == false);
+    assert!(supports_streaming || !supports_streaming);
 
     let supports_multimodal = engine.supports_multimodal();
-    assert!(supports_multimodal == true || supports_multimodal == false);
+    assert!(supports_multimodal || !supports_multimodal);
 
     let features = engine.supported_features();
     // Features should be internally consistent

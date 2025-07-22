@@ -3,8 +3,9 @@
 
 -- Helper function to safely create an agent
 local function safe_create_agent(config)
+    -- Use the synchronous wrapper provided by the API
     local success, agent = pcall(function()
-        return Agent.create(config)
+        return Agent.createAsync(config)
     end)
     if success then
         return agent, nil
@@ -28,9 +29,17 @@ if agent1 then
     
     -- Test agent execution
     print("\n2. Testing agent execution...")
-    local success, response = pcall(function()
-        return agent1:execute({text = "What is 2 + 2?"})
+    -- Create coroutine for async invoke
+    local co = coroutine.create(function()
+        return agent1:invoke({text = "What is 2 + 2?"})
     end)
+    
+    local success, response = coroutine.resume(co)
+    
+    -- Handle async operations that yield
+    while success and coroutine.status(co) ~= "dead" do
+        success, response = coroutine.resume(co, response)
+    end
     
     if success then
         if type(response) == "table" and response.text then
@@ -95,9 +104,24 @@ else
     print("   ✗ Failed to list agents: " .. tostring(agents))
 end
 
--- Test 4: Skip discover (method doesn't exist yet)
+-- Test 4: Test discover method
 print("\n5. Agent discovery...")
-print("   (Agent.discover() not yet implemented)")
+local success, agent_types = pcall(function()
+    return Agent.discover()
+end)
+
+if success and type(agent_types) == "table" then
+    print("   Available agent types:")
+    for i, agent_type in ipairs(agent_types) do
+        if type(agent_type) == "table" and agent_type.type then
+            print("   - " .. agent_type.type)
+        else
+            print("   - " .. tostring(agent_type))
+        end
+    end
+else
+    print("   ✗ Failed to discover agents: " .. tostring(agent_types))
+end
 
 -- Test 5: Agent with custom parameters
 print("\n6. Creating agent with custom parameters...")
@@ -112,9 +136,16 @@ if custom_agent then
     print("   ✓ Custom agent created")
     
     -- Test with creative prompt
-    local success, response = pcall(function()
-        return custom_agent:execute({text = "Describe a sunset in one sentence."})
+    local co = coroutine.create(function()
+        return custom_agent:invoke({text = "Describe a sunset in one sentence."})
     end)
+    
+    local success, response = coroutine.resume(co)
+    
+    -- Handle async operations that yield
+    while success and coroutine.status(co) ~= "dead" do
+        success, response = coroutine.resume(co, response)
+    end
     
     if success then
         if type(response) == "table" and response.text then
@@ -134,8 +165,15 @@ print("\nNote: Some operations may fail due to:")
 print("- Missing API keys")
 print("- Network connectivity")
 print("- Model availability")
-print("\nThis demo uses only the currently available Agent API methods:")
-print("- Agent.create()")
-print("- Agent.list()")
-print("- Agent.discover() [not yet implemented]")
-print("- agent:execute()")
+print("\nThis demo uses the Agent API methods:")
+print("- Agent.createAsync() - Create agents synchronously")
+print("- Agent.list() - List agent instances")
+print("- Agent.discover() - Discover agent types")
+print("- Agent.register() - Register new agents")
+print("- Agent.get() - Get existing agents")
+print("- Agent.getInfo() - Get agent type information")
+print("- Agent.listCapabilities() - List agent capabilities")
+print("- Agent.wrapAsTool() - Wrap agents as tools")
+print("- Agent.createComposite() - Create composite agents")
+print("- Agent.discoverByCapability() - Find agents by capability")
+print("- agent:invoke() - Execute agent tasks")

@@ -149,7 +149,7 @@ impl AgentDiscovery {
 }
 
 /// Information about an agent type
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct AgentInfo {
     /// Agent type name
     pub name: String,

@@ -344,7 +344,7 @@ async fn test_error_propagation() {
     let branch_result = &result.branch_results[0];
     assert!(!branch_result.success);
     // Only first step should have succeeded
-    assert!(branch_result.step_results.len() >= 1);
+    assert!(!branch_result.step_results.is_empty());
     assert!(branch_result.step_results[0].success);
 }
 
