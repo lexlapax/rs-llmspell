@@ -8,7 +8,7 @@ local agent_config = {
     agent_type = "llm",
     model = {
         provider = "openai",
-        model_id = "gpt-4o",
+        model_id = "gpt-4o-mini",
         temperature = 0.7,
         max_tokens = 100
     },

@@ -28,10 +28,13 @@ local simple_conditional = Workflow.conditional({
         {
             name = "premium_branch",
             condition = {
-                type = "custom",
-                evaluate = function()
-                    return test_data.user_type == "premium"
-                end
+                type = "tool",
+                tool = "json_processor",
+                input = {
+                    input = test_data,
+                    operation = "query",
+                    query = '.user_type == "premium"'
+                }
             },
             steps = {
                 {
@@ -57,10 +60,13 @@ local simple_conditional = Workflow.conditional({
         {
             name = "regular_branch",
             condition = {
-                type = "custom",
-                evaluate = function()
-                    return test_data.user_type == "regular"
-                end
+                type = "tool",
+                tool = "json_processor",
+                input = {
+                    input = test_data,
+                    operation = "query",
+                    query = '.user_type == "regular"'
+                }
             },
             steps = {
                 {
@@ -135,16 +141,22 @@ local multi_condition = Workflow.conditional({
                 type = "and",
                 conditions = {
                     {
-                        type = "custom",
-                        evaluate = function()
-                            return environment_data.temperature > 70
-                        end
+                        type = "tool",
+                        tool = "json_processor",
+                        input = {
+                            input = environment_data,
+                            operation = "query",
+                            query = ".temperature > 70"
+                        }
                     },
                     {
-                        type = "custom",
-                        evaluate = function()
-                            return environment_data.humidity > 60
-                        end
+                        type = "tool",
+                        tool = "json_processor",
+                        input = {
+                            input = environment_data,
+                            operation = "query",
+                            query = ".humidity > 60"
+                        }
                     }
                 }
             },
@@ -172,10 +184,13 @@ Action: AC on, Dehumidifier on
         {
             name = "heating_mode",
             condition = {
-                type = "custom",
-                evaluate = function()
-                    return environment_data.temperature < 60
-                end
+                type = "tool",
+                tool = "json_processor",
+                input = {
+                    input = environment_data,
+                    operation = "query",
+                    query = ".temperature < 60"
+                }
             },
             steps = {
                 {
@@ -196,16 +211,22 @@ Action: AC on, Dehumidifier on
                 type = "or",
                 conditions = {
                     {
-                        type = "custom",
-                        evaluate = function()
-                            return environment_data.time_of_day == "night"
-                        end
+                        type = "tool",
+                        tool = "json_processor",
+                        input = {
+                            input = environment_data,
+                            operation = "query",
+                            query = '.time_of_day == "night"'
+                        }
                     },
                     {
-                        type = "custom",
-                        evaluate = function()
-                            return environment_data.time_of_day == "late_evening"
-                        end
+                        type = "tool",
+                        tool = "json_processor",
+                        input = {
+                            input = environment_data,
+                            operation = "query",
+                            query = '.time_of_day == "late_evening"'
+                        }
                     }
                 }
             },
@@ -259,7 +280,7 @@ print("\n\nExample 3: Dynamic Condition Workflow")
 print("-" .. string.rep("-", 37))
 
 -- Function to create dynamic conditions
-local function create_price_workflow(threshold)
+local function create_price_workflow(threshold, order_total)
     return Workflow.conditional({
         name = "dynamic_pricing",
         description = "Dynamic pricing based on threshold",
@@ -269,17 +290,20 @@ local function create_price_workflow(threshold)
             {
                 name = "high_value",
                 condition = {
-                    type = "custom",
-                    evaluate = function()
-                        return current_order_total >= threshold
-                    end
+                    type = "tool",
+                    tool = "json_processor",
+                    input = {
+                        input = { order_total = order_total, threshold = threshold },
+                        operation = "query",
+                        query = ".order_total >= .threshold"
+                    }
                 },
                 steps = {
                     {
                         name = "apply_vip_discount",
                         type = "tool",
                         tool = "calculator",
-                        input = { input = string.format("%d * 0.15", current_order_total) }
+                        input = { input = string.format("%d * 0.15", order_total) }
                     },
                     {
                         name = "add_gift",
@@ -287,7 +311,7 @@ local function create_price_workflow(threshold)
                         tool = "template_engine",
                         input = {
                             template = "VIP Order: ${{total}} - Free gift included!",
-                            variables = { total = current_order_total }
+                            variables = { total = order_total }
                         }
                     }
                 }
@@ -301,7 +325,7 @@ local function create_price_workflow(threshold)
                         name = "standard_discount",
                         type = "tool",
                         tool = "calculator",
-                        input = { input = string.format("%d * 0.05", current_order_total) }
+                        input = { input = string.format("%d * 0.05", order_total) }
                     }
                 }
             }
@@ -318,7 +342,7 @@ for _, amount in ipairs(test_orders) do
     
     -- Create workflow with dynamic threshold
     local threshold = 1000
-    local pricing_workflow = create_price_workflow(threshold)
+    local pricing_workflow = create_price_workflow(threshold, amount)
     
     print(string.format("\nProcessing order of $%d (threshold: $%d)", amount, threshold))
     local result, err = helpers.executeWorkflow(pricing_workflow)
@@ -344,6 +368,9 @@ local request_data = {
     user_tier = "enterprise"
 }
 
+-- Create JSON string from request data
+local request_json = '{"request_type":"data_processing","data_size":"large","priority":"high","user_tier":"enterprise"}'
+
 local nested_conditional = Workflow.conditional({
     name = "request_router",
     description = "Route requests based on multiple factors",
@@ -353,10 +380,12 @@ local nested_conditional = Workflow.conditional({
         {
             name = "data_processing_branch",
             condition = {
-                type = "custom",
-                evaluate = function()
-                    return request_data.request_type == "data_processing"
-                end
+                type = "tool",
+                tool = "json_processor",
+                input = {
+                    json = request_json,
+                    query = '.request_type == "data_processing"'
+                }
             },
             steps = {
                 -- First, check data size
@@ -369,10 +398,13 @@ local nested_conditional = Workflow.conditional({
                             {
                                 name = "large_data",
                                 condition = {
-                                    type = "custom",
-                                    evaluate = function()
-                                        return request_data.data_size == "large"
-                                    end
+                                    type = "tool",
+                                    tool = "json_processor",
+                                    input = {
+                                        input = request_data,
+                                        operation = "query",
+                                        query = '.data_size == "large"'
+                                    }
                                 },
                                 steps = {
                                     {
@@ -382,8 +414,8 @@ local nested_conditional = Workflow.conditional({
                                         input = {
                                             template = "Queued for batch processing: {{tier}} tier, {{priority}} priority",
                                             variables = {
-                                                tier = request_data.user_tier,
-                                                priority = request_data.priority
+                                                tier = "enterprise",
+                                                priority = "high"
                                             }
                                         }
                                     }
@@ -413,10 +445,12 @@ local nested_conditional = Workflow.conditional({
         {
             name = "api_request_branch",
             condition = {
-                type = "custom",
-                evaluate = function()
-                    return request_data.request_type == "api"
-                end
+                type = "tool",
+                tool = "json_processor",
+                input = {
+                    json = request_json,
+                    query = '.request_type == "api"'
+                }
             },
             steps = {
                 {

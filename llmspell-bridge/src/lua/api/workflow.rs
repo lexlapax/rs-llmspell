@@ -129,29 +129,20 @@ pub fn inject_workflow_api(
             let params = lua_table_to_workflow_params(lua, config)
                 .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
 
-            // Create and execute workflow using a blocking task
-            let (_workflow_id, result_json) = {
-                let bridge_clone = bridge.clone();
-                let workflow_type_clone = workflow_type.clone();
-                let params_clone = params.clone();
-
-                // Use spawn_blocking to run async code in a blocking context
-                std::thread::spawn(move || {
-                    let rt = tokio::runtime::Runtime::new().unwrap();
-                    rt.block_on(async move {
-                        let workflow_id = bridge_clone
-                            .create_workflow(&workflow_type_clone, params_clone)
-                            .await?;
-                        let result = bridge_clone
-                            .execute_workflow(&workflow_id, serde_json::json!({}))
-                            .await?;
-                        Ok::<_, llmspell_core::LLMSpellError>((workflow_id, result))
-                    })
+            // Create and execute workflow using the same pattern as Agent API
+            let (_workflow_id, result_json) = tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(async {
+                    let workflow_id = bridge
+                        .create_workflow(&workflow_type, params)
+                        .await
+                        .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+                    let result = bridge
+                        .execute_workflow(&workflow_id, serde_json::json!({}))
+                        .await
+                        .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+                    Ok::<_, mlua::Error>((workflow_id, result))
                 })
-                .join()
-                .unwrap()
-                .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?
-            };
+            })?;
 
             // Convert result
             let result: crate::conversion::ScriptWorkflowResult =
@@ -175,12 +166,9 @@ pub fn inject_workflow_api(
         .create_function(|lua, _: ()| -> mlua::Result<Table> {
             let wrapper_ud: mlua::AnyUserData = lua.named_registry_value(WORKFLOW_BRIDGE_KEY)?;
             let bridge = wrapper_ud.borrow::<BridgeWrapper>()?.0.clone();
-            let workflows = std::thread::spawn(move || {
-                let rt = tokio::runtime::Runtime::new().unwrap();
-                rt.block_on(bridge.list_workflows())
-            })
-            .join()
-            .unwrap();
+            let workflows = tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(bridge.list_workflows())
+            });
 
             let result = lua.create_table()?;
             for (i, (id, info)) in workflows.into_iter().enumerate() {
@@ -203,12 +191,9 @@ pub fn inject_workflow_api(
         .create_function(|lua, _: ()| -> mlua::Result<Table> {
             let wrapper_ud: mlua::AnyUserData = lua.named_registry_value(WORKFLOW_BRIDGE_KEY)?;
             let bridge = wrapper_ud.borrow::<BridgeWrapper>()?.0.clone();
-            let types = std::thread::spawn(move || {
-                let rt = tokio::runtime::Runtime::new().unwrap();
-                rt.block_on(bridge.discover_workflow_types())
-            })
-            .join()
-            .unwrap();
+            let types = tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(bridge.discover_workflow_types())
+            });
 
             let result = lua.create_table()?;
             for (i, (type_name, info)) in types.into_iter().enumerate() {
@@ -274,6 +259,46 @@ pub fn inject_workflow_api(
         .set("discover_types", discover_fn)
         .map_err(|e| LLMSpellError::Component {
             message: format!("Failed to set Workflow.discover_types: {}", e),
+            source: None,
+        })?;
+
+    // Add executeAsync convenience wrapper similar to Agent.createAsync
+    let execute_async_code = r#"
+        -- Helper to execute workflows within a coroutine context
+        function(workflow_config)
+            -- Create coroutine for async execution
+            local co = coroutine.create(function()
+                return Workflow.execute(workflow_config)
+            end)
+            
+            -- Execute the coroutine
+            local success, result = coroutine.resume(co)
+            
+            -- Handle async operations that yield
+            while success and coroutine.status(co) ~= "dead" do
+                success, result = coroutine.resume(co, result)
+            end
+            
+            if not success then
+                error(tostring(result))
+            end
+            
+            return result
+        end
+    "#;
+
+    let execute_async_fn = lua
+        .load(execute_async_code)
+        .eval::<mlua::Function>()
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to create executeAsync function: {}", e),
+            source: None,
+        })?;
+
+    workflow_table
+        .set("executeAsync", execute_async_fn)
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to set Workflow.executeAsync: {}", e),
             source: None,
         })?;
 

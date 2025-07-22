@@ -902,6 +902,38 @@ pub fn inject_workflow_global(
         })?,
     )?;
 
+    // Add executeAsync convenience wrapper similar to Agent.createAsync
+    let execute_async_code = r#"
+        -- Helper to execute workflows within a coroutine context
+        function(workflow_instance, input)
+            -- Execute the workflow instance
+            local co = coroutine.create(function()
+                return workflow_instance:execute(input)
+            end)
+            
+            -- Execute the coroutine
+            local success, result = coroutine.resume(co)
+            
+            -- Handle async operations that yield
+            while success and coroutine.status(co) ~= "dead" do
+                success, result = coroutine.resume(co, result)
+            end
+            
+            if not success then
+                error(tostring(result))
+            end
+            
+            return result
+        end
+    "#;
+
+    let execute_async_fn = lua
+        .load(execute_async_code)
+        .eval::<mlua::Function>()
+        .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+
+    workflow_table.set("executeAsync", execute_async_fn)?;
+
     // Set Workflow as global
     lua.globals().set("Workflow", workflow_table)?;
 

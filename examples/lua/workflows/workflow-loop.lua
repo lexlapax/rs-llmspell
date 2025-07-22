@@ -78,8 +78,8 @@ local products = {
     { name = "Device D", price = 149.99, quantity = 10 }
 }
 
--- Inventory tracking variables
-local inventory_total = 0
+-- Initialize inventory state file
+local inventory_state_file = "/tmp/inventory_state.json"
 
 local collection_loop = Workflow.loop({
     name = "inventory_processor",
@@ -119,29 +119,90 @@ Total Value: ${{value}}
             }
         },
         {
-            name = "accumulate_total",
-            type = "custom",
-            execute = function(context)
-                local item_value = tonumber(context.steps.calculate_value.output) or 0
-                inventory_total = inventory_total + item_value
-                
+            name = "read_current_total",
+            type = "tool",
+            tool = "file_operations",
+            input = {
+                operation = "read",
+                path = inventory_state_file
+            },
+            on_error = function(err)
+                -- Initialize if file doesn't exist
                 return {
                     success = true,
-                    output = "Running total: $" .. string.format("%.2f", inventory_total)
+                    output = '{"total": 0}'
                 }
             end
+        },
+        {
+            name = "parse_total",
+            type = "tool",
+            tool = "json_processor",
+            input = {
+                json = "{{step:read_current_total:output}}",
+                query = "$.total"
+            }
+        },
+        {
+            name = "calculate_new_total",
+            type = "tool",
+            tool = "calculator",
+            input = {
+                input = "{{step:parse_total:output}} + {{step:calculate_value:output}}"
+            }
+        },
+        {
+            name = "save_new_total",
+            type = "tool",
+            tool = "json_processor",
+            input = {
+                json = '{"total": {{step:calculate_new_total:output}}}',
+                query = "$"
+            }
+        },
+        {
+            name = "write_total_state",
+            type = "tool",
+            tool = "file_operations",
+            input = {
+                operation = "write",
+                path = inventory_state_file,
+                content = "{{step:save_new_total:output}}"
+            }
         }
     },
     
     -- Initialize before loop
     on_start = function()
-        inventory_total = 0
+        -- Initialize state file
+        local init_tool = Tool.getByName("file_operations")
+        init_tool:execute({
+            operation = "write",
+            path = inventory_state_file,
+            content = '{"total": 0}'
+        })
         print("Starting inventory calculation...")
     end,
     
     -- Summarize after loop
     on_complete = function(result)
-        print(string.format("\nTotal Inventory Value: $%.2f", inventory_total))
+        -- Read final total
+        local read_tool = Tool.getByName("file_operations")
+        local final_state = read_tool:execute({
+            operation = "read",
+            path = inventory_state_file
+        })
+        
+        if final_state.success then
+            local json_tool = Tool.getByName("json_processor")
+            local total_result = json_tool:execute({
+                json = final_state.output,
+                query = "$.total"
+            })
+            if total_result.success then
+                print(string.format("\nTotal Inventory Value: $%.2f", tonumber(total_result.output)))
+            end
+        end
     end
 })
 
@@ -159,9 +220,8 @@ end
 print("\n\nExample 3: While Condition Loop")
 print("-" .. string.rep("-", 31))
 
--- Initialize counter variables
-local counter = 0
-local sum = 0
+-- Initialize state files
+local while_state_file = "/tmp/while_state.json"
 
 local while_loop = Workflow.loop({
     name = "while_accumulator",
@@ -170,10 +230,12 @@ local while_loop = Workflow.loop({
     -- Continue while condition is met
     iterator = {
         while_condition = {
-            type = "custom",
-            evaluate = function()
-                return sum < 100
-            end
+            type = "tool",
+            tool = "json_processor",
+            input = {
+                json = "{{file:" .. while_state_file .. "}}",
+                query = "$.sum < 100"
+            }
         }
     },
     
@@ -190,42 +252,129 @@ local while_loop = Workflow.loop({
             }
         },
         {
-            name = "update_sum",
-            type = "custom",
-            execute = function(context)
-                local new_value = tonumber(context.steps.generate_value.output) or 0
-                sum = sum + new_value
-                counter = counter + 1
-                
-                return {
-                    success = true,
-                    output = string.format(
-                        "Added %d, new sum: %d",
-                        new_value,
-                        sum
-                    )
+            name = "read_state",
+            type = "tool",
+            tool = "file_operations",
+            input = {
+                operation = "read",
+                path = while_state_file
+            }
+        },
+        {
+            name = "parse_sum",
+            type = "tool",
+            tool = "json_processor",
+            input = {
+                json = "{{step:read_state:output}}",
+                query = "$.sum"
+            }
+        },
+        {
+            name = "parse_counter",
+            type = "tool",
+            tool = "json_processor",
+            input = {
+                json = "{{step:read_state:output}}",
+                query = "$.counter"
+            }
+        },
+        {
+            name = "calculate_new_sum",
+            type = "tool",
+            tool = "calculator",
+            input = {
+                input = "{{step:parse_sum:output}} + {{step:generate_value:output}}"
+            }
+        },
+        {
+            name = "increment_counter",
+            type = "tool",
+            tool = "calculator",
+            input = {
+                input = "{{step:parse_counter:output}} + 1"
+            }
+        },
+        {
+            name = "create_update_message",
+            type = "tool",
+            tool = "template_engine",
+            input = {
+                template = "Added {{value}}, new sum: {{sum}}",
+                variables = {
+                    value = "{{step:generate_value:output}}",
+                    sum = "{{step:calculate_new_sum:output}}"
                 }
-            end
+            }
+        },
+        {
+            name = "update_state",
+            type = "tool",
+            tool = "json_processor",
+            input = {
+                json = '{"sum": {{step:calculate_new_sum:output}}, "counter": {{step:increment_counter:output}}}',
+                query = "$"
+            }
+        },
+        {
+            name = "save_state",
+            type = "tool",
+            tool = "file_operations",
+            input = {
+                operation = "write",
+                path = while_state_file,
+                content = "{{step:update_state:output}}"
+            }
         }
     },
     
-    -- Break condition
+    -- Break condition using json_processor
     break_condition = {
-        type = "custom",
-        evaluate = function()
-            return sum > 150  -- Stop if sum exceeds 150
-        end
-    }
+        type = "tool",
+        tool = "json_processor",
+        input = {
+            json = "{{file:" .. while_state_file .. "}}",
+            query = "$.sum > 150"
+        }
+    },
+    
+    -- Initialize before loop
+    on_start = function()
+        local init_tool = Tool.getByName("file_operations")
+        init_tool:execute({
+            operation = "write",
+            path = while_state_file,
+            content = '{"sum": 0, "counter": 0}'
+        })
+    end
 })
 
 print("Executing while condition loop...")
 local while_result, err = helpers.executeWorkflow(while_loop)
 
 if while_result then
-    print("While loop completed:")
-    print("- Final sum: " .. sum)
-    print("- Iterations: " .. counter)
-    print("- Break reason: " .. (while_result.data and while_result.data.break_reason or "condition met"))
+    -- Read final state
+    local read_tool = Tool.getByName("file_operations")
+    local final_state = read_tool:execute({
+        operation = "read",
+        path = while_state_file
+    })
+    
+    if final_state.success then
+        local json_tool = Tool.getByName("json_processor")
+        local sum_result = json_tool:execute({
+            json = final_state.output,
+            query = "$.sum"
+        })
+        local counter_result = json_tool:execute({
+            json = final_state.output,
+            query = "$.counter"
+        })
+        
+        print("While loop completed:")
+        print("- Final sum: " .. (sum_result.output or "N/A"))
+        print("- Iterations: " .. (counter_result.output or "N/A"))
+        print("- Break reason: " .. (while_result.data and while_result.data.break_reason or "condition met"))
+    end
 else
     print("Execution error: " .. tostring(err))
 end
@@ -241,8 +390,8 @@ local matrix = {
     { 7, 8, 9 }
 }
 
--- Matrix processing variables
-local matrix_results = {}
+-- Matrix results file
+local matrix_results_file = "/tmp/matrix_results.json"
 
 local outer_loop = Workflow.loop({
     name = "matrix_row_processor",
@@ -275,27 +424,76 @@ local outer_loop = Workflow.loop({
             })
         },
         {
-            name = "store_row_result",
-            type = "custom",
-            execute = function(context)
-                table.insert(matrix_results, context.steps.process_row.output)
-                
+            name = "read_results",
+            type = "tool",
+            tool = "file_operations",
+            input = {
+                operation = "read",
+                path = matrix_results_file
+            },
+            on_error = function(err)
                 return {
                     success = true,
-                    output = "Row processed"
+                    output = '{"rows": []}'
                 }
             end
+        },
+        {
+            name = "append_row",
+            type = "tool",
+            tool = "json_processor",
+            input = {
+                json = "{{step:read_results:output}}",
+                query = "$.rows",
+                operation = "append",
+                value = "{{step:process_row:output}}"
+            }
+        },
+        {
+            name = "save_results",
+            type = "tool",
+            tool = "file_operations",
+            input = {
+                operation = "write",
+                path = matrix_results_file,
+                content = '{"rows": {{step:append_row:output}}}'
+            }
         }
-    }
+    },
+    
+    -- Initialize before loop
+    on_start = function()
+        local init_tool = Tool.getByName("file_operations")
+        init_tool:execute({
+            operation = "write",
+            path = matrix_results_file,
+            content = '{"rows": []}'
+        })
+    end
 })
 
 print("Executing nested loop processing...")
 local nested_result, err = helpers.executeWorkflow(outer_loop)
 
 if nested_result then
-    print("Matrix processing completed:")
-    print("- Rows processed: " .. (nested_result.data and nested_result.data.completed_iterations or "N/A"))
-    print("- Total elements processed: " .. (#matrix_results * #matrix_results[1]))
+    -- Read final results
+    local read_tool = Tool.getByName("file_operations")
+    local final_results = read_tool:execute({
+        operation = "read",
+        path = matrix_results_file
+    })
+    
+    if final_results.success then
+        local json_tool = Tool.getByName("json_processor")
+        local rows_result = json_tool:execute({
+            json = final_results.output,
+            query = "$.rows | length"
+        })
+        
+        print("Matrix processing completed:")
+        print("- Rows processed: " .. (nested_result.data and nested_result.data.completed_iterations or "N/A"))
+        print("- Total rows stored: " .. (rows_result.output or "N/A"))
+    end
 else
     print("Execution error: " .. tostring(err))
 end
@@ -314,9 +512,8 @@ local data_with_errors = {
     { id = 6, value = "40" }
 }
 
--- Error tracking variables
-local error_count = 0
-local success_count = 0
+-- Error tracking file
+local error_state_file = "/tmp/error_state.json"
 
 local error_handling_loop = Workflow.loop({
     name = "robust_processor",
@@ -335,10 +532,42 @@ local error_handling_loop = Workflow.loop({
                 input = "{{loop:current_item.value}} + 5"
             },
             on_error = function(err)
-                print("Error processing item " .. 
-                      context.current_index .. 
-                      ": " .. tostring(err))
-                error_count = error_count + 1
+                -- Update error count in state file
+                local read_tool = Tool.getByName("file_operations")
+                local state_result = read_tool:execute({
+                    operation = "read",
+                    path = error_state_file
+                })
+                
+                if state_result.success then
+                    local json_tool = Tool.getByName("json_processor")
+                    local error_count_result = json_tool:execute({
+                        json = state_result.output,
+                        query = "$.error_count"
+                    })
+                    
+                    local calc_tool = Tool.getByName("calculator")
+                    local new_error_count = calc_tool:execute({
+                        input = (error_count_result.output or "0") .. " + 1"
+                    })
+                    
+                    if new_error_count.success then
+                        local update_result = json_tool:execute({
+                            json = state_result.output,
+                            query = "$",
+                            operation = "set",
+                            path = "$.error_count",
+                            value = new_error_count.output
+                        })
+                        
+                        read_tool:execute({
+                            operation = "write",
+                            path = error_state_file,
+                            content = update_result.output
+                        })
+                    end
+                end
+                
                 return {
                     success = false,
                     output = "ERROR"
@@ -346,24 +575,47 @@ local error_handling_loop = Workflow.loop({
             end
         },
         {
-            name = "record_result",
-            type = "custom",
-            execute = function(context)
-                if context.steps.parse_value.success then
-                    success_count = success_count + 1
-                    return {
-                        success = true,
-                        output = "Processed: " .. context.steps.parse_value.output
-                    }
-                else
-                    return {
-                        success = true,  -- Continue loop despite error
-                        output = "Skipped due to error"
-                    }
-                end
-            end
+            name = "read_state",
+            type = "tool",
+            tool = "file_operations",
+            input = {
+                operation = "read",
+                path = error_state_file
+            }
+        },
+        {
+            name = "update_count",
+            type = "tool",
+            tool = "json_processor",
+            input = {
+                json = "{{step:read_state:output}}",
+                query = "$",
+                operation = "set",
+                path = "$.{{step:parse_value:success ? 'success_count' : 'error_count'}}",
+                value = "{{step:parse_value:success ? '{{step:read_state:output | json_query:$.success_count}} + 1' : '{{step:read_state:output | json_query:$.error_count}}'}}"
+            }
+        },
+        {
+            name = "save_state",
+            type = "tool",
+            tool = "file_operations",
+            input = {
+                operation = "write",
+                path = error_state_file,
+                content = "{{step:update_count:output}}"
+            }
         }
     },
+    
+    -- Initialize before loop
+    on_start = function()
+        local init_tool = Tool.getByName("file_operations")
+        init_tool:execute({
+            operation = "write",
+            path = error_state_file,
+            content = '{"success_count": 0, "error_count": 0}'
+        })
+    end,
     
     -- Continue processing despite errors
     error_strategy = "continue"
@@ -373,10 +625,29 @@ print("Executing error handling loop...")
 local error_result, err = helpers.executeWorkflow(error_handling_loop)
 
 if error_result then
-    print("\nError handling results:")
-    print("- Total items: " .. #data_with_errors)
-    print("- Successful: " .. success_count)
-    print("- Errors: " .. error_count)
+    -- Read final counts
+    local read_tool = Tool.getByName("file_operations")
+    local final_state = read_tool:execute({
+        operation = "read",
+        path = error_state_file
+    })
+    
+    if final_state.success then
+        local json_tool = Tool.getByName("json_processor")
+        local success_count = json_tool:execute({
+            json = final_state.output,
+            query = "$.success_count"
+        })
+        local error_count = json_tool:execute({
+            json = final_state.output,
+            query = "$.error_count"
+        })
+        
+        print("\nError handling results:")
+        print("- Total items: " .. #data_with_errors)
+        print("- Successful: " .. (success_count.output or "0"))
+        print("- Errors: " .. (error_count.output or "0"))
+    end
 else
     print("Execution error: " .. tostring(err))
 end
@@ -391,6 +662,9 @@ for i = 1, 100 do
     table.insert(large_dataset, i)
 end
 
+-- Batch results file
+local batch_results_file = "/tmp/batch_results.json"
+
 local optimized_loop = Workflow.loop({
     name = "performance_loop",
     description = "Optimized batch processing",
@@ -404,22 +678,70 @@ local optimized_loop = Workflow.loop({
     
     body = {
         {
-            name = "batch_sum",
-            type = "custom",
-            execute = function(context)
-                -- In batch mode, current_item is an array
-                local batch = context.current_item
-                local sum = 0
-                for _, val in ipairs(batch) do
-                    sum = sum + val
-                end
+            name = "batch_to_json",
+            type = "tool",
+            tool = "json_processor",
+            input = {
+                json = "{{loop:current_item | to_json}}",
+                query = "$"
+            }
+        },
+        {
+            name = "calculate_batch_sum",
+            type = "tool",
+            tool = "json_processor",
+            input = {
+                json = "{{step:batch_to_json:output}}",
+                query = "$[*] | add"
+            }
+        },
+        {
+            name = "read_results",
+            type = "tool",
+            tool = "file_operations",
+            input = {
+                operation = "read",
+                path = batch_results_file
+            },
+            on_error = function(err)
                 return {
                     success = true,
-                    output = sum
+                    output = '{"batches": []}'
                 }
             end
+        },
+        {
+            name = "append_batch_sum",
+            type = "tool",
+            tool = "json_processor",
+            input = {
+                json = "{{step:read_results:output}}",
+                query = "$.batches",
+                operation = "append",
+                value = "{{step:calculate_batch_sum:output}}"
+            }
+        },
+        {
+            name = "save_results",
+            type = "tool",
+            tool = "file_operations",
+            input = {
+                operation = "write",
+                path = batch_results_file,
+                content = '{"batches": {{step:append_batch_sum:output}}}'
+            }
         }
     },
+    
+    -- Initialize before loop
+    on_start = function()
+        local init_tool = Tool.getByName("file_operations")
+        init_tool:execute({
+            operation = "write",
+            path = batch_results_file,
+            content = '{"batches": []}'
+        })
+    end,
     
     -- Only collect summary
     aggregation_strategy = "summary"

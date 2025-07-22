@@ -58,10 +58,8 @@ You generate clear, professional reports. You:
     temperature = 0.5
 })
 
--- Register agents
-for name, agent in pairs(agents) do
-    Agent.register(name, agent)
-end
+-- Note: In Phase 3.3, agents would be registered but for now we'll use them directly
+-- Agent registration will be properly implemented in the agent infrastructure phase
 
 -- Example 1: Sequential Workflow with Agent Steps
 print("Example 1: Sequential Workflow with Agent Steps")
@@ -529,8 +527,15 @@ local feedback_items = {
     "Customer service was unhelpful. Waited 2 hours for response"
 }
 
--- Feedback tracking variables
-local sentiment_summary = { positive = 0, negative = 0, neutral = 0 }
+-- Feedback tracking file
+local sentiment_file = "/tmp/sentiment_summary.json"
+
+-- Initialize sentiment tracking
+local init_result = tool_helpers.invokeTool("file_operations", {
+    operation = "write",
+    path = sentiment_file,
+    content = '{"positive": 0, "negative": 0, "neutral": 0}'
+})
 
 -- Loop with agent processing
 local feedback_workflow = Workflow.loop({
@@ -572,42 +577,150 @@ Identify:
             }
         },
         {
-            name = "update_summary",
-            type = "custom",
-            execute = function(context)
-                local sentiment = context.steps.analyze_sentiment.output:lower()
-                local summary = sentiment_summary
-                
-                if sentiment:find("positive") then
-                    summary.positive = summary.positive + 1
-                elseif sentiment:find("negative") then
-                    summary.negative = summary.negative + 1
-                else
-                    summary.neutral = summary.neutral + 1
-                end
-                
-                sentiment_summary = summary
-                
-                return {
-                    success = true,
-                    output = "Processed feedback #" .. context.current_index
+            name = "read_current_sentiment",
+            type = "tool",
+            tool = "file_operations",
+            input = {
+                operation = "read",
+                path = sentiment_file
+            }
+        },
+        {
+            name = "parse_sentiment_data",
+            type = "tool",
+            tool = "json_processor",
+            input = {
+                json = "{{step:read_current_sentiment:output}}",
+                query = "$"
+            }
+        },
+        {
+            name = "determine_sentiment_type",
+            type = "tool",
+            tool = "text_manipulator",
+            input = {
+                input = "{{step:analyze_sentiment:output}}",
+                operation = "lowercase"
+            }
+        },
+        {
+            name = "check_positive",
+            type = "tool",
+            tool = "text_manipulator",
+            input = {
+                input = "{{step:determine_sentiment_type:output}}",
+                operation = "contains",
+                pattern = "positive"
+            }
+        },
+        {
+            name = "check_negative",
+            type = "tool",
+            tool = "text_manipulator",
+            input = {
+                input = "{{step:determine_sentiment_type:output}}",
+                operation = "contains",
+                pattern = "negative"
+            }
+        },
+        {
+            name = "get_positive_count",
+            type = "tool",
+            tool = "json_processor",
+            input = {
+                json = "{{step:parse_sentiment_data:output}}",
+                query = "$.positive"
+            }
+        },
+        {
+            name = "get_negative_count",
+            type = "tool",
+            tool = "json_processor",
+            input = {
+                json = "{{step:parse_sentiment_data:output}}",
+                query = "$.negative"
+            }
+        },
+        {
+            name = "get_neutral_count",
+            type = "tool",
+            tool = "json_processor",
+            input = {
+                json = "{{step:parse_sentiment_data:output}}",
+                query = "$.neutral"
+            }
+        },
+        {
+            name = "calculate_new_count",
+            type = "tool",
+            tool = "calculator",
+            input = {
+                input = "{{step:check_positive:output == 'true' ? step:get_positive_count:output : (step:check_negative:output == 'true' ? step:get_negative_count:output : step:get_neutral_count:output)}} + 1"
+            }
+        },
+        {
+            name = "update_sentiment_data",
+            type = "tool",
+            tool = "template_engine",
+            input = {
+                template = '{"positive": {{positive}}, "negative": {{negative}}, "neutral": {{neutral}}}',
+                variables = {
+                    positive = "{{step:check_positive:output == 'true' ? step:calculate_new_count:output : step:get_positive_count:output}}",
+                    negative = "{{step:check_negative:output == 'true' ? step:calculate_new_count:output : step:get_negative_count:output}}",
+                    neutral = "{{step:check_positive:output != 'true' && step:check_negative:output != 'true' ? step:calculate_new_count:output : step:get_neutral_count:output}}"
                 }
-            end
+            }
+        },
+        {
+            name = "save_updated_sentiment",
+            type = "tool",
+            tool = "file_operations",
+            input = {
+                operation = "write",
+                path = sentiment_file,
+                content = "{{step:update_sentiment_data:output}}"
+            }
+        },
+        {
+            name = "create_progress_message",
+            type = "tool",
+            tool = "template_engine",
+            input = {
+                template = "Processed feedback #{{index}}",
+                variables = {
+                    index = "{{loop:current_index}}"
+                }
+            }
         }
     },
     
     -- Generate summary report
     on_complete = function()
-        local summary = sentiment_summary
-        local total = summary.positive + summary.negative + summary.neutral
+        -- Read final sentiment data
+        local read_result = tool_helpers.invokeTool("file_operations", {
+            operation = "read",
+            path = sentiment_file
+        })
         
-        print("\nFeedback Analysis Summary:")
-        print(string.format("- Positive: %d (%.1f%%)", 
-              summary.positive, (summary.positive/total)*100))
-        print(string.format("- Negative: %d (%.1f%%)", 
-              summary.negative, (summary.negative/total)*100))
-        print(string.format("- Neutral: %d (%.1f%%)", 
-              summary.neutral, (summary.neutral/total)*100))
+        if read_result and read_result.success then
+            local parse_result = tool_helpers.invokeTool("json_processor", {
+                json = read_result.output,
+                query = "$"
+            })
+            
+            if parse_result and parse_result.success then
+                local summary = parse_result.output
+                local total = summary.positive + summary.negative + summary.neutral
+                
+                print("\nFeedback Analysis Summary:")
+                print(string.format("- Positive: %d (%.1f%%)", 
+                      summary.positive, (summary.positive/total)*100))
+                print(string.format("- Negative: %d (%.1f%%)", 
+                      summary.negative, (summary.negative/total)*100))
+                print(string.format("- Neutral: %d (%.1f%%)", 
+                      summary.neutral, (summary.neutral/total)*100))
+            end
+        end
     end
 })
 

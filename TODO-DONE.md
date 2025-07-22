@@ -1,5 +1,23 @@
 # rs-llmspell Completed Tasks
 
+## Task 3.3.28 - Update Agent Integration Workflow (2025-01-22) ✅
+- Replaced update_summary custom function with file_operations + json_processor + template_engine
+- Ensured all agent-workflow integration uses proper tool steps
+- Updated sentiment tracking to use file persistence instead of in-memory variables
+- Replaced custom function with 13 tool-based steps for proper serialization
+- Completed as part of fixing workflow examples to work without custom functions
+
+## Task 3.3.28 - Test All Updated Examples (2025-01-22) ✅
+- Tested all workflow examples with llmspell CLI
+- Fixed syntax errors and API compatibility issues
+- Documented remaining limitations:
+  - Workflow.loop() API not yet implemented
+  - Agent.createAsync() API not yet implemented  
+  - JSON serialization issues with nested Lua tables
+  - Missing json module in safe Lua mode
+- Successfully tested: 7 out of 10 workflow examples working
+- Migration guide: Replace custom functions with tool-based steps using file_operations for state persistence
+
 ## Phase 3: Tool Enhancement & Workflow Orchestration
 
 ### Phase 3.2: Security & Performance

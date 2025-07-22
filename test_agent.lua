@@ -5,7 +5,7 @@ print("Testing LLM agent creation...")
 local agent = Agent.createAsync({
     name = "test-llm-agent",
     description = "Test LLM agent",
-    model = "gpt-4o",
+    model = "gpt-4o-mini",
     temperature = 0.7,
     max_tokens = 100,
     system_prompt = "You are a helpful assistant. Keep responses concise."

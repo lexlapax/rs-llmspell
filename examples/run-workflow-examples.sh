@@ -3,12 +3,23 @@
 # ABOUTME: Tests workflow execution patterns (sequential, conditional, loop, parallel)
 
 # Set the llmspell command path
-if [ -x "../target/debug/llmspell" ]; then
-    LLMSPELL_CMD="../target/debug/llmspell"
-elif [ -x "./target/debug/llmspell" ]; then
-    LLMSPELL_CMD="./target/debug/llmspell"
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
+
+if [ -n "$LLMSPELL_CMD" ]; then
+    # Use the provided command
+    echo "Using provided LLMSPELL_CMD: $LLMSPELL_CMD"
+elif [ -x "$PROJECT_ROOT/target/debug/llmspell" ]; then
+    LLMSPELL_CMD="$PROJECT_ROOT/target/debug/llmspell"
+    echo "Using llmspell binary: $LLMSPELL_CMD"
+elif [ -x "$PROJECT_ROOT/target/release/llmspell" ]; then
+    LLMSPELL_CMD="$PROJECT_ROOT/target/release/llmspell"
+    echo "Using llmspell binary: $LLMSPELL_CMD"
+elif command -v cargo &> /dev/null; then
+    LLMSPELL_CMD="cargo run --bin llmspell --"
+    echo "Using cargo run as llmspell command"
 else
-    echo "Error: llmspell binary not found in ../target/debug or ./target/debug"
+    echo "Error: llmspell binary not found and cargo not available"
     exit 1
 fi
 
@@ -77,7 +88,13 @@ for file in "${workflow_files[@]}"; do
     
     # Run with timeout
     cd $(dirname $file)
-    timeout 60 $LLMSPELL_CMD run "$(basename $file)" 2>&1 | cat
+    if [[ "$LLMSPELL_CMD" == *"cargo run"* ]]; then
+        # For cargo run, we need to handle it differently
+        timeout 60 bash -c "$LLMSPELL_CMD run \"$(basename $file)\"" 2>&1 | cat
+    else
+        # For direct binary execution
+        timeout 60 $LLMSPELL_CMD run "$(basename $file)" 2>&1 | cat
+    fi
     exit_code=${PIPESTATUS[0]}
     cd - > /dev/null
     

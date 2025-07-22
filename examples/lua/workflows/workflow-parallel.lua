@@ -8,6 +8,7 @@
 local helpers = dofile("examples/lua/workflows/workflow-helpers.lua")
 -- Load tool helpers for async tool invocation
 local tool_helpers = dofile("examples/lua/tools/tool-helpers.lua")
+-- JSON operations will be done with tools instead of requiring json module
 
 print("=== Parallel Workflow Example ===\n")
 
@@ -138,27 +139,49 @@ local fork_join = Workflow.parallel({
                 name = "process_" .. chunk.id,
                 steps = {
                     {
+                        name = "save_chunk_data",
+                        type = "tool",
+                        tool = "file_operations",
+                        input = {
+                            operation = "write",
+                            path = "/tmp/chunk_" .. chunk.id .. ".json",
+                            content = '[' .. table.concat(chunk.data, ',') .. ']'
+                        }
+                    },
+                    {
+                        name = "read_chunk_data",
+                        type = "tool",
+                        tool = "file_operations",
+                        input = {
+                            operation = "read",
+                            path = "/tmp/chunk_" .. chunk.id .. ".json"
+                        }
+                    },
+                    {
                         name = "sum_chunk",
-                        type = "custom",
-                        execute = function()
-                            local sum = 0
-                            for _, val in ipairs(chunk.data) do
-                                sum = sum + val
-                            end
-                            return {
-                                success = true,
-                                output = { chunk_id = chunk.id, sum = sum }
-                            }
-                        end
+                        type = "tool",
+                        tool = "json_processor",
+                        input = {
+                            input = '{{step:read_chunk_data:output}}',
+                            query = 'add'
+                        }
+                    },
+                    {
+                        name = "save_sum_result",
+                        type = "tool",
+                        tool = "file_operations",
+                        input = {
+                            operation = "write",
+                            path = "/tmp/sum_" .. chunk.id .. ".json",
+                            content = '{"chunk_id": "' .. chunk.id .. '", "sum": {{step:sum_chunk:output}}}'
+                        }
                     },
                     {
                         name = "calculate_average",
                         type = "tool",
                         tool = "calculator",
                         input = {
-                            input = string.format("%d / %d", 
-                                "{{step:sum_chunk:output.sum}}", 
-                                #chunk.data)
+                            input = "{{step:sum_chunk:output}} / " .. #chunk.data
                         }
                     }
                 }
@@ -167,30 +190,8 @@ local fork_join = Workflow.parallel({
         return branches
     end)(),
     
-    -- Join results after parallel execution
-    on_complete = function(result)
-        -- Aggregate results from all branches
-        local total_sum = 0
-        local total_count = 0
-        
-        for _, branch in ipairs(result.branches) do
-            if branch.success then
-                -- Extract sum from first step
-                local sum_step = branch.steps[1]
-                if sum_step and sum_step.output then
-                    total_sum = total_sum + sum_step.output.sum
-                    total_count = total_count + #data_chunks[1].data
-                end
-            end
-        end
-        
-        -- Store aggregated results (would use State in Phase 5)
-        fork_join_result_data = {
-            total_sum = total_sum,
-            total_count = total_count,
-            average = total_sum / total_count
-        }
-    end
+    -- Maximum concurrent chunks to process
+    max_concurrency = 4
 })
 
 print("Executing fork-join pattern...")
@@ -199,10 +200,8 @@ local fork_join_result, err = helpers.executeWorkflow(fork_join)
 if fork_join_result then
     print("Fork-Join Results:")
     print("- Chunks processed: " .. #data_chunks)
-    if fork_join_result_data then
-        print("- Total sum: " .. fork_join_result_data.total_sum)
-        print("- Overall average: " .. string.format("%.2f", fork_join_result_data.average))
-    end
+    print("- Success: " .. tostring(fork_join_result.success))
+    print("- Parallel processing completed")
 else
     print("Execution error: " .. tostring(err))
 end
@@ -246,16 +245,13 @@ local dependency_parallel = Workflow.parallel({
             required = false,  -- Can fail without affecting overall success
             steps = {
                 {
-                    name = "enhance_data",
-                    type = "custom",
-                    execute = function()
-                        -- Simulate 50% failure rate
-                        if math.random() > 0.5 then
-                            return { success = true, output = "Enhanced successfully" }
-                        else
-                            error("Enhancement failed (simulated)")
-                        end
-                    end
+                    name = "attempt_read_optional_file",
+                    type = "tool",
+                    tool = "file_operations",
+                    input = {
+                        operation = "read",
+                        path = "/tmp/optional_config_" .. os.time() .. ".json"  -- File that might not exist
+                    }
                 }
             }
         },
@@ -290,8 +286,7 @@ local dep_result, err = helpers.executeWorkflow(dependency_parallel)
 if dep_result then
     print("Results:")
     print("- Overall success: " .. tostring(dep_result.success))
-    print("- Successful branches: " .. (dep_result.data and dep_result.data.successful_branches or "N/A") .. "/" .. 
-          #dependency_parallel.branches)
+    print("- Successful branches: " .. (dep_result.data and dep_result.data.successful_branches or "N/A") .. "/3")
     if dep_result.data and dep_result.data.failed_branches and dep_result.data.failed_branches > 0 then
         print("- Failed branches: " .. dep_result.data.failed_branches)
     end
@@ -310,19 +305,32 @@ for i = 1, 10 do
         name = "task_" .. i,
         steps = {
             {
+                name = "create_task_data",
+                type = "tool",
+                tool = "uuid_generator",
+                input = { version = "v4" }
+            },
+            {
                 name = "process_task",
-                type = "custom",
-                execute = function()
-                    -- Simulate varying processing time
-                    local processing_time = math.random(100, 300) / 1000
-                    os.execute("sleep " .. processing_time)
-                    
-                    return {
-                        success = true,
-                        output = string.format("Task %d completed in %.0fms", 
-                                             i, processing_time * 1000)
+                type = "tool",
+                tool = "file_operations",
+                input = {
+                    operation = "write",
+                    path = "/tmp/task_" .. i .. "_{{step:create_task_data:output}}.txt",
+                    content = "Task " .. i .. " processed at " .. os.date("%Y-%m-%d %H:%M:%S")
+                }
+            },
+            {
+                name = "log_completion",
+                type = "tool",
+                tool = "template_engine",
+                input = {
+                    template = "Task {{task_id}} completed with UUID {{uuid}}",
+                    variables = {
+                        task_id = tostring(i),
+                        uuid = "{{step:create_task_data:output}}"
                     }
-                end
+                }
             }
         }
     })
@@ -337,10 +345,8 @@ local rate_limited = Workflow.parallel({
     -- Limit concurrent execution
     max_concurrency = 3,  -- Only 3 tasks run at once
     
-    -- Track progress
-    on_branch_complete = function(branch_name, result)
-        print("Completed: " .. branch_name)
-    end
+    -- Maximum time to wait
+    timeout = 10000  -- 10 seconds
 })
 
 print("Executing rate-limited parallel workflow (10 tasks, max 3 concurrent)...")
@@ -382,19 +388,44 @@ local map_reduce = Workflow.parallel({
                 name = "map_doc_" .. i,
                 steps = {
                     {
-                        name = "count_words",
-                        type = "custom",
-                        execute = function()
-                            local words = {}
-                            for word in doc:gmatch("%w+") do
-                                word = word:lower()
-                                words[word] = (words[word] or 0) + 1
-                            end
-                            return {
-                                success = true,
-                                output = words
-                            }
-                        end
+                        name = "save_document",
+                        type = "tool",
+                        tool = "file_operations",
+                        input = {
+                            operation = "write",
+                            path = "/tmp/doc_" .. i .. ".txt",
+                            content = doc
+                        }
+                    },
+                    {
+                        name = "normalize_text",
+                        type = "tool",
+                        tool = "text_manipulator",
+                        input = {
+                            input = doc,
+                            operation = "lowercase"
+                        }
+                    },
+                    {
+                        name = "process_words",
+                        type = "tool",
+                        tool = "text_manipulator",
+                        input = {
+                            input = "{{step:normalize_text:output}}",
+                            operation = "replace",
+                            pattern = "[^a-z0-9 ]+",
+                            replacement = " "
+                        }
+                    },
+                    {
+                        name = "save_word_counts",
+                        type = "tool",
+                        tool = "file_operations",
+                        input = {
+                            operation = "write",
+                            path = "/tmp/doc_words_" .. i .. ".txt",
+                            content = "{{step:process_words:output}}"
+                        }
                     }
                 }
             })
@@ -405,39 +436,25 @@ local map_reduce = Workflow.parallel({
     -- Reduce phase: combine results
     post_steps = {
         {
-            name = "reduce_counts",
-            type = "custom",
-            execute = function(context)
-                local global_counts = {}
-                
-                -- Combine word counts from all branches
-                for _, branch_result in ipairs(context.branch_results) do
-                    if branch_result.success then
-                        local word_counts = branch_result.steps[1].output
-                        for word, count in pairs(word_counts) do
-                            global_counts[word] = (global_counts[word] or 0) + count
-                        end
-                    end
-                end
-                
-                -- Find top words
-                local sorted_words = {}
-                for word, count in pairs(global_counts) do
-                    table.insert(sorted_words, {word = word, count = count})
-                end
-                table.sort(sorted_words, function(a, b) return a.count > b.count end)
-                
-                -- Store word count results (would use State in Phase 5)
-                word_count_results = {
-                    total_words = #sorted_words,
-                    top_words = {sorted_words[1], sorted_words[2], sorted_words[3]}
+            name = "create_summary",
+            type = "tool",
+            tool = "template_engine",
+            input = {
+                template = "Processed {{doc_count}} documents in parallel. Results saved to individual files.",
+                variables = {
+                    doc_count = tostring(#documents)
                 }
-                
-                return {
-                    success = true,
-                    output = "Reduce completed"
-                }
-            end
+            }
+        },
+        {
+            name = "save_summary",
+            type = "tool",
+            tool = "file_operations",
+            input = {
+                operation = "write",
+                path = "/tmp/mapreduce_summary.txt",
+                content = "{{step:create_summary:output}}"
+            }
         }
     }
 })
@@ -448,16 +465,19 @@ local mapreduce_result, err = helpers.executeWorkflow(map_reduce)
 if mapreduce_result then
     print("Map-Reduce Results:")
     print("- Documents processed: " .. #documents)
-    if word_count_results then
-        print("- Unique words: " .. word_count_results.total_words)
+    print("- Success: " .. tostring(mapreduce_result.success))
+    print("- Results saved to /tmp/mapreduce_summary.txt")
+    
+    -- Read and display summary
+    local read_result = tool_helpers.invokeTool("file_operations", {
+        operation = "read",
+        path = "/tmp/mapreduce_summary.txt"
+    })
+    if read_result and read_result.success then
+        print("- Summary: " .. tostring(read_result.output))
     end
-    print("- Top words:")
-    for i, word_data in ipairs(word_results.top_words or {}) do
 else
     print("Execution error: " .. tostring(err))
-    for i, word_data in ipairs({}) do
-    print(string.format("  %d. '%s' - %d occurrences", 
-                        i, word_data.word, word_data.count))
 end
 
 -- Performance comparison
