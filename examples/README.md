@@ -14,7 +14,7 @@ This directory contains comprehensive examples demonstrating the Phase 2 tools l
 
 ### Phase 2 & 3 Tools Examples (Updated Naming Convention)
 
-All tool example files follow the pattern: `tools-{category}.lua`
+All tool example files follow the pattern: `lua/tools/tools-{category}.lua`
 
 #### Tool Demonstrations
 - **`tools-showcase.lua`** - Complete demonstration of all 26 Phase 2 tools
@@ -74,29 +74,29 @@ llmspell run examples/hello.lua
 llmspell run examples/basic-math.lua
 
 # Run tool demonstrations
-llmspell run examples/tools-utility.lua
-llmspell run examples/tools-filesystem.lua
+llmspell run examples/lua/tools/tools-utility.lua
+llmspell run examples/lua/tools/tools-filesystem.lua
 ```
 
 ### Advanced Usage
 ```bash
 # Run complete tools showcase
-llmspell run examples/tools-showcase.lua
+llmspell run examples/lua/tools/tools-showcase.lua
 
 # Run system integration examples (requires elevated permissions)
-llmspell run examples/tools-system.lua
+llmspell run examples/lua/tools/tools-system.lua
 
 # Run multi-tool workflows
-llmspell run examples/tools-workflow.lua
+llmspell run examples/lua/tools/tools-workflow.lua
 
 # Run performance benchmarks
-llmspell run examples/tools-performance.lua
+llmspell run examples/lua/tools/tools-performance.lua
 
 # Run Phase 3.1 web tools
-llmspell run examples/tools-web.lua
+llmspell run examples/lua/tools/tools-web.lua
 
 # Run Phase 3.1 integration tools
-llmspell run examples/tools-integration.lua
+llmspell run examples/lua/tools/tools-integration.lua
 
 # Run all examples
 ./examples/run-all-tools-examples.sh
@@ -190,18 +190,18 @@ All examples demonstrate secure usage:
 ### Beginner Examples
 - `hello.lua` - Basic script structure
 - `basic-math.lua` - Simple operations
-- `tools-utility.lua` - Safe utility operations
+- `lua/tools/tools-utility.lua` - Safe utility operations
 
 ### Intermediate Examples
-- `tools-filesystem.lua` - File operations with security
-- `tools-data.lua` - Data processing operations
-- `tools-showcase.lua` - Multiple tool integration
+- `lua/tools/tools-filesystem.lua` - File operations with security
+- `lua/tools/tools-data.lua` - Data processing operations
+- `lua/tools/tools-showcase.lua` - Multiple tool integration
 
 ### Advanced Examples
-- `tools-system.lua` - System-level operations
-- `tools-security.lua` - Security testing and validation
-- `tools-workflow.lua` - Multi-tool integration workflows
-- `tools-performance.lua` - Performance benchmarking
+- `lua/tools/tools-system.lua` - System-level operations
+- `lua/tools/tools-security.lua` - Security testing and validation
+- `lua/tools/tools-workflow.lua` - Multi-tool integration workflows
+- `lua/tools/tools-performance.lua` - Performance benchmarking
 
 ## 🎯 Use Cases
 

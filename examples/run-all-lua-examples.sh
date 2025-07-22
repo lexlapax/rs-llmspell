@@ -2,6 +2,28 @@
 # ABOUTME: Master script to run all Lua examples and generate comprehensive report
 # ABOUTME: Orchestrates testing of tools, agents, workflows, and core functionality
 
+# Set the llmspell command path
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
+EXAMPLES_DIR="$PROJECT_ROOT/examples"
+
+if [ -n "$LLMSPELL_CMD" ]; then
+    # Use the provided command
+    echo "Using provided LLMSPELL_CMD: $LLMSPELL_CMD"
+elif [ -x "$PROJECT_ROOT/target/debug/llmspell" ]; then
+    LLMSPELL_CMD="$PROJECT_ROOT/target/debug/llmspell"
+    echo "Using llmspell binary: $LLMSPELL_CMD"
+elif [ -x "$PROJECT_ROOT/target/release/llmspell" ]; then
+    LLMSPELL_CMD="$PROJECT_ROOT/target/release/llmspell"
+    echo "Using llmspell binary: $LLMSPELL_CMD"
+elif command -v cargo &> /dev/null; then
+    LLMSPELL_CMD="cargo run --bin llmspell --"
+    echo "Using cargo run as llmspell command"
+else
+    echo "Error: llmspell binary not found and cargo not available"
+    exit 1
+fi
+
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -98,7 +120,7 @@ run_lua_files() {
         echo -n "Testing $basename_file... "
         
         # Run with timeout
-        timeout 30 ./target/debug/llmspell run "$file" > /tmp/lua_test_output.log 2>&1
+        timeout 30 $LLMSPELL_CMD run "$file" > /tmp/lua_test_output.log 2>&1
         exit_code=$?
         
         if [ $exit_code -eq 0 ]; then

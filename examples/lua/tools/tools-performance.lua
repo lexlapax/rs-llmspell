@@ -32,8 +32,8 @@ local function benchmark_tool(name, operations)
     -- Measure tool initialization/availability check
     local init_time, tool_exists = measure_time(function()
         local tools = Tool.list()
-        for _, tool_name in ipairs(tools) do
-            if tool_name == name then
+        for _, tool in ipairs(tools) do
+            if tool.name == name then
                 return true
             end
         end

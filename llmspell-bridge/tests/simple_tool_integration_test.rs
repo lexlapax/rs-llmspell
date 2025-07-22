@@ -33,31 +33,69 @@ async fn test_simple_tool_integration() {
             error("Could not get base64_encoder tool")
         end
         
-        -- Debug: print what we're sending
-        local params = {
-            operation = "encode",
-            input = "Hello, World!"
-        }
+        -- Test if we can call Tool.invoke directly
+        -- Tool.invoke should wrap parameters correctly
+        print("Testing Tool.invoke...")
         
-        -- Debug: check if params is a valid table
-        if type(params) ~= "table" then
-            error("params is not a table, it's a " .. type(params))
+        -- Create a coroutine to call Tool.invoke (which is async)
+        local co = coroutine.create(function()
+            return Tool.invoke("base64_encoder", {
+                operation = "encode",
+                input = "Hello, World!"
+            })
+        end)
+        
+        -- Execute the coroutine
+        local success, result = coroutine.resume(co)
+        
+        -- Handle async operations that yield
+        while success and coroutine.status(co) ~= "dead" do
+            success, result = coroutine.resume(co, result)
         end
         
-        local result = tool:execute(params)
+        if not success then
+            error("Tool execution failed: " .. tostring(result))
+        end
         
         if not result then
             error("Tool execution returned nil")
         end
         
-        if not result.success then
+        if not result then
+            error("Tool execution failed: result is nil")
+        end
+        
+        -- Debug: print what we got
+        local result_type = type(result)
+        if result_type ~= "table" then
+            error("Tool execution failed: result is " .. result_type .. ", not a table")
+        end
+        
+        -- Check what fields are in result
+        local fields = {}
+        for k, v in pairs(result) do
+            table.insert(fields, k .. "=" .. type(v))
+        end
+        
+        -- Check if execution failed
+        if result.success == false then
             error("Tool execution failed: " .. (result.error or "unknown error"))
         end
         
-        -- Parse the JSON output
-        local parsed = JSON.parse(result.output)
-        if not parsed or not parsed.result then
-            error("Failed to parse tool output: " .. tostring(result.output))
+        -- The result from executeAsync should have text field with JSON
+        if not result.text then
+            error("Tool execution failed: no text in result. Fields: " .. table.concat(fields, ", "))
+        end
+        
+        -- Parse the JSON output from the text field
+        local parsed = JSON.parse(result.text)
+        if not parsed then
+            error("Failed to parse tool output: " .. tostring(result.text))
+        end
+        
+        -- Tool returns {success: true, result: {output: "...", variant: "standard", binary: false}}
+        if not parsed.success then
+            error("Tool returned failure: " .. tostring(parsed.message or "unknown"))
         end
         
         return {
@@ -81,18 +119,38 @@ async fn test_simple_tool_integration() {
 
     // Test 2: Calculator tool
     let calc_test = r#"
-        local result = Tool.get("calculator"):execute({
-            operation = "evaluate",
-            input = "2 + 3 * 4"
-        })
+        -- Use coroutine for async Tool.invoke
+        local co = coroutine.create(function()
+            return Tool.invoke("calculator", {
+                operation = "evaluate",
+                input = "2 + 3 * 4"
+            })
+        end)
         
-        if not result.success then
-            error("Calculator failed: " .. (result.error or "unknown"))
+        local success, result = coroutine.resume(co)
+        while success and coroutine.status(co) ~= "dead" do
+            success, result = coroutine.resume(co, result)
         end
         
-        local parsed = JSON.parse(result.output)
+        if not success then
+            error("Calculator execution failed: " .. tostring(result))
+        end
+        
+        if not result then
+            error("Calculator failed: result is nil")
+        end
+        
+        if not result.text then
+            error("Calculator failed: no text in result")
+        end
+        
+        local parsed = JSON.parse(result.text)
+        if not parsed.success then
+            error("Calculator tool failed: " .. tostring(parsed.message or "unknown"))
+        end
+        
         return {
-            result = parsed.result.result,
+            result = parsed.result.result, -- The actual numeric result is nested
             success = true
         }
     "#;
@@ -108,31 +166,79 @@ async fn test_simple_tool_integration() {
 
     // Test 3: Tool chaining
     let chain_test = r#"
-        -- Generate UUID
-        local uuid_result = Tool.get("uuid_generator"):execute({
-            operation = "generate",
-            version = "v4"
-        })
-        
-        if not uuid_result.success then
-            error("UUID generation failed")
+        -- Debug: Check what tools are available
+        local tools = Tool.list()
+        print("Available tools:")
+        for i, tool in ipairs(tools) do
+            print("  " .. i .. ": " .. tool.name)
         end
         
-        local uuid_parsed = JSON.parse(uuid_result.output)
+        -- Generate UUID (using Tool instance methods)
+        local uuid_tool = Tool.get("uuid_generator")
+        if not uuid_tool then
+            error("Could not get uuid_generator tool")
+        end
+        
+        -- Create coroutine for async execution
+        local co = coroutine.create(function()
+            return uuid_tool:execute({
+                operation = "generate",
+                version = "v4"
+            })
+        end)
+        
+        local success, uuid_result = coroutine.resume(co)
+        while success and coroutine.status(co) ~= "dead" do
+            success, uuid_result = coroutine.resume(co, uuid_result)
+        end
+        
+        if not success then
+            error("UUID generation failed: " .. tostring(uuid_result))
+        end
+        
+        if not uuid_result.text then
+            error("UUID generation failed: no text in result")
+        end
+        
+        local uuid_parsed = JSON.parse(uuid_result.text)
+        if not uuid_parsed.success then
+            error("UUID generation failed: " .. tostring(uuid_parsed.message or "unknown"))
+        end
+        
         local uuid = uuid_parsed.result.uuid
         
-        -- Hash the UUID
-        local hash_result = Tool.get("hash_calculator"):execute({
-            operation = "hash",
-            algorithm = "md5",
-            input = uuid
-        })
-        
-        if not hash_result.success then
-            error("Hash calculation failed")
+        -- Hash the UUID (using Tool instance methods)
+        local hash_tool = Tool.get("hash_calculator")
+        if not hash_tool then
+            error("Could not get hash_calculator tool")
         end
         
-        local hash_parsed = JSON.parse(hash_result.output)
+        -- Create coroutine for async execution
+        local co2 = coroutine.create(function()
+            return hash_tool:execute({
+                operation = "hash",
+                algorithm = "md5",
+                input = uuid
+            })
+        end)
+        
+        local success2, hash_result = coroutine.resume(co2)
+        while success2 and coroutine.status(co2) ~= "dead" do
+            success2, hash_result = coroutine.resume(co2, hash_result)
+        end
+        
+        if not success2 then
+            error("Hash calculation failed: " .. tostring(hash_result))
+        end
+        
+        if not hash_result.text then
+            error("Hash calculation failed: no text in result")
+        end
+        
+        local hash_parsed = JSON.parse(hash_result.text)
+        if not hash_parsed.success then
+            error("Hash calculation failed: " .. tostring(hash_parsed.message or "unknown"))
+        end
         
         return {
             uuid = uuid,
@@ -183,18 +289,36 @@ async fn test_simple_tool_integration() {
     // Test 5: System → Data → Utility chain (Env → JSON → Template)
     let system_chain_test = r#"
         -- System → Data → Utility chain
-        -- Step 1: Read environment variable
-        local env_result = Tool.get("environment_reader"):execute({
-            operation = "get",
-            variable_name = "PATH"
-        })
-        
-        if not env_result.success then
-            error("Environment read failed: " .. (env_result.error or "unknown"))
+        -- Step 1: Read environment variable (using Tool instance)
+        local env_tool = Tool.get("environment_reader")
+        if not env_tool then
+            error("Could not get environment_reader tool")
         end
         
-        -- For now, just verify we got something back
-        local has_env_output = env_result.output ~= nil and env_result.output ~= ""
+        -- Create coroutine for async execution
+        local co = coroutine.create(function()
+            return env_tool:execute({
+                operation = "get",
+                variable_name = "PATH"
+            })
+        end)
+        
+        local success, env_result = coroutine.resume(co)
+        while success and coroutine.status(co) ~= "dead" do
+            success, env_result = coroutine.resume(co, env_result)
+        end
+        
+        if not success then
+            error("Environment read failed: " .. tostring(env_result))
+        end
+        
+        if not env_result.text then
+            error("Environment read failed: no text in result")
+        end
+        
+        -- Parse result and check for success
+        local env_parsed = JSON.parse(env_result.text)
+        local has_env_output = env_parsed and env_parsed.success
         
         -- Step 2: Test JSON processor with simple data
         local test_data = {
@@ -204,50 +328,93 @@ async fn test_simple_tool_integration() {
             }
         }
         
-        local json_result = Tool.get("json_processor"):execute({
-            operation = "query",
-            input = JSON.stringify(test_data),
-            query = ".users | length"
-        })
-        
-        if not json_result.success then
-            error("JSON processing failed: " .. (json_result.error or "unknown"))
+        local json_tool = Tool.get("json_processor")
+        if not json_tool then
+            error("Could not get json_processor tool")
         end
         
-        local json_parsed = JSON.parse(json_result.output)
-        -- The result might be in different places depending on the tool
+        -- Create coroutine for async execution
+        local co2 = coroutine.create(function()
+            return json_tool:execute({
+                operation = "query",
+                input = JSON.stringify(test_data),
+                query = ".users | length"
+            })
+        end)
+        
+        local success2, json_result = coroutine.resume(co2)
+        while success2 and coroutine.status(co2) ~= "dead" do
+            success2, json_result = coroutine.resume(co2, json_result)
+        end
+        
+        if not success2 then
+            error("JSON processing failed: " .. tostring(json_result))
+        end
+        
+        if not json_result.text then
+            error("JSON processing failed: no text in result")
+        end
+        
+        local json_parsed = JSON.parse(json_result.text)
+        
+        -- Debug: Print what we actually got
+        print("DEBUG json_parsed type:", type(json_parsed))
+        print("DEBUG json_parsed value:", tostring(json_parsed))
+        if type(json_parsed) == "table" then
+            print("DEBUG json_parsed.success:", json_parsed.success)
+            print("DEBUG json_parsed.result type:", type(json_parsed.result))
+            print("DEBUG json_parsed.result value:", tostring(json_parsed.result))
+        end
+        
+        -- Handle if json_parsed is directly the number result
         local user_count = nil
         if type(json_parsed) == "number" then
             user_count = json_parsed
-        elseif json_parsed.result then
+        elseif type(json_parsed) == "table" and json_parsed.success then
             if type(json_parsed.result) == "number" then
                 user_count = json_parsed.result
-            elseif json_parsed.result.result then
+            elseif json_parsed.result and type(json_parsed.result.result) == "number" then
                 user_count = json_parsed.result.result
             end
+        else
+            error("JSON processing failed: " .. tostring(json_parsed.message or "unknown"))
         end
         user_count = user_count or 0
         
         -- Step 3: Use the result in a template
-        local template_result = Tool.get("template_engine"):execute({
-            input = "Found {{count}} users in the system",
-            context = {
-                count = user_count
-            },
-            engine = "handlebars"
-        })
-        
-        if not template_result.success then
-            error("Template rendering failed: " .. (template_result.error or "unknown"))
+        local template_tool = Tool.get("template_engine")
+        if not template_tool then
+            error("Could not get template_engine tool")
         end
         
-        local template_parsed = JSON.parse(template_result.output)
-        -- Handle different output formats for template result
+        -- Create coroutine for async execution
+        local co3 = coroutine.create(function()
+            return template_tool:execute({
+                input = "Found {{count}} users in the system",
+                context = {
+                    count = user_count
+                },
+                engine = "handlebars"
+            })
+        end)
+        
+        local success3, template_result = coroutine.resume(co3)
+        while success3 and coroutine.status(co3) ~= "dead" do
+            success3, template_result = coroutine.resume(co3, template_result)
+        end
+        
+        if not success3 then
+            error("Template rendering failed: " .. tostring(template_result))
+        end
+        
+        if not template_result.text then
+            error("Template rendering failed: no text in result")
+        end
+        
+        local template_parsed = JSON.parse(template_result.text)
         local template_output = nil
-        if template_parsed.result then
+        if template_parsed.success and template_parsed.result then
             template_output = template_parsed.result.output or template_parsed.result.rendered or template_parsed.result
-        elseif type(template_parsed) == "string" then
-            template_output = template_parsed
         end
         
         return {
@@ -274,47 +441,78 @@ async fn test_simple_tool_integration() {
         -- File → Data → File chain
         -- Step 1: Write initial data
         local test_data = "name,age,city\nAlice,30,NYC\nBob,25,LA\nCharlie,35,Chicago"
-        local write_result = Tool.get("file_operations"):execute({
-            operation = "write",
-            path = "/tmp/llmspell_test_data.csv",
-            input = test_data
-        })
         
-        if not write_result.success then
-            error("File write failed: " .. (write_result.error or "unknown"))
+        local file_tool = Tool.get("file_operations")
+        if not file_tool then
+            error("Could not get file_operations tool")
+        end
+        
+        -- Create coroutine for async execution
+        local co = coroutine.create(function()
+            return file_tool:execute({
+                operation = "write",
+                path = "/tmp/llmspell_test_data.csv",
+                input = test_data
+            })
+        end)
+        
+        local success, write_result = coroutine.resume(co)
+        while success and coroutine.status(co) ~= "dead" do
+            success, write_result = coroutine.resume(co, write_result)
+        end
+        
+        if not success then
+            error("File write failed: " .. tostring(write_result))
+        end
+        
+        if not write_result.text then
+            error("File write failed: no text in result")
+        end
+        
+        -- Handle file operations result - it returns plain text, not JSON
+        if not string.find(write_result.text, "Wrote .* bytes") then
+            error("File write failed: unexpected response format")
         end
         
         -- Step 2: Analyze the CSV data
-        local csv_result = Tool.get("csv_analyzer"):execute({
-            operation = "analyze",
-            input = test_data
-        })
-        
-        if not csv_result.success then
-            error("CSV analysis failed: " .. (csv_result.error or "unknown"))
+        local csv_tool = Tool.get("csv_analyzer")
+        if not csv_tool then
+            error("Could not get csv_analyzer tool")
         end
         
-        local csv_parsed = JSON.parse(csv_result.output)
+        -- Create coroutine for async execution
+        local co2 = coroutine.create(function()
+            return csv_tool:execute({
+                operation = "analyze",
+                input = test_data
+            })
+        end)
         
-        -- Extract CSV analysis results
-        local row_count = 0
-        local column_count = 0
+        local success2, csv_result = coroutine.resume(co2)
+        while success2 and coroutine.status(co2) ~= "dead" do
+            success2, csv_result = coroutine.resume(co2, csv_result)
+        end
+        
+        if not success2 then
+            error("CSV analysis failed: " .. tostring(csv_result))
+        end
+        
+        if not csv_result.text then
+            error("CSV analysis failed: no text in result")
+        end
+        
+        local csv_parsed = JSON.parse(csv_result.text)
+        
+        -- CSV analyzer returns data directly, not wrapped in success/result structure
+        local row_count = csv_parsed.row_count or 0
+        local column_count = csv_parsed.column_count or 0
         local headers = {}
         
-        if csv_parsed.result then
-            row_count = csv_parsed.result.row_count or 0
-            column_count = csv_parsed.result.column_count or 0
-            headers = csv_parsed.result.headers or {}
-        elseif csv_parsed.row_count then
-            -- Direct properties on parsed object
-            row_count = csv_parsed.row_count or 0
-            column_count = csv_parsed.column_count or 0
-            -- Extract header names from columns array
-            if csv_parsed.columns and type(csv_parsed.columns) == "table" then
-                for _, col in ipairs(csv_parsed.columns) do
-                    if col.name then
-                        table.insert(headers, col.name)
-                    end
+        -- Extract header names from columns array
+        if csv_parsed.columns and type(csv_parsed.columns) == "table" then
+            for _, col in ipairs(csv_parsed.columns) do
+                if col.name then
+                    table.insert(headers, col.name)
                 end
             end
         end
@@ -327,25 +525,49 @@ async fn test_simple_tool_integration() {
             table.concat(headers, ", ")
         )
         
-        local write_analysis = Tool.get("file_operations"):execute({
-            operation = "write",
-            path = "/tmp/llmspell_analysis.txt",
-            input = analysis_content
-        })
+        -- Create coroutine for async execution
+        local co3 = coroutine.create(function()
+            return file_tool:execute({
+                operation = "write",
+                path = "/tmp/llmspell_analysis.txt",
+                input = analysis_content
+            })
+        end)
         
-        if not write_analysis.success then
-            error("Analysis write failed: " .. (write_analysis.error or "unknown"))
+        local success3, write_analysis = coroutine.resume(co3)
+        while success3 and coroutine.status(co3) ~= "dead" do
+            success3, write_analysis = coroutine.resume(co3, write_analysis)
         end
         
-        -- Cleanup
-        Tool.get("file_operations"):execute({
-            operation = "delete",
-            path = "/tmp/llmspell_test_data.csv"
-        })
-        Tool.get("file_operations"):execute({
-            operation = "delete",
-            path = "/tmp/llmspell_analysis.txt"
-        })
+        if not success3 then
+            error("Analysis write failed: " .. tostring(write_analysis))
+        end
+        
+        if not write_analysis.text then
+            error("Analysis write failed: no text in result")
+        end
+        
+        -- Handle file operations result - it returns plain text, not JSON
+        if not string.find(write_analysis.text, "Wrote .* bytes") then
+            error("Analysis write failed: unexpected response format")
+        end
+        
+        -- Cleanup (using synchronous pattern since we don't check results)
+        local co4 = coroutine.create(function()
+            return file_tool:execute({
+                operation = "delete",
+                path = "/tmp/llmspell_test_data.csv"
+            })
+        end)
+        coroutine.resume(co4)
+        
+        local co5 = coroutine.create(function()
+            return file_tool:execute({
+                operation = "delete",
+                path = "/tmp/llmspell_analysis.txt"
+            })
+        end)
+        coroutine.resume(co5)
         
         return {
             file_written = true,
@@ -369,8 +591,6 @@ async fn test_simple_tool_integration() {
     // Test 7: Data → System → File chain (HTTP simulation → Process → Save)
     let data_system_file_test = r#"
         -- Data → System → File chain
-        -- Note: Simplified test without process_executor (async tool)
-        
         -- Step 1: Simulate HTTP data (would normally be http_request)
         local mock_data = {
             users = {
@@ -381,61 +601,126 @@ async fn test_simple_tool_integration() {
         }
         
         -- Use json_processor to query the data
-        local json_result = Tool.get("json_processor"):execute({
-            operation = "query",
-            input = JSON.stringify(mock_data),
-            query = ".users | length"
-        })
-        
-        if not json_result.success then
-            error("JSON query failed: " .. (json_result.error or "unknown"))
+        local json_tool = Tool.get("json_processor")
+        if not json_tool then
+            error("Could not get json_processor tool")
         end
         
-        local json_parsed = JSON.parse(json_result.output)
-        -- Handle different result formats
+        -- Create coroutine for async execution
+        local co = coroutine.create(function()
+            return json_tool:execute({
+                operation = "query",
+                input = JSON.stringify(mock_data),
+                query = ".users | length"
+            })
+        end)
+        
+        local success, json_result = coroutine.resume(co)
+        while success and coroutine.status(co) ~= "dead" do
+            success, json_result = coroutine.resume(co, json_result)
+        end
+        
+        if not success then
+            error("JSON query failed: " .. tostring(json_result))
+        end
+        
+        if not json_result.text then
+            error("JSON query failed: no text in result")
+        end
+        
+        local json_parsed = JSON.parse(json_result.text)
+        
+        -- Handle JSON processor returning direct number result  
         local user_count = nil
         if type(json_parsed) == "number" then
             user_count = json_parsed
-        elseif json_parsed.result then
+        elseif type(json_parsed) == "table" and json_parsed.success then
             if type(json_parsed.result) == "number" then
                 user_count = json_parsed.result
-            elseif json_parsed.result.result then
+            elseif json_parsed.result and type(json_parsed.result.result) == "number" then
                 user_count = json_parsed.result.result
             end
+        else
+            error("JSON query failed: " .. tostring(json_parsed.message or "unknown"))
         end
         user_count = user_count or 0
         
-        -- Step 2: Use environment reader instead of process executor (sync tool)
-        local env_result = Tool.get("environment_reader"):execute({
-            operation = "list",
-            pattern = "PATH"
-        })
-        
-        if not env_result.success then
-            error("Environment read failed: " .. (env_result.error or "unknown"))
+        -- Step 2: Use environment reader
+        local env_tool = Tool.get("environment_reader")
+        if not env_tool then
+            error("Could not get environment_reader tool")
         end
+        
+        -- Create coroutine for async execution
+        local co2 = coroutine.create(function()
+            return env_tool:execute({
+                operation = "list",
+                pattern = "PATH"
+            })
+        end)
+        
+        local success2, env_result = coroutine.resume(co2)
+        while success2 and coroutine.status(co2) ~= "dead" do
+            success2, env_result = coroutine.resume(co2, env_result)
+        end
+        
+        if not success2 then
+            error("Environment read failed: " .. tostring(env_result))
+        end
+        
+        if not env_result.text then
+            error("Environment read failed: no text in result")
+        end
+        
+        local env_parsed = JSON.parse(env_result.text)
+        local system_checked = env_parsed and env_parsed.success
         
         -- Step 3: Save the results to a file
-        local save_result = Tool.get("file_operations"):execute({
-            operation = "write",
-            path = "/tmp/llmspell_data_chain.txt",
-            input = string.format("Data Chain Results:\nUser count: %d\nEnvironment checked: true\nTimestamp: %s", 
-                user_count, os.date())
-        })
-        
-        if not save_result.success then
-            error("File save failed: " .. (save_result.error or "unknown"))
+        local file_tool = Tool.get("file_operations")
+        if not file_tool then
+            error("Could not get file_operations tool")
         end
         
-        -- Cleanup
-        Tool.get("file_operations"):execute({
-            operation = "delete",
-            path = "/tmp/llmspell_data_chain.txt"
-        })
+        -- Create coroutine for async execution
+        local co3 = coroutine.create(function()
+            return file_tool:execute({
+                operation = "write",
+                path = "/tmp/llmspell_data_chain.txt",
+                input = string.format("Data Chain Results:\nUser count: %d\nEnvironment checked: true\nTimestamp: %s", 
+                    user_count, os.date())
+            })
+        end)
+        
+        local success3, save_result = coroutine.resume(co3)
+        while success3 and coroutine.status(co3) ~= "dead" do
+            success3, save_result = coroutine.resume(co3, save_result)
+        end
+        
+        if not success3 then
+            error("File save failed: " .. tostring(save_result))
+        end
+        
+        if not save_result.text then
+            error("File save failed: no text in result")
+        end
+        
+        -- Handle file operations result - it returns plain text, not JSON
+        if not string.find(save_result.text, "Wrote .* bytes") then
+            error("File save failed: unexpected response format")
+        end
+        
+        -- Cleanup (using synchronous pattern since we don't check results)
+        local co4 = coroutine.create(function()
+            return file_tool:execute({
+                operation = "delete",
+                path = "/tmp/llmspell_data_chain.txt"
+            })
+        end)
+        coroutine.resume(co4)
         
         return {
             data_queried = user_count == 3,
-            system_checked = env_result.output ~= nil,
+            system_checked = system_checked,
             file_saved = true,
             success = true
         }
@@ -459,18 +744,44 @@ async fn test_simple_tool_integration() {
         
         -- Chain with invalid tool
         local success1 = pcall(function()
-            local result = Tool.get("nonexistent_tool"):execute({})
+            local result = Tool.get("nonexistent_tool")
+            if result then
+                error("Should not get nonexistent tool")
+            end
         end)
-        chain_errors.invalid_tool = not success1
+        chain_errors.invalid_tool = not success1 or Tool.get("nonexistent_tool") == nil
         
         -- Chain with invalid parameters
         local success2 = pcall(function()
-            local result = Tool.get("base64_encoder"):execute({
-                operation = "invalid_op",
-                input = "test"
-            })
-            if not result.success then
-                error(result.error)
+            local tool = Tool.get("base64_encoder")
+            if not tool then
+                error("Could not get base64_encoder tool")
+            end
+            
+            -- Create coroutine for async execution with invalid operation
+            local co = coroutine.create(function()
+                return tool:execute({
+                    operation = "invalid_op",
+                    input = "test"
+                })
+            end)
+            
+            local success, result = coroutine.resume(co)
+            while success and coroutine.status(co) ~= "dead" do
+                success, result = coroutine.resume(co, result)
+            end
+            
+            if not success then
+                error("Tool execution failed: " .. tostring(result))
+            end
+            
+            if not result.text then
+                error("Tool execution failed: no text in result")
+            end
+            
+            local parsed = JSON.parse(result.text)
+            if not parsed.success then
+                error("Tool execution failed: " .. tostring(parsed.message or "unknown"))
             end
         end)
         chain_errors.invalid_params = not success2
@@ -478,20 +789,57 @@ async fn test_simple_tool_integration() {
         -- Chain where middle step fails
         local success3, err3 = pcall(function()
             -- Step 1: Generate UUID (should work)
-            local uuid_result = Tool.get("uuid_generator"):execute({
-                operation = "generate",
-                version = "v4"
-            })
+            local uuid_tool = Tool.get("uuid_generator")
+            if not uuid_tool then
+                error("Could not get uuid_generator tool")
+            end
+            
+            local co = coroutine.create(function()
+                return uuid_tool:execute({
+                    operation = "generate",
+                    version = "v4"
+                })
+            end)
+            
+            local success, uuid_result = coroutine.resume(co)
+            while success and coroutine.status(co) ~= "dead" do
+                success, uuid_result = coroutine.resume(co, uuid_result)
+            end
+            
+            if not success then
+                error("UUID generation failed: " .. tostring(uuid_result))
+            end
             
             -- Step 2: Try to hash with missing required parameter
-            local hash_result = Tool.get("hash_calculator"):execute({
-                operation = "hash",
-                algorithm = "md5"
-                -- Missing required 'input' parameter
-            })
+            local hash_tool = Tool.get("hash_calculator")
+            if not hash_tool then
+                error("Could not get hash_calculator tool")
+            end
             
-            if not hash_result.success then
-                error("Chain failed at hash step: " .. hash_result.error)
+            local co2 = coroutine.create(function()
+                return hash_tool:execute({
+                    operation = "hash",
+                    algorithm = "md5"
+                    -- Missing required 'input' parameter
+                })
+            end)
+            
+            local success2, hash_result = coroutine.resume(co2)
+            while success2 and coroutine.status(co2) ~= "dead" do
+                success2, hash_result = coroutine.resume(co2, hash_result)
+            end
+            
+            if not success2 then
+                error("Chain failed at hash step: " .. tostring(hash_result))
+            end
+            
+            if not hash_result.text then
+                error("Chain failed at hash step: no text in result")
+            end
+            
+            local hash_parsed = JSON.parse(hash_result.text)
+            if not hash_parsed.success then
+                error("Chain failed at hash step: " .. tostring(hash_parsed.message or "unknown"))
             end
         end)
         chain_errors.middle_step_fail = not success3

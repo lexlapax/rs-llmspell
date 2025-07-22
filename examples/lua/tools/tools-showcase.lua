@@ -8,7 +8,18 @@ print("====================================")
 -- Helper function to execute tool and handle errors
 local function use_tool(tool_name, params)
     -- Use the async-aware helper that handles coroutines properly
-    return Tool.executeAsync(tool_name, params)
+    local result = Tool.executeAsync(tool_name, params)
+    
+    -- Parse the JSON result to get the actual tool response
+    if result and result.text then
+        local parsed = JSON.parse(result.text)
+        if parsed then
+            return parsed
+        end
+    end
+    
+    -- Return error result if parsing failed
+    return {success = false, error = "Failed to parse tool result"}
 end
 
 -- Helper to print tool results

@@ -11,8 +11,20 @@
 print("🔧 Utility Tools Examples")
 print("=========================")
 
--- Load test helpers for better output
-local TestHelpers = dofile("test-helpers.lua")
+-- Load test helpers for better output (handle different working directories)
+local TestHelpers = nil
+local function try_dofile(path)
+    local success, result = pcall(dofile, path)
+    return success and result or nil
+end
+
+TestHelpers = try_dofile("test-helpers.lua") or 
+              try_dofile("examples/lua/tools/test-helpers.lua") or
+              try_dofile("lua/tools/test-helpers.lua")
+
+if not TestHelpers then
+    error("Could not load test-helpers.lua from any expected location")
+end
 
 -- Helper function to execute tool
 local function use_tool(tool_name, params)
@@ -26,24 +38,27 @@ local function print_result(label, result)
     elseif result.success == false then
         print("  ❌ " .. label .. ": " .. (result.message or "Failed"))
     else
-        -- Parse JSON output if available
-        local parsed, err = TestHelpers.parse_tool_output(result)
-        if parsed then
-            -- Extract the most relevant field from parsed output
-            local value = parsed.result and (
-                parsed.result.uuid or 
-                parsed.result.output or 
-                parsed.result.hash or 
-                parsed.result.result or 
-                parsed.result.datetime or 
-                parsed.result.formatted or 
-                parsed.result.value or 
-                parsed.result.valid
-            ) or parsed.message
-            print("  ✅ " .. label .. ": " .. tostring(value))
-        else
-            print("  ❌ " .. label .. " (parse error): " .. tostring(err))
+        -- Result is already parsed by execute_tool, extract relevant field
+        local value = nil
+        if result.result then
+            -- Extract the most relevant field from result
+            value = result.result.uuid or 
+                    result.result.output or 
+                    result.result.hash or 
+                    result.result.result or 
+                    result.result.datetime or 
+                    result.result.formatted or 
+                    result.result.value or 
+                    result.result.valid or
+                    result.result.encoded or
+                    result.result.decoded or
+                    result.result.rendered
+        elseif result.message then
+            value = result.message
+        elseif result.output then
+            value = result.output
         end
+        print("  ✅ " .. label .. ": " .. tostring(value))
     end
 end
 

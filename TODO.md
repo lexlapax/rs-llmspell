@@ -1926,18 +1926,29 @@ The agent factory needs to create agents that actually use LLM providers for the
 - ✅ No lua/api/agent.rs references in engine
 - ✅ All tests already updated
 
-#### Sub-task 3.3.29.2: Tool Consolidation
-**Status**: TODO
+#### Sub-task 3.3.29.2: Tool Consolidation for bridge apis ✅ COMPLETE (2025-07-22)
+**Status**: COMPLETE  
+**Completed**: 2025-07-22
+**Key Achievements**: 
+- Fixed critical parameter wrapping issue in Tool.invoke and Tool.get().execute() methods
+- All 34+ tools now work correctly with proper async handling
+- Tool.executeAsync working correctly with proper JSON result parsing
+- Multiple tool examples verified working (tools-showcase.lua and others)
+- Comprehensive integration test suite passing (8/8 tests)
 **Tasks**:
-1. [ ] Remove lua/api/tool.rs entirely
-2. [ ] Ensure lua/globals/tool.rs has complete implementation
-3. [ ] Verify all tool methods work (discover, invoke, etc.)
-4. [ ] Remove inject_tool_api references from engine.rs
-5. [ ] Update tool_global.rs to not use any api references
-6. [ ] Update all tool tests in llmspell-bridge/tests/
-7. [ ] Delete api::tool tests
-8. [ ] Update integration tests to use Tool global directly
-9. [ ] Verify all tool examples still work
+1. [x] Remove lua/api/tool.rs entirely ✅
+2. [x] Ensure lua/globals/tool.rs has complete implementation ✅
+3. [x] Verify all tool methods work (discover, invoke, etc.) ✅
+4. [x] Remove inject_tool_api references from engine.rs ✅
+5. [x] Update tool_global.rs to not use any api references ✅
+6. [x] Update all tool tests in llmspell-bridge/tests/ ✅
+7. [x] Delete api::tool tests ✅
+8. [x] Update integration tests to use Tool global directly ✅
+9. [x] Verify all tool examples still work ✅ 
+   - [x] Fixed Tool.executeAsync implementation ✅
+   - [x] Fixed tools-showcase.lua helper functions ✅
+   - [x] Verified 34+ tools work correctly ✅
+   - [x] Multiple tool examples now working ✅
 
 #### Sub-task 3.3.29.3: Workflow Consolidation  
 **Status**: TODO

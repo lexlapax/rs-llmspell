@@ -6,7 +6,20 @@ print("📊 Data Processing Tools Examples")
 print("=================================")
 
 -- Load test helpers
-local TestHelpers = dofile("test-helpers.lua")
+-- Load test helpers for better output (handle different working directories)
+local TestHelpers = nil
+local function try_dofile(path)
+    local success, result = pcall(dofile, path)
+    return success and result or nil
+end
+
+TestHelpers = try_dofile("test-helpers.lua") or 
+              try_dofile("examples/lua/tools/test-helpers.lua") or
+              try_dofile("lua/tools/test-helpers.lua")
+
+if not TestHelpers then
+    error("Could not load test-helpers.lua from any expected location")
+end
 
 -- Helper function to execute tool
 local function use_tool(tool_name, params)

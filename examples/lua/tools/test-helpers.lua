@@ -56,8 +56,28 @@ function TestHelpers.execute_tool(tool_name, params)
     -- Use the new async-aware helper that handles coroutines properly
     local result = Tool.executeAsync(tool_name, params)
     
-    -- The executeAsync helper already returns proper error structure
-    return result
+    -- Parse the JSON result to get the actual tool response
+    if result and result.text then
+        -- Try to parse as JSON first
+        local success, parsed = pcall(function()
+            return JSON.parse(result.text)
+        end)
+        
+        if success and parsed then
+            return parsed
+        else
+            -- If JSON parsing fails, it might be plain text output
+            -- Wrap it in a success structure
+            return {
+                success = true,
+                result = result.text,
+                output = result.text
+            }
+        end
+    end
+    
+    -- Return error result if result is nil or has no text
+    return {success = false, error = "Tool returned no output"}
 end
 
 -- Alternative: Direct tool execution (for testing sync tools)
@@ -71,7 +91,7 @@ function TestHelpers.execute_tool_direct(tool_name, params)
     end
     
     local success, result = pcall(function()
-        return tool.execute(params or {})
+        return tool:execute(params or {})
     end)
     
     if not success then

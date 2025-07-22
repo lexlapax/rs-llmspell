@@ -6,7 +6,20 @@ print("🌐 Web Tools Examples")
 print("===================")
 
 -- Load test helpers
-local TestHelpers = dofile("test-helpers.lua")
+-- Load test helpers for better output (handle different working directories)
+local TestHelpers = nil
+local function try_dofile(path)
+    local success, result = pcall(dofile, path)
+    return success and result or nil
+end
+
+TestHelpers = try_dofile("test-helpers.lua") or 
+              try_dofile("examples/lua/tools/test-helpers.lua") or
+              try_dofile("lua/tools/test-helpers.lua")
+
+if not TestHelpers then
+    error("Could not load test-helpers.lua from any expected location")
+end
 
 -- Helper function to execute tool
 local function use_tool(tool_name, params)
@@ -72,20 +85,21 @@ TestHelpers.print_section("Web Scraper Tool")
 
 print("\nScraping web content:")
 
--- Basic scraping
+-- Basic scraping (with short timeout to prevent hanging)
 local scrape_result = use_tool("web-scraper", {
-    input = "https://example.com",
+    input = "https://httpbin.org/html",
     extract_links = true,
     extract_images = false,
-    extract_meta = true
+    extract_meta = true,
+    timeout = 5  -- Short timeout
 })
 print_result("Basic web scraping", scrape_result)
 
--- Scraping with CSS selector
+-- Scraping with CSS selector (use httpbin which is more reliable)
 local selector_result = use_tool("web-scraper", {
-    input = "https://example.com",
+    input = "https://httpbin.org/html",
     selector = "h1",
-    timeout = 10
+    timeout = 5  -- Short timeout
 })
 print_result("Scraping with selector", selector_result)
 
@@ -95,7 +109,7 @@ local full_scrape_result = use_tool("web-scraper", {
     extract_links = true,
     extract_images = true,
     extract_meta = true,
-    timeout = 15
+    timeout = 5  -- Reduced timeout
 })
 print_result("Full metadata extraction", full_scrape_result)
 
