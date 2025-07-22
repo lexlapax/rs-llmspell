@@ -7,7 +7,7 @@
 print("=== Agent Monitor Example ===\n")
 
 -- Create a monitoring agent
-local monitor = Agent.createAsync({
+local monitor = Agent.create({
     name = "system_monitor_agent",
     description = "Monitors system health, processes, and data changes",
     provider = "openai",
@@ -25,10 +25,8 @@ Be concise and focus on important changes and potential issues.
     temperature = 0.2  -- Low temperature for consistent monitoring
 })
 
--- Register the monitor
-if monitor then
-    Agent.register("monitor", monitor)
-else
+-- Check if monitor was created successfully
+if not monitor then
     print("Failed to create monitor agent - check API keys")
     return
 end

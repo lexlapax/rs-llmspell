@@ -52,116 +52,130 @@ pub fn inject_agent_api(
     let registry_clone = registry.clone();
     let providers_clone = providers.clone();
 
-    // Create the Agent.create() function
+    // Create the Agent.create() function with synchronous wrapper
     let create_fn = lua
-        .create_async_function(move |_lua, args: Table| {
+        .create_function(move |_lua, args: Table| {
             let registry = registry_clone.clone();
             let providers = providers_clone.clone();
 
-            async move {
-                // Extract configuration from Lua table
-                let system_prompt: Option<String> = args.get("system_prompt").ok();
-                let temperature: Option<f32> = args.get("temperature").ok();
-                let max_tokens: Option<usize> = args.get("max_tokens").ok();
-                let max_conversation_length: Option<usize> =
-                    args.get("max_conversation_length").ok();
-                let base_url: Option<String> = args.get("base_url").ok();
-                let api_key: Option<String> = args.get("api_key").ok();
+            // Use block_on to execute async code synchronously
+            tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(async move {
+                    // Extract configuration from Lua table
+                    let system_prompt: Option<String> = args.get("system_prompt").ok();
+                    let temperature: Option<f32> = args.get("temperature").ok();
+                    let max_tokens: Option<usize> = args.get("max_tokens").ok();
+                    let max_conversation_length: Option<usize> =
+                        args.get("max_conversation_length").ok();
+                    let base_url: Option<String> = args.get("base_url").ok();
+                    let api_key: Option<String> = args.get("api_key").ok();
 
-                // Create a basic agent configuration
-                let agent_config = AgentConfig {
-                    system_prompt,
-                    temperature,
-                    max_tokens,
-                    max_conversation_length,
-                };
+                    // Create a basic agent configuration
+                    let agent_config = AgentConfig {
+                        system_prompt,
+                        temperature,
+                        max_tokens,
+                        max_conversation_length,
+                    };
 
-                // Handle model specification with new syntax support
-                let provider = if let Some(model_str) =
-                    args.get::<_, Option<String>>("model").ok().flatten()
-                {
-                    // New syntax: "provider/model" or "model"
-                    let model_spec = ModelSpecifier::parse(&model_str).map_err(|e| {
+                    // Handle model specification with new syntax support
+                    let provider = if let Some(model_str) =
+                        args.get::<_, Option<String>>("model").ok().flatten()
+                    {
+                        // New syntax: "provider/model" or "model"
+                        let model_spec = ModelSpecifier::parse(&model_str).map_err(|e| {
+                            mlua::Error::RuntimeError(format!(
+                                "Invalid model specification '{}': {}",
+                                model_str, e
+                            ))
+                        })?;
+
+                        providers
+                            .as_ref()
+                            .create_agent_from_spec(
+                                model_spec,
+                                base_url.as_deref(),
+                                api_key.as_deref(),
+                            )
+                            .await
+                            .map_err(|e| {
+                                mlua::Error::RuntimeError(format!(
+                                    "Failed to create agent from spec: {}",
+                                    e
+                                ))
+                            })?
+                    } else if let (Some(provider_name), Some(model_name)) = (
+                        args.get::<_, Option<String>>("provider").ok().flatten(),
+                        args.get::<_, Option<String>>("model_name").ok().flatten(),
+                    ) {
+                        // Legacy syntax: separate provider and model_name fields
+                        let model_spec = ModelSpecifier::with_provider(provider_name, model_name);
+                        providers
+                            .as_ref()
+                            .create_agent_from_spec(
+                                model_spec,
+                                base_url.as_deref(),
+                                api_key.as_deref(),
+                            )
+                            .await
+                            .map_err(|e| {
+                                mlua::Error::RuntimeError(format!(
+                                    "Failed to create agent from legacy spec: {}",
+                                    e
+                                ))
+                            })?
+                    } else if let Some(provider_name) =
+                        args.get::<_, Option<String>>("provider").ok().flatten()
+                    {
+                        // Legacy syntax with just provider (use default model)
+                        providers
+                            .get_provider(Some(&provider_name))
+                            .await
+                            .map_err(|e| {
+                                mlua::Error::RuntimeError(format!(
+                                    "Failed to get provider '{}': {}",
+                                    provider_name, e
+                                ))
+                            })?
+                    } else {
+                        // No provider specified, use default
+                        providers.get_default_provider().await.map_err(|e| {
+                            mlua::Error::RuntimeError(format!(
+                                "Failed to get default provider: {}",
+                                e
+                            ))
+                        })?
+                    };
+
+                    // Create a simple agent wrapper
+                    let agent: Arc<dyn Agent> = Arc::new(SimpleProviderAgent::new(
+                        agent_config,
+                        provider,
+                        "default".to_string(), // This will be overridden by the provider's model
+                    ));
+
+                    // Create the Lua wrapper with bridge access
+                    let core_providers_inner = futures::executor::block_on(
+                        providers.create_core_manager_arc(),
+                    )
+                    .map_err(|e| {
                         mlua::Error::RuntimeError(format!(
-                            "Invalid model specification '{}': {}",
-                            model_str, e
+                            "Failed to create core provider manager: {}",
+                            e
                         ))
                     })?;
+                    let bridge = Arc::new(AgentBridge::new(registry.clone(), core_providers_inner));
+                    let wrapper = LuaAgentWrapper {
+                        agent,
+                        bridge,
+                        agent_instance_name: "anonymous_agent".to_string(), // For Agent.create(), no instance name
+                        _registry: registry,
+                        _providers: providers,
+                    };
 
-                    providers
-                        .as_ref()
-                        .create_agent_from_spec(model_spec, base_url.as_deref(), api_key.as_deref())
-                        .await
-                        .map_err(|e| {
-                            mlua::Error::RuntimeError(format!(
-                                "Failed to create agent from spec: {}",
-                                e
-                            ))
-                        })?
-                } else if let (Some(provider_name), Some(model_name)) = (
-                    args.get::<_, Option<String>>("provider").ok().flatten(),
-                    args.get::<_, Option<String>>("model_name").ok().flatten(),
-                ) {
-                    // Legacy syntax: separate provider and model_name fields
-                    let model_spec = ModelSpecifier::with_provider(provider_name, model_name);
-                    providers
-                        .as_ref()
-                        .create_agent_from_spec(model_spec, base_url.as_deref(), api_key.as_deref())
-                        .await
-                        .map_err(|e| {
-                            mlua::Error::RuntimeError(format!(
-                                "Failed to create agent from legacy spec: {}",
-                                e
-                            ))
-                        })?
-                } else if let Some(provider_name) =
-                    args.get::<_, Option<String>>("provider").ok().flatten()
-                {
-                    // Legacy syntax with just provider (use default model)
-                    providers
-                        .get_provider(Some(&provider_name))
-                        .await
-                        .map_err(|e| {
-                            mlua::Error::RuntimeError(format!(
-                                "Failed to get provider '{}': {}",
-                                provider_name, e
-                            ))
-                        })?
-                } else {
-                    // No provider specified, use default
-                    providers.get_default_provider().await.map_err(|e| {
-                        mlua::Error::RuntimeError(format!("Failed to get default provider: {}", e))
-                    })?
-                };
-
-                // Create a simple agent wrapper
-                let agent: Arc<dyn Agent> = Arc::new(SimpleProviderAgent::new(
-                    agent_config,
-                    provider,
-                    "default".to_string(), // This will be overridden by the provider's model
-                ));
-
-                // Create the Lua wrapper with bridge access
-                let core_providers_inner = futures::executor::block_on(
-                    providers.create_core_manager_arc(),
-                )
-                .map_err(|e| {
-                    mlua::Error::RuntimeError(format!(
-                        "Failed to create core provider manager: {}",
-                        e
-                    ))
-                })?;
-                let bridge = Arc::new(AgentBridge::new(registry.clone(), core_providers_inner));
-                let wrapper = LuaAgentWrapper {
-                    agent,
-                    bridge,
-                    agent_instance_name: "anonymous_agent".to_string(), // For Agent.create(), no instance name
-                    _registry: registry,
-                    _providers: providers,
-                };
-
-                Ok(wrapper)
-            }
+                    Ok(wrapper)
+                })
+            })
         })
         .map_err(|e| LLMSpellError::Component {
             message: format!("Failed to create Agent.create function: {}", e),
@@ -179,16 +193,14 @@ pub fn inject_agent_api(
     // Add Agent.list() function to list available agent types
     let bridge_for_list = bridge.clone();
     let list_fn = lua
-        .create_async_function(move |lua, _: ()| {
+        .create_function(move |lua, _: ()| {
             let bridge = bridge_for_list.clone();
-            async move {
-                let types = bridge.list_agent_types().await;
-                let list_table = lua.create_table()?;
-                for (i, agent_type) in types.iter().enumerate() {
-                    list_table.set(i + 1, agent_type.clone())?;
-                }
-                Ok(list_table)
+            let types = futures::executor::block_on(async move { bridge.list_agent_types().await });
+            let list_table = lua.create_table()?;
+            for (i, agent_type) in types.iter().enumerate() {
+                list_table.set(i + 1, agent_type.clone())?;
             }
+            Ok(list_table)
         })
         .map_err(|e| LLMSpellError::Component {
             message: format!("Failed to create Agent.list function: {}", e),
@@ -205,16 +217,15 @@ pub fn inject_agent_api(
     // Add Agent.listTemplates() function
     let bridge_for_templates = bridge.clone();
     let list_templates_fn = lua
-        .create_async_function(move |lua, _: ()| {
+        .create_function(move |lua, _: ()| {
             let bridge = bridge_for_templates.clone();
-            async move {
-                let templates = bridge.list_templates().await;
-                let list_table = lua.create_table()?;
-                for (i, template) in templates.iter().enumerate() {
-                    list_table.set(i + 1, template.clone())?;
-                }
-                Ok(list_table)
+            let templates =
+                futures::executor::block_on(async move { bridge.list_templates().await });
+            let list_table = lua.create_table()?;
+            for (i, template) in templates.iter().enumerate() {
+                list_table.set(i + 1, template.clone())?;
             }
+            Ok(list_table)
         })
         .map_err(|e| LLMSpellError::Component {
             message: format!("Failed to create Agent.listTemplates function: {}", e),
@@ -233,11 +244,11 @@ pub fn inject_agent_api(
     let registry_for_get = registry.clone();
     let providers_for_get = providers.clone();
     let get_fn = lua
-        .create_async_function(move |_lua, name: String| {
+        .create_function(move |_lua, name: String| {
             let bridge = bridge_for_get.clone();
             let registry = registry_for_get.clone();
             let providers = providers_for_get.clone();
-            async move {
+            futures::executor::block_on(async move {
                 if let Some(agent) = bridge.get_agent(&name).await {
                     let wrapper = LuaAgentWrapper {
                         agent,
@@ -250,7 +261,7 @@ pub fn inject_agent_api(
                 } else {
                     Ok(None)
                 }
-            }
+            })
         })
         .map_err(|e| LLMSpellError::Component {
             message: format!("Failed to create Agent.get function: {}", e),
@@ -269,47 +280,49 @@ pub fn inject_agent_api(
     let registry_for_template = registry.clone();
     let providers_for_template = providers.clone();
     let create_from_template_fn = lua
-        .create_async_function(
+        .create_function(
             move |_lua, (instance_name, template_name, params): (String, String, Table)| {
                 let bridge = bridge_for_template.clone();
                 let registry = registry_for_template.clone();
                 let providers = providers_for_template.clone();
-                async move {
-                    // Convert Lua table to HashMap
-                    let mut parameters = HashMap::new();
-                    for (key, value) in params.pairs::<String, mlua::Value>().flatten() {
-                        if let Ok(json_value) = lua_value_to_json(value) {
-                            parameters.insert(key, json_value);
+                tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(async move {
+                        // Convert Lua table to HashMap
+                        let mut parameters = HashMap::new();
+                        for (key, value) in params.pairs::<String, mlua::Value>().flatten() {
+                            if let Ok(json_value) = lua_value_to_json(value) {
+                                parameters.insert(key, json_value);
+                            }
                         }
-                    }
 
-                    // Create from template
-                    bridge
-                        .create_from_template(&instance_name, &template_name, parameters)
-                        .await
-                        .map_err(|e| {
-                            mlua::Error::RuntimeError(format!(
-                                "Failed to create agent from template: {}",
-                                e
+                        // Create from template
+                        bridge
+                            .create_from_template(&instance_name, &template_name, parameters)
+                            .await
+                            .map_err(|e| {
+                                mlua::Error::RuntimeError(format!(
+                                    "Failed to create agent from template: {}",
+                                    e
+                                ))
+                            })?;
+
+                        // Return the created agent
+                        if let Some(agent) = bridge.get_agent(&instance_name).await {
+                            let wrapper = LuaAgentWrapper {
+                                agent,
+                                bridge: bridge.clone(),
+                                agent_instance_name: instance_name,
+                                _registry: registry,
+                                _providers: providers,
+                            };
+                            Ok(wrapper)
+                        } else {
+                            Err(mlua::Error::RuntimeError(
+                                "Failed to retrieve created agent".to_string(),
                             ))
-                        })?;
-
-                    // Return the created agent
-                    if let Some(agent) = bridge.get_agent(&instance_name).await {
-                        let wrapper = LuaAgentWrapper {
-                            agent,
-                            bridge: bridge.clone(),
-                            agent_instance_name: instance_name,
-                            _registry: registry,
-                            _providers: providers,
-                        };
-                        Ok(wrapper)
-                    } else {
-                        Err(mlua::Error::RuntimeError(
-                            "Failed to retrieve created agent".to_string(),
-                        ))
-                    }
-                }
+                        }
+                    })
+                })
             },
         )
         .map_err(|e| LLMSpellError::Component {
@@ -327,16 +340,16 @@ pub fn inject_agent_api(
     // Add Agent.listInstances() function
     let bridge_for_instances = bridge.clone();
     let list_instances_fn = lua
-        .create_async_function(move |lua, _: ()| {
+        .create_function(move |lua, _: ()| {
             let bridge = bridge_for_instances.clone();
-            async move {
+            futures::executor::block_on(async move {
                 let instances = bridge.list_instances().await;
                 let list_table = lua.create_table()?;
                 for (i, instance) in instances.iter().enumerate() {
                     list_table.set(i + 1, instance.clone())?;
                 }
                 Ok(list_table)
-            }
+            })
         })
         .map_err(|e| LLMSpellError::Component {
             message: format!("Failed to create Agent.listInstances function: {}", e),
@@ -355,9 +368,9 @@ pub fn inject_agent_api(
     // Add Agent.createContext() function
     let bridge_for_context = bridge.clone();
     let create_context_fn = lua
-        .create_async_function(move |_lua, config: Table| {
+        .create_function(move |_lua, config: Table| {
             let bridge = bridge_for_context.clone();
-            async move {
+            futures::executor::block_on(async move {
                 // Convert Lua table to JSON
                 let config_json = lua_value_to_json(mlua::Value::Table(config))?;
 
@@ -368,7 +381,7 @@ pub fn inject_agent_api(
                         e
                     ))),
                 }
-            }
+            })
         })
         .map_err(|e| LLMSpellError::Component {
             message: format!("Failed to create Agent.createContext function: {}", e),
@@ -385,23 +398,25 @@ pub fn inject_agent_api(
     // Add Agent.createChildContext() function
     let bridge_for_child = bridge.clone();
     let create_child_context_fn = lua
-        .create_async_function(
+        .create_function(
             move |_lua, (parent_id, scope, inheritance): (String, Table, String)| {
                 let bridge = bridge_for_child.clone();
-                async move {
-                    let scope_json = lua_value_to_json(mlua::Value::Table(scope))?;
+                tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(async move {
+                        let scope_json = lua_value_to_json(mlua::Value::Table(scope))?;
 
-                    match bridge
-                        .create_child_context(&parent_id, scope_json, &inheritance)
-                        .await
-                    {
-                        Ok(child_id) => Ok(child_id),
-                        Err(e) => Err(mlua::Error::RuntimeError(format!(
-                            "Failed to create child context: {}",
-                            e
-                        ))),
-                    }
-                }
+                        match bridge
+                            .create_child_context(&parent_id, scope_json, &inheritance)
+                            .await
+                        {
+                            Ok(child_id) => Ok(child_id),
+                            Err(e) => Err(mlua::Error::RuntimeError(format!(
+                                "Failed to create child context: {}",
+                                e
+                            ))),
+                        }
+                    })
+                })
             },
         )
         .map_err(|e| LLMSpellError::Component {
@@ -419,20 +434,22 @@ pub fn inject_agent_api(
     // Add Agent.updateContext() function
     let bridge_for_update = bridge.clone();
     let update_context_fn = lua
-        .create_async_function(
+        .create_function(
             move |_lua, (context_id, key, value): (String, String, mlua::Value)| {
                 let bridge = bridge_for_update.clone();
-                async move {
-                    let value_json = lua_value_to_json(value)?;
+                tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(async move {
+                        let value_json = lua_value_to_json(value)?;
 
-                    match bridge.update_context(&context_id, key, value_json).await {
-                        Ok(()) => Ok(()),
-                        Err(e) => Err(mlua::Error::RuntimeError(format!(
-                            "Failed to update context: {}",
-                            e
-                        ))),
-                    }
-                }
+                        match bridge.update_context(&context_id, key, value_json).await {
+                            Ok(()) => Ok(()),
+                            Err(e) => Err(mlua::Error::RuntimeError(format!(
+                                "Failed to update context: {}",
+                                e
+                            ))),
+                        }
+                    })
+                })
             },
         )
         .map_err(|e| LLMSpellError::Component {
@@ -450,9 +467,9 @@ pub fn inject_agent_api(
     // Add Agent.getContextData() function
     let bridge_for_get = bridge.clone();
     let get_context_data_fn = lua
-        .create_async_function(move |lua, (context_id, key): (String, String)| {
+        .create_function(move |lua, (context_id, key): (String, String)| {
             let bridge = bridge_for_get.clone();
-            async move {
+            futures::executor::block_on(async move {
                 match bridge.get_context_data(&context_id, &key).await {
                     Ok(Some(value)) => {
                         // Convert JSON to Lua value
@@ -464,7 +481,7 @@ pub fn inject_agent_api(
                         e
                     ))),
                 }
-            }
+            })
         })
         .map_err(|e| LLMSpellError::Component {
             message: format!("Failed to create Agent.getContextData function: {}", e),
@@ -481,21 +498,23 @@ pub fn inject_agent_api(
     // Add Agent.setSharedMemory() function
     let bridge_for_shared_set = bridge.clone();
     let set_shared_memory_fn = lua
-        .create_async_function(
+        .create_function(
             move |_lua, (scope, key, value): (Table, String, mlua::Value)| {
                 let bridge = bridge_for_shared_set.clone();
-                async move {
-                    let scope_json = lua_value_to_json(mlua::Value::Table(scope))?;
-                    let value_json = lua_value_to_json(value)?;
+                tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(async move {
+                        let scope_json = lua_value_to_json(mlua::Value::Table(scope))?;
+                        let value_json = lua_value_to_json(value)?;
 
-                    match bridge.set_shared_memory(scope_json, key, value_json).await {
-                        Ok(()) => Ok(()),
-                        Err(e) => Err(mlua::Error::RuntimeError(format!(
-                            "Failed to set shared memory: {}",
-                            e
-                        ))),
-                    }
-                }
+                        match bridge.set_shared_memory(scope_json, key, value_json).await {
+                            Ok(()) => Ok(()),
+                            Err(e) => Err(mlua::Error::RuntimeError(format!(
+                                "Failed to set shared memory: {}",
+                                e
+                            ))),
+                        }
+                    })
+                })
             },
         )
         .map_err(|e| LLMSpellError::Component {
@@ -513,9 +532,9 @@ pub fn inject_agent_api(
     // Add Agent.getSharedMemory() function
     let bridge_for_shared_get = bridge.clone();
     let get_shared_memory_fn = lua
-        .create_async_function(move |lua, (scope, key): (Table, String)| {
+        .create_function(move |lua, (scope, key): (Table, String)| {
             let bridge = bridge_for_shared_get.clone();
-            async move {
+            futures::executor::block_on(async move {
                 let scope_json = lua_value_to_json(mlua::Value::Table(scope))?;
 
                 match bridge.get_shared_memory(scope_json, &key).await {
@@ -526,7 +545,7 @@ pub fn inject_agent_api(
                         e
                     ))),
                 }
-            }
+            })
         })
         .map_err(|e| LLMSpellError::Component {
             message: format!("Failed to create Agent.getSharedMemory function: {}", e),
@@ -543,9 +562,9 @@ pub fn inject_agent_api(
     // Add Agent.removeContext() function
     let bridge_for_remove = bridge.clone();
     let remove_context_fn = lua
-        .create_async_function(move |_lua, context_id: String| {
+        .create_function(move |_lua, context_id: String| {
             let bridge = bridge_for_remove.clone();
-            async move {
+            futures::executor::block_on(async move {
                 match bridge.remove_context(&context_id).await {
                     Ok(()) => Ok(()),
                     Err(e) => Err(mlua::Error::RuntimeError(format!(
@@ -553,7 +572,7 @@ pub fn inject_agent_api(
                         e
                     ))),
                 }
-            }
+            })
         })
         .map_err(|e| LLMSpellError::Component {
             message: format!("Failed to create Agent.removeContext function: {}", e),
@@ -572,9 +591,9 @@ pub fn inject_agent_api(
     // Add Agent.wrapAsTool() function
     let bridge_for_wrap = bridge.clone();
     let wrap_as_tool_fn = lua
-        .create_async_function(move |_lua, args: (String, Option<Table>)| {
+        .create_function(move |_lua, args: (String, Option<Table>)| {
             let bridge = bridge_for_wrap.clone();
-            async move {
+            futures::executor::block_on(async move {
                 let (agent_name, config_table) = args;
 
                 // Convert config table to JSON
@@ -590,7 +609,7 @@ pub fn inject_agent_api(
                     .await
                     .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
                 Ok(tool_name)
-            }
+            })
         })
         .map_err(|e| LLMSpellError::Component {
             message: format!("Failed to create Agent.wrapAsTool function: {}", e),
@@ -607,9 +626,9 @@ pub fn inject_agent_api(
     // Add Agent.listCapabilities() function
     let bridge_for_caps = bridge.clone();
     let list_capabilities_fn = lua
-        .create_async_function(move |lua, _args: ()| {
+        .create_function(move |lua, _args: ()| {
             let bridge = bridge_for_caps.clone();
-            async move {
+            futures::executor::block_on(async move {
                 let capabilities = bridge
                     .list_agent_capabilities()
                     .await
@@ -618,7 +637,7 @@ pub fn inject_agent_api(
                 // Convert JSON to Lua
                 let lua_value = json_to_lua_value(lua, &capabilities)?;
                 Ok(lua_value)
-            }
+            })
         })
         .map_err(|e| LLMSpellError::Component {
             message: format!("Failed to create Agent.listCapabilities function: {}", e),
@@ -635,9 +654,9 @@ pub fn inject_agent_api(
     // Add Agent.getInfo() function
     let bridge_for_info = bridge.clone();
     let get_info_fn = lua
-        .create_async_function(move |lua, agent_name: String| {
+        .create_function(move |lua, agent_name: String| {
             let bridge = bridge_for_info.clone();
-            async move {
+            futures::executor::block_on(async move {
                 let info = bridge
                     .get_agent_details(&agent_name)
                     .await
@@ -646,7 +665,7 @@ pub fn inject_agent_api(
                 // Convert JSON to Lua
                 let lua_value = json_to_lua_value(lua, &info)?;
                 Ok(lua_value)
-            }
+            })
         })
         .map_err(|e| LLMSpellError::Component {
             message: format!("Failed to create Agent.getInfo function: {}", e),
@@ -663,9 +682,9 @@ pub fn inject_agent_api(
     // Add Agent.createComposite() function
     let bridge_for_composite = bridge.clone();
     let create_composite_fn = lua
-        .create_async_function(move |_lua, args: (String, Table, Option<Table>)| {
+        .create_function(move |_lua, args: (String, Table, Option<Table>)| {
             let bridge = bridge_for_composite.clone();
-            async move {
+            futures::executor::block_on(async move {
                 let (composite_name, delegates_table, routing_table) = args;
 
                 // Extract delegate agent names
@@ -689,7 +708,7 @@ pub fn inject_agent_api(
                     .await
                     .map_err(|e| mlua::Error::RuntimeError(e.to_string()))?;
                 Ok(())
-            }
+            })
         })
         .map_err(|e| LLMSpellError::Component {
             message: format!("Failed to create Agent.createComposite function: {}", e),
@@ -706,9 +725,9 @@ pub fn inject_agent_api(
     // Add Agent.discoverByCapability() function
     let bridge_for_discover = bridge.clone();
     let discover_by_capability_fn = lua
-        .create_async_function(move |lua, capability: String| {
+        .create_function(move |lua, capability: String| {
             let bridge = bridge_for_discover.clone();
-            async move {
+            futures::executor::block_on(async move {
                 let agents = bridge
                     .discover_agents_by_capability(&capability)
                     .await
@@ -720,7 +739,7 @@ pub fn inject_agent_api(
                     table.set(i + 1, agent_name.clone())?;
                 }
                 Ok(table)
-            }
+            })
         })
         .map_err(|e| LLMSpellError::Component {
             message: format!(
@@ -740,9 +759,9 @@ pub fn inject_agent_api(
     // Add Agent.getHierarchy() function
     let bridge_for_hierarchy = bridge.clone();
     let get_hierarchy_fn = lua
-        .create_async_function(move |lua, agent_name: String| {
+        .create_function(move |lua, agent_name: String| {
             let bridge = bridge_for_hierarchy.clone();
-            async move {
+            futures::executor::block_on(async move {
                 let hierarchy = bridge
                     .get_composition_hierarchy(&agent_name)
                     .await
@@ -751,7 +770,7 @@ pub fn inject_agent_api(
                 // Convert JSON to Lua
                 let lua_value = json_to_lua_value(lua, &hierarchy)?;
                 Ok(lua_value)
-            }
+            })
         })
         .map_err(|e| LLMSpellError::Component {
             message: format!("Failed to create Agent.getHierarchy function: {}", e),
@@ -762,54 +781,6 @@ pub fn inject_agent_api(
         .set("getHierarchy", get_hierarchy_fn)
         .map_err(|e| LLMSpellError::Component {
             message: format!("Failed to set Agent.getHierarchy: {}", e),
-            source: None,
-        })?;
-
-    // Add createAsync helper for coroutine context
-    let create_async_code = r#"
-        -- Helper to create agents within a coroutine context
-        function(config)
-            -- Create coroutine for async execution
-            local co = coroutine.create(function()
-                return Agent.create(config)
-            end)
-            
-            -- Execute the coroutine with safety checks
-            local success, result = coroutine.resume(co)
-            local resume_count = 0
-            local max_resumes = 1000  -- Prevent infinite loops (increased for complex async operations)
-            
-            -- Handle async operations that yield
-            while success and coroutine.status(co) ~= "dead" and resume_count < max_resumes do
-                resume_count = resume_count + 1
-                success, result = coroutine.resume(co, result)
-            end
-            
-            -- Check for infinite loop
-            if resume_count >= max_resumes then
-                error("Agent creation timed out - possible infinite loop in async operation")
-            end
-            
-            if not success then
-                error(tostring(result))
-            end
-            
-            return result
-        end
-    "#;
-
-    let create_async_fn = lua
-        .load(create_async_code)
-        .eval::<mlua::Function>()
-        .map_err(|e| LLMSpellError::Component {
-            message: format!("Failed to create Agent.createAsync helper: {}", e),
-            source: None,
-        })?;
-
-    agent_table
-        .set("createAsync", create_async_fn)
-        .map_err(|e| LLMSpellError::Component {
-            message: format!("Failed to set Agent.createAsync: {}", e),
             source: None,
         })?;
 
@@ -872,16 +843,17 @@ struct LuaAgentWrapper {
 impl UserData for LuaAgentWrapper {
     fn add_methods<'lua, M: UserDataMethods<'lua, Self>>(methods: &mut M) {
         // execute method
-        methods.add_async_method("execute", |lua, this, input: Table| async move {
+        methods.add_method("execute", |lua, this, input: Table| {
             // Convert Lua table to AgentInput
             let agent_input = lua_table_to_agent_input(lua, input)?;
             let context = ExecutionContext::new();
 
-            // Execute the agent
-            let result = this
-                .agent
-                .execute(agent_input, context)
-                .await
+            // Execute the agent using synchronous wrapper
+            let agent = this.agent.clone();
+            let result =
+                futures::executor::block_on(
+                    async move { agent.execute(agent_input, context).await },
+                )
                 .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
 
             // Convert AgentOutput to Lua table
@@ -954,9 +926,9 @@ impl UserData for LuaAgentWrapper {
         });
 
         // invokeTool method
-        methods.add_async_method(
+        methods.add_method(
             "invokeTool",
-            |lua, this, (tool_name, input_table): (String, Table)| async move {
+            |lua, this, (tool_name, input_table): (String, Table)| {
                 // Convert Lua table to JSON for tool input
                 let tool_input_json = lua_table_to_tool_input(lua, input_table)?;
 
@@ -970,11 +942,14 @@ impl UserData for LuaAgentWrapper {
                 };
 
                 // Invoke the tool through the bridge
-                let result = this
-                    .bridge
-                    .invoke_tool_for_agent(&this.agent_instance_name, &tool_name, agent_input, None)
-                    .await
-                    .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+                let bridge = this.bridge.clone();
+                let agent_instance_name = this.agent_instance_name.clone();
+                let result = futures::executor::block_on(async move {
+                    bridge
+                        .invoke_tool_for_agent(&agent_instance_name, &tool_name, agent_input, None)
+                        .await
+                        .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))
+                })?;
 
                 // Convert AgentOutput to Lua table
                 let output_table = agent_output_to_lua_table(lua, result)?;
@@ -1012,138 +987,152 @@ impl UserData for LuaAgentWrapper {
         // Monitoring & Lifecycle Methods
 
         // getMetrics method
-        methods.add_async_method("getMetrics", |lua, this, ()| async move {
-            match this
-                .bridge
-                .get_agent_metrics(&this.agent_instance_name)
-                .await
-            {
-                Ok(metrics) => {
-                    let metrics_table = lua.create_table()?;
-                    metrics_table.set("agent_id", metrics.agent_id.clone())?;
-                    metrics_table.set("requests_total", metrics.requests_total.get() as f64)?;
-                    metrics_table.set("requests_failed", metrics.requests_failed.get() as f64)?;
-                    metrics_table.set("requests_active", metrics.requests_active.get())?;
-                    metrics_table.set("tool_invocations", metrics.tool_invocations.get() as f64)?;
-                    metrics_table.set("memory_bytes", metrics.memory_bytes.get())?;
-                    metrics_table.set("cpu_percent", metrics.cpu_percent.get())?;
-                    Ok(Some(metrics_table))
+        methods.add_method("getMetrics", |lua, this, ()| {
+            let bridge = this.bridge.clone();
+            let agent_instance_name = this.agent_instance_name.clone();
+            futures::executor::block_on(async move {
+                match bridge.get_agent_metrics(&agent_instance_name).await {
+                    Ok(metrics) => {
+                        let metrics_table = lua.create_table()?;
+                        metrics_table.set("agent_id", metrics.agent_id.clone())?;
+                        metrics_table.set("requests_total", metrics.requests_total.get() as f64)?;
+                        metrics_table
+                            .set("requests_failed", metrics.requests_failed.get() as f64)?;
+                        metrics_table.set("requests_active", metrics.requests_active.get())?;
+                        metrics_table
+                            .set("tool_invocations", metrics.tool_invocations.get() as f64)?;
+                        metrics_table.set("memory_bytes", metrics.memory_bytes.get())?;
+                        metrics_table.set("cpu_percent", metrics.cpu_percent.get())?;
+                        Ok(Some(metrics_table))
+                    }
+                    Err(_) => Ok(None),
                 }
-                Err(_) => Ok(None),
-            }
+            })
         });
 
         // getHealth method
-        methods.add_async_method("getHealth", |lua, this, ()| async move {
-            match this
-                .bridge
-                .get_agent_health(&this.agent_instance_name)
-                .await
-            {
-                Ok(health_json) => {
-                    // Convert JSON to Lua table
-                    let health_table = lua.create_table()?;
-                    if let Some(status) = health_json.get("status").and_then(|v| v.as_str()) {
-                        health_table.set("status", status)?;
+        methods.add_method("getHealth", |lua, this, ()| {
+            let bridge = this.bridge.clone();
+            let agent_instance_name = this.agent_instance_name.clone();
+            futures::executor::block_on(async move {
+                match bridge.get_agent_health(&agent_instance_name).await {
+                    Ok(health_json) => {
+                        // Convert JSON to Lua table
+                        let health_table = lua.create_table()?;
+                        if let Some(status) = health_json.get("status").and_then(|v| v.as_str()) {
+                            health_table.set("status", status)?;
+                        }
+                        if let Some(message) = health_json.get("message").and_then(|v| v.as_str()) {
+                            health_table.set("message", message)?;
+                        }
+                        if let Some(timestamp) =
+                            health_json.get("timestamp").and_then(|v| v.as_str())
+                        {
+                            health_table.set("timestamp", timestamp)?;
+                        }
+                        Ok(Some(health_table))
                     }
-                    if let Some(message) = health_json.get("message").and_then(|v| v.as_str()) {
-                        health_table.set("message", message)?;
-                    }
-                    if let Some(timestamp) = health_json.get("timestamp").and_then(|v| v.as_str()) {
-                        health_table.set("timestamp", timestamp)?;
-                    }
-                    Ok(Some(health_table))
+                    Err(_) => Ok(None),
                 }
-                Err(_) => Ok(None),
-            }
+            })
         });
 
         // getPerformance method
-        methods.add_async_method("getPerformance", |lua, this, ()| async move {
-            match this
-                .bridge
-                .get_agent_performance(&this.agent_instance_name)
-                .await
-            {
-                Ok(perf_json) => {
-                    let perf_table = lua.create_table()?;
-                    if let Some(total_executions) =
-                        perf_json.get("total_executions").and_then(|v| v.as_u64())
-                    {
-                        perf_table.set("total_executions", total_executions as f64)?;
+        methods.add_method("getPerformance", |lua, this, ()| {
+            let bridge = this.bridge.clone();
+            let agent_instance_name = this.agent_instance_name.clone();
+            futures::executor::block_on(async move {
+                match bridge.get_agent_performance(&agent_instance_name).await {
+                    Ok(perf_json) => {
+                        let perf_table = lua.create_table()?;
+                        if let Some(total_executions) =
+                            perf_json.get("total_executions").and_then(|v| v.as_u64())
+                        {
+                            perf_table.set("total_executions", total_executions as f64)?;
+                        }
+                        if let Some(avg_time) = perf_json
+                            .get("avg_execution_time_ms")
+                            .and_then(|v| v.as_f64())
+                        {
+                            perf_table.set("avg_execution_time_ms", avg_time)?;
+                        }
+                        if let Some(success_rate) =
+                            perf_json.get("success_rate").and_then(|v| v.as_f64())
+                        {
+                            perf_table.set("success_rate", success_rate)?;
+                        }
+                        if let Some(error_rate) =
+                            perf_json.get("error_rate").and_then(|v| v.as_f64())
+                        {
+                            perf_table.set("error_rate", error_rate)?;
+                        }
+                        Ok(Some(perf_table))
                     }
-                    if let Some(avg_time) = perf_json
-                        .get("avg_execution_time_ms")
-                        .and_then(|v| v.as_f64())
-                    {
-                        perf_table.set("avg_execution_time_ms", avg_time)?;
-                    }
-                    if let Some(success_rate) =
-                        perf_json.get("success_rate").and_then(|v| v.as_f64())
-                    {
-                        perf_table.set("success_rate", success_rate)?;
-                    }
-                    if let Some(error_rate) = perf_json.get("error_rate").and_then(|v| v.as_f64()) {
-                        perf_table.set("error_rate", error_rate)?;
-                    }
-                    Ok(Some(perf_table))
+                    Err(_) => Ok(None),
                 }
-                Err(_) => Ok(None),
-            }
+            })
         });
 
         // logEvent method
-        methods.add_async_method(
+        methods.add_method(
             "logEvent",
-            |_lua, this, (event_type, message): (String, String)| async move {
-                this.bridge
-                    .log_agent_event(&this.agent_instance_name, &event_type, &message)
-                    .await
-                    .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
-                Ok(())
+            |_lua, this, (event_type, message): (String, String)| {
+                let bridge = this.bridge.clone();
+                let agent_instance_name = this.agent_instance_name.clone();
+                tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(async move {
+                        bridge
+                            .log_agent_event(&agent_instance_name, &event_type, &message)
+                            .await
+                            .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+                        Ok(())
+                    })
+                })
             },
         );
 
         // configureAlerts method
-        methods.add_async_method(
-            "configureAlerts",
-            |_lua, this, config_table: Table| async move {
-                // Convert Lua table to JSON for alert configuration
-                let config_json = lua_value_to_json(mlua::Value::Table(config_table))?;
-                this.bridge
-                    .configure_agent_alerts(&this.agent_instance_name, config_json)
+        methods.add_method("configureAlerts", |_lua, this, config_table: Table| {
+            // Convert Lua table to JSON for alert configuration
+            let config_json = lua_value_to_json(mlua::Value::Table(config_table))?;
+            let bridge = this.bridge.clone();
+            let agent_instance_name = this.agent_instance_name.clone();
+            futures::executor::block_on(async move {
+                bridge
+                    .configure_agent_alerts(&agent_instance_name, config_json)
                     .await
                     .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
                 Ok(())
-            },
-        );
+            })
+        });
 
         // getAlerts method
-        methods.add_async_method("getAlerts", |lua, this, ()| async move {
-            match this
-                .bridge
-                .get_agent_alerts(&this.agent_instance_name)
-                .await
-            {
-                Ok(alerts) => {
-                    let alerts_table = lua.create_table()?;
-                    for (i, alert) in alerts.iter().enumerate() {
-                        let alert_table = lua.create_table()?;
-                        if let Some(severity) = alert.get("severity").and_then(|v| v.as_str()) {
-                            alert_table.set("severity", severity)?;
+        methods.add_method("getAlerts", |lua, this, ()| {
+            let bridge = this.bridge.clone();
+            let agent_instance_name = this.agent_instance_name.clone();
+            futures::executor::block_on(async move {
+                match bridge.get_agent_alerts(&agent_instance_name).await {
+                    Ok(alerts) => {
+                        let alerts_table = lua.create_table()?;
+                        for (i, alert) in alerts.iter().enumerate() {
+                            let alert_table = lua.create_table()?;
+                            if let Some(severity) = alert.get("severity").and_then(|v| v.as_str()) {
+                                alert_table.set("severity", severity)?;
+                            }
+                            if let Some(message) = alert.get("message").and_then(|v| v.as_str()) {
+                                alert_table.set("message", message)?;
+                            }
+                            if let Some(timestamp) = alert.get("timestamp").and_then(|v| v.as_str())
+                            {
+                                alert_table.set("timestamp", timestamp)?;
+                            }
+                            alerts_table.set(i + 1, alert_table)?;
                         }
-                        if let Some(message) = alert.get("message").and_then(|v| v.as_str()) {
-                            alert_table.set("message", message)?;
-                        }
-                        if let Some(timestamp) = alert.get("timestamp").and_then(|v| v.as_str()) {
-                            alert_table.set("timestamp", timestamp)?;
-                        }
-                        alerts_table.set(i + 1, alert_table)?;
+                        Ok(alerts_table)
                     }
-                    Ok(alerts_table)
+                    Err(e) => Err(mlua::Error::ExternalError(Arc::new(e))),
                 }
-                Err(e) => Err(mlua::Error::ExternalError(Arc::new(e))),
-            }
+            })
         });
 
         // getBridgeMetrics method (static bridge-wide metrics)
@@ -1182,224 +1171,272 @@ impl UserData for LuaAgentWrapper {
         // State Machine Methods
 
         // getState method - Get current agent state
-        methods.add_async_method("getAgentState", |_lua, this, ()| async move {
-            match this.bridge.get_agent_state(&this.agent_instance_name).await {
-                Ok(state) => Ok(format!("{:?}", state)),
-                Err(e) => Err(mlua::Error::ExternalError(Arc::new(e))),
-            }
+        methods.add_method("getAgentState", |_lua, this, ()| {
+            let bridge = this.bridge.clone();
+            let agent_instance_name = this.agent_instance_name.clone();
+            futures::executor::block_on(async move {
+                match bridge.get_agent_state(&agent_instance_name).await {
+                    Ok(state) => Ok(format!("{:?}", state)),
+                    Err(e) => Err(mlua::Error::ExternalError(Arc::new(e))),
+                }
+            })
         });
 
         // initialize method - Initialize agent state machine
-        methods.add_async_method("initialize", |_lua, this, ()| async move {
-            this.bridge
-                .initialize_agent(&this.agent_instance_name)
-                .await
-                .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
-            Ok(())
+        methods.add_method("initialize", |_lua, this, ()| {
+            let bridge = this.bridge.clone();
+            let agent_instance_name = this.agent_instance_name.clone();
+            futures::executor::block_on(async move {
+                bridge
+                    .initialize_agent(&agent_instance_name)
+                    .await
+                    .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+                Ok(())
+            })
         });
 
         // start method - Start agent execution
-        methods.add_async_method("start", |_lua, this, ()| async move {
-            this.bridge
-                .start_agent(&this.agent_instance_name)
-                .await
-                .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
-            Ok(())
+        methods.add_method("start", |_lua, this, ()| {
+            let bridge = this.bridge.clone();
+            let agent_instance_name = this.agent_instance_name.clone();
+            futures::executor::block_on(async move {
+                bridge
+                    .start_agent(&agent_instance_name)
+                    .await
+                    .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+                Ok(())
+            })
         });
 
         // pause method - Pause agent execution
-        methods.add_async_method("pause", |_lua, this, ()| async move {
-            this.bridge
-                .pause_agent(&this.agent_instance_name)
-                .await
-                .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
-            Ok(())
+        methods.add_method("pause", |_lua, this, ()| {
+            let bridge = this.bridge.clone();
+            let agent_instance_name = this.agent_instance_name.clone();
+            futures::executor::block_on(async move {
+                bridge
+                    .pause_agent(&agent_instance_name)
+                    .await
+                    .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+                Ok(())
+            })
         });
 
         // resume method - Resume agent execution
-        methods.add_async_method("resume", |_lua, this, ()| async move {
-            this.bridge
-                .resume_agent(&this.agent_instance_name)
-                .await
-                .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
-            Ok(())
+        methods.add_method("resume", |_lua, this, ()| {
+            let bridge = this.bridge.clone();
+            let agent_instance_name = this.agent_instance_name.clone();
+            futures::executor::block_on(async move {
+                bridge
+                    .resume_agent(&agent_instance_name)
+                    .await
+                    .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+                Ok(())
+            })
         });
 
         // stop method - Stop agent execution
-        methods.add_async_method("stop", |_lua, this, ()| async move {
-            this.bridge
-                .stop_agent(&this.agent_instance_name)
-                .await
-                .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
-            Ok(())
+        methods.add_method("stop", |_lua, this, ()| {
+            let bridge = this.bridge.clone();
+            let agent_instance_name = this.agent_instance_name.clone();
+            futures::executor::block_on(async move {
+                bridge
+                    .stop_agent(&agent_instance_name)
+                    .await
+                    .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+                Ok(())
+            })
         });
 
         // terminate method - Terminate agent
-        methods.add_async_method("terminate", |_lua, this, ()| async move {
-            this.bridge
-                .terminate_agent(&this.agent_instance_name)
-                .await
-                .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
-            Ok(())
+        methods.add_method("terminate", |_lua, this, ()| {
+            let bridge = this.bridge.clone();
+            let agent_instance_name = this.agent_instance_name.clone();
+            futures::executor::block_on(async move {
+                bridge
+                    .terminate_agent(&agent_instance_name)
+                    .await
+                    .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+                Ok(())
+            })
         });
 
         // setError method - Put agent in error state
-        methods.add_async_method("setError", |_lua, this, error_message: String| async move {
-            this.bridge
-                .error_agent(&this.agent_instance_name, error_message)
-                .await
-                .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
-            Ok(())
+        methods.add_method("setError", |_lua, this, error_message: String| {
+            let bridge = this.bridge.clone();
+            let agent_instance_name = this.agent_instance_name.clone();
+            futures::executor::block_on(async move {
+                bridge
+                    .error_agent(&agent_instance_name, error_message)
+                    .await
+                    .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+                Ok(())
+            })
         });
 
         // recover method - Attempt to recover from error
-        methods.add_async_method("recover", |_lua, this, ()| async move {
-            this.bridge
-                .recover_agent(&this.agent_instance_name)
-                .await
-                .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
-            Ok(())
+        methods.add_method("recover", |_lua, this, ()| {
+            let bridge = this.bridge.clone();
+            let agent_instance_name = this.agent_instance_name.clone();
+            futures::executor::block_on(async move {
+                bridge
+                    .recover_agent(&agent_instance_name)
+                    .await
+                    .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+                Ok(())
+            })
         });
 
         // getStateHistory method - Get state transition history
-        methods.add_async_method("getStateHistory", |lua, this, ()| async move {
-            match this
-                .bridge
-                .get_agent_state_history(&this.agent_instance_name)
-                .await
-            {
-                Ok(history) => {
-                    let history_table = lua.create_table()?;
-                    for (i, transition) in history.iter().enumerate() {
-                        let transition_table = lua.create_table()?;
-                        if let Some(from) = transition.get("from").and_then(|v| v.as_str()) {
-                            transition_table.set("from", from)?;
+        methods.add_method("getStateHistory", |lua, this, ()| {
+            let bridge = this.bridge.clone();
+            let agent_instance_name = this.agent_instance_name.clone();
+            futures::executor::block_on(async move {
+                match bridge.get_agent_state_history(&agent_instance_name).await {
+                    Ok(history) => {
+                        let history_table = lua.create_table()?;
+                        for (i, transition) in history.iter().enumerate() {
+                            let transition_table = lua.create_table()?;
+                            if let Some(from) = transition.get("from").and_then(|v| v.as_str()) {
+                                transition_table.set("from", from)?;
+                            }
+                            if let Some(to) = transition.get("to").and_then(|v| v.as_str()) {
+                                transition_table.set("to", to)?;
+                            }
+                            if let Some(timestamp) =
+                                transition.get("timestamp").and_then(|v| v.as_str())
+                            {
+                                transition_table.set("timestamp", timestamp)?;
+                            }
+                            if let Some(elapsed) =
+                                transition.get("elapsed").and_then(|v| v.as_f64())
+                            {
+                                transition_table.set("elapsed", elapsed)?;
+                            }
+                            if let Some(reason) = transition.get("reason").and_then(|v| v.as_str())
+                            {
+                                transition_table.set("reason", reason)?;
+                            }
+                            history_table.set(i + 1, transition_table)?;
                         }
-                        if let Some(to) = transition.get("to").and_then(|v| v.as_str()) {
-                            transition_table.set("to", to)?;
-                        }
-                        if let Some(timestamp) =
-                            transition.get("timestamp").and_then(|v| v.as_str())
-                        {
-                            transition_table.set("timestamp", timestamp)?;
-                        }
-                        if let Some(elapsed) = transition.get("elapsed").and_then(|v| v.as_f64()) {
-                            transition_table.set("elapsed", elapsed)?;
-                        }
-                        if let Some(reason) = transition.get("reason").and_then(|v| v.as_str()) {
-                            transition_table.set("reason", reason)?;
-                        }
-                        history_table.set(i + 1, transition_table)?;
+                        Ok(history_table)
                     }
-                    Ok(history_table)
+                    Err(e) => Err(mlua::Error::ExternalError(Arc::new(e))),
                 }
-                Err(e) => Err(mlua::Error::ExternalError(Arc::new(e))),
-            }
+            })
         });
 
         // getLastError method - Get last error message
-        methods.add_async_method("getLastError", |_lua, this, ()| async move {
-            match this
-                .bridge
-                .get_agent_last_error(&this.agent_instance_name)
-                .await
-            {
-                Ok(error) => Ok(error),
-                Err(e) => Err(mlua::Error::ExternalError(Arc::new(e))),
-            }
+        methods.add_method("getLastError", |_lua, this, ()| {
+            let bridge = this.bridge.clone();
+            let agent_instance_name = this.agent_instance_name.clone();
+            futures::executor::block_on(async move {
+                match bridge.get_agent_last_error(&agent_instance_name).await {
+                    Ok(error) => Ok(error),
+                    Err(e) => Err(mlua::Error::ExternalError(Arc::new(e))),
+                }
+            })
         });
 
         // getRecoveryAttempts method - Get recovery attempt count
-        methods.add_async_method("getRecoveryAttempts", |_lua, this, ()| async move {
-            match this
-                .bridge
-                .get_agent_recovery_attempts(&this.agent_instance_name)
-                .await
-            {
-                Ok(attempts) => Ok(attempts),
-                Err(e) => Err(mlua::Error::ExternalError(Arc::new(e))),
-            }
+        methods.add_method("getRecoveryAttempts", |_lua, this, ()| {
+            let bridge = this.bridge.clone();
+            let agent_instance_name = this.agent_instance_name.clone();
+            futures::executor::block_on(async move {
+                match bridge
+                    .get_agent_recovery_attempts(&agent_instance_name)
+                    .await
+                {
+                    Ok(attempts) => Ok(attempts),
+                    Err(e) => Err(mlua::Error::ExternalError(Arc::new(e))),
+                }
+            })
         });
 
         // isHealthy method - Check if agent is in healthy state
-        methods.add_async_method("isHealthy", |_lua, this, ()| async move {
-            match this
-                .bridge
-                .is_agent_healthy(&this.agent_instance_name)
-                .await
-            {
-                Ok(healthy) => Ok(healthy),
-                Err(e) => Err(mlua::Error::ExternalError(Arc::new(e))),
-            }
+        methods.add_method("isHealthy", |_lua, this, ()| {
+            let bridge = this.bridge.clone();
+            let agent_instance_name = this.agent_instance_name.clone();
+            futures::executor::block_on(async move {
+                match bridge.is_agent_healthy(&agent_instance_name).await {
+                    Ok(healthy) => Ok(healthy),
+                    Err(e) => Err(mlua::Error::ExternalError(Arc::new(e))),
+                }
+            })
         });
 
         // getStateMetrics method - Get state machine metrics
-        methods.add_async_method("getStateMetrics", |lua, this, ()| async move {
-            match this
-                .bridge
-                .get_agent_state_metrics(&this.agent_instance_name)
-                .await
-            {
-                Ok(metrics_json) => {
-                    let metrics_table = lua.create_table()?;
-                    if let Some(state) = metrics_json.get("current_state").and_then(|v| v.as_str())
-                    {
-                        metrics_table.set("current_state", state)?;
-                    }
-                    if let Some(transitions) = metrics_json
-                        .get("total_transitions")
-                        .and_then(|v| v.as_u64())
-                    {
-                        metrics_table.set("total_transitions", transitions as f64)?;
-                    }
-                    if let Some(errors) = metrics_json.get("error_count").and_then(|v| v.as_u64()) {
-                        metrics_table.set("error_count", errors as f64)?;
-                    }
-                    if let Some(attempts) = metrics_json
-                        .get("recovery_attempts")
-                        .and_then(|v| v.as_u64())
-                    {
-                        metrics_table.set("recovery_attempts", attempts as f64)?;
-                    }
-                    if let Some(uptime) = metrics_json.get("uptime").and_then(|v| v.as_f64()) {
-                        metrics_table.set("uptime", uptime)?;
-                    }
-                    if let Some(last_transition) =
-                        metrics_json.get("last_transition").and_then(|v| v.as_str())
-                    {
-                        metrics_table.set("last_transition", last_transition)?;
-                    }
-                    if let Some(state_dist) = metrics_json
-                        .get("state_time_distribution")
-                        .and_then(|v| v.as_object())
-                    {
-                        let dist_table = lua.create_table()?;
-                        for (state, time) in state_dist {
-                            if let Some(time_val) = time.as_f64() {
-                                dist_table.set(state.as_str(), time_val)?;
-                            }
+        methods.add_method("getStateMetrics", |lua, this, ()| {
+            let bridge = this.bridge.clone();
+            let agent_instance_name = this.agent_instance_name.clone();
+            futures::executor::block_on(async move {
+                match bridge.get_agent_state_metrics(&agent_instance_name).await {
+                    Ok(metrics_json) => {
+                        let metrics_table = lua.create_table()?;
+                        if let Some(state) =
+                            metrics_json.get("current_state").and_then(|v| v.as_str())
+                        {
+                            metrics_table.set("current_state", state)?;
                         }
-                        metrics_table.set("state_time_distribution", dist_table)?;
+                        if let Some(transitions) = metrics_json
+                            .get("total_transitions")
+                            .and_then(|v| v.as_u64())
+                        {
+                            metrics_table.set("total_transitions", transitions as f64)?;
+                        }
+                        if let Some(errors) =
+                            metrics_json.get("error_count").and_then(|v| v.as_u64())
+                        {
+                            metrics_table.set("error_count", errors as f64)?;
+                        }
+                        if let Some(attempts) = metrics_json
+                            .get("recovery_attempts")
+                            .and_then(|v| v.as_u64())
+                        {
+                            metrics_table.set("recovery_attempts", attempts as f64)?;
+                        }
+                        if let Some(uptime) = metrics_json.get("uptime").and_then(|v| v.as_f64()) {
+                            metrics_table.set("uptime", uptime)?;
+                        }
+                        if let Some(last_transition) =
+                            metrics_json.get("last_transition").and_then(|v| v.as_str())
+                        {
+                            metrics_table.set("last_transition", last_transition)?;
+                        }
+                        if let Some(state_dist) = metrics_json
+                            .get("state_time_distribution")
+                            .and_then(|v| v.as_object())
+                        {
+                            let dist_table = lua.create_table()?;
+                            for (state, time) in state_dist {
+                                if let Some(time_val) = time.as_f64() {
+                                    dist_table.set(state.as_str(), time_val)?;
+                                }
+                            }
+                            metrics_table.set("state_time_distribution", dist_table)?;
+                        }
+                        Ok(metrics_table)
                     }
-                    Ok(metrics_table)
+                    Err(e) => Err(mlua::Error::ExternalError(Arc::new(e))),
                 }
-                Err(e) => Err(mlua::Error::ExternalError(Arc::new(e))),
-            }
+            })
         });
 
         // Context & Communication Methods
 
         // executeWithContext method - Execute agent with a specific context
-        methods.add_async_method(
+        methods.add_method(
             "executeWithContext",
-            |lua, this, (input, context_id): (Table, String)| async move {
+            |lua, this, (input, context_id): (Table, String)| {
                 let agent_input = lua_table_to_agent_input(lua, input)?;
+                let bridge = this.bridge.clone();
+                let agent_instance_name = this.agent_instance_name.clone();
 
-                let result = this
-                    .bridge
-                    .execute_agent_with_context(&this.agent_instance_name, agent_input, &context_id)
-                    .await
-                    .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+                let result = futures::executor::block_on(async move {
+                    bridge
+                        .execute_agent_with_context(&agent_instance_name, agent_input, &context_id)
+                        .await
+                        .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))
+                })?;
 
                 let output_table = agent_output_to_lua_table(lua, result)?;
                 Ok(output_table)

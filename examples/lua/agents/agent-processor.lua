@@ -7,7 +7,7 @@
 print("=== Agent Data Processor Example ===\n")
 
 -- Create a data processing agent
-local processor = Agent.createAsync({
+local processor = Agent.create({
     name = "data_processor_agent",
     description = "Processes and transforms data with intelligent analysis",
     provider = "openai",
@@ -25,10 +25,8 @@ Always ensure data quality and provide clear transformations.
     temperature = 0.3
 })
 
--- Register the processor
-if processor then
-    Agent.register("processor", processor)
-else
+-- Check if processor was created successfully
+if not processor then
     print("Failed to create processor agent - check API keys")
     return
 end
@@ -116,13 +114,13 @@ local user_data = {
 }
 
 -- Save JSON data
-local json_result = Tools.get("json_processor"):execute({
+local json_result = Tool.get("json_processor"):execute({
     operation = "stringify",
     input = user_data,
     pretty = true
 })
 
-Tools.get("file_operations"):execute({
+Tool.get("file_operations"):execute({
     operation = "write",
     path = "/tmp/user_orders.json",
     content = json_result.output

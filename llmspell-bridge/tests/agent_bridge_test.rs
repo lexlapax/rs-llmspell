@@ -3,7 +3,7 @@
 
 use llmspell_bridge::{RuntimeConfig, ScriptRuntime};
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_agent_discovery_from_lua() {
     let mut config = RuntimeConfig::default();
     config.default_engine = "lua".to_string();
@@ -28,7 +28,7 @@ async fn test_agent_discovery_from_lua() {
     assert!(output.metadata.warnings.is_empty());
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_agent_templates_from_lua() {
     let mut config = RuntimeConfig::default();
     config.default_engine = "lua".to_string();
@@ -53,7 +53,7 @@ async fn test_agent_templates_from_lua() {
     assert!(output.metadata.warnings.is_empty());
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_agent_creation_and_execution() {
     let mut config = RuntimeConfig::default();
     config.default_engine = "lua".to_string();
@@ -89,7 +89,7 @@ async fn test_agent_creation_and_execution() {
     assert!(result.is_ok() || result.is_err());
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_agent_parameter_conversion() {
     let mut config = RuntimeConfig::default();
     config.default_engine = "lua".to_string();
@@ -132,7 +132,7 @@ async fn test_agent_parameter_conversion() {
     assert!(output.metadata.warnings.is_empty());
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_agent_tool_integration() {
     let mut config = RuntimeConfig::default();
     config.default_engine = "lua".to_string();

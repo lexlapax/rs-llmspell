@@ -76,41 +76,4 @@ mod tests {
             Err(e) => panic!("Script execution failed: {:?}", e),
         }
     }
-
-    #[tokio::test]
-    async fn test_lua_agent_create_placeholder() {
-        let config = LuaConfig::default();
-        let mut engine = EngineFactory::create_lua_engine(&config).unwrap();
-
-        // Create mock registry and provider manager
-        let registry = Arc::new(ComponentRegistry::new());
-        let provider_config = ProviderManagerConfig::default();
-        let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
-
-        // Inject APIs
-        engine.inject_apis(&registry, &providers).unwrap();
-
-        // Test that Agent.create exists but returns error (placeholder)
-        let script = r#"
-            local ok, err = pcall(function()
-                return Agent.create({system_prompt = "test"})
-            end)
-            return {ok = ok, error = tostring(err)}
-        "#;
-
-        let output = engine.execute_script(script).await;
-
-        match output {
-            Ok(result) => {
-                let obj = result.output.as_object().expect("Expected object result");
-                assert_eq!(obj.get("ok").and_then(|v| v.as_bool()), Some(false));
-                let error = obj.get("error").and_then(|v| v.as_str()).unwrap_or("");
-                assert!(
-                    error.contains("Failed to get default provider"),
-                    "Expected provider error"
-                );
-            }
-            Err(e) => panic!("Script execution failed: {:?}", e),
-        }
-    }
 }

@@ -10,7 +10,7 @@ print("=== Agent Coordinator Example ===\n")
 local agents = {}
 
 -- Research Agent
-agents.researcher = Agent.createAsync({
+agents.researcher = Agent.create({
     name = "research_agent",
     description = "Gathers and analyzes information",
     provider = "openai",
@@ -27,7 +27,7 @@ You are a research specialist. You:
 })
 
 -- Analysis Agent
-agents.analyst = Agent.createAsync({
+agents.analyst = Agent.create({
     name = "analysis_agent",
     description = "Performs deep analysis on data",
     provider = "openai",
@@ -44,7 +44,7 @@ You are a data analyst. You:
 })
 
 -- Decision Agent
-agents.decision_maker = Agent.createAsync({
+agents.decision_maker = Agent.create({
     name = "decision_agent",
     description = "Makes recommendations based on analysis",
     provider = "openai",
@@ -61,7 +61,7 @@ You are a decision-making specialist. You:
 })
 
 -- Coordinator Agent (orchestrates others)
-agents.coordinator = Agent.createAsync({
+agents.coordinator = Agent.create({
     name = "coordinator_agent",
     description = "Coordinates multiple agents to achieve complex goals",
     provider = "openai",
@@ -84,7 +84,7 @@ You work with:
 
 -- Register all agents
 for name, agent in pairs(agents) do
-    Agent.register(name, agent)
+    -- Agent is automatically registered when created with a name
 end
 
 -- Example 1: Market Analysis Coordination
