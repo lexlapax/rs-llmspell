@@ -4081,6 +4081,116 @@ impl WorkflowBridge {
 - **Memory efficient** parameter conversion
 - **Error handling** with proper script error formatting
 
+### 11.6 Complete Bridge Architecture Overview
+
+The llmspell architecture follows a three-layer bridge pattern that provides language-agnostic abstraction between Rust implementations and script engines:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     Script Layer (Lua/JavaScript)                 │
+│  ┌─────────────┐  ┌──────────────┐  ┌─────────────────────┐    │
+│  │ Agent.create │  │ Tool.execute │  │ Workflow.sequential │    │
+│  │ Agent.list   │  │ Tool.get     │  │ Workflow.execute    │    │
+│  │ Agent.*      │  │ Tool.list    │  │ Workflow.list       │    │
+│  └──────┬───────┘  └──────┬───────┘  └──────────┬──────────┘    │
+└─────────┼──────────────────┼──────────────────────┼──────────────┘
+          │                  │                       │
+┌─────────▼──────────────────▼───────────────────────▼──────────────┐
+│              Language-Specific API Injection Layer                 │
+│  ┌────────────────┐  ┌─────────────────┐  ┌───────────────────┐  │
+│  │ inject_agent_  │  │ inject_tool_api │  │ inject_workflow_  │  │
+│  │ api() creates  │  │ creates Tool    │  │ api() creates     │  │
+│  │ Agent global   │  │ global          │  │ Workflow global   │  │
+│  └────────┬───────┘  └────────┬────────┘  └─────────┬─────────┘  │
+└───────────┼───────────────────┼──────────────────────┼────────────┘
+            │                   │                      │
+┌───────────▼───────────────────▼──────────────────────▼────────────┐
+│           Language-Agnostic Bridge Layer (llmspell-bridge)         │
+│  ┌─────────────────┐  ┌──────────────┐  ┌────────────────────┐   │
+│  │ AgentBridge     │  │ ToolBridge   │  │ WorkflowBridge     │   │
+│  │ ├─create_agent  │  │ ├─get_tool   │  │ ├─create_workflow  │   │
+│  │ ├─list_agents   │  │ ├─execute    │  │ ├─execute_workflow │   │
+│  │ ├─wrap_as_tool  │  │ ├─list_tools │  │ ├─list_workflows   │   │
+│  │ └─compose       │  │ └─discover   │  │ └─discover_types   │   │
+│  └────────┬────────┘  └───────┬──────┘  └─────────┬──────────┘   │
+└───────────┼────────────────────┼────────────────────┼─────────────┘
+            │                    │                     │
+┌───────────▼────────────────────▼─────────────────────▼─────────────┐
+│              Rust Core Implementation Layer                         │
+│  ┌──────────────────┐  ┌────────────────┐  ┌──────────────────┐   │
+│  │ llmspell-agents  │  │ llmspell-tools │  │ llmspell-        │   │
+│  │ ├─Agent trait    │  │ ├─Tool trait   │  │ workflows        │   │
+│  │ ├─BaseAgent      │  │ ├─33+ tools    │  │ ├─Workflow trait │   │
+│  │ ├─Composition    │  │ ├─Categories   │  │ ├─Sequential     │   │
+│  │ └─AgentWrapped   │  │ └─Registry     │  │ ├─Parallel       │   │
+│  │   Tool           │  │                 │  │ ├─Conditional    │   │
+│  └──────────────────┘  └────────────────┘  │ └─Loop           │   │
+│                                             └──────────────────┘   │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+#### Bridge Layer Responsibilities
+
+1. **Rust Core Implementation Layer**:
+   - Implements all business logic in pure Rust
+   - Defines traits (Agent, Tool, Workflow, BaseAgent)
+   - Provides concrete implementations
+   - Handles all async operations natively
+   - Manages resource lifecycle and security
+
+2. **Language-Agnostic Bridge Layer**:
+   - Provides uniform interfaces across all script engines
+   - Handles async-to-sync conversion for script compatibility
+   - Manages component registration and discovery
+   - Implements cross-component integration (e.g., agents using tools)
+   - Maintains performance with caching and optimization
+
+3. **Language-Specific API Injection Layer**:
+   - Maps bridge methods to language idioms
+   - Creates global objects (Agent, Tool, Workflow)
+   - Handles parameter conversion (tables↔JSON)
+   - Implements language-specific patterns (e.g., Lua metatables)
+   - Manages script engine lifecycle
+
+#### Implementation Status (Phase 3.3)
+
+**Fully Implemented in Rust**:
+- ✅ Agent composition patterns (hierarchical, delegation, capability-based)
+- ✅ Agent-as-tool wrapping (`AgentWrappedTool`)
+- ✅ Tool discovery and invocation from agents
+- ✅ All workflow patterns (Sequential, Parallel, Conditional, Loop)
+- ✅ Multi-agent coordination infrastructure
+
+**Bridge Layer Implementation**:
+- ✅ AgentBridge: Full implementation including `wrap_agent_as_tool()`, `create_composite()`, etc.
+- ✅ ToolBridge: Complete with all 33+ tools accessible
+- ✅ WorkflowBridge: All workflow types supported
+
+**Script API Exposure Gaps**:
+- ⚠️ Agent API: Only basic methods exposed (create, list, discover)
+  - Missing: `wrapAsTool()`, `getInfo()`, `listCapabilities()`, `createComposite()`, etc.
+- ✅ Tool API: Fully exposed with functional pattern
+- ✅ Workflow API: Fully exposed with functional pattern (not OOP as examples expected)
+
+#### API Pattern Consistency
+
+All script APIs follow a functional pattern rather than OOP:
+
+```lua
+-- Functional Pattern (Implemented):
+local workflow = Workflow.sequential({...})  -- Returns config table
+local result = Workflow.execute(workflow)    -- Execute via global function
+
+-- NOT OOP Pattern (Examples incorrectly assumed):
+local workflow = Workflow.sequential({...})  -- Would return object with methods
+local result = workflow:execute()            -- Method call on object
+```
+
+This functional pattern is consistent across all three APIs:
+- `Agent.create()` returns an agent instance, execution via `agent:execute()`
+- `Tool.get()` returns tool reference, execution via `Tool.execute(tool, params)`
+- `Workflow.sequential()` returns config, execution via `Workflow.execute(config)`
+
 ### 12. Lua API Implementation Changes
 
 #### 12.1 Synchronous Agent Creation
