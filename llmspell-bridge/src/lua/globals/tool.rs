@@ -3,8 +3,9 @@
 
 use crate::globals::GlobalContext;
 use crate::lua::conversion::json_to_lua_value;
+use crate::lua::sync_utils::block_on_async_lua;
 use crate::ComponentRegistry;
-use mlua::{Lua, Table};
+use mlua::{Lua, Table, Value};
 use std::sync::Arc;
 
 /// Inject Tool global into Lua environment
@@ -74,9 +75,10 @@ pub fn inject_tool_global(
                     let tool_instance = tool_arc.clone();
                     let name = tool_name.clone();
 
-                    // Use block_on to execute async code synchronously
-                    let result = tokio::task::block_in_place(|| {
-                        tokio::runtime::Handle::current().block_on(async move {
+                    // Use shared sync utility to execute async code
+                    let result = block_on_async_lua(
+                        "tool_execute",
+                        async move {
                             // Create AgentInput with parameters wrapped correctly for extract_parameters
                             let params_table = lua.create_table()?;
                             params_table.set("text", "Tool invocation")?; // Required by AgentInput
@@ -105,9 +107,12 @@ pub fn inject_tool_global(
                                 })?;
 
                             // Convert output to Lua table
-                            crate::lua::conversion::agent_output_to_lua_table(lua, output)
-                        })
-                    })?;
+                            let table =
+                                crate::lua::conversion::agent_output_to_lua_table(lua, output)?;
+                            Ok(Value::Table(table))
+                        },
+                        None,
+                    )?;
 
                     Ok(result)
                 })?,
@@ -124,9 +129,10 @@ pub fn inject_tool_global(
     let invoke_fn = lua.create_function(move |lua, (name, input): (String, Table)| {
         let registry = registry_clone.clone();
 
-        // Use block_on to execute async code synchronously
-        let result = tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(async move {
+        // Use shared sync utility to execute async code
+        let result = block_on_async_lua(
+            "tool_invoke",
+            async move {
                 // Get the tool
                 let tool = registry.get_tool(&name).ok_or_else(|| {
                     mlua::Error::RuntimeError(format!("Tool '{}' not found", name))
@@ -152,9 +158,11 @@ pub fn inject_tool_global(
                 })?;
 
                 // Convert output to Lua table
-                crate::lua::conversion::agent_output_to_lua_table(lua, output)
-            })
-        })?;
+                let table = crate::lua::conversion::agent_output_to_lua_table(lua, output)?;
+                Ok(Value::Table(table))
+            },
+            None,
+        )?;
 
         Ok(result)
     })?;

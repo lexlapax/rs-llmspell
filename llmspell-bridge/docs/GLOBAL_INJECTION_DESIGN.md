@@ -7,7 +7,7 @@ The current llmspell-bridge has partial global injection:
 - Individual `inject_*_api` functions for each component (Agent, Tool, Workflow, JSON, Streaming)
 - Each API has a definition struct in `engine/types.rs`
 - APIs are injected during engine initialization via `inject_apis()`
-- Language-specific implementations in `lua/api/*` and `javascript/api/*`
+- Language-specific implementations in `lua/globals/*` and `javascript/globals/*`
 
 ### Issues with Current Approach
 1. **Scattered Implementation**: Each API requires separate injection function

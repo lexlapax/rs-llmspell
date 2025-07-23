@@ -145,7 +145,7 @@ print("\n=== Future Multimodal API (Preview) ===\n")
 print([[
 -- This is how multimodal content will work in future phases:
 
-local agent = Agent.createAsync({
+local agent = Agent.create({
     name = "vision-agent",
     supports_multimodal = true
 })

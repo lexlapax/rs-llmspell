@@ -210,23 +210,6 @@ impl ScriptEngineBridge for LuaEngine {
                     })?;
             let injector = GlobalInjector::new(Arc::new(global_registry));
             injector.inject_lua(&lua, &global_context)?;
-
-            // OLD APIs - Commented out to use new globals system
-            // Tool and Workflow APIs are now injected via the globals system above
-
-            // super::api::inject_tool_api(&lua, &api_surface.tool_api, registry.clone())?;
-
-            // let workflow_bridge = Arc::new(crate::workflows::WorkflowBridge::new(registry.clone()));
-            // super::api::inject_workflow_api(
-            //     &lua,
-            //     &api_surface.workflow_api,
-            //     registry.clone(),
-            //     workflow_bridge,
-            // )?;
-
-            // Streaming API now handled via globals
-
-            // JSON API now handled via globals
         }
         Ok(())
     }

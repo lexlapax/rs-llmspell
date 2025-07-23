@@ -172,13 +172,11 @@ fn benchmark_lua_workflow_api(c: &mut Criterion) {
     let lua = Lua::new();
     let registry = Arc::new(ComponentRegistry::new());
     let provider_config = ProviderManagerConfig::default();
-    let providers = Arc::new(rt.block_on(async {
-        ProviderManager::new(provider_config).await.unwrap()
-    }));
+    let providers =
+        Arc::new(rt.block_on(async { ProviderManager::new(provider_config).await.unwrap() }));
     let context = Arc::new(GlobalContext::new(registry.clone(), providers));
-    let global_registry = rt.block_on(async {
-        create_standard_registry(context.clone()).await.unwrap()
-    });
+    let global_registry =
+        rt.block_on(async { create_standard_registry(context.clone()).await.unwrap() });
     let injector = GlobalInjector::new(Arc::new(global_registry));
     injector.inject_lua(&lua, &context).unwrap();
 
@@ -187,7 +185,8 @@ fn benchmark_lua_workflow_api(c: &mut Criterion) {
         b.iter(|| {
             let start = std::time::Instant::now();
 
-            lua.load(r#"
+            lua.load(
+                r#"
                 local workflow = Workflow.sequential({
                     name = "bench_sequential",
                     steps = {
@@ -195,7 +194,8 @@ fn benchmark_lua_workflow_api(c: &mut Criterion) {
                     }
                 })
                 return workflow
-            "#)
+            "#,
+            )
             .eval::<mlua::Value>()
             .unwrap();
 
@@ -311,7 +311,8 @@ fn benchmark_lua_workflow_api(c: &mut Criterion) {
         b.iter(|| {
             let start = std::time::Instant::now();
 
-            lua.load(r#"
+            lua.load(
+                r#"
                 local workflow = Workflow.sequential({
                     name = "bench_complete",
                     steps = {
@@ -320,7 +321,8 @@ fn benchmark_lua_workflow_api(c: &mut Criterion) {
                 })
                 local result = workflow:execute({input = "test_data"})
                 return result
-            "#)
+            "#,
+            )
             .eval::<mlua::Value>()
             .unwrap();
 

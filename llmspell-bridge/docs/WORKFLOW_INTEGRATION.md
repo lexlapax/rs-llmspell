@@ -41,7 +41,7 @@ The workflow bridge provides comprehensive script-to-workflow integration, enabl
 - Real-time performance metrics (average, P99)
 - <10ms overhead verification
 
-### 6. Lua Integration (`lua/api/workflow.rs`)
+### 6. Lua Integration (`lua/globals/workflow.rs`)
 - Data-oriented API design (no complex closures)
 - Workflow constructors return configuration tables
 - Single execute function with bridge stored in Lua registry
