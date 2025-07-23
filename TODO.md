@@ -2099,19 +2099,23 @@ The agent factory needs to create agents that actually use LLM providers for the
 8. [x] Verify JSON.parse/stringify still work in all examples ✅
 
 #### Sub-task 3.3.29.5: Streaming Consolidation
-**Status**: TODO  
+**Status**: COMPLETE ✅
+**Started**: 2025-07-23
+**Completed**: 2025-07-23
+**Key Achievement**: Successfully consolidated streaming API to globals pattern, maintaining two-layer architecture (streaming_global.rs + lua/globals/streaming.rs)
+**Verification**: All streaming tests passing, streaming example works correctly, quality checks pass
 **Tasks**:
-1. [ ] Create new streaming_global.rs in globals/
-2. [ ] Create new lua/globals/streaming.rs with full implementation
-3. [ ] Move logic from lua/api/streaming.rs to lua/globals/streaming.rs
-4. [ ] Implement StreamingGlobal with GlobalObject trait
-5. [ ] Remove lua/api/streaming.rs entirely
-6. [ ] Update engine.rs to use globals instead of api
-7. [ ] Register StreamingGlobal in global registry
-8. [ ] Update all streaming tests
-9. [ ] Delete api::streaming tests
-10. [ ] Create new streaming integration tests
-11. [ ] Verify streaming examples work
+1. [x] Create new streaming_global.rs in globals/ ✅
+2. [x] Create new lua/globals/streaming.rs with full implementation ✅
+3. [x] Move logic from lua/api/streaming.rs to lua/globals/streaming.rs ✅
+4. [x] Implement StreamingGlobal with GlobalObject trait ✅
+5. [x] Remove lua/api/streaming.rs entirely ✅
+6. [x] Update engine.rs to use globals instead of api ✅
+7. [x] Register StreamingGlobal in global registry ✅
+8. [x] Update all streaming tests ✅
+9. [x] Delete api::streaming tests ✅ (no dedicated API tests existed)
+10. [x] Create new streaming integration tests ✅ (tests included in globals implementation)
+11. [x] Verify streaming examples work ✅ (streaming-demo.lua works perfectly)
 
 #### Sub-task 3.3.29.6: Engine and Infrastructure Updates
 **Status**: TODO
@@ -2166,7 +2170,7 @@ let func = lua.create_function(move |lua, args: Table| {
 ```
 
 **Common Tasks**:
-1. [ ] Document synchronous API design decision in mlua-async-coroutine-solution.md
+1. [ ] extract and merge mlua-async-coroutine-solution.md into phase-03-design-doc.md and make sure it's not specific to lua but other languages.
 2. [ ] Create shared utility for block_on pattern if needed
 3. [ ] Add proper error handling for runtime panics
 4. [ ] Performance validation - ensure no significant regression vs async

@@ -214,8 +214,8 @@ impl ScriptEngineBridge for LuaEngine {
         {
             let lua = self.lua.lock();
 
-            // Get the API surface definition
-            let api_surface = ApiSurface::standard();
+            // Get the API surface definition (unused after globals migration)
+            let _api_surface = ApiSurface::standard();
 
             // Inject globals using the new system
             use crate::globals::{create_standard_registry, GlobalContext, GlobalInjector};
@@ -242,8 +242,7 @@ impl ScriptEngineBridge for LuaEngine {
             //     workflow_bridge,
             // )?;
 
-            // Inject Streaming API
-            super::api::inject_streaming_api(&lua, &api_surface.streaming_api)?;
+            // Streaming API now handled via globals
 
             // JSON API now handled via globals
 

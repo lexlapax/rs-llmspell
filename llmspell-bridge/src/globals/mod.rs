@@ -9,6 +9,7 @@ pub mod injection;
 pub mod json_global;
 pub mod registry;
 pub mod state_global;
+pub mod streaming_global;
 pub mod tool_global;
 pub mod types;
 pub mod workflow_global;
@@ -46,6 +47,8 @@ pub async fn create_standard_registry(context: Arc<GlobalContext>) -> Result<Glo
     builder.register(Arc::new(workflow_global::WorkflowGlobal::new(
         context.registry.clone(),
     )));
+
+    builder.register(Arc::new(streaming_global::StreamingGlobal::new()));
 
     builder.build()
 }
