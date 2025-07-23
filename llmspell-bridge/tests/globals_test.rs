@@ -26,6 +26,8 @@ mod lua_globals {
         assert!(registry.get("Agent").is_some());
         assert!(registry.get("Tool").is_some());
         assert!(registry.get("Workflow").is_some());
+        assert!(registry.get("JSON").is_some());
+        assert!(registry.get("Streaming").is_some());
         assert!(registry.get("Logger").is_some());
         assert!(registry.get("Config").is_some());
         assert!(registry.get("Utils").is_some());
@@ -49,6 +51,8 @@ mod lua_globals {
             assert(Agent ~= nil, "Agent global not found")
             assert(Tool ~= nil, "Tool global not found")
             assert(Workflow ~= nil, "Workflow global not found")
+            assert(JSON ~= nil, "JSON global not found")
+            assert(Streaming ~= nil, "Streaming global not found")
             assert(Logger ~= nil, "Logger global not found")
             assert(Config ~= nil, "Config global not found")
             assert(Utils ~= nil, "Utils global not found")
@@ -520,6 +524,72 @@ mod lua_globals {
         .exec()
         .map_err(|e| llmspell_core::LLMSpellError::Component {
             message: format!("State Lua test failed: {}", e),
+            source: None,
+        })?;
+
+        Ok(())
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_streaming_global_lua() -> Result<()> {
+        let lua = Lua::new();
+        let context = setup_test_context().await;
+        let registry = create_standard_registry(context.clone()).await?;
+        let injector = GlobalInjector::new(Arc::new(registry));
+
+        injector.inject_lua(&lua, &context)?;
+
+        // Test Streaming global functions
+        lua.load(
+            r#"
+            -- Test Streaming.create()
+            local stream = Streaming.create(function()
+                for i = 1, 3 do
+                    coroutine.yield("chunk" .. i)
+                end
+            end)
+            assert(stream ~= nil, "Streaming.create() should return a stream")
+            assert(type(stream.next) == "function", "Stream should have next() method")
+            assert(type(stream.isDone) == "function", "Stream should have isDone() method")
+            assert(type(stream.collect) == "function", "Stream should have collect() method")
+            
+            -- Test stream iteration
+            local chunks = {}
+            while not stream:isDone() do
+                local chunk = stream:next()
+                if chunk ~= nil then
+                    table.insert(chunks, chunk)
+                end
+            end
+            assert(#chunks == 3, "Should have 3 chunks")
+            assert(chunks[1] == "chunk1", "First chunk should be 'chunk1'")
+            assert(chunks[2] == "chunk2", "Second chunk should be 'chunk2'")
+            assert(chunks[3] == "chunk3", "Third chunk should be 'chunk3'")
+            
+            -- Test that stream is done
+            assert(stream:isDone() == true, "Stream should be done after iteration")
+            assert(stream:next() == nil, "next() should return nil when done")
+            
+            -- Test stream collection
+            local new_stream = Streaming.create(function()
+                coroutine.yield("a")
+                coroutine.yield("b")
+                coroutine.yield("c")
+            end)
+            local collected = new_stream:collect()
+            assert(type(collected) == "table", "collect() should return a table")
+            assert(#collected == 3, "collect() should return 3 items")
+            assert(collected[1] == "a", "First collected item should be 'a'")
+            assert(collected[2] == "b", "Second collected item should be 'b'")
+            assert(collected[3] == "c", "Third collected item should be 'c'")
+            
+            -- Test Streaming.yield exists (even if it's a placeholder)
+            assert(type(Streaming.yield) == "function", "Streaming.yield should be a function")
+        "#,
+        )
+        .exec()
+        .map_err(|e| llmspell_core::LLMSpellError::Component {
+            message: format!("Streaming Lua test failed: {}", e),
             source: None,
         })?;
 

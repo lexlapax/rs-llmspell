@@ -10,20 +10,13 @@ local function use_tool(tool_name, params)
     -- Use the synchronous Tool API
     local result = Tool.invoke(tool_name, params)
     
-    -- Parse the JSON result to get the actual tool response
-    if result and result.text then
-        local success, parsed = pcall(JSON.parse, result.text)
-        if success and parsed then
-            return parsed
-        else
-            print("JSON parse error for tool " .. tool_name .. ": " .. tostring(parsed))
-            print("Raw text was: " .. tostring(result.text))
-            return {success = false, error = "Failed to parse tool result: " .. tostring(parsed)}
-        end
+    -- Tool.invoke now returns structured results directly (no JSON parsing needed)
+    if result then
+        return result
     end
     
-    -- Return error result if parsing failed
-    return {success = false, error = "No result.text from tool"}
+    -- Return error result if no result
+    return {success = false, error = "Tool returned no result"}
 end
 
 -- Helper to print tool results

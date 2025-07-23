@@ -15,16 +15,13 @@ print("=========================")
 local function use_tool(tool_name, params)
     local result = Tool.invoke(tool_name, params)
     
-    -- Parse the JSON result to get the actual tool response
-    if result and result.text then
-        local parsed = JSON.parse(result.text)
-        if parsed then
-            return parsed
-        end
+    -- Tool.invoke now returns structured results directly (no JSON parsing needed)
+    if result then
+        return result
     end
     
-    -- Return error result if parsing failed
-    return {success = false, error = "Failed to parse tool result"}
+    -- Return error result if no result
+    return {success = false, error = "Tool returned no result"}
 end
 
 -- Helper to print clean results
