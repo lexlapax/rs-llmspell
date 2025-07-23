@@ -164,175 +164,168 @@ fn benchmark_bridge_overhead(c: &mut Criterion) {
 
 fn benchmark_lua_workflow_api(c: &mut Criterion) {
     use llmspell_bridge::globals::{create_standard_registry, GlobalContext, GlobalInjector};
-    use llmspell_providers::ProviderManager;
+    use llmspell_bridge::providers::{ProviderManager, ProviderManagerConfig};
 
     let rt = Runtime::new().unwrap();
 
     // Setup Lua environment with workflow global
     let lua = Lua::new();
     let registry = Arc::new(ComponentRegistry::new());
-    let providers = Arc::new(ProviderManager::new());
+    let provider_config = ProviderManagerConfig::default();
+    let providers = Arc::new(rt.block_on(async {
+        ProviderManager::new(provider_config).await.unwrap()
+    }));
     let context = Arc::new(GlobalContext::new(registry.clone(), providers));
-    let global_registry = create_standard_registry(context.clone()).unwrap();
+    let global_registry = rt.block_on(async {
+        create_standard_registry(context.clone()).await.unwrap()
+    });
     let injector = GlobalInjector::new(Arc::new(global_registry));
     injector.inject_lua(&lua, &context).unwrap();
 
     // Benchmark Workflow.sequential creation from Lua
     c.bench_function("lua_workflow_sequential_creation", |b| {
         b.iter(|| {
-            rt.block_on(async {
-                let start = std::time::Instant::now();
+            let start = std::time::Instant::now();
 
-                lua.load(r#"
-                    local workflow = Workflow.sequential({
-                        name = "bench_sequential",
-                        steps = {
-                            {name = "step1", type = "tool", tool = "mock_tool", input = {value = 42}}
-                        }
-                    })
-                    return workflow
-                "#)
-                .eval::<mlua::Value>()
-                .unwrap();
+            lua.load(r#"
+                local workflow = Workflow.sequential({
+                    name = "bench_sequential",
+                    steps = {
+                        {name = "step1", type = "tool", tool = "mock_tool", input = {value = 42}}
+                    }
+                })
+                return workflow
+            "#)
+            .eval::<mlua::Value>()
+            .unwrap();
 
-                let duration = start.elapsed();
-                black_box(duration);
-            })
+            let duration = start.elapsed();
+            black_box(duration);
         })
     });
 
     // Benchmark Workflow.conditional creation from Lua
     c.bench_function("lua_workflow_conditional_creation", |b| {
         b.iter(|| {
-            rt.block_on(async {
-                let start = std::time::Instant::now();
+            let start = std::time::Instant::now();
 
-                lua.load(
-                    r#"
-                    local workflow = Workflow.conditional({
-                        name = "bench_conditional",
-                        branches = {
-                            {
-                                name = "branch1",
-                                condition = {type = "always"},
-                                steps = {
-                                    {name = "step1", type = "tool", tool = "mock_tool", input = {}}
-                                }
+            lua.load(
+                r#"
+                local workflow = Workflow.conditional({
+                    name = "bench_conditional",
+                    branches = {
+                        {
+                            name = "branch1",
+                            condition = {type = "always"},
+                            steps = {
+                                {name = "step1", type = "tool", tool = "mock_tool", input = {}}
                             }
                         }
-                    })
-                    return workflow
-                "#,
-                )
-                .eval::<mlua::Value>()
-                .unwrap();
+                    }
+                })
+                return workflow
+            "#,
+            )
+            .eval::<mlua::Value>()
+            .unwrap();
 
-                let duration = start.elapsed();
-                black_box(duration);
-            })
+            let duration = start.elapsed();
+            black_box(duration);
         })
     });
 
     // Benchmark Workflow.loop creation from Lua
     c.bench_function("lua_workflow_loop_creation", |b| {
         b.iter(|| {
-            rt.block_on(async {
-                let start = std::time::Instant::now();
+            let start = std::time::Instant::now();
 
-                lua.load(
-                    r#"
-                    local workflow = Workflow.loop({
-                        name = "bench_loop",
-                        iterator = "range",
-                        start = 1,
-                        ["end"] = 10,
-                        step = 1,
-                        body = {
-                            {name = "step1", type = "tool", tool = "mock_tool", input = {}}
-                        }
-                    })
-                    return workflow
-                "#,
-                )
-                .eval::<mlua::Value>()
-                .unwrap();
+            lua.load(
+                r#"
+                local workflow = Workflow.loop({
+                    name = "bench_loop",
+                    iterator = "range",
+                    start = 1,
+                    ["end"] = 10,
+                    step = 1,
+                    body = {
+                        {name = "step1", type = "tool", tool = "mock_tool", input = {}}
+                    }
+                })
+                return workflow
+            "#,
+            )
+            .eval::<mlua::Value>()
+            .unwrap();
 
-                let duration = start.elapsed();
-                black_box(duration);
-            })
+            let duration = start.elapsed();
+            black_box(duration);
         })
     });
 
     // Benchmark Workflow.parallel creation from Lua
     c.bench_function("lua_workflow_parallel_creation", |b| {
         b.iter(|| {
-            rt.block_on(async {
-                let start = std::time::Instant::now();
+            let start = std::time::Instant::now();
 
-                lua.load(
-                    r#"
-                    local workflow = Workflow.parallel({
-                        name = "bench_parallel",
-                        max_concurrency = 4,
-                        branches = {
-                            {
-                                name = "branch1",
-                                steps = {
-                                    {name = "step1", type = "tool", tool = "mock_tool", input = {}}
-                                }
+            lua.load(
+                r#"
+                local workflow = Workflow.parallel({
+                    name = "bench_parallel",
+                    max_concurrency = 4,
+                    branches = {
+                        {
+                            name = "branch1",
+                            steps = {
+                                {name = "step1", type = "tool", tool = "mock_tool", input = {}}
                             }
                         }
-                    })
-                    return workflow
-                "#,
-                )
-                .eval::<mlua::Value>()
-                .unwrap();
+                    }
+                })
+                return workflow
+            "#,
+            )
+            .eval::<mlua::Value>()
+            .unwrap();
 
-                let duration = start.elapsed();
-                black_box(duration);
-            })
+            let duration = start.elapsed();
+            black_box(duration);
         })
     });
 
     // Benchmark workflow registry operations from Lua
     c.bench_function("lua_workflow_list", |b| {
         b.iter(|| {
-            rt.block_on(async {
-                let start = std::time::Instant::now();
+            let start = std::time::Instant::now();
 
-                lua.load("return Workflow.list()")
-                    .eval::<mlua::Value>()
-                    .unwrap();
+            lua.load("return Workflow.list()")
+                .eval::<mlua::Value>()
+                .unwrap();
 
-                let duration = start.elapsed();
-                black_box(duration);
-            })
+            let duration = start.elapsed();
+            black_box(duration);
         })
     });
 
     // Benchmark complete Lua workflow operation (create + execute)
     c.bench_function("lua_workflow_complete_operation", |b| {
         b.iter(|| {
-            rt.block_on(async {
-                let start = std::time::Instant::now();
+            let start = std::time::Instant::now();
 
-                lua.load(r#"
-                    local workflow = Workflow.sequential({
-                        name = "bench_complete",
-                        steps = {
-                            {name = "step1", type = "tool", tool = "mock_tool", input = {data = "test"}}
-                        }
-                    })
-                    local result = workflow:execute({input = "test_data"})
-                    return result
-                "#)
-                .eval::<mlua::Value>()
-                .unwrap();
+            lua.load(r#"
+                local workflow = Workflow.sequential({
+                    name = "bench_complete",
+                    steps = {
+                        {name = "step1", type = "tool", tool = "mock_tool", input = {data = "test"}}
+                    }
+                })
+                local result = workflow:execute({input = "test_data"})
+                return result
+            "#)
+            .eval::<mlua::Value>()
+            .unwrap();
 
-                let duration = start.elapsed();
-                black_box(duration);
-            })
+            let duration = start.elapsed();
+            black_box(duration);
         })
     });
 }
