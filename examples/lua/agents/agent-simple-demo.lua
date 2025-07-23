@@ -1,27 +1,29 @@
 -- ABOUTME: Simple agent demonstration using only available Agent API methods
 -- ABOUTME: Shows basic agent creation, listing, and execution
 
--- Load agent helpers
-local helpers = dofile("agent-helpers.lua")
-
 print("=== Simple Agent API Demo ===")
 print()
 
 -- Test 1: Create a basic agent
 print("1. Creating a basic agent...")
-local agent1, err1 = helpers.createAgent({
-    model = "gpt-4o-mini",
-    system_prompt = "You are a helpful assistant. Keep responses brief."
-})
+local success1, agent1 = pcall(function()
+    return Agent.create({
+        name = "simple-agent",
+        model = "gpt-4o-mini",
+        system_prompt = "You are a helpful assistant. Keep responses brief."
+    })
+end)
 
-if agent1 then
+if success1 and agent1 then
     print("   ✓ Agent created successfully")
     
     -- Test agent execution
     print("\n2. Testing agent execution...")
-    local response, err = helpers.invokeAgent(agent1, {text = "What is 2 + 2?"})
+    local success2, response = pcall(function()
+        return agent1:invoke({text = "What is 2 + 2?"})
+    end)
     
-    if response then
+    if success2 and response then
         if type(response) == "table" and response.text then
             print("   Agent response: " .. response.text)
         else
@@ -31,7 +33,7 @@ if agent1 then
         print("   ✗ Execution failed: " .. tostring(response))
     end
 else
-    print("   ✗ Failed to create agent: " .. err1)
+    print("   ✗ Failed to create agent: " .. tostring(agent1))
 end
 
 -- Test 2: Create multiple agents with different models
@@ -43,17 +45,20 @@ local test_models = {
 }
 
 local created_agents = 0
-for _, test in ipairs(test_models) do
-    local agent, err = helpers.createAgent({
-        model = test.model,
-        system_prompt = "You are a test agent."
-    })
+for i, test in ipairs(test_models) do
+    local success, agent = pcall(function()
+        return Agent.create({
+            name = "test-agent-" .. i,
+            model = test.model,
+            system_prompt = "You are a test agent."
+        })
+    end)
     
-    if agent then
+    if success and agent then
         print("   ✓ " .. test.name .. " - created")
         created_agents = created_agents + 1
     else
-        print("   ✗ " .. test.name .. " - failed: " .. err)
+        print("   ✗ " .. test.name .. " - failed: " .. tostring(agent))
     end
 end
 
@@ -105,30 +110,35 @@ end
 
 -- Test 5: Agent with custom parameters
 print("\n6. Creating agent with custom parameters...")
-local custom_agent, err = helpers.createAgent({
-    model = "gpt-4o-mini",
-    system_prompt = "You are a creative writer. Use vivid language.",
-    temperature = 0.9,
-    max_tokens = 150
-})
+local success, custom_agent = pcall(function()
+    return Agent.create({
+        name = "custom-agent",
+        model = "gpt-4o-mini",
+        system_prompt = "You are a creative writer. Use vivid language.",
+        temperature = 0.9,
+        max_tokens = 150
+    })
+end)
 
-if custom_agent then
+if success and custom_agent then
     print("   ✓ Custom agent created")
     
     -- Test with creative prompt
-    local response, err = helpers.invokeAgent(custom_agent, {text = "Describe a sunset in one sentence."})
+    local success2, response = pcall(function()
+        return custom_agent:invoke({text = "Describe a sunset in one sentence."})
+    end)
     
-    if response then
+    if success2 and response then
         if type(response) == "table" and response.text then
             print("   Creative response: " .. response.text)
         else
             print("   Creative response: " .. tostring(response))
         end
     else
-        print("   ✗ Execution failed: " .. tostring(err))
+        print("   ✗ Execution failed: " .. tostring(response))
     end
 else
-    print("   ✗ Failed to create custom agent: " .. err)
+    print("   ✗ Failed to create custom agent: " .. tostring(custom_agent))
 end
 
 print("\n=== Demo Complete ===")
@@ -137,7 +147,7 @@ print("- Missing API keys")
 print("- Network connectivity")
 print("- Model availability")
 print("\nThis demo uses the Agent API methods:")
-print("- Agent.createAsync() - Create agents synchronously")
+print("- Agent.create() - Create agents synchronously")
 print("- Agent.list() - List agent instances")
 print("- Agent.discover() - Discover agent types")
 print("- Agent.register() - Register new agents")

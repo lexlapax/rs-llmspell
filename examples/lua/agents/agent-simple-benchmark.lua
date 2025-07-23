@@ -36,6 +36,7 @@ print()
 -- Test 1: Basic agent creation overhead
 local creation_time = benchmark("Basic Agent Creation", function()
     return Agent.create({
+        name = "benchmark-agent-1",
         model = "gpt-4o-mini",
         prompt = "You are a test assistant"
     })
@@ -44,6 +45,7 @@ end, 20)
 -- Test 2: Agent creation with provider/model syntax
 benchmark("Provider/Model Syntax", function()
     return Agent.create({
+        name = "benchmark-agent-2",
         model = "anthropic/claude-3-sonnet",
         prompt = "Test"
     })
@@ -52,6 +54,7 @@ end, 20)
 -- Test 3: Agent creation with tools
 benchmark("Agent with Tools", function()
     return Agent.create({
+        name = "benchmark-agent-3",
         model = "gpt-4o-mini",
         prompt = "Test assistant",
         tools = {"calculator", "uuid_generator"}
@@ -74,6 +77,7 @@ print("\n=== Synchronous API Test ===")
 local start = os.clock()
 local sync_success = pcall(function()
     local agent = Agent.create({
+        name = "sync-test-agent",
         model = "gpt-4o-mini", 
         prompt = "Sync test"
     })

@@ -355,7 +355,7 @@ All examples include:
 Enable debug logging for detailed information:
 ```lua
 -- Enable debug mode
-local agent = Agent.create("claude-3-sonnet-20240229", {
+local agent = Agent.create("claude-3-5-haiku-latest", {
     debug = true,
     log_level = "debug"
 })

@@ -1,9 +1,6 @@
 -- ABOUTME: Comprehensive Agent API demonstration showing all available methods
 -- ABOUTME: Covers creation, discovery, composition, tool wrapping, and capabilities
 
--- Load agent helpers
-local helpers = dofile("agent-helpers.lua")
-
 print("=== Comprehensive Agent API Demo ===\n")
 
 -- 1. Test Agent.register() - Register new agents
@@ -39,14 +36,16 @@ if retrieved_agent then
     print("   ✓ Retrieved agent successfully")
     
     -- Test invoke
-    local result, err = helpers.invokeAgent(retrieved_agent, {
-        text = "Analyze this data: Sales Q1: $100k, Q2: $120k, Q3: $95k, Q4: $140k"
-    })
+    local success, result = pcall(function()
+        return retrieved_agent:invoke({
+            text = "Analyze this data: Sales Q1: $100k, Q2: $120k, Q3: $95k, Q4: $140k"
+        })
+    end)
     
-    if result and result.text then
+    if success and result and result.text then
         print("   Analysis: " .. result.text)
     else
-        print("   ✗ Invoke failed: " .. tostring(err))
+        print("   ✗ Invoke failed: " .. tostring(result))
     end
 else
     print("   ✗ Failed to retrieve agent")
@@ -89,39 +88,35 @@ end
 
 -- 5. Test Agent.wrapAsTool() - Wrap agent as tool
 print("\n5. Testing Agent.wrapAsTool()...")
-local writer_agent_name = Agent.register({
-    name = "creative-writer",
-    description = "Creative writing agent",
-    agent_type = "llm",
-    model = {
-        provider = "openai",
-        model_id = "gpt-3.5-turbo",
+-- Skip Agent.register for now - it has a different format requirement
+-- Instead, create an agent using Agent.create and wrap that
+local writer_success, writer_agent = pcall(function()
+    return Agent.create({
+        name = "creative-writer",
+        model = "openai/gpt-3.5-turbo",
+        system_prompt = "You are a creative writer. Write engaging short content.",
         temperature = 0.8,
-        max_tokens = 100,
-        settings = {}
-    },
-    allowed_tools = {},
-    custom_config = {
-        system_prompt = "You are a creative writer. Write engaging short content."
-    },
-    resource_limits = {
-        max_execution_time_secs = 30,
-        max_memory_mb = 128,
-        max_tool_calls = 0,
-        max_recursion_depth = 1
-    }
-})
+        max_tokens = 100
+    })
+end)
 
-local tool_name = Agent.wrapAsTool(writer_agent_name, {
-    tool_name = "creative_writer_tool",
-    description = "Tool for creative writing tasks"
-})
-print("   ✓ Wrapped agent as tool: " .. tool_name)
-
--- Check if tool exists
-if Tool and Tool.exists then
-    local exists = Tool.exists(tool_name)
-    print("   Tool registered: " .. tostring(exists))
+if not writer_success then
+    print("   ✗ Failed to create writer agent: " .. tostring(writer_agent))
+    print("   Skipping wrapAsTool test")
+else
+    local writer_agent_name = "creative-writer"
+    
+    local tool_name = Agent.wrapAsTool(writer_agent_name, {
+        tool_name = "creative_writer_tool",
+        description = "Tool for creative writing tasks"
+    })
+    print("   ✓ Wrapped agent as tool: " .. tool_name)
+    
+    -- Check if tool exists
+    if Tool and Tool.exists then
+        local exists = Tool.exists(tool_name)
+        print("   Tool registered: " .. tostring(exists))
+    end
 end
 
 -- 6. Test Agent.discoverByCapability() - Find agents by capability
@@ -138,40 +133,34 @@ end
 
 -- 7. Test Agent.createComposite() - Create composite agent
 print("\n7. Testing Agent.createComposite()...")
--- First create another agent
-local summarizer_name = Agent.register({
-    name = "summarizer",
-    description = "Text summarization agent",
-    agent_type = "llm",
-    model = {
-        provider = "openai",
-        model_id = "gpt-3.5-turbo",
+-- First create another agent using Agent.create
+local summarizer_success, summarizer = pcall(function()
+    return Agent.create({
+        name = "summarizer",
+        model = "openai/gpt-3.5-turbo",
+        system_prompt = "You are a summarizer. Create brief summaries.",
         temperature = 0.2,
-        max_tokens = 100,
-        settings = {}
-    },
-    allowed_tools = {},
-    custom_config = {
-        system_prompt = "You are a summarizer. Create brief summaries."
-    },
-    resource_limits = {
-        max_execution_time_secs = 30,
-        max_memory_mb = 128,
-        max_tool_calls = 0,
-        max_recursion_depth = 1
-    }
-})
+        max_tokens = 100
+    })
+end)
 
--- Create composite agent
-Agent.createComposite(
-    "analysis-and-summary",
-    {agent_name, summarizer_name},
-    {
-        routing_strategy = "sequential",
-        description = "Analyzes data then summarizes findings"
-    }
-)
-print("   ✓ Created composite agent: analysis-and-summary")
+if not summarizer_success then
+    print("   ✗ Failed to create summarizer: " .. tostring(summarizer))
+    print("   Skipping createComposite test")
+else
+    local summarizer_name = "summarizer"
+    
+    -- Create composite agent
+    Agent.createComposite(
+        "analysis-and-summary",
+        {agent_name, summarizer_name},
+        {
+            routing_strategy = "sequential",
+            description = "Analyzes data then summarizes findings"
+        }
+    )
+    print("   ✓ Created composite agent: analysis-and-summary")
+end
 
 -- 8. Test Agent.list() - List all agents
 print("\n8. Testing Agent.list()...")
@@ -201,23 +190,24 @@ if streaming_agent then
     print("   Starting streaming response...")
     local chunks = {}
     
-    -- Use helper for streaming
-    local result, err = helpers.invokeAgentStream(
-        streaming_agent,
-        { text = "Count from 1 to 5 slowly" },
-        function(chunk)
-            table.insert(chunks, chunk)
-            if chunk.text then
-                io.write("   Chunk: " .. chunk.text)
-                io.flush()
+    -- Direct streaming invocation (synchronous)
+    local success, result = pcall(function()
+        return streaming_agent:invokeStream(
+            { text = "Count from 1 to 5 slowly" },
+            function(chunk)
+                table.insert(chunks, chunk)
+                if chunk.text then
+                    io.write("   Chunk: " .. chunk.text)
+                    io.flush()
+                end
             end
-        end
-    )
+        )
+    end)
     
-    if result then
+    if success and result then
         print("\n   Received " .. #chunks .. " chunks")
     else
-        print("\n   ✗ Streaming failed: " .. tostring(err))
+        print("\n   ✗ Streaming failed: " .. tostring(result))
     end
 else
     print("   ✗ Failed to get agent for streaming")

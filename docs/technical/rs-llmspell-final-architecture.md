@@ -28133,7 +28133,7 @@ timeout = 30000
 [providers.anthropic]
 api_key_env = "ANTHROPIC_API_KEY"
 base_url = "https://api.anthropic.com"  # Can be overridden for API-compatible services
-model = "claude-3-sonnet-20240229"
+model = "claude-3-5-haiku-latest"
 timeout = 30000
 retry_attempts = 3
 retry_delay = 1000

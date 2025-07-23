@@ -4,9 +4,6 @@
 -- Agent Coordinator Example
 -- Demonstrates multi-agent coordination and collaboration patterns
 
--- Load agent helpers
-local helpers = dofile("agent-helpers.lua")
-
 print("=== Agent Coordinator Example ===\n")
 
 -- Create specialized agents
@@ -15,9 +12,7 @@ local agents = {}
 -- Research Agent
 agents.researcher = Agent.create({
     name = "research_agent",
-    description = "Gathers and analyzes information",
-    provider = "openai",
-    model = "gpt-4o-mini",
+    model = "openai/gpt-4o-mini",
     system_prompt = [[
 You are a research specialist. You:
 1. Gather relevant information on topics
@@ -32,9 +27,7 @@ You are a research specialist. You:
 -- Analysis Agent
 agents.analyst = Agent.create({
     name = "analysis_agent",
-    description = "Performs deep analysis on data",
-    provider = "openai",
-    model = "gpt-4o-mini",
+    model = "openai/gpt-4o-mini",
     system_prompt = [[
 You are a data analyst. You:
 1. Identify patterns and trends
@@ -49,9 +42,7 @@ You are a data analyst. You:
 -- Decision Agent
 agents.decision_maker = Agent.create({
     name = "decision_agent",
-    description = "Makes recommendations based on analysis",
-    provider = "openai",
-    model = "gpt-4o-mini",
+    model = "openai/gpt-4o-mini",
     system_prompt = [[
 You are a decision-making specialist. You:
 1. Evaluate multiple options
@@ -67,8 +58,7 @@ You are a decision-making specialist. You:
 agents.coordinator = Agent.create({
     name = "coordinator_agent",
     description = "Coordinates multiple agents to achieve complex goals",
-    provider = "openai",
-    model = "gpt-4o-mini",
+    model = "openai/gpt-4o-mini",
     system_prompt = [[
 You are a multi-agent coordinator. You:
 1. Break down complex tasks into sub-tasks
@@ -128,9 +118,15 @@ if json_result and json_result.output then
     })
 end
 
+-- Convert market data to JSON string for prompt
+local market_data_json = ""
+if json_result and json_result.output then
+    market_data_json = json_result.output
+end
+
 -- Coordinator orchestrates market analysis
-local market_result = agents.coordinator:execute({
-    prompt = string.format([[
+local market_result = agents.coordinator:invoke({
+    text = string.format([[
 Coordinate a comprehensive market analysis for a new smart home product:
 
 Market Data: %s
@@ -141,11 +137,15 @@ Please coordinate with:
 3. Decision Agent - Recommend market entry strategy
 
 Synthesize all findings into a cohesive market analysis report.
-]], JSON.stringify(market_data))
+]], market_data_json)
 })
 
 print("Market Analysis Result:")
-print(market_result.content)
+if market_result and market_result.text then
+    print(market_result.text)
+else
+    print("No content available - market_result:", tostring(market_result))
+end
 
 -- Example 2: Problem-Solving Coordination
 print("\n\nExample 2: Problem-Solving Coordination")
@@ -162,8 +162,8 @@ A software company is experiencing:
 ]]
 
 -- Coordinator manages problem-solving
-local problem_result = agents.coordinator:execute({
-    prompt = string.format([[
+local problem_result = agents.coordinator:invoke({
+    text = string.format([[
 Coordinate a solution for this business problem:
 
 %s
@@ -178,7 +178,11 @@ Provide both immediate fixes and long-term solutions.
 })
 
 print("Problem-Solving Result:")
-print(problem_result.content)
+if problem_result and problem_result.text then
+    print(problem_result.text)
+else
+    print("No content available - problem_result:", tostring(problem_result))
+end
 
 -- Example 3: Sequential Agent Pipeline
 print("\n\nExample 3: Sequential Agent Pipeline")
@@ -198,8 +202,8 @@ local feedback_data = [[
 
 -- Step 1: Research agent analyzes feedback
 print("Step 1: Research Agent analyzing feedback...")
-local research_result = agents.researcher:execute({
-    prompt = string.format([[
+local research_result = agents.researcher:invoke({
+    text = string.format([[
 Research and categorize this customer feedback:
 
 %s
@@ -214,8 +218,8 @@ Identify:
 
 -- Step 2: Analysis agent processes findings
 print("Step 2: Analysis Agent processing findings...")
-local analysis_result = agents.analyst:execute({
-    prompt = string.format([[
+local analysis_result = agents.analyst:invoke({
+    text = string.format([[
 Analyze these research findings:
 
 %s
@@ -225,13 +229,13 @@ Provide:
 2. Sentiment analysis
 3. Priority ranking of problems
 4. Customer satisfaction drivers
-]], research_result.content)
+]], research_result.text)
 })
 
 -- Step 3: Decision agent makes recommendations
 print("Step 3: Decision Agent making recommendations...")
-local decision_result = agents.decision_maker:execute({
-    prompt = string.format([[
+local decision_result = agents.decision_maker:invoke({
+    text = string.format([[
 Based on this analysis, make recommendations:
 
 %s
@@ -241,13 +245,13 @@ Provide:
 2. 90-day improvement plan
 3. Resource allocation suggestions
 4. Success metrics
-]], analysis_result.content)
+]], analysis_result.text)
 })
 
 -- Step 4: Coordinator synthesizes all results
 print("Step 4: Coordinator synthesizing results...")
-local synthesis_result = agents.coordinator:execute({
-    prompt = string.format([[
+local synthesis_result = agents.coordinator:invoke({
+    text = string.format([[
 Synthesize all agent findings into an executive summary:
 
 Research Findings:
@@ -260,11 +264,15 @@ Recommendations:
 %s
 
 Create a concise action plan with clear priorities.
-]], research_result.content, analysis_result.content, decision_result.content)
+]], research_result.text, analysis_result.text, decision_result.text)
 })
 
 print("\nFinal Synthesis:")
-print(synthesis_result.content)
+if synthesis_result and synthesis_result.text then
+    print(synthesis_result.text)
+else
+    print("No content available - synthesis_result:", tostring(synthesis_result))
+end
 
 -- Example 4: Parallel Agent Coordination
 print("\n\nExample 4: Parallel Agent Coordination")
@@ -304,8 +312,8 @@ print("Running parallel analysis on expansion scenario...")
 local parallel_results = {}
 
 -- Research agent examines each market
-parallel_results.market_research = agents.researcher:execute({
-    prompt = string.format([[
+parallel_results.market_research = agents.researcher:invoke({
+    text = string.format([[
 Research these target markets for expansion:
 %s
 
@@ -314,12 +322,12 @@ For each market, identify:
 2. Regulatory requirements
 3. Competition landscape
 4. Cultural considerations
-]], JSON.stringify(scenario.target_markets))
+]], tostring(scenario.target_markets[1] .. ", " .. scenario.target_markets[2] .. ", " .. scenario.target_markets[3]))
 })
 
 -- Analyst examines financial implications
-parallel_results.financial_analysis = agents.analyst:execute({
-    prompt = string.format([[
+parallel_results.financial_analysis = agents.analyst:invoke({
+    text = string.format([[
 Analyze financial implications of expansion:
 Budget: %s
 Current Revenue: %s
@@ -334,8 +342,8 @@ Calculate:
 })
 
 -- Decision maker evaluates options
-parallel_results.strategic_options = agents.decision_maker:execute({
-    prompt = string.format([[
+parallel_results.strategic_options = agents.decision_maker:invoke({
+    text = string.format([[
 Evaluate expansion strategies:
 Company: %s
 Team Size: %s
@@ -350,8 +358,8 @@ Consider:
 })
 
 -- Coordinator merges parallel results
-local parallel_synthesis = agents.coordinator:execute({
-    prompt = string.format([[
+local parallel_synthesis = agents.coordinator:invoke({
+    text = string.format([[
 Merge these parallel analyses into a cohesive expansion plan:
 
 Market Research:
@@ -364,13 +372,17 @@ Strategic Options:
 %s
 
 Create an integrated expansion roadmap with clear milestones.
-]], parallel_results.market_research.content,
-    parallel_results.financial_analysis.content,
-    parallel_results.strategic_options.content)
+]], parallel_results.market_research.text,
+    parallel_results.financial_analysis.text,
+    parallel_results.strategic_options.text)
 })
 
 print("\nParallel Coordination Result:")
-print(parallel_synthesis.content)
+if parallel_synthesis and parallel_synthesis.text then
+    print(parallel_synthesis.text)
+else
+    print("No content available - parallel_synthesis:", tostring(parallel_synthesis))
+end
 
 -- Example 5: Dynamic Agent Selection
 print("\n\nExample 5: Dynamic Agent Selection")
@@ -403,18 +415,25 @@ for i, request in ipairs(requests) do
     
     local result
     if request.type == "research" then
-        result = agents.researcher:execute({ prompt = request.content })
+        result = agents.researcher:invoke({ text = request.content })
     elseif request.type == "data_analysis" then
-        result = agents.analyst:execute({ prompt = request.content })
+        result = agents.analyst:invoke({ text = request.content })
     elseif request.type == "decision" then
-        result = agents.decision_maker:execute({ prompt = request.content })
+        result = agents.decision_maker:invoke({ text = request.content })
     else  -- complex requests need coordination
-        result = agents.coordinator:execute({ 
-            prompt = request.content .. "\n\nCoordinate with all available agents as needed."
+        result = agents.coordinator:invoke({ 
+            text = request.content .. "\n\nCoordinate with all available agents as needed."
         })
     end
     
-    print("Response: " .. string.sub(result.content, 1, 150) .. "...\n")
+    if result and result.text then
+        print("Response: " .. string.sub(result.text, 1, 150) .. "...\n")
+    else
+        print("Response: No content available or result is nil\n")
+        if result then
+            print("Result structure: " .. tostring(result) .. "\n")
+        end
+    end
 end
 
 -- Performance Metrics

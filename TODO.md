@@ -1951,28 +1951,60 @@ The agent factory needs to create agents that actually use LLM providers for the
 9. [x] Verify all agent_bridge_test tests pass (5/5) ✅
 10. [x] Run cargo fmt and cargo clippy ✅
 
-**Phase 2 - Synchronous Wrapper Implementation** (Following mlua-async-coroutine-solution.md):
-11. [ ] Replace `create_async_function` with `create_function` + `block_on` for Agent.createAsync
-12. [ ] Rename Agent.createAsync to Agent.create (breaking change)
-13. [ ] Update Agent.register to use sync wrapper
-14. [ ] Update Agent.createFromTemplate to use sync wrapper
-15. [ ] Convert agent instance methods to sync:
-    - [ ] agent:invoke (replace add_async_method with add_method + block_on)
-    - [ ] agent:invokeStream 
-    - [ ] agent:execute (alias for invoke)
-    - [ ] agent:executeWithContext
-16. [ ] Remove createAsync Lua wrapper code (lines 768-814 in agent.rs per solution doc)
-17. [ ] Delete agent-helpers.lua completely
-18. [ ] Update all agent examples to use direct API calls:
-    - [ ] agent-simple-demo.lua
-    - [ ] agent-async-example.lua
-    - [ ] agent-api-comprehensive.lua
-    - [ ] agent-composition.lua
-    - [ ] agent-coordinator.lua
-    - [ ] agent-processor.lua
-    - [ ] All other agent examples
-19. [ ] Test all agent examples work without coroutine errors
-20. [ ] Update agent integration tests for sync API
+**Phase 2 - Synchronous Wrapper Implementation** ✅ IN PROGRESS (Following mlua-async-coroutine-solution.md):
+11. [x] Replace `create_async_function` with `create_function` + `block_on` for Agent.createAsync ✅
+12. [x] Rename Agent.createAsync to Agent.create (breaking change) ✅
+13. [x] Update Agent.register to use sync wrapper ✅ (already was sync)
+14. [x] Update Agent.createFromTemplate to use sync wrapper ✅ (already was sync)
+15. [x] Convert agent instance methods to sync: (27/27 complete) ✅
+    - [x] agent:invoke (replace add_async_method with add_method + block_on) ✅
+    - [x] agent:invokeStream ✅
+    - [x] agent:execute (alias for invoke) ✅
+    - [x] agent:executeWithContext ✅
+    - [x] agent:getState ✅
+    - [x] agent:invokeTool ✅
+    - [x] agent:getMetrics ✅
+    - [x] agent:getHealth ✅
+    - [x] agent:getPerformance ✅
+    - [x] agent:logEvent ✅
+    - [x] agent:configureAlerts ✅
+    - [x] agent:getAlerts ✅
+    - [x] agent:getAgentState ✅
+    - [x] agent:initialize ✅
+    - [x] agent:start ✅
+    - [x] agent:pause ✅
+    - [x] agent:resume ✅
+    - [x] agent:stop ✅
+    - [x] agent:terminate ✅
+    - [x] agent:setError ✅
+    - [x] agent:recover ✅
+    - [x] agent:getStateHistory ✅
+    - [x] agent:getLastError ✅
+    - [x] agent:getRecoveryAttempts ✅
+    - [x] agent:isHealthy ✅
+    - [x] agent:getStateMetrics ✅
+    - [x] agent:destroy ✅
+16. [x] Remove createAsync Lua wrapper code (lines 768-814 in agent.rs per solution doc) ✅
+17. [x] Delete agent-helpers.lua completely ✅
+18. [x] Update all agent examples to use direct API calls: ✅
+    - [x] agent-simple-demo.lua ✅
+    - [x] agent-async-example.lua ✅
+    - [x] agent-api-comprehensive.lua ✅
+    - [x] agent-composition.lua ✅
+    - [x] agent-coordinator.lua ✅ (already clean)
+    - [x] agent-monitor.lua ✅ (already clean)
+    - [x] agent-orchestrator.lua ✅ (already clean)
+    - [x] agent-processor.lua ✅ (rewritten to be cleaner)
+19. [x] Test all agent bridge tests including integration tests ✅
+20. [x] Test all agent examples work without coroutine errors ✅
+    - [x] Fixed agent-coordinator.lua parameter format (text= not prompt=) ✅
+    - [x] All agent examples now run successfully ✅
+21. [x] Update agent integration tests for sync API ✅
+    - [x] Fixed agent_bridge_test.rs to use new API format (model="provider/model") ✅
+    - [x] All 5 agent bridge tests passing ✅
+    - [x] All 1 agent methods test passing ✅
+    - [x] All 6 multi-agent workflow tests passing ✅
+    - [x] All 9 bridge integration tests passing ✅
 
 #### Sub-task 3.3.29.2: Tool Consolidation and Synchronous API
 **Status**: IN PROGRESS  

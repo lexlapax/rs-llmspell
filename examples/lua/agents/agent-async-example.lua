@@ -1,61 +1,66 @@
--- Example: Using Agent.createAsync for coroutine-safe agent creation
+-- Example: Using Agent.create for synchronous agent creation
 -- This example demonstrates how to create and use agents in Lua scripts
 
--- Load agent helpers
-local helpers = dofile("agent-helpers.lua")
+print("=== Agent Synchronous Example ===\n")
 
-print("=== Agent Async Example ===\n")
-
--- 1. Create an agent using Agent.createAsync
+-- 1. Create an agent using Agent.create
 print("1. Creating a conversational agent...")
-local agent, err = helpers.createAgent({
-    name = "assistant",
-    model = "openai/gpt-3.5-turbo",  -- Format: provider/model
-    system_prompt = "You are a helpful AI assistant. Be concise and friendly.",
-    temperature = 0.7,
-    max_tokens = 150
-})
-if agent then
+local success, agent = pcall(function()
+    return Agent.create({
+        name = "assistant",
+        model = "openai/gpt-3.5-turbo",  -- Format: provider/model
+        system_prompt = "You are a helpful AI assistant. Be concise and friendly.",
+        temperature = 0.7,
+        max_tokens = 150
+    })
+end)
+if success and agent then
     print("   ✓ Agent created: " .. type(agent))
 else
-    print("   ✗ Failed to create agent: " .. tostring(err))
+    print("   ✗ Failed to create agent: " .. tostring(agent))
     return
 end
 
 -- 2. Execute a simple query
 print("\n2. Asking a simple question...")
-local response, err = helpers.invokeAgent(agent, {
-    text = "What are the three primary colors?"
-})
-if response then
+local success2, response = pcall(function()
+    return agent:invoke({
+        text = "What are the three primary colors?"
+    })
+end)
+if success2 and response then
     print("   Response: " .. (response.text or response.output or "No response"))
 else
-    print("   ✗ Failed to invoke agent: " .. tostring(err))
+    print("   ✗ Failed to invoke agent: " .. tostring(response))
 end
 
 -- 3. Create a specialized agent
 print("\n3. Creating a code expert agent...")
-local codeAgent, err = helpers.createAgent({
-    name = "code-expert",
-    model = "openai/gpt-3.5-turbo",
-    system_prompt = "You are a programming expert. Provide code examples when appropriate. Be concise.",
-    temperature = 0.3,  -- Lower temperature for more focused responses
-    max_tokens = 200
-})
+local success3, codeAgent = pcall(function()
+    return Agent.create({
+        name = "code-expert",
+        model = "openai/gpt-3.5-turbo",
+        system_prompt = "You are a programming expert. Provide code examples when appropriate. Be concise.",
+        temperature = 0.3,  -- Lower temperature for more focused responses
+        max_tokens = 200
+    })
+end)
 
-if codeAgent then
+if success3 and codeAgent then
     -- 4. Ask a programming question
     print("\n4. Asking a programming question...")
-    local codeResponse, err = helpers.invokeAgent(codeAgent, {
-        text = "Write a Python function to reverse a string"
-    })
-    if codeResponse then
+    local success4, codeResponse = pcall(function()
+        return codeAgent:invoke({
+            text = "Write a Python function to reverse a string"
+        })
+    end)
+    if success4 and codeResponse then
         print("   Response:\n" .. (codeResponse.text or codeResponse.output or "No response"))
     else
-        print("   ✗ Failed to invoke code agent: " .. tostring(err))
+        print("   ✗ Failed to invoke code agent: " .. tostring(codeResponse))
     end
 else
-    print("   ✗ Failed to create code agent: " .. tostring(err))
+    print("   ✗ Failed to create code agent: " .. tostring(codeAgent))
 end
 
 -- 5. Working with different providers (if configured)
@@ -63,23 +68,24 @@ print("\n5. Creating agents with different providers...")
 
 -- Example with Anthropic (requires ANTHROPIC_API_KEY)
 local providers = {
-    {provider = "anthropic", model = "claude-3-sonnet-20240229"},
+    {provider = "anthropic", model = "claude-3-5-haiku-latest"},
     {provider = "openai", model = "gpt-4"},
-    {provider = "cohere", model = "command-r"}
 }
 
-for _, config in ipairs(providers) do
-    local agent, err = helpers.createAgent({
-        name = config.provider .. "-agent",
-        model = config.provider .. "/" .. config.model,
-        system_prompt = "You are a helpful assistant.",
-        temperature = 0.7
-    })
+for i, config in ipairs(providers) do
+    local success, agent = pcall(function()
+        return Agent.create({
+            name = config.provider .. "-agent-" .. i,
+            model = config.provider .. "/" .. config.model,
+            system_prompt = "You are a helpful assistant.",
+            temperature = 0.7
+        })
+    end)
     
-    if agent then
+    if success and agent then
         print("   ✓ Created " .. config.provider .. " agent")
     else
-        print("   ✗ Failed to create " .. config.provider .. " agent: " .. tostring(err))
+        print("   ✗ Failed to create " .. config.provider .. " agent: " .. tostring(agent))
     end
 end
 
@@ -94,8 +100,8 @@ end
 print("\n=== Example Complete ===")
 
 -- Important notes:
--- 1. Always use Agent.createAsync() instead of Agent.createAsync() to avoid coroutine errors
--- 2. Wrap async method calls (like execute) in the asyncCall helper
+-- 1. Agent.create() is now synchronous - no coroutines needed
+-- 2. All agent methods like invoke() are synchronous
 -- 3. Set appropriate API keys in environment variables:
 --    - OPENAI_API_KEY for OpenAI
 --    - ANTHROPIC_API_KEY for Anthropic

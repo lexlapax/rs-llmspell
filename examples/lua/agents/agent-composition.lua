@@ -1,9 +1,6 @@
 -- ABOUTME: Example demonstrating agent composition patterns in LLMSpell
 -- ABOUTME: Shows how to wrap agents as tools, create composite agents, and discover agents by capability
 
--- Load agent helpers
-local helpers = dofile("agent-helpers.lua")
-
 -- Helper function to print results
 local function print_result(name, result)
     print("\n=== " .. name .. " ===")
@@ -167,15 +164,17 @@ end
 print("\n=== Using Composite Agent ===")
 local composite = Agent.get("composite_analyst")
 if composite then
-    local result, err = helpers.invokeAgent(composite, {
-        text = "Research the latest trends in AI and analyze their potential impact on business"
-    })
+    local success, result = pcall(function()
+        return composite:invoke({
+            text = "Research the latest trends in AI and analyze their potential impact on business"
+        })
+    end)
     
-    if result and result.text then
+    if success and result and result.text then
         print("\nComposite agent result:")
         print(result.text)
     else
-        print("\nComposite agent execution failed: " .. tostring(err))
+        print("\nComposite agent execution failed: " .. tostring(result))
     end
 else
     print("Failed to get composite agent")

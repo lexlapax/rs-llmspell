@@ -64,15 +64,15 @@ async fn test_agent_creation_and_execution() {
 
     // Test creating and executing an agent
     let script = r#"
-        -- Create a simple agent using the legacy API
+        -- Create a simple agent using the new API format
         local agent = Agent.create({
-            provider = "mock",
-            model = "test-model",
+            name = "test-agent",
+            model = "mock/test-model",
             system_prompt = "You are a helpful assistant"
         })
 
-        -- Execute the agent
-        local result = agent:execute({
+        -- Execute the agent using invoke (execute is alias)
+        local result = agent:invoke({
             text = "Hello, agent!"
         })
 
@@ -145,8 +145,8 @@ async fn test_agent_tool_integration() {
     let script = r#"
         -- Create an agent
         local agent = Agent.create({
-            provider = "mock",
-            model = "test-model",
+            name = "tool-test-agent",
+            model = "mock/test-model",
             system_prompt = "You are a helpful assistant"
         })
 

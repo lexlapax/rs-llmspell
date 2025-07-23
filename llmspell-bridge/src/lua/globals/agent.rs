@@ -18,62 +18,92 @@ struct LuaAgentInstance {
 
 impl UserData for LuaAgentInstance {
     fn add_methods<'lua, M: UserDataMethods<'lua, Self>>(methods: &mut M) {
-        // invoke method (same as execute in API)
-        methods.add_async_method("invoke", |lua, this, input: Table| async move {
+        // invoke method (same as execute in API) - synchronous wrapper
+        methods.add_method("invoke", |lua, this, input: Table| {
             let agent_input = lua_table_to_agent_input(lua, input)?;
+            let bridge = this.bridge.clone();
+            let agent_name = this.agent_instance_name.clone();
 
-            let result = this
-                .bridge
-                .execute_agent(&this.agent_instance_name, agent_input, None)
-                .await
-                .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+            // Use block_on to execute async code synchronously
+            let result = tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(async move {
+                    bridge
+                        .execute_agent(&agent_name, agent_input, None)
+                        .await
+                        .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))
+                })
+            })?;
 
             agent_output_to_lua_table(lua, result)
         });
 
-        // execute method (alias for invoke)
-        methods.add_async_method("execute", |lua, this, input: Table| async move {
+        // execute method (alias for invoke) - synchronous wrapper
+        methods.add_method("execute", |lua, this, input: Table| {
             let agent_input = lua_table_to_agent_input(lua, input)?;
+            let bridge = this.bridge.clone();
+            let agent_name = this.agent_instance_name.clone();
 
-            let result = this
-                .bridge
-                .execute_agent(&this.agent_instance_name, agent_input, None)
-                .await
-                .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+            // Use block_on to execute async code synchronously
+            let result = tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(async move {
+                    bridge
+                        .execute_agent(&agent_name, agent_input, None)
+                        .await
+                        .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))
+                })
+            })?;
 
             agent_output_to_lua_table(lua, result)
         });
 
-        // invokeStream method
-        methods.add_async_method(
+        // invokeStream method - synchronous wrapper
+        methods.add_method(
             "invokeStream",
-            |lua, this, (input, callback): (Table, mlua::Function)| async move {
+            |lua, this, (input, callback): (Table, mlua::Function)| {
                 let agent_input = lua_table_to_agent_input(lua, input)?;
+                let bridge = this.bridge.clone();
+                let agent_name = this.agent_instance_name.clone();
 
-                // Get streaming receiver
-                let mut rx = this
-                    .bridge
-                    .execute_agent_streaming(&this.agent_instance_name, agent_input, None)
-                    .await
-                    .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+                // Use block_on to handle the streaming operation
+                tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(async move {
+                        // Get streaming receiver
+                        let mut rx = bridge
+                            .execute_agent_streaming(&agent_name, agent_input, None)
+                            .await
+                            .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
 
-                // Process stream
-                while let Some(output) = rx.recv().await {
-                    let output_table = agent_output_to_lua_table(lua, output)?;
-                    callback.call::<_, ()>(output_table)?;
-                }
+                        // Process stream
+                        let mut chunk_count = 0;
+                        while let Some(output) = rx.recv().await {
+                            let output_table = agent_output_to_lua_table(lua, output)?;
+                            callback.call::<_, ()>(output_table)?;
+                            chunk_count += 1;
+                        }
 
-                Ok(())
+                        // Return a table with streaming results
+                        let result_table = lua.create_table()?;
+                        result_table.set("success", true)?;
+                        result_table.set("chunks_received", chunk_count)?;
+                        Ok(result_table)
+                    })
+                })
             },
         );
 
-        // getState method
-        methods.add_async_method("getState", |_, this, ()| async move {
-            let state = this
-                .bridge
-                .get_agent_state(&this.agent_instance_name)
-                .await
-                .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+        // getState method - synchronous wrapper
+        methods.add_method("getState", |_, this, ()| {
+            let bridge = this.bridge.clone();
+            let agent_name = this.agent_instance_name.clone();
+
+            let state = tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(async move {
+                    bridge
+                        .get_agent_state(&agent_name)
+                        .await
+                        .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))
+                })
+            })?;
             Ok(format!("{:?}", state))
         });
 
@@ -123,10 +153,10 @@ impl UserData for LuaAgentInstance {
             }
         });
 
-        // invokeTool method
-        methods.add_async_method(
+        // invokeTool method - synchronous wrapper
+        methods.add_method(
             "invokeTool",
-            |lua, this, (tool_name, input_table): (String, Table)| async move {
+            |lua, this, (tool_name, input_table): (String, Table)| {
                 // Convert Lua table to tool input
                 let tool_input_json = crate::lua::conversion::lua_table_to_json(input_table)?;
 
@@ -139,12 +169,18 @@ impl UserData for LuaAgentInstance {
                     output_modalities: vec![],
                 };
 
+                let bridge = this.bridge.clone();
+                let agent_name = this.agent_instance_name.clone();
+
                 // Invoke the tool through the bridge
-                let result = this
-                    .bridge
-                    .invoke_tool_for_agent(&this.agent_instance_name, &tool_name, agent_input, None)
-                    .await
-                    .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+                let result = tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(async move {
+                        bridge
+                            .invoke_tool_for_agent(&agent_name, &tool_name, agent_input, None)
+                            .await
+                            .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))
+                    })
+                })?;
 
                 // Convert AgentOutput to Lua table
                 agent_output_to_lua_table(lua, result)
@@ -180,13 +216,17 @@ impl UserData for LuaAgentInstance {
 
         // Monitoring & Lifecycle Methods
 
-        // getMetrics method
-        methods.add_async_method("getMetrics", |lua, this, ()| async move {
-            match this
-                .bridge
-                .get_agent_metrics(&this.agent_instance_name)
-                .await
-            {
+        // getMetrics method - synchronous wrapper
+        methods.add_method("getMetrics", |lua, this, ()| {
+            let bridge = this.bridge.clone();
+            let agent_name = this.agent_instance_name.clone();
+
+            let metrics_result = tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current()
+                    .block_on(async move { bridge.get_agent_metrics(&agent_name).await })
+            });
+
+            match metrics_result {
                 Ok(metrics) => {
                     let metrics_table = lua.create_table()?;
                     metrics_table.set("agent_id", metrics.agent_id.clone())?;
@@ -202,13 +242,17 @@ impl UserData for LuaAgentInstance {
             }
         });
 
-        // getHealth method
-        methods.add_async_method("getHealth", |lua, this, ()| async move {
-            match this
-                .bridge
-                .get_agent_health(&this.agent_instance_name)
-                .await
-            {
+        // getHealth method - synchronous wrapper
+        methods.add_method("getHealth", |lua, this, ()| {
+            let bridge = this.bridge.clone();
+            let agent_name = this.agent_instance_name.clone();
+
+            let health_result = tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current()
+                    .block_on(async move { bridge.get_agent_health(&agent_name).await })
+            });
+
+            match health_result {
                 Ok(health_json) => {
                     // Convert JSON to Lua table
                     let health_table = lua.create_table()?;
@@ -227,13 +271,17 @@ impl UserData for LuaAgentInstance {
             }
         });
 
-        // getPerformance method
-        methods.add_async_method("getPerformance", |lua, this, ()| async move {
-            match this
-                .bridge
-                .get_agent_performance(&this.agent_instance_name)
-                .await
-            {
+        // getPerformance method - synchronous wrapper
+        methods.add_method("getPerformance", |lua, this, ()| {
+            let bridge = this.bridge.clone();
+            let agent_name = this.agent_instance_name.clone();
+
+            let perf_result = tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current()
+                    .block_on(async move { bridge.get_agent_performance(&agent_name).await })
+            });
+
+            match perf_result {
                 Ok(perf_json) => {
                     let perf_table = lua.create_table()?;
                     if let Some(total_executions) =
@@ -261,39 +309,54 @@ impl UserData for LuaAgentInstance {
             }
         });
 
-        // logEvent method
-        methods.add_async_method(
+        // logEvent method - synchronous wrapper
+        methods.add_method(
             "logEvent",
-            |_, this, (event_type, message): (String, String)| async move {
-                this.bridge
-                    .log_agent_event(&this.agent_instance_name, &event_type, &message)
-                    .await
-                    .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+            |_, this, (event_type, message): (String, String)| {
+                let bridge = this.bridge.clone();
+                let agent_name = this.agent_instance_name.clone();
+
+                tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(async move {
+                        bridge
+                            .log_agent_event(&agent_name, &event_type, &message)
+                            .await
+                            .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))
+                    })
+                })?;
                 Ok(())
             },
         );
 
-        // configureAlerts method
-        methods.add_async_method(
-            "configureAlerts",
-            |_lua, this, config_table: Table| async move {
-                // Convert Lua table to JSON for alert configuration
-                let config_json = lua_table_to_json(config_table)?;
-                this.bridge
-                    .configure_agent_alerts(&this.agent_instance_name, config_json)
-                    .await
-                    .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
-                Ok(())
-            },
-        );
+        // configureAlerts method - synchronous wrapper
+        methods.add_method("configureAlerts", |_lua, this, config_table: Table| {
+            // Convert Lua table to JSON for alert configuration
+            let config_json = lua_table_to_json(config_table)?;
+            let bridge = this.bridge.clone();
+            let agent_name = this.agent_instance_name.clone();
 
-        // getAlerts method
-        methods.add_async_method("getAlerts", |lua, this, ()| async move {
-            match this
-                .bridge
-                .get_agent_alerts(&this.agent_instance_name)
-                .await
-            {
+            tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(async move {
+                    bridge
+                        .configure_agent_alerts(&agent_name, config_json)
+                        .await
+                        .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))
+                })
+            })?;
+            Ok(())
+        });
+
+        // getAlerts method - synchronous wrapper
+        methods.add_method("getAlerts", |lua, this, ()| {
+            let bridge = this.bridge.clone();
+            let agent_name = this.agent_instance_name.clone();
+
+            let alerts_result = tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current()
+                    .block_on(async move { bridge.get_agent_alerts(&agent_name).await })
+            });
+
+            match alerts_result {
                 Ok(alerts) => {
                     let alerts_table = lua.create_table()?;
                     for (i, alert) in alerts.iter().enumerate() {
@@ -350,95 +413,161 @@ impl UserData for LuaAgentInstance {
 
         // State Machine Methods
 
-        // getAgentState method - Get current agent state with full details
-        methods.add_async_method("getAgentState", |_, this, ()| async move {
-            let state = this
-                .bridge
-                .get_agent_state(&this.agent_instance_name)
-                .await
-                .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+        // getAgentState method - Get current agent state with full details - synchronous wrapper
+        methods.add_method("getAgentState", |_, this, ()| {
+            let bridge = this.bridge.clone();
+            let agent_name = this.agent_instance_name.clone();
+
+            let state = tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(async move {
+                    bridge
+                        .get_agent_state(&agent_name)
+                        .await
+                        .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))
+                })
+            })?;
             Ok(format!("{:?}", state))
         });
 
-        // initialize method
-        methods.add_async_method("initialize", |_, this, ()| async move {
-            this.bridge
-                .initialize_agent(&this.agent_instance_name)
-                .await
-                .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+        // initialize method - synchronous wrapper
+        methods.add_method("initialize", |_, this, ()| {
+            let bridge = this.bridge.clone();
+            let agent_name = this.agent_instance_name.clone();
+
+            tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(async move {
+                    bridge
+                        .initialize_agent(&agent_name)
+                        .await
+                        .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))
+                })
+            })?;
             Ok(())
         });
 
-        // start method
-        methods.add_async_method("start", |_, this, ()| async move {
-            this.bridge
-                .start_agent(&this.agent_instance_name)
-                .await
-                .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+        // start method - synchronous wrapper
+        methods.add_method("start", |_, this, ()| {
+            let bridge = this.bridge.clone();
+            let agent_name = this.agent_instance_name.clone();
+
+            tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(async move {
+                    bridge
+                        .start_agent(&agent_name)
+                        .await
+                        .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))
+                })
+            })?;
             Ok(())
         });
 
-        // pause method
-        methods.add_async_method("pause", |_, this, ()| async move {
-            this.bridge
-                .pause_agent(&this.agent_instance_name)
-                .await
-                .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+        // pause method - synchronous wrapper
+        methods.add_method("pause", |_, this, ()| {
+            let bridge = this.bridge.clone();
+            let agent_name = this.agent_instance_name.clone();
+
+            tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(async move {
+                    bridge
+                        .pause_agent(&agent_name)
+                        .await
+                        .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))
+                })
+            })?;
             Ok(())
         });
 
-        // resume method
-        methods.add_async_method("resume", |_, this, ()| async move {
-            this.bridge
-                .resume_agent(&this.agent_instance_name)
-                .await
-                .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+        // resume method - synchronous wrapper
+        methods.add_method("resume", |_, this, ()| {
+            let bridge = this.bridge.clone();
+            let agent_name = this.agent_instance_name.clone();
+
+            tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(async move {
+                    bridge
+                        .resume_agent(&agent_name)
+                        .await
+                        .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))
+                })
+            })?;
             Ok(())
         });
 
-        // stop method
-        methods.add_async_method("stop", |_, this, ()| async move {
-            this.bridge
-                .stop_agent(&this.agent_instance_name)
-                .await
-                .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+        // stop method - synchronous wrapper
+        methods.add_method("stop", |_, this, ()| {
+            let bridge = this.bridge.clone();
+            let agent_name = this.agent_instance_name.clone();
+
+            tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(async move {
+                    bridge
+                        .stop_agent(&agent_name)
+                        .await
+                        .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))
+                })
+            })?;
             Ok(())
         });
 
-        // terminate method
-        methods.add_async_method("terminate", |_, this, ()| async move {
-            this.bridge
-                .terminate_agent(&this.agent_instance_name)
-                .await
-                .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+        // terminate method - synchronous wrapper
+        methods.add_method("terminate", |_, this, ()| {
+            let bridge = this.bridge.clone();
+            let agent_name = this.agent_instance_name.clone();
+
+            tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(async move {
+                    bridge
+                        .terminate_agent(&agent_name)
+                        .await
+                        .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))
+                })
+            })?;
             Ok(())
         });
 
-        // setError method
-        methods.add_async_method("setError", |_, this, error_message: String| async move {
-            this.bridge
-                .error_agent(&this.agent_instance_name, error_message)
-                .await
-                .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+        // setError method - synchronous wrapper
+        methods.add_method("setError", |_, this, error_message: String| {
+            let bridge = this.bridge.clone();
+            let agent_name = this.agent_instance_name.clone();
+
+            tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(async move {
+                    bridge
+                        .error_agent(&agent_name, error_message)
+                        .await
+                        .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))
+                })
+            })?;
             Ok(())
         });
 
-        // recover method
-        methods.add_async_method("recover", |_, this, ()| async move {
-            this.bridge
-                .recover_agent(&this.agent_instance_name)
-                .await
-                .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+        // recover method - synchronous wrapper
+        methods.add_method("recover", |_, this, ()| {
+            let bridge = this.bridge.clone();
+            let agent_name = this.agent_instance_name.clone();
+
+            tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(async move {
+                    bridge
+                        .recover_agent(&agent_name)
+                        .await
+                        .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))
+                })
+            })?;
             Ok(())
         });
 
-        // getStateHistory method
-        methods.add_async_method("getStateHistory", |lua, this, ()| async move {
-            match this
-                .bridge
-                .get_agent_state_history(&this.agent_instance_name)
-                .await
-            {
+        // getStateHistory method - synchronous wrapper
+        methods.add_method("getStateHistory", |lua, this, ()| {
+            let bridge = this.bridge.clone();
+            let agent_name = this.agent_instance_name.clone();
+
+            let history_result = tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current()
+                    .block_on(async move { bridge.get_agent_state_history(&agent_name).await })
+            });
+
+            match history_result {
                 Ok(history) => {
                     let history_table = lua.create_table()?;
                     for (i, transition) in history.iter().enumerate() {
@@ -468,49 +597,65 @@ impl UserData for LuaAgentInstance {
             }
         });
 
-        // getLastError method
-        methods.add_async_method("getLastError", |_, this, ()| async move {
-            match this
-                .bridge
-                .get_agent_last_error(&this.agent_instance_name)
-                .await
-            {
+        // getLastError method - synchronous wrapper
+        methods.add_method("getLastError", |_, this, ()| {
+            let bridge = this.bridge.clone();
+            let agent_name = this.agent_instance_name.clone();
+
+            let error_result = tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current()
+                    .block_on(async move { bridge.get_agent_last_error(&agent_name).await })
+            });
+
+            match error_result {
                 Ok(error) => Ok(error),
                 Err(e) => Err(mlua::Error::ExternalError(Arc::new(e))),
             }
         });
 
-        // getRecoveryAttempts method
-        methods.add_async_method("getRecoveryAttempts", |_, this, ()| async move {
-            match this
-                .bridge
-                .get_agent_recovery_attempts(&this.agent_instance_name)
-                .await
-            {
+        // getRecoveryAttempts method - synchronous wrapper
+        methods.add_method("getRecoveryAttempts", |_, this, ()| {
+            let bridge = this.bridge.clone();
+            let agent_name = this.agent_instance_name.clone();
+
+            let attempts_result = tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current()
+                    .block_on(async move { bridge.get_agent_recovery_attempts(&agent_name).await })
+            });
+
+            match attempts_result {
                 Ok(attempts) => Ok(attempts),
                 Err(e) => Err(mlua::Error::ExternalError(Arc::new(e))),
             }
         });
 
-        // isHealthy method
-        methods.add_async_method("isHealthy", |_, this, ()| async move {
-            match this
-                .bridge
-                .is_agent_healthy(&this.agent_instance_name)
-                .await
-            {
+        // isHealthy method - synchronous wrapper
+        methods.add_method("isHealthy", |_, this, ()| {
+            let bridge = this.bridge.clone();
+            let agent_name = this.agent_instance_name.clone();
+
+            let healthy_result = tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current()
+                    .block_on(async move { bridge.is_agent_healthy(&agent_name).await })
+            });
+
+            match healthy_result {
                 Ok(healthy) => Ok(healthy),
                 Err(e) => Err(mlua::Error::ExternalError(Arc::new(e))),
             }
         });
 
-        // getStateMetrics method
-        methods.add_async_method("getStateMetrics", |lua, this, ()| async move {
-            match this
-                .bridge
-                .get_agent_state_metrics(&this.agent_instance_name)
-                .await
-            {
+        // getStateMetrics method - synchronous wrapper
+        methods.add_method("getStateMetrics", |lua, this, ()| {
+            let bridge = this.bridge.clone();
+            let agent_name = this.agent_instance_name.clone();
+
+            let metrics_result = tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current()
+                    .block_on(async move { bridge.get_agent_state_metrics(&agent_name).await })
+            });
+
+            match metrics_result {
                 Ok(metrics_json) => {
                     let metrics_table = lua.create_table()?;
                     if let Some(state) = metrics_json.get("current_state").and_then(|v| v.as_str())
@@ -560,29 +705,42 @@ impl UserData for LuaAgentInstance {
 
         // Context & Communication Methods
 
-        // executeWithContext method
-        methods.add_async_method(
+        // executeWithContext method - synchronous wrapper
+        methods.add_method(
             "executeWithContext",
-            |lua, this, (input, context_id): (Table, String)| async move {
+            |lua, this, (input, context_id): (Table, String)| {
                 let agent_input = lua_table_to_agent_input(lua, input)?;
+                let bridge = this.bridge.clone();
+                let agent_name = this.agent_instance_name.clone();
 
-                let result = this
-                    .bridge
-                    .execute_agent_with_context(&this.agent_instance_name, agent_input, &context_id)
-                    .await
-                    .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+                // Use block_on to execute async code synchronously
+                let result = tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(async move {
+                        bridge
+                            .execute_agent_with_context(&agent_name, agent_input, &context_id)
+                            .await
+                            .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))
+                    })
+                })?;
 
                 agent_output_to_lua_table(lua, result)
             },
         );
 
         // destroy method
-        methods.add_async_method("destroy", |_, this, ()| async move {
-            this.bridge
-                .remove_agent(&this.agent_instance_name)
-                .await
-                .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
-            Ok(())
+        methods.add_method("destroy", |_, this, ()| {
+            let agent_name = this.agent_instance_name.clone();
+            let bridge = this.bridge.clone();
+
+            tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(async move {
+                    bridge
+                        .remove_agent(&agent_name)
+                        .await
+                        .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
+                    Ok(())
+                })
+            })
         });
     }
 }
@@ -598,122 +756,127 @@ pub fn inject_agent_global(
     // Store bridge reference in context for cross-global access
     context.set_bridge("agent", bridge.clone());
 
-    // Create Agent.create() function
+    // Create Agent.create() function (synchronous wrapper)
     let bridge_clone = bridge.clone();
-    let create_fn = lua.create_async_function(move |_lua, args: Table| {
+    let create_fn = lua.create_function(move |_lua, args: Table| {
         let bridge = bridge_clone.clone();
 
-        async move {
-            // Extract configuration from Lua table
-            let name: String = args.get("name").unwrap_or_else(|_| {
-                format!(
-                    "agent_{}",
-                    uuid::Uuid::new_v4()
-                        .to_string()
-                        .chars()
-                        .take(8)
-                        .collect::<String>()
+        // Extract configuration from Lua table
+        let name: String = args.get("name").unwrap_or_else(|_| {
+            format!(
+                "agent_{}",
+                uuid::Uuid::new_v4()
+                    .to_string()
+                    .chars()
+                    .take(8)
+                    .collect::<String>()
+            )
+        });
+        let description: String = args
+            .get("description")
+            .unwrap_or_else(|_| "LLM-powered agent".to_string());
+        let system_prompt: Option<String> = args.get("system_prompt").ok();
+        let temperature: Option<f32> = args.get("temperature").ok();
+        let max_tokens: Option<u32> = args.get("max_tokens").ok().map(|v: usize| v as u32);
+        let max_conversation_length: Option<usize> = args.get("max_conversation_length").ok();
+        let base_url: Option<String> = args.get("base_url").ok();
+        let api_key: Option<String> = args.get("api_key").ok();
+
+        // Get model specification - support both "model" and "provider_model" fields
+        let model_str = args
+            .get::<_, Option<String>>("model")
+            .ok()
+            .flatten()
+            .or_else(|| {
+                args.get::<_, Option<String>>("provider_model")
+                    .ok()
+                    .flatten()
+            })
+            .ok_or_else(|| {
+                mlua::Error::RuntimeError(
+                    "Model specification required (use 'model' field)".to_string(),
                 )
-            });
-            let description: String = args
-                .get("description")
-                .unwrap_or_else(|_| "LLM-powered agent".to_string());
-            let system_prompt: Option<String> = args.get("system_prompt").ok();
-            let temperature: Option<f32> = args.get("temperature").ok();
-            let max_tokens: Option<u32> = args.get("max_tokens").ok().map(|v: usize| v as u32);
-            let max_conversation_length: Option<usize> = args.get("max_conversation_length").ok();
-            let base_url: Option<String> = args.get("base_url").ok();
-            let api_key: Option<String> = args.get("api_key").ok();
+            })?;
 
-            // Get model specification - support both "model" and "provider_model" fields
-            let model_str = args
-                .get::<_, Option<String>>("model")
-                .ok()
-                .flatten()
-                .or_else(|| {
-                    args.get::<_, Option<String>>("provider_model")
-                        .ok()
-                        .flatten()
-                })
-                .ok_or_else(|| {
-                    mlua::Error::RuntimeError(
-                        "Model specification required (use 'model' field)".to_string(),
-                    )
-                })?;
+        // Parse provider/model syntax (e.g., "openai/gpt-4")
+        let (provider, model_id) = if model_str.contains('/') {
+            let parts: Vec<&str> = model_str.splitn(2, '/').collect();
+            (parts[0].to_string(), parts[1].to_string())
+        } else {
+            // Default to openai if no provider specified
+            ("openai".to_string(), model_str)
+        };
 
-            // Parse provider/model syntax (e.g., "openai/gpt-4")
-            let (provider, model_id) = if model_str.contains('/') {
-                let parts: Vec<&str> = model_str.splitn(2, '/').collect();
-                (parts[0].to_string(), parts[1].to_string())
-            } else {
-                // Default to openai if no provider specified
-                ("openai".to_string(), model_str)
-            };
-
-            // Create model configuration
-            let model_config = serde_json::json!({
-                "provider": provider,
-                "model_id": model_id,
-                "temperature": temperature,
-                "max_tokens": max_tokens,
-                "settings": {
-                    "base_url": base_url,
-                    "api_key": api_key
-                }
-            });
-
-            // Create custom config for agent
-            let mut custom_config = serde_json::Map::new();
-            if let Some(prompt) = system_prompt {
-                custom_config.insert("system_prompt".to_string(), serde_json::json!(prompt));
+        // Create model configuration
+        let model_config = serde_json::json!({
+            "provider": provider,
+            "model_id": model_id,
+            "temperature": temperature,
+            "max_tokens": max_tokens,
+            "settings": {
+                "base_url": base_url,
+                "api_key": api_key
             }
-            if let Some(len) = max_conversation_length {
-                custom_config.insert(
-                    "max_conversation_length".to_string(),
-                    serde_json::json!(len),
-                );
-            }
+        });
 
-            // Create full agent configuration
-            let agent_config = serde_json::json!({
-                "name": name.clone(),
-                "description": description,
-                "agent_type": "llm",  // Default to LLM agent type
-                "model": model_config,
-                "allowed_tools": [],  // Can be extended later
-                "custom_config": custom_config,
-                "resource_limits": {
-                    "max_execution_time_secs": 300,
-                    "max_memory_mb": 512,
-                    "max_tool_calls": 100,
-                    "max_recursion_depth": 10
-                }
-            });
-
-            // Convert JSON value to HashMap for bridge
-            let config_map: HashMap<String, serde_json::Value> = match agent_config {
-                serde_json::Value::Object(map) => map.into_iter().collect(),
-                _ => {
-                    return Err(mlua::Error::RuntimeError(
-                        "Invalid agent configuration format".to_string(),
-                    ))
-                }
-            };
-
-            // Create the agent through discovery
-            bridge
-                .create_agent(&name, "llm", config_map)
-                .await
-                .map_err(|e| mlua::Error::RuntimeError(format!("Failed to create agent: {}", e)))?;
-
-            // Create Lua agent instance
-            let agent_instance = LuaAgentInstance {
-                agent_instance_name: name,
-                bridge: bridge.clone(),
-            };
-
-            Ok(agent_instance)
+        // Create custom config for agent
+        let mut custom_config = serde_json::Map::new();
+        if let Some(prompt) = system_prompt {
+            custom_config.insert("system_prompt".to_string(), serde_json::json!(prompt));
         }
+        if let Some(len) = max_conversation_length {
+            custom_config.insert(
+                "max_conversation_length".to_string(),
+                serde_json::json!(len),
+            );
+        }
+
+        // Create full agent configuration
+        let agent_config = serde_json::json!({
+            "name": name.clone(),
+            "description": description,
+            "agent_type": "llm",  // Default to LLM agent type
+            "model": model_config,
+            "allowed_tools": [],  // Can be extended later
+            "custom_config": custom_config,
+            "resource_limits": {
+                "max_execution_time_secs": 300,
+                "max_memory_mb": 512,
+                "max_tool_calls": 100,
+                "max_recursion_depth": 10
+            }
+        });
+
+        // Convert JSON value to HashMap for bridge
+        let config_map: HashMap<String, serde_json::Value> = match agent_config {
+            serde_json::Value::Object(map) => map.into_iter().collect(),
+            _ => {
+                return Err(mlua::Error::RuntimeError(
+                    "Invalid agent configuration format".to_string(),
+                ))
+            }
+        };
+
+        // Use block_on to execute async code synchronously
+        tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                // Create the agent through discovery
+                bridge
+                    .create_agent(&name, "llm", config_map)
+                    .await
+                    .map_err(|e| {
+                        mlua::Error::RuntimeError(format!("Failed to create agent: {}", e))
+                    })?;
+
+                // Create Lua agent instance
+                let agent_instance = LuaAgentInstance {
+                    agent_instance_name: name,
+                    bridge: bridge.clone(),
+                };
+
+                Ok(agent_instance)
+            })
+        })
     })?;
 
     // Create Agent.list() function
@@ -882,8 +1045,18 @@ pub fn inject_agent_global(
         let agent_type: String = args.get("agent_type").unwrap_or_else(|_| "llm".to_string());
 
         // Convert entire args table to JSON for config
-        let config_json = lua_table_to_json(args)
+        let mut config_json = lua_table_to_json(args)
             .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert config: {}", e)))?;
+        
+        // Fix empty objects that should be arrays
+        if let serde_json::Value::Object(ref mut map) = config_json {
+            // Fix allowed_tools if it's an empty object
+            if let Some(serde_json::Value::Object(allowed_tools)) = map.get("allowed_tools") {
+                if allowed_tools.is_empty() {
+                    map.insert("allowed_tools".to_string(), serde_json::Value::Array(vec![]));
+                }
+            }
+        }
 
         // Convert JSON to HashMap for bridge
         let config_map: HashMap<String, serde_json::Value> = match config_json {
@@ -1176,38 +1349,6 @@ pub fn inject_agent_global(
     agent_table.set("getSharedMemory", get_shared_memory_fn)?;
     agent_table.set("getHierarchy", get_hierarchy_fn)?;
     agent_table.set("getDetails", get_details_fn)?;
-
-    // Add coroutine wrapper helper for async Agent.create
-    let create_async_code = r#"
-        -- Helper to create agents within a coroutine context
-        function(config)
-            -- Create coroutine for async execution
-            local co = coroutine.create(function()
-                return Agent.create(config)
-            end)
-            
-            -- Execute the coroutine
-            local success, result = coroutine.resume(co)
-            
-            -- Handle async operations that yield
-            while success and coroutine.status(co) ~= "dead" do
-                success, result = coroutine.resume(co, result)
-            end
-            
-            if not success then
-                error(tostring(result))
-            end
-            
-            return result
-        end
-    "#;
-
-    let create_async_fn = lua
-        .load(create_async_code)
-        .eval::<mlua::Function>()
-        .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
-
-    agent_table.set("createAsync", create_async_fn)?;
 
     // Set Agent as global
     lua.globals().set("Agent", agent_table)?;
