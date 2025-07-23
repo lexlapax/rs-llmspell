@@ -128,7 +128,7 @@ where
 
 /// Execute an async operation that returns a Lua value directly
 ///
-/// This is a convenience wrapper for operations that already return LuaResult<LuaValue>
+/// This is a convenience wrapper for operations that already return `LuaResult<LuaValue>`
 /// and don't need additional error transformation.
 ///
 /// # Example
