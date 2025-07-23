@@ -5,9 +5,17 @@
 -- Demonstrates intelligent data processing, transformation, and analysis
 
 -- Load agent helpers
-local helpers = dofile("examples/lua/agents/agent-helpers.lua")
--- Load tool helpers
-local tool_helpers = dofile("examples/lua/tools/tool-helpers.lua")
+local helpers = dofile("agent-helpers.lua")
+-- Load tool helpers (try multiple paths)
+local function try_dofile(filename)
+    local ok, result = pcall(dofile, filename)
+    if ok then return result end
+    return nil
+end
+
+local tool_helpers = try_dofile("../tools/test-helpers.lua") or
+                     try_dofile("test-helpers.lua") or
+                     try_dofile("examples/lua/tools/test-helpers.lua")
 
 print("=== Agent Data Processor Example ===\n")
 

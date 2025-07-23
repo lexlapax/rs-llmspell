@@ -1919,23 +1919,73 @@ The agent factory needs to create agents that actually use LLM providers for the
 
 **Description**: Consolidate all Lua bindings to follow single pattern: globals -> lua/globals. Remove the API layer entirely with no backward compatibility requirements.
 
-#### Sub-task 3.3.29.1: Agent Consolidation (ALREADY COMPLETE)
-**Status**: DONE
-- ✅ Agent already follows the correct pattern
-- ✅ lua/globals/agent.rs contains full implementation
-- ✅ No lua/api/agent.rs references in engine
-- ✅ All tests already updated
+#### Sub-task 3.3.29.1: Agent Consolidation and Synchronous API
+**Status**: IN PROGRESS  
+**Started**: 2025-07-22
+**Completed Consolidation**: 2025-07-22
+**Key Achievements**: 
+- Moved all agent API functions from lua/api/agent.rs to lua/globals/agent.rs
+- Successfully consolidated 20+ agent methods including templates, contexts, shared memory
+- All agent bridge tests passing (5/5 tests)
+- Removed lua/api/agent.rs and its references completely
 
-#### Sub-task 3.3.29.2: Tool Consolidation for bridge apis ✅ COMPLETE (2025-07-22)
-**Status**: COMPLETE  
-**Completed**: 2025-07-22
+**Phase 1 - Consolidation Tasks** ✅ COMPLETE:
+1. [x] Identify all functions in lua/api/agent.rs ✅
+   - [x] Agent table functions: listTemplates, createFromTemplate, listInstances ✅
+   - [x] Context management: createContext, createChildContext, updateContext, getContextData, removeContext ✅
+   - [x] Shared memory: setSharedMemory, getSharedMemory ✅
+   - [x] Composition: getHierarchy, getDetails ✅
+2. [x] Identify all agent instance methods ✅
+   - [x] Basic methods: execute (alias for invoke), getConfig, setState ✅
+   - [x] Tool integration: discoverTools, getToolMetadata, invokeTool, hasTool, getAllToolMetadata ✅
+   - [x] Monitoring: getMetrics, getHealth, getPerformance, logEvent, configureAlerts, getAlerts, getBridgeMetrics ✅
+   - [x] State machine: getAgentState, initialize, start, pause, resume, stop, terminate, setError, recover ✅
+   - [x] State queries: getStateHistory, getLastError, getRecoveryAttempts, isHealthy, getStateMetrics ✅
+   - [x] Context execution: executeWithContext ✅
+3. [x] Move all functions to lua/globals/agent.rs ✅
+4. [x] Update LuaAgentInstance userdata with all methods ✅
+5. [x] Fix compilation issues (getConfig without configuration field) ✅
+6. [x] Remove lua/api/agent.rs file ✅
+7. [x] Update lua/api/mod.rs to remove agent module ✅
+8. [x] Verify test_agent_templates_from_lua passes ✅
+9. [x] Verify all agent_bridge_test tests pass (5/5) ✅
+10. [x] Run cargo fmt and cargo clippy ✅
+
+**Phase 2 - Synchronous Wrapper Implementation** (Following mlua-async-coroutine-solution.md):
+11. [ ] Replace `create_async_function` with `create_function` + `block_on` for Agent.createAsync
+12. [ ] Rename Agent.createAsync to Agent.create (breaking change)
+13. [ ] Update Agent.register to use sync wrapper
+14. [ ] Update Agent.createFromTemplate to use sync wrapper
+15. [ ] Convert agent instance methods to sync:
+    - [ ] agent:invoke (replace add_async_method with add_method + block_on)
+    - [ ] agent:invokeStream 
+    - [ ] agent:execute (alias for invoke)
+    - [ ] agent:executeWithContext
+16. [ ] Remove createAsync Lua wrapper code (lines 768-814 in agent.rs per solution doc)
+17. [ ] Delete agent-helpers.lua completely
+18. [ ] Update all agent examples to use direct API calls:
+    - [ ] agent-simple-demo.lua
+    - [ ] agent-async-example.lua
+    - [ ] agent-api-comprehensive.lua
+    - [ ] agent-composition.lua
+    - [ ] agent-coordinator.lua
+    - [ ] agent-processor.lua
+    - [ ] All other agent examples
+19. [ ] Test all agent examples work without coroutine errors
+20. [ ] Update agent integration tests for sync API
+
+#### Sub-task 3.3.29.2: Tool Consolidation and Synchronous API
+**Status**: IN PROGRESS  
+**Started**: 2025-07-22
+**Completed Consolidation**: 2025-07-22
 **Key Achievements**: 
 - Fixed critical parameter wrapping issue in Tool.invoke and Tool.get().execute() methods
 - All 34+ tools now work correctly with proper async handling
 - Tool.executeAsync working correctly with proper JSON result parsing
 - Multiple tool examples verified working (tools-showcase.lua and others)
 - Comprehensive integration test suite passing (8/8 tests)
-**Tasks**:
+
+**Phase 1 - Consolidation Tasks** ✅ COMPLETE:
 1. [x] Remove lua/api/tool.rs entirely ✅
 2. [x] Ensure lua/globals/tool.rs has complete implementation ✅
 3. [x] Verify all tool methods work (discover, invoke, etc.) ✅
@@ -1950,18 +2000,44 @@ The agent factory needs to create agents that actually use LLM providers for the
    - [x] Verified 34+ tools work correctly ✅
    - [x] Multiple tool examples now working ✅
 
-#### Sub-task 3.3.29.3: Workflow Consolidation  
+**Phase 2 - Synchronous Wrapper Implementation** (For API consistency):
+10. [ ] Convert Tool.invoke from create_async_function to create_function + block_on
+11. [ ] Convert tool instance execute method to sync (in Tool.get)
+12. [ ] Remove Tool.executeAsync helper (no longer needed)
+13. [ ] Update all tool examples to remove executeAsync usage:
+    - [ ] tools-showcase.lua
+    - [ ] tools-workflow.lua
+    - [ ] All tool-specific examples
+14. [ ] Test all tool examples work with direct API (Tool.invoke, tool:execute)
+15. [ ] Update tool integration tests for sync API
+
+#### Sub-task 3.3.29.3: Workflow Consolidation and Synchronous API
 **Status**: TODO
-**Tasks**:
+
+**Phase 1 - Consolidation Tasks**:
 1. [ ] Remove lua/api/workflow.rs entirely
 2. [ ] Ensure lua/globals/workflow.rs is complete (already mostly done)
 3. [ ] Remove any remaining inject_workflow_api references
 4. [ ] Remove workflow_api from ApiSurface
 5. [ ] Update all workflow tests
 6. [ ] Delete api::workflow tests
-7. [ ] Ensure Workflow.executeAsync() is properly tested
-8. [ ] Update integration tests
-9. [ ] Remove workflow-helpers.lua from all examples
+7. [ ] Update integration tests
+
+**Phase 2 - Synchronous Wrapper Implementation** (For API consistency):
+8. [ ] Convert remaining async methods to sync:
+   - [ ] Workflow.sequential (currently async)
+   - [ ] Workflow.conditional (currently async)
+   - [ ] Workflow.loop (currently async)
+   - [ ] Workflow.parallel (currently async)
+   - [ ] Workflow.list (currently async)
+   - [ ] Workflow.remove (currently async)
+9. [ ] Keep existing sync methods as-is (get, register, clear already use block_on)
+10. [ ] Convert workflow instance execute to sync (add_method + block_on)
+11. [ ] Remove Workflow.executeAsync helper (no longer needed)
+12. [ ] Remove workflow-helpers.lua from all examples
+13. [ ] Update workflow examples to use direct API
+14. [ ] Test all workflow examples work without coroutines
+15. [ ] Update workflow integration tests for sync API
 
 #### Sub-task 3.3.29.4: JSON Consolidation
 **Status**: TODO
@@ -2024,13 +2100,47 @@ The agent factory needs to create agents that actually use LLM providers for the
 6. [ ] Run cargo clippy and fix all warnings
 7. [ ] Run cargo fmt on all changed files
 
+#### Sub-task 3.3.29.9: Synchronous API Implementation Strategy
+**Status**: TODO
+**Priority**: HIGH
+**Description**: Common implementation patterns for all synchronous wrappers
+
+**Implementation Pattern** (Use consistently across Agent, Tool, Workflow):
+```rust
+// Pattern for sync wrapper
+let func = lua.create_function(move |lua, args: Table| {
+    let runtime = tokio::task::block_in_place(|| {
+        tokio::runtime::Handle::current()
+    });
+    runtime.block_on(async {
+        // existing async code
+    })
+})?;
+```
+
+**Common Tasks**:
+1. [ ] Document synchronous API design decision in mlua-async-coroutine-solution.md
+2. [ ] Create shared utility for block_on pattern if needed
+3. [ ] Add proper error handling for runtime panics
+4. [ ] Performance validation - ensure no significant regression vs async
+5. [ ] Create migration guide for users
+6. [ ] Update all helper files to be removed:
+   - [ ] agent-helpers.lua
+   - [ ] Tool.executeAsync
+   - [ ] Workflow.executeAsync
+7. [ ] Ensure consistent error messages across all sync wrappers
+8. [ ] Add integration tests specifically for sync behavior
+
 **Definition of Done:**
 - [ ] All lua/api/* files removed
 - [ ] All functionality moved to lua/globals/*
+- [ ] All async Lua APIs converted to synchronous
 - [ ] All tests updated and passing
 - [ ] No references to api layer remain
-- [ ] All examples work without helpers
+- [ ] All examples work without helpers or coroutines
+- [ ] No "attempt to yield from outside coroutine" errors
 - [ ] Documentation updated
+- [ ] Consistent API across Agent, Tool, and Workflow
 
 ### Task 3.3.30: Future Async API Design (Optional)
 **Priority**: LOW  

@@ -1,49 +1,41 @@
 -- Example: Using Agent.createAsync for coroutine-safe agent creation
 -- This example demonstrates how to create and use agents in Lua scripts
 
-print("=== Agent Async Example ===\n")
+-- Load agent helpers
+local helpers = dofile("agent-helpers.lua")
 
--- Helper function to wrap async operations in coroutines
--- This is needed for any async method calls on agents
-local function asyncCall(func, ...)
-    local args = {...}
-    local co = coroutine.create(function()
-        return func(table.unpack(args))
-    end)
-    
-    local success, result = coroutine.resume(co)
-    while success and coroutine.status(co) ~= "dead" do
-        success, result = coroutine.resume(co, result)
-    end
-    
-    if not success then
-        error(tostring(result))
-    end
-    
-    return result
-end
+print("=== Agent Async Example ===\n")
 
 -- 1. Create an agent using Agent.createAsync
 print("1. Creating a conversational agent...")
-local agent = Agent.createAsync({
+local agent, err = helpers.createAgent({
     name = "assistant",
     model = "openai/gpt-3.5-turbo",  -- Format: provider/model
     system_prompt = "You are a helpful AI assistant. Be concise and friendly.",
     temperature = 0.7,
     max_tokens = 150
 })
-print("   ✓ Agent created: " .. type(agent))
+if agent then
+    print("   ✓ Agent created: " .. type(agent))
+else
+    print("   ✗ Failed to create agent: " .. tostring(err))
+    return
+end
 
 -- 2. Execute a simple query
 print("\n2. Asking a simple question...")
-local response = asyncCall(agent.execute, agent, {
+local response, err = helpers.invokeAgent(agent, {
     text = "What are the three primary colors?"
 })
-print("   Response: " .. (response.text or response.output or "No response"))
+if response then
+    print("   Response: " .. (response.text or response.output or "No response"))
+else
+    print("   ✗ Failed to invoke agent: " .. tostring(err))
+end
 
 -- 3. Create a specialized agent
 print("\n3. Creating a code expert agent...")
-local codeAgent = Agent.createAsync({
+local codeAgent, err = helpers.createAgent({
     name = "code-expert",
     model = "openai/gpt-3.5-turbo",
     system_prompt = "You are a programming expert. Provide code examples when appropriate. Be concise.",
@@ -51,12 +43,20 @@ local codeAgent = Agent.createAsync({
     max_tokens = 200
 })
 
--- 4. Ask a programming question
-print("\n4. Asking a programming question...")
-local codeResponse = asyncCall(codeAgent.execute, codeAgent, {
-    text = "Write a Python function to reverse a string"
-})
-print("   Response:\n" .. (codeResponse.text or codeResponse.output or "No response"))
+if codeAgent then
+    -- 4. Ask a programming question
+    print("\n4. Asking a programming question...")
+    local codeResponse, err = helpers.invokeAgent(codeAgent, {
+        text = "Write a Python function to reverse a string"
+    })
+    if codeResponse then
+        print("   Response:\n" .. (codeResponse.text or codeResponse.output or "No response"))
+    else
+        print("   ✗ Failed to invoke code agent: " .. tostring(err))
+    end
+else
+    print("   ✗ Failed to create code agent: " .. tostring(err))
+end
 
 -- 5. Working with different providers (if configured)
 print("\n5. Creating agents with different providers...")
@@ -69,17 +69,17 @@ local providers = {
 }
 
 for _, config in ipairs(providers) do
-    local ok, agent = pcall(Agent.createAsync, {
+    local agent, err = helpers.createAgent({
         name = config.provider .. "-agent",
         model = config.provider .. "/" .. config.model,
         system_prompt = "You are a helpful assistant.",
         temperature = 0.7
     })
     
-    if ok then
+    if agent then
         print("   ✓ Created " .. config.provider .. " agent")
     else
-        print("   ✗ Failed to create " .. config.provider .. " agent: API key may be missing")
+        print("   ✗ Failed to create " .. config.provider .. " agent: " .. tostring(err))
     end
 end
 

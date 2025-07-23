@@ -1,25 +1,15 @@
 -- ABOUTME: Simple agent demonstration using only available Agent API methods
 -- ABOUTME: Shows basic agent creation, listing, and execution
 
--- Helper function to safely create an agent
-local function safe_create_agent(config)
-    -- Use the synchronous wrapper provided by the API
-    local success, agent = pcall(function()
-        return Agent.createAsync(config)
-    end)
-    if success then
-        return agent, nil
-    else
-        return nil, tostring(agent)
-    end
-end
+-- Load agent helpers
+local helpers = dofile("agent-helpers.lua")
 
 print("=== Simple Agent API Demo ===")
 print()
 
 -- Test 1: Create a basic agent
 print("1. Creating a basic agent...")
-local agent1, err1 = safe_create_agent({
+local agent1, err1 = helpers.createAgent({
     model = "gpt-4o-mini",
     system_prompt = "You are a helpful assistant. Keep responses brief."
 })
@@ -29,19 +19,9 @@ if agent1 then
     
     -- Test agent execution
     print("\n2. Testing agent execution...")
-    -- Create coroutine for async invoke
-    local co = coroutine.create(function()
-        return agent1:invoke({text = "What is 2 + 2?"})
-    end)
+    local response, err = helpers.invokeAgent(agent1, {text = "What is 2 + 2?"})
     
-    local success, response = coroutine.resume(co)
-    
-    -- Handle async operations that yield
-    while success and coroutine.status(co) ~= "dead" do
-        success, response = coroutine.resume(co, response)
-    end
-    
-    if success then
+    if response then
         if type(response) == "table" and response.text then
             print("   Agent response: " .. response.text)
         else
@@ -64,7 +44,7 @@ local test_models = {
 
 local created_agents = 0
 for _, test in ipairs(test_models) do
-    local agent, err = safe_create_agent({
+    local agent, err = helpers.createAgent({
         model = test.model,
         system_prompt = "You are a test agent."
     })
@@ -125,7 +105,7 @@ end
 
 -- Test 5: Agent with custom parameters
 print("\n6. Creating agent with custom parameters...")
-local custom_agent, err = safe_create_agent({
+local custom_agent, err = helpers.createAgent({
     model = "gpt-4o-mini",
     system_prompt = "You are a creative writer. Use vivid language.",
     temperature = 0.9,
@@ -136,25 +116,16 @@ if custom_agent then
     print("   ✓ Custom agent created")
     
     -- Test with creative prompt
-    local co = coroutine.create(function()
-        return custom_agent:invoke({text = "Describe a sunset in one sentence."})
-    end)
+    local response, err = helpers.invokeAgent(custom_agent, {text = "Describe a sunset in one sentence."})
     
-    local success, response = coroutine.resume(co)
-    
-    -- Handle async operations that yield
-    while success and coroutine.status(co) ~= "dead" do
-        success, response = coroutine.resume(co, response)
-    end
-    
-    if success then
+    if response then
         if type(response) == "table" and response.text then
             print("   Creative response: " .. response.text)
         else
             print("   Creative response: " .. tostring(response))
         end
     else
-        print("   ✗ Execution failed: " .. tostring(response))
+        print("   ✗ Execution failed: " .. tostring(err))
     end
 else
     print("   ✗ Failed to create custom agent: " .. err)

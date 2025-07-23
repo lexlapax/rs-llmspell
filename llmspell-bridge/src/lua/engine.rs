@@ -217,19 +217,7 @@ impl ScriptEngineBridge for LuaEngine {
             // Get the API surface definition
             let api_surface = ApiSurface::standard();
 
-            // TODO: Phase 3.3 - Using new globals system instead of old API injection
-            // The old inject_agent_api is commented out as it conflicts with the new
-            // inject_agent_global which provides more functionality
-
-            // OLD API - Commented out to use new globals system
-            // super::api::inject_agent_api(
-            //     &lua,
-            //     &api_surface.agent_api,
-            //     registry.clone(),
-            //     providers.clone(),
-            // )?;
-
-            // NEW: Inject globals using the new system
+            // Inject globals using the new system
             use crate::globals::{create_standard_registry, GlobalContext, GlobalInjector};
             let global_context = Arc::new(GlobalContext::new(registry.clone(), providers.clone()));
             let global_registry =

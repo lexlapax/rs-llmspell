@@ -4,6 +4,9 @@
 -- Agent Coordinator Example
 -- Demonstrates multi-agent coordination and collaboration patterns
 
+-- Load agent helpers
+local helpers = dofile("agent-helpers.lua")
+
 print("=== Agent Coordinator Example ===\n")
 
 -- Create specialized agents

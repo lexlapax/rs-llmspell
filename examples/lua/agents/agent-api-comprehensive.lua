@@ -1,26 +1,10 @@
 -- ABOUTME: Comprehensive Agent API demonstration showing all available methods
 -- ABOUTME: Covers creation, discovery, composition, tool wrapping, and capabilities
 
-print("=== Comprehensive Agent API Demo ===\n")
+-- Load agent helpers
+local helpers = dofile("agent-helpers.lua")
 
--- Helper to invoke agents asynchronously
-local function invokeAgent(agent, input)
-    local co = coroutine.create(function()
-        return agent:invoke(input)
-    end)
-    
-    local success, result = coroutine.resume(co)
-    
-    while success and coroutine.status(co) ~= "dead" do
-        success, result = coroutine.resume(co, result)
-    end
-    
-    if success then
-        return result
-    else
-        return nil, tostring(result)
-    end
-end
+print("=== Comprehensive Agent API Demo ===\n")
 
 -- 1. Test Agent.register() - Register new agents
 print("1. Testing Agent.register()...")
@@ -55,7 +39,7 @@ if retrieved_agent then
     print("   ✓ Retrieved agent successfully")
     
     -- Test invoke
-    local result, err = invokeAgent(retrieved_agent, {
+    local result, err = helpers.invokeAgent(retrieved_agent, {
         text = "Analyze this data: Sales Q1: $100k, Q2: $120k, Q3: $95k, Q4: $140k"
     })
     
@@ -213,32 +197,30 @@ end
 -- 10. Test invokeStream method
 print("\n10. Testing agent:invokeStream()...")
 local streaming_agent = Agent.get(agent_name)
-if streaming_agent and streaming_agent.invokeStream then
+if streaming_agent then
     print("   Starting streaming response...")
     local chunks = {}
     
-    -- Create coroutine for async streaming
-    local co = coroutine.create(function()
-        return streaming_agent:invokeStream(
-            { text = "Count from 1 to 5 slowly" },
-            function(chunk)
-                table.insert(chunks, chunk)
-                if chunk.text then
-                    io.write("   Chunk: " .. chunk.text)
-                    io.flush()
-                end
+    -- Use helper for streaming
+    local result, err = helpers.invokeAgentStream(
+        streaming_agent,
+        { text = "Count from 1 to 5 slowly" },
+        function(chunk)
+            table.insert(chunks, chunk)
+            if chunk.text then
+                io.write("   Chunk: " .. chunk.text)
+                io.flush()
             end
-        )
-    end)
+        end
+    )
     
-    local success = coroutine.resume(co)
-    while success and coroutine.status(co) ~= "dead" do
-        success = coroutine.resume(co)
+    if result then
+        print("\n   Received " .. #chunks .. " chunks")
+    else
+        print("\n   ✗ Streaming failed: " .. tostring(err))
     end
-    
-    print("\n   Received " .. #chunks .. " chunks")
 else
-    print("   ✗ Streaming not available")
+    print("   ✗ Failed to get agent for streaming")
 end
 
 print("\n=== Demo Complete ===")
