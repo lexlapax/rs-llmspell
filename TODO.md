@@ -2044,21 +2044,20 @@ The agent factory needs to create agents that actually use LLM providers for the
 15. [x] Update tool integration tests for sync API ✅
 
 #### Sub-task 3.3.29.3: Workflow Consolidation and Synchronous API
-**Status**: COMPLETE ✅ - Examples Done, Integration Tests Pending
+**Status**: COMPLETE ✅
 **Started**: 2025-07-23
-**Completed Examples**: 2025-07-23
-**Key Achievement**: All workflow methods converted to synchronous wrappers, all 9 examples updated and tested
-**Verification**: All workflow examples running successfully with new synchronous API
-**Remaining**: Integration test updates (items 5, 6, 7, 15)
+**Completed**: 2025-07-23
+**Key Achievement**: All workflow methods converted to synchronous wrappers, all 9 examples updated and tested, all integration tests updated
+**Verification**: All workflow examples running successfully with new synchronous API, all workflow tests passing
 
 **Phase 1 - Consolidation Tasks**:
 1. [x] Remove lua/api/workflow.rs entirely ✅
 2. [x] Ensure lua/globals/workflow.rs is complete (already mostly done) ✅
 3. [x] Remove any remaining inject_workflow_api references ✅ (commented out)
 4. [x] Remove workflow_api from ApiSurface ✅ (left in structure for compatibility)
-5. [ ] Update all workflow tests
-6. [ ] Delete api::workflow tests
-7. [ ] Update integration tests
+5. [x] Update all workflow tests ✅
+6. [x] Delete api::workflow tests (no tests existed - module was already removed) ✅
+7. [x] Update integration tests ✅
 
 **Phase 2 - Synchronous Wrapper Implementation** ✅ COMPLETE:
 8. [x] Convert remaining async methods to sync: ✅
@@ -2081,7 +2080,7 @@ The agent factory needs to create agents that actually use LLM providers for the
     - ✅ Completely redesigned workflow-agent-integration.lua to showcase 5 core patterns
     - ✅ All examples/lua/agents, examples/lua/workflows, examples/lua/tools updated
 14. [✅] Test all workflow examples work without coroutines (VERIFIED - synchronous API working)
-15. [ ] Update workflow integration tests for sync API
+15. [x] Update workflow integration tests for sync API ✅
 
 #### Sub-task 3.3.29.4: JSON Consolidation
 **Status**: TODO

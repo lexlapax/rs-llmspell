@@ -268,10 +268,13 @@ mod lua_globals {
             local loop_wf = Workflow.loop({
                 name = "test_loop",
                 description = "A test loop workflow",
-                iterator = "range",
-                start = 1,
-                ["end"] = 5,
-                step = 1,
+                iterator = {
+                    range = {
+                        start = 1,
+                        ["end"] = 5,
+                        step = 1
+                    }
+                },
                 body = {
                     {
                         name = "loop_step",

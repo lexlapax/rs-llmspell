@@ -1,6 +1,6 @@
 //! Simple integration test for Phase 2 tools
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "lua")]
 async fn test_simple_tool_integration() {
     use llmspell_bridge::{
@@ -875,7 +875,7 @@ async fn test_simple_tool_integration() {
     println!("\n✅ All integration tests passed!");
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[cfg(feature = "lua")]
 async fn test_tool_performance() {
     use llmspell_bridge::{

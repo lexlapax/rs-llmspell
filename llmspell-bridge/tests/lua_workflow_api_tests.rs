@@ -33,7 +33,7 @@ async fn create_test_registry() -> Arc<ComponentRegistry> {
     registry
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_lua_workflow_sequential_creation() {
     let registry = create_test_registry().await;
     let providers = create_test_providers().await;
@@ -45,13 +45,15 @@ async fn test_lua_workflow_sequential_creation() {
         local workflow = Workflow.sequential({
             name = "test_sequential",
             steps = {
-                { name = "step1", tool = "calculator", parameters = { operation = "add", a = 5, b = 3 } }
+                { name = "step1", type = "tool", tool = "calculator", input = { input = "5 + 3" } }
             }
         })
         
+        local info = workflow:getInfo()
+        
         return { 
-            workflow_type = workflow.type,
-            has_config = workflow.config ~= nil
+            workflow_type = info.type,
+            has_name = info.name == "test_sequential"
         }
     "#;
 
@@ -59,10 +61,10 @@ async fn test_lua_workflow_sequential_creation() {
     let value = result.output;
 
     assert_eq!(value["workflow_type"], "sequential");
-    assert_eq!(value["has_config"], true);
+    assert_eq!(value["has_name"], true);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_lua_workflow_parallel() {
     let registry = create_test_registry().await;
     let providers = create_test_providers().await;
@@ -73,14 +75,15 @@ async fn test_lua_workflow_parallel() {
     let script = r#"
         local workflow = Workflow.parallel({
             name = "parallel_calc",
-            steps = {
-                { name = "calc1", tool = "calculator", parameters = { operation = "add", a = 1, b = 2 } },
-                { name = "calc2", tool = "calculator", parameters = { operation = "multiply", a = 3, b = 4 } }
+            branches = {
+                { name = "calc1", steps = {{ name = "add", type = "tool", tool = "calculator", input = { input = "1 + 2" } }} },
+                { name = "calc2", steps = {{ name = "multiply", type = "tool", tool = "calculator", input = { input = "3 * 4" } }} }
             },
             max_concurrency = 2
         })
         
-        return { workflow_type = workflow.type }
+        local info = workflow:getInfo()
+        return { workflow_type = info.type }
     "#;
 
     let result = engine.execute_script(script).await.unwrap();
@@ -89,7 +92,7 @@ async fn test_lua_workflow_parallel() {
     assert_eq!(value["workflow_type"], "parallel");
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_lua_workflow_conditional() {
     let registry = create_test_registry().await;
     let providers = create_test_providers().await;
@@ -100,12 +103,22 @@ async fn test_lua_workflow_conditional() {
     let script = r#"
         local workflow = Workflow.conditional({
             name = "conditional_test",
-            condition = "true",
-            then_branch = { name = "then", tool = "calculator", parameters = { operation = "add", a = 1, b = 1 } },
-            else_branch = { name = "else", tool = "calculator", parameters = { operation = "subtract", a = 5, b = 3 } }
+            branches = {
+                {
+                    name = "then_branch",
+                    condition = { type = "always" },
+                    steps = {{ name = "add", type = "tool", tool = "calculator", input = { input = "1 + 1" } }}
+                },
+                {
+                    name = "else_branch", 
+                    condition = { type = "never" },
+                    steps = {{ name = "subtract", type = "tool", tool = "calculator", input = { input = "5 - 3" } }}
+                }
+            }
         })
         
-        return { workflow_type = workflow.type }
+        local info = workflow:getInfo()
+        return { workflow_type = info.type }
     "#;
 
     let result = engine.execute_script(script).await.unwrap();
@@ -114,7 +127,7 @@ async fn test_lua_workflow_conditional() {
     assert_eq!(value["workflow_type"], "conditional");
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_lua_workflow_loop() {
     let registry = create_test_registry().await;
     let providers = create_test_providers().await;
@@ -125,12 +138,20 @@ async fn test_lua_workflow_loop() {
     let script = r#"
         local workflow = Workflow.loop({
             name = "loop_test",
-            max_iterations = 5,
-            condition = "iteration < 5",
-            body = { name = "body", tool = "calculator", parameters = { operation = "add", a = "$iteration", b = 1 } }
+            iterator = {
+                range = {
+                    start = 1,
+                    ["end"] = 5,
+                    step = 1
+                }
+            },
+            body = {
+                { name = "add_iteration", type = "tool", tool = "calculator", input = { input = "{{loop:current_value}} + 1" } }
+            }
         })
         
-        return { workflow_type = workflow.type }
+        local info = workflow:getInfo()
+        return { workflow_type = info.type }
     "#;
 
     let result = engine.execute_script(script).await.unwrap();
@@ -139,7 +160,7 @@ async fn test_lua_workflow_loop() {
     assert_eq!(value["workflow_type"], "loop");
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_lua_workflow_list() {
     let registry = create_test_registry().await;
     let providers = create_test_providers().await;
@@ -152,12 +173,9 @@ async fn test_lua_workflow_list() {
         local workflow = Workflow.sequential({
             name = "list_test",
             steps = {
-                { name = "step1", tool = "calculator", parameters = { operation = "add", a = 1, b = 1 } }
+                { name = "step1", type = "tool", tool = "calculator", input = { input = "1 + 1" } }
             }
         })
-        
-        -- Execute it to ensure it's registered
-        Workflow.execute(workflow)
         
         -- List workflows
         local workflows = Workflow.list()
@@ -183,9 +201,8 @@ async fn test_lua_workflow_discover_types() {
     engine.inject_apis(&registry, &providers).unwrap();
 
     let script = r#"
-        local types = Workflow.discover_types()
+        local types = Workflow.types()
         
-        local type_names = {}
         local result = {
             count = #types,
             has_sequential = false,
@@ -195,14 +212,14 @@ async fn test_lua_workflow_discover_types() {
         }
         
         -- Check for specific types
-        for _, t in ipairs(types) do
-            if t.type == "sequential" then
+        for _, type_name in ipairs(types) do
+            if type_name == "sequential" then
                 result.has_sequential = true
-            elseif t.type == "parallel" then
+            elseif type_name == "parallel" then
                 result.has_parallel = true
-            elseif t.type == "conditional" then
+            elseif type_name == "conditional" then
                 result.has_conditional = true
-            elseif t.type == "loop" then
+            elseif type_name == "loop" then
                 result.has_loop = true
             end
         end
@@ -220,7 +237,7 @@ async fn test_lua_workflow_discover_types() {
     assert_eq!(value["has_loop"], true);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_lua_workflow_error_handling() {
     let registry = create_test_registry().await;
     let providers = create_test_providers().await;
@@ -228,10 +245,13 @@ async fn test_lua_workflow_error_handling() {
     let mut engine = create_test_engine().await;
     engine.inject_apis(&registry, &providers).unwrap();
 
-    // Test with invalid workflow type
+    // Test with invalid workflow configuration
     let script = r#"
         local success, err = pcall(function()
-            Workflow.execute({ type = "invalid", config = {} })
+            local workflow = Workflow.sequential({
+                -- Missing required 'name' field
+                steps = {}
+            })
         end)
         
         return {
