@@ -62,7 +62,8 @@ impl GlobalObject for LoggerGlobal {
         _ctx: &mut boa_engine::Context,
         _context: &GlobalContext,
     ) -> Result<()> {
-        // TODO: Implement JavaScript injection
+        // TODO (Phase 12): Implement Logger object for JavaScript
+        // For now, just return Ok since console.log is available natively
         Ok(())
     }
 }
@@ -114,7 +115,8 @@ impl GlobalObject for ConfigGlobal {
         _ctx: &mut boa_engine::Context,
         _context: &GlobalContext,
     ) -> Result<()> {
-        // TODO: Implement JavaScript injection
+        // TODO (Phase 12): Implement Config object for JavaScript
+        // For now, just return Ok since config will be available in Phase 12
         Ok(())
     }
 }
@@ -169,7 +171,8 @@ impl GlobalObject for UtilsGlobal {
         _ctx: &mut boa_engine::Context,
         _context: &GlobalContext,
     ) -> Result<()> {
-        // TODO: Implement JavaScript injection
+        // TODO (Phase 12): Implement Utils object for JavaScript
+        // For now, just return Ok since utils will be available in Phase 12
         Ok(())
     }
 }

@@ -54,10 +54,14 @@ impl GlobalObject for WorkflowGlobal {
     #[cfg(feature = "javascript")]
     fn inject_javascript(
         &self,
-        _ctx: &mut boa_engine::Context,
-        _context: &GlobalContext,
+        ctx: &mut boa_engine::Context,
+        context: &GlobalContext,
     ) -> Result<()> {
-        // TODO: Implement JavaScript injection
-        Ok(())
+        crate::javascript::globals::workflow::inject_workflow_global(ctx, context).map_err(|e| {
+            llmspell_core::LLMSpellError::Component {
+                message: format!("Failed to inject Workflow global for JavaScript: {}", e),
+                source: None,
+            }
+        })
     }
 }

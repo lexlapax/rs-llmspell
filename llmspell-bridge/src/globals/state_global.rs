@@ -156,7 +156,7 @@ impl GlobalObject for StateGlobal {
         _ctx: &mut boa_engine::Context,
         _context: &GlobalContext,
     ) -> Result<(), LLMSpellError> {
-        // TODO: Phase 5 - JavaScript implementation
+        // TODO (Phase 5): JavaScript State implementation - stub for now
         Ok(())
     }
 }

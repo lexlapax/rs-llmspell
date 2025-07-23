@@ -61,8 +61,27 @@ impl ScriptEngineBridge for JSEngine {
         _registry: &Arc<ComponentRegistry>,
         _providers: &Arc<ProviderManager>,
     ) -> Result<(), LLMSpellError> {
-        // TODO: Implement API injection
-        Ok(())
+        #[cfg(feature = "javascript")]
+        {
+            // TODO (Phase 12): When JavaScript engine is implemented:
+            // 1. Create JavaScript context/engine instance
+            // 2. Inject globals using the new system (similar to Lua implementation)
+            // 3. Remove this placeholder and add actual implementation
+
+            // Placeholder implementation following Lua pattern:
+            // use crate::globals::{create_standard_registry, GlobalContext, GlobalInjector};
+            // let global_context = Arc::new(GlobalContext::new(_registry.clone(), _providers.clone()));
+            // let global_registry = futures::executor::block_on(create_standard_registry(global_context.clone()))?;
+            // let injector = GlobalInjector::new(Arc::new(global_registry));
+            // injector.inject_javascript(&mut js_context, &global_context)?;
+
+            Ok(())
+        }
+
+        #[cfg(not(feature = "javascript"))]
+        {
+            Ok(())
+        }
     }
 
     fn get_engine_name(&self) -> &'static str {

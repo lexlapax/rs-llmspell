@@ -90,7 +90,7 @@ impl GlobalObject for HookGlobal {
         _ctx: &mut boa_engine::Context,
         _context: &GlobalContext,
     ) -> Result<(), LLMSpellError> {
-        // TODO: Phase 4 - JavaScript implementation
+        // TODO (Phase 4): JavaScript Hook implementation - stub for now
         Ok(())
     }
 }

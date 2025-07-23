@@ -2148,7 +2148,57 @@ The agent factory needs to create agents that actually use LLM providers for the
 6. [x] Create new test utilities for globals pattern ✅ (globals_test.rs provides comprehensive test patterns)
 7. [x] Verify all examples still pass ✅ (streaming, workflow, tool examples verified working)
 
-#### Sub-task 3.3.29.8: Documentation and Cleanup
+#### Sub-task 3.3.29.8: Move Javascript Stub implementation to the globals structure
+**Status**: COMPLETE ✅
+**Started**: 2025-07-23
+**Completed**: 2025-07-23
+**Key Achievement**: Successfully migrated JavaScript from API pattern to globals pattern for consistency with Lua architecture
+**Verification**: All quality checks pass, JavaScript structure now mirrors Lua's two-layer globals architecture
+
+**Detailed Tasks Completed**:
+1. [x] **Created javascript/globals/ directory structure** ✅
+   - Created mod.rs with proper module declarations and exports
+   - Mirrors lua/globals/ structure exactly
+
+2. [x] **Created JavaScript global stub implementations** ✅
+   - [x] javascript/globals/json.rs - Native JSON support stub
+   - [x] javascript/globals/agent.rs - Agent API stub for Phase 12+
+   - [x] javascript/globals/tool.rs - Tool API stub for Phase 12+
+   - [x] javascript/globals/streaming.rs - Streaming API stub for Phase 12+
+   - [x] javascript/globals/workflow.rs - Workflow API stub for Phase 12+
+   - All stubs have proper TODO (Phase 12) comments for future implementation
+
+3. [x] **Updated language-agnostic globals to call JavaScript implementations** ✅
+   - [x] AgentGlobal::inject_javascript() → calls javascript::globals::agent::inject_agent_global
+   - [x] ToolGlobal::inject_javascript() → calls javascript::globals::tool::inject_tool_global
+   - [x] StreamingGlobal::inject_javascript() → calls javascript::globals::streaming::inject_streaming_global
+   - [x] WorkflowGlobal::inject_javascript() → calls javascript::globals::workflow::inject_workflow_global
+   - [x] JsonGlobal::inject_javascript() → kept as-is (JavaScript has native JSON)
+   - [x] Core globals (Logger, Config, Utils) → updated TODO comments to Phase 12
+   - [x] Phase 4+ globals (State, Event, Hook) → updated TODO comments with proper phase numbers
+
+4. [x] **Updated JavaScript engine to use globals pattern** ✅
+   - Modified javascript/engine.rs inject_apis() to prepare for globals injection
+   - Added detailed TODO comments showing Lua pattern to follow
+   - Fixed unused parameter warnings (_registry, _providers)
+
+5. [x] **Updated JavaScript module structure** ✅
+   - Changed javascript/mod.rs from `pub mod api` to `pub mod globals`
+   - Removed all references to old API pattern
+
+6. [x] **Removed old JavaScript API directory** ✅
+   - Deleted entire javascript/api/ directory and all empty stub files
+   - Clean removal with no orphaned references
+
+7. [x] **Fixed compilation and quality issues** ✅
+   - Fixed formatting issues (newlines at end of files)
+   - Fixed clippy warnings (unused variables in engine.rs)
+   - All quality checks passing (formatting, clippy, build, tests, docs)
+
+**Impact**: JavaScript now follows the same consistent two-layer globals architecture as Lua, making the codebase more maintainable and setting up proper structure for Phase 12+ JavaScript implementation.
+
+
+#### Sub-task 3.3.29.9: Documentation and Cleanup
 **Status**: TODO
 **Tasks**:
 1. [ ] Update architecture documentation
@@ -2159,7 +2209,7 @@ The agent factory needs to create agents that actually use LLM providers for the
 6. [ ] Run cargo clippy and fix all warnings
 7. [ ] Run cargo fmt on all changed files
 
-#### Sub-task 3.3.29.9: Synchronous API Implementation Strategy
+#### Sub-task 3.3.29.10: Synchronous API Implementation Strategy
 **Status**: TODO
 **Priority**: HIGH
 **Description**: Common implementation patterns for all synchronous wrappers
