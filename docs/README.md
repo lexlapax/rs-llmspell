@@ -1,106 +1,189 @@
-# LLMSpell Documentation
+# Rs-LLMSpell Documentation
 
-Welcome to the LLMSpell documentation. This directory contains comprehensive guides, technical documentation, and references for the LLMSpell project.
+**Scriptable LLM interactions via Lua, JavaScript** - Cast scripting spells to animate LLM golems
 
-## 📚 Documentation Structure
+> **📖 Documentation Hub**: Complete documentation for rs-llmspell, a Rust library that enables scriptable LLM interactions through embedded scripting engines. This documentation covers everything from quick start guides to deep architectural analysis.
 
-### User Guides
-Essential guides for using LLMSpell effectively:
-
-- **[Getting Started](user-guide/getting-started.md)** - Quick start guide for new users
-- **[External Tools Guide](user-guide/external-tools-guide.md)** - Comprehensive guide for Phase 3.1 external integration tools
-- **[External Tools Quick Reference](user-guide/external-tools-quick-reference.md)** - Quick reference card for all external tools
-- **[API Setup Guides](user-guide/api-setup-guides.md)** - Step-by-step instructions for configuring external APIs
-- **[Error Handling](user-guide/error-handling.md)** - Error handling patterns and best practices
-- **[Performance Tips](user-guide/performance-tips.md)** - Optimization strategies and performance tuning
-- **[Tool Integration Patterns](user-guide/tool-integration-patterns.md)** - Common patterns for tool integration
-
-### Technical Documentation
-Architecture and implementation details:
-
-- **[Final Architecture](technical/rs-llmspell-final-architecture.md)** - Complete system architecture documentation
-- **[Tool Integration Architecture](technical/tool-integration-architecture.md)** - Tool system design and integration
-
-### Security Documentation
-Security guidelines and findings:
-
-- **[Security Best Practices](security/SECURITY_BEST_PRACTICES.md)** - Security guidelines for tool development
-- **[Security Validation Findings](security/SECURITY_VALIDATION_FINDINGS.md)** - Security audit results and recommendations
-
-### In-Progress Documentation
-Active development documentation:
-
-- **[Phase 3 Design Doc](in-progress/phase-03-design-doc.md)** - Phase 3 implementation plan
-- **[Phase 3 Tools Migration](in-progress/phase-03-tools-migration.md)** - Tool standardization guide
-- **[Known Issues](in-progress/KNOWN_ISSUES.md)** - Current known issues and workarounds
-
-### Completed Tasks
-Documentation for completed Phase 3.1 tasks:
-
-- **[Web Scraping Tools](completed/task-3.1.2-web-scraping-tools-documentation.md)** - Web tools implementation
-- **[External Dependencies](completed/task-3.1.4-external-dependencies.md)** - Dependency management
-- **[API Key Management](completed/task-3.1.5-api-key-management.md)** - Secure API key handling
-- **[Rate Limiting Framework](completed/task-3.1.6-rate-limiting-framework.md)** - Rate limiting implementation
-- **[Circuit Breaker](completed/task-3.1.7-circuit-breaker.md)** - Circuit breaker pattern
-- **[Integration Testing](completed/task-3.1.8-integration-testing-final.md)** - Test suite documentation
-
-## 🚀 Quick Links
-
-### For Users
-1. Start with [Getting Started](user-guide/getting-started.md)
-2. Learn about tools in [External Tools Guide](user-guide/external-tools-guide.md)
-3. Set up APIs using [API Setup Guides](user-guide/api-setup-guides.md)
-4. Keep the [Quick Reference](user-guide/external-tools-quick-reference.md) handy
-
-### For Developers
-1. Understand the [Architecture](technical/rs-llmspell-final-architecture.md)
-2. Follow [Security Best Practices](security/SECURITY_BEST_PRACTICES.md)
-3. Review [Tool Integration Patterns](user-guide/tool-integration-patterns.md)
-4. Check [Phase 3 Design](in-progress/phase-03-design-doc.md)
-
-### For Contributors
-1. Read the architecture documentation
-2. Follow security guidelines
-3. Update documentation as you work
-4. Add examples to the [examples directory](../examples/)
-
-## 📊 Project Status
-
-- **Phase 2**: ✅ Complete - 26 tools implemented
-- **Phase 3.1**: ✅ Complete - 8 external tools added
-- **Phase 3.2**: ⏳ Pending - Security hardening
-- **Phase 3.3**: ⏳ Pending - Workflow orchestration
-
-## 🔧 Tool Count
-
-- **Phase 2 Tools**: 26 (Utility, File System, System, Data, Media, Search)
-- **Phase 3.1 Tools**: 8 (Web, Communication)
-- **Total Tools**: 34
-
-## 📝 Documentation Standards
-
-When contributing documentation:
-
-1. **Use Markdown** - All docs in Markdown format
-2. **Include Examples** - Practical code examples
-3. **Add Tables** - For parameter references
-4. **Update Index** - Keep this README current
-5. **Cross-Reference** - Link related documents
-
-## 🔍 Finding Information
-
-- **Search by Tool Name**: Use grep or IDE search
-- **Browse by Category**: Check user-guide/ or technical/
-- **Check Examples**: See [examples/README.md](../examples/README.md)
-- **Review Tests**: Integration tests often document usage
-
-## 📞 Getting Help
-
-- File issues on GitHub
-- Check [Troubleshooting](user-guide/external-tools-guide.md#troubleshooting)
-- Review [Known Issues](in-progress/KNOWN_ISSUES.md)
-- See examples in [examples/](../examples/)
+**🔗 Back to Project**: [← Main README](../README.md) | **Current Status**: Phase 3.3 Complete (95%+) | **Target**: Version 1.0
 
 ---
 
-Last Updated: 2025-07-16 (Phase 3.1 Documentation Complete)
+## What Rs-LLMSpell Actually Does
+
+Rs-LLMSpell is a **focused scripting framework** for LLM interactions. It provides:
+
+✅ **What it delivers:**
+- 34 production-ready tools across 9 categories (file, network, data processing, etc.)
+- Embedded Lua and JavaScript runtimes with zero-configuration global APIs
+- Agent creation and coordination through scripts
+- Workflow orchestration (Sequential, Conditional, Loop, Parallel patterns)
+- Thread-safe state management for complex interactions
+- Comprehensive security with sandboxing and resource limits
+
+❌ **What it doesn't do:**
+- Replace general-purpose automation tools (not a Zapier alternative)
+- Provide GUI or web interfaces (command-line and library focused)
+- Include ML/AI models (integrates with external LLM providers)
+- Solve every workflow automation need (focused on LLM-centric use cases)
+
+**Target Audience**: Developers who need scriptable LLM interactions, researchers building LLM workflows, and teams automating LLM-driven processes.
+
+---
+
+## Documentation Structure
+
+### 📘 [User Guide](user-guide/) - *For End Users*
+**Purpose**: Practical guides for using rs-llmspell to build LLM-driven scripts and workflows.
+
+**Contents**: Getting started, API reference, tool documentation, workflow patterns, best practices  
+**Audience**: Script writers, workflow builders, integration developers  
+**Status**: ✅ Complete and current (11 documents)
+
+**Start here if**: You want to write Lua/JavaScript scripts that use LLMs and tools
+
+---
+
+### 🔧 [Developer Guide](developer-guide/) - *For Library Developers*  
+**Purpose**: Technical guides for developers contributing to or extending the rs-llmspell library itself.
+
+**Contents**: Tool development, security implementation, testing strategies, contribution workflows  
+**Audience**: Rust developers, library contributors, custom tool creators  
+**Status**: ✅ Complete and current (6 documents)
+
+**Start here if**: You want to create custom tools, contribute code, or understand the development process
+
+---
+
+### 🏗️ [Technical](technical/) - *For System Architects*
+**Purpose**: Deep architectural documentation for system design, integration patterns, and technical decisions.
+
+**Contents**: Complete architecture reference, security model, performance analysis, implementation deep dives  
+**Audience**: System architects, technical leads, integration specialists  
+**Status**: ✅ Complete and current (6 documents + master architecture)
+
+**Start here if**: You need to understand system architecture, security model, or integration patterns
+
+---
+
+### 📚 [Archives](archives/) - *Historical Reference*
+**Purpose**: Preserve historical documents, research notes, and deprecated documentation for reference.
+
+**Contents**: Historical design decisions, deprecated guides, research documentation, migration notes  
+**Audience**: Project historians, researchers, anyone needing historical context  
+**Status**: 🗂️ Repository for historical materials
+
+**Contains**: Documents that are no longer current but may be valuable for understanding project evolution
+
+---
+
+### 🚧 [In-Progress](in-progress/) - *Development Tracking*
+**Purpose**: Track planning, implementation, and progress toward version 1.0 release.
+
+**Contents**: Phase completion documents, implementation roadmaps, handoff packages, TODOs  
+**Audience**: Core team, project managers, contributors tracking progress  
+**Status**: 📋 Active development tracking
+
+**Contains**: Phase completion status, implementation plans, progress tracking until 1.0 release
+
+---
+
+## Quick Navigation
+
+### 🚀 **I want to use rs-llmspell**
+1. **[Getting Started Guide](user-guide/getting-started.md)** - 5-minute setup and first script
+2. **[Tool Reference](user-guide/tool-reference.md)** - Browse all 34 available tools  
+3. **[Agent API Guide](user-guide/agent-api.md)** - Create and coordinate LLM agents
+4. **[Workflow Patterns](user-guide/workflow-api.md)** - Build complex multi-step processes
+
+### 🔨 **I want to extend rs-llmspell**
+1. **[Developer Setup](developer-guide/README.md)** - 5-minute development environment
+2. **[Tool Development](developer-guide/tool-development-guide.md)** - Create custom tools
+3. **[Security Requirements](developer-guide/security-guide.md)** - Implement security correctly
+4. **[Testing Guide](developer-guide/testing-guide.md)** - Test your contributions
+
+### 🏛️ **I need architectural understanding**
+1. **[Master Architecture](technical/rs-llmspell-final-architecture.md)** - Complete system reference
+2. **[Security Architecture](technical/security-architecture.md)** - Threat model and defenses
+3. **[Global Injection System](technical/global-injection-architecture.md)** - API injection deep dive
+4. **[Performance Characteristics](technical/README.md#performance-characteristics)** - Benchmarks and limits
+
+### 📊 **I want to track progress**
+1. **[Implementation Phases](in-progress/implementation-phases.md)** - Roadmap to 1.0
+2. **[Phase Status](in-progress/)** - Current completion status  
+3. **[Known Limitations](user-guide/README.md#current-limitations--workarounds)** - What's not yet available
+4. **[Future Features](technical/hook-implementation.md)** - Planned Phase 4+ features
+
+---
+
+## Current Project Status
+
+### ✅ **Phase 3.3 Complete** (July 2025)
+- **Agent Infrastructure**: Factory, registry, lifecycle management
+- **34 Production Tools**: File, network, data processing, system utilities
+- **Bridge Architecture**: Lua/JavaScript APIs with async execution
+- **Security Hardening**: Defense-in-depth with comprehensive testing
+- **Workflow Patterns**: 4 orchestration patterns implemented
+- **State Management**: Thread-safe workflow coordination
+
+### 📋 **Working Toward 1.0** (Target: Q4 2025)
+- **Phase 4**: Hook and Event System (Q3 2025)
+- **Phase 5**: Persistent State Management (Q4 2025)  
+- **Version 1.0**: Stable API with backward compatibility guarantees
+
+### 🎯 **What 1.0 Means For You**
+- **API Stability**: No breaking changes without major version bump
+- **Production Ready**: Full enterprise deployment support
+- **Complete Documentation**: All features fully documented
+- **Long-term Support**: Maintenance and security updates
+
+---
+
+## Documentation Quality Standards
+
+This documentation follows strict quality standards:
+
+### **Accuracy Requirements**
+- ✅ All code examples tested and working
+- ✅ API documentation matches implementation
+- ✅ Status indicators reflect actual implementation
+- ✅ No aspirational features presented as current
+
+### **User Experience Focus**
+- 🎯 Clear navigation for different user types
+- 🎯 Realistic expectations about capabilities
+- 🎯 Practical examples over theoretical concepts
+- 🎯 Progressive disclosure (basic → advanced)
+
+### **Maintenance Standards**
+- 📝 Regular updates as features are implemented
+- 📝 Version tracking for all major changes
+- 📝 Cross-references validated and current
+- 📝 Deprecated content moved to archives
+
+---
+
+## Getting Help
+
+**📋 Documentation Issues**: File issues on GitHub if you find outdated or incorrect documentation
+
+**❓ Usage Questions**: 
+- Check [User Guide FAQ](user-guide/getting-started.md#troubleshooting)
+- Browse [examples directory](../examples/) for patterns
+- Review [troubleshooting guides](user-guide/README.md)
+
+**🐛 Bug Reports**: Use GitHub issues with specific reproduction steps
+
+**💡 Feature Requests**: Review [planned features](in-progress/implementation-phases.md) first, then file GitHub issues
+
+**🤝 Contributing**: Start with [Developer Guide](developer-guide/README.md) for contribution workflow
+
+---
+
+## Documentation Navigation
+
+- **🏠 Project Home**: [Main README](../README.md)
+- **📁 Examples**: [Examples Directory](../examples/)
+- **🔧 Source Code**: [Library Source](../llmspell-*)
+- **🧪 Tests**: [Integration Tests](../tests/)
+
+**Last Updated**: July 2025 | **Documentation Version**: Phase 3.3 Complete | **Next Update**: Phase 4 Features (Q3 2025)

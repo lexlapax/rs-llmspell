@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Phase 3.3 Complete - 2025-07-23
+- **Agent Infrastructure**: Factory, registry, lifecycle management
+- **Workflow Integration**: Agents can be used in all workflow patterns
+- **Bridge Consolidation**: Synchronous API wrapper for all async operations
+- **Global Injection**: Zero-configuration access to all functionality
+- **Performance**: <10ms tool initialization, <5ms global injection
+- **34 Production Tools**: Complete tool suite with security hardening
+
+### Phase 3.2 Complete - 2025-07-17
+- **Security Hardening**: Comprehensive security fixes across all tools
+- **Resource Limits**: Memory guards and operation tracking
+- **Path Security**: Unified path validation preventing traversal attacks
+- **DoS Protection**: Fixed Calculator regex vulnerability
+- **Security Tests**: 200+ security-specific tests added
+
+### Phase 3.1 Complete - 2025-07-16
+- **External Integration Tools**: 8 new tools for web and communication
+- **Web Tools**: WebScraper, UrlAnalyzer, SitemapCrawler, WebpageMonitor
+- **API Tools**: ApiTester, WebhookCaller
+- **Communication**: EmailSender, DatabaseConnector
+- **Rate Limiting**: Framework for API rate limits
+
+### Phase 3.0 Complete - 2025-07-11
+- **Tool Standardization**: All 26 tools use consistent interfaces
+- **Parameter Consistency**: Universal `input` parameter across tools
+- **Response Pattern**: StandardResponseBuilder for all tool outputs
+- **DRY Compliance**: 95% code reuse through llmspell-utils
+- **Breaking Changes**: Clean break approach documented
+
 ## [0.2.0] - 2025-07-11
 
 ### Added

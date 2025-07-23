@@ -1,5 +1,7 @@
 # External Tools Guide - Phase 3.1
 
+✅ **Production Ready**: All 8 external integration tools are fully implemented, tested, and available for use.
+
 This guide provides comprehensive documentation for the 8 external integration tools added in Phase 3.1.
 
 ## Table of Contents
@@ -765,6 +767,129 @@ export LLMSPELL_LOG_LEVEL=debug
 6. **Rotate keys regularly** - Use key rotation features
 7. **Restrict permissions** - Minimum required access
 
+## Quick Reference
+
+### Web Tools Summary
+
+| Tool | Code Name | Purpose | Key Parameters |
+|------|-----------|---------|----------------|
+| 🔗 **UrlAnalyzerTool** | `url-analyzer` | Validate and parse URLs | `input`, `decode_params` |
+| 🌐 **WebScraperTool** | `web-scraper` | Extract web content | `input`, `selector`, `timeout` |
+| 🧪 **ApiTesterTool** | `api-tester` | Test REST APIs | `input`, `method`, `headers`, `body` |
+| 🪝 **WebhookCallerTool** | `webhook-caller` | Call webhooks with retry | `input`, `payload`, `retry_count` |
+| 👁️ **WebpageMonitorTool** | `webpage-monitor` | Detect page changes | `input`, `previous_content` |
+| 🗺️ **SitemapCrawlerTool** | `sitemap-crawler` | Parse sitemaps | `input`, `max_urls` |
+
+### Communication Tools Summary
+
+| Tool | Code Name | Purpose | Key Parameters |
+|------|-----------|---------|----------------|
+| 📧 **EmailSenderTool** | `email-sender` | Send emails | `provider`, `from`, `to`, `subject` |
+| 🗄️ **DatabaseConnectorTool** | `database-connector` | Database operations | `provider`, `query`, `params` |
+
+### Quick Examples
+
+```lua
+-- URL Analysis
+Tool.get("url-analyzer"):execute({input = "https://example.com/path?q=value"})
+
+-- Web Scraping
+Tool.get("web-scraper"):execute({
+    input = "https://example.com",
+    selector = "h1",
+    extract_links = true
+})
+
+-- API Testing
+Tool.get("api-tester"):execute({
+    input = "https://api.example.com/endpoint",
+    method = "POST",
+    body = {key = "value"}
+})
+
+-- Send Email (SendGrid)
+Tool.get("email-sender"):execute({
+    provider = "sendgrid",
+    from = "sender@example.com",
+    to = "recipient@example.com",
+    subject = "Test",
+    body = "Message"
+})
+
+-- Database Query
+Tool.get("database-connector"):execute({
+    provider = "postgresql",
+    connection_string = "postgresql://user:pass@localhost/db",
+    operation = "query",
+    query = "SELECT * FROM users WHERE status = $1",
+    params = {"active"}
+})
+```
+
+### Environment Variables Quick Reference
+
+```bash
+# Web Search
+export LLMSPELL_API_KEY_GOOGLE="..."
+export LLMSPELL_API_KEY_BRAVE="..."
+export LLMSPELL_API_KEY_SERPAPI="..."
+export LLMSPELL_API_KEY_SERPERDEV="..."
+
+# Email
+export LLMSPELL_API_KEY_SENDGRID="..."
+export AWS_ACCESS_KEY_ID="..."
+export AWS_SECRET_ACCESS_KEY="..."
+
+# Database
+export DATABASE_URL="postgresql://..."
+```
+
+### Common Patterns
+
+#### Error Handling
+```lua
+local result = tool:execute(params)
+if not result.success then
+    Logger.error("Operation failed", {error = result.error.message})
+end
+```
+
+#### Retry with Backoff
+```lua
+local result = tool:execute({
+    input = url,
+    retry_count = 5,
+    retry_delay = 2000  -- ms
+})
+```
+
+#### Connection Pooling
+```lua
+local result = tool:execute({
+    provider = "postgresql",
+    use_pool = true,
+    pool_size = 10,
+    -- other params
+})
+```
+
+### Performance Tips
+
+1. **Set appropriate timeouts** - Default 30s may be too long
+2. **Use connection pooling** - For repeated database queries
+3. **Cache web content** - Avoid repeated scraping
+4. **Batch operations** - Group similar requests
+5. **Handle rate limits** - Implement exponential backoff
+
+### Security Reminders
+
+- ⚠️ Never hardcode credentials
+- ⚠️ Always use parameterized queries
+- ⚠️ Validate URLs before scraping
+- ⚠️ Sanitize email inputs
+- ⚠️ Use HTTPS endpoints only
+- ⚠️ Rotate API keys regularly
+
 ## Additional Resources
 
 - [LLMSpell Examples](../../examples/README.md)
@@ -774,4 +899,4 @@ export LLMSPELL_LOG_LEVEL=debug
 
 ---
 
-For feature requests or bug reports, please file an issue on the [LLMSpell GitHub repository](https://github.com/yourusername/llmspell).
+For feature requests or bug reports, please file an issue in the project repository.
