@@ -2083,16 +2083,20 @@ The agent factory needs to create agents that actually use LLM providers for the
 15. [x] Update workflow integration tests for sync API ✅
 
 #### Sub-task 3.3.29.4: JSON Consolidation
-**Status**: TODO
+**Status**: COMPLETE ✅
+**Started**: 2025-07-23
+**Completed**: 2025-07-23
+**Key Achievement**: All JSON functionality consolidated from API layer to globals layer, using shared conversion functions
+**Verification**: JSON.parse/stringify working correctly in all examples, performance tests passing
 **Tasks**:
-1. [ ] Move all logic from lua/api/json.rs to lua/globals/json.rs
-2. [ ] Remove lua/api/json.rs entirely
-3. [ ] Update lua/globals/json.rs to contain full implementation
-4. [ ] Remove inject_json_api call from engine.rs
-5. [ ] Update json_global.rs inject_lua to use new implementation
-6. [ ] Update JSON tests to test via globals
-7. [ ] Delete api::json tests
-8. [ ] Verify JSON.parse/stringify still work in all examples
+1. [x] Move all logic from lua/api/json.rs to lua/globals/json.rs ✅
+2. [x] Remove lua/api/json.rs entirely ✅
+3. [x] Update lua/globals/json.rs to contain full implementation ✅
+4. [x] Remove inject_json_api call from engine.rs ✅
+5. [x] Update json_global.rs inject_lua to use new implementation ✅ (already correct)
+6. [x] Update JSON tests to test via globals ✅
+7. [x] Delete api::json tests ✅ (no dedicated tests existed)
+8. [x] Verify JSON.parse/stringify still work in all examples ✅
 
 #### Sub-task 3.3.29.5: Streaming Consolidation
 **Status**: TODO  

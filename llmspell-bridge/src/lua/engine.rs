@@ -245,8 +245,7 @@ impl ScriptEngineBridge for LuaEngine {
             // Inject Streaming API
             super::api::inject_streaming_api(&lua, &api_surface.streaming_api)?;
 
-            // Inject JSON API
-            super::api::inject_json_api(&lua, &api_surface.json_api)?;
+            // JSON API now handled via globals
 
             self.api_injected = true;
         }

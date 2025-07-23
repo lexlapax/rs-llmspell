@@ -2,16 +2,14 @@
 
 #![cfg(feature = "lua")]
 
-use llmspell_bridge::engine::types::JsonApiDefinition;
-use llmspell_bridge::lua::api::inject_json_api;
+use llmspell_bridge::lua::globals::json::inject_json_global;
 use std::time::Instant;
 
 /// Benchmark JSON parsing performance
 #[test]
 fn test_json_parse_performance() {
     let lua = mlua::Lua::new();
-    let api_def = JsonApiDefinition::standard();
-    inject_json_api(&lua, &api_def).unwrap();
+    inject_json_global(&lua).unwrap();
 
     // Small JSON (typical tool output)
     let small_json = r#"{"success":true,"result":{"uuid":"123e4567-e89b-12d3-a456-426614174000","version":"v4"}}"#;
@@ -114,8 +112,7 @@ fn test_json_parse_performance() {
 #[test]
 fn test_json_stringify_performance() {
     let lua = mlua::Lua::new();
-    let api_def = JsonApiDefinition::standard();
-    inject_json_api(&lua, &api_def).unwrap();
+    inject_json_global(&lua).unwrap();
 
     // Setup test data in Lua
     lua.load(
@@ -203,8 +200,7 @@ fn test_json_stringify_performance() {
 #[test]
 fn test_json_roundtrip_performance() {
     let lua = mlua::Lua::new();
-    let api_def = JsonApiDefinition::standard();
-    inject_json_api(&lua, &api_def).unwrap();
+    inject_json_global(&lua).unwrap();
 
     let tool_output = r#"{"success":true,"result":{"operation":"completed","data":{"items":[1,2,3],"metadata":{"count":3,"type":"array"}}}}"#;
 
