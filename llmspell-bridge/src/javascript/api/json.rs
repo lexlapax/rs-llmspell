@@ -1,7 +1,8 @@
 //! ABOUTME: JSON API stub for JavaScript engine - native JSON support
 //! ABOUTME: JavaScript has built-in JSON object, this ensures API consistency
 
-use crate::engine::types::JsonApiDefinition;
+// NOTE: JsonApiDefinition removed during API consolidation (Phase 3.3.29)
+// This module is disabled until JavaScript engine implementation (Phase 12+)
 use llmspell_core::error::LLMSpellError;
 
 /// Inject JSON API into JavaScript engine
@@ -14,23 +15,12 @@ use llmspell_core::error::LLMSpellError;
 /// 2. Optionally wrap native JSON to ensure consistent error handling
 /// 3. Add any LLMSpell-specific extensions if needed
 /// 4. Ensure behavior matches Lua implementation for cross-engine compatibility
+// Disabled during API consolidation - will be rewritten for Phase 12+
+#[allow(dead_code)]
 pub fn inject_json_api(
     _engine: &(), // TODO: Replace with actual JS engine type
-    api_def: &JsonApiDefinition,
 ) -> Result<(), LLMSpellError> {
-    // JavaScript natively provides JSON.parse() and JSON.stringify()
-    // This stub ensures we have the same API surface across all engines
-
-    // TODO: In Phase 12 implementation:
-    // - Verify global JSON object exists
-    // - Check that parse/stringify functions match our API definition
-    // - Consider adding error normalization for consistency
-    // - Add performance monitoring if needed
-
-    // Log message for when this stub is called
-    // TODO: In Phase 12, add proper logging when JS engine is implemented
-    let _ = api_def; // Use the parameter to avoid unused warning
-
+    // TODO: Reimplement for Phase 12 using globals pattern
     Ok(())
 }
 
@@ -41,8 +31,7 @@ mod tests {
     #[test]
     fn test_json_api_stub() {
         // This test verifies the stub compiles and has correct signature
-        let api_def = JsonApiDefinition::standard();
-        let result = inject_json_api(&(), &api_def);
+        let result = inject_json_api(&());
         assert!(result.is_ok());
     }
 
