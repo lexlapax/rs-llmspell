@@ -91,9 +91,11 @@ Rs-LLMSpell is a **focused scripting framework** for LLM interactions. It provid
 
 ### 🚀 **I want to use rs-llmspell**
 1. **[Getting Started Guide](user-guide/getting-started.md)** - 5-minute setup and first script
-2. **[Tool Reference](user-guide/tool-reference.md)** - Browse all 34 available tools  
-3. **[Agent API Guide](user-guide/agent-api.md)** - Create and coordinate LLM agents
-4. **[Workflow Patterns](user-guide/workflow-api.md)** - Build complex multi-step processes
+2. **[Tutorial: Agents & Workflows](user-guide/tutorial-agents-workflows.md)** - Step-by-step learning
+3. **[Tool Reference](user-guide/tool-reference.md)** - Browse all 34 available tools  
+4. **[Agent API Guide](user-guide/agent-api.md)** - Create and coordinate LLM agents
+5. **[Workflow Patterns](user-guide/workflow-api.md)** - Build complex multi-step processes
+6. **[Examples](../examples/)** - Working code examples
 
 ### 🔨 **I want to extend rs-llmspell**
 1. **[Developer Setup](developer-guide/README.md)** - 5-minute development environment

@@ -75,12 +75,36 @@ Welcome to the rs-llmspell user documentation! This guide will help you write po
   - Resource usage patterns
   - Caching strategies
 
+### Tutorials & Examples
+- **[Tutorial: Agents & Workflows](tutorial-agents-workflows.md)** - Step-by-step tutorial
+  - Learn agents from basics to advanced patterns
+  - Master all 4 workflow types with examples
+  - Combine agents and workflows effectively
+  - Performance optimization techniques
+
+- **[Examples Directory](../../examples/)** - Working code examples
+  - 10+ agent examples
+  - 13+ tool examples  
+  - 9+ workflow examples
+  - Complete demos and benchmarks
+
 ### Reference
-- **[API Reference](api-reference.md)** - Quick reference for all globals and methods
+- **[Tool Reference](tool-reference.md)** - Complete reference for all 34 tools
+  - Detailed documentation for every tool
+  - Usage examples and parameters
+  - Security levels and best practices
+  - Performance characteristics
+
+- **[Agent & Workflow API Reference](api-reference-agents-workflows.md)** - Comprehensive API docs
   - Complete method signatures
-  - Parameter types and formats
-  - Return values and error conditions
-  - Quick lookup tables
+  - All parameters and options
+  - Template syntax and references
+  - Integration patterns
+
+- **[API Reference](api-reference.md)** - Quick reference for all globals
+  - Global objects (Agent, Tool, Workflow, State, etc.)
+  - Quick method lookup
+  - Common patterns
 
 ## 🚀 Quick Start
 

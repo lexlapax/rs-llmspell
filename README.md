@@ -51,16 +51,18 @@ cargo build --release
 
 ## Current Status
 
+- **v0.3.0 Released**: 34 tools, agent infrastructure, and workflows (2025-01-30)
 - **Phase 3.3 Complete**: Agent infrastructure and workflow integration done
 - **Pre-1.0 Software**: Breaking changes expected before stable release
 - **Not Production Ready**: Use for experimentation and development only
 - See [CHANGELOG.md](CHANGELOG.md) for detailed version history
+- See [RELEASE_NOTES_v0.3.0.md](RELEASE_NOTES_v0.3.0.md) for latest release
 
 ## Documentation
 
 - **[Quick Start Guide](docs/user-guide/getting-started.md)** - Get started in 5 minutes
 - **[Documentation Hub](docs/README.md)** - Complete documentation index
-- **[API Reference](docs/user-guide/api-reference.md)** - Detailed API documentation
+- **[Tool Reference](docs/user-guide/tool-reference.md)** - All 34 tools documented
 - **[Examples](examples/)** - Working code examples for all features
 
 ## Development

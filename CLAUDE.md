@@ -3,201 +3,218 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 rs-llmspell: **Scriptable LLM interactions** via Lua, JavaScript - Cast scripting spells to animate LLM golems
-## Phase Status
-- ✅ Phase 0: Foundation Infrastructure (COMPLETE)
-- ✅ Phase 1: Core Execution Runtime (COMPLETE)
-- ✅ Phase 2: Self-Contained Tools Library (COMPLETE - 26 tools)
-- 🚀 **Phase 3: Tool Enhancement & Agent Infrastructure** (ACTIVE - Weeks 9-16)
-  - ✅ Phase 3.0: Critical Tool Fixes (Weeks 9-10) - COMPLETE 2025-07-11
-  - ✅ Phase 3.1: External Integration Tools (Weeks 11-12) - COMPLETE 2025-07-16
-  - ✅ Phase 3.2: Security & Performance (Weeks 13-14) - COMPLETE 2025-07-17
-  - 🚧 **Phase 3.3: Agent Infrastructure & Basic Multi-Agent Coordination (Weeks 15-16) - IN PROGRESS**
-- ⏳ Phase 4: Hook and Event System (Weeks 17-18)
-- ⏳ Phase 5: Persistent State Management (Weeks 19-20)
-- ⏳ Phase 6: Session and Artifact Management (Weeks 21-22)
-- ⏳ Phase 7: Vector Storage (Weeks 23-24)
-- ⏳ Phase 8: Advanced Workflow Features (Weeks 25-26)
-- ⏳ Phase 9+: Future phases...
 
-## Current Status
+## Primary Documentation
 
-🚧 **Phase 3.3 - Agent Infrastructure & Basic Multi-Agent Coordination**: IN PROGRESS
-- **Completed**: Phases 0, 1, 2, 3.0, 3.1, 3.2 ✅ (33+ standardized and secured tools)
-- **Current Focus**: Implementing agent infrastructure foundation
-- **Next Task**: Task 3.3.1 - Agent Factory Implementation
-- **Phase 3.3 Scope**: 
-  - Agent factory, registry, and lifecycle management
-  - BaseAgent tool integration for agent-tool composition
-  - Basic workflow patterns (Sequential, Conditional, Loop)
-  - Script-to-agent integration bridge
-  - Multi-agent coordination via workflows
-- **Achievements**: 95% parameter consistency, 95% DRY compliance, comprehensive security hardening, 33+ production-ready tools
+- **Architecture**: `/docs/technical/rs-llmspell-final-architecture.md` - Complete system architecture
+- **Implementation Phases**: `/docs/in-progress/implementation-phases.md` - 16-phase roadmap
+- **Current Phase**: See `/docs/in-progress/PHASE*-TODO.md` for active phase tracking
+- **User Guide**: `/docs/user-guide/README.md` - For end users
+- **Developer Guide**: `/docs/developer-guide/README.md` - For contributors
 
-## Key Commands
+## Development Norms
+
+### Code Quality Standards
+
+- **Zero Warnings Policy**: All code must compile without warnings (`cargo clippy -- -D warnings`)
+- **Test Coverage**: >90% coverage required (enforced in CI)
+- **Documentation**: >95% API documentation coverage required
+- **Formatting**: Run `cargo fmt --all` before every commit
+- **Performance**: Maintain established benchmarks (e.g., <10ms tool initialization)
+
+### Quality Check Commands
 
 ```bash
-# Quality Checks (MANDATORY before commits)
-cargo clippy -- -D warnings            # Zero warnings policy
-cargo fmt --all                        # Apply formatting
+# MANDATORY before commits
 ./scripts/quality-check-minimal.sh     # Quick check (seconds) - formatting, clippy, compilation
 ./scripts/quality-check-fast.sh        # Fast check (~1 min) - adds unit tests & docs
 ./scripts/quality-check.sh             # Full check (5+ min) - all tests & coverage
 
-# Test Runners (See scripts/README.md for full documentation)
+# Test specific components
 ./scripts/test-by-tag.sh unit         # Run only unit tests
 ./scripts/test-by-tag.sh tool         # Run tool tests
 ./scripts/test-by-tag.sh external     # Run external/network tests
 ./scripts/list-tests-by-tag.sh all    # List test categories
 SKIP_SLOW_TESTS=true ./scripts/quality-check.sh  # Skip slow tests
-
-# Phase 3 Specific
-cargo test -p llmspell-tools          # Test tools crate
-cargo test -p llmspell-utils          # Test shared utilities
-cargo bench -p llmspell-tools         # Benchmark tool performance
-
-# Phase 3.3 Agent Development
-cargo test -p llmspell-agents         # Test agents crate (when created)
-cargo test -p llmspell-workflows      # Test workflows crate (when created)
-cargo run --example agent-basic       # Run basic agent example
-cargo run --example workflow-sequential # Run sequential workflow example
 ```
 
-## Architecture Overview
+### Implementation Principles
 
-**Core-Bridge-Script Architecture**: BaseAgent → Agent → Tool → Workflow hierarchy with full composition support.
+1. **State-First Design**: Components communicate through shared state, not direct messaging
+2. **DRY Principle**: Use `llmspell-utils` crate for all shared functionality
+3. **Security First**: All inputs validated, all paths sanitized, resource limits enforced
+4. **Composition Over Inheritance**: Prefer trait composition patterns
+5. **Bridge-First Architecture**: Leverage existing Rust crates rather than reimplementing
+6. **Script API Consistency**: Same API surface across Lua, JavaScript, and Python
 
-**Tech Stack**: `rig` (LLM providers), `mlua` (scripting), `sled`/`rocksdb` (storage), comprehensive testing.
+### Coding Standards
 
-**Phase 3.3 Agent Infrastructure Focus**:
-- **Agent Factory**: Flexible agent creation with configuration builders
-- **Agent Registry**: Centralized discovery and management
-- **BaseAgent Tool Integration**: Agents can discover and invoke tools
-- **Basic Workflows**: Sequential, Conditional, and Loop patterns for multi-agent coordination
-- **Script Bridge**: Lua/JavaScript access to agents and workflows
-- **Composition**: Agents as tools, workflows using agents, full bidirectional integration
+1. **Parameter Naming**:
+   - Primary data: `input` (not: text, content, data, expression, query, etc.)
+   - File paths: `path` for single files, `source_path`/`target_path` for operations
+   - Operations: Always require explicit `operation` parameter for multi-function tools
 
-## Quality Requirements
+2. **Response Format**:
+   ```json
+   {
+     "operation": "operation_name",
+     "success": true,
+     "result": {...},
+     "error": null,
+     "metadata": {...}
+   }
+   ```
 
-- **Zero Warnings**: All code must compile without warnings
-- **Test Coverage**: >90% coverage enforced in CI
-- **Documentation**: >95% coverage requirement
-- **CI/CD**: All quality gates implemented and enforced
+3. **Error Handling**:
+   - Use `Result<T, E>` for all fallible operations
+   - Create specific error types, not generic strings
+   - Include context in errors (use `anyhow` with `.context()`)
+   - Sanitize error messages (no sensitive paths or data)
 
-### Quality Check Scripts
-
-Three levels of quality validation are available:
-
-1. **Minimal Check** (`quality-check-minimal.sh`) - Runs in seconds
-   - Code formatting verification
-   - Clippy lints with zero warnings
-   - Compilation check
-   
-2. **Fast Check** (`quality-check-fast.sh`) - Runs in ~1 minute
-   - All minimal checks
-   - Unit tests only
-   - Documentation build verification
-   
-3. **Full Check** (`quality-check.sh`) - Runs in 5+ minutes
-   - All fast checks
-   - Full integration test suite
-   - Optional coverage analysis (if cargo-tarpaulin installed)
-   - Security audit (if cargo-audit installed)
-
-**Recommendation**: Use minimal check before commits, fast check before pushing, and full check before PRs.
-
-## Critical Implementation Principles
-
-- **State-First**: Agents communicate through shared state
-- **Tool Composition**: Agents can be wrapped as tools
-- **Security First**: Sandboxing and resource limits enforced
-- **DRY Principle**: Use llmspell-utils for shared functionality
-
-## Key Development Reminders
-
-- **Complete Tasks Fully**: No lazy implementations, check Definition of Done
-- **DRY**: Use llmspell-utils for common functionality
-- **Follow TODO.md**: Stick to task hierarchy, don't jump ahead
-- **Zero Warnings**: Maintain compilation without warnings
-- **Update Progress**: Keep TODO.md timestamps current
-- **No shortcuts/skips just to pass tests**: Complete the implementation or redo it properly
-
-## Primary Documentation
-
-- **Architecture**: `/docs/technical/rs-llmspell-final-architecture.md`
-- **Current Progress**: `/docs/in-progress/PHASE03-TODO.md` - Phase 3 task tracking
-- **Phase 3 Design**: `/docs/in-progress/phase-03-design-doc.md`
-- **Breaking Changes**: Clean break approach with comprehensive documentation
-
-## Phase 3 Plan (41+ Tools Target)
-
-**Phase 3.0 (Weeks 9-10)**: Critical Tool Fixes ✅ COMPLETE
-- ✅ Standardized all 26 tools to consistent interfaces
-- ✅ Extracted shared utilities (DRY compliance 95% achieved)
-- ✅ Implemented critical security fixes (Calculator DoS, path traversal)
-- ✅ Created breaking changes documentation (CHANGELOG_v0.3.0.md)
-
-**Phase 3.1 (Weeks 11-12)**: External Integration Tools (16 new)
-- Web & Network: WebSearchTool enhancement, web_scraper, url_analyzer, api_tester, webhook_caller, webpage_monitor, sitemap_crawler
-- Communication: email_sender, database_connector
-- Rate limiting and circuit breaker patterns
-
-**Phase 3.2 (Weeks 13-14)**: Advanced Security & Performance
-- Comprehensive security hardening for all 41 tools
-- Performance optimization (maintain 52,600x target)
-- Resource limit enforcement
-
-**Phase 3.3 (Weeks 15-16)**: Agent Infrastructure & Basic Multi-Agent Coordination ✅ STARTING
-- Agent Factory, Registry, Lifecycle Management
-- BaseAgent Tool Integration (agents can discover and use tools)
-- Basic Workflow Patterns (Sequential, Conditional, Loop)
-- Script-to-Agent Integration Bridge
-- Multi-agent coordination via workflows
-
-## Phase 3 Breaking Changes
-
-**Clean Break Approach**: As a pre-1.0 project (v0.1.0 → v0.3.0), we're making breaking changes without migration tools.
-
-**Key Changes**:
-- **Parameter Standardization**: `input` as universal primary data parameter
-- **Path Parameters**: `path: PathBuf` for single files, `source_path`/`target_path` for transforms
-- **ResponseBuilder Pattern**: All tools use standardized response format
-- **No Migration Tools**: Clear documentation and examples instead
-
-**Documentation**: See `/docs/in-progress/CHANGELOG_v0.3.0.md` for complete breaking changes.
-
-## Agent Implementation Guidelines (Phase 3.3)
-
-### Core Agent Architecture
-- **BaseAgent Trait**: Foundation trait that all components (Agent, Tool, Workflow) implement
-- **Agent Trait**: Extends BaseAgent with LLM-specific capabilities
-- **Tool Integration**: BaseAgent includes tool discovery and invocation methods
-- **Composition Pattern**: Agents can wrap tools, tools can wrap agents
-
-### Implementation Priorities
-1. **Agent Factory** (Task 3.3.1): Start with flexible creation patterns
-2. **Agent Registry** (Task 3.3.2): Enable discovery and management
-3. **Tool Integration** (Task 3.3.3): Connect agents to 33+ existing tools
-4. **Script Bridge** (Task 3.3.4): Enable Lua/JS access to agents
-5. **Basic Workflows** (Tasks 3.3.12-3.3.14): Implement multi-agent coordination
-
-### Key Design Principles
-- **ADK Alignment**: Follow Google ADK patterns for multi-agent coordination
-- **Tool Reuse**: Leverage all 33+ standardized tools from Phases 3.0-3.2
-- **Memory-Based State**: Phase 3.3 uses in-memory state (persistence in Phase 5)
-- **Script-First**: All agent capabilities must be accessible from Lua/JavaScript
-- **Composition Over Inheritance**: Prefer composition patterns for flexibility
+4. **File Structure**:
+   - Each tool in its own module under `llmspell-tools/src/`
+   - Shared utilities in `llmspell-utils/src/`
+   - Script bindings in `llmspell-bridge/src/lua/globals/`
+   - Examples in `examples/` with working code
 
 ### Testing Requirements
-- **Agent Unit Tests**: Test factory, registry, lifecycle independently
-- **Tool Integration Tests**: Verify agents can invoke all 33+ tools
-- **Workflow Tests**: Test Sequential, Conditional, Loop patterns
-- **Script Integration Tests**: Verify Lua can create and invoke agents
-- **Performance**: <50ms agent creation, <10ms tool invocation overhead
 
-## Testing Strategy
+1. **Test Categories** (use `#[cfg_attr(test_category = "...")]`):
+   - `unit`: Fast, isolated component tests
+   - `integration`: Cross-component tests
+   - `tool`: Individual tool functionality tests
+   - `agent`: Agent-specific tests
+   - `workflow`: Workflow pattern tests
+   - `external`: Tests requiring network/external resources
+   - `security`: Security-specific tests
 
-- **Unit Tests**: Individual components
-- **Integration Tests**: Tool interactions and script APIs  
-- **Security Tests**: DoS protection, path traversal, resource limits
-- **Performance**: <10ms tool initialization requirement
-- **Coverage**: >90% enforced in CI
+2. **Test Coverage**:
+   - Every public API must have tests
+   - Security edge cases must be tested
+   - Performance benchmarks for critical paths
+   - Script integration tests for all exposed APIs
+
+### Development Workflow
+
+1. **Before Starting Work**:
+   - Read relevant phase design doc in `/docs/in-progress/`
+   - Check TODO.md for current task status
+   - Run full quality check to ensure clean baseline
+
+2. **During Development**:
+   - Follow TDD: Write tests first
+   - Run minimal quality check frequently
+   - Update documentation as you code
+   - No lazy implementations or TODOs without explicit approval
+
+3. **Before Committing**:
+   - Run `./scripts/quality-check-fast.sh`
+   - Ensure all tests pass
+   - Update CHANGELOG.md if adding features
+   - Keep commits focused and atomic
+
+4. **Definition of Done**:
+   - Feature fully implemented (no stubs)
+   - All tests passing
+   - Documentation complete
+   - Quality checks passing
+   - No regression in performance
+   - Security considerations addressed
+
+### Architecture Patterns
+
+1. **Trait Hierarchy**:
+   ```
+   BaseAgent ← Agent ← SpecializedAgent
+       ↑
+     Tool ← ToolWrappedAgent
+       ↑
+   Workflow ← Sequential, Parallel, Conditional, Loop
+   ```
+
+2. **Crate Organization**:
+   - `llmspell-core`: Core traits and types
+   - `llmspell-tools`: Tool implementations
+   - `llmspell-agents`: Agent infrastructure
+   - `llmspell-workflows`: Workflow patterns
+   - `llmspell-bridge`: Script language integration
+   - `llmspell-utils`: Shared utilities
+
+3. **Script Integration**:
+   - All functionality exposed through global objects
+   - Synchronous wrappers for async operations
+   - Consistent error propagation to scripts
+   - Zero-configuration access (globals injected automatically)
+
+### Breaking Changes Policy
+
+- Pre-1.0: Clean breaks allowed with documentation, no backward compatibility
+- Post-1.0: Deprecation cycle required
+- Always document in CHANGELOG.md
+- Provide migration examples
+- Update all examples and tests
+- Megathink and widen scope of research in code 
+
+### Performance Targets
+
+- Tool initialization: <10ms
+- Agent creation: <50ms including provider setup
+- Tool invocation overhead: <10ms
+- Workflow step overhead: <20ms
+- Script bridge overhead: <5ms
+- Memory usage: Linear with workload
+
+### Security Requirements
+
+1. **Input Validation**:
+   - Length limits on all string inputs
+   - Path traversal prevention
+   - Command injection prevention
+   - URL validation for web operations
+
+2. **Resource Limits**:
+   - Memory limits enforced
+   - CPU time limits
+   - Operation count limits
+   - Concurrent operation limits
+
+3. **Sandboxing**:
+   - File system access restrictions
+   - Network access controls
+   - Process spawning limits
+   - Credential protection
+
+### Common Pitfalls to Avoid
+
+1. **Don't** create new files unless absolutely necessary
+2. **Don't** implement features not in the current phase
+3. **Don't** skip tests to make deadlines
+4. **Don't** ignore security implications
+6. **Don't** use unwrap() in production code
+7. **Don't** hardcode configuration values
+8. **Don't** expose internal implementation details
+
+### Useful Commands
+
+```bash
+# Find TODO items
+rg "TODO|FIXME|HACK" --type rust
+
+# Check for unwrap usage
+rg "\.unwrap\(\)" --type rust
+
+# Run specific test
+cargo test -p llmspell-tools test_name_here
+
+# Benchmark performance
+cargo bench -p llmspell-tools
+
+# Generate documentation
+cargo doc --workspace --no-deps --open
+
+# Check dependencies
+cargo tree -d  # Find duplicate dependencies
+cargo audit    # Security audit
+```
+
+Remember: When in doubt, refer to `/docs/technical/rs-llmspell-final-architecture.md` for architectural decisions and `/docs/in-progress/implementation-phases.md` for the roadmap.
