@@ -88,10 +88,20 @@ else
     OVERALL_SUCCESS=1
 fi
 
+# 4b. Run core component package unit tests
+echo ""
+echo "4b. Running core component package unit tests..."
+if cargo test --lib -p llmspell-agents -p llmspell-workflows -p llmspell-bridge -p llmspell-providers > /dev/null 2>&1; then
+    print_status 0 "core component package unit tests passed"
+else
+    print_status 1 "core component package unit tests failed"
+    OVERALL_SUCCESS=1
+fi
+
 # 4b. Run other package unit tests
 echo ""
-echo "4b. Running other unit tests..."
-if cargo test --lib -p llmspell-bridge -p llmspell-utils -p llmspell-storage > /dev/null 2>&1; then
+echo "4c. Running other unit tests..."
+if cargo test --lib -p llmspell-cli -p llmspell-config -p llmspell-utils -p llmspell-storage > /dev/null 2>&1; then
     print_status 0 "Other unit tests passed"
 else
     print_status 1 "Other unit tests failed"

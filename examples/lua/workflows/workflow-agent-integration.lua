@@ -1,839 +1,496 @@
--- ABOUTME: Workflow-Agent integration example demonstrating combined capabilities
--- ABOUTME: Shows how agents and workflows work together for complex automation
+-- ABOUTME: Workflow-Agent integration example demonstrating AI-powered automation
+-- ABOUTME: Shows core patterns of combining agents and workflows for intelligent processing
 
--- Workflow-Agent Integration Example
--- Demonstrates how to combine agents and workflows for intelligent automation
-
--- Load workflow helpers for async execution
-local helpers = dofile("examples/lua/workflows/workflow-helpers.lua")
--- Load tool helpers for async tool invocation
-local tool_helpers = dofile("examples/lua/tools/tool-helpers.lua")
+-- Note: All workflow and agent methods are now synchronous - no helpers needed
 
 print("=== Workflow-Agent Integration Example ===\n")
 
--- Create specialized agents for the workflow
-local agents = {}
+-- Core Concept 1: Agents as Intelligent Steps
+-- Unlike deterministic tools, agents bring reasoning and context understanding
+print("Concept 1: Agents as Intelligent Steps")
+print("-" .. string.rep("-", 38))
 
--- Data Analysis Agent
-agents.analyzer = Agent.createAsync({
-    name = "data_analyzer",
-    model = "gpt-4",
-    system_prompt = [[
-You are a data analysis expert. Analyze data and provide:
-1. Key insights and patterns
-2. Statistical summary
-3. Anomalies or concerns
-4. Recommendations
-Be concise and data-driven.
-]],
-    temperature = 0.3
-})
-
--- Decision Making Agent
-agents.decision_maker = Agent.createAsync({
-    name = "decision_agent",
-    model = "gpt-4",
-    system_prompt = [[
-You are a decision-making specialist. Based on analysis:
-1. Evaluate options
-2. Assess risks
-3. Make clear recommendations
-4. Provide action steps
-Be decisive and practical.
-]],
-    temperature = 0.2
-})
-
--- Report Generator Agent
-agents.reporter = Agent.createAsync({
-    name = "report_generator",
-    model = "gpt-3.5-turbo",
-    system_prompt = [[
-You generate clear, professional reports. You:
-1. Summarize findings concisely
-2. Use clear structure
-3. Highlight key points
-4. Make reports actionable
-]],
-    temperature = 0.5
-})
-
--- Note: In Phase 3.3, agents would be registered but for now we'll use them directly
--- Agent registration will be properly implemented in the agent infrastructure phase
-
--- Example 1: Sequential Workflow with Agent Steps
-print("Example 1: Sequential Workflow with Agent Steps")
-print("-" .. string.rep("-", 47))
-
--- Create sample business data
-local business_data = {
-    revenue = {
-        q1 = 250000,
-        q2 = 280000,
-        q3 = 265000,
-        q4 = 310000
-    },
-    expenses = {
-        q1 = 180000,
-        q2 = 195000,
-        q3 = 205000,
-        q4 = 220000
-    },
-    customers = {
-        q1 = 1200,
-        q2 = 1350,
-        q3 = 1280,
-        q4 = 1450
-    }
-}
-
--- Save data
-local json_result = tool_helpers.invokeTool("json_processor", {
-    operation = "stringify",
-    input = business_data,
-    pretty = true
-})
-if json_result and json_result.output then
-    tool_helpers.invokeTool("file_operations", {
-        operation = "write",
-        path = "/tmp/business_data.json",
-        content = json_result.output
-    })
-end
-
--- Create integrated workflow
-local analysis_workflow = Workflow.sequential({
-    name = "business_analysis_pipeline",
-    description = "Analyze business data with AI assistance",
+-- Create a content analysis workflow where agents provide intelligence
+local content_analysis = Workflow.sequential({
+    name = "intelligent_content_analysis",
+    description = "Analyze content using AI reasoning vs pure tools",
     
     steps = {
-        -- Step 1: Load and prepare data
+        -- Step 1: Create sample content
         {
-            name = "load_data",
-            type = "tool",
-            tool = "file_operations",
+            name = "create_sample",
+            type = "tool", 
+            tool = "template_engine",
             input = {
-                operation = "read",
-                path = "/tmp/business_data.json"
+                template = [[Breaking: Local startup SecureVault raises $2M in Series A funding. 
+The cybersecurity company, founded in 2022, plans to expand their team from 12 to 25 employees. 
+CEO Sarah Chen says "This funding validates our approach to zero-trust architecture."
+However, some industry experts question whether the market is oversaturated.]],
+                variables = {}
             }
         },
         
-        -- Step 2: Calculate metrics
+        -- Step 2: Tool-based analysis (deterministic)
         {
-            name = "calculate_metrics",
+            name = "tool_analysis",
             type = "tool",
-            tool = "json_processor",
+            tool = "text_manipulator", 
             input = {
-                input = "{{step:load_data:output}}",
-                operation = "parse"
-            },
-            on_complete = function(result)
-                -- Calculate additional metrics
-                local data = result.output
-                local total_revenue = 0
-                local total_expenses = 0
-                
-                for _, rev in pairs(data.revenue) do
-                    total_revenue = total_revenue + rev
-                end
-                for _, exp in pairs(data.expenses) do
-                    total_expenses = total_expenses + exp
-                end
-                
-                -- Store calculated metrics (would use State in Phase 5)
-                calculated_metrics = {
-                    total_revenue = total_revenue,
-                    total_expenses = total_expenses,
-                    profit = total_revenue - total_expenses,
-                    profit_margin = ((total_revenue - total_expenses) / total_revenue) * 100
+                input = "{{step:create_sample:output}}",
+                operation = "word_count"
+            }
+        },
+        
+        -- Step 3: Agent-based analysis (intelligent)
+        {
+            name = "agent_analysis", 
+            type = "agent",
+            agent = "content_analyzer",
+            input = {
+                text = "{{step:create_sample:output}}",
+                prompt = "Analyze this news content for: 1) Key business insights 2) Market sentiment 3) Strategic implications. Be concise."
+            }
+        },
+        
+        -- Step 4: Compare approaches
+        {
+            name = "comparison_report",
+            type = "tool",
+            tool = "template_engine",
+            input = {
+                template = [[
+=== Content Analysis Comparison ===
+Tool Analysis (deterministic): {{tool_result}} words
+Agent Analysis (intelligent): {{agent_result}}
+
+Key Difference: Tools count, Agents understand meaning and context.
+]],
+                variables = {
+                    tool_result = "{{step:tool_analysis:output}}",
+                    agent_result = "{{step:agent_analysis:output}}"
                 }
-            end
-        },
-        
-        -- Step 3: AI Analysis
-        {
-            name = "ai_analysis",
-            type = "agent",
-            agent = agents.analyzer,
-            input = {
-                prompt = string.format([[
-Analyze this business data:
-
-%s
-
-Additional Metrics:
-- Total Revenue: $%d
-- Total Expenses: $%d
-- Profit: $%d
-- Profit Margin: %.1f%%
-
-Provide insights on:
-1. Revenue trends
-2. Expense management
-3. Customer growth
-4. Overall health
-]], 
-                    "{{step:load_data:output}}",
-                    calculated_metrics.total_revenue,
-                    calculated_metrics.total_expenses,
-                    calculated_metrics.profit,
-                    calculated_metrics.profit_margin
-                )
-            }
-        },
-        
-        -- Step 4: Decision Making
-        {
-            name = "make_decisions",
-            type = "agent",
-            agent = agents.decision_maker,
-            input = {
-                prompt = [[
-Based on this analysis, make strategic recommendations:
-
-{{step:ai_analysis:output}}
-
-Consider:
-1. Growth opportunities
-2. Cost optimization
-3. Risk mitigation
-4. Next quarter priorities
-]]
-            }
-        },
-        
-        -- Step 5: Generate Report
-        {
-            name = "generate_report",
-            type = "agent",
-            agent = agents.reporter,
-            input = {
-                prompt = [[
-Create an executive summary report:
-
-Analysis:
-{{step:ai_analysis:output}}
-
-Recommendations:
-{{step:make_decisions:output}}
-
-Format as a professional business report.
-]]
-            }
-        },
-        
-        -- Step 6: Save Report
-        {
-            name = "save_report",
-            type = "tool",
-            tool = "file_operations",
-            input = {
-                operation = "write",
-                path = "/tmp/business_analysis_report.md",
-                content = "{{step:generate_report:output}}"
             }
         }
     }
 })
 
-print("Executing business analysis workflow...")
-local analysis_result, err = helpers.executeWorkflow(analysis_workflow)
-
+-- Execute and show the difference
+local analysis_result = content_analysis:execute()
 if analysis_result and analysis_result.success then
-    print("✓ Analysis completed successfully!")
-    print("Report saved to: /tmp/business_analysis_report.md")
-elseif analysis_result then
-    print("✗ Analysis failed: " .. (analysis_result.error and analysis_result.error.message or "Unknown"))
+    print("✓ Content analysis completed - shows agent intelligence vs tool determinism")
 else
-    print("✗ Execution error: " .. tostring(err))
+    print("✗ Analysis failed")
 end
 
--- Example 2: Conditional Workflow with Agent Decisions
-print("\n\nExample 2: Conditional Workflow with Agent Decisions")
-print("-" .. string.rep("-", 52))
+-- Core Concept 2: Agent-Driven Routing 
+-- Agent decisions drive workflow branching logic
+print("\n\nConcept 2: Agent-Driven Routing")
+print("-" .. string.rep("-", 31))
 
--- Customer support ticket
-local support_ticket = {
-    id = "TICKET-1234",
-    customer = "john.doe@example.com",
-    subject = "Product not working after update",
-    message = "After the latest update, the app crashes on startup. I've tried reinstalling but the problem persists.",
-    priority = "high",
-    product = "ProApp Enterprise"
+-- Create sample customer emails to route
+local customer_emails = {
+    "Hi, I can't log into my account after password reset",
+    "Your billing charged me twice this month, please refund", 
+    "Love the new features! Any plans for mobile app?",
+    "System is down, urgent - our production is affected"
 }
 
--- Support ticket variable (would use State in Phase 5)
-local current_ticket = support_ticket
-
--- Agent-driven conditional workflow
-local support_workflow = Workflow.conditional({
-    name = "intelligent_support_router",
-    description = "Route support tickets based on AI analysis",
+-- Agent-driven email routing workflow
+for i, email in ipairs(customer_emails) do
+    print(string.format("\nRouting Email #%d: %s", i, email:sub(1, 40) .. "..."))
     
-    -- First, analyze the ticket
-    pre_steps = {
-        {
-            name = "analyze_ticket",
-            type = "agent",
-            agent = Agent.createAsync({
-                name = "ticket_analyzer",
-                model = "gpt-3.5-turbo",
-                system_prompt = "Analyze support tickets and categorize them as: technical, billing, feature_request, or general"
-            }),
-            input = {
-                prompt = string.format([[
-Analyze this support ticket and categorize it:
-
-Ticket ID: %s
-Subject: %s
-Message: %s
-Priority: %s
-
-Respond with just the category: technical, billing, feature_request, or general
-]], support_ticket.id, support_ticket.subject, 
-    support_ticket.message, support_ticket.priority)
-            }
-        }
-    },
-    
-    branches = {
-        -- Technical issues branch
-        {
-            name = "technical_support",
-            condition = {
-                type = "step_output_contains",
-                step_name = "analyze_ticket",
-                substring = "technical"
-            },
-            steps = {
-                {
-                    name = "diagnose_issue",
-                    type = "agent",
-                    agent = Agent.createAsync({
-                        name = "tech_support_agent",
-                        model = "gpt-4",
-                        system_prompt = "You are a technical support specialist. Diagnose issues and provide solutions."
-                    }),
+    local email_router = Workflow.conditional({
+        name = "intelligent_email_router",
+        description = "Route emails based on AI understanding",
+        
+        branches = {
+            -- Technical issue branch
+            {
+                name = "technical_support",
+                condition = {
+                    type = "agent_decision",
+                    agent = "email_classifier", 
                     input = {
-                        prompt = "Diagnose and provide solution for: " .. support_ticket.message
-                    }
+                        email = email,
+                        prompt = "Is this a technical support issue? Answer yes or no."
+                    },
+                    expected = "yes"
                 },
-                {
-                    name = "create_response",
-                    type = "tool",
-                    tool = "template_engine",
+                steps = {
+                    {
+                        name = "tech_response",
+                        type = "tool",
+                        tool = "template_engine", 
+                        input = {
+                            template = "→ Routed to TECHNICAL SUPPORT (Priority: High)",
+                            variables = {}
+                        }
+                    }
+                }
+            },
+            
+            -- Billing issue branch  
+            {
+                name = "billing_support",
+                condition = {
+                    type = "agent_decision",
+                    agent = "email_classifier",
                     input = {
-                        template = [[
-Dear {{customer}},
-
-Thank you for reporting this issue with {{product}}.
-
-{{diagnosis}}
-
-Please let us know if this resolves your issue.
-
-Best regards,
-Technical Support Team
-]],
-                        variables = {
-                            customer = support_ticket.customer,
-                            product = support_ticket.product,
-                            diagnosis = "{{step:diagnose_issue:output}}"
+                        email = email,
+                        prompt = "Is this a billing or payment issue? Answer yes or no."
+                    },
+                    expected = "yes"
+                },
+                steps = {
+                    {
+                        name = "billing_response", 
+                        type = "tool",
+                        tool = "template_engine",
+                        input = {
+                            template = "→ Routed to BILLING DEPARTMENT",
+                            variables = {}
+                        }
+                    }
+                }
+            },
+            
+            -- Default: General support
+            {
+                name = "general_support",
+                condition = { type = "always" },
+                steps = {
+                    {
+                        name = "general_response",
+                        type = "tool", 
+                        tool = "template_engine",
+                        input = {
+                            template = "→ Routed to GENERAL SUPPORT",
+                            variables = {}
                         }
                     }
                 }
             }
-        },
-        
-        -- Billing issues branch
-        {
-            name = "billing_support",
-            condition = {
-                type = "step_output_contains",
-                step_name = "analyze_ticket",
-                substring = "billing"
-            },
-            steps = {
-                {
-                    name = "billing_response",
-                    type = "tool",
-                    tool = "template_engine",
-                    input = {
-                        template = "Routing to billing department for: {{ticket}}",
-                        variables = { ticket = support_ticket.id }
-                    }
-                }
-            }
-        },
-        
-        -- Default branch
-        {
-            name = "general_support",
-            condition = { type = "always" },
-            steps = {
-                {
-                    name = "general_response",
-                    type = "agent",
-                    agent = agents.reporter,
-                    input = {
-                        prompt = "Create a polite response acknowledging the ticket: " .. support_ticket.subject
-                    }
-                }
-            }
         }
-    }
-})
-
-print("Executing intelligent support workflow...")
-local support_result, err = helpers.executeWorkflow(support_workflow)
-if support_result then
-    print("Support ticket routed and processed")
-else
-    print("Execution error: " .. tostring(err))
+    })
+    
+    local route_result = email_router:execute()
+    if route_result and route_result.success then
+        print("  ✓ Email routed successfully")
+    end
 end
 
--- Example 3: Parallel Workflow with Multiple Agents
-print("\n\nExample 3: Parallel Workflow with Multiple Agents")
-print("-" .. string.rep("-", 49))
+-- Core Concept 3: Multi-Agent Collaboration
+-- Specialized agents working together toward a common goal
+print("\n\nConcept 3: Multi-Agent Collaboration") 
+print("-" .. string.rep("-", 36))
 
--- Market research scenario
-local market_data = {
-    product = "Smart Home Assistant",
-    competitors = {"AlexaHome", "GoogleNest", "AppleHome"},
-    target_market = "Tech-savvy homeowners aged 25-45",
-    price_point = "$199"
-}
-
--- Market research variable
-local market_research = market_data
-
--- Parallel multi-agent analysis
-local research_workflow = Workflow.parallel({
-    name = "market_research_analysis",
-    description = "Comprehensive market analysis using multiple AI agents",
+-- Market research scenario with specialized agents
+local market_research = Workflow.parallel({
+    name = "collaborative_market_research",
+    description = "Multiple specialized agents analyze different aspects",
     
     branches = {
-        -- Competitive Analysis
+        -- Competitive analysis agent
         {
-            name = "competitive_analysis",
+            name = "competitive_analysis", 
             steps = {
                 {
-                    name = "analyze_competition",
+                    name = "analyze_competitors",
                     type = "agent",
-                    agent = Agent.createAsync({
-                        name = "competitive_analyst",
-                        model = "gpt-4",
-                        system_prompt = "You are a competitive analysis expert."
-                    }),
+                    agent = "competitive_analyst",
                     input = {
-                        prompt = string.format([[
-Analyze competitive landscape for %s
-Competitors: %s
-Price: %s
-
-Provide competitive advantages and disadvantages.
-]], market_data.product, table.concat(market_data.competitors, ", "), market_data.price_point)
+                        product = "AI-powered email assistant",
+                        competitors = "Gmail Smart Compose, Outlook Editor, Grammarly",
+                        prompt = "Analyze competitive landscape focusing on differentiation opportunities"
                     }
                 }
             }
         },
         
-        -- Market Opportunity
+        -- Market sizing agent
         {
-            name = "market_opportunity",
+            name = "market_sizing",
             steps = {
                 {
-                    name = "assess_opportunity",
-                    type = "agent",
-                    agent = agents.analyzer,
+                    name = "estimate_market",
+                    type = "agent", 
+                    agent = "market_analyst",
                     input = {
-                        prompt = string.format([[
-Assess market opportunity for: %s
-Target: %s
-Price: %s
-
-Identify market size, growth potential, and risks.
-]], market_data.product, market_data.target_market, market_data.price_point)
+                        market = "Email productivity tools",
+                        prompt = "Estimate total addressable market and growth trends"
                     }
                 }
             }
         },
         
-        -- Marketing Strategy
+        -- Pricing strategy agent
         {
-            name = "marketing_strategy",
+            name = "pricing_strategy",
             steps = {
                 {
-                    name = "develop_strategy",
+                    name = "recommend_pricing",
                     type = "agent",
-                    agent = agents.decision_maker,
+                    agent = "pricing_strategist", 
                     input = {
-                        prompt = string.format([[
-Develop marketing strategy for: %s
-Target: %s
-
-Suggest channels, messaging, and campaign ideas.
-]], market_data.product, market_data.target_market)
+                        product_type = "SaaS email assistant",
+                        prompt = "Recommend pricing model and tiers for market entry"
                     }
                 }
             }
         }
     },
     
-    -- Synthesize results
+    -- Synthesis agent combines all insights
     post_steps = {
         {
             name = "synthesize_research",
             type = "agent",
-            agent = agents.reporter,
+            agent = "research_synthesizer",
             input = {
-                prompt = [[
-Synthesize these market research findings into a cohesive strategy:
-
-Competitive Analysis:
-{{branch:competitive_analysis:analyze_competition:output}}
-
-Market Opportunity:
-{{branch:market_opportunity:assess_opportunity:output}}
-
-Marketing Strategy:
-{{branch:marketing_strategy:develop_strategy:output}}
-
-Create an executive summary with key recommendations.
-]]
+                competitive_analysis = "{{branch:competitive_analysis:analyze_competitors:output}}",
+                market_sizing = "{{branch:market_sizing:estimate_market:output}}", 
+                pricing_strategy = "{{branch:pricing_strategy:recommend_pricing:output}}",
+                prompt = "Synthesize all research into executive summary with key recommendations"
             }
         }
     }
 })
 
-print("Executing parallel market research...")
-local research_result, err = helpers.executeWorkflow(research_workflow)
-if research_result then
-    print("Market research completed with " .. (research_result.data and research_result.data.successful_branches or "N/A") .. " analyses")
+print("Executing collaborative market research...")
+local research_result = market_research:execute()
+if research_result and research_result.success then
+    print("✓ Multi-agent collaboration completed")
+    print("  - Competitive analysis: Done")
+    print("  - Market sizing: Done") 
+    print("  - Pricing strategy: Done")
+    print("  - Synthesis: Done")
 else
-    print("Execution error: " .. tostring(err))
+    print("✗ Collaboration failed")
 end
 
--- Example 4: Loop Workflow with Agent Processing
-print("\n\nExample 4: Loop Workflow with Agent Processing")
-print("-" .. string.rep("-", 46))
+-- Core Concept 4: Stateful Agent Context
+-- Agents maintaining context and learning across iterations
+print("\n\nConcept 4: Stateful Agent Context")
+print("-" .. string.rep("-", 33))
 
--- Customer feedback to process
-local feedback_items = {
-    "The new feature is amazing but the UI could be more intuitive",
-    "Great product! Shipping was fast and packaging was excellent",
-    "App crashes frequently on Android. Very frustrating experience",
-    "Love the design. Would pay extra for premium features",
-    "Customer service was unhelpful. Waited 2 hours for response"
+-- Document review process where agent builds understanding
+local documents = {
+    "Product Requirements Document v1.0",
+    "Technical Architecture Specification", 
+    "Security Audit Report",
+    "User Experience Research Findings"
 }
 
--- Feedback tracking file
-local sentiment_file = "/tmp/sentiment_summary.json"
-
--- Initialize sentiment tracking
-local init_result = tool_helpers.invokeTool("file_operations", {
+-- Initialize review context
+Tool.invoke("file_operations", {
     operation = "write",
-    path = sentiment_file,
-    content = '{"positive": 0, "negative": 0, "neutral": 0}'
+    path = "/tmp/review_context.json", 
+    input = '{"reviewed_docs": [], "key_insights": [], "concerns": []}'
 })
 
--- Loop with agent processing
-local feedback_workflow = Workflow.loop({
-    name = "feedback_processor",
-    description = "Process customer feedback with AI sentiment analysis",
+local document_reviewer = Workflow.loop({
+    name = "stateful_document_review",
+    description = "Agent builds context across document reviews",
     
     iterator = {
-        collection = feedback_items
+        collection = documents
     },
     
     body = {
+        -- Read current context
         {
-            name = "analyze_sentiment",
-            type = "agent",
-            agent = Agent.createAsync({
-                name = "sentiment_analyzer",
-                model = "gpt-3.5-turbo",
-                system_prompt = "Analyze sentiment as positive, negative, or neutral. Respond with just the sentiment.",
-                temperature = 0.1
-            }),
-            input = {
-                prompt = "Analyze sentiment of: {{loop:current_item}}"
-            }
-        },
-        {
-            name = "extract_insights",
-            type = "agent",
-            agent = agents.analyzer,
-            input = {
-                prompt = [[
-Extract key insights from this feedback:
-{{loop:current_item}}
-
-Identify:
-1. Main topic (product, service, shipping, etc.)
-2. Specific issue or praise
-3. Actionable suggestion
-]]
-            }
-        },
-        {
-            name = "read_current_sentiment",
+            name = "read_context",
             type = "tool",
             tool = "file_operations",
             input = {
                 operation = "read",
-                path = sentiment_file
+                path = "/tmp/review_context.json"
             }
         },
+        
+        -- Agent review with accumulated context
         {
-            name = "parse_sentiment_data",
+            name = "review_document",
+            type = "agent", 
+            agent = "document_reviewer",
+            input = {
+                document = "{{loop:current_item}}",
+                previous_context = "{{step:read_context:output}}",
+                prompt = "Review this document considering previous reviews. Build on earlier insights."
+            }
+        },
+        
+        -- Update context with new insights
+        {
+            name = "update_context",
             type = "tool",
             tool = "json_processor",
             input = {
-                json = "{{step:read_current_sentiment:output}}",
-                query = "$"
+                input = "{{step:read_context:output}}",
+                operation = "transform",
+                query = ".reviewed_docs += [\"{{loop:current_item}}\"] | .key_insights += [\"New insight from {{loop:current_item}}\"]"
             }
         },
+        
+        -- Save updated context
         {
-            name = "determine_sentiment_type",
-            type = "tool",
-            tool = "text_manipulator",
-            input = {
-                input = "{{step:analyze_sentiment:output}}",
-                operation = "lowercase"
-            }
-        },
-        {
-            name = "check_positive",
-            type = "tool",
-            tool = "text_manipulator",
-            input = {
-                input = "{{step:determine_sentiment_type:output}}",
-                operation = "contains",
-                pattern = "positive"
-            }
-        },
-        {
-            name = "check_negative",
-            type = "tool",
-            tool = "text_manipulator",
-            input = {
-                input = "{{step:determine_sentiment_type:output}}",
-                operation = "contains",
-                pattern = "negative"
-            }
-        },
-        {
-            name = "get_positive_count",
-            type = "tool",
-            tool = "json_processor",
-            input = {
-                json = "{{step:parse_sentiment_data:output}}",
-                query = "$.positive"
-            }
-        },
-        {
-            name = "get_negative_count",
-            type = "tool",
-            tool = "json_processor",
-            input = {
-                json = "{{step:parse_sentiment_data:output}}",
-                query = "$.negative"
-            }
-        },
-        {
-            name = "get_neutral_count",
-            type = "tool",
-            tool = "json_processor",
-            input = {
-                json = "{{step:parse_sentiment_data:output}}",
-                query = "$.neutral"
-            }
-        },
-        {
-            name = "calculate_new_count",
-            type = "tool",
-            tool = "calculator",
-            input = {
-                input = "{{step:check_positive:output == 'true' ? step:get_positive_count:output : (step:check_negative:output == 'true' ? step:get_negative_count:output : step:get_neutral_count:output)}} + 1"
-            }
-        },
-        {
-            name = "update_sentiment_data",
-            type = "tool",
-            tool = "template_engine",
-            input = {
-                template = '{"positive": {{positive}}, "negative": {{negative}}, "neutral": {{neutral}}}',
-                variables = {
-                    positive = "{{step:check_positive:output == 'true' ? step:calculate_new_count:output : step:get_positive_count:output}}",
-                    negative = "{{step:check_negative:output == 'true' ? step:calculate_new_count:output : step:get_negative_count:output}}",
-                    neutral = "{{step:check_positive:output != 'true' && step:check_negative:output != 'true' ? step:calculate_new_count:output : step:get_neutral_count:output}}"
-                }
-            }
-        },
-        {
-            name = "save_updated_sentiment",
+            name = "save_context", 
             type = "tool",
             tool = "file_operations",
             input = {
                 operation = "write",
-                path = sentiment_file,
-                content = "{{step:update_sentiment_data:output}}"
+                path = "/tmp/review_context.json",
+                content = "{{step:update_context:output}}"
             }
-        },
-        {
-            name = "create_progress_message",
-            type = "tool",
-            tool = "template_engine",
-            input = {
-                template = "Processed feedback #{{index}}",
-                variables = {
-                    index = "{{loop:current_index}}"
-                }
-            }
-        }
-    },
-    
-    -- Generate summary report
-    on_complete = function()
-        -- Read final sentiment data
-        local read_result = tool_helpers.invokeTool("file_operations", {
-            operation = "read",
-            path = sentiment_file
-        })
-        
-        if read_result and read_result.success then
-            local parse_result = tool_helpers.invokeTool("json_processor", {
-                json = read_result.output,
-                query = "$"
-            })
-            
-            if parse_result and parse_result.success then
-                local summary = parse_result.output
-                local total = summary.positive + summary.negative + summary.neutral
-                
-                print("\nFeedback Analysis Summary:")
-                print(string.format("- Positive: %d (%.1f%%)", 
-                      summary.positive, (summary.positive/total)*100))
-                print(string.format("- Negative: %d (%.1f%%)", 
-                      summary.negative, (summary.negative/total)*100))
-                print(string.format("- Neutral: %d (%.1f%%)", 
-                      summary.neutral, (summary.neutral/total)*100))
-            end
-        end
-    end
-})
-
-print("Processing customer feedback...")
-local feedback_result, err = helpers.executeWorkflow(feedback_workflow)
-
--- Example 5: Complex Integration - Multi-Stage Pipeline
-print("\n\nExample 5: Complex Multi-Stage Pipeline")
-print("-" .. string.rep("-", 39))
-
--- Document processing pipeline
-local document_pipeline = Workflow.sequential({
-    name = "document_processing_pipeline",
-    description = "Complex document processing with multiple AI stages",
-    
-    steps = {
-        -- Stage 1: Document Analysis
-        {
-            name = "analyze_document",
-            type = "parallel",
-            workflow = Workflow.parallel({
-                branches = {
-                    {
-                        name = "extract_topics",
-                        steps = {{
-                            name = "topic_extraction",
-                            type = "agent",
-                            agent = agents.analyzer,
-                            input = {
-                                prompt = "Extract main topics from this document: [Document content here]"
-                            }
-                        }}
-                    },
-                    {
-                        name = "check_compliance",
-                        steps = {{
-                            name = "compliance_check",
-                            type = "agent",
-                            agent = Agent.createAsync({
-                                name = "compliance_checker",
-                                model = "gpt-4",
-                                system_prompt = "Check documents for compliance issues."
-                            }),
-                            input = {
-                                prompt = "Check for compliance issues: [Document content here]"
-                            }
-                        }}
-                    }
-                }
-            })
-        },
-        
-        -- Stage 2: Decision Point
-        {
-            name = "routing_decision",
-            type = "conditional",
-            workflow = Workflow.conditional({
-                branches = {
-                    {
-                        name = "needs_revision",
-                        condition = {
-                            type = "step_output_contains",
-                            step_name = "analyze_document",
-                            substring = "compliance issue"
-                        },
-                        steps = {{
-                            name = "revision_notes",
-                            type = "agent",
-                            agent = agents.reporter,
-                            input = {
-                                prompt = "Create revision notes for compliance issues"
-                            }
-                        }}
-                    },
-                    {
-                        name = "ready_to_publish",
-                        condition = { type = "always" },
-                        steps = {{
-                            name = "create_summary",
-                            type = "agent",
-                            agent = agents.reporter,
-                            input = {
-                                prompt = "Create publishable summary"
-                            }
-                        }}
-                    }
-                }
-            })
         }
     }
 })
 
-print("Executing complex document pipeline...")
-local pipeline_result, err = helpers.executeWorkflow(document_pipeline)
-if pipeline_result then
-    print("Document pipeline completed")
+print("Processing documents with stateful agent context...")
+local review_result = document_reviewer:execute()
+if review_result and review_result.success then
+    print("✓ Stateful document review completed")
+    print("  Agent built understanding across " .. #documents .. " documents")
 else
-    print("Execution error: " .. tostring(err))
+    print("✗ Stateful review failed")
 end
 
--- Performance and Summary
-print("\n\n=== Workflow-Agent Integration Summary ===")
-print("Integration patterns demonstrated:")
-print("1. Sequential workflow with agent analysis steps")
-print("2. Conditional routing based on agent decisions")
-print("3. Parallel execution with multiple specialized agents")
-print("4. Loop processing with agent-based analysis")
-print("5. Complex multi-stage pipelines")
-print("\nKey capabilities shown:")
-print("- Agents as workflow steps")
-print("- Agent output driving workflow logic")
-print("- Multiple agents working in parallel")
-print("- State sharing between agents and workflows")
-print("- Complex orchestration patterns")
+-- Core Concept 5: Hierarchical Agent Coordination  
+-- Supervisor agent orchestrating worker agents
+print("\n\nConcept 5: Hierarchical Agent Coordination")
+print("-" .. string.rep("-", 42))
+
+-- Project management scenario with supervisor and workers
+local project_coordinator = Workflow.sequential({
+    name = "hierarchical_project_management",
+    description = "Supervisor agent coordinates worker agents",
+    
+    steps = {
+        -- Supervisor creates project plan
+        {
+            name = "create_project_plan",
+            type = "agent",
+            agent = "project_supervisor", 
+            input = {
+                project = "Launch AI email assistant MVP",
+                timeline = "8 weeks",
+                prompt = "Create project plan with work breakdown structure"
+            }
+        },
+        
+        -- Supervisor delegates to specialist workers
+        {
+            name = "delegate_development",
+            type = "parallel",
+            workflow = Workflow.parallel({
+                branches = {
+                    -- Backend development worker
+                    {
+                        name = "backend_work",
+                        steps = {
+                            {
+                                name = "backend_tasks",
+                                type = "agent",
+                                agent = "backend_developer",
+                                input = {
+                                    project_plan = "{{step:create_project_plan:output}}",
+                                    prompt = "Extract backend development tasks and estimate effort"
+                                }
+                            }
+                        }
+                    },
+                    
+                    -- Frontend development worker  
+                    {
+                        name = "frontend_work",
+                        steps = {
+                            {
+                                name = "frontend_tasks", 
+                                type = "agent",
+                                agent = "frontend_developer",
+                                input = {
+                                    project_plan = "{{step:create_project_plan:output}}",
+                                    prompt = "Extract frontend development tasks and estimate effort"
+                                }
+                            }
+                        }
+                    },
+                    
+                    -- QA testing worker
+                    {
+                        name = "qa_work",
+                        steps = {
+                            {
+                                name = "qa_tasks",
+                                type = "agent", 
+                                agent = "qa_engineer",
+                                input = {
+                                    project_plan = "{{step:create_project_plan:output}}",
+                                    prompt = "Create QA strategy and testing timeline"
+                                }
+                            }
+                        }
+                    }
+                }
+            })
+        },
+        
+        -- Supervisor consolidates worker outputs
+        {
+            name = "consolidate_plan",
+            type = "agent",
+            agent = "project_supervisor",
+            input = {
+                original_plan = "{{step:create_project_plan:output}}",
+                backend_plan = "{{step:delegate_development:backend_work:backend_tasks:output}}",
+                frontend_plan = "{{step:delegate_development:frontend_work:frontend_tasks:output}}", 
+                qa_plan = "{{step:delegate_development:qa_work:qa_tasks:output}}",
+                prompt = "Consolidate worker plans into final integrated project timeline"
+            }
+        }
+    }
+})
+
+print("Executing hierarchical project coordination...")
+local coord_result = project_coordinator:execute()
+if coord_result and coord_result.success then
+    print("✓ Hierarchical coordination completed")
+    print("  - Supervisor created plan")
+    print("  - Workers specialized on domains") 
+    print("  - Integration achieved")
+else
+    print("✗ Coordination failed")
+end
+
+-- Summary of Integration Patterns
+print("\n\n=== Integration Patterns Summary ===")
+print("Core agent-workflow patterns demonstrated:")
+print()
+print("1. INTELLIGENT STEPS: Agents bring reasoning vs deterministic tools")
+print("   - Tools: Count words, manipulate text") 
+print("   - Agents: Understand meaning, provide insights")
+print()
+print("2. AGENT-DRIVEN ROUTING: AI decisions control workflow paths")
+print("   - Agent analyzes content and determines routing")
+print("   - More flexible than rule-based conditions")
+print()
+print("3. MULTI-AGENT COLLABORATION: Specialized agents work together")
+print("   - Each agent focuses on domain expertise")
+print("   - Parallel processing with synthesis")
+print()
+print("4. STATEFUL CONTEXT: Agents build understanding over time")
+print("   - Context carries forward across iterations")
+print("   - Agent learns and builds on previous insights")
+print()
+print("5. HIERARCHICAL COORDINATION: Supervisor orchestrates workers")
+print("   - Clear delegation and consolidation patterns")
+print("   - Scalable for complex multi-agent scenarios")
+
+print("\n=== Key Benefits of Agent-Workflow Integration ===")
+print("• Intelligence: Move beyond deterministic automation")
+print("• Flexibility: Adapt to context and unexpected situations") 
+print("• Scalability: Coordinate multiple specialized agents")
+print("• Learning: Build context and improve over iterations")
+print("• Orchestration: Manage complex multi-step processes")
 
 print("\n=== Workflow-Agent Integration Example Complete ===")

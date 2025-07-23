@@ -227,7 +227,7 @@ struct WorkflowInstance {
 impl UserData for WorkflowInstance {
     fn add_methods<'lua, M: UserDataMethods<'lua, Self>>(methods: &mut M) {
         // execute method
-        methods.add_async_method("execute", |lua, this, input: Option<Table>| async move {
+        methods.add_method("execute", |lua, this, input: Option<Table>| {
             let input_json = if let Some(input_table) = input {
                 lua_value_to_json(Value::Table(input_table))?
             } else {
@@ -236,13 +236,17 @@ impl UserData for WorkflowInstance {
 
             info!("Executing {} workflow: {}", this.workflow_type, this.name);
 
-            let result = this
-                .bridge
-                .execute_workflow(&this.workflow_id, input_json)
-                .await
-                .map_err(|e| {
-                    mlua::Error::RuntimeError(format!("Workflow execution failed: {}", e))
-                })?;
+            // Use block_on to execute async code synchronously
+            let result = tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(async move {
+                    this.bridge
+                        .execute_workflow(&this.workflow_id, input_json)
+                        .await
+                        .map_err(|e| {
+                            mlua::Error::RuntimeError(format!("Workflow execution failed: {}", e))
+                        })
+                })
+            })?;
 
             // Convert result to Lua table
             let result_value = json_to_lua_value(lua, &result)?;
@@ -434,302 +438,321 @@ pub fn inject_workflow_global(
 
     // Workflow.sequential() - accepts full configuration
     let bridge_clone = workflow_bridge.clone();
-    let sequential_fn = lua.create_async_function(move |_lua, config: Table| {
+    let sequential_fn = lua.create_function(move |_lua, config: Table| {
         let bridge = bridge_clone.clone();
-        async move {
-            let name: String = config.get("name")?;
-            let description: Option<String> = config.get("description").ok();
-            let steps: Table = config.get("steps")?;
-            let error_strategy: Option<String> = config.get("error_strategy").ok();
-            let timeout_ms: Option<u64> = config.get("timeout_ms").ok();
 
-            // Convert to JSON parameters for WorkflowFactory
-            let mut params = serde_json::json!({
-                "name": name.clone(),
-                "steps": []
-            });
+        // Use block_on to execute async code synchronously
+        let result = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async move {
+                let name: String = config.get("name")?;
+                let description: Option<String> = config.get("description").ok();
+                let steps: Table = config.get("steps")?;
+                let error_strategy: Option<String> = config.get("error_strategy").ok();
+                let timeout_ms: Option<u64> = config.get("timeout_ms").ok();
 
-            if let Some(desc) = &description {
-                params["description"] = serde_json::json!(desc);
-            }
+                // Convert to JSON parameters for WorkflowFactory
+                let mut params = serde_json::json!({
+                    "name": name.clone(),
+                    "steps": []
+                });
 
-            if let Some(strategy) = &error_strategy {
-                params["error_strategy"] = serde_json::json!(strategy);
-            }
+                if let Some(desc) = &description {
+                    params["description"] = serde_json::json!(desc);
+                }
 
-            if let Some(ms) = timeout_ms {
-                params["timeout_ms"] = serde_json::json!(ms);
-            }
+                if let Some(strategy) = &error_strategy {
+                    params["error_strategy"] = serde_json::json!(strategy);
+                }
 
-            // Add steps to params
-            let steps_array = params["steps"].as_array_mut().unwrap();
-            for pair in steps.pairs::<i32, Table>() {
-                let (_, step_table) = pair?;
-                let step_json = lua_value_to_json(Value::Table(step_table))?;
-                steps_array.push(step_json);
-            }
+                if let Some(ms) = timeout_ms {
+                    params["timeout_ms"] = serde_json::json!(ms);
+                }
 
-            // Register with workflow bridge
-            let workflow_id = bridge
-                .create_workflow("sequential", params)
-                .await
-                .map_err(|e| {
-                    mlua::Error::RuntimeError(format!("Failed to register workflow: {}", e))
-                })?;
+                // Add steps to params
+                let steps_array = params["steps"].as_array_mut().unwrap();
+                for pair in steps.pairs::<i32, Table>() {
+                    let (_, step_table) = pair?;
+                    let step_json = lua_value_to_json(Value::Table(step_table))?;
+                    steps_array.push(step_json);
+                }
 
-            debug!(
-                "Created and registered sequential workflow: {} ({})",
-                name, workflow_id
-            );
+                // Register with workflow bridge
+                let workflow_id =
+                    bridge
+                        .create_workflow("sequential", params)
+                        .await
+                        .map_err(|e| {
+                            mlua::Error::RuntimeError(format!("Failed to register workflow: {}", e))
+                        })?;
 
-            Ok(WorkflowInstance {
-                bridge: bridge.clone(),
-                workflow_id,
-                name,
-                workflow_type: "sequential".to_string(),
+                debug!(
+                    "Created and registered sequential workflow: {} ({})",
+                    name, workflow_id
+                );
+
+                Ok::<WorkflowInstance, mlua::Error>(WorkflowInstance {
+                    bridge: bridge.clone(),
+                    workflow_id,
+                    name,
+                    workflow_type: "sequential".to_string(),
+                })
             })
-        }
+        })?;
+
+        Ok(result)
     })?;
 
     // Workflow.conditional() - accepts branches and conditions
     let bridge_clone = workflow_bridge.clone();
-    let conditional_fn = lua.create_async_function(move |_lua, config: Table| {
+    let conditional_fn = lua.create_function(move |_lua, config: Table| {
         let bridge = bridge_clone.clone();
-        async move {
-            let name: String = config.get("name")?;
-            let description: Option<String> = config.get("description").ok();
-            let branches: Table = config.get("branches")?;
-            let default_branch: Option<Table> = config.get("default_branch").ok();
-            let error_strategy: Option<String> = config.get("error_strategy").ok();
 
-            // Convert to JSON parameters for WorkflowFactory
-            let mut params = serde_json::json!({
-                "name": name.clone(),
-                "branches": []
-            });
+        // Use block_on to execute async code synchronously
+        let result = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async move {
+                let name: String = config.get("name")?;
+                let description: Option<String> = config.get("description").ok();
+                let branches: Table = config.get("branches")?;
+                let default_branch: Option<Table> = config.get("default_branch").ok();
+                let error_strategy: Option<String> = config.get("error_strategy").ok();
 
-            if let Some(desc) = &description {
-                params["description"] = serde_json::json!(desc);
-            }
+                // Convert to JSON parameters for WorkflowFactory
+                let mut params = serde_json::json!({
+                    "name": name.clone(),
+                    "branches": []
+                });
 
-            if let Some(strategy) = &error_strategy {
-                params["error_strategy"] = serde_json::json!(strategy);
-            }
+                if let Some(desc) = &description {
+                    params["description"] = serde_json::json!(desc);
+                }
 
-            // Add branches to params
-            let branches_array = params["branches"].as_array_mut().unwrap();
-            for pair in branches.pairs::<i32, Table>() {
-                let (_, branch_table) = pair?;
-                let branch_json = lua_value_to_json(Value::Table(branch_table))?;
-                branches_array.push(branch_json);
-            }
+                if let Some(strategy) = &error_strategy {
+                    params["error_strategy"] = serde_json::json!(strategy);
+                }
 
-            // Add default branch if provided
-            if let Some(default_table) = default_branch {
-                let default_json = lua_value_to_json(Value::Table(default_table))?;
-                params["default_branch"] = default_json;
-            }
+                // Add branches to params
+                let branches_array = params["branches"].as_array_mut().unwrap();
+                for pair in branches.pairs::<i32, Table>() {
+                    let (_, branch_table) = pair?;
+                    let branch_json = lua_value_to_json(Value::Table(branch_table))?;
+                    branches_array.push(branch_json);
+                }
 
-            // Register with workflow bridge
-            let workflow_id = bridge
-                .create_workflow("conditional", params)
-                .await
-                .map_err(|e| {
-                    mlua::Error::RuntimeError(format!("Failed to register workflow: {}", e))
-                })?;
+                // Add default branch if provided
+                if let Some(default_table) = default_branch {
+                    let default_json = lua_value_to_json(Value::Table(default_table))?;
+                    params["default_branch"] = default_json;
+                }
 
-            debug!(
-                "Created and registered conditional workflow: {} ({})",
-                name, workflow_id
-            );
+                // Register with workflow bridge
+                let workflow_id = bridge
+                    .create_workflow("conditional", params)
+                    .await
+                    .map_err(|e| {
+                        mlua::Error::RuntimeError(format!("Failed to register workflow: {}", e))
+                    })?;
 
-            Ok(WorkflowInstance {
-                bridge: bridge.clone(),
-                workflow_id,
-                name,
-                workflow_type: "conditional".to_string(),
+                debug!(
+                    "Created and registered conditional workflow: {} ({})",
+                    name, workflow_id
+                );
+
+                Ok::<WorkflowInstance, mlua::Error>(WorkflowInstance {
+                    bridge: bridge.clone(),
+                    workflow_id,
+                    name,
+                    workflow_type: "conditional".to_string(),
+                })
             })
-        }
+        })?;
+
+        Ok(result)
     })?;
 
     // Workflow.loop() - accepts iterators and body
     let bridge_clone = workflow_bridge.clone();
-    let loop_fn = lua.create_async_function(move |_lua, config: Table| {
+    let loop_fn = lua.create_function(move |_lua, config: Table| {
         let bridge = bridge_clone.clone();
-        async move {
-            let name: String = config.get("name")?;
-            let description: Option<String> = config.get("description").ok();
-            let iterator_type: String = config.get("iterator")?;
-            let body: Table = config.get("body")?;
-            let break_conditions: Option<Table> = config.get("break_conditions").ok();
-            let error_strategy: Option<String> = config.get("error_strategy").ok();
 
-            // Convert to JSON parameters for WorkflowFactory
-            let mut params = serde_json::json!({
-                "name": name.clone(),
-                "body": []
-            });
+        // Use block_on to execute async code synchronously
+        let result = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async move {
+                let name: String = config.get("name")?;
+                let description: Option<String> = config.get("description").ok();
+                let iterator_table: Table = config.get("iterator")?;
+                let body: Table = config.get("body")?;
+                let break_conditions: Option<Table> = config.get("break_conditions").ok();
+                let error_strategy: Option<String> = config.get("error_strategy").ok();
 
-            if let Some(desc) = &description {
-                params["description"] = serde_json::json!(desc);
-            }
+                // Convert to JSON parameters for WorkflowFactory
+                let mut params = serde_json::json!({
+                    "name": name.clone(),
+                    "body": []
+                });
 
-            if let Some(strategy) = &error_strategy {
-                params["error_strategy"] = serde_json::json!(strategy);
-            }
+                if let Some(desc) = &description {
+                    params["description"] = serde_json::json!(desc);
+                }
 
-            // Add iterator-specific parameters
-            // The bridge expects iterator to be an object with specific structure
-            let iterator_obj = match iterator_type.as_str() {
-                "range" => {
+                if let Some(strategy) = &error_strategy {
+                    params["error_strategy"] = serde_json::json!(strategy);
+                }
+
+                // Parse iterator configuration from the table
+                let iterator_obj = if let Ok(range) = iterator_table.get::<_, Table>("range") {
+                    // Range iterator
+                    let start = range.get::<_, i32>("start").unwrap_or(0);
+                    let end = range.get::<_, i32>("end")?;
+                    let step = range.get::<_, i32>("step").unwrap_or(1);
+
                     serde_json::json!({
                         "range": {
-                            "start": config.get::<_, i32>("start").unwrap_or(0),
-                            "end": config.get::<_, i32>("end")?,
-                            "step": config.get::<_, i32>("step").unwrap_or(1)
+                            "start": start,
+                            "end": end,
+                            "step": step
                         }
                     })
-                }
-                "collection" => {
-                    let items: Table = config.get("items")?;
-                    let mut collection = Vec::new();
-
-                    for pair in items.pairs::<i32, Value>() {
+                } else if let Ok(collection) = iterator_table.get::<_, Table>("collection") {
+                    // Collection iterator
+                    let mut collection_vec = Vec::new();
+                    for pair in collection.pairs::<i32, Value>() {
                         let (_, value) = pair?;
-                        collection.push(lua_value_to_json(value)?);
+                        collection_vec.push(lua_value_to_json(value)?);
                     }
 
                     serde_json::json!({
-                        "collection": collection
+                        "collection": collection_vec
                     })
-                }
-                "while" => {
-                    let condition_value: Value = config.get("condition")?;
-                    let condition_str = match condition_value {
-                        Value::String(s) => s.to_str()?.to_string(),
-                        _ => {
-                            return Err(mlua::Error::RuntimeError(
-                                "while condition must be a string".to_string(),
-                            ))
-                        }
-                    };
-                    let max_iterations = config.get::<_, u64>("max_iterations").unwrap_or(100);
+                } else if let Ok(condition_str) = iterator_table.get::<_, String>("while_condition")
+                {
+                    // While iterator
+                    let max_iterations = iterator_table
+                        .get::<_, u64>("max_iterations")
+                        .unwrap_or(100);
 
                     serde_json::json!({
                         "while_condition": condition_str,
                         "max_iterations": max_iterations
                     })
+                } else {
+                    return Err(mlua::Error::RuntimeError(
+                        "Iterator must contain 'range', 'collection', or 'while_condition'"
+                            .to_string(),
+                    ));
+                };
+
+                params["iterator"] = iterator_obj;
+
+                // Add body steps
+                let body_array = params["body"].as_array_mut().unwrap();
+                for pair in body.pairs::<i32, Table>() {
+                    let (_, step_table) = pair?;
+                    let step_json = lua_value_to_json(Value::Table(step_table))?;
+                    body_array.push(step_json);
                 }
-                _ => {
-                    return Err(mlua::Error::RuntimeError(format!(
-                        "Unknown iterator type: {}",
-                        iterator_type
-                    )))
+
+                // Add break conditions
+                if let Some(conditions_table) = break_conditions {
+                    let mut break_conditions_array = Vec::new();
+                    for pair in conditions_table.pairs::<i32, Value>() {
+                        let (_, condition_value) = pair?;
+                        let condition_json = lua_value_to_json(condition_value)?;
+                        break_conditions_array.push(condition_json);
+                    }
+                    params["break_conditions"] = serde_json::json!(break_conditions_array);
                 }
-            };
 
-            params["iterator"] = iterator_obj;
+                // Register with workflow bridge
+                let workflow_id = bridge.create_workflow("loop", params).await.map_err(|e| {
+                    mlua::Error::RuntimeError(format!("Failed to register workflow: {}", e))
+                })?;
 
-            // Add body steps
-            let body_array = params["body"].as_array_mut().unwrap();
-            for pair in body.pairs::<i32, Table>() {
-                let (_, step_table) = pair?;
-                let step_json = lua_value_to_json(Value::Table(step_table))?;
-                body_array.push(step_json);
-            }
+                debug!(
+                    "Created and registered loop workflow: {} ({})",
+                    name, workflow_id
+                );
 
-            // Add break conditions
-            if let Some(conditions_table) = break_conditions {
-                let mut break_conditions_array = Vec::new();
-                for pair in conditions_table.pairs::<i32, Value>() {
-                    let (_, condition_value) = pair?;
-                    let condition_json = lua_value_to_json(condition_value)?;
-                    break_conditions_array.push(condition_json);
-                }
-                params["break_conditions"] = serde_json::json!(break_conditions_array);
-            }
-
-            // Register with workflow bridge
-            let workflow_id = bridge.create_workflow("loop", params).await.map_err(|e| {
-                mlua::Error::RuntimeError(format!("Failed to register workflow: {}", e))
-            })?;
-
-            debug!(
-                "Created and registered loop workflow: {} ({})",
-                name, workflow_id
-            );
-
-            Ok(WorkflowInstance {
-                bridge: bridge.clone(),
-                workflow_id,
-                name,
-                workflow_type: "loop".to_string(),
+                Ok::<WorkflowInstance, mlua::Error>(WorkflowInstance {
+                    bridge: bridge.clone(),
+                    workflow_id,
+                    name,
+                    workflow_type: "loop".to_string(),
+                })
             })
-        }
+        })?;
+
+        Ok(result)
     })?;
 
     // Workflow.parallel() - accepts branches configuration
     let bridge_clone = workflow_bridge.clone();
-    let parallel_fn = lua.create_async_function(move |_lua, config: Table| {
+    let parallel_fn = lua.create_function(move |_lua, config: Table| {
         let bridge = bridge_clone.clone();
-        async move {
-            let name: String = config.get("name")?;
-            let description: Option<String> = config.get("description").ok();
-            let branches: Table = config.get("branches")?;
-            let max_concurrency: Option<usize> = config.get("max_concurrency").ok();
-            let error_strategy: Option<String> = config.get("error_strategy").ok();
-            let timeout_ms: Option<u64> = config.get("timeout_ms").ok();
 
-            // Convert to JSON parameters for WorkflowFactory
-            let mut params = serde_json::json!({
-                "name": name.clone(),
-                "branches": []
-            });
+        // Use block_on to execute async code synchronously
+        let result = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async move {
+                let name: String = config.get("name")?;
+                let description: Option<String> = config.get("description").ok();
+                let branches: Table = config.get("branches")?;
+                let max_concurrency: Option<usize> = config.get("max_concurrency").ok();
+                let error_strategy: Option<String> = config.get("error_strategy").ok();
+                let timeout_ms: Option<u64> = config.get("timeout_ms").ok();
 
-            if let Some(desc) = &description {
-                params["description"] = serde_json::json!(desc);
-            }
+                // Convert to JSON parameters for WorkflowFactory
+                let mut params = serde_json::json!({
+                    "name": name.clone(),
+                    "branches": []
+                });
 
-            if let Some(strategy) = &error_strategy {
-                params["error_strategy"] = serde_json::json!(strategy);
-            }
+                if let Some(desc) = &description {
+                    params["description"] = serde_json::json!(desc);
+                }
 
-            if let Some(max) = max_concurrency {
-                params["max_concurrency"] = serde_json::json!(max);
-            }
+                if let Some(strategy) = &error_strategy {
+                    params["error_strategy"] = serde_json::json!(strategy);
+                }
 
-            if let Some(ms) = timeout_ms {
-                params["timeout_ms"] = serde_json::json!(ms);
-            }
+                if let Some(max) = max_concurrency {
+                    params["max_concurrency"] = serde_json::json!(max);
+                }
 
-            // Add branches to params
-            let branches_array = params["branches"].as_array_mut().unwrap();
-            for pair in branches.pairs::<i32, Table>() {
-                let (_, branch_table) = pair?;
-                let branch_json = lua_value_to_json(Value::Table(branch_table))?;
-                branches_array.push(branch_json);
-            }
+                if let Some(ms) = timeout_ms {
+                    params["timeout_ms"] = serde_json::json!(ms);
+                }
 
-            // Register with workflow bridge
-            let workflow_id = bridge
-                .create_workflow("parallel", params)
-                .await
-                .map_err(|e| {
-                    mlua::Error::RuntimeError(format!("Failed to register workflow: {}", e))
-                })?;
+                // Add branches to params
+                let branches_array = params["branches"].as_array_mut().unwrap();
+                for pair in branches.pairs::<i32, Table>() {
+                    let (_, branch_table) = pair?;
+                    let branch_json = lua_value_to_json(Value::Table(branch_table))?;
+                    branches_array.push(branch_json);
+                }
 
-            debug!(
-                "Created and registered parallel workflow: {} ({})",
-                name, workflow_id
-            );
+                // Register with workflow bridge
+                let workflow_id =
+                    bridge
+                        .create_workflow("parallel", params)
+                        .await
+                        .map_err(|e| {
+                            mlua::Error::RuntimeError(format!("Failed to register workflow: {}", e))
+                        })?;
 
-            Ok(WorkflowInstance {
-                bridge: bridge.clone(),
-                workflow_id,
-                name,
-                workflow_type: "parallel".to_string(),
+                debug!(
+                    "Created and registered parallel workflow: {} ({})",
+                    name, workflow_id
+                );
+
+                Ok::<WorkflowInstance, mlua::Error>(WorkflowInstance {
+                    bridge: bridge.clone(),
+                    workflow_id,
+                    name,
+                    workflow_type: "parallel".to_string(),
+                })
             })
-        }
+        })?;
+
+        Ok(result)
     })?;
 
     // Set workflow constructors on table
@@ -786,23 +809,29 @@ pub fn inject_workflow_global(
     let bridge_clone = workflow_bridge.clone();
     workflow_table.set(
         "list",
-        lua.create_async_function(move |lua, ()| {
+        lua.create_function(move |lua, ()| {
             let bridge = bridge_clone.clone();
-            async move {
-                let workflows = bridge.list_workflows().await;
 
-                let list_table = lua.create_table()?;
-                for (i, (id, info)) in workflows.iter().enumerate() {
-                    let workflow_table = lua.create_table()?;
-                    workflow_table.set("id", id.clone())?;
-                    workflow_table.set("type", info.workflow_type.clone())?;
-                    workflow_table.set("description", info.description.clone())?;
-                    workflow_table.set("features", info.features.clone())?;
-                    list_table.set(i + 1, workflow_table)?;
-                }
+            // Use block_on to execute async code synchronously
+            let result = tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(async move {
+                    let workflows = bridge.list_workflows().await;
 
-                Ok(list_table)
-            }
+                    let list_table = lua.create_table()?;
+                    for (i, (id, info)) in workflows.iter().enumerate() {
+                        let workflow_table = lua.create_table()?;
+                        workflow_table.set("id", id.clone())?;
+                        workflow_table.set("type", info.workflow_type.clone())?;
+                        workflow_table.set("description", info.description.clone())?;
+                        workflow_table.set("features", info.features.clone())?;
+                        list_table.set(i + 1, workflow_table)?;
+                    }
+
+                    Ok::<Table, mlua::Error>(list_table)
+                })
+            })?;
+
+            Ok(result)
         })?,
     )?;
 
@@ -843,14 +872,19 @@ pub fn inject_workflow_global(
     let bridge_clone = workflow_bridge.clone();
     workflow_table.set(
         "remove",
-        lua.create_async_function(move |_, workflow_id: String| {
+        lua.create_function(move |_, workflow_id: String| {
             let bridge = bridge_clone.clone();
-            async move {
-                bridge.remove_workflow(&workflow_id).await.map_err(|e| {
-                    mlua::Error::RuntimeError(format!("Failed to remove workflow: {}", e))
-                })?;
-                Ok(())
-            }
+
+            // Use block_on to execute async code synchronously
+            tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(async move {
+                    bridge.remove_workflow(&workflow_id).await.map_err(|e| {
+                        mlua::Error::RuntimeError(format!("Failed to remove workflow: {}", e))
+                    })
+                })
+            })?;
+
+            Ok(())
         })?,
     )?;
 
@@ -902,37 +936,7 @@ pub fn inject_workflow_global(
         })?,
     )?;
 
-    // Add executeAsync convenience wrapper similar to Agent.createAsync
-    let execute_async_code = r#"
-        -- Helper to execute workflows within a coroutine context
-        function(workflow_instance, input)
-            -- Execute the workflow instance
-            local co = coroutine.create(function()
-                return workflow_instance:execute(input)
-            end)
-            
-            -- Execute the coroutine
-            local success, result = coroutine.resume(co)
-            
-            -- Handle async operations that yield
-            while success and coroutine.status(co) ~= "dead" do
-                success, result = coroutine.resume(co, result)
-            end
-            
-            if not success then
-                error(tostring(result))
-            end
-            
-            return result
-        end
-    "#;
-
-    let execute_async_fn = lua
-        .load(execute_async_code)
-        .eval::<mlua::Function>()
-        .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
-
-    workflow_table.set("executeAsync", execute_async_fn)?;
+    // Note: executeAsync helper removed - all methods now use synchronous API
 
     // Set Workflow as global
     lua.globals().set("Workflow", workflow_table)?;

@@ -1,10 +1,7 @@
 -- ABOUTME: Basic conditional workflow example using only tool steps
 -- ABOUTME: Demonstrates branching logic without custom condition functions
 
--- Load workflow helpers for async execution
-local helpers = dofile("examples/lua/workflows/workflow-helpers.lua")
--- Load tool helpers for async tool invocation
-local tool_helpers = dofile("examples/lua/tools/tool-helpers.lua")
+-- Note: All workflow and tool methods are now synchronous - no helpers needed
 
 print("=== Basic Conditional Workflow Example ===\n")
 
@@ -14,10 +11,10 @@ print("-" .. string.rep("-", 39))
 
 -- Create test data
 local test_value = 75
-tool_helpers.invokeTool("file_operations", {
+Tool.invoke("file_operations", {
     operation = "write",
     path = "/tmp/test_value.txt",
-    content = tostring(test_value)
+    input = tostring(test_value)
 })
 
 local simple_conditional = Workflow.conditional({
@@ -73,13 +70,13 @@ local simple_conditional = Workflow.conditional({
 })
 
 print("Executing value-based branching...")
-local result, err = helpers.executeWorkflow(simple_conditional)
+local result = simple_conditional:execute()
 
 if result and result.success then
     print("✓ Conditional workflow completed!")
     print("Branches executed: " .. (result.data and result.data.executed_branches or "N/A"))
 else
-    print("✗ Workflow failed: " .. tostring(err or (result and result.error)))
+    print("✗ Workflow failed: " .. tostring(result and result.error or "Unknown error"))
 end
 
 -- Example 2: String Pattern Matching
@@ -168,13 +165,13 @@ local pattern_conditional = Workflow.conditional({
 })
 
 print("Executing pattern matching workflow...")
-local pattern_result, err = helpers.executeWorkflow(pattern_conditional)
+local pattern_result = pattern_conditional:execute()
 
 if pattern_result and pattern_result.success then
     print("✓ Pattern matching completed!")
     print("Result: " .. (pattern_result.data and pattern_result.data.final_output or "N/A"))
 else
-    print("✗ Pattern matching failed: " .. tostring(err))
+    print("✗ Pattern matching failed: " .. tostring(pattern_result and pattern_result.error or "Unknown error"))
 end
 
 -- Example 3: Multi-Criteria Decision
@@ -190,15 +187,15 @@ local product = {
 }
 
 -- Save product data
-local product_json = tool_helpers.invokeTool("json_processor", {
+local product_json = Tool.invoke("json_processor", {
     operation = "stringify",
     input = product
 })
 if product_json then
-    tool_helpers.invokeTool("file_operations", {
+    Tool.invoke("file_operations", {
         operation = "write",
         path = "/tmp/product.json",
-        content = product_json.output
+        input = product_json.output
     })
 end
 
@@ -300,13 +297,13 @@ local decision_workflow = Workflow.conditional({
 })
 
 print("Executing multi-criteria decision...")
-local decision_result, err = helpers.executeWorkflow(decision_workflow)
+local decision_result = decision_workflow:execute()
 
 if decision_result and decision_result.success then
     print("✓ Decision workflow completed!")
     print("Matched branches: " .. (decision_result.data and decision_result.data.matched_branches or "0"))
 else
-    print("✗ Decision workflow failed: " .. tostring(err))
+    print("✗ Decision workflow failed: " .. tostring(decision_result and decision_result.error or "Unknown error"))
 end
 
 -- Example 4: File Existence Branching
@@ -395,12 +392,12 @@ local file_conditional = Workflow.conditional({
 })
 
 print("Executing file existence branching...")
-local file_result, err = helpers.executeWorkflow(file_conditional)
+local file_result = file_conditional:execute()
 
 if file_result and file_result.success then
     print("✓ File processing completed!")
 else
-    print("✗ File processing failed: " .. tostring(err))
+    print("✗ File processing failed: " .. tostring(file_result and file_result.error or "Unknown error"))
 end
 
 -- Summary

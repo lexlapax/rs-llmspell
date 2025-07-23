@@ -4,8 +4,7 @@
 -- Conditional Workflow Example
 -- Demonstrates branching logic and condition-based execution
 
--- Load workflow helpers for async execution
-local helpers = dofile("examples/lua/workflows/workflow-helpers.lua")
+-- Note: All workflow methods are now synchronous - no helpers needed
 
 print("=== Conditional Workflow Example ===\n")
 
@@ -108,14 +107,14 @@ local simple_conditional = Workflow.conditional({
 })
 
 print("Executing simple conditional workflow...")
-local simple_result, err = helpers.executeWorkflow(simple_conditional)
+local simple_result = simple_conditional:execute()
 
 if simple_result then
     print("Result:")
     print("- Executed branches: " .. (simple_result.data and simple_result.data.executed_branches or "N/A"))
     print("- Success: " .. tostring(simple_result.success))
 else
-    print("Execution error: " .. tostring(err))
+    print("Execution error: Unknown error")
 end
 
 -- Example 2: Multi-Condition Workflow
@@ -265,14 +264,14 @@ Action: AC on, Dehumidifier on
 })
 
 print("Executing multi-condition workflow...")
-local multi_result, err = helpers.executeWorkflow(multi_condition)
+local multi_result = multi_condition:execute()
 
 if multi_result then
     print("Results:")
     print("- Matched branches: " .. (multi_result.data and multi_result.data.matched_branches or "N/A"))
     print("- Total branches evaluated: " .. (multi_result.data and multi_result.data.total_branches or "N/A"))
 else
-    print("Execution error: " .. tostring(err))
+    print("Execution error: Unknown error")
 end
 
 -- Example 3: Dynamic Condition Workflow
@@ -345,7 +344,7 @@ for _, amount in ipairs(test_orders) do
     local pricing_workflow = create_price_workflow(threshold, amount)
     
     print(string.format("\nProcessing order of $%d (threshold: $%d)", amount, threshold))
-    local result, err = helpers.executeWorkflow(pricing_workflow)
+    local result = pricing_workflow:execute()
     
     if result and result.success then
         print("- Branch executed: " .. (result.data and result.data.executed_branches > 0 and "found" or "none"))
@@ -356,110 +355,51 @@ for _, amount in ipairs(test_orders) do
     end
 end
 
--- Example 4: Nested Conditional Logic
-print("\n\nExample 4: Nested Conditional Logic")
-print("-" .. string.rep("-", 35))
+-- Example 4: Simple Condition Types
+print("\n\nExample 4: Simple Condition Types")
+print("-" .. string.rep("-", 33))
 
--- Complex scenario data
-local request_data = {
-    request_type = "data_processing",
-    data_size = "large",
-    priority = "high",
-    user_tier = "enterprise"
-}
-
--- Create JSON string from request data
-local request_json = '{"request_type":"data_processing","data_size":"large","priority":"high","user_tier":"enterprise"}'
-
-local nested_conditional = Workflow.conditional({
-    name = "request_router",
-    description = "Route requests based on multiple factors",
+-- Demonstrate different condition types
+local condition_types = Workflow.conditional({
+    name = "condition_demo",
+    description = "Demonstrate different condition types",
     
     branches = {
-        -- Data processing requests
+        -- String condition
         {
-            name = "data_processing_branch",
+            name = "string_condition",
             condition = {
                 type = "tool",
-                tool = "json_processor",
+                tool = "text_manipulator",
                 input = {
-                    json = request_json,
-                    query = '.request_type == "data_processing"'
-                }
-            },
-            steps = {
-                -- First, check data size
-                {
-                    name = "route_by_size",
-                    type = "conditional",
-                    workflow = Workflow.conditional({
-                        name = "size_router",
-                        branches = {
-                            {
-                                name = "large_data",
-                                condition = {
-                                    type = "tool",
-                                    tool = "json_processor",
-                                    input = {
-                                        input = request_data,
-                                        operation = "query",
-                                        query = '.data_size == "large"'
-                                    }
-                                },
-                                steps = {
-                                    {
-                                        name = "queue_batch",
-                                        type = "tool",
-                                        tool = "template_engine",
-                                        input = {
-                                            template = "Queued for batch processing: {{tier}} tier, {{priority}} priority",
-                                            variables = {
-                                                tier = "enterprise",
-                                                priority = "high"
-                                            }
-                                        }
-                                    }
-                                }
-                            },
-                            {
-                                name = "small_data",
-                                condition = { type = "always" },
-                                steps = {
-                                    {
-                                        name = "process_immediate",
-                                        type = "tool",
-                                        tool = "text_manipulator",
-                                        input = {
-                                            input = "Processing immediately",
-                                            operation = "uppercase"
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    })
-                }
-            }
-        },
-        -- API requests
-        {
-            name = "api_request_branch",
-            condition = {
-                type = "tool",
-                tool = "json_processor",
-                input = {
-                    json = request_json,
-                    query = '.request_type == "api"'
+                    input = "test",
+                    operation = "uppercase"
                 }
             },
             steps = {
                 {
-                    name = "rate_limit_check",
+                    name = "string_result",
                     type = "tool",
                     tool = "template_engine",
                     input = {
-                        template = "API request from {{tier}} tier - checking rate limits",
-                        variables = { tier = request_data.user_tier }
+                        template = "String condition matched",
+                        variables = {}
+                    }
+                }
+            }
+        },
+        -- Always condition (fallback)
+        {
+            name = "fallback",
+            condition = { type = "always" },
+            steps = {
+                {
+                    name = "fallback_result",
+                    type = "tool", 
+                    tool = "text_manipulator",
+                    input = {
+                        input = "Fallback condition executed",
+                        operation = "lowercase"
                     }
                 }
             }
@@ -467,12 +407,12 @@ local nested_conditional = Workflow.conditional({
     }
 })
 
-print("Executing nested conditional workflow...")
-local nested_result, err = helpers.executeWorkflow(nested_conditional)
-if nested_result then
-    print("Nested routing completed: " .. (nested_result.success and "Success" or "Failed"))
+print("Executing condition types demonstration...")
+local types_result = condition_types:execute()
+if types_result then
+    print("Condition types demo completed: " .. (types_result.success and "Success" or "Failed"))
 else
-    print("Execution error: " .. tostring(err))
+    print("Execution error: Unknown error")
 end
 
 -- Example 5: Condition with Step Output
@@ -557,11 +497,11 @@ local step_output_workflow = Workflow.conditional({
 })
 
 print("Executing step output conditional workflow...")
-local step_output_result, err = helpers.executeWorkflow(step_output_workflow)
+local step_output_result = step_output_workflow:execute()
 if step_output_result then
     print("Validation workflow completed")
 else
-    print("Execution error: " .. tostring(err))
+    print("Execution error: Unknown error")
 end
 
 -- Performance test
@@ -591,7 +531,7 @@ local total_time = 0
 
 for i = 1, iterations do
     local start = os.clock()
-    helpers.executeWorkflow(perf_workflow)
+    perf_workflow:execute()
     total_time = total_time + (os.clock() - start) * 1000
 end
 

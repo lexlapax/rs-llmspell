@@ -4,11 +4,7 @@
 -- Parallel Workflow Example
 -- Demonstrates concurrent execution and result aggregation
 
--- Load workflow helpers for async execution
-local helpers = dofile("examples/lua/workflows/workflow-helpers.lua")
--- Load tool helpers for async tool invocation
-local tool_helpers = dofile("examples/lua/tools/tool-helpers.lua")
--- JSON operations will be done with tools instead of requiring json module
+-- Note: All workflow and tool methods are now synchronous - no helpers needed
 
 print("=== Parallel Workflow Example ===\n")
 
@@ -99,7 +95,7 @@ local basic_parallel = Workflow.parallel({
 
 print("Executing basic parallel workflow...")
 local start_time = os.clock()
-local basic_result, err = helpers.executeWorkflow(basic_parallel)
+local basic_result = basic_parallel:execute()
 local elapsed = (os.clock() - start_time) * 1000
 
 if basic_result then
@@ -109,7 +105,7 @@ if basic_result then
     print("- Execution time: " .. string.format("%.2f ms", elapsed))
     print("- Speedup vs sequential: ~3x (estimated)")
 else
-    print("Execution error: " .. tostring(err))
+    print("Execution error: Unknown error")
 end
 
 -- Example 2: Fork-Join Pattern
@@ -195,7 +191,7 @@ local fork_join = Workflow.parallel({
 })
 
 print("Executing fork-join pattern...")
-local fork_join_result, err = helpers.executeWorkflow(fork_join)
+local fork_join_result = fork_join:execute()
 
 if fork_join_result then
     print("Fork-Join Results:")
@@ -203,7 +199,7 @@ if fork_join_result then
     print("- Success: " .. tostring(fork_join_result.success))
     print("- Parallel processing completed")
 else
-    print("Execution error: " .. tostring(err))
+    print("Execution error: Unknown error")
 end
 
 -- Example 3: Parallel with Dependencies
@@ -281,7 +277,7 @@ local dependency_parallel = Workflow.parallel({
 })
 
 print("Executing parallel workflow with dependencies...")
-local dep_result, err = helpers.executeWorkflow(dependency_parallel)
+local dep_result = dependency_parallel:execute()
 
 if dep_result then
     print("Results:")
@@ -291,7 +287,7 @@ if dep_result then
         print("- Failed branches: " .. dep_result.data.failed_branches)
     end
 else
-    print("Execution error: " .. tostring(err))
+    print("Execution error: Unknown error")
 end
 
 -- Example 4: Resource-Limited Parallel Execution
@@ -351,7 +347,7 @@ local rate_limited = Workflow.parallel({
 
 print("Executing rate-limited parallel workflow (10 tasks, max 3 concurrent)...")
 local rate_start = os.clock()
-local rate_result, err = helpers.executeWorkflow(rate_limited)
+local rate_result = rate_limited:execute()
 local rate_elapsed = (os.clock() - rate_start) * 1000
 
 if rate_result then
@@ -359,7 +355,7 @@ if rate_result then
     print(string.format("- Total time: %.2f ms", rate_elapsed))
     print("- All tasks completed: " .. tostring(rate_result.success))
 else
-    print("Execution error: " .. tostring(err))
+    print("Execution error: Unknown error")
 end
 
 -- Example 5: Map-Reduce Pattern
@@ -460,24 +456,17 @@ local map_reduce = Workflow.parallel({
 })
 
 print("Executing map-reduce word count...")
-local mapreduce_result, err = helpers.executeWorkflow(map_reduce)
+local mapreduce_result = map_reduce:execute()
 
 if mapreduce_result then
     print("Map-Reduce Results:")
     print("- Documents processed: " .. #documents)
     print("- Success: " .. tostring(mapreduce_result.success))
-    print("- Results saved to /tmp/mapreduce_summary.txt")
+    print("- Results saved to individual word count files")
     
-    -- Read and display summary
-    local read_result = tool_helpers.invokeTool("file_operations", {
-        operation = "read",
-        path = "/tmp/mapreduce_summary.txt"
-    })
-    if read_result and read_result.success then
-        print("- Summary: " .. tostring(read_result.output))
-    end
+    -- Map-reduce completed successfully
 else
-    print("Execution error: " .. tostring(err))
+    print("Execution error: Unknown error")
 end
 
 -- Performance comparison
@@ -486,9 +475,9 @@ print("\n\n=== Parallel Performance Analysis ===")
 -- Sequential baseline
 local seq_start = os.clock()
 for i = 1, 3 do
-    tool_helpers.invokeTool("calculator", { input = "100 * 2" })
-    tool_helpers.invokeTool("uuid_generator", { version = "v4" })
-    tool_helpers.invokeTool("text_manipulator", { 
+    Tool.invoke("calculator", { input = "100 * 2" })
+    Tool.invoke("uuid_generator", { version = "v4" })
+    Tool.invoke("text_manipulator", { 
         input = "test", 
         operation = "uppercase" 
     })
@@ -497,6 +486,7 @@ local seq_time = (os.clock() - seq_start) * 1000
 
 -- Parallel execution
 local par_workflow = Workflow.parallel({
+    name = "performance_test",
     branches = {
         { name = "b1", steps = {{ name = "s1", type = "tool", tool = "calculator", input = { input = "100 * 2" }}}},
         { name = "b2", steps = {{ name = "s2", type = "tool", tool = "uuid_generator", input = { version = "v4" }}}},
@@ -505,7 +495,7 @@ local par_workflow = Workflow.parallel({
 })
 
 local par_start = os.clock()
-helpers.executeWorkflow(par_workflow)
+par_workflow:execute()
 local par_time = (os.clock() - par_start) * 1000
 
 print(string.format("Sequential time: %.2f ms", seq_time))

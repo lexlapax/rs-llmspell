@@ -1,10 +1,7 @@
 -- ABOUTME: Basic parallel workflow example using only tool steps
 -- ABOUTME: Demonstrates concurrent execution without custom functions
 
--- Load workflow helpers for async execution
-local helpers = dofile("examples/lua/workflows/workflow-helpers.lua")
--- Load tool helpers for async tool invocation
-local tool_helpers = dofile("examples/lua/tools/tool-helpers.lua")
+-- Note: All workflow and tool methods are now synchronous - no helpers needed
 
 print("=== Basic Parallel Workflow Example ===\n")
 
@@ -78,14 +75,14 @@ local simple_parallel = Workflow.parallel({
 
 print("Executing parallel tools...")
 local start_time = os.clock()
-local result, err = helpers.executeWorkflow(simple_parallel)
+local result = simple_parallel:execute()
 local elapsed = (os.clock() - start_time) * 1000
 
 if result and result.success then
     print("✓ Parallel execution completed in " .. string.format("%.2f ms", elapsed))
     print("Branches executed: " .. (result.data and result.data.successful_branches or "N/A"))
 else
-    print("✗ Parallel execution failed: " .. tostring(err))
+    print("✗ Parallel execution failed: " .. tostring(result and result.error or "Unknown error"))
 end
 
 -- Example 2: Parallel Data Processing
@@ -113,13 +110,13 @@ local datasets = {
 
 -- Save datasets
 for name, data in pairs(datasets) do
-    local json = tool_helpers.invokeTool("json_processor", {
-        operation = "stringify",
+    local json = Tool.invoke("json_processor", {
+        operation = "format",
         input = data,
         pretty = true
     })
     if json and json.output then
-        tool_helpers.invokeTool("file_operations", {
+        Tool.invoke("file_operations", {
             operation = "write",
             path = "/tmp/" .. name .. "_data.json",
             content = json.output
@@ -235,13 +232,13 @@ local data_parallel = Workflow.parallel({
 })
 
 print("Processing multiple datasets in parallel...")
-local data_result, err = helpers.executeWorkflow(data_parallel)
+local data_result = data_parallel:execute()
 
 if data_result and data_result.success then
     print("✓ All datasets processed successfully!")
     print("Successful branches: " .. (data_result.data and data_result.data.successful_branches or "0"))
 else
-    print("✗ Data processing failed: " .. tostring(err))
+    print("✗ Data processing failed: " .. tostring(data_result and data_result.error or "Unknown error"))
 end
 
 -- Example 3: Parallel File Operations
@@ -336,7 +333,7 @@ local file_parallel = Workflow.parallel({
 })
 
 print("Creating multiple reports in parallel...")
-local file_result, err = helpers.executeWorkflow(file_parallel)
+local file_result = file_parallel:execute()
 
 if file_result and file_result.success then
     print("✓ All reports created successfully!")
@@ -346,7 +343,7 @@ if file_result and file_result.success then
         print("  - " .. file)
     end
 else
-    print("✗ Report creation failed: " .. tostring(err))
+    print("✗ Report creation failed: " .. tostring(file_result and file_result.error or "Unknown error"))
 end
 
 -- Example 4: Map-Reduce Pattern
@@ -363,12 +360,12 @@ local chunks = {
 
 -- Save chunks
 for i, chunk in ipairs(chunks) do
-    local json = tool_helpers.invokeTool("json_processor", {
-        operation = "stringify",
+    local json = Tool.invoke("json_processor", {
+        operation = "format",
         input = chunk
     })
     if json then
-        tool_helpers.invokeTool("file_operations", {
+        Tool.invoke("file_operations", {
             operation = "write",
             path = "/tmp/chunk_" .. i .. ".json",
             content = json.output
@@ -419,7 +416,7 @@ local map_reduce = Workflow.parallel({
 })
 
 print("Executing map phase (parallel processing)...")
-local map_result, err = helpers.executeWorkflow(map_reduce)
+local map_result = map_reduce:execute()
 
 if map_result and map_result.success then
     print("✓ Map phase completed!")
@@ -428,7 +425,7 @@ if map_result and map_result.success then
     print("\nExecuting reduce phase...")
     local total = 0
     for i = 1, #chunks do
-        local result = tool_helpers.invokeTool("file_operations", {
+        local result = Tool.invoke("file_operations", {
             operation = "read",
             path = "/tmp/sum_" .. i .. ".txt"
         })
@@ -440,7 +437,7 @@ if map_result and map_result.success then
     print("✓ Reduce phase completed!")
     print("Final sum: " .. total)
 else
-    print("✗ Map phase failed: " .. tostring(err))
+    print("✗ Map phase failed: " .. tostring(map_result and map_result.error or "Unknown error"))
 end
 
 -- Summary

@@ -4,8 +4,7 @@
 -- Loop Workflow Example
 -- Demonstrates various iteration patterns and batch processing
 
--- Load workflow helpers for async execution
-local helpers = dofile("examples/lua/workflows/workflow-helpers.lua")
+-- Note: All workflow and tool methods are now synchronous - no helpers needed
 
 print("=== Loop Workflow Example ===\n")
 
@@ -56,14 +55,14 @@ local range_loop = Workflow.loop({
 })
 
 print("Executing range-based loop...")
-local range_result, err = helpers.executeWorkflow(range_loop)
+local range_result = range_loop:execute()
 
 if range_result then
     print("Results:")
     print("- Completed iterations: " .. (range_result.data and range_result.data.completed_iterations or "N/A"))
     print("- Total iterations: " .. (range_result.data and range_result.data.total_iterations or "N/A"))
 else
-    print("Execution error: " .. tostring(err))
+    print("Execution error: Unknown error")
 end
 
 -- Example 2: Collection-Based Loop
@@ -207,13 +206,13 @@ Total Value: ${{value}}
 })
 
 print("Executing collection-based loop...")
-local collection_result, err = helpers.executeWorkflow(collection_loop)
+local collection_result = collection_loop:execute()
 
 if collection_result then
     print("Inventory processing completed:")
     print("- Items processed: " .. (collection_result.data and collection_result.data.completed_iterations or "N/A"))
 else
-    print("Execution error: " .. tostring(err))
+    print("Execution error: Unknown error")
 end
 
 -- Example 3: While Condition Loop
@@ -349,7 +348,7 @@ local while_loop = Workflow.loop({
 })
 
 print("Executing while condition loop...")
-local while_result, err = helpers.executeWorkflow(while_loop)
+local while_result = while_loop:execute()
 
 if while_result then
     -- Read final state
@@ -376,7 +375,7 @@ if while_result then
         print("- Break reason: " .. (while_result.data and while_result.data.break_reason or "condition met"))
     end
 else
-    print("Execution error: " .. tostring(err))
+    print("Execution error: Unknown error")
 end
 
 -- Example 4: Nested Loops
@@ -473,7 +472,7 @@ local outer_loop = Workflow.loop({
 })
 
 print("Executing nested loop processing...")
-local nested_result, err = helpers.executeWorkflow(outer_loop)
+local nested_result = outer_loop:execute()
 
 if nested_result then
     -- Read final results
@@ -495,7 +494,7 @@ if nested_result then
         print("- Total rows stored: " .. (rows_result.output or "N/A"))
     end
 else
-    print("Execution error: " .. tostring(err))
+    print("Execution error: Unknown error")
 end
 
 -- Example 5: Loop with Error Handling
@@ -622,7 +621,7 @@ local error_handling_loop = Workflow.loop({
 })
 
 print("Executing error handling loop...")
-local error_result, err = helpers.executeWorkflow(error_handling_loop)
+local error_result = error_handling_loop:execute()
 
 if error_result then
     -- Read final counts
@@ -649,7 +648,7 @@ if error_result then
         print("- Errors: " .. (error_count.output or "0"))
     end
 else
-    print("Execution error: " .. tostring(err))
+    print("Execution error: Unknown error")
 end
 
 -- Example 6: Performance-Optimized Loop
@@ -748,7 +747,7 @@ local optimized_loop = Workflow.loop({
 })
 
 local start_time = os.clock()
-local perf_result, err = helpers.executeWorkflow(optimized_loop)
+local perf_result = optimized_loop:execute()
 local elapsed = (os.clock() - start_time) * 1000
 
 if perf_result then
@@ -758,7 +757,7 @@ if perf_result then
     print(string.format("- Throughput: %.0f items/second", 
                         (#large_dataset / elapsed) * 1000))
 else
-    print("Execution error: " .. tostring(err))
+    print("Execution error: Unknown error")
 end
 
 -- Summary

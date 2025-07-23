@@ -4,7 +4,7 @@
 -- Sequential Workflow Example
 -- Demonstrates step-by-step workflow execution with dependencies
 
--- No helpers needed! Workflow.executeAsync() provides synchronous execution
+-- Note: All workflow methods are now synchronous - no helpers needed
 
 print("=== Sequential Workflow Example ===\n")
 
@@ -73,7 +73,7 @@ Status: Active
 -- Execute the workflow
 print("Executing basic sequential workflow...")
 local success, basic_result = pcall(function()
-    return Workflow.executeAsync(basic_workflow)
+    return basic_workflow:execute()
 end)
 local err = success and nil or basic_result
 
@@ -258,7 +258,7 @@ Generated: {{timestamp}}
 
 print("Executing data processing pipeline...")
 local pipeline_success, pipeline_result = pcall(function()
-    return Workflow.executeAsync(pipeline_workflow)
+    return pipeline_workflow:execute()
 end)
 local err = pipeline_success and nil or pipeline_result
 pipeline_result = pipeline_success and pipeline_result or nil
@@ -488,7 +488,7 @@ local stateful_workflow = Workflow.sequential({
 
 print("Executing stateful sequential workflow...")
 local stateful_success, stateful_result = pcall(function()
-    return Workflow.executeAsync(stateful_workflow)
+    return stateful_workflow:execute()
 end)
 local err = stateful_success and nil or stateful_result
 stateful_result = stateful_success and stateful_result or nil
@@ -604,7 +604,7 @@ local recovery_workflow = Workflow.sequential({
 
 print("Executing error recovery workflow...")
 local recovery_success, recovery_result = pcall(function()
-    return Workflow.executeAsync(recovery_workflow)
+    return recovery_workflow:execute()
 end)
 local err = recovery_success and nil or recovery_result
 recovery_result = recovery_success and recovery_result or nil
@@ -676,7 +676,7 @@ print("Running performance benchmark (" .. iterations .. " iterations)...")
 for i = 1, iterations do
     local iter_start = os.clock()
     local opt_success, result = pcall(function()
-        return Workflow.executeAsync(optimized_workflow)
+        return optimized_workflow:execute()
     end)
     local err = opt_success and nil or result
     result = opt_success and result or nil

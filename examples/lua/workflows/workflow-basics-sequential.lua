@@ -1,10 +1,7 @@
 -- ABOUTME: Basic sequential workflow example using only tool steps
 -- ABOUTME: Demonstrates simple step-by-step execution without custom functions
 
--- Load workflow helpers for async execution
-local helpers = dofile("examples/lua/workflows/workflow-helpers.lua")
--- Load tool helpers for async tool invocation
-local tool_helpers = dofile("examples/lua/tools/tool-helpers.lua")
+-- Note: All workflow and tool methods are now synchronous - no helpers needed
 
 print("=== Basic Sequential Workflow Example ===\n")
 
@@ -48,13 +45,13 @@ local simple_workflow = Workflow.sequential({
 })
 
 print("Executing simple tool chain...")
-local result, err = helpers.executeWorkflow(simple_workflow)
+local result = simple_workflow:execute()
 
 if result and result.success then
     print("✓ Workflow completed!")
     print("Final output: " .. (result.data and result.data.final_output or "N/A"))
 else
-    print("✗ Workflow failed: " .. tostring(err or (result and result.error)))
+    print("✗ Workflow failed: " .. tostring(result and result.error or "Unknown error"))
 end
 
 -- Example 2: Data Processing Pipeline

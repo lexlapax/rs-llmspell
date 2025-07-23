@@ -1,10 +1,7 @@
 -- ABOUTME: Basic loop workflow example using only tool steps
 -- ABOUTME: Demonstrates iteration patterns without custom functions
 
--- Load workflow helpers for async execution
-local helpers = dofile("examples/lua/workflows/workflow-helpers.lua")
--- Load tool helpers for async tool invocation
-local tool_helpers = dofile("examples/lua/tools/tool-helpers.lua")
+-- Note: All workflow and tool methods are now synchronous - no helpers needed
 
 print("=== Basic Loop Workflow Example ===\n")
 
@@ -54,7 +51,7 @@ local range_loop = Workflow.loop({
             input = {
                 operation = "append",
                 path = "/tmp/squares.txt",
-                content = "{{step:format_result:output}}\n"
+                input = "{{step:format_result:output}}\n"
             }
         }
     },
@@ -63,29 +60,29 @@ local range_loop = Workflow.loop({
 })
 
 -- Clear output file
-tool_helpers.invokeTool("file_operations", {
+Tool.invoke("file_operations", {
     operation = "write",
     path = "/tmp/squares.txt",
-    content = "Square Numbers\n==============\n"
+    input = "Square Numbers\n==============\n"
 })
 
 print("Executing range loop...")
-local range_result, err = helpers.executeWorkflow(range_loop)
+local range_result = range_loop:execute()
 
 if range_result and range_result.success then
     print("✓ Range loop completed!")
     print("Iterations: " .. (range_result.data and range_result.data.completed_iterations or "N/A"))
     
     -- Read and display results
-    local output = tool_helpers.invokeTool("file_operations", {
+    local output = Tool.invoke("file_operations", {
         operation = "read",
         path = "/tmp/squares.txt"
     })
-    if output then
+    if output and output.output then
         print("\nOutput:\n" .. output.output)
     end
 else
-    print("✗ Range loop failed: " .. tostring(err))
+    print("✗ Range loop failed: " .. tostring(range_result and range_result.error or "Unknown error"))
 end
 
 -- Example 2: Collection Loop
@@ -141,27 +138,27 @@ local collection_loop = Workflow.loop({
             input = {
                 operation = "append",
                 path = "/tmp/inventory_values.txt",
-                content = "{{step:format_item:output}}\n"
+                input = "{{step:format_item:output}}\n"
             }
         }
     }
 })
 
 -- Initialize report file
-tool_helpers.invokeTool("file_operations", {
+Tool.invoke("file_operations", {
     operation = "write",
     path = "/tmp/inventory_values.txt",
-    content = "Inventory Value Report\n=====================\n"
+    input = "Inventory Value Report\n=====================\n"
 })
 
 print("Processing collection items...")
-local collection_result, err = helpers.executeWorkflow(collection_loop)
+local collection_result = collection_loop:execute()
 
 if collection_result and collection_result.success then
     print("✓ Collection processing completed!")
     print("Items processed: " .. (collection_result.data and collection_result.data.completed_iterations or "N/A"))
 else
-    print("✗ Collection processing failed: " .. tostring(err))
+    print("✗ Collection processing failed: " .. tostring(collection_result and collection_result.error or "Unknown error"))
 end
 
 -- Example 3: Accumulator Pattern
@@ -174,10 +171,10 @@ local numbers = {10, 25, 15, 30, 20}
 -- Numbers will be passed directly to the workflow
 
 -- Initialize accumulator
-tool_helpers.invokeTool("file_operations", {
+Tool.invoke("file_operations", {
     operation = "write",
     path = "/tmp/accumulator.txt",
-    content = "0"
+    input = "0"
 })
 
 local accumulator_loop = Workflow.loop({
@@ -216,7 +213,7 @@ local accumulator_loop = Workflow.loop({
             input = {
                 operation = "write",
                 path = "/tmp/accumulator.txt",
-                content = "{{step:add_to_sum:output}}"
+                input = "{{step:add_to_sum:output}}"
             }
         },
         -- Log progress
@@ -236,24 +233,24 @@ local accumulator_loop = Workflow.loop({
 })
 
 print("Calculating sum with accumulator...")
-local acc_result, err = helpers.executeWorkflow(accumulator_loop)
+local acc_result = accumulator_loop:execute()
 
 if acc_result and acc_result.success then
     print("✓ Accumulator loop completed!")
     
     -- Read final sum
-    local final_sum = tool_helpers.invokeTool("file_operations", {
+    local final_sum = Tool.invoke("file_operations", {
         operation = "read",
         path = "/tmp/accumulator.txt"
     })
-    if final_sum then
+    if final_sum and final_sum.output then
         print("Final sum: " .. final_sum.output)
         
         -- Expected sum: 10 + 25 + 15 + 30 + 20 = 100
         print("Expected sum: 100")
     end
 else
-    print("✗ Accumulator loop failed: " .. tostring(err))
+    print("✗ Accumulator loop failed: " .. tostring(acc_result and acc_result.error or "Unknown error"))
 end
 
 -- Example 4: Filtered Processing
@@ -318,7 +315,7 @@ local filter_loop = Workflow.loop({
             input = {
                 operation = "append",
                 path = "/tmp/products_only.txt",
-                content = "{{step:process_product:output}}\n"
+                input = "{{step:process_product:output}}\n"
             },
             skip_condition = {
                 tool = "json_processor",
@@ -333,28 +330,28 @@ local filter_loop = Workflow.loop({
 })
 
 -- Initialize output file
-tool_helpers.invokeTool("file_operations", {
+Tool.invoke("file_operations", {
     operation = "write",
     path = "/tmp/products_only.txt",
-    content = "Products List\n============\n"
+    input = "Products List\n============\n"
 })
 
 print("Processing filtered items...")
-local filter_result, err = helpers.executeWorkflow(filter_loop)
+local filter_result = filter_loop:execute()
 
 if filter_result and filter_result.success then
     print("✓ Filtered processing completed!")
     
     -- Show results
-    local products = tool_helpers.invokeTool("file_operations", {
+    local products = Tool.invoke("file_operations", {
         operation = "read",
         path = "/tmp/products_only.txt"
     })
-    if products then
+    if products and products.output then
         print("\n" .. products.output)
     end
 else
-    print("✗ Filtered processing failed: " .. tostring(err))
+    print("✗ Filtered processing failed: " .. tostring(filter_result and filter_result.error or "Unknown error"))
 end
 
 -- Example 5: Batch Processing
@@ -424,13 +421,13 @@ local batch_loop = Workflow.loop({
 })
 
 print("Processing in batches...")
-local batch_result, err = helpers.executeWorkflow(batch_loop)
+local batch_result = batch_loop:execute()
 
 if batch_result and batch_result.success then
     print("✓ Batch processing completed!")
     print("Batches processed: " .. (batch_result.data and batch_result.data.completed_iterations or "N/A"))
 else
-    print("✗ Batch processing failed: " .. tostring(err))
+    print("✗ Batch processing failed: " .. tostring(batch_result and batch_result.error or "Unknown error"))
 end
 
 -- Summary
