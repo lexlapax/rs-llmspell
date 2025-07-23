@@ -1047,13 +1047,16 @@ pub fn inject_agent_global(
         // Convert entire args table to JSON for config
         let mut config_json = lua_table_to_json(args)
             .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert config: {}", e)))?;
-        
+
         // Fix empty objects that should be arrays
         if let serde_json::Value::Object(ref mut map) = config_json {
             // Fix allowed_tools if it's an empty object
             if let Some(serde_json::Value::Object(allowed_tools)) = map.get("allowed_tools") {
                 if allowed_tools.is_empty() {
-                    map.insert("allowed_tools".to_string(), serde_json::Value::Array(vec![]));
+                    map.insert(
+                        "allowed_tools".to_string(),
+                        serde_json::Value::Array(vec![]),
+                    );
                 }
             }
         }

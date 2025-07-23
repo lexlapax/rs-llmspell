@@ -5,32 +5,27 @@
 print("🔌 External Integration Tools Examples")
 print("====================================")
 
--- Load test helpers
--- Load test helpers for better output (handle different working directories)
-local TestHelpers = nil
-local function try_dofile(path)
-    local success, result = pcall(dofile, path)
-    return success and result or nil
-end
-
-TestHelpers = try_dofile("test-helpers.lua") or 
-              try_dofile("examples/lua/tools/test-helpers.lua") or
-              try_dofile("lua/tools/test-helpers.lua")
-
-if not TestHelpers then
-    error("Could not load test-helpers.lua from any expected location")
-end
-
--- Helper function to execute tool
+-- Helper function to execute tool using synchronous API
 local function use_tool(tool_name, params)
-    return TestHelpers.execute_tool(tool_name, params)
+    local result = Tool.invoke(tool_name, params)
+    
+    -- Parse the JSON result to get the actual tool response
+    if result and result.text then
+        local parsed = JSON.parse(result.text)
+        if parsed then
+            return parsed
+        end
+    end
+    
+    -- Return error result if parsing failed
+    return {success = false, error = "Failed to parse tool result"}
 end
 
 -- Helper to print clean results
 local function print_result(label, result)
     -- Check if the tool returned an error in the output
     if result.output and type(result.output) == "string" then
-        local ok, parsed = pcall(function() return TestHelpers.json.decode(result.output) end)
+        local ok, parsed = pcall(function() return JSON.parse(result.output) end)
         if ok and parsed.success == false then
             print("  ❌ " .. label .. ": " .. (parsed.error and parsed.error.message or "Failed"))
             return
@@ -55,13 +50,13 @@ local function print_result(label, result)
         else
             print("  ✅ " .. label .. ": Success")
             if type(r) == "table" then
-                TestHelpers.print_table(r, 2)
+                print(r, 2)
             end
         end
     end
 end
 
-TestHelpers.print_section("Email Sender Tool")
+print("Email Sender Tool")
 
 print("\nNote: Email examples require configuration of SMTP or API credentials")
 print("Set environment variables like SENDGRID_API_KEY, AWS_ACCESS_KEY_ID, etc.\n")
@@ -119,7 +114,7 @@ local attachment_result = use_tool("email-sender", {
 })
 print_result("Email with attachment", attachment_result)
 
-TestHelpers.print_section("Database Connector Tool")
+print("Database Connector Tool")
 
 print("\nNote: Database examples require connection strings or credentials")
 print("Set DATABASE_URL or individual connection parameters\n")
@@ -182,7 +177,7 @@ local insert_result = use_tool("database-connector", {
 })
 print_result("Insert user", insert_result)
 
-TestHelpers.print_section("Rate Limiting Examples")
+print("Rate Limiting Examples")
 
 print("\nDemonstrating rate limiting behavior:")
 
@@ -216,7 +211,7 @@ for i = 1, 3 do
     print_result("API call " .. i, result)
 end
 
-TestHelpers.print_section("Circuit Breaker Examples")
+print("Circuit Breaker Examples")
 
 print("\nDemonstrating circuit breaker pattern:")
 
@@ -250,7 +245,7 @@ local recovery_result = use_tool("api-tester", {
 })
 print_result("Recovery attempt", recovery_result)
 
-TestHelpers.print_section("API Key Management Examples")
+print("API Key Management Examples")
 
 print("\nDemonstrating API key management:")
 
@@ -295,7 +290,7 @@ else
     print_result("SendGrid with API", email_api_result)
 end
 
-TestHelpers.print_section("Connection Pooling Examples")
+print("Connection Pooling Examples")
 
 print("\nDemonstrating connection pooling:")
 

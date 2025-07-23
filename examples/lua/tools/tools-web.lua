@@ -5,25 +5,20 @@
 print("🌐 Web Tools Examples")
 print("===================")
 
--- Load test helpers
--- Load test helpers for better output (handle different working directories)
-local TestHelpers = nil
-local function try_dofile(path)
-    local success, result = pcall(dofile, path)
-    return success and result or nil
-end
-
-TestHelpers = try_dofile("test-helpers.lua") or 
-              try_dofile("examples/lua/tools/test-helpers.lua") or
-              try_dofile("lua/tools/test-helpers.lua")
-
-if not TestHelpers then
-    error("Could not load test-helpers.lua from any expected location")
-end
-
--- Helper function to execute tool
+-- Helper function to execute tool using synchronous API
 local function use_tool(tool_name, params)
-    return TestHelpers.execute_tool(tool_name, params)
+    local result = Tool.invoke(tool_name, params)
+    
+    -- Parse the JSON result to get the actual tool response
+    if result and result.text then
+        local parsed = JSON.parse(result.text)
+        if parsed then
+            return parsed
+        end
+    end
+    
+    -- Return error result if parsing failed
+    return {success = false, error = "Failed to parse tool result"}
 end
 
 -- Helper to print clean results
@@ -50,13 +45,13 @@ local function print_result(label, result)
         else
             print("  ✅ " .. label .. ": Success")
             if type(r) == "table" then
-                TestHelpers.print_table(r, 2)
+                print(r, 2)
             end
         end
     end
 end
 
-TestHelpers.print_section("URL Analyzer Tool")
+print("URL Analyzer Tool")
 
 print("\nAnalyzing different URLs:")
 
@@ -81,7 +76,7 @@ local invalid_url_result = use_tool("url-analyzer", {
 })
 print_result("Invalid URL", invalid_url_result)
 
-TestHelpers.print_section("Web Scraper Tool")
+print("Web Scraper Tool")
 
 print("\nScraping web content:")
 
@@ -113,7 +108,7 @@ local full_scrape_result = use_tool("web-scraper", {
 })
 print_result("Full metadata extraction", full_scrape_result)
 
-TestHelpers.print_section("API Tester Tool")
+print("API Tester Tool")
 
 print("\nTesting REST APIs:")
 
@@ -150,7 +145,7 @@ local validation_result = use_tool("api-tester", {
 })
 print_result("Status validation", validation_result)
 
-TestHelpers.print_section("Webhook Caller Tool")
+print("Webhook Caller Tool")
 
 print("\nCalling webhooks:")
 
@@ -182,7 +177,7 @@ local webhook_headers_result = use_tool("webhook-caller", {
 })
 print_result("Webhook with headers", webhook_headers_result)
 
-TestHelpers.print_section("Webpage Monitor Tool")
+print("Webpage Monitor Tool")
 
 print("\nMonitoring webpage changes:")
 
@@ -209,7 +204,7 @@ local monitor_selector_result = use_tool("webpage-monitor", {
 })
 print_result("Monitor specific element", monitor_selector_result)
 
-TestHelpers.print_section("Sitemap Crawler Tool")
+print("Sitemap Crawler Tool")
 
 print("\nCrawling sitemaps:")
 
@@ -230,7 +225,7 @@ local sitemap_timeout_result = use_tool("sitemap-crawler", {
 })
 print_result("Sitemap with limits", sitemap_timeout_result)
 
-TestHelpers.print_section("Enhanced Web Search Tool")
+print("Enhanced Web Search Tool")
 
 print("\nUsing enhanced web search with providers:")
 

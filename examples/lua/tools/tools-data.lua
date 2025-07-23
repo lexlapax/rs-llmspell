@@ -5,25 +5,20 @@
 print("📊 Data Processing Tools Examples")
 print("=================================")
 
--- Load test helpers
--- Load test helpers for better output (handle different working directories)
-local TestHelpers = nil
-local function try_dofile(path)
-    local success, result = pcall(dofile, path)
-    return success and result or nil
-end
-
-TestHelpers = try_dofile("test-helpers.lua") or 
-              try_dofile("examples/lua/tools/test-helpers.lua") or
-              try_dofile("lua/tools/test-helpers.lua")
-
-if not TestHelpers then
-    error("Could not load test-helpers.lua from any expected location")
-end
-
--- Helper function to execute tool
+-- Helper function to execute tool using synchronous API
 local function use_tool(tool_name, params)
-    return TestHelpers.execute_tool(tool_name, params)
+    local result = Tool.invoke(tool_name, params)
+    
+    -- Parse the JSON result to get the actual tool response
+    if result and result.text then
+        local parsed = JSON.parse(result.text)
+        if parsed then
+            return parsed
+        end
+    end
+    
+    -- Return error result if parsing failed
+    return {success = false, error = "Failed to parse tool result"}
 end
 
 -- Helper to print clean results
@@ -39,7 +34,7 @@ local function print_result(label, result)
             -- For JSON output, try to format it nicely
             if type(r.output) == "table" then
                 print("  ✅ " .. label .. ":")
-                TestHelpers.print_table(r.output, 2)
+                print(r.output, 2)
             else
                 print("  ✅ " .. label .. ": " .. tostring(r.output))
             end
@@ -57,7 +52,7 @@ local function print_result(label, result)
     end
 end
 
-TestHelpers.print_section("JSON Processor Tool")
+print("JSON Processor Tool")
 
 print("\nJSON processing operations:")
 
@@ -142,7 +137,7 @@ local pretty_json = use_tool("json_processor", {
 })
 print_result("Pretty print", pretty_json)
 
-TestHelpers.print_section("CSV Analyzer Tool")
+print("CSV Analyzer Tool")
 
 print("\nCSV analysis operations:")
 
@@ -188,7 +183,7 @@ local csv_to_json = use_tool("csv_analyzer", {
 })
 print_result("CSV to JSON", csv_to_json)
 
-TestHelpers.print_section("HTTP Request Tool")
+print("HTTP Request Tool")
 
 print("\nHTTP request operations:")
 
@@ -236,7 +231,7 @@ local timeout_request = use_tool("http_request", {
 })
 print_result("Timeout test", timeout_request)
 
-TestHelpers.print_section("GraphQL Query Tool")
+print("GraphQL Query Tool")
 
 print("\nGraphQL operations:")
 

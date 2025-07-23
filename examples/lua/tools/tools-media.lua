@@ -5,25 +5,20 @@
 print("🎬 Media Processing Tools Examples")
 print("==================================")
 
--- Load test helpers
--- Load test helpers for better output (handle different working directories)
-local TestHelpers = nil
-local function try_dofile(path)
-    local success, result = pcall(dofile, path)
-    return success and result or nil
-end
-
-TestHelpers = try_dofile("test-helpers.lua") or 
-              try_dofile("examples/lua/tools/test-helpers.lua") or
-              try_dofile("lua/tools/test-helpers.lua")
-
-if not TestHelpers then
-    error("Could not load test-helpers.lua from any expected location")
-end
-
--- Helper function to execute tool
+-- Helper function to execute tool using synchronous API
 local function use_tool(tool_name, params)
-    return TestHelpers.execute_tool(tool_name, params)
+    local result = Tool.invoke(tool_name, params)
+    
+    -- Parse the JSON result to get the actual tool response
+    if result and result.text then
+        local parsed = JSON.parse(result.text)
+        if parsed then
+            return parsed
+        end
+    end
+    
+    -- Return error result if parsing failed
+    return {success = false, error = "Failed to parse tool result"}
 end
 
 -- Helper to print clean results
@@ -59,7 +54,7 @@ local function print_result(label, result)
     end
 end
 
-TestHelpers.print_section("Audio Processor Tool")
+print("Audio Processor Tool")
 
 print("\nAudio processing operations:")
 
@@ -94,7 +89,7 @@ print("  ℹ️  Audio detect: Phase 3+ feature")
 -- Note: Waveform and trim operations not supported in Phase 2
 -- These are placeholders for Phase 3+ functionality
 
-TestHelpers.print_section("Video Processor Tool")
+print("Video Processor Tool")
 
 print("\nVideo processing operations:")
 
@@ -139,7 +134,7 @@ print_result("Generate thumbnail (Phase 3+)", thumbnail)
 -- Would be: operation = "detect" in Phase 3+
 print("  ℹ️  Video detect: Phase 3+ feature")
 
-TestHelpers.print_section("Image Processor Tool")
+print("Image Processor Tool")
 
 print("\nImage processing operations:")
 

@@ -5,25 +5,20 @@
 print("🔒 Security Features Examples")
 print("=============================")
 
--- Load test helpers
--- Load test helpers for better output (handle different working directories)
-local TestHelpers = nil
-local function try_dofile(path)
-    local success, result = pcall(dofile, path)
-    return success and result or nil
-end
-
-TestHelpers = try_dofile("test-helpers.lua") or 
-              try_dofile("examples/lua/tools/test-helpers.lua") or
-              try_dofile("lua/tools/test-helpers.lua")
-
-if not TestHelpers then
-    error("Could not load test-helpers.lua from any expected location")
-end
-
--- Helper function to execute tool
+-- Helper function to execute tool using synchronous API
 local function use_tool(tool_name, params)
-    return TestHelpers.execute_tool(tool_name, params)
+    local result = Tool.invoke(tool_name, params)
+    
+    -- Parse the JSON result to get the actual tool response
+    if result and result.text then
+        local parsed = JSON.parse(result.text)
+        if parsed then
+            return parsed
+        end
+    end
+    
+    -- Return error result if parsing failed
+    return {success = false, error = "Failed to parse tool result"}
 end
 
 -- Helper to print security results
@@ -49,7 +44,7 @@ local function print_security_result(label, result, expected_fail)
     end
 end
 
-TestHelpers.print_section("File System Security")
+print("File System Security")
 
 print("\nPath traversal prevention:")
 
@@ -89,7 +84,7 @@ local system_write = use_tool("file_operations", {
 })
 print_security_result("Write to system dir", system_write, true)
 
-TestHelpers.print_section("Process Execution Security")
+print("Process Execution Security")
 
 print("\nCommand whitelisting:")
 
@@ -125,7 +120,7 @@ local injection = use_tool("process_executor", {
 })
 print_security_result("Command injection", injection, true)
 
-TestHelpers.print_section("Network Security")
+print("Network Security")
 
 print("\nNetwork access controls:")
 
@@ -163,7 +158,7 @@ print_security_result("Public internet access", public_net, false)
 -- })
 -- print_security_result("SSRF attempt (metadata)", ssrf_attempt, true)
 
-TestHelpers.print_section("Environment Security")
+print("Environment Security")
 
 print("\nEnvironment variable filtering:")
 
@@ -190,7 +185,7 @@ local safe_var = use_tool("environment_reader", {
 })
 print_security_result("Read LANG variable", safe_var, false)
 
-TestHelpers.print_section("Resource Limits")
+print("Resource Limits")
 
 print("\nResource limitation enforcement:")
 
@@ -217,7 +212,7 @@ local memory_bomb = use_tool("json_processor", {
 })
 print_security_result("Process 100MB JSON", memory_bomb, true)
 
-TestHelpers.print_section("Security Levels Demo")
+print("Security Levels Demo")
 
 print("\n🛡️ Security Level Examples:")
 print("============================")

@@ -70,27 +70,31 @@ pub fn inject_tool_global(
             let tool_name = name.clone();
             tool_table.set(
                 "execute",
-                lua.create_async_function(move |lua, (_self, params): (Table, Table)| {
+                lua.create_function(move |lua, (_self, params): (Table, Table)| {
                     let tool_instance = tool_arc.clone();
                     let name = tool_name.clone();
-                    async move {
-                        // Create AgentInput with parameters wrapped correctly for extract_parameters
-                        let params_table = lua.create_table()?;
-                        params_table.set("text", "Tool invocation")?; // Required by AgentInput
 
-                        // Create nested parameters structure that extract_parameters expects
-                        let nested_params = lua.create_table()?;
-                        nested_params.set("parameters", params)?;
-                        params_table.set("parameters", nested_params)?;
+                    // Use block_on to execute async code synchronously
+                    let result = tokio::task::block_in_place(|| {
+                        tokio::runtime::Handle::current().block_on(async move {
+                            // Create AgentInput with parameters wrapped correctly for extract_parameters
+                            let params_table = lua.create_table()?;
+                            params_table.set("text", "Tool invocation")?; // Required by AgentInput
 
-                        // Convert params to agent input
-                        let agent_input =
-                            crate::lua::conversion::lua_table_to_agent_input(lua, params_table)?;
+                            // Create nested parameters structure that extract_parameters expects
+                            let nested_params = lua.create_table()?;
+                            nested_params.set("parameters", params)?;
+                            params_table.set("parameters", nested_params)?;
 
-                        // Execute the tool
-                        let context = llmspell_core::ExecutionContext::default();
-                        let output =
-                            tool_instance
+                            // Convert params to agent input
+                            let agent_input = crate::lua::conversion::lua_table_to_agent_input(
+                                lua,
+                                params_table,
+                            )?;
+
+                            // Execute the tool
+                            let context = llmspell_core::ExecutionContext::default();
+                            let output = tool_instance
                                 .execute(agent_input, context)
                                 .await
                                 .map_err(|e| {
@@ -100,9 +104,12 @@ pub fn inject_tool_global(
                                     ))
                                 })?;
 
-                        // Convert output to Lua table
-                        crate::lua::conversion::agent_output_to_lua_table(lua, output)
-                    }
+                            // Convert output to Lua table
+                            crate::lua::conversion::agent_output_to_lua_table(lua, output)
+                        })
+                    })?;
+
+                    Ok(result)
                 })?,
             )?;
 
@@ -112,39 +119,44 @@ pub fn inject_tool_global(
         }
     })?;
 
-    // Create Tool.invoke() function
+    // Create Tool.invoke() function - synchronous wrapper
     let registry_clone = registry.clone();
-    let invoke_fn = lua.create_async_function(move |lua, (name, input): (String, Table)| {
+    let invoke_fn = lua.create_function(move |lua, (name, input): (String, Table)| {
         let registry = registry_clone.clone();
 
-        async move {
-            // Get the tool
-            let tool = registry
-                .get_tool(&name)
-                .ok_or_else(|| mlua::Error::RuntimeError(format!("Tool '{}' not found", name)))?;
+        // Use block_on to execute async code synchronously
+        let result = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async move {
+                // Get the tool
+                let tool = registry.get_tool(&name).ok_or_else(|| {
+                    mlua::Error::RuntimeError(format!("Tool '{}' not found", name))
+                })?;
 
-            // Create AgentInput with parameters wrapped correctly for extract_parameters
-            let params_table = lua.create_table()?;
-            params_table.set("text", "Tool invocation")?; // Required by AgentInput
+                // Create AgentInput with parameters wrapped correctly for extract_parameters
+                let params_table = lua.create_table()?;
+                params_table.set("text", "Tool invocation")?; // Required by AgentInput
 
-            // Create nested parameters structure that extract_parameters expects
-            let nested_params = lua.create_table()?;
-            nested_params.set("parameters", input)?;
-            params_table.set("parameters", nested_params)?;
+                // Create nested parameters structure that extract_parameters expects
+                let nested_params = lua.create_table()?;
+                nested_params.set("parameters", input)?;
+                params_table.set("parameters", nested_params)?;
 
-            // Convert input to agent input
-            let agent_input = crate::lua::conversion::lua_table_to_agent_input(lua, params_table)?;
+                // Convert input to agent input
+                let agent_input =
+                    crate::lua::conversion::lua_table_to_agent_input(lua, params_table)?;
 
-            // Execute the tool
-            let context = llmspell_core::ExecutionContext::default();
-            let output = tool
-                .execute(agent_input, context)
-                .await
-                .map_err(|e| mlua::Error::RuntimeError(format!("Tool execution failed: {}", e)))?;
+                // Execute the tool
+                let context = llmspell_core::ExecutionContext::default();
+                let output = tool.execute(agent_input, context).await.map_err(|e| {
+                    mlua::Error::RuntimeError(format!("Tool execution failed: {}", e))
+                })?;
 
-            // Convert output to Lua table
-            crate::lua::conversion::agent_output_to_lua_table(lua, output)
-        }
+                // Convert output to Lua table
+                crate::lua::conversion::agent_output_to_lua_table(lua, output)
+            })
+        })?;
+
+        Ok(result)
     })?;
 
     // Create Tool.exists() function
@@ -338,56 +350,7 @@ pub fn inject_tool_global(
 
     tool_table.set("discover", discover_fn)?;
 
-    // Add executeAsync convenience wrapper
-    let execute_async_code = r#"
-        -- Helper to execute tool functions within a coroutine context
-        function(tool_name, params)
-            local tool
-            
-            -- Get the tool instance
-            if type(tool_name) == "string" then
-                tool = Tool[tool_name] or Tool.get(tool_name)
-            else
-                tool = tool_name -- Assume it's already a tool instance
-            end
-            
-            if not tool then
-                return {success = false, error = "Tool not found: " .. tostring(tool_name)}
-            end
-            
-            -- Create coroutine for async execution
-            local co = coroutine.create(function()
-                -- If tool has execute method, use it
-                if tool.execute then
-                    return tool:execute(params or {})
-                else
-                    -- Fall back to Tool.invoke
-                    return Tool.invoke(tool.name or tostring(tool_name), params or {})
-                end
-            end)
-            
-            -- Execute the coroutine
-            local success, result = coroutine.resume(co)
-            
-            -- Handle async operations that yield
-            while success and coroutine.status(co) ~= "dead" do
-                success, result = coroutine.resume(co, result)
-            end
-            
-            if not success then
-                return {success = false, error = tostring(result)}
-            end
-            
-            return result
-        end
-    "#;
-
-    let execute_async_fn = lua
-        .load(execute_async_code)
-        .eval::<mlua::Function>()
-        .map_err(|e| mlua::Error::ExternalError(Arc::new(e)))?;
-
-    tool_table.set("executeAsync", execute_async_fn)?;
+    // Tool.executeAsync removed - all tools now use synchronous API
 
     // Set Tool as global
     lua.globals().set("Tool", tool_table)?;

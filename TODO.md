@@ -2044,7 +2044,7 @@ The agent factory needs to create agents that actually use LLM providers for the
 15. [ ] Update tool integration tests for sync API
 
 #### Sub-task 3.3.29.3: Workflow Consolidation and Synchronous API
-**Status**: TODO
+**Status**: IN PROGRESS
 
 **Phase 1 - Consolidation Tasks**:
 1. [ ] Remove lua/api/workflow.rs entirely

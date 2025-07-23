@@ -36,7 +36,7 @@ print("Example 1: System Resource Monitoring")
 print("-" .. string.rep("-", 37))
 
 -- Get baseline system metrics
-local baseline_metrics = Tool.executeAsync("system_monitor", {
+local baseline_metrics = Tool.invoke("system_monitor", {
     operation = "stats"
 })
 
@@ -65,32 +65,32 @@ print("\n\nExample 2: File Change Monitoring")
 print("-" .. string.rep("-", 33))
 
 -- Create a test directory structure
-Tool.executeAsync("file_operations", {
+Tool.invoke("file_operations", {
     operation = "write",
     path = "/tmp/monitor_test/config.json",
     input = '{"version": "1.0", "debug": false}'
 })
 
-Tool.executeAsync("file_operations", {
+Tool.invoke("file_operations", {
     operation = "write",
     path = "/tmp/monitor_test/data.csv",
     input = "timestamp,value\n2024-01-01,100\n2024-01-02,105"
 })
 
 -- Initial file state
-local initial_files = Tool.executeAsync("file_operations", {
+local initial_files = Tool.invoke("file_operations", {
     operation = "list",
     path = "/tmp/monitor_test"
 })
 
 -- Simulate changes
-Tool.executeAsync("file_operations", {
+Tool.invoke("file_operations", {
     operation = "write",
     path = "/tmp/monitor_test/config.json",
     input = '{"version": "1.1", "debug": true, "new_feature": "enabled"}'
 })
 
-Tool.executeAsync("file_operations", {
+Tool.invoke("file_operations", {
     operation = "write",
     path = "/tmp/monitor_test/new_file.txt",
     input = "This is a new file"
@@ -116,7 +116,7 @@ print("\n\nExample 3: Process Monitoring")
 print("-" .. string.rep("-", 29))
 
 -- Get current processes
-local processes = Tool.executeAsync("process_executor", {
+local processes = Tool.invoke("process_executor", {
     command = "ps",
     args = {"aux"},
     capture_output = true
@@ -157,7 +157,7 @@ local log_data = [[
 2024-01-21 10:06:00 INFO Cleanup process started
 ]]
 
-Tool.executeAsync("file_operations", {
+Tool.invoke("file_operations", {
     operation = "write",
     path = "/tmp/application.log",
     input = log_data
@@ -246,7 +246,7 @@ while monitoring_active and iteration < max_iterations do
     -- Collect current metrics
     local current_state = {
         timestamp = os.date("%Y-%m-%d %H:%M:%S"),
-        metrics = Tool.executeAsync("system_monitor", {
+        metrics = Tool.invoke("system_monitor", {
             operation = "stats"
         }).output,
         random_event = math.random() > 0.7 and "Spike detected" or "Normal"

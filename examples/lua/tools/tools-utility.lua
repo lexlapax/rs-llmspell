@@ -11,24 +11,20 @@
 print("🔧 Utility Tools Examples")
 print("=========================")
 
--- Load test helpers for better output (handle different working directories)
-local TestHelpers = nil
-local function try_dofile(path)
-    local success, result = pcall(dofile, path)
-    return success and result or nil
-end
-
-TestHelpers = try_dofile("test-helpers.lua") or 
-              try_dofile("examples/lua/tools/test-helpers.lua") or
-              try_dofile("lua/tools/test-helpers.lua")
-
-if not TestHelpers then
-    error("Could not load test-helpers.lua from any expected location")
-end
-
--- Helper function to execute tool
+-- Helper function to execute tool using synchronous API
 local function use_tool(tool_name, params)
-    return TestHelpers.execute_tool(tool_name, params)
+    local result = Tool.invoke(tool_name, params)
+    
+    -- Parse the JSON result to get the actual tool response
+    if result and result.text then
+        local parsed = JSON.parse(result.text)
+        if parsed then
+            return parsed
+        end
+    end
+    
+    -- Return error result if parsing failed
+    return {success = false, error = "Failed to parse tool result"}
 end
 
 -- Helper to print clean results
@@ -62,7 +58,7 @@ local function print_result(label, result)
     end
 end
 
-TestHelpers.print_section("UUID Generator Tool")
+print("UUID Generator Tool")
 
 -- Generate different UUID versions
 print("\nGenerating UUIDs:")
@@ -97,7 +93,7 @@ local deterministic_id = use_tool("uuid_generator", {
 })
 print_result("Deterministic ID", deterministic_id)
 
-TestHelpers.print_section("Base64 Encoder Tool")
+print("Base64 Encoder Tool")
 
 -- Encode and decode text
 local original = "Hello, LLMSpell! 🚀"
@@ -111,7 +107,7 @@ local encoded = use_tool("base64_encoder", {
 print_result("Encoded", encoded)
 
 -- Parse the encoded result to get the output
-local encoded_parsed, _ = TestHelpers.parse_tool_output(encoded)
+local encoded_parsed, _ = encoded
 if encoded_parsed and encoded_parsed.result and encoded_parsed.result.output then
     local decoded = use_tool("base64_encoder", {
         operation = "decode",
@@ -128,7 +124,7 @@ local url_safe = use_tool("base64_encoder", {
 })
 print_result("URL-safe", url_safe)
 
-TestHelpers.print_section("Hash Calculator Tool")
+print("Hash Calculator Tool")
 
 -- Different hash algorithms
 local text = "LLMSpell Phase 2 Security"
@@ -149,7 +145,7 @@ local sha256_hash = use_tool("hash_calculator", {
 print_result("SHA256", sha256_hash)
 
 -- Verify hash (if we got a valid hash)
-local sha256_parsed, _ = TestHelpers.parse_tool_output(sha256_hash)
+local sha256_parsed, _ = sha256_hash
 if sha256_parsed and sha256_parsed.result and sha256_parsed.result.hash then
     local verify_result = use_tool("hash_calculator", {
         operation = "verify",
@@ -160,7 +156,7 @@ if sha256_parsed and sha256_parsed.result and sha256_parsed.result.hash then
     print_result("Verification", verify_result)
 end
 
-TestHelpers.print_section("Text Manipulator Tool")
+print("Text Manipulator Tool")
 
 local sample_text = "hello world from llmspell"
 print("\nText operations on: " .. sample_text)
@@ -219,7 +215,7 @@ local substring = use_tool("text_manipulator", {
 })
 print_result("Substring", substring)
 
-TestHelpers.print_section("Calculator Tool")
+print("Calculator Tool")
 
 -- Basic arithmetic
 print("\nCalculations:")
@@ -287,7 +283,7 @@ print_result("sqrt(x²+y²) * sin(θ) where x=3, y=4, θ=0.927", advanced_calc)
 local functions_list = use_tool("calculator", {
     operation = "functions"
 })
-local functions_parsed, _ = TestHelpers.parse_tool_output(functions_list)
+local functions_parsed, _ = functions_list
 if functions_parsed and functions_parsed.result then
     print("\nAvailable mathematical functions:")
     if functions_parsed.result.trigonometric then
@@ -301,7 +297,7 @@ if functions_parsed and functions_parsed.result then
     end
 end
 
-TestHelpers.print_section("Date Time Handler Tool")
+print("Date Time Handler Tool")
 
 -- Current date and time
 print("\nDate/Time operations:")
@@ -326,7 +322,7 @@ local future_date = use_tool("date_time_handler", {
 })
 print_result("30 days from 2024-01-01", future_date)
 
-TestHelpers.print_section("Diff Calculator Tool")
+print("Diff Calculator Tool")
 
 -- Text diff
 local old_text = "The quick brown fox\njumps over the lazy dog"
@@ -338,7 +334,7 @@ local unified_diff = use_tool("diff_calculator", {
     new_text = new_text,
     format = "unified"
 })
-local diff_parsed, _ = TestHelpers.parse_tool_output(unified_diff)
+local diff_parsed, _ = unified_diff
 if diff_parsed and diff_parsed.result and diff_parsed.result.output then
     print(diff_parsed.result.output)
 else
@@ -364,14 +360,14 @@ local json_diff = use_tool("diff_calculator", {
     old_json = old_json,
     new_json = new_json
 })
-local json_diff_parsed, _ = TestHelpers.parse_tool_output(json_diff)
+local json_diff_parsed, _ = json_diff
 if json_diff_parsed and json_diff_parsed.result and json_diff_parsed.result.output then
     print(json_diff_parsed.result.output)
 else
     print_result("JSON diff", json_diff)
 end
 
-TestHelpers.print_section("Data Validation Tool")
+print("Data Validation Tool")
 
 -- Email validation
 print("\nValidating data:")
@@ -408,7 +404,7 @@ local complex_validation = use_tool("data_validation", {
 })
 print_result("Complex validation", complex_validation)
 
-TestHelpers.print_section("Template Engine Tool")
+print("Template Engine Tool")
 
 -- Handlebars template
 print("\nTemplate rendering:")

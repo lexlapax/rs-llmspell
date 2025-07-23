@@ -2,7 +2,21 @@
 -- Shows how to chain tools together for complex operations
 
 -- Load test helpers for consistent formatting
-local helpers = dofile("test-helpers.lua")
+-- Helper function to execute tool using synchronous API
+local function use_tool(tool_name, params)
+    local result = Tool.invoke(tool_name, params)
+    
+    -- Parse the JSON result to get the actual tool response
+    if result and result.text then
+        local parsed = JSON.parse(result.text)
+        if parsed then
+            return parsed
+        end
+    end
+    
+    -- Return error result if parsing failed
+    return {success = false, error = "Failed to parse tool result"}
+end
 
 print("🔗 Multi-Tool Workflow Examples")
 print("=================================")

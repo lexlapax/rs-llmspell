@@ -104,14 +104,14 @@ local market_data = {
 }
 
 -- Save market data
-local json_result = Tool.executeAsync("json_processor", {
+local json_result = Tool.invoke("json_processor", {
     operation = "stringify",
     input = market_data,
     pretty = true
 })
 
 if json_result and json_result.output then
-    Tool.executeAsync("file_operations", {
+    Tool.invoke("file_operations", {
         operation = "write",
         path = "/tmp/market_data.json",
         input = json_result.output
@@ -292,14 +292,14 @@ local scenario = {
 }
 
 -- Save scenario
-local json_result = Tool.executeAsync("json_processor", {
+local json_result = Tool.invoke("json_processor", {
     operation = "stringify",
     input = scenario,
     pretty = true
 })
 
 if json_result and json_result.output then
-    Tool.executeAsync("file_operations", {
+    Tool.invoke("file_operations", {
         operation = "write",
         path = "/tmp/expansion_scenario.json",
         input = json_result.output

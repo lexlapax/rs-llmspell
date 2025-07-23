@@ -2,7 +2,21 @@
 -- Measures initialization time, execution time, and resource usage
 
 -- Load test helpers
-local helpers = dofile("test-helpers.lua")
+-- Helper function to execute tool using synchronous API
+local function use_tool(tool_name, params)
+    local result = Tool.invoke(tool_name, params)
+    
+    -- Parse the JSON result to get the actual tool response
+    if result and result.text then
+        local parsed = JSON.parse(result.text)
+        if parsed then
+            return parsed
+        end
+    end
+    
+    -- Return error result if parsing failed
+    return {success = false, error = "Failed to parse tool result"}
+end
 
 print("⚡ Tool Performance Benchmarks")
 print("================================")
@@ -53,7 +67,7 @@ local function benchmark_tool(name, operations)
     
     for op_name, op_params in pairs(operations) do
         local exec_time, result = measure_time(function()
-            return Tool.executeAsync(name, op_params)
+            return Tool.invoke(name, op_params)
         end)
         
         total_time = total_time + exec_time

@@ -5,25 +5,20 @@
 print("📁 File System Tools Examples")
 print("=============================")
 
--- Load test helpers
--- Load test helpers for better output (handle different working directories)
-local TestHelpers = nil
-local function try_dofile(path)
-    local success, result = pcall(dofile, path)
-    return success and result or nil
-end
-
-TestHelpers = try_dofile("test-helpers.lua") or 
-              try_dofile("examples/lua/tools/test-helpers.lua") or
-              try_dofile("lua/tools/test-helpers.lua")
-
-if not TestHelpers then
-    error("Could not load test-helpers.lua from any expected location")
-end
-
--- Helper function to execute tool
+-- Helper function to execute tool using synchronous API
 local function use_tool(tool_name, params)
-    return TestHelpers.execute_tool(tool_name, params)
+    local result = Tool.invoke(tool_name, params)
+    
+    -- Parse the JSON result to get the actual tool response
+    if result and result.text then
+        local parsed = JSON.parse(result.text)
+        if parsed then
+            return parsed
+        end
+    end
+    
+    -- Return error result if parsing failed
+    return {success = false, error = "Failed to parse tool result"}
 end
 
 -- Helper to print clean results
@@ -52,7 +47,7 @@ local function print_result(label, result)
     end
 end
 
-TestHelpers.print_section("File Operations Tool")
+print("File Operations Tool")
 
 -- Write a file
 local file_content = [[
@@ -121,7 +116,7 @@ local copy_result = use_tool("file_operations", {
 })
 print_result("Copy file", copy_result)
 
-TestHelpers.print_section("Archive Handler Tool")
+print("Archive Handler Tool")
 
 print("\nArchive operations:")
 
@@ -149,7 +144,7 @@ local extract_result = use_tool("archive_handler", {
 })
 print_result("Extract archive", extract_result)
 
-TestHelpers.print_section("File Watcher Tool")
+print("File Watcher Tool")
 
 print("\nFile monitoring:")
 
@@ -175,7 +170,7 @@ else
     print_result("Watch directory", watch_result)
 end
 
-TestHelpers.print_section("File Converter Tool")
+print("File Converter Tool")
 
 print("\nFile conversions:")
 
@@ -207,7 +202,7 @@ local convert_encoding = use_tool("file_converter", {
 })
 print_result("Convert to UTF-16", convert_encoding)
 
-TestHelpers.print_section("File Search Tool")
+print("File Search Tool")
 
 print("\nSearching files:")
 

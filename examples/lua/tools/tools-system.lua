@@ -5,25 +5,20 @@
 print("🖥️ System Integration Tools Examples")
 print("====================================")
 
--- Load test helpers
--- Load test helpers for better output (handle different working directories)
-local TestHelpers = nil
-local function try_dofile(path)
-    local success, result = pcall(dofile, path)
-    return success and result or nil
-end
-
-TestHelpers = try_dofile("test-helpers.lua") or 
-              try_dofile("examples/lua/tools/test-helpers.lua") or
-              try_dofile("lua/tools/test-helpers.lua")
-
-if not TestHelpers then
-    error("Could not load test-helpers.lua from any expected location")
-end
-
--- Helper function to execute tool
+-- Helper function to execute tool using synchronous API
 local function use_tool(tool_name, params)
-    return TestHelpers.execute_tool(tool_name, params)
+    local result = Tool.invoke(tool_name, params)
+    
+    -- Parse the JSON result to get the actual tool response
+    if result and result.text then
+        local parsed = JSON.parse(result.text)
+        if parsed then
+            return parsed
+        end
+    end
+    
+    -- Return error result if parsing failed
+    return {success = false, error = "Failed to parse tool result"}
 end
 
 -- Helper to print clean results
@@ -77,7 +72,7 @@ local function print_security_test(label, result, should_fail)
     end
 end
 
-TestHelpers.print_section("Environment Reader Tool")
+print("Environment Reader Tool")
 
 print("\nEnvironment operations:")
 
@@ -108,7 +103,7 @@ local all_vars = use_tool("environment_reader", {
 })
 print_result("All allowed vars", all_vars)
 
-TestHelpers.print_section("Process Executor Tool")
+print("Process Executor Tool")
 
 print("\nProcess execution (sandboxed):")
 
@@ -142,7 +137,7 @@ local timeout_command = use_tool("process_executor", {
 -- Note: sleep is not whitelisted so this tests security blocking, not timeout
 print_security_test("Sleep command blocked", timeout_command, true)
 
-TestHelpers.print_section("Service Checker Tool")
+print("Service Checker Tool")
 
 print("\nService availability checks:")
 
@@ -178,7 +173,7 @@ local custom_check = use_tool("service_checker", {
 })
 print_result("Custom port (8080)", custom_check)
 
-TestHelpers.print_section("System Monitor Tool")
+print("System Monitor Tool")
 
 print("\nSystem resource monitoring:")
 

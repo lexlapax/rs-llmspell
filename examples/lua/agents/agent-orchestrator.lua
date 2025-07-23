@@ -47,7 +47,7 @@ Device D,49.99,25
 ]]
 
 -- Save sample data
-local file_result = Tool.executeAsync("file_operations", {
+local file_result = Tool.invoke("file_operations", {
     operation = "write",
     path = "/tmp/products.csv",
     input = csv_data
@@ -75,13 +75,13 @@ print("\n\nExample 2: Multi-Source Data Aggregation")
 print("-" .. string.rep("-", 40))
 
 -- Create multiple data sources
-Tool.executeAsync("file_operations", {
+Tool.invoke("file_operations", {
     operation = "write",
     path = "/tmp/sales_q1.json",
     input = '{"quarter": "Q1", "sales": 150000, "region": "North"}'
 })
 
-Tool.executeAsync("file_operations", {
+Tool.invoke("file_operations", {
     operation = "write",
     path = "/tmp/sales_q2.json",
     input = '{"quarter": "Q2", "sales": 175000, "region": "North"}'
@@ -142,14 +142,14 @@ local complex_data = {
 }
 
 -- Save as JSON
-local json_result = Tool.executeAsync("json_processor", {
+local json_result = Tool.invoke("json_processor", {
     operation = "stringify",
     input = complex_data,
     pretty = true
 })
 
 if json_result and json_result.output then
-    Tool.executeAsync("file_operations", {
+    Tool.invoke("file_operations", {
         operation = "write",
         path = "/tmp/student_data.json",
         input = json_result.output
