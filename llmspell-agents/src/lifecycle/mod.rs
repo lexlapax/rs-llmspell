@@ -8,7 +8,13 @@ pub mod resources;
 pub mod shutdown;
 pub mod state_machine;
 
+#[cfg(test)]
+pub mod tests;
+
+pub mod benchmarks;
+
 // Re-export all lifecycle components
+pub use benchmarks::*;
 pub use events::*;
 pub use hooks::*;
 pub use middleware::*;

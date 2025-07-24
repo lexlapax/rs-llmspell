@@ -48,7 +48,7 @@ impl HookFeatures {
     pub fn enable_feature(&mut self, feature: impl Into<String>) {
         let feature = feature.into();
         self.enabled_features.insert(feature.clone());
-        
+
         // Enable dependencies
         if let Some(deps) = self.feature_dependencies.get(&feature).cloned() {
             for dep in deps {
@@ -69,7 +69,10 @@ impl HookFeatures {
 
     /// Check if all required features are enabled
     pub fn are_features_enabled(&self, features: &[impl AsRef<str>]) -> bool {
-        self.global_enabled && features.iter().all(|f| self.enabled_features.contains(f.as_ref()))
+        self.global_enabled
+            && features
+                .iter()
+                .all(|f| self.enabled_features.contains(f.as_ref()))
     }
 
     /// Add feature dependency
@@ -111,10 +114,7 @@ impl Default for SelectiveRegistryConfig {
         Self {
             max_instantiated_hooks: 100,
             use_lru_eviction: true,
-            preload_points: vec![
-                HookPoint::SystemStartup,
-                HookPoint::SystemShutdown,
-            ],
+            preload_points: vec![HookPoint::SystemStartup, HookPoint::SystemShutdown],
             default_features: vec!["core".to_string()],
             collect_stats: true,
         }
@@ -141,11 +141,7 @@ pub struct LazyHookEntry {
 
 impl LazyHookEntry {
     /// Create new lazy hook entry
-    fn new(
-        factory: HookFactory,
-        metadata: HookMetadata,
-        required_features: Vec<String>,
-    ) -> Self {
+    fn new(factory: HookFactory, metadata: HookMetadata, required_features: Vec<String>) -> Self {
         Self {
             factory,
             instance: Arc::new(RwLock::new(None)),
@@ -160,17 +156,17 @@ impl LazyHookEntry {
     /// Get or create hook instance
     pub(crate) fn get_instance(&self) -> ArcHook {
         let mut instance = self.instance.write();
-        
+
         if instance.is_none() {
             let hook = (self.factory)();
             *instance = Some(Arc::from(hook));
             trace!("Instantiated lazy hook: {}", self.metadata.name);
         }
-        
+
         // Update access tracking
         *self.access_count.write() += 1;
         *self.last_access.write() = std::time::Instant::now();
-        
+
         instance.as_ref().unwrap().clone()
     }
 
@@ -327,7 +323,7 @@ impl SelectiveHookRegistry {
             .ok_or_else(|| RegistryError::HookNotFound(hook_name.to_string()))?;
 
         let (_, (_, hook_entry)) = entry.pair();
-        
+
         if self.should_load_hook(&hook_entry.required_features) {
             hook_entry.get_instance();
             debug!("Preloaded hook: {}", hook_name);
@@ -352,7 +348,7 @@ impl SelectiveHookRegistry {
         F: Fn(&LazyHookEntry) -> bool,
     {
         let features = self.features.read();
-        
+
         if !features.global_enabled {
             return Vec::new();
         }
@@ -411,14 +407,14 @@ impl SelectiveHookRegistry {
     /// Maybe evict hooks based on LRU
     fn maybe_evict_hooks(&self, _candidates: Vec<String>) {
         let instantiated_count = self.count_instantiated_hooks();
-        
+
         if instantiated_count <= self.config.max_instantiated_hooks {
             return;
         }
 
         // Find least recently used hooks
         let mut lru_candidates: Vec<(String, std::time::Instant, u64)> = Vec::new();
-        
+
         for entry in self.hook_index.iter() {
             let (name, (_, hook_entry)) = entry.pair();
             if hook_entry.is_instantiated() {
@@ -437,7 +433,7 @@ impl SelectiveHookRegistry {
             if let Some(entry) = self.hook_index.get(name) {
                 let (_, (_, hook_entry)) = entry.pair();
                 hook_entry.evict();
-                
+
                 if self.config.collect_stats {
                     self.stats.write().evictions += 1;
                 }
@@ -457,11 +453,7 @@ impl SelectiveHookRegistry {
     }
 
     /// Enable or disable a hook
-    pub fn set_hook_enabled(
-        &self,
-        hook_name: &str,
-        enabled: bool,
-    ) -> Result<(), RegistryError> {
+    pub fn set_hook_enabled(&self, hook_name: &str, enabled: bool) -> Result<(), RegistryError> {
         let entry = self
             .hook_index
             .get_mut(hook_name)
@@ -544,11 +536,11 @@ impl SelectiveHookRegistry {
             let (_, (_, hook_entry)) = entry.pair();
             hook_entry.evict();
         }
-        
+
         if self.config.collect_stats {
             self.update_stats();
         }
-        
+
         info!("Cleared all instantiated hooks");
     }
 
@@ -557,8 +549,8 @@ impl SelectiveHookRegistry {
         let base_size = std::mem::size_of::<Self>();
         let instantiated = self.count_instantiated_hooks();
         let total = self.hook_index.len();
-        
-        // Rough estimate: 
+
+        // Rough estimate:
         // - Each lazy entry: ~200 bytes
         // - Each instantiated hook: ~1KB (varies greatly)
         base_size + (total * 200) + (instantiated * 1024)
@@ -633,7 +625,11 @@ mod tests {
         // Register hook requiring logging feature
         let result = registry.register_with_features(
             HookPoint::BeforeAgentExecution,
-            || Box::new(TestHook { name: "test-hook".to_string() }),
+            || {
+                Box::new(TestHook {
+                    name: "test-hook".to_string(),
+                })
+            },
             &["logging"],
         );
         assert!(result.is_ok());
@@ -652,7 +648,11 @@ mod tests {
         registry
             .register_with_features(
                 HookPoint::BeforeToolExecution,
-                || Box::new(TestHook { name: "metrics-hook".to_string() }),
+                || {
+                    Box::new(TestHook {
+                        name: "metrics-hook".to_string(),
+                    })
+                },
                 &["metrics"],
             )
             .unwrap();
@@ -684,7 +684,9 @@ mod tests {
                 HookPoint::BeforeToolExecution,
                 move || {
                     *counter_clone.write() += 1;
-                    Box::new(TestHook { name: "lazy-hook".to_string() })
+                    Box::new(TestHook {
+                        name: "lazy-hook".to_string(),
+                    })
                 },
                 &["core"],
             )
@@ -707,7 +709,7 @@ mod tests {
         let features = HookFeatures::with_features(vec!["test"]);
         let mut config = SelectiveRegistryConfig::default();
         config.max_instantiated_hooks = 2;
-        
+
         let registry = SelectiveHookRegistry::with_config(features, config);
 
         // Register multiple hooks
@@ -715,7 +717,11 @@ mod tests {
             registry
                 .register_with_features(
                     HookPoint::BeforeAgentExecution,
-                    move || Box::new(TestHook { name: format!("hook-{}", i) }),
+                    move || {
+                        Box::new(TestHook {
+                            name: format!("hook-{}", i),
+                        })
+                    },
                     &["test"],
                 )
                 .unwrap();
@@ -739,7 +745,11 @@ mod tests {
         registry
             .register_with_features(
                 HookPoint::BeforeToolExecution,
-                || Box::new(TestHook { name: "stats-hook-1".to_string() }),
+                || {
+                    Box::new(TestHook {
+                        name: "stats-hook-1".to_string(),
+                    })
+                },
                 &["stats", "logging"],
             )
             .unwrap();
@@ -747,7 +757,11 @@ mod tests {
         registry
             .register_with_features(
                 HookPoint::AfterToolExecution,
-                || Box::new(TestHook { name: "stats-hook-2".to_string() }),
+                || {
+                    Box::new(TestHook {
+                        name: "stats-hook-2".to_string(),
+                    })
+                },
                 &["stats"],
             )
             .unwrap();
@@ -767,7 +781,11 @@ mod tests {
         registry
             .register_with_features(
                 HookPoint::BeforeAgentExecution,
-                || Box::new(TestHook { name: "inst-test".to_string() }),
+                || {
+                    Box::new(TestHook {
+                        name: "inst-test".to_string(),
+                    })
+                },
                 &["test"],
             )
             .unwrap();
@@ -775,13 +793,13 @@ mod tests {
         // Get the hook entry directly
         let entry = registry.hook_index.get("inst-test").unwrap();
         let (_, (_, hook_entry)) = entry.pair();
-        
+
         // Check it's not instantiated yet
         assert!(!hook_entry.is_instantiated());
-        
+
         // Get instance
         let _inst = hook_entry.get_instance();
-        
+
         // Now it should be instantiated
         assert!(hook_entry.is_instantiated());
     }
@@ -796,17 +814,21 @@ mod tests {
         registry
             .register_with_features(
                 HookPoint::AfterToolExecution,
-                || Box::new(TestHook { name: "clear-hook".to_string() }),
+                || {
+                    Box::new(TestHook {
+                        name: "clear-hook".to_string(),
+                    })
+                },
                 &["clear"],
             )
             .unwrap();
 
         // First check that nothing is instantiated yet
         assert_eq!(registry.stats().instantiated_hooks, 0);
-        
+
         let hooks = registry.get_hooks(&HookPoint::AfterToolExecution);
         assert_eq!(hooks.len(), 1); // Should have one hook
-        
+
         // Now check if it got instantiated
         let stats = registry.stats();
         assert_eq!(stats.instantiated_hooks, 1); // Should be instantiated
