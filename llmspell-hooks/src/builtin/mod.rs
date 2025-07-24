@@ -1,12 +1,14 @@
 // ABOUTME: Core built-in hooks module providing production-ready hooks
 // ABOUTME: Includes logging, metrics, debugging, security, caching, rate limiting, retry, and cost tracking
 
+pub mod caching;
 pub mod debugging;
 pub mod logging;
 pub mod metrics;
 pub mod security;
 
 // Re-exports for easy access
+pub use caching::CachingHook;
 pub use debugging::DebuggingHook;
 pub use logging::LoggingHook;
 pub use metrics::MetricsHook;
@@ -42,6 +44,11 @@ mod tests {
         // Test security hook
         let security_hook = SecurityHook::new();
         let result = security_hook.execute(&mut context).await.unwrap();
+        assert!(result.should_continue());
+
+        // Test caching hook
+        let caching_hook = CachingHook::new();
+        let result = caching_hook.execute(&mut context).await.unwrap();
         assert!(result.should_continue());
     }
 }
