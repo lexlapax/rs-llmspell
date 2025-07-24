@@ -1,11 +1,14 @@
 //! ABOUTME: Tool registry for discovery, validation, and management
 //! ABOUTME: Provides thread-safe tool registration and capability-based discovery
 
+use crate::lifecycle::{ExecutionMetrics, ToolExecutor, ToolLifecycleConfig};
 use llmspell_core::{
     error::LLMSpellError,
     traits::tool::{ResourceLimits, SecurityLevel, SecurityRequirements, Tool, ToolCategory},
-    Result,
+    types::{AgentInput, AgentOutput},
+    ExecutionContext, Result,
 };
+use llmspell_hooks::{HookExecutor, HookRegistry};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -130,6 +133,10 @@ pub struct ToolRegistry {
     metadata_cache: MetadataCache,
     /// Category index for fast category-based lookups
     category_index: CategoryIndex,
+    /// Hook-enabled tool executor
+    tool_executor: Option<Arc<ToolExecutor>>,
+    /// Hook executor configuration
+    hook_config: ToolLifecycleConfig,
 }
 
 impl ToolRegistry {
@@ -139,6 +146,33 @@ impl ToolRegistry {
             tools: Arc::new(RwLock::new(HashMap::new())),
             metadata_cache: Arc::new(RwLock::new(HashMap::new())),
             category_index: Arc::new(RwLock::new(HashMap::new())),
+            tool_executor: None,
+            hook_config: ToolLifecycleConfig::default(),
+        }
+    }
+
+    /// Create a new tool registry with hook support
+    pub fn with_hooks(
+        hook_executor: Option<Arc<HookExecutor>>,
+        hook_registry: Option<Arc<HookRegistry>>,
+        hook_config: ToolLifecycleConfig,
+    ) -> Self {
+        let tool_executor = if hook_config.enable_hooks {
+            Some(Arc::new(ToolExecutor::new(
+                hook_config.clone(),
+                hook_executor,
+                hook_registry,
+            )))
+        } else {
+            None
+        };
+
+        Self {
+            tools: Arc::new(RwLock::new(HashMap::new())),
+            metadata_cache: Arc::new(RwLock::new(HashMap::new())),
+            category_index: Arc::new(RwLock::new(HashMap::new())),
+            tool_executor,
+            hook_config,
         }
     }
 
@@ -340,6 +374,92 @@ impl ToolRegistry {
             security_level_counts,
         }
     }
+
+    /// Execute a tool with hook integration (if enabled)
+    pub async fn execute_tool_with_hooks(
+        &self,
+        tool_name: &str,
+        input: AgentInput,
+        context: ExecutionContext,
+    ) -> Result<AgentOutput> {
+        let tool = self
+            .get_tool(tool_name)
+            .await
+            .ok_or_else(|| LLMSpellError::Component {
+                message: format!("Tool '{}' not found in registry", tool_name),
+                source: None,
+            })?;
+
+        if let Some(ref executor) = self.tool_executor {
+            // Execute with hooks
+            executor
+                .execute_tool_with_hooks(tool.as_ref().as_ref(), input, context)
+                .await
+        } else {
+            // Execute directly without hooks
+            tool.execute(input, context).await
+        }
+    }
+
+    /// Execute a tool by name (with or without hooks based on configuration)
+    pub async fn execute_tool(
+        &self,
+        tool_name: &str,
+        input: AgentInput,
+        context: ExecutionContext,
+    ) -> Result<AgentOutput> {
+        self.execute_tool_with_hooks(tool_name, input, context)
+            .await
+    }
+
+    /// Check if hook integration is enabled
+    pub fn has_hook_integration(&self) -> bool {
+        self.tool_executor.is_some()
+    }
+
+    /// Get the tool executor (if hook integration is enabled)
+    pub fn get_tool_executor(&self) -> Option<Arc<ToolExecutor>> {
+        self.tool_executor.clone()
+    }
+
+    /// Get hook configuration
+    pub fn get_hook_config(&self) -> &ToolLifecycleConfig {
+        &self.hook_config
+    }
+
+    /// Enable or disable hook integration
+    pub fn set_hook_integration_enabled(&mut self, enabled: bool) {
+        self.hook_config.enable_hooks = enabled;
+        // Note: This only changes the config - to create/destroy the ToolExecutor
+        // would require recreating the registry with the new configuration
+    }
+
+    /// Get execution metrics from the tool executor
+    pub fn get_execution_metrics(&self) -> Option<ExecutionMetrics> {
+        self.tool_executor
+            .as_ref()
+            .map(|executor| executor.get_execution_metrics())
+    }
+
+    /// Get resource usage statistics for all tool executions
+    pub async fn get_resource_usage_stats(&self) -> ResourceUsageStats {
+        let stats = self.get_statistics().await;
+        let execution_metrics = self.get_execution_metrics().unwrap_or_default();
+
+        ResourceUsageStats {
+            total_tools: stats.total_tools,
+            tools_with_hooks: if self.has_hook_integration() {
+                stats.total_tools
+            } else {
+                0
+            },
+            total_executions: execution_metrics.total_executions,
+            total_hook_overhead_ms: execution_metrics.hook_overhead_ms,
+            average_memory_usage: execution_metrics.average_memory_usage,
+            average_cpu_time: execution_metrics.average_cpu_time,
+            resource_limits_hit: execution_metrics.resource_limits_hit,
+        }
+    }
 }
 
 impl Default for ToolRegistry {
@@ -359,6 +479,25 @@ pub struct RegistryStatistics {
     pub category_counts: HashMap<ToolCategory, usize>,
     /// Count of tools per security level
     pub security_level_counts: HashMap<SecurityLevel, usize>,
+}
+
+/// Resource usage statistics for tools with hook integration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ResourceUsageStats {
+    /// Total number of tools in registry
+    pub total_tools: usize,
+    /// Number of tools with hook integration enabled
+    pub tools_with_hooks: usize,
+    /// Total tool executions
+    pub total_executions: u64,
+    /// Total overhead from hook execution in milliseconds
+    pub total_hook_overhead_ms: u64,
+    /// Average memory usage across all executions
+    pub average_memory_usage: usize,
+    /// Average CPU time across all executions
+    pub average_cpu_time: u64,
+    /// Number of times resource limits were hit
+    pub resource_limits_hit: u64,
 }
 
 #[cfg(test)]
@@ -679,5 +818,186 @@ mod tests {
 
         let matcher = CapabilityMatcher::new().with_search_terms(vec!["nonexistent".to_string()]);
         assert!(!matcher.matches(&tool_info));
+    }
+
+    #[tokio::test]
+    async fn test_registry_with_hooks() {
+        use llmspell_hooks::{HookExecutor as HookExecutorImpl, HookRegistry};
+
+        let hook_registry = Arc::new(HookRegistry::new());
+        let hook_executor = Arc::new(HookExecutorImpl::new());
+        let hook_config = ToolLifecycleConfig {
+            enable_hooks: true,
+            ..Default::default()
+        };
+
+        let registry = ToolRegistry::with_hooks(
+            Some(hook_executor.clone()),
+            Some(hook_registry),
+            hook_config,
+        );
+
+        // Check that hook integration is enabled
+        assert!(registry.has_hook_integration());
+        assert!(registry.get_tool_executor().is_some());
+
+        // Register a tool
+        let tool = MockTool::new(
+            "hook_test_tool".to_string(),
+            ToolCategory::Utility,
+            SecurityLevel::Safe,
+        );
+        registry
+            .register("hook_test_tool".to_string(), tool)
+            .await
+            .unwrap();
+
+        // Execute tool with hooks
+        let input = AgentInput::text("test input");
+        let context = ExecutionContext::default();
+        let result = registry
+            .execute_tool_with_hooks("hook_test_tool", input.clone(), context.clone())
+            .await;
+
+        assert!(result.is_ok());
+        let output = result.unwrap();
+        assert!(output.text.contains("Executed hook_test_tool"));
+
+        // Test direct execute_tool method as well
+        let result = registry
+            .execute_tool("hook_test_tool", input, context)
+            .await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_registry_without_hooks() {
+        let registry = ToolRegistry::new();
+
+        // Check that hook integration is disabled
+        assert!(!registry.has_hook_integration());
+        assert!(registry.get_tool_executor().is_none());
+
+        // Register a tool
+        let tool = MockTool::new(
+            "no_hook_tool".to_string(),
+            ToolCategory::Utility,
+            SecurityLevel::Safe,
+        );
+        registry
+            .register("no_hook_tool".to_string(), tool)
+            .await
+            .unwrap();
+
+        // Execute tool without hooks
+        let input = AgentInput::text("test input");
+        let context = ExecutionContext::default();
+        let result = registry.execute_tool("no_hook_tool", input, context).await;
+
+        assert!(result.is_ok());
+        let output = result.unwrap();
+        assert!(output.text.contains("Executed no_hook_tool"));
+    }
+
+    #[tokio::test]
+    async fn test_tool_execution_error_handling() {
+        let registry = ToolRegistry::new();
+
+        let input = AgentInput::text("test input");
+        let context = ExecutionContext::default();
+
+        // Try to execute non-existent tool
+        let result = registry
+            .execute_tool("nonexistent_tool", input, context)
+            .await;
+
+        assert!(result.is_err());
+        if let Err(LLMSpellError::Component { message, .. }) = result {
+            assert!(message.contains("Tool 'nonexistent_tool' not found"));
+        } else {
+            panic!("Expected Component error");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_resource_usage_stats_with_hooks() {
+        use llmspell_hooks::{HookExecutor as HookExecutorImpl, HookRegistry};
+
+        let hook_registry = Arc::new(HookRegistry::new());
+        let hook_executor = Arc::new(HookExecutorImpl::new());
+        let hook_config = ToolLifecycleConfig {
+            enable_hooks: true,
+            ..Default::default()
+        };
+
+        let registry =
+            ToolRegistry::with_hooks(Some(hook_executor), Some(hook_registry), hook_config);
+
+        // Register multiple tools
+        for i in 0..3 {
+            let tool = MockTool::new(
+                format!("test_tool_{}", i),
+                ToolCategory::Utility,
+                SecurityLevel::Safe,
+            );
+            registry
+                .register(format!("test_tool_{}", i), tool)
+                .await
+                .unwrap();
+        }
+
+        // Get resource usage stats
+        let stats = registry.get_resource_usage_stats().await;
+
+        assert_eq!(stats.total_tools, 3);
+        assert_eq!(stats.tools_with_hooks, 3); // All tools have hooks when enabled
+        assert_eq!(stats.total_executions, 0); // No executions yet
+        assert_eq!(stats.total_hook_overhead_ms, 0);
+        assert_eq!(stats.average_memory_usage, 0);
+        assert_eq!(stats.average_cpu_time, 0);
+        assert_eq!(stats.resource_limits_hit, 0);
+    }
+
+    #[tokio::test]
+    async fn test_resource_usage_stats_without_hooks() {
+        let registry = ToolRegistry::new();
+
+        // Register a tool
+        let tool = MockTool::new(
+            "test_tool".to_string(),
+            ToolCategory::Utility,
+            SecurityLevel::Safe,
+        );
+        registry
+            .register("test_tool".to_string(), tool)
+            .await
+            .unwrap();
+
+        // Get resource usage stats
+        let stats = registry.get_resource_usage_stats().await;
+
+        assert_eq!(stats.total_tools, 1);
+        assert_eq!(stats.tools_with_hooks, 0); // No hooks enabled
+        assert_eq!(stats.total_executions, 0);
+    }
+
+    #[tokio::test]
+    async fn test_execution_metrics_from_registry() {
+        use llmspell_hooks::{HookExecutor as HookExecutorImpl, HookRegistry};
+
+        let hook_registry = Arc::new(HookRegistry::new());
+        let hook_executor = Arc::new(HookExecutorImpl::new());
+        let hook_config = ToolLifecycleConfig::default();
+
+        let registry =
+            ToolRegistry::with_hooks(Some(hook_executor), Some(hook_registry), hook_config);
+
+        // Test that we can get execution metrics (even if empty)
+        let metrics = registry.get_execution_metrics();
+        assert!(metrics.is_some());
+
+        let metrics = metrics.unwrap();
+        assert_eq!(metrics.total_executions, 0);
+        assert_eq!(metrics.hook_overhead_ms, 0);
     }
 }

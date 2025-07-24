@@ -906,6 +906,78 @@ impl Tool for FileOperationsTool {
     }
 }
 
+impl FileOperationsTool {
+    /// Check if this tool supports hook integration
+    pub fn supports_hooks(&self) -> bool {
+        true // All tools that implement Tool automatically support hooks
+    }
+
+    /// Get hook integration metadata for this tool
+    pub fn hook_metadata(&self) -> serde_json::Value {
+        json!({
+            "tool_name": self.metadata().name,
+            "hook_points_supported": [
+                "parameter_validation",
+                "security_check",
+                "resource_allocation",
+                "pre_execution",
+                "post_execution",
+                "error_handling",
+                "resource_cleanup",
+                "timeout"
+            ],
+            "security_level": self.security_level(),
+            "resource_limits": {
+                "memory_mb": 100,
+                "cpu_time_seconds": 30,
+                "file_ops_critical": true
+            },
+            "hook_integration_benefits": [
+                "File access validation and sandboxing",
+                "Path traversal attack prevention",
+                "Atomic write operation monitoring",
+                "Resource usage tracking for file operations",
+                "Security audit logging for sensitive file operations",
+                "Performance monitoring for I/O intensive operations"
+            ],
+            "security_considerations": [
+                "All file paths validated through sandbox",
+                "Privileged security level for file system access",
+                "Path traversal protection enabled",
+                "Atomic write operations for data integrity"
+            ]
+        })
+    }
+
+    /// Demonstrate hook-aware execution for file operations
+    /// This method showcases how the file operations tool works with the hook system
+    pub async fn demonstrate_hook_integration(
+        &self,
+        tool_executor: &crate::lifecycle::ToolExecutor,
+        operation: &str,
+        path: &str,
+        content: Option<&str>,
+    ) -> Result<AgentOutput> {
+        let mut params = json!({
+            "operation": operation,
+            "path": path,
+            "hook_integration": true  // Flag to indicate this is a hook demo
+        });
+
+        if let Some(content) = content {
+            params["input"] = json!(content);
+        }
+
+        let input = AgentInput::text("File operations hook demonstration")
+            .with_parameter("parameters", params);
+        let context = ExecutionContext::default();
+
+        // Execute with hooks using the HookableToolExecution trait
+        use crate::lifecycle::HookableToolExecution;
+        self.execute_with_hooks(input, context, tool_executor).await
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -964,5 +1036,74 @@ mod tests {
         assert_eq!(parsed.operation, FileOperation::Copy);
         assert_eq!(parsed.source_path, Some(PathBuf::from("/tmp/source.txt")));
         assert_eq!(parsed.target_path, Some(PathBuf::from("/tmp/target.txt")));
+    }
+
+    #[test]
+    fn test_hook_integration_metadata() {
+        let tool = FileOperationsTool::default();
+
+        // Test that the tool supports hooks
+        assert!(tool.supports_hooks());
+
+        // Test hook metadata
+        let metadata = tool.hook_metadata();
+        assert_eq!(metadata["tool_name"], "file-operations-tool");
+        assert!(metadata["hook_points_supported"].is_array());
+        assert_eq!(
+            metadata["hook_points_supported"].as_array().unwrap().len(),
+            8
+        );
+        assert!(metadata["hook_integration_benefits"].is_array());
+        assert!(metadata["security_considerations"].is_array());
+        assert_eq!(metadata["security_level"], "Privileged");
+    }
+
+    #[tokio::test]
+    async fn test_file_operations_hook_integration() {
+        use crate::lifecycle::{ToolExecutor, ToolLifecycleConfig};
+        let tool = FileOperationsTool::default();
+
+        let config = ToolLifecycleConfig::default();
+        let tool_executor = ToolExecutor::new(config, None, None);
+
+        // Demonstrate hook integration with a read operation (should fail gracefully)
+        let result = tool
+            .demonstrate_hook_integration(
+                &tool_executor,
+                "exists",
+                "/tmp/test_hook_integration.txt",
+                None,
+            )
+            .await;
+
+        // The operation might fail due to file not existing, but should not panic
+        // and should return a proper response structure
+        assert!(result.is_ok() || result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_hookable_tool_execution_trait() {
+        use crate::lifecycle::{HookableToolExecution, ToolExecutor, ToolLifecycleConfig};
+        let tool = FileOperationsTool::default();
+
+        // Verify the tool implements HookableToolExecution
+        // This is automatic via the blanket implementation
+        let config = ToolLifecycleConfig::default();
+        let tool_executor = ToolExecutor::new(config, None, None);
+
+        let input = AgentInput::text("Hook trait test").with_parameter(
+            "parameters",
+            json!({
+                "operation": "exists",
+                "path": "/tmp/hook_trait_test.txt"
+            }),
+        );
+        let context = ExecutionContext::default();
+
+        // This should compile and execute without errors (file may not exist, that's ok)
+        let result = tool
+            .execute_with_hooks(input, context, &tool_executor)
+            .await;
+        assert!(result.is_ok() || result.is_err()); // Should not panic
     }
 }

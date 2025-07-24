@@ -6,6 +6,7 @@ pub mod api_key_integration;
 pub mod communication;
 pub mod data;
 pub mod fs;
+pub mod lifecycle;
 pub mod media;
 pub mod registry;
 pub mod resource_limited;
@@ -15,8 +16,16 @@ pub mod util;
 pub mod web;
 
 // Re-export main types
-pub use registry::{CapabilityMatcher, RegistryStatistics, ToolInfo, ToolRegistry};
+pub use registry::{
+    CapabilityMatcher, RegistryStatistics, ResourceUsageStats, ToolInfo, ToolRegistry,
+};
 pub use resource_limited::{ResourceLimitExt, ResourceLimited, ResourceLimitedTool};
+
+// Re-export lifecycle components
+pub use lifecycle::{
+    ExecutionMetrics, HookableToolExecution, ToolExecutionState, ToolExecutor, ToolHookContext,
+    ToolLifecycleConfig, ToolStateMachine,
+};
 
 // Re-export tools
 pub use api::{GraphQLQueryTool, HttpRequestTool};

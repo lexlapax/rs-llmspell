@@ -10,6 +10,7 @@ license.workspace = true
 [dependencies]
 llmspell-core = { path = "../llmspell-core" }
 llmspell-utils = { path = "../llmspell-utils" }
+llmspell-hooks = { path = "../llmspell-hooks" }
 tokio.workspace = true
 async-trait.workspace = true
 serde.workspace = true
@@ -118,6 +119,7 @@ full = ["email", "email-aws", "database"]
 tempfile = "3.20"
 futures = "0.3"
 criterion = { version = "0.5", features = ["html_reports"] }
+llmspell-bridge = { path = "../llmspell-bridge" }
 
 [[bench]]
 name = "tool_initialization"
@@ -125,4 +127,8 @@ harness = false
 
 [[bench]]
 name = "tool_operations"
+harness = false
+
+[[bench]]
+name = "hook_performance"
 harness = false

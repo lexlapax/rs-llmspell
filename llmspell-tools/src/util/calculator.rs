@@ -9,7 +9,7 @@
 //! - Variable storage and substitution
 //! - Expression validation with helpful errors
 
-use crate::resource_limited::ResourceLimited;
+use crate::{lifecycle::HookableToolExecution, resource_limited::ResourceLimited};
 use async_trait::async_trait;
 use fasteval::Error as FastevalError;
 use llmspell_core::{
@@ -429,6 +429,70 @@ impl ResourceLimited for CalculatorTool {
             operation_timeout_ms: Some(5_000),        // 5 seconds
             ..Default::default()
         }
+    }
+}
+
+// Demonstrate that CalculatorTool automatically implements HookableToolExecution
+// This is provided by the blanket implementation in the lifecycle module
+impl CalculatorTool {
+    /// Helper method to show hook integration capabilities
+    pub fn supports_hooks(&self) -> bool {
+        true // All tools that implement Tool automatically support hooks
+    }
+
+    /// Get hook integration metadata for this tool
+    pub fn hook_metadata(&self) -> serde_json::Value {
+        json!({
+            "tool_name": self.metadata().name,
+            "hook_points_supported": [
+                "parameter_validation",
+                "security_check",
+                "resource_allocation",
+                "pre_execution",
+                "post_execution",
+                "error_handling",
+                "resource_cleanup",
+                "timeout"
+            ],
+            "security_level": self.security_level(),
+            "resource_limits": {
+                "memory_mb": 10,
+                "cpu_time_ms": 5000,
+                "operations": 10000
+            },
+            "hook_integration_benefits": [
+                "Security validation before expression evaluation",
+                "Resource monitoring during calculation",
+                "Error logging and recovery",
+                "Performance metrics collection",
+                "Timeout handling",
+                "Audit trail for mathematical operations"
+            ]
+        })
+    }
+
+    /// Demonstrate hook-aware execution
+    /// This method showcases how the calculator works with the hook system
+    pub async fn demonstrate_hook_integration(
+        &self,
+        tool_executor: &crate::lifecycle::ToolExecutor,
+        expression: &str,
+        variables: Option<serde_json::Map<String, JsonValue>>,
+    ) -> Result<AgentOutput> {
+        let input = AgentInput::text("Hook demonstration").with_parameter(
+            "parameters",
+            json!({
+                "operation": "evaluate",
+                "input": expression,
+                "variables": variables.unwrap_or_default(),
+                "hook_integration": true  // Flag to indicate this is a hook demo
+            }),
+        );
+
+        let context = ExecutionContext::default();
+
+        // Execute with hooks using the HookableToolExecution trait
+        self.execute_with_hooks(input, context, tool_executor).await
     }
 }
 
@@ -878,5 +942,106 @@ mod tests {
                 expr
             );
         }
+    }
+
+    #[tokio::test]
+    async fn test_hook_integration_capability() {
+        let tool = CalculatorTool::new();
+
+        // Test that the tool supports hooks
+        assert!(tool.supports_hooks());
+
+        // Test hook metadata
+        let metadata = tool.hook_metadata();
+        assert_eq!(metadata["tool_name"], "calculator");
+        assert!(metadata["hook_points_supported"].is_array());
+        assert_eq!(
+            metadata["hook_points_supported"].as_array().unwrap().len(),
+            8
+        );
+        assert!(metadata["hook_integration_benefits"].is_array());
+    }
+
+    #[tokio::test]
+    async fn test_calculator_with_hook_executor() {
+        use crate::lifecycle::{ToolExecutor, ToolLifecycleConfig};
+
+        let tool = CalculatorTool::new();
+
+        // Create a ToolExecutor for testing (without actual hooks for this demo)
+        let config = ToolLifecycleConfig {
+            enable_hooks: false, // Disable for testing to avoid hook dependencies
+            ..Default::default()
+        };
+        let tool_executor = ToolExecutor::new(config, None, None);
+
+        // Demonstrate hook integration
+        let result = tool
+            .demonstrate_hook_integration(&tool_executor, "2 + 3", None)
+            .await;
+
+        assert!(result.is_ok());
+        let output = result.unwrap();
+        let parsed: JsonValue = serde_json::from_str(&output.text).unwrap();
+        assert!(parsed["success"].as_bool().unwrap_or(false));
+        assert_eq!(parsed["result"]["result"], 5.0);
+    }
+
+    #[tokio::test]
+    async fn test_calculator_hook_integration_with_variables() {
+        use crate::lifecycle::{ToolExecutor, ToolLifecycleConfig};
+
+        let tool = CalculatorTool::new();
+
+        let config = ToolLifecycleConfig::default();
+        let tool_executor = ToolExecutor::new(config, None, None);
+
+        // Test with variables
+        let mut variables = serde_json::Map::new();
+        variables.insert("x".to_string(), json!(4));
+        variables.insert("y".to_string(), json!(3));
+
+        let result = tool
+            .demonstrate_hook_integration(&tool_executor, "x^2 + y^2", Some(variables))
+            .await;
+
+        assert!(result.is_ok());
+        let output = result.unwrap();
+        let parsed: JsonValue = serde_json::from_str(&output.text).unwrap();
+        assert!(parsed["success"].as_bool().unwrap_or(false));
+        assert_eq!(parsed["result"]["result"], 25.0);
+    }
+
+    #[tokio::test]
+    async fn test_hookable_tool_execution_trait() {
+        use crate::lifecycle::{HookableToolExecution, ToolExecutor, ToolLifecycleConfig};
+
+        let tool = CalculatorTool::new();
+
+        // Verify the tool implements HookableToolExecution
+        // This is automatic via the blanket implementation
+        let config = ToolLifecycleConfig::default();
+        let tool_executor = ToolExecutor::new(config, None, None);
+
+        let input = AgentInput::text("test hook trait").with_parameter(
+            "parameters",
+            json!({
+                "operation": "evaluate",
+                "input": "10 / 2"
+            }),
+        );
+
+        let context = ExecutionContext::default();
+
+        // Call the trait method directly
+        let result = tool
+            .execute_with_hooks(input, context, &tool_executor)
+            .await;
+
+        assert!(result.is_ok());
+        let output = result.unwrap();
+        let parsed: JsonValue = serde_json::from_str(&output.text).unwrap();
+        assert!(parsed["success"].as_bool().unwrap_or(false));
+        assert_eq!(parsed["result"]["result"], 5.0);
     }
 }
