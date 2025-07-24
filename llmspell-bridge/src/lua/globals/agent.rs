@@ -152,12 +152,15 @@ impl UserData for LuaAgentInstance {
                 // Convert Lua table to tool input
                 let tool_input_json = crate::lua::conversion::lua_table_to_json(input_table)?;
 
-                // Create AgentInput with the tool input as parameters
+                // Wrap the parameters in a "parameters" key as expected by extract_parameters
+                let mut wrapped_params = std::collections::HashMap::new();
+                wrapped_params.insert("parameters".to_string(), tool_input_json);
+
                 let agent_input = llmspell_core::types::AgentInput {
                     text: format!("Invoking tool: {}", tool_name),
                     media: vec![],
                     context: None,
-                    parameters: serde_json::from_value(tool_input_json).unwrap_or_default(),
+                    parameters: wrapped_params,
                     output_modalities: vec![],
                 };
 

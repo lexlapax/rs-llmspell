@@ -169,6 +169,10 @@ All tools now return consistent ResponseBuilder format:
 
 ### Fixed
 
+- **agent:invokeTool() parameter format** - Fixed double-nesting requirement
+  - Previously required: `{parameters: {parameters: {actual_params}}}`
+  - Now accepts: `{actual_params}` directly
+  - Affects all 34 tools when invoked through agents
 - Multiple security vulnerabilities (see Security section)
 - Inconsistent parameter naming across tools
 - Code duplication issues (reduced from 40% to <5%)

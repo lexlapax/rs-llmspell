@@ -32,7 +32,7 @@
 
 ## Phase 4.0: Quick Wins from Phase 3 (Day 1)
 
-### Task 4.0.1: Fix Tool Invocation Parameter Format
+### Task 4.0.1: Fix Tool Invocation Parameter Format ✅
 **Priority**: HIGH  
 **Estimated Time**: 2 hours  
 **Assignee**: Bridge Team
@@ -40,10 +40,10 @@
 **Description**: Fix the parameter wrapping issue in agent:invokeTool() that requires double-nested parameters.
 
 **Acceptance Criteria:**
-- [ ] Parameter format matches tool expectations
-- [ ] agent:invokeTool() works with single parameter object
-- [ ] Existing tests updated and passing
-- [ ] No breaking changes to working code
+- [x] Parameter format matches tool expectations
+- [x] agent:invokeTool() works with single parameter object
+- [x] Existing tests updated and passing
+- [x] No breaking changes to working code
 
 **Implementation Steps:**
 1. Locate issue in `llmspell-bridge/src/lua/globals/agent.rs` line ~153
@@ -59,7 +59,7 @@ agent:invokeTool("calculator", {expression = "2 + 2"})
 agent:invokeTool("calculator", {parameters = {parameters = {expression = "2 + 2"}}})
 ```
 
-### Task 4.0.2: Create CHANGELOG for v0.3.0
+### Task 4.0.2: Create CHANGELOG for v0.3.0 ✅
 **Priority**: MEDIUM  
 **Estimated Time**: 2 hours  
 **Assignee**: Documentation Team
@@ -67,10 +67,10 @@ agent:invokeTool("calculator", {parameters = {parameters = {expression = "2 + 2"
 **Description**: Document breaking changes from Phase 3 parameter standardization.
 
 **Acceptance Criteria:**
-- [ ] CHANGELOG_v0.3.0.md created
-- [ ] All breaking changes documented
-- [ ] Migration examples provided
-- [ ] Version compatibility notes included
+- [x] CHANGELOG_v0.3.0.md created (updates added to main CHANGELOG.md)
+- [x] All breaking changes documented
+- [x] Migration examples provided
+- [x] Version compatibility notes included
 
 **Content to Include:**
 - Parameter standardization (content → input, etc.)
@@ -86,10 +86,10 @@ agent:invokeTool("calculator", {parameters = {parameters = {expression = "2 + 2"
 **Description**: Update provider hierarchy and configuration documentation.
 
 **Acceptance Criteria:**
-- [ ] `/docs/providers/README.md` updated
+- [ ] `/docs/providers/README.md` - that's not the location -- where should it go? user-guide? developer-guide ? 
 - [ ] Hierarchical naming explained
 - [ ] Configuration examples provided
-- [ ] Migration guide included
+- [ ] Migration guide included (not needed - no backward compatibility)
 
 ---
 

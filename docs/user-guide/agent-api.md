@@ -138,6 +138,51 @@ local agent = Agent.create({
 local response = agent:execute("Search for recent AI developments and calculate the growth rate")
 ```
 
+### Invoking Tools Directly
+
+As of v0.3.0, agents can invoke tools directly with simplified parameter passing:
+
+```lua
+-- Invoke a tool directly through the agent
+local result = agent:invokeTool("calculator", {
+    operation = "evaluate",
+    input = "2 + 2"
+})
+
+-- Parse the tool response
+if result and result.text then
+    local parsed = JSON.parse(result.text)
+    if parsed.success then
+        print("Result:", parsed.result.result)  -- Output: 4
+    else
+        print("Error:", parsed.error)
+    end
+end
+```
+
+### Tool Discovery
+
+Agents can discover available tools:
+
+```lua
+-- Check if a specific tool is available
+if agent:hasTool("calculator") then
+    print("Calculator is available")
+end
+
+-- Discover all available tools
+local tools = agent:discoverTools()
+for _, tool in ipairs(tools) do
+    print("Available tool:", tool)
+end
+
+-- Get metadata for all tools
+local metadata = agent:getAllToolMetadata()
+for tool_name, info in pairs(metadata) do
+    print(tool_name .. ": " .. info.description)
+end
+```
+
 ## Error Handling
 
 ```lua
@@ -237,3 +282,42 @@ List all registered agents.
 
 **Returns:**
 - Array of agent names
+
+### agent:invokeTool(tool_name, parameters)
+Invoke a tool directly through the agent (v0.3.0+).
+
+**Parameters:**
+- `tool_name` (string): Name of the tool to invoke
+- `parameters` (table): Tool-specific parameters
+
+**Returns:**
+- Table with `text` field containing JSON response
+
+**Example:**
+```lua
+local result = agent:invokeTool("calculator", {
+    operation = "evaluate",
+    input = "10 * 5"
+})
+```
+
+### agent:hasTool(tool_name)
+Check if a specific tool is available.
+
+**Parameters:**
+- `tool_name` (string): Name of the tool
+
+**Returns:**
+- Boolean indicating tool availability
+
+### agent:discoverTools()
+Get a list of all available tools.
+
+**Returns:**
+- Array of tool names
+
+### agent:getAllToolMetadata()
+Get metadata for all available tools.
+
+**Returns:**
+- Table mapping tool names to metadata objects
