@@ -309,31 +309,168 @@ agent:invokeTool("calculator", {parameters = {parameters = {expression = "2 + 2"
 - [x] HighThroughputProcessor with parallel workers ✅
 - [x] ThroughputMeasurement utilities for performance validation ✅
 
-### Task 4.2.3: Build CrossLanguageEventBridge
+### Task 4.2.3: Build CrossLanguageEventBridge (ENHANCED MEGATHINK VERSION)
 **Priority**: HIGH  
-**Estimated Time**: 5 hours  
+**Estimated Time**: 8 hours (increased from 5 - comprehensive architecture analysis)  
 **Assignee**: Bridge Team
 
-**Description**: Implement cross-language event propagation system in the bridge crate (following architectural separation).
+**ARCHITECTURAL ANALYSIS**: Following llmspell-bridge three-layer pattern:
+1. **Cross-Language Abstraction Layer** (`src/globals/event_global.rs`) - GlobalObject trait implementation
+2. **Bridge Layer** (`src/event_bridge.rs` + `src/event_serialization.rs`) - Arc-based async state management  
+3. **Language-Specific Bindings** (`src/lua/globals/event.rs`, `src/javascript/globals/event.rs`) - sync wrappers
 
-**Files to Create:**
-- `llmspell-bridge/src/event_bridge.rs` - CrossLanguageEventBridge implementation
-- `llmspell-bridge/src/event_serialization.rs` - Language-specific event serialization
-- `llmspell-bridge/src/lua/globals/event.rs` - Lua event globals and bindings
+**CRITICAL CODE PATTERNS DISCOVERED:**
+- **sync_utils.rs**: `block_on_async(op_name, future, timeout)` & `block_on_async_lua()` for Lua sync wrapping
+- **Bridge Pattern**: Arc<RwLock<HashMap<>>> for thread-safe state, async methods, GlobalContext storage
+- **Lua Pattern**: inject_[name]_global() functions, UserData for complex objects, conversion utilities
+- **JavaScript Pattern**: Feature-gated stubs with matching signatures for Phase 15 implementation
 
-**Acceptance Criteria:**
-- [ ] Event propagation between languages
-- [ ] Type marshalling for each language
-- [ ] Preserve event ordering
-- [ ] Handle language-specific formats
-- [ ] Error recovery for failed propagation
-- [ ] Performance metrics per language
+**Description**: Implement comprehensive cross-language event propagation system following the established bridge architecture patterns. Replace placeholder `event_global.rs` with full implementation integrating llmspell-events EventBus.
 
-**Definition of Done:**
-- Cross-language propagation tested
-- Type conversion validated
-- Performance acceptable
-- Error scenarios handled
+**Files to Create/Update:**
+
+**Bridge Layer (Core Logic):**
+- `llmspell-bridge/src/event_bridge.rs` - EventBridge with EventBus integration
+  - Struct pattern: `pub struct EventBridge { event_bus: Arc<EventBus>, subscriptions: Arc<RwLock<HashMap<...>>> }`
+  - Constructor: `EventBridge::new(context: Arc<GlobalContext>) -> Result<Self>`
+  - Async methods: `publish_event()`, `subscribe_pattern()`, `unsubscribe()`
+  - Thread-safe with Arc<tokio::sync::RwLock<>> patterns following AgentBridge pattern
+  - Integration with llmspell-events EventBus and UniversalEvent
+  - Subscription management with unique IDs and cleanup
+
+- `llmspell-bridge/src/event_serialization.rs` - Language-agnostic serialization
+  - UniversalEvent ↔ Language-specific format conversion
+  - JSON-based serialization with language type hints
+  - Error handling for unsupported types
+  - Performance-optimized conversion utilities
+
+**Cross-Language Abstraction:**
+- `llmspell-bridge/src/globals/event_global.rs` - **REPLACE PLACEHOLDER**
+  - EventGlobal struct pattern: `pub struct EventGlobal { event_bridge: Arc<EventBridge> }`
+  - Constructor: `EventGlobal::new(event_bridge: Arc<EventBridge>) -> Self`
+  - Implement full GlobalObject trait (replace current placeholder)
+  - `metadata()` - name: "Event", version: "1.0.0", description: "Cross-language event system"
+  - `inject_lua()` - calls `crate::lua::globals::event::inject_event_global(lua, context, self.event_bridge.clone())`
+  - `inject_javascript()` - calls `crate::javascript::globals::event::inject_event_global(ctx, context)`
+  - Store EventBridge in GlobalContext using `context.set_bridge("event_bridge", self.event_bridge.clone())`
+
+**Language-Specific Bindings:**
+
+**Lua Implementation:**
+- `llmspell-bridge/src/lua/globals/event.rs` - Full Lua bindings
+  - **CRITICAL**: Use existing `crate::lua::sync_utils::{block_on_async, block_on_async_lua}` functions
+  - Function signature: `inject_event_global(lua: &Lua, context: &GlobalContext, event_bridge: Arc<EventBridge>)`
+  - LuaEventSubscription UserData for managing subscriptions with cleanup Drop impl
+  - Event.emit(event_type, data) - `block_on_async("event_emit", async { ... }, None)`
+  - Event.subscribe(pattern, callback) - `block_on_async("event_subscribe", async { ... }, None)`
+  - Event.unsubscribe(subscription) - `block_on_async("event_unsubscribe", async { ... }, None)`
+  - Conversion utilities: `lua_value_to_universal_event`, `universal_event_to_lua_table`
+  - Use existing `crate::lua::conversion::{lua_table_to_json, json_to_lua_value}` patterns
+  - Proper error handling with `mlua::Error::ExternalError(Arc::new(e))` pattern
+
+**JavaScript Stub Implementation:**
+- `llmspell-bridge/src/javascript/globals/event.rs` - Phase 15 prep stub
+  - Function signature: `inject_event_global(ctx: &mut boa_engine::Context, context: &GlobalContext) -> Result<(), LLMSpellError>`
+  - Feature-gated with `#[cfg(feature = "javascript")]` and `#[cfg(not(feature = "javascript"))]` variants
+  - Stub implementation returns `Ok(())` with TODO comments for Phase 15
+  - Match existing pattern from `crate::javascript::globals::agent::inject_agent_global`
+  - Include test module with basic compilation verification
+
+**Integration Points:**
+- Update `llmspell-bridge/src/lib.rs` to export event bridge components
+- Update `llmspell-bridge/src/globals/mod.rs` `create_standard_registry()` function:
+  - Create EventBridge: `let event_bridge = Arc::new(EventBridge::new(context.clone()).await?);`
+  - Replace placeholder: `builder.register(Arc::new(event_global::EventGlobal::new(event_bridge)));`
+  - Store bridge reference: `context.set_bridge("event_bridge", event_bridge.clone());`
+- Update `llmspell-bridge/Cargo.toml` dependency (already added)
+
+**Enhanced Acceptance Criteria:**
+
+**Cross-Language Communication:**
+- [x] llmspell-events dependency added to llmspell-bridge ✅
+- [ ] EventBridge integrates with EventBus from llmspell-events
+- [ ] Event propagation: Lua → EventBus → JavaScript (when implemented)
+- [ ] Event propagation: JavaScript → EventBus → Lua (when implemented)
+- [ ] UniversalEvent format preserved across language boundaries
+- [ ] Correlation IDs maintained for event tracing
+- [ ] Language field properly set for event source tracking
+
+**Type Marshalling & Serialization:**
+- [ ] Lua table ↔ UniversalEvent conversion with nested data support
+- [ ] JavaScript Object ↔ UniversalEvent conversion (stub prepared)
+- [ ] JSON serialization fallback for complex types
+- [ ] Error handling for unsupported type conversions
+- [ ] Performance-optimized conversion paths
+
+**Event Ordering & Delivery:**
+- [ ] Sequence numbers preserved during cross-language propagation
+- [ ] Pattern-based subscription routing works across languages
+- [ ] Event filtering respects language-specific patterns
+- [ ] Backpressure handling prevents script engine blocking
+
+**Error Recovery & Resilience:**
+- [ ] Failed event serialization doesn't crash script engines
+- [ ] Subscription errors properly propagated to script callbacks
+- [ ] Circuit breaker integration for failing cross-language propagation
+- [ ] Graceful degradation when target language unavailable
+
+**Performance & Monitoring:**
+- [ ] Per-language event metrics collection
+- [ ] Cross-language latency measurement
+- [ ] Memory usage tracking for active subscriptions
+- [ ] Performance benchmarks: <5ms cross-language overhead
+
+**API Consistency:**
+- [ ] Lua and JavaScript APIs have identical signatures (when implemented)
+- [ ] Error messages consistent across languages
+- [ ] Behavior matches between languages for same operations
+- [ ] Documentation examples work in both languages
+
+**Enhanced Definition of Done:**
+
+**Architecture Compliance:**
+- [ ] Follows three-layer bridge architecture pattern
+- [ ] Uses Arc<T> for thread-safe cross-language sharing
+- [ ] Implements GlobalObject trait with proper metadata
+- [ ] Bridge references stored in GlobalContext correctly
+- [ ] Feature gates working for JavaScript stub
+
+**Integration Testing:**
+- [ ] Lua → EventBus → Lua event propagation tested
+- [ ] Cross-language event propagation framework tested (even with JS stub)
+- [ ] Pattern matching works across language boundaries
+- [ ] Subscription lifecycle (create, receive, cleanup) tested
+- [ ] Error scenarios (network failure, serialization errors) tested
+
+**Performance Validation:**
+- [ ] Latency benchmarks: Event propagation <5ms end-to-end
+- [ ] Throughput: Support 1000+ events/sec cross-language
+- [ ] Memory: No memory leaks in subscription management
+- [ ] CPU: <2% overhead for cross-language event routing
+
+**Documentation & Examples:**
+- [ ] API documentation with examples for both languages
+- [ ] Cross-language event patterns documented
+- [ ] Migration guide from placeholder implementation
+- [ ] Performance characteristics documented
+
+**Backwards Compatibility:**
+- [ ] Existing placeholder Event global behavior maintained during transition
+- [ ] No breaking changes to existing script APIs
+- [ ] Smooth upgrade path from Phase 3 event placeholders
+
+**Phase Integration Readiness:**
+- [ ] JavaScript stub properly structured for Phase 15 implementation
+- [ ] Hook integration points prepared for Phase 4.4+
+- [ ] Agent integration points identified for cross-agent events
+- [ ] Workflow integration prepared for event-driven workflows
+
+**Testing Coverage:**
+- [ ] Unit tests for all bridge components (>95% coverage)
+- [ ] Integration tests for cross-language scenarios
+- [ ] Property tests for serialization round-trips
+- [ ] Performance regression tests in CI
+- [ ] Error injection tests for resilience validation
 
 ---
 
@@ -473,83 +610,176 @@ agent:invokeTool("calculator", {parameters = {parameters = {expression = "2 + 2"
 
 ---
 
-## Phase 4.4: Language Adapters and Bridges (Days 5.5-6.5)
+## Phase 4.4: Language Adapters and Bridges (Days 5.5-6.5) (ENHANCED MEGATHINK VERSION)
 
-### Task 4.4.1: Implement Lua Hook Adapter
+**ARCHITECTURAL ANALYSIS**: Following llmspell-bridge three-layer pattern:
+1. **Cross-Language Abstraction Layer** (`src/globals/hook_global.rs`) - GlobalObject trait implementation
+2. **Bridge Layer** (`src/hook_bridge.rs` + adapters) - Arc-based async state management with HookExecutor/HookRegistry integration
+3. **Language-Specific Bindings** (`src/lua/globals/hook.rs`, `src/javascript/globals/hook.rs`) - sync wrappers
+
+**CRITICAL CODE PATTERNS DISCOVERED:**
+- **HookAdapter trait**: `type Context`, `type Result`, `adapt_context()`, `adapt_result()` methods
+- **HookExecutor/HookRegistry**: Existing llmspell-hooks crate with Arc<DashMap>, CircuitBreaker, PerformanceMonitor
+- **Bridge Pattern**: Arc<RwLock<HashMap<>>> for thread-safe state, async methods, GlobalContext storage
+- **Lua Pattern**: UserData for complex objects, sync_utils::block_on_async, conversion utilities
+- **JavaScript Pattern**: Feature-gated stubs with matching signatures for Phase 15 implementation
+
+### Task 4.4.1: Build CrossLanguageHookBridge (ENHANCED)
 **Priority**: CRITICAL  
-**Estimated Time**: 4 hours  
+**Estimated Time**: 6 hours (increased from split tasks - comprehensive architecture)
 **Assignee**: Bridge Team
 
-**Description**: Build Lua-specific hook adapter for synchronous execution.
+**Description**: Implement comprehensive cross-language hook execution system following the established bridge architecture patterns. Replace placeholder `hook_global.rs` with full implementation integrating llmspell-hooks infrastructure.
 
-**Files to Create:**
-- `llmspell-bridge/src/lua/hook_adapter.rs`
-- `llmspell-bridge/src/lua/context_conversion.rs`
-- `llmspell-bridge/src/lua/result_conversion.rs`
+**Files to Create/Update:**
 
-**Acceptance Criteria:**
-- [ ] LuaHookAdapter implements HookAdapter trait
-- [ ] Context marshalling to Lua tables
-- [ ] Result unmarshalling from Lua
-- [ ] Synchronous execution wrapper
-- [ ] Error propagation
-- [ ] Type safety maintained
+**Bridge Layer (Core Logic):**
+- `llmspell-bridge/src/hook_bridge.rs` - HookBridge with HookExecutor/HookRegistry integration
+  - Struct pattern: `pub struct HookBridge { hook_executor: Arc<HookExecutor>, hook_registry: Arc<HookRegistry>, adapters: Arc<RwLock<HashMap<Language, Box<dyn HookAdapter>>>> }`
+  - Constructor: `HookBridge::new(context: Arc<GlobalContext>) -> Result<Self>`
+  - Async methods: `execute_hook()`, `register_hook()`, `list_hooks()`, `unregister_hook()`
+  - Language routing with adapter pattern
+  - Integration with llmspell-hooks HookExecutor and HookRegistry
+  - Thread-safe with Arc<tokio::sync::RwLock<>> patterns following AgentBridge pattern
 
-**Definition of Done:**
-- Lua hook execution tested
-- Type conversions validated
-- Performance acceptable
-- Error handling comprehensive
+**Language Adapters:**
+- `llmspell-bridge/src/lua/hook_adapter.rs` - LuaHookAdapter implementing HookAdapter trait
+  - `impl HookAdapter for LuaHookAdapter { type Context = mlua::Table; type Result = mlua::Value; }`
+  - `adapt_context()` - HookContext → Lua table conversion using existing conversion patterns
+  - `adapt_result()` - Lua value → HookResult conversion
+  - Integration with existing `crate::lua::conversion` utilities
+  - Error extraction with `mlua::Error::ExternalError(Arc::new(e))` pattern
 
-### Task 4.4.2: Implement JavaScript Hook Adapter (Stub)
-**Priority**: MEDIUM  
-**Estimated Time**: 3 hours  
-**Assignee**: Bridge Team
+- `llmspell-bridge/src/javascript/hook_adapter.rs` - JavaScript stub for Phase 15
+  - Feature-gated stub implementing HookAdapter trait
+  - `type Context = boa_engine::Value; type Result = boa_engine::Value;`
+  - Stub implementations returning appropriate defaults
+  - TODO comments for Phase 15 implementation
 
-**Description**: Build JavaScript hook adapter stub for Promise-based execution (Phase 15 prep).
+**Cross-Language Abstraction:**
+- `llmspell-bridge/src/globals/hook_global.rs` - **REPLACE PLACEHOLDER**
+  - HookGlobal struct pattern: `pub struct HookGlobal { hook_bridge: Arc<HookBridge> }`
+  - Constructor: `HookGlobal::new(hook_bridge: Arc<HookBridge>) -> Self`
+  - Implement full GlobalObject trait (replace current placeholder)
+  - `metadata()` - name: "Hook", version: "1.0.0", description: "Cross-language hook system"
+  - `inject_lua()` - calls `crate::lua::globals::hook::inject_hook_global(lua, context, self.hook_bridge.clone())`
+  - `inject_javascript()` - calls `crate::javascript::globals::hook::inject_hook_global(ctx, context)`
+  - Store HookBridge in GlobalContext using `context.set_bridge("hook_bridge", self.hook_bridge.clone())`
 
-**Files to Create:**
-- `llmspell-bridge/src/js/hook_adapter.rs` (stub)
-- `llmspell-bridge/src/js/promise_wrapper.rs` (stub)
+**Language-Specific Bindings:**
 
-**Acceptance Criteria:**
-- [ ] JavaScriptHookAdapter trait implementation
-- [ ] Promise wrapper design documented
-- [ ] Async/await pattern support planned
-- [ ] Type conversion interfaces defined
-- [ ] Integration points identified
+**Lua Implementation:**
+- `llmspell-bridge/src/lua/globals/hook.rs` - Full Lua bindings
+  - **CRITICAL**: Use existing `crate::lua::sync_utils::{block_on_async, block_on_async_lua}` functions
+  - Function signature: `inject_hook_global(lua: &Lua, context: &GlobalContext, hook_bridge: Arc<HookBridge>)`
+  - LuaHookHandle UserData for managing hook registration with cleanup Drop impl
+  - Hook.register(hook_point, callback) - `block_on_async("hook_register", async { ... }, None)`
+  - Hook.unregister(hook_handle) - `block_on_async("hook_unregister", async { ... }, None)`
+  - Hook.list(hook_point) - `block_on_async("hook_list", async { ... }, None)`
+  - Conversion utilities: `hook_context_to_lua_table`, `lua_value_to_hook_result`
+  - Use existing `crate::lua::conversion::{lua_table_to_json, json_to_lua_value}` patterns
+  - Proper error handling with `mlua::Error::ExternalError(Arc::new(e))` pattern
 
-**Definition of Done:**
-- Stub compiles successfully
-- Interface documented
-- Phase 15 requirements captured
-- Design reviewed
+**JavaScript Stub Implementation:**
+- `llmspell-bridge/src/javascript/globals/hook.rs` - Phase 15 prep stub
+  - Function signature: `inject_hook_global(ctx: &mut boa_engine::Context, context: &GlobalContext) -> Result<(), LLMSpellError>`
+  - Feature-gated with `#[cfg(feature = "javascript")]` and `#[cfg(not(feature = "javascript"))]` variants
+  - Stub implementation returns `Ok(())` with TODO comments for Phase 15
+  - Match existing pattern from `crate::javascript::globals::agent::inject_agent_global`
+  - Include test module with basic compilation verification
 
-### Task 4.4.3: Build CrossLanguageHookBridge
-**Priority**: HIGH  
-**Estimated Time**: 5 hours  
-**Assignee**: Bridge Team
+**Integration Points:**
+- Update `llmspell-bridge/src/lib.rs` to export hook bridge components
+- Update `llmspell-bridge/src/globals/mod.rs` `create_standard_registry()` function:
+  - Create HookBridge: `let hook_bridge = Arc::new(HookBridge::new(context.clone()).await?);`
+  - Replace placeholder: `builder.register(Arc::new(hook_global::HookGlobal::new(hook_bridge)));`
+  - Store bridge reference: `context.set_bridge("hook_bridge", hook_bridge.clone());`
+- Add llmspell-hooks dependency to llmspell-bridge/Cargo.toml
 
-**Description**: Implement the cross-language hook execution bridge.
+**Enhanced Acceptance Criteria:**
 
-**Files to Create:**
-- `llmspell-bridge/src/hook_bridge.rs`
-- `llmspell-bridge/src/language_detector.rs`
-- `llmspell-bridge/src/hook_routing.rs`
+**Cross-Language Hook Execution:**
+- [ ] HookBridge integrates with HookExecutor from llmspell-hooks
+- [ ] Hook registration: Lua → HookRegistry → JavaScript (when implemented)
+- [ ] Hook execution: JavaScript → HookBridge → Lua (when implemented)
+- [ ] HookContext format preserved across language boundaries
+- [ ] Language field properly set for hook source tracking
+- [ ] CircuitBreaker protection active for cross-language hooks
 
-**Acceptance Criteria:**
-- [ ] Language detection from context
-- [ ] Routing to appropriate adapter
-- [ ] Fallback handling
-- [ ] Performance monitoring
-- [ ] Error aggregation
-- [ ] Metrics per language
+**Language Adapter Integration:**
+- [ ] LuaHookAdapter implements HookAdapter trait correctly
+- [ ] HookContext ↔ Lua table conversion with nested data support
+- [ ] JavaScript HookAdapter stub prepared for Phase 15
+- [ ] Error handling for unsupported type conversions
+- [ ] Performance-optimized conversion paths
 
-**Definition of Done:**
-- Multi-language execution tested
-- Routing performance validated
-- Error handling robust
-- Metrics accurately tracked
+**Hook Registration & Management:**
+- [ ] Hook.register() works from Lua with priority support
+- [ ] Hook.unregister() properly cleans up subscriptions
+- [ ] Hook.list() returns registered hooks with metadata
+- [ ] Thread-safe registration with concurrent script access
+- [ ] Hook metadata preserved during cross-language registration
+
+**Performance & Monitoring:**
+- [ ] Per-language hook execution metrics collection
+- [ ] Cross-language latency measurement
+- [ ] Memory usage tracking for active hooks
+- [ ] Performance benchmarks: <2ms cross-language hook overhead
+- [ ] CircuitBreaker triggers on slow cross-language hooks
+
+**Error Recovery & Resilience:**
+- [ ] Failed hook execution doesn't crash script engines
+- [ ] Hook errors properly propagated to script contexts
+- [ ] Circuit breaker integration for failing cross-language hooks
+- [ ] Graceful degradation when target language unavailable
+
+**Enhanced Definition of Done:**
+
+**Architecture Compliance:**
+- [ ] Follows three-layer bridge architecture pattern
+- [ ] Uses Arc<T> for thread-safe cross-language sharing
+- [ ] Implements GlobalObject trait with proper metadata
+- [ ] Bridge references stored in GlobalContext correctly
+- [ ] Feature gates working for JavaScript stub
+- [ ] Integrates properly with existing llmspell-hooks infrastructure
+
+**Integration Testing:**
+- [ ] Lua → HookBridge → Lua hook execution tested
+- [ ] Cross-language hook registration framework tested
+- [ ] HookPoint filtering works across language boundaries
+- [ ] Hook lifecycle (register, execute, cleanup) tested
+- [ ] Error scenarios (network failure, hook errors) tested
+
+**Performance Validation:**
+- [ ] Latency benchmarks: Hook execution <2ms end-to-end
+- [ ] Throughput: Support 100+ hooks/sec cross-language
+- [ ] Memory: No memory leaks in hook management
+- [ ] CPU: <1% overhead for cross-language hook routing
+- [ ] CircuitBreaker effectiveness validated
+
+**Documentation & Examples:**
+- [ ] API documentation with examples for both languages
+- [ ] Cross-language hook patterns documented
+- [ ] Migration guide from placeholder implementation
+- [ ] Performance characteristics documented
+
+**Backwards Compatibility:**
+- [ ] Existing placeholder Hook global behavior maintained during transition
+- [ ] No breaking changes to existing script APIs
+- [ ] Smooth upgrade path from Phase 3 hook placeholders
+
+**Phase Integration Readiness:**
+- [ ] JavaScript stub properly structured for Phase 15 implementation
+- [ ] Built-in hook integration points prepared for Phase 4.3+
+- [ ] Agent integration points identified for lifecycle hooks
+- [ ] Workflow integration prepared for hook-driven workflows
+
+**Testing Coverage:**
+- [ ] Unit tests for all bridge components (>95% coverage)
+- [ ] Integration tests for cross-language scenarios
+- [ ] Property tests for context/result round-trips
+- [ ] Performance regression tests in CI
+- [ ] Error injection tests for resilience validation
 
 ---
 
