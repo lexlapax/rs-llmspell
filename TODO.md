@@ -790,30 +790,30 @@ agent:invokeTool("calculator", {parameters = {parameters = {expression = "2 + 2"
 - Phase 16-17 requirements met ✅
 - Security review complete ✅
 
-### Task 4.5.2: Implement SelectiveHookRegistry
+### Task 4.5.2: Implement SelectiveHookRegistry ✅
 **Priority**: MEDIUM  
 **Estimated Time**: 3 hours  
 **Assignee**: Architecture Team
 
 **Description**: Build SelectiveHookRegistry for library mode support (Phase 18 prep).
 
-**Files to Create:**
-- `llmspell-hooks/src/selective/mod.rs`
-- `llmspell-hooks/src/selective/registry.rs`
+**Files Created:**
+- `llmspell-hooks/src/selective/mod.rs` ✅
+- `llmspell-hooks/src/selective/registry.rs` ✅
 
 **Acceptance Criteria:**
-- [ ] Feature flag support
-- [ ] Lazy hook loading
-- [ ] Minimal memory footprint
-- [ ] Dynamic enable/disable
-- [ ] Registry filtering
-- [ ] Performance optimized
+- [x] Feature flag support ✅
+- [x] Lazy hook loading ✅
+- [x] Minimal memory footprint ✅
+- [x] Dynamic enable/disable ✅
+- [x] Registry filtering ✅
+- [x] Performance optimized ✅
 
 **Definition of Done:**
-- Selective loading tested
-- Memory usage validated
-- Performance benchmarked
-- Phase 18 requirements met
+- Selective loading tested ✅
+- Memory usage validated ✅
+- Performance benchmarked ✅
+- Phase 18 requirements met ✅
 
 ---
 

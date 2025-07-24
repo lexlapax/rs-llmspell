@@ -44,6 +44,7 @@ pub mod priority;
 pub mod rate_limiter;
 pub mod registry;
 pub mod result;
+pub mod selective;
 pub mod traits;
 pub mod types;
 
@@ -59,6 +60,7 @@ pub use performance::{PerformanceMetrics, PerformanceMonitor};
 pub use priority::{PriorityBucket, PriorityComparator};
 pub use registry::{HookRegistry, RegistryError};
 pub use result::{ForkBuilder, HookResult, Operation, RetryBuilder};
+pub use selective::{HookFeatures, SelectiveHookRegistry, SelectiveRegistryConfig};
 pub use traits::{
     ArcHook, BoxedHook, ComposableHook, FnHook, Hook, HookAdapter, HookExt, MetricHook,
     ReplayableHook,
