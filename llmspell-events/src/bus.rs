@@ -4,8 +4,10 @@
 use crate::flow_controller::{FlowController, FlowControllerConfig};
 use crate::handler::AsyncEventHandler;
 use crate::pattern::{EventPattern, PatternMatcher};
+use crate::storage_adapter::{EventPersistenceManager, EventStorage, PersistenceConfig};
 use crate::universal_event::UniversalEvent;
 use dashmap::DashMap;
+use llmspell_storage::StorageBackend;
 use std::sync::Arc;
 use tokio::sync::{broadcast, mpsc};
 use tracing::{debug, error, info};
@@ -21,6 +23,26 @@ pub struct EventBus {
     broadcast_tx: broadcast::Sender<UniversalEvent>,
     /// Pattern matcher
     pattern_matcher: PatternMatcher,
+    /// Optional event persistence
+    persistence_manager: Option<Arc<tokio::sync::Mutex<Box<dyn EventPersistenceManagerTrait>>>>,
+}
+
+/// Trait for type-erased persistence manager
+#[async_trait::async_trait]
+trait EventPersistenceManagerTrait: Send + Sync {
+    async fn maybe_store_event(&self, event: &UniversalEvent) -> anyhow::Result<bool>;
+    fn storage(&self) -> &dyn EventStorage;
+}
+
+#[async_trait::async_trait]
+impl<B: StorageBackend + 'static> EventPersistenceManagerTrait for EventPersistenceManager<B> {
+    async fn maybe_store_event(&self, event: &UniversalEvent) -> anyhow::Result<bool> {
+        self.maybe_store_event(event).await
+    }
+
+    fn storage(&self) -> &dyn EventStorage {
+        self.storage()
+    }
 }
 
 /// Individual subscription
@@ -48,6 +70,27 @@ impl EventBus {
             flow_controller: Arc::new(FlowController::new(config)),
             broadcast_tx,
             pattern_matcher: PatternMatcher::new(),
+            persistence_manager: None,
+        }
+    }
+
+    /// Create an event bus with persistence using any storage backend
+    pub fn with_persistence<B: StorageBackend + 'static>(
+        flow_config: FlowControllerConfig,
+        storage_adapter: crate::storage_adapter::EventStorageAdapter<B>,
+        persistence_config: PersistenceConfig,
+    ) -> Self {
+        let (broadcast_tx, _) = broadcast::channel(10000);
+        let persistence_manager = EventPersistenceManager::new(storage_adapter, persistence_config);
+
+        Self {
+            subscriptions: Arc::new(DashMap::new()),
+            flow_controller: Arc::new(FlowController::new(flow_config)),
+            broadcast_tx,
+            pattern_matcher: PatternMatcher::new(),
+            persistence_manager: Some(Arc::new(tokio::sync::Mutex::new(
+                Box::new(persistence_manager) as Box<dyn EventPersistenceManagerTrait>,
+            ))),
         }
     }
 
@@ -78,6 +121,15 @@ impl EventBus {
         // Send to broadcast channel
         if self.broadcast_tx.send(event.clone()).is_err() {
             debug!("No broadcast receivers for event: {}", event.event_type);
+        }
+
+        // Store event in persistence if configured
+        if let Some(persistence_manager) = &self.persistence_manager {
+            let manager = persistence_manager.lock().await;
+            if let Err(e) = manager.maybe_store_event(&event).await {
+                error!("Failed to persist event: {}", e);
+                // Don't fail the publish if persistence fails
+            }
         }
 
         // Route to pattern-matched subscriptions
@@ -186,6 +238,48 @@ impl EventBus {
             .map(|entry| entry.value().len())
             .sum()
     }
+
+    /// Get persisted events by pattern (if persistence is enabled)
+    pub async fn get_persisted_events(
+        &self,
+        pattern: &str,
+    ) -> Result<Vec<UniversalEvent>, anyhow::Error> {
+        if let Some(persistence_manager) = &self.persistence_manager {
+            let manager = persistence_manager.lock().await;
+            manager.storage().get_events_by_pattern(pattern).await
+        } else {
+            Ok(Vec::new())
+        }
+    }
+
+    /// Get persisted events by correlation ID (if persistence is enabled)
+    pub async fn get_events_by_correlation_id(
+        &self,
+        correlation_id: Uuid,
+    ) -> Result<Vec<UniversalEvent>, anyhow::Error> {
+        if let Some(persistence_manager) = &self.persistence_manager {
+            let manager = persistence_manager.lock().await;
+            manager
+                .storage()
+                .get_events_by_correlation_id(correlation_id)
+                .await
+        } else {
+            Ok(Vec::new())
+        }
+    }
+
+    /// Get storage statistics (if persistence is enabled)
+    pub async fn get_storage_stats(
+        &self,
+    ) -> Result<Option<crate::storage_adapter::StorageStats>, anyhow::Error> {
+        if let Some(persistence_manager) = &self.persistence_manager {
+            let manager = persistence_manager.lock().await;
+            let stats = manager.storage().get_storage_stats().await?;
+            Ok(Some(stats))
+        } else {
+            Ok(None)
+        }
+    }
 }
 
 impl Default for EventBus {
@@ -198,6 +292,7 @@ impl Default for EventBus {
 pub struct EventBusBuilder {
     flow_config: FlowControllerConfig,
     broadcast_capacity: usize,
+    persistence_config: Option<(Box<dyn EventPersistenceManagerTrait>, PersistenceConfig)>,
 }
 
 impl EventBusBuilder {
@@ -206,6 +301,7 @@ impl EventBusBuilder {
         Self {
             flow_config: FlowControllerConfig::default(),
             broadcast_capacity: 10000,
+            persistence_config: None,
         }
     }
 
@@ -221,9 +317,31 @@ impl EventBusBuilder {
         self
     }
 
+    /// Set persistence configuration with storage backend
+    pub fn with_storage_persistence<B: StorageBackend + 'static>(
+        mut self,
+        storage_adapter: crate::storage_adapter::EventStorageAdapter<B>,
+        config: PersistenceConfig,
+    ) -> Self {
+        let manager = EventPersistenceManager::new(storage_adapter, config.clone());
+        self.persistence_config = Some((Box::new(manager), config));
+        self
+    }
+
     /// Build the event bus
     pub fn build(self) -> EventBus {
-        EventBus::with_config(self.flow_config)
+        if let Some((manager, _)) = self.persistence_config {
+            let (broadcast_tx, _) = broadcast::channel(self.broadcast_capacity);
+            EventBus {
+                subscriptions: Arc::new(DashMap::new()),
+                flow_controller: Arc::new(FlowController::new(self.flow_config)),
+                broadcast_tx,
+                pattern_matcher: PatternMatcher::new(),
+                persistence_manager: Some(Arc::new(tokio::sync::Mutex::new(manager))),
+            }
+        } else {
+            EventBus::with_config(self.flow_config)
+        }
     }
 }
 

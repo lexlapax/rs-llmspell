@@ -11,6 +11,7 @@ categories = ["asynchronous", "api-bindings"]
 
 [dependencies]
 llmspell-utils = { path = "../llmspell-utils" }
+llmspell-storage = { path = "../llmspell-storage" }
 anyhow = "1.0"
 async-trait = "0.1"
 thiserror = "1.0"

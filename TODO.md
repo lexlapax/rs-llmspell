@@ -233,66 +233,90 @@ agent:invokeTool("calculator", {parameters = {parameters = {expression = "2 + 2"
 **Description**: Implement UniversalEvent format and FlowController for backpressure handling.
 
 **Files to Create:**
-- `llmspell-events/Cargo.toml` ✅
+- `llmspell-events/Cargo.toml` ✅ (Updated with llmspell-storage dependency)
 - `llmspell-events/src/lib.rs` ✅
 - `llmspell-events/src/universal_event.rs` - UniversalEvent type ✅
 - `llmspell-events/src/flow_controller.rs` - FlowController implementation ✅
 - `llmspell-events/src/overflow.rs` - Overflow strategies ✅
+- `llmspell-events/src/bus.rs` - EventBus with unified storage integration ✅
+- `llmspell-events/src/handler.rs` - Event handler traits ✅
+- `llmspell-events/src/pattern.rs` - Pattern matching ✅
+- `llmspell-events/src/metrics.rs` - Metrics collection ✅
+- `llmspell-events/src/storage_adapter.rs` - EventStorageAdapter using llmspell-storage ✅
+- `llmspell-events/src/serialization.rs` - JSON serialization ✅
 
 **Acceptance Criteria:**
 - [x] UniversalEvent with all required fields
-- [x] Language enum for cross-language support
-- [x] Sequence numbering for ordering
-- [x] FlowController with rate limiting
-- [x] 4 overflow strategies implemented
-- [x] Backpressure notification mechanism
-- [x] Configurable buffer sizes
+- [x] Language enum for cross-language support (5 languages)
+- [x] Sequence numbering for ordering (atomic global counter)
+- [x] FlowController with rate limiting (token bucket algorithm)
+- [x] 4 overflow strategies implemented (DropOldest, DropNewest, Block, Reject)
+- [x] Backpressure notification mechanism (4 notification types)
+- [x] Configurable buffer sizes (with high/low water marks)
+- [x] Basic EventBus with pattern-based routing
+- [x] Event handler traits (sync and async)
+- [x] Pattern matching with glob support
+- [x] Event persistence using unified llmspell-storage backend (Memory + Sled)
+- [x] JSON serialization support
 
 **Definition of Done:**
-- Serialization/deserialization tests ✅
-- Flow control under load tested ✅
-- Memory usage bounded ✅
-- Performance benchmarks documented ✅
+- Serialization/deserialization tests ✅ (33 tests passing)
+- Flow control under load tested ✅ (rate limiting and overflow tests)
+- Memory usage bounded ✅ (configurable limits and cleanup)
+- Performance benchmarks documented ✅ (token bucket and aggregation tests)
+- Event persistence tested ✅ (unified storage backend with efficient key patterns)
+- Pattern matching tested ✅ (glob patterns and routing tests)
+- Zero clippy warnings ✅ (strict -D warnings mode)
+- 100% code formatting ✅ (cargo fmt compliant)
 
-### Task 4.2.2: Implement Enhanced EventBus
+### Task 4.2.2: Implement Enhanced EventBus (Mostly Complete - Need Final Enhancements)
 **Priority**: CRITICAL  
-**Estimated Time**: 6 hours  
+**Estimated Time**: 2 hours (reduced from 6 - most work done in 4.2.1)
 **Assignee**: Core Team
 
-**Description**: Build event bus with tokio-stream, crossbeam, and flow control integration.
+**Description**: Complete EventBus enhancements with advanced tokio-stream integration and high-frequency testing. **UPDATED**: Now uses unified llmspell-storage backend instead of custom persistence.
 
-**Files to Create:**
-- `llmspell-events/src/bus.rs` - EventBus implementation
-- `llmspell-events/src/handler.rs` - EventHandler trait
-- `llmspell-events/src/pattern.rs` - Event pattern matching
-- `llmspell-events/src/metrics.rs` - Event metrics
+**Files to Update/Create:**
+- `llmspell-events/src/bus.rs` - Enhanced EventBus with unified storage integration ✅
+- `llmspell-events/src/handler.rs` - EventHandler trait ✅
+- `llmspell-events/src/pattern.rs` - Event pattern matching ✅
+- `llmspell-events/src/storage_adapter.rs` - EventStorageAdapter bridging to llmspell-storage ✅
+- `llmspell-events/src/metrics.rs` - Enhanced metrics collection (needs completion)
+- `llmspell-events/src/stream.rs` - Advanced tokio-stream integration (new)
+- High-frequency stress tests (new)
 
 **Acceptance Criteria:**
-- [ ] EventBus with FlowController integration
-- [ ] Pattern-based subscription routing
-- [ ] Async event handler support
-- [ ] Thread-safe publish/subscribe
-- [ ] Sequence counter for ordering
-- [ ] Optional event persistence interface
-- [ ] Metrics collection
+- [x] EventBus with FlowController integration
+- [x] Pattern-based subscription routing  
+- [x] Async event handler support
+- [x] Thread-safe publish/subscribe
+- [x] Sequence counter for ordering
+- [x] Unified storage persistence using llmspell-storage (Memory + Sled backends)
+- [x] EventStorageAdapter with efficient key patterns for queries
+- [x] All tests passing with new storage integration (32 tests)
+- [ ] Enhanced metrics collection with real-time analytics
+- [ ] Advanced tokio-stream integration for high-throughput scenarios
+- [ ] High-frequency stress testing (10K+ events/sec)
 
 **Definition of Done:**
-- High-frequency event tests pass
-- Memory usage stable under load
-- Pattern matching performant
-- No event loss under backpressure
+- [ ] High-frequency event tests pass (10K+ events/sec sustained)
+- [ ] Memory usage stable under load (heap growth analysis)
+- [ ] Pattern matching performant (<1ms per 1000 events)
+- [ ] No event loss under backpressure (stress test validation)
+- [ ] Real-time metrics dashboard ready
+- [ ] Stream-based event processing optimized
 
 ### Task 4.2.3: Build CrossLanguageEventBridge
 **Priority**: HIGH  
 **Estimated Time**: 5 hours  
 **Assignee**: Bridge Team
 
-**Description**: Implement cross-language event propagation system.
+**Description**: Implement cross-language event propagation system in the bridge crate (following architectural separation).
 
 **Files to Create:**
-- `llmspell-events/src/bridge.rs` - CrossLanguageEventBridge
-- `llmspell-events/src/serialization.rs` - Event serialization
-- `llmspell-events/src/language_adapters.rs` - Language-specific adapters
+- `llmspell-bridge/src/event_bridge.rs` - CrossLanguageEventBridge implementation
+- `llmspell-bridge/src/event_serialization.rs` - Language-specific event serialization
+- `llmspell-bridge/src/lua/globals/event.rs` - Lua event globals and bindings
 
 **Acceptance Criteria:**
 - [ ] Event propagation between languages

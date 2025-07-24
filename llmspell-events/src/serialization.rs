@@ -1,11 +1,10 @@
-// ABOUTME: Event serialization for cross-language compatibility
-// ABOUTME: Handles JSON serialization and language-specific format conversion
+// ABOUTME: Basic event serialization for JSON format
+// ABOUTME: Handles core JSON serialization for UniversalEvent
 
-use crate::universal_event::{Language, UniversalEvent};
+use crate::universal_event::UniversalEvent;
 use anyhow::Result;
-use serde_json::Value;
 
-/// Event serializer for cross-language compatibility
+/// Event serializer for JSON format
 pub struct EventSerializer;
 
 impl EventSerializer {
@@ -19,51 +18,16 @@ impl EventSerializer {
         serde_json::from_str(json).map_err(Into::into)
     }
 
-    /// Convert event to language-specific format
-    pub fn to_language_format(event: &UniversalEvent, target_language: Language) -> Result<Value> {
-        match target_language {
-            Language::Rust => Ok(serde_json::to_value(event)?),
-            Language::Lua => {
-                // Convert to Lua-friendly format
-                Ok(serde_json::json!({
-                    "id": event.id,
-                    "event_type": event.event_type,
-                    "data": event.data,
-                    "language": event.language.as_str(),
-                    "timestamp": event.timestamp.to_rfc3339(),
-                    "sequence": event.sequence,
-                }))
-            }
-            Language::JavaScript => {
-                // Convert to JavaScript-friendly format
-                Ok(serde_json::json!({
-                    "id": event.id,
-                    "eventType": event.event_type,
-                    "data": event.data,
-                    "language": event.language.as_str(),
-                    "timestamp": event.timestamp.to_rfc3339(),
-                    "sequence": event.sequence,
-                }))
-            }
-            Language::Python => {
-                // Convert to Python-friendly format
-                Ok(serde_json::json!({
-                    "id": event.id,
-                    "event_type": event.event_type,
-                    "data": event.data,
-                    "language": event.language.as_str(),
-                    "timestamp": event.timestamp.to_rfc3339(),
-                    "sequence": event.sequence,
-                }))
-            }
-            Language::Unknown => Ok(serde_json::to_value(event)?),
-        }
+    /// Pretty-print event to JSON
+    pub fn to_json_pretty(event: &UniversalEvent) -> Result<String> {
+        serde_json::to_string_pretty(event).map_err(Into::into)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::universal_event::Language;
     use serde_json::Value;
 
     #[test]
@@ -78,17 +42,15 @@ mod tests {
     }
 
     #[test]
-    fn test_language_formats() {
+    fn test_pretty_json() {
         let event = UniversalEvent::new(
             "test.event",
             serde_json::json!({"key": "value"}),
             Language::Rust,
         );
 
-        let lua_format = EventSerializer::to_language_format(&event, Language::Lua).unwrap();
-        assert_eq!(lua_format["event_type"], "test.event");
-
-        let js_format = EventSerializer::to_language_format(&event, Language::JavaScript).unwrap();
-        assert_eq!(js_format["eventType"], "test.event");
+        let pretty_json = EventSerializer::to_json_pretty(&event).unwrap();
+        assert!(pretty_json.contains("\"test.event\""));
+        assert!(pretty_json.contains("\n")); // Should have formatting
     }
 }
