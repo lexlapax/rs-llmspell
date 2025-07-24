@@ -37,6 +37,7 @@ pub mod builtin;
 pub mod cache;
 pub mod circuit_breaker;
 pub mod context;
+pub mod coordination;
 pub mod distributed;
 pub mod executor;
 pub mod performance;
@@ -51,6 +52,10 @@ pub mod types;
 // Re-export commonly used items at crate root
 pub use circuit_breaker::{BreakerState, CircuitBreaker};
 pub use context::{HookContext, HookContextBuilder, OperationContext};
+pub use coordination::{
+    CorrelationId, CrossComponentContext, CrossComponentCoordinator, DependencyGraph,
+    DependencyNode, EventCorrelator, EventTrace, ExecutionChain, ExecutionOrder,
+};
 pub use distributed::{
     DistributedHookContext, DistributedHookContextBuilder, PropagationFlags, RemoteAgentId,
     SecurityContext,
@@ -83,7 +88,8 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub mod prelude {
     pub use crate::{
         BreakerState, Cache, CacheKey, CachingHook, CircuitBreaker, ComponentId, ComponentType,
-        CostTrackingHook, DebuggingHook, FnHook, Hook, HookAdapter, HookContext, HookExecutor,
+        CorrelationId, CostTrackingHook, CrossComponentCoordinator, DebuggingHook, DependencyGraph,
+        EventCorrelator, ExecutionChain, FnHook, Hook, HookAdapter, HookContext, HookExecutor,
         HookExt, HookPoint, HookRegistry, HookResult, Language, LoggingHook, MetricsHook, Priority,
         RateLimitHook, ReplayableHook, RetryHook, SecurityHook,
     };
