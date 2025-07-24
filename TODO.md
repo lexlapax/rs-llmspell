@@ -51,17 +51,63 @@
 ## Phase 4.0: Quick Wins from Phase 3 (Day 1)
 
 ### Task 4.0.1: Fix Tool Invocation Parameter Format ✅
-**Status**: COMPLETE
-**Files Updated**: `llmspell-bridge/src/lua/globals/agent.rs`
+**Priority**: HIGH  
+**Estimated Time**: 2 hours  
+**Assignee**: Bridge Team
+
+**Description**: Fix the parameter wrapping issue in agent:invokeTool() that requires double-nested parameters.
+
+**Acceptance Criteria:**
+- [x] Parameter format matches tool expectations
+- [x] agent:invokeTool() works with single parameter object
+- [x] Existing tests updated and passing
+- [x] No breaking changes to working code
+
+**Implementation Steps:**
+1. Locate issue in `llmspell-bridge/src/lua/globals/agent.rs` line ~153
+2. Update parameter extraction logic
+3. Test with all 34 tools
+4. Update any affected examples
+
+**Testing:**
+```lua
+-- Should work after fix:
+agent:invokeTool("calculator", {expression = "2 + 2"})
+-- Instead of current:
+agent:invokeTool("calculator", {parameters = {parameters = {expression = "2 + 2"}}})
+```
 
 ### Task 4.0.2: Create CHANGELOG for v0.3.0 ✅
-**Status**: COMPLETE  
-**Files Created**: Updated main `CHANGELOG.md`
+**Priority**: MEDIUM  
+**Estimated Time**: 2 hours  
+**Assignee**: Documentation Team
+
+**Description**: Document breaking changes from Phase 3 parameter standardization.
+
+**Acceptance Criteria:**
+- [x] CHANGELOG_v0.3.0.md created (updates added to main CHANGELOG.md)
+- [x] All breaking changes documented
+- [x] Migration examples provided
+- [x] Version compatibility notes included
+
+**Content to Include:**
+- Parameter standardization (content → input, etc.)
+- Response format changes
+- Tool API updates
+- Agent infrastructure changes
 
 ### Task 4.0.3: Update Provider Documentation ✅
-**Status**: COMPLETE
-**Files Created**: `/docs/user-guide/providers.md`
+**Priority**: MEDIUM  
+**Estimated Time**: 2 hours  
+**Assignee**: Documentation Team
 
+**Description**: Update provider hierarchy and configuration documentation.
+
+**Acceptance Criteria:**
+- [x] `/docs/user-guide/providers.md` - Created comprehensive provider documentation
+- [x] Hierarchical naming explained
+- [x] Configuration examples provided
+- [x] Migration guide included (not needed - no backward compatibility)
 ---
 
 ## Phase 4.1: Enhanced Core Hook Infrastructure (Days 2-3.5)
