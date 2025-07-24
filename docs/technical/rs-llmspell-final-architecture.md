@@ -1381,6 +1381,17 @@ Rs-LLMSpell implements a **hierarchical, event-driven architecture** built on fo
 
 In this mode, `rs-llmspell` acts as a standalone runtime that executes scripts (spells). This is the primary mode for building new applications from scratch, where `rs-llmspell` provides the complete execution environment.
 
+### Session Management Layer
+
+Rs-LLMSpell implements comprehensive session management that spans agent lifecycles:
+
+- **Session Context**: Persistent state across agent invocations, maintaining conversation history, user preferences, and execution context
+- **Session Storage**: Durable storage for long-running sessions with automatic persistence and recovery
+- **Session Recovery**: Automatic recovery from interruptions with checkpoint restoration and state reconstruction
+- **Session Transfer**: Seamless handoff between agents with full context preservation and state migration
+
+The session layer ensures continuity across agent interactions, system restarts, and distributed deployments, providing a foundation for stateful AI applications.
+
 ```
 ┌─────────────────────────────────────┐
 │         Rs-LLMSpell Runtime         │
@@ -1669,12 +1680,31 @@ pub struct Event {
     pub metadata: EventMetadata,
 }
 
-// ExecutionContext provides controlled access (prevents circular dependencies)
+// ExecutionContext: Service Bundle Architecture (ADK-inspired)
+// Provides comprehensive runtime services to all components
 pub struct ExecutionContext {
-    component_access: ComponentAccessor,  // Controlled access, not direct registry access
-    state: ExecutionState,
-    metadata: EventMetadata,
-    // Safe access patterns, no direct component references
+    // Core Services
+    pub session: SessionContext,              // Session management and persistence
+    pub state: StateAccessor,                 // State access with propagation support
+    pub artifacts: ArtifactAccessor,          // Artifact storage and retrieval
+    pub events: EventDispatcher,              // Event publishing and subscription
+    
+    // Runtime Services
+    pub logger: ContextLogger,                // Contextual logging with correlation
+    pub metrics: MetricsCollector,            // Performance and business metrics
+    pub tracer: DistributedTracer,            // Distributed tracing support
+    
+    // Security & Resources
+    pub security: SecurityContext,            // Permission checks and security policies
+    pub resources: ResourceLimiter,           // Resource usage limits and monitoring
+    
+    // Agent Services
+    pub agent_locator: AgentLocator,          // Find and communicate with other agents
+    pub capability_registry: CapabilityRegistry, // Discover agent capabilities
+    
+    // Component Access (legacy compatibility)
+    component_access: ComponentAccessor,      // Controlled access to registry
+    metadata: EventMetadata,                  // Request metadata
 }
 
 #[derive(Debug, Clone)]
@@ -2057,6 +2087,12 @@ llmspell-utils:
   - Shared utilities for all crates
   - File helpers, async patterns, string utils
   - System info, error builders, path normalization
+    ↓
+llmspell-storage:
+  - Backend-agnostic persistence layer
+  - StorageBackend trait with Memory, Sled, RocksDB implementations
+  - Type-safe serialization abstractions (StorageSerialize trait)
+  - Used by agent registry and future persistent components
     ↓
 llmspell-bridge: 
   - ScriptEngineBridge, ExternalRuntimeBridge, C API
@@ -2924,10 +2960,23 @@ ScriptRuntime (Central Orchestrator)
     │   ├── LocalProvider (candle integration)
     │   └── CustomProvider
     │
+    ├── SessionManager (Session Lifecycle Management)
+    │   ├── SessionContext
+    │   ├── SessionStore
+    │   └── SessionLifecycle
+    │
+    ├── ArtifactStore (Generated Content Storage)
+    │   ├── StorageBackend
+    │   ├── MetadataIndex
+    │   ├── VersionController
+    │   └── AccessController
+    │
     └── ExecutionContext (Runtime State Management)
         ├── StateManager
         ├── HookExecutor
-        └── EventBus
+        ├── EventBus
+        ├── CallbackRegistry
+        └── StatePropagator
 ```
 
 ### ScriptRuntime: Central Orchestrator
@@ -3345,6 +3394,465 @@ pub trait Agent: BaseAgent {
     // Learning and Adaptation  
     async fn learn_from_feedback(&mut self, feedback: Feedback) -> Result<()>;
     fn learning_config(&self) -> &LearningConfig;
+}
+```
+
+### Agent Lifecycle Management
+
+Complete lifecycle management with scaffolding support for robust agent development and deployment:
+
+```rust
+#[async_trait]
+pub trait AgentLifecycle: Send + Sync {
+    // Initialization phases
+    async fn pre_init(&mut self, context: &ExecutionContext) -> Result<()> {
+        Ok(()) // Default no-op
+    }
+    
+    async fn init(&mut self, context: &ExecutionContext) -> Result<()>;
+    
+    async fn post_init(&mut self, context: &ExecutionContext) -> Result<()> {
+        Ok(()) // Default no-op
+    }
+    
+    // Execution lifecycle
+    async fn pre_execute(&mut self, input: &AgentInput, context: &ExecutionContext) -> Result<()> {
+        Ok(()) // Default no-op
+    }
+    
+    async fn post_execute(&mut self, output: &AgentOutput, context: &ExecutionContext) -> Result<()> {
+        Ok(()) // Default no-op
+    }
+    
+    // State management
+    async fn checkpoint(&self) -> Result<AgentCheckpoint> {
+        Ok(AgentCheckpoint::default())
+    }
+    
+    async fn restore(&mut self, checkpoint: AgentCheckpoint) -> Result<()> {
+        Ok(()) // Default no-op
+    }
+    
+    // Health and readiness
+    async fn health_check(&self) -> Result<HealthStatus> {
+        Ok(HealthStatus::Healthy)
+    }
+    
+    async fn readiness_check(&self) -> Result<ReadinessStatus> {
+        Ok(ReadinessStatus::Ready)
+    }
+    
+    // Termination
+    async fn pre_shutdown(&mut self) -> Result<()> {
+        Ok(()) // Default no-op
+    }
+    
+    async fn shutdown(&mut self) -> Result<()>;
+}
+
+// Checkpoint structure for agent state persistence
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentCheckpoint {
+    pub agent_id: AgentId,
+    pub timestamp: SystemTime,
+    pub state: AgentState,
+    pub conversation_history: Vec<ConversationMessage>,
+    pub memory_snapshot: HashMap<String, Value>,
+    pub metadata: CheckpointMetadata,
+}
+
+// Agent health and readiness status
+#[derive(Debug, Clone)]
+pub enum HealthStatus {
+    Healthy,
+    Degraded { reason: String },
+    Unhealthy { error: String },
+}
+
+#[derive(Debug, Clone)]
+pub enum ReadinessStatus {
+    Ready,
+    Starting { progress: f32 },
+    NotReady { reason: String },
+}
+```
+
+### Agent Scaffolding Templates
+
+Provide scaffolding for common agent patterns to accelerate development:
+
+```rust
+// Template registry for agent scaffolding
+pub struct AgentTemplateRegistry {
+    templates: HashMap<String, Box<dyn AgentTemplate>>,
+}
+
+#[async_trait]
+pub trait AgentTemplate: Send + Sync {
+    fn name(&self) -> &str;
+    fn description(&self) -> &str;
+    fn category(&self) -> AgentCategory;
+    
+    // Generate agent implementation from template
+    async fn generate(&self, config: TemplateConfig) -> Result<GeneratedAgent>;
+    
+    // Validate template configuration
+    fn validate_config(&self, config: &TemplateConfig) -> Result<()>;
+    
+    // Get required tools for this template
+    fn required_tools(&self) -> Vec<ToolId>;
+    
+    // Get recommended configuration
+    fn recommended_config(&self) -> AgentConfig;
+}
+
+// Pre-built agent templates
+pub enum AgentCategory {
+    Research,          // Research and information gathering
+    Conversation,      // Chat and dialogue agents
+    Analysis,          // Data analysis and insights
+    Coding,           // Code generation and review
+    CustomerService,  // Support and assistance
+    Workflow,         // Task orchestration
+    Creative,         // Content generation
+    Custom,           // User-defined patterns
+}
+
+// Research Agent Template
+pub struct ResearchAgentTemplate;
+
+impl ResearchAgentTemplate {
+    pub fn new() -> Self {
+        Self {}
+    }
+}
+
+#[async_trait]
+impl AgentTemplate for ResearchAgentTemplate {
+    fn name(&self) -> &str { "research_agent" }
+    
+    fn description(&self) -> &str {
+        "Agent specialized in research, information gathering, and synthesis"
+    }
+    
+    fn category(&self) -> AgentCategory { AgentCategory::Research }
+    
+    async fn generate(&self, config: TemplateConfig) -> Result<GeneratedAgent> {
+        // Generate a complete research agent with:
+        // - Web search integration
+        // - Document analysis capabilities
+        // - Source tracking and citations
+        // - Synthesis and summarization
+        // - Fact checking workflows
+        
+        let agent_code = self.generate_agent_code(&config)?;
+        let workflow_code = self.generate_workflow_code(&config)?;
+        let config_files = self.generate_config_files(&config)?;
+        
+        Ok(GeneratedAgent {
+            agent_code,
+            workflow_code,
+            config_files,
+            tools: vec!["web_search", "document_reader", "fact_checker"],
+            readme: self.generate_readme(&config)?,
+        })
+    }
+    
+    fn required_tools(&self) -> Vec<ToolId> {
+        vec![
+            ToolId::from("web_search"),
+            ToolId::from("document_reader"),
+            ToolId::from("text_summarizer"),
+        ]
+    }
+    
+    fn recommended_config(&self) -> AgentConfig {
+        AgentConfig {
+            model: ModelConfig {
+                provider: "openai".to_string(),
+                model: "gpt-4".to_string(),
+                temperature: 0.7,
+                max_tokens: 4000,
+            },
+            memory: MemoryConfig {
+                short_term_capacity: 100,
+                long_term_enabled: true,
+                embedding_model: Some("text-embedding-ada-002".to_string()),
+            },
+            behavior: BehaviorConfig {
+                verify_sources: true,
+                cite_references: true,
+                fact_check: true,
+                ..Default::default()
+            },
+        }
+    }
+}
+
+// Tool Orchestrator Agent Template
+pub struct ToolOrchestratorTemplate;
+
+#[async_trait]
+impl AgentTemplate for ToolOrchestratorTemplate {
+    fn name(&self) -> &str { "tool_orchestrator" }
+    
+    fn description(&self) -> &str {
+        "Agent that coordinates multiple tools to accomplish complex tasks"
+    }
+    
+    fn category(&self) -> AgentCategory { AgentCategory::Workflow }
+    
+    async fn generate(&self, config: TemplateConfig) -> Result<GeneratedAgent> {
+        // Generate orchestrator with:
+        // - Dynamic tool selection
+        // - Parallel tool execution
+        // - Result aggregation
+        // - Error handling and retries
+        // - Progress tracking
+        
+        Ok(GeneratedAgent {
+            agent_code: self.generate_orchestrator_code(&config)?,
+            workflow_code: self.generate_coordination_workflows(&config)?,
+            config_files: self.generate_tool_configs(&config)?,
+            tools: config.selected_tools.clone(),
+            readme: self.generate_orchestrator_docs(&config)?,
+        })
+    }
+    
+    fn required_tools(&self) -> Vec<ToolId> {
+        vec![] // Flexible - depends on use case
+    }
+    
+    fn recommended_config(&self) -> AgentConfig {
+        AgentConfig {
+            model: ModelConfig {
+                provider: "anthropic".to_string(),
+                model: "claude-3-opus".to_string(),
+                temperature: 0.3, // Lower for planning
+                max_tokens: 8000,
+            },
+            behavior: BehaviorConfig {
+                max_retries: 3,
+                parallel_execution: true,
+                timeout_seconds: 300,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+    }
+}
+
+// Conversation Agent Template
+pub struct ConversationAgentTemplate;
+
+#[async_trait]
+impl AgentTemplate for ConversationAgentTemplate {
+    fn name(&self) -> &str { "conversation_agent" }
+    
+    fn description(&self) -> &str {
+        "Agent optimized for natural conversations and dialogue"
+    }
+    
+    fn category(&self) -> AgentCategory { AgentCategory::Conversation }
+    
+    async fn generate(&self, config: TemplateConfig) -> Result<GeneratedAgent> {
+        // Generate conversational agent with:
+        // - Context window management
+        // - Personality configuration
+        // - Memory recall strategies
+        // - Response formatting
+        // - Multi-turn dialogue handling
+        
+        Ok(GeneratedAgent {
+            agent_code: self.generate_chat_agent(&config)?,
+            workflow_code: self.generate_dialogue_flows(&config)?,
+            config_files: self.generate_personality_config(&config)?,
+            tools: vec!["memory_store", "context_manager"],
+            readme: self.generate_conversation_guide(&config)?,
+        })
+    }
+    
+    fn required_tools(&self) -> Vec<ToolId> {
+        vec![ToolId::from("memory_store")]
+    }
+    
+    fn recommended_config(&self) -> AgentConfig {
+        AgentConfig {
+            model: ModelConfig {
+                provider: "openai".to_string(),
+                model: "gpt-4-turbo".to_string(),
+                temperature: 0.8, // Higher for creativity
+                max_tokens: 2000,
+            },
+            memory: MemoryConfig {
+                short_term_capacity: 50,
+                conversation_window: 20,
+                summarize_on_overflow: true,
+                ..Default::default()
+            },
+            ..Default::default()
+        }
+    }
+}
+
+// Generated agent structure
+#[derive(Debug)]
+pub struct GeneratedAgent {
+    pub agent_code: String,
+    pub workflow_code: Option<String>,
+    pub config_files: Vec<ConfigFile>,
+    pub tools: Vec<&'static str>,
+    pub readme: String,
+}
+
+#[derive(Debug)]
+pub struct ConfigFile {
+    pub path: PathBuf,
+    pub content: String,
+}
+
+// Template configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TemplateConfig {
+    pub name: String,
+    pub description: Option<String>,
+    pub language: ScriptLanguage,
+    pub selected_tools: Vec<ToolId>,
+    pub custom_prompts: HashMap<String, String>,
+    pub behavior_overrides: HashMap<String, Value>,
+}
+```
+
+### Agent Factory and Builder
+
+Streamlined agent creation with builder pattern:
+
+```rust
+// Agent factory for dynamic agent creation
+pub struct AgentFactory {
+    template_registry: Arc<AgentTemplateRegistry>,
+    llm_providers: Arc<ProviderManager>,
+    tool_registry: Arc<ToolRegistry>,
+}
+
+impl AgentFactory {
+    pub fn builder() -> AgentBuilder {
+        AgentBuilder::new()
+    }
+    
+    // Create agent from template
+    pub async fn create_from_template(
+        &self,
+        template_name: &str,
+        config: TemplateConfig,
+    ) -> Result<Box<dyn Agent>> {
+        let template = self.template_registry.get(template_name)?;
+        let generated = template.generate(config).await?;
+        self.instantiate_agent(generated).await
+    }
+    
+    // Create custom agent
+    pub async fn create_custom(
+        &self,
+        builder: AgentBuilder,
+    ) -> Result<Box<dyn Agent>> {
+        builder.build(self).await
+    }
+}
+
+// Fluent builder for custom agents
+pub struct AgentBuilder {
+    name: Option<String>,
+    description: Option<String>,
+    model_config: Option<ModelConfig>,
+    tools: Vec<ToolId>,
+    system_prompt: Option<String>,
+    behaviors: HashMap<String, Value>,
+    lifecycle_hooks: Vec<Box<dyn AgentLifecycle>>,
+}
+
+impl AgentBuilder {
+    pub fn new() -> Self {
+        Self {
+            name: None,
+            description: None,
+            model_config: None,
+            tools: Vec::new(),
+            system_prompt: None,
+            behaviors: HashMap::new(),
+            lifecycle_hooks: Vec::new(),
+        }
+    }
+    
+    pub fn name(mut self, name: impl Into<String>) -> Self {
+        self.name = Some(name.into());
+        self
+    }
+    
+    pub fn description(mut self, desc: impl Into<String>) -> Self {
+        self.description = Some(desc.into());
+        self
+    }
+    
+    pub fn model(mut self, provider: &str, model: &str) -> Self {
+        self.model_config = Some(ModelConfig {
+            provider: provider.to_string(),
+            model: model.to_string(),
+            ..Default::default()
+        });
+        self
+    }
+    
+    pub fn add_tool(mut self, tool_id: impl Into<ToolId>) -> Self {
+        self.tools.push(tool_id.into());
+        self
+    }
+    
+    pub fn system_prompt(mut self, prompt: impl Into<String>) -> Self {
+        self.system_prompt = Some(prompt.into());
+        self
+    }
+    
+    pub fn behavior(mut self, key: &str, value: impl Into<Value>) -> Self {
+        self.behaviors.insert(key.to_string(), value.into());
+        self
+    }
+    
+    pub fn add_lifecycle_hook(mut self, hook: Box<dyn AgentLifecycle>) -> Self {
+        self.lifecycle_hooks.push(hook);
+        self
+    }
+    
+    pub async fn build(self, factory: &AgentFactory) -> Result<Box<dyn Agent>> {
+        // Validate configuration
+        self.validate()?;
+        
+        // Create agent instance
+        let agent = CustomAgent {
+            base: BaseAgentImpl::new(
+                ComponentId::new(),
+                self.name.unwrap_or_else(|| "custom_agent".to_string()),
+                self.description.unwrap_or_default(),
+            ),
+            llm_provider: factory.llm_providers.get_provider(&self.model_config.unwrap())?,
+            tools: factory.tool_registry.get_tools(&self.tools)?,
+            system_prompt: self.system_prompt.unwrap_or_default(),
+            behaviors: self.behaviors,
+            lifecycle_hooks: self.lifecycle_hooks,
+        };
+        
+        Ok(Box::new(agent))
+    }
+    
+    fn validate(&self) -> Result<()> {
+        if self.name.is_none() {
+            return Err(Error::ValidationError("Agent name is required".into()));
+        }
+        if self.model_config.is_none() {
+            return Err(Error::ValidationError("Model configuration is required".into()));
+        }
+        Ok(())
+    }
 }
 ```
 
@@ -4469,6 +4977,370 @@ This bridge-first approach provides:
 - **Focus**: We build unique value, not infrastructure
 - **Flexibility**: Easy to swap implementations
 - **Performance**: Optimized native code
+
+## State Management Architecture
+
+Rs-LLMSpell implements a comprehensive state management system that enables persistent, distributed, and hierarchical state across agents, sessions, and workflows. This architecture supports both in-memory and persistent storage backends with automatic synchronization and conflict resolution.
+
+### State Hierarchy and Scopes
+
+The state system operates at multiple hierarchical levels, each with its own lifecycle and visibility rules:
+
+```rust
+pub enum StateScope {
+    Global,              // Application-wide shared state
+    Session(SessionId),  // Session-scoped state
+    Workflow(WorkflowId),// Workflow execution state
+    Agent(AgentId),      // Individual agent state
+    User(UserId),        // User-specific persistent state
+}
+
+pub struct StateManager {
+    stores: HashMap<StateScope, Box<dyn StateStore>>,
+    propagation_rules: Vec<PropagationRule>,
+    conflict_resolver: Box<dyn ConflictResolver>,
+    event_bus: Arc<EventBus>,
+}
+```
+
+### State Store Trait
+
+The core abstraction for state storage supporting multiple backends:
+
+```rust
+#[async_trait]
+pub trait StateStore: Send + Sync {
+    // Basic CRUD operations
+    async fn get(&self, key: &str) -> Result<Option<Value>>;
+    async fn set(&self, key: &str, value: Value) -> Result<()>;
+    async fn delete(&self, key: &str) -> Result<()>;
+    async fn exists(&self, key: &str) -> Result<bool>;
+    
+    // Batch operations
+    async fn get_many(&self, keys: &[String]) -> Result<HashMap<String, Value>>;
+    async fn set_many(&self, entries: HashMap<String, Value>) -> Result<()>;
+    
+    // Prefix operations
+    async fn list_keys(&self, prefix: &str) -> Result<Vec<String>>;
+    async fn delete_prefix(&self, prefix: &str) -> Result<usize>;
+    
+    // Atomic operations
+    async fn compare_and_swap(&self, key: &str, old: Option<Value>, new: Value) -> Result<bool>;
+    async fn increment(&self, key: &str, delta: i64) -> Result<i64>;
+    
+    // Transaction support
+    async fn transaction<F>(&self, operations: F) -> Result<()>
+    where
+        F: FnOnce(&mut Transaction) -> Result<()>;
+}
+```
+
+### State Propagation Framework
+
+State can be automatically propagated between different scopes based on configurable rules:
+
+```rust
+pub enum PropagationStrategy {
+    Broadcast,      // Propagate to all child scopes
+    Selective {     // Propagate based on patterns
+        patterns: Vec<String>,
+        scopes: Vec<StateScope>,
+    },
+    Hierarchical {  // Propagate up/down the hierarchy
+        direction: PropagationDirection,
+        levels: usize,
+    },
+    EventDriven {   // Propagate based on events
+        events: Vec<EventType>,
+        filter: Box<dyn Fn(&Event) -> bool>,
+    },
+}
+
+pub struct PropagationRule {
+    name: String,
+    source_scope: StateScope,
+    strategy: PropagationStrategy,
+    transform: Option<Box<dyn StateTransformer>>,
+    priority: i32,
+}
+
+#[async_trait]
+pub trait StateTransformer: Send + Sync {
+    async fn transform(&self, key: &str, value: Value, context: &PropagationContext) -> Result<Option<Value>>;
+}
+```
+
+### Conflict Resolution
+
+When state conflicts arise during propagation or concurrent updates:
+
+```rust
+pub enum ConflictResolution {
+    LastWrite,           // Latest timestamp wins
+    FirstWrite,          // First write is preserved
+    Merge(MergeStrategy),// Custom merge logic
+    Manual,              // Require manual resolution
+}
+
+pub enum MergeStrategy {
+    // For objects
+    DeepMerge,          // Recursive merge
+    ShallowMerge,       // Top-level only
+    
+    // For arrays
+    Append,             // Concatenate arrays
+    Union,              // Unique elements only
+    Replace,            // Full replacement
+    
+    // For numbers
+    Sum,                // Add values
+    Max,                // Keep maximum
+    Min,                // Keep minimum
+    Average,            // Average values
+    
+    // Custom
+    Custom(Box<dyn Merger>),
+}
+```
+
+### State Persistence Backends
+
+Multiple backend implementations for different use cases:
+
+```rust
+// In-memory store for development/testing
+pub struct MemoryStateStore {
+    data: Arc<RwLock<HashMap<String, Value>>>,
+    ttl_manager: Option<TtlManager>,
+}
+
+// RocksDB for high-performance persistent storage
+pub struct RocksStateStore {
+    db: Arc<rocksdb::DB>,
+    serializer: Box<dyn StateSerializer>,
+    compaction_filter: Option<CompactionFilter>,
+}
+
+// Sled for embedded scenarios
+pub struct SledStateStore {
+    db: sled::Db,
+    trees: HashMap<String, sled::Tree>,
+}
+
+// Redis for distributed state
+pub struct RedisStateStore {
+    client: redis::Client,
+    pool: Arc<redis::Pool>,
+    key_prefix: String,
+}
+
+// S3 for large state objects
+pub struct S3StateStore {
+    client: aws_sdk_s3::Client,
+    bucket: String,
+    encryption: Option<EncryptionConfig>,
+}
+```
+
+### State Access Patterns
+
+Convenient APIs for common state access patterns:
+
+```rust
+pub struct StateAccessor {
+    scope: StateScope,
+    store: Arc<dyn StateStore>,
+    cache: Option<StateCache>,
+}
+
+impl StateAccessor {
+    // Typed access
+    pub async fn get_typed<T: DeserializeOwned>(&self, key: &str) -> Result<Option<T>> {
+        self.get(key).await?
+            .map(|v| serde_json::from_value(v))
+            .transpose()
+            .map_err(Into::into)
+    }
+    
+    // Namespaced access
+    pub fn namespace(&self, ns: &str) -> NamespacedAccessor {
+        NamespacedAccessor::new(self.clone(), ns)
+    }
+    
+    // Subscriptions
+    pub async fn watch(&self, pattern: &str) -> Result<StateWatcher> {
+        StateWatcher::new(self.scope.clone(), pattern).await
+    }
+    
+    // Bulk operations
+    pub async fn export(&self) -> Result<StateSnapshot> {
+        StateSnapshot::from_store(&self.store).await
+    }
+    
+    pub async fn import(&self, snapshot: StateSnapshot) -> Result<()> {
+        snapshot.restore_to(&self.store).await
+    }
+}
+```
+
+### State Synchronization
+
+Automatic synchronization between different state stores:
+
+```rust
+pub struct StateSynchronizer {
+    primary: Arc<dyn StateStore>,
+    replicas: Vec<Arc<dyn StateStore>>,
+    sync_strategy: SyncStrategy,
+    conflict_resolver: Arc<dyn ConflictResolver>,
+}
+
+pub enum SyncStrategy {
+    Immediate,           // Sync on every write
+    Eventual {           // Periodic sync
+        interval: Duration,
+        batch_size: usize,
+    },
+    OnDemand,           // Manual sync trigger
+    Smart {             // Adaptive sync
+        hot_keys: HashSet<String>,
+        cold_interval: Duration,
+        hot_interval: Duration,
+    },
+}
+```
+
+### State Events and Hooks
+
+Integration with the event system for state changes:
+
+```rust
+pub enum StateEvent {
+    // Value events
+    ValueSet { scope: StateScope, key: String, value: Value },
+    ValueDeleted { scope: StateScope, key: String },
+    ValueChanged { scope: StateScope, key: String, old: Value, new: Value },
+    
+    // Bulk events
+    BatchUpdate { scope: StateScope, keys: Vec<String> },
+    PrefixCleared { scope: StateScope, prefix: String, count: usize },
+    
+    // Sync events
+    SyncStarted { source: StateScope, target: StateScope },
+    SyncCompleted { source: StateScope, target: StateScope, keys: usize },
+    SyncFailed { source: StateScope, target: StateScope, error: String },
+    
+    // Conflict events
+    ConflictDetected { key: String, scopes: Vec<StateScope> },
+    ConflictResolved { key: String, resolution: ConflictResolution },
+}
+```
+
+### State Migration and Versioning
+
+Support for evolving state schemas over time:
+
+```rust
+pub struct StateMigrator {
+    migrations: BTreeMap<Version, Box<dyn Migration>>,
+    current_version: Version,
+}
+
+#[async_trait]
+pub trait Migration: Send + Sync {
+    fn version(&self) -> Version;
+    fn description(&self) -> &str;
+    
+    async fn up(&self, store: &dyn StateStore) -> Result<()>;
+    async fn down(&self, store: &dyn StateStore) -> Result<()>;
+    
+    // Validation
+    async fn validate(&self, store: &dyn StateStore) -> Result<ValidationReport>;
+}
+```
+
+### Script API Integration
+
+Seamless state access from scripts:
+
+```lua
+-- Lua API
+local state = State.for_agent(agent_id)
+
+-- Set values
+state:set("counter", 1)
+state:set("user_data", {name = "Alice", score = 100})
+
+-- Get values
+local counter = state:get("counter")
+local user = state:get_typed("user_data", UserSchema)
+
+-- Atomic operations
+local new_count = state:increment("counter", 5)
+local swapped = state:compare_and_swap("status", "pending", "active")
+
+-- Namespace support
+local cache = state:namespace("cache")
+cache:set_with_ttl("result", data, 300) -- 5 minute TTL
+
+-- Watch for changes
+state:watch("user_data.*", function(event)
+    print("User data changed:", event.key, event.value)
+end)
+```
+
+```javascript
+// JavaScript API
+const state = await State.forSession(sessionId);
+
+// Async operations
+await state.set("preferences", {theme: "dark", lang: "en"});
+const prefs = await state.get("preferences");
+
+// Transactions
+await state.transaction(async (tx) => {
+    const balance = await tx.get("balance") || 0;
+    await tx.set("balance", balance + 100);
+    await tx.append("history", {type: "deposit", amount: 100});
+});
+
+// Bulk operations
+const snapshot = await state.export();
+await backupState.import(snapshot);
+```
+
+### Performance Optimization
+
+Built-in caching and optimization strategies:
+
+```rust
+pub struct StateCache {
+    lru: LruCache<String, CachedValue>,
+    write_buffer: Arc<RwLock<WriteBuffer>>,
+    read_through: bool,
+    write_through: bool,
+}
+
+pub struct CachedValue {
+    value: Value,
+    loaded_at: Instant,
+    access_count: AtomicU64,
+    ttl: Option<Duration>,
+}
+
+pub struct WriteBuffer {
+    pending: HashMap<String, PendingWrite>,
+    flush_interval: Duration,
+    max_size: usize,
+}
+```
+
+This state management architecture provides:
+- **Flexibility**: Multiple storage backends and synchronization strategies
+- **Reliability**: Automatic conflict resolution and migration support
+- **Performance**: Built-in caching and optimization
+- **Observability**: Comprehensive event system for monitoring
+- **Usability**: Simple script APIs with powerful capabilities
 
 # Part III: Scripting and API Reference
 
@@ -8107,7 +8979,7 @@ function debugToolOutput(toolName, result) {
 
 ## Complete Built-in Tools Catalog
 
-Rs-LLMSpell provides a comprehensive library of **42+ production-ready tools** organized into 8 categories. These tools are immediately available in all scripting environments and provide essential functionality for AI workflows.
+Rs-LLMSpell provides a comprehensive library of **48+ production-ready tools** organized into 10 categories. These tools are immediately available in all scripting environments and provide essential functionality for AI workflows.
 
 ### Tool Organization by Category
 
@@ -8560,6 +9432,163 @@ const imageStream = await Tools.get("image_generator").streamCall({
 for await (const progressImage of imageStream) {
     updatePreview(progressImage);
 }
+```
+
+#### 10. **Artifact Management Tools** (6 tools)
+Specialized tools for managing artifacts - binary data, generated files, and persistent content across sessions.
+
+| Tool Name | Description | Storage Backends | Features |
+|-----------|-------------|------------------|----------|
+| `artifact_store` | Store and retrieve artifacts | S3, filesystem, RocksDB | Versioning, metadata |
+| `artifact_browser` | Browse and search artifacts | All backends | Full-text search, filtering |
+| `artifact_versioner` | Version control for artifacts | Git LFS, custom | Diff, merge, history |
+| `artifact_migrator` | Migrate artifacts between stores | All backends | Batch ops, validation |
+| `artifact_cache` | Intelligent artifact caching | Memory, Redis | TTL, LRU eviction |
+| `artifact_compressor` | Compress/decompress artifacts | ZIP, 7z, TAR | Streaming, encryption |
+
+```lua
+-- Artifact management examples
+local artifact_id = Tools.get("artifact_store"):execute({
+    operation = "store",
+    artifact = {
+        type = "model_output",
+        name = "research_report_v3.pdf",
+        data = report_data,  -- binary data
+        metadata = {
+            generator = "research_agent",
+            timestamp = os.time(),
+            tags = {"research", "quarterly", "2025-Q1"},
+            session_id = context.session_id
+        }
+    },
+    storage_backend = "s3",  -- s3, filesystem, rocksdb
+    encryption = true
+})
+
+-- Retrieve with versioning
+local artifact = Tools.get("artifact_store"):execute({
+    operation = "retrieve",
+    artifact_id = artifact_id,
+    version = "latest",  -- latest, specific version, or tag
+    include_metadata = true
+})
+
+-- Browse artifacts
+local artifacts = Tools.get("artifact_browser"):execute({
+    filter = {
+        type = "model_output",
+        tags = {"research"},
+        created_after = "2025-01-01",
+        session_id = context.session_id
+    },
+    sort_by = "created_at",
+    order = "desc",
+    limit = 20,
+    include_previews = true
+})
+
+-- Version control
+Tools.get("artifact_versioner"):execute({
+    operation = "create_version",
+    artifact_id = artifact_id,
+    changes = {
+        data = updated_report_data,
+        metadata_updates = {
+            version_notes = "Added executive summary",
+            reviewer = "alice@example.com"
+        }
+    },
+    tag = "v3.1-final"
+})
+
+-- Batch migration
+local migration_result = Tools.get("artifact_migrator"):execute({
+    operation = "migrate",
+    source = {
+        backend = "filesystem",
+        path = "/var/artifacts"
+    },
+    destination = {
+        backend = "s3",
+        bucket = "ai-artifacts",
+        prefix = "production/"
+    },
+    filter = {
+        created_before = "2024-12-31",
+        size_greater_than = 1048576  -- 1MB
+    },
+    options = {
+        parallel_transfers = 4,
+        verify_checksums = true,
+        delete_after_transfer = false
+    }
+})
+```
+
+```javascript
+// JavaScript artifact management
+const artifactStore = Tools.get("artifact_store");
+
+// Store with automatic compression
+const storedArtifact = await artifactStore.execute({
+    operation: "store",
+    artifact: {
+        type: "generated_image",
+        name: "landscape_v2.png",
+        data: imageBuffer,
+        metadata: {
+            prompt: "Beautiful mountain landscape",
+            model: "stable-diffusion-xl",
+            parameters: { steps: 50, guidance: 7.5 }
+        }
+    },
+    compression: "auto",  // auto, gzip, brotli, none
+    deduplication: true   // Content-based deduplication
+});
+
+// Intelligent caching
+const cache = Tools.get("artifact_cache");
+const cachedData = await cache.execute({
+    operation: "get_or_compute",
+    key: `processed_data_${inputHash}`,
+    compute: async () => {
+        // Expensive computation
+        return await processLargeDataset(input);
+    },
+    ttl: 3600,  // 1 hour
+    storage_tier: "memory"  // memory, redis, hybrid
+});
+
+// Stream large artifacts
+const compressor = Tools.get("artifact_compressor");
+const compressionStream = await compressor.streamCall({
+    operation: "compress",
+    input_stream: largeFileStream,
+    algorithm: "gzip",
+    level: 6,
+    encryption: {
+        enabled: true,
+        algorithm: "aes-256-gcm",
+        key_source: "kms"  // Use key management service
+    }
+});
+
+// Advanced search across artifacts
+const searchResults = await Tools.get("artifact_browser").execute({
+    query: {
+        text_search: "quarterly report",
+        metadata_filters: {
+            "metadata.department": "finance",
+            "metadata.fiscal_year": 2025
+        },
+        similarity_search: {
+            reference_artifact_id: "baseline_report_123",
+            threshold: 0.8
+        }
+    },
+    facets: ["type", "tags", "creator"],
+    highlight: true
+});
 ```
 
 > **Note on Search Tools**: Two advanced search tools (`SemanticSearchTool` and `CodeSearchTool`) have been deferred to Phase 3.5 to be implemented alongside the vector storage infrastructure and llmspell-rag crate. These tools will provide:
@@ -10090,6 +11119,617 @@ This comprehensive template system provides:
 - **Testing Framework**: Comprehensive testing patterns for agent templates
 - **Workflow Integration**: Built-in workflows for complex tasks
 
+## Workflow Libraries
+
+Rs-LLMSpell provides a comprehensive library of pre-built workflows that combine agents, tools, and orchestration patterns for common AI tasks.
+
+### Built-in Workflow Patterns
+
+#### 1. **Research Workflow**
+Complete research pipeline with multi-source gathering, analysis, and synthesis.
+
+```lua
+local research_workflow = Workflows.research({
+    topic = "AI governance frameworks",
+    sources = {"academic", "news", "technical"},
+    depth = "comprehensive",
+    output_format = "structured_report"
+})
+
+local report = research_workflow:execute({
+    validation_level = "high",
+    citation_required = true,
+    max_sources = 50
+})
+```
+
+#### 2. **Code Analysis Workflow**
+Multi-stage code review with security, performance, and quality checks.
+
+```javascript
+const codeReview = await Workflows.codeAnalysis({
+    repository: "./src",
+    checks: ["security", "performance", "style", "complexity"],
+    languages: ["rust", "typescript", "lua"],
+    reportFormat: "markdown"
+});
+
+const issues = await codeReview.execute({
+    severityThreshold: "medium",
+    autoFix: true,
+    createPullRequest: false
+});
+```
+
+#### 3. **Data Processing Pipeline**
+ETL workflow with validation, transformation, and loading stages.
+
+```lua
+local data_pipeline = Workflows.dataProcessing({
+    stages = {
+        extract = { source = "database", query = sql_query },
+        transform = { 
+            operations = {"clean", "normalize", "aggregate"},
+            schema = output_schema
+        },
+        load = { destination = "data_warehouse", format = "parquet" }
+    },
+    error_handling = "continue_with_logging"
+})
+```
+
+### Workflow Composition Tools
+
+The workflow library provides tools for creating custom workflows:
+
+```rust
+pub struct WorkflowBuilder {
+    name: String,
+    description: String,
+    stages: Vec<WorkflowStage>,
+    error_strategy: ErrorStrategy,
+    state_manager: StateManager,
+}
+
+impl WorkflowBuilder {
+    pub fn add_stage(mut self, stage: WorkflowStage) -> Self {
+        self.stages.push(stage);
+        self
+    }
+    
+    pub fn with_rollback(mut self, strategy: RollbackStrategy) -> Self {
+        self.error_strategy = ErrorStrategy::Rollback(strategy);
+        self
+    }
+    
+    pub fn with_checkpoints(mut self) -> Self {
+        self.state_manager.enable_checkpoints();
+        self
+    }
+    
+    pub fn build(self) -> Result<Workflow> {
+        Workflow::new(self)
+    }
+}
+```
+
+## Hook and Event System
+
+Rs-LLMSpell implements a comprehensive hook and event system that enables extensibility, monitoring, and reactive programming patterns across all components. This system unifies synchronous callbacks (hooks) and asynchronous events into a cohesive architecture.
+
+### Architecture Overview
+
+The hook and event system consists of three main components:
+
+1. **Hook System**: Synchronous interception points for modifying behavior
+2. **Event Bus**: Asynchronous publish-subscribe for loose coupling
+3. **Unified Interface**: Common patterns accessible from all scripting languages
+
+### Hook System
+
+Hooks provide synchronous interception points throughout the execution lifecycle:
+
+```rust
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum HookPoint {
+    // Agent lifecycle hooks
+    BeforeAgentInit,
+    AfterAgentInit,
+    BeforeAgentExecution,
+    AfterAgentExecution,
+    AgentError,
+    BeforeAgentShutdown,
+    AfterAgentShutdown,
+    
+    // Tool execution hooks
+    BeforeToolDiscovery,
+    AfterToolDiscovery,
+    BeforeToolExecution,
+    AfterToolExecution,
+    ToolValidation,
+    ToolError,
+    
+    // Workflow hooks
+    BeforeWorkflowStart,
+    WorkflowStageTransition,
+    BeforeWorkflowStage,
+    AfterWorkflowStage,
+    WorkflowCheckpoint,
+    WorkflowRollback,
+    AfterWorkflowComplete,
+    WorkflowError,
+    
+    // State management hooks
+    BeforeStateRead,
+    AfterStateRead,
+    BeforeStateWrite,
+    AfterStateWrite,
+    StateConflict,
+    StateMigration,
+    
+    // Session hooks
+    SessionCreate,
+    SessionResume,
+    SessionSuspend,
+    SessionDestroy,
+    SessionTimeout,
+    
+    // System hooks
+    SystemStartup,
+    SystemShutdown,
+    ConfigurationChange,
+    ResourceLimitExceeded,
+    SecurityViolation,
+    
+    // Custom hooks
+    Custom(String),
+}
+
+#[async_trait]
+pub trait Hook: Send + Sync {
+    /// Hook metadata
+    fn id(&self) -> &str;
+    fn priority(&self) -> i32;
+    fn hook_points(&self) -> &[HookPoint];
+    
+    /// Synchronous execution with mutable context
+    async fn execute(&self, context: &mut HookContext) -> Result<HookResult>;
+    
+    /// Optional filtering
+    fn should_execute(&self, context: &HookContext) -> bool {
+        true
+    }
+}
+
+pub struct HookContext {
+    pub point: HookPoint,
+    pub component_id: String,
+    pub data: HashMap<String, Value>,
+    pub metadata: HashMap<String, String>,
+    pub execution_context: ExecutionContext,
+    pub cancellable: bool,
+    pub modifiable: bool,
+}
+
+pub enum HookResult {
+    Continue,                    // Continue normal execution
+    Modified(Value),            // Continue with modified data
+    Cancel(String),             // Cancel operation with reason
+    Redirect(Box<dyn Any>),     // Redirect to alternative flow
+}
+```
+
+### Event System
+
+The event system provides asynchronous, decoupled communication:
+
+```rust
+#[derive(Debug, Clone)]
+pub struct Event {
+    pub id: Uuid,
+    pub event_type: EventType,
+    pub source: ComponentId,
+    pub timestamp: DateTime<Utc>,
+    pub correlation_id: Option<Uuid>,
+    pub causation_id: Option<Uuid>,
+    pub data: EventData,
+    pub metadata: EventMetadata,
+}
+
+#[derive(Debug, Clone)]
+pub enum EventType {
+    // Lifecycle events
+    Lifecycle(LifecycleEvent),
+    
+    // Execution events
+    Execution(ExecutionEvent),
+    
+    // State events
+    State(StateEvent),
+    
+    // Session events
+    Session(SessionEvent),
+    
+    // Workflow events
+    Workflow(WorkflowEvent),
+    
+    // System events
+    System(SystemEvent),
+    
+    // Performance events
+    Performance(PerformanceEvent),
+    
+    // Security events
+    Security(SecurityEvent),
+    
+    // Custom events
+    Custom { 
+        namespace: String,
+        event_name: String,
+    },
+}
+
+#[async_trait]
+pub trait EventHandler: Send + Sync {
+    /// Handler metadata
+    fn id(&self) -> &str;
+    fn event_patterns(&self) -> &[EventPattern];
+    
+    /// Asynchronous event handling
+    async fn handle(&self, event: &Event) -> Result<()>;
+    
+    /// Optional event filtering
+    fn filter(&self, event: &Event) -> bool {
+        true
+    }
+}
+
+pub struct EventBus {
+    subscribers: Arc<RwLock<HashMap<EventPattern, Vec<Arc<dyn EventHandler>>>>>,
+    event_store: Option<Arc<dyn EventStore>>,
+    dispatcher: Arc<EventDispatcher>,
+    metrics: Arc<EventMetrics>,
+}
+
+impl EventBus {
+    pub async fn publish(&self, event: Event) -> Result<()> {
+        // Store event if persistence enabled
+        if let Some(store) = &self.event_store {
+            store.append(&event).await?;
+        }
+        
+        // Collect matching handlers
+        let handlers = self.collect_handlers(&event).await?;
+        
+        // Dispatch to handlers
+        self.dispatcher.dispatch(event, handlers).await?;
+        
+        // Update metrics
+        self.metrics.record_event(&event);
+        
+        Ok(())
+    }
+    
+    pub async fn subscribe(&self, pattern: EventPattern, handler: Arc<dyn EventHandler>) -> Result<SubscriptionId> {
+        let mut subscribers = self.subscribers.write().await;
+        subscribers.entry(pattern).or_default().push(handler);
+        Ok(SubscriptionId::new())
+    }
+}
+```
+
+### Hook and Event Coordination
+
+The system provides coordination between hooks and events:
+
+```rust
+pub struct UnifiedEventSystem {
+    hook_manager: HookManager,
+    event_bus: EventBus,
+    coordinator: SystemCoordinator,
+}
+
+impl UnifiedEventSystem {
+    /// Execute hooks and emit events for a lifecycle point
+    pub async fn execute_lifecycle_point(
+        &self,
+        point: HookPoint,
+        context: &mut HookContext,
+    ) -> Result<()> {
+        // Pre-execution event
+        self.event_bus.publish(Event::hook_executing(point.clone(), context)).await?;
+        
+        // Execute hooks
+        let hook_result = self.hook_manager.execute_hooks(point.clone(), context).await?;
+        
+        // Post-execution event with results
+        self.event_bus.publish(Event::hook_executed(point, &hook_result)).await?;
+        
+        // Handle hook results
+        match hook_result {
+            HookResult::Cancel(reason) => {
+                self.event_bus.publish(Event::operation_cancelled(reason)).await?;
+                return Err(Error::Cancelled);
+            }
+            HookResult::Modified(data) => {
+                context.data.insert("modified_data".to_string(), data);
+            }
+            _ => {}
+        }
+        
+        Ok(())
+    }
+}
+```
+
+### Script API Integration
+
+#### Lua Hook and Event API
+
+```lua
+-- Hook registration
+Hooks.register({
+    point = "BeforeAgentExecution",
+    priority = 100,
+    handler = function(context)
+        -- Modify agent input
+        local input = context.data.input
+        input.enhanced = true
+        
+        -- Add metadata
+        context.metadata["preprocessed"] = "true"
+        
+        -- Continue with modifications
+        return Hooks.Result.Modified(input)
+    end
+})
+
+-- Event subscription
+Events.subscribe("agent.execution.complete", function(event)
+    local duration = event.data.duration_ms
+    local agent_id = event.source
+    
+    -- React to event
+    if duration > 5000 then
+        Logger.warn("Slow agent execution", {
+            agent = agent_id,
+            duration = duration
+        })
+    end
+end)
+
+-- Emit custom events
+Events.emit({
+    type = "custom.analysis.complete",
+    data = {
+        results = analysis_results,
+        confidence = 0.95,
+        sources = source_list
+    },
+    metadata = {
+        correlation_id = context.correlation_id,
+        user_id = context.user_id
+    }
+})
+```
+
+#### JavaScript Hook and Event API
+
+```javascript
+// Hook registration with TypeScript support
+await Hooks.register({
+    points: [HookPoint.BeforeToolExecution, HookPoint.AfterToolExecution],
+    priority: 50,
+    handler: async (context) => {
+        const startTime = Date.now();
+        
+        // Store in context for after hook
+        context.data.startTime = startTime;
+        
+        // Validate tool permissions
+        if (!await validateToolAccess(context.data.tool_id)) {
+            return Hooks.Result.cancel("Insufficient permissions");
+        }
+        
+        return Hooks.Result.continue();
+    }
+});
+
+// Event handling with filtering
+const subscription = await Events.subscribe({
+    pattern: "workflow.stage.*",
+    filter: (event) => event.data.workflow_type === "research",
+    handler: async (event) => {
+        // Update progress UI
+        await updateProgress({
+            workflow: event.data.workflow_id,
+            stage: event.data.stage_name,
+            progress: event.data.progress_percentage
+        });
+    }
+});
+
+// Event sourcing patterns
+class EventSourcingExample {
+    async replayEvents(fromTimestamp) {
+        const events = await Events.query({
+            since: fromTimestamp,
+            types: ["state.*", "workflow.*"],
+            limit: 1000
+        });
+        
+        for (const event of events) {
+            await this.applyEvent(event);
+        }
+    }
+}
+```
+
+### Advanced Patterns
+
+#### 1. **Hook Chains and Pipelines**
+
+```rust
+pub struct HookPipeline {
+    stages: Vec<Box<dyn Hook>>,
+    error_strategy: PipelineErrorStrategy,
+}
+
+impl HookPipeline {
+    pub async fn execute(&self, context: &mut HookContext) -> Result<HookResult> {
+        let mut result = HookResult::Continue;
+        
+        for hook in &self.stages {
+            result = match hook.execute(context).await {
+                Ok(HookResult::Continue) => continue,
+                Ok(HookResult::Modified(data)) => {
+                    context.data.insert("pipeline_data".to_string(), data);
+                    HookResult::Continue
+                }
+                Ok(HookResult::Cancel(reason)) => {
+                    return Ok(HookResult::Cancel(reason));
+                }
+                Err(e) => {
+                    match self.error_strategy {
+                        PipelineErrorStrategy::Fail => return Err(e),
+                        PipelineErrorStrategy::Continue => {
+                            log::warn!("Hook pipeline error: {}", e);
+                            continue;
+                        }
+                        PipelineErrorStrategy::Fallback(ref handler) => {
+                            handler.handle_error(e, context).await?
+                        }
+                    }
+                }
+            };
+        }
+        
+        Ok(result)
+    }
+}
+```
+
+#### 2. **Event Replay and Time Travel**
+
+```rust
+pub struct EventReplayer {
+    event_store: Arc<dyn EventStore>,
+    snapshot_store: Arc<dyn SnapshotStore>,
+    replayer: Arc<dyn StateReplayer>,
+}
+
+impl EventReplayer {
+    pub async fn replay_to_point(&self, target_time: DateTime<Utc>) -> Result<SystemState> {
+        // Find nearest snapshot before target
+        let snapshot = self.snapshot_store.find_before(target_time).await?;
+        
+        // Load events after snapshot
+        let events = self.event_store.query(
+            EventQuery::after(snapshot.timestamp)
+                .before(target_time)
+                .ordered()
+        ).await?;
+        
+        // Replay events on snapshot
+        let mut state = snapshot.state;
+        for event in events {
+            state = self.replayer.apply_event(state, event).await?;
+        }
+        
+        Ok(state)
+    }
+}
+```
+
+#### 3. **Event-Driven Sagas**
+
+```lua
+-- Saga pattern for distributed transactions
+local PaymentSaga = Saga.create({
+    name = "payment_processing",
+    
+    steps = {
+        {
+            name = "validate_payment",
+            handler = function(context)
+                return PaymentService.validate(context.payment_data)
+            end,
+            compensate = function(context)
+                PaymentService.cancel_validation(context.validation_id)
+            end
+        },
+        {
+            name = "charge_card",
+            handler = function(context)
+                return PaymentGateway.charge(context.card_data)
+            end,
+            compensate = function(context)
+                PaymentGateway.refund(context.charge_id)
+            end
+        },
+        {
+            name = "update_inventory",
+            handler = function(context)
+                return Inventory.reserve(context.items)
+            end,
+            compensate = function(context)
+                Inventory.release(context.reservation_id)
+            end
+        }
+    },
+    
+    on_complete = function(result)
+        Events.emit("payment.saga.complete", result)
+    end,
+    
+    on_failure = function(error, completed_steps)
+        Events.emit("payment.saga.failed", {
+            error = error,
+            steps_to_compensate = completed_steps
+        })
+    end
+})
+```
+
+### Performance Considerations
+
+The hook and event system is optimized for high throughput:
+
+```rust
+pub struct OptimizedEventBus {
+    // Sharded subscribers for parallel dispatch
+    subscriber_shards: Vec<Arc<RwLock<SubscriberShard>>>,
+    
+    // Lock-free event queue
+    event_queue: crossbeam::queue::ArrayQueue<Event>,
+    
+    // Dedicated dispatcher threads
+    dispatcher_pool: Arc<DispatcherPool>,
+    
+    // Metrics with minimal overhead
+    metrics: Arc<AtomicMetrics>,
+}
+
+pub struct HookCache {
+    // Cache computed hook chains
+    hook_chains: DashMap<HookPoint, Arc<Vec<Arc<dyn Hook>>>>,
+    
+    // Skip patterns for performance
+    skip_patterns: Arc<SkipPatternMatcher>,
+    
+    // JIT compilation for hot paths
+    compiled_hooks: DashMap<String, CompiledHook>,
+}
+```
+
+This comprehensive hook and event system provides:
+- **Flexibility**: Both synchronous hooks and asynchronous events
+- **Extensibility**: Easy to add new hook points and event types
+- **Performance**: Optimized dispatch and caching strategies
+- **Reliability**: Error handling and compensation patterns
+- **Observability**: Built-in metrics and event sourcing
+- **Script Integration**: Native APIs for all supported languages
+
 ---
 
 # Part V: Technology Stack and Implementation
@@ -11489,6 +13129,478 @@ impl StorageConfig {
     }
 }
 ```
+
+### Artifact Storage System
+
+Rs-LLMSpell provides a specialized storage system for artifacts - binary data, generated files, model outputs, and persistent content that needs to be managed across sessions with versioning and metadata support.
+
+#### Artifact Storage Architecture
+
+```rust
+use chrono::{DateTime, Utc};
+use uuid::Uuid;
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Artifact {
+    pub id: ArtifactId,
+    pub name: String,
+    pub artifact_type: ArtifactType,
+    pub size: u64,
+    pub checksum: String,
+    pub metadata: ArtifactMetadata,
+    pub storage_location: StorageLocation,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+    pub version: u32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ArtifactMetadata {
+    pub mime_type: String,
+    pub generator: String,
+    pub session_id: Option<SessionId>,
+    pub user_id: Option<UserId>,
+    pub tags: HashSet<String>,
+    pub properties: HashMap<String, Value>,
+    pub dependencies: Vec<ArtifactId>,
+    pub access_count: u64,
+    pub last_accessed: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone)]
+pub enum ArtifactType {
+    ModelOutput,        // LLM generated content
+    GeneratedImage,     // AI-generated images
+    ProcessedData,      // Transformed datasets
+    Report,            // Analysis reports
+    Checkpoint,        // Workflow checkpoints
+    UserUpload,        // User-provided files
+    SystemGenerated,   // System artifacts
+    Custom(String),    // Custom types
+}
+
+#[derive(Debug, Clone)]
+pub enum StorageLocation {
+    Local { path: PathBuf },
+    S3 { bucket: String, key: String },
+    Database { table: String, id: String },
+    Memory { cache_key: String },
+    Hybrid { primary: Box<StorageLocation>, cache: Box<StorageLocation> },
+}
+
+#[async_trait]
+pub trait ArtifactStore: Send + Sync {
+    // Core operations
+    async fn store(&self, data: Vec<u8>, metadata: ArtifactMetadata) -> Result<Artifact>;
+    async fn retrieve(&self, id: &ArtifactId) -> Result<Option<(Artifact, Vec<u8>)>>;
+    async fn update(&self, id: &ArtifactId, data: Vec<u8>) -> Result<Artifact>;
+    async fn delete(&self, id: &ArtifactId) -> Result<()>;
+    
+    // Metadata operations
+    async fn get_metadata(&self, id: &ArtifactId) -> Result<Option<Artifact>>;
+    async fn update_metadata(&self, id: &ArtifactId, metadata: ArtifactMetadata) -> Result<()>;
+    
+    // Query operations
+    async fn list(&self, filter: ArtifactFilter) -> Result<Vec<Artifact>>;
+    async fn search(&self, query: ArtifactQuery) -> Result<Vec<Artifact>>;
+    
+    // Versioning
+    async fn get_version(&self, id: &ArtifactId, version: u32) -> Result<Option<(Artifact, Vec<u8>)>>;
+    async fn list_versions(&self, id: &ArtifactId) -> Result<Vec<Artifact>>;
+    
+    // Bulk operations
+    async fn store_batch(&self, items: Vec<(Vec<u8>, ArtifactMetadata)>) -> Result<Vec<Artifact>>;
+    async fn delete_batch(&self, ids: &[ArtifactId]) -> Result<()>;
+    
+    // Storage management
+    async fn get_storage_stats(&self) -> Result<StorageStats>;
+    async fn cleanup_old_artifacts(&self, before: DateTime<Utc>) -> Result<u64>;
+    async fn optimize_storage(&self) -> Result<()>;
+}
+```
+
+#### Multi-Backend Artifact Storage
+
+```rust
+pub struct MultiBackendArtifactStore {
+    backends: HashMap<String, Box<dyn ArtifactStore>>,
+    routing_policy: RoutingPolicy,
+    deduplication: DeduplicationStrategy,
+    compression: CompressionConfig,
+}
+
+impl MultiBackendArtifactStore {
+    pub async fn store_with_policy(
+        &self,
+        data: Vec<u8>,
+        metadata: ArtifactMetadata,
+        policy: StoragePolicy,
+    ) -> Result<Artifact> {
+        // Apply compression if configured
+        let compressed_data = if self.should_compress(&metadata, data.len()) {
+            self.compress_data(&data).await?
+        } else {
+            data
+        };
+        
+        // Check for duplicates
+        if let Some(existing) = self.check_duplicate(&compressed_data, &metadata).await? {
+            return Ok(existing);
+        }
+        
+        // Route to appropriate backend
+        let backend = self.select_backend(&metadata, &policy)?;
+        let artifact = backend.store(compressed_data, metadata).await?;
+        
+        // Update routing index
+        self.update_routing_index(&artifact).await?;
+        
+        Ok(artifact)
+    }
+    
+    fn select_backend(&self, metadata: &ArtifactMetadata, policy: &StoragePolicy) -> Result<&Box<dyn ArtifactStore>> {
+        match policy {
+            StoragePolicy::Performance => self.backends.get("memory"),
+            StoragePolicy::Durability => self.backends.get("s3"),
+            StoragePolicy::Cost => self.backends.get("filesystem"),
+            StoragePolicy::Auto => {
+                // Intelligent routing based on artifact characteristics
+                match metadata.mime_type.as_str() {
+                    "image/png" | "image/jpeg" => self.backends.get("s3"),
+                    "application/json" if metadata.properties.get("size").map(|v| v.as_u64().unwrap_or(0) < 1_000_000).unwrap_or(true) => {
+                        self.backends.get("memory")
+                    }
+                    _ => self.backends.get("filesystem"),
+                }
+            }
+        }.ok_or_else(|| Error::BackendNotFound)
+    }
+}
+```
+
+#### Filesystem Artifact Store
+
+```rust
+pub struct FilesystemArtifactStore {
+    base_path: PathBuf,
+    metadata_db: Box<dyn StorageBackend>,
+    file_layout: FileLayout,
+    lock_manager: FileLockManager,
+}
+
+impl FilesystemArtifactStore {
+    async fn store_artifact(&self, data: Vec<u8>, metadata: ArtifactMetadata) -> Result<Artifact> {
+        let artifact_id = ArtifactId::new();
+        let checksum = self.calculate_checksum(&data);
+        
+        // Determine storage path
+        let storage_path = self.file_layout.artifact_path(&artifact_id, &metadata);
+        
+        // Ensure directory exists
+        if let Some(parent) = storage_path.parent() {
+            tokio::fs::create_dir_all(parent).await?;
+        }
+        
+        // Acquire lock for write
+        let _lock = self.lock_manager.acquire_write(&artifact_id).await?;
+        
+        // Write data atomically
+        let temp_path = storage_path.with_extension("tmp");
+        tokio::fs::write(&temp_path, &data).await?;
+        tokio::fs::rename(&temp_path, &storage_path).await?;
+        
+        // Store metadata
+        let artifact = Artifact {
+            id: artifact_id,
+            name: metadata.properties.get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("unnamed")
+                .to_string(),
+            artifact_type: self.infer_type(&metadata),
+            size: data.len() as u64,
+            checksum,
+            metadata,
+            storage_location: StorageLocation::Local { path: storage_path },
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+            version: 1,
+        };
+        
+        self.metadata_db.set_typed(
+            &format!("artifact:{}", artifact_id),
+            &artifact
+        ).await?;
+        
+        Ok(artifact)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum FileLayout {
+    // Date-based: /YYYY/MM/DD/artifact_id
+    DateBased,
+    
+    // Type-based: /type/subtype/artifact_id
+    TypeBased,
+    
+    // Hash-based: /XX/YY/artifact_id (first 2 bytes of hash)
+    HashBased,
+    
+    // Session-based: /session_id/artifact_id
+    SessionBased,
+    
+    // Custom layout function
+    Custom(Arc<dyn Fn(&ArtifactId, &ArtifactMetadata) -> PathBuf + Send + Sync>),
+}
+```
+
+#### S3 Artifact Store
+
+```rust
+pub struct S3ArtifactStore {
+    client: aws_sdk_s3::Client,
+    bucket: String,
+    prefix: String,
+    metadata_store: Box<dyn StorageBackend>,
+    encryption: S3EncryptionConfig,
+}
+
+impl S3ArtifactStore {
+    async fn store_with_multipart(&self, data: Vec<u8>, metadata: ArtifactMetadata) -> Result<Artifact> {
+        let artifact_id = ArtifactId::new();
+        let key = format!("{}/{}", self.prefix, artifact_id);
+        
+        // Use multipart upload for large files
+        if data.len() > 5 * 1024 * 1024 { // 5MB threshold
+            self.multipart_upload(&key, &data).await?;
+        } else {
+            // Direct upload for small files
+            self.client
+                .put_object()
+                .bucket(&self.bucket)
+                .key(&key)
+                .body(data.into())
+                .metadata("artifact-type", &metadata.mime_type)
+                .metadata("generator", &metadata.generator)
+                .send()
+                .await?;
+        }
+        
+        // Store metadata separately for fast queries
+        let artifact = Artifact {
+            id: artifact_id,
+            storage_location: StorageLocation::S3 {
+                bucket: self.bucket.clone(),
+                key: key.clone(),
+            },
+            // ... other fields
+        };
+        
+        self.metadata_store.set_typed(
+            &format!("s3:artifact:{}", artifact_id),
+            &artifact
+        ).await?;
+        
+        Ok(artifact)
+    }
+    
+    async fn multipart_upload(&self, key: &str, data: &[u8]) -> Result<()> {
+        // Initialize multipart upload
+        let multipart = self.client
+            .create_multipart_upload()
+            .bucket(&self.bucket)
+            .key(key)
+            .send()
+            .await?;
+        
+        let upload_id = multipart.upload_id().unwrap();
+        const PART_SIZE: usize = 5 * 1024 * 1024; // 5MB parts
+        
+        let mut parts = Vec::new();
+        let chunks: Vec<_> = data.chunks(PART_SIZE).collect();
+        
+        // Upload parts in parallel
+        let mut tasks = Vec::new();
+        for (i, chunk) in chunks.iter().enumerate() {
+            let client = self.client.clone();
+            let bucket = self.bucket.clone();
+            let key = key.to_string();
+            let upload_id = upload_id.to_string();
+            let chunk = chunk.to_vec();
+            let part_number = (i + 1) as i32;
+            
+            tasks.push(tokio::spawn(async move {
+                client
+                    .upload_part()
+                    .bucket(bucket)
+                    .key(key)
+                    .upload_id(upload_id)
+                    .part_number(part_number)
+                    .body(chunk.into())
+                    .send()
+                    .await
+            }));
+        }
+        
+        // Collect results
+        for (i, task) in tasks.into_iter().enumerate() {
+            let result = task.await??;
+            parts.push(
+                CompletedPart::builder()
+                    .part_number((i + 1) as i32)
+                    .e_tag(result.e_tag().unwrap())
+                    .build()
+            );
+        }
+        
+        // Complete multipart upload
+        self.client
+            .complete_multipart_upload()
+            .bucket(&self.bucket)
+            .key(key)
+            .upload_id(upload_id)
+            .multipart_upload(
+                CompletedMultipartUpload::builder()
+                    .set_parts(Some(parts))
+                    .build()
+            )
+            .send()
+            .await?;
+        
+        Ok(())
+    }
+}
+```
+
+#### Artifact Caching and Optimization
+
+```rust
+pub struct ArtifactCache {
+    memory_cache: Arc<RwLock<LruCache<ArtifactId, CachedArtifact>>>,
+    disk_cache: Option<FilesystemArtifactStore>,
+    cache_policy: CachePolicy,
+    metrics: Arc<CacheMetrics>,
+}
+
+#[derive(Clone)]
+pub struct CachedArtifact {
+    artifact: Artifact,
+    data: Arc<Vec<u8>>,
+    cached_at: Instant,
+    access_count: AtomicU64,
+    last_access: AtomicU64,
+}
+
+impl ArtifactCache {
+    pub async fn get_or_fetch<F>(&self, id: &ArtifactId, fetcher: F) -> Result<(Artifact, Vec<u8>)>
+    where
+        F: Future<Output = Result<(Artifact, Vec<u8>)>>,
+    {
+        // Check memory cache
+        if let Some(cached) = self.get_from_memory(id).await {
+            self.metrics.memory_hits.fetch_add(1, Ordering::Relaxed);
+            return Ok((cached.artifact.clone(), (*cached.data).clone()));
+        }
+        
+        // Check disk cache
+        if let Some(disk_cache) = &self.disk_cache {
+            if let Some((artifact, data)) = disk_cache.retrieve(id).await? {
+                self.metrics.disk_hits.fetch_add(1, Ordering::Relaxed);
+                
+                // Promote to memory cache if hot
+                if self.should_promote(&artifact) {
+                    self.add_to_memory(artifact.clone(), data.clone()).await;
+                }
+                
+                return Ok((artifact, data));
+            }
+        }
+        
+        // Fetch from source
+        self.metrics.misses.fetch_add(1, Ordering::Relaxed);
+        let (artifact, data) = fetcher.await?;
+        
+        // Add to caches based on policy
+        self.add_to_caches(artifact.clone(), data.clone()).await?;
+        
+        Ok((artifact, data))
+    }
+    
+    fn should_promote(&self, artifact: &Artifact) -> bool {
+        match &self.cache_policy {
+            CachePolicy::LRU => true,
+            CachePolicy::LFU => artifact.metadata.access_count > 3,
+            CachePolicy::Adaptive => {
+                // Use access patterns and artifact characteristics
+                let recency_score = (Utc::now() - artifact.metadata.last_accessed).num_seconds() as f64;
+                let frequency_score = artifact.metadata.access_count as f64;
+                let size_penalty = (artifact.size as f64 / 1_000_000.0).max(1.0);
+                
+                (frequency_score / recency_score.max(1.0)) / size_penalty > 0.5
+            }
+        }
+    }
+}
+```
+
+#### Artifact Deduplication
+
+```rust
+pub struct ArtifactDeduplicator {
+    index: Arc<RwLock<HashMap<String, ArtifactId>>>,
+    hash_algorithm: HashAlgorithm,
+    similarity_threshold: f32,
+}
+
+impl ArtifactDeduplicator {
+    pub async fn find_duplicate(
+        &self,
+        data: &[u8],
+        metadata: &ArtifactMetadata,
+    ) -> Result<Option<ArtifactId>> {
+        // Content-based deduplication
+        let content_hash = self.calculate_hash(data);
+        
+        if let Some(existing_id) = self.index.read().await.get(&content_hash) {
+            return Ok(Some(existing_id.clone()));
+        }
+        
+        // Fuzzy matching for similar content
+        if metadata.mime_type.starts_with("text/") || metadata.mime_type == "application/json" {
+            if let Some(similar_id) = self.find_similar_text(data, metadata).await? {
+                return Ok(Some(similar_id));
+            }
+        }
+        
+        Ok(None)
+    }
+    
+    async fn find_similar_text(
+        &self,
+        data: &[u8],
+        metadata: &ArtifactMetadata,
+    ) -> Result<Option<ArtifactId>> {
+        // Convert to text
+        let text = String::from_utf8_lossy(data);
+        
+        // Generate shingles for similarity comparison
+        let shingles = self.generate_shingles(&text, 3);
+        
+        // Search for similar documents
+        // This would integrate with the vector storage for semantic similarity
+        // For now, using simple shingle comparison
+        
+        Ok(None) // Placeholder
+    }
+}
+```
+
+This artifact storage system provides:
+- **Flexibility**: Multiple storage backends with intelligent routing
+- **Performance**: Caching, deduplication, and optimization strategies
+- **Reliability**: Atomic operations, versioning, and metadata tracking
+- **Scalability**: Support for large files with multipart uploads
+- **Integration**: Works seamlessly with the state management system
 
 ## Async Patterns and Concurrency
 
@@ -26021,7 +28133,7 @@ timeout = 30000
 [providers.anthropic]
 api_key_env = "ANTHROPIC_API_KEY"
 base_url = "https://api.anthropic.com"  # Can be overridden for API-compatible services
-model = "claude-3-sonnet-20240229"
+model = "claude-3-5-haiku-latest"
 timeout = 30000
 retry_attempts = 3
 retry_delay = 1000

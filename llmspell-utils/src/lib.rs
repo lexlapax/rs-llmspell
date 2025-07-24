@@ -77,6 +77,45 @@ pub mod validators;
 /// Response building utilities
 pub mod response;
 
+/// Retry logic with exponential backoff
+pub mod retry;
+
+/// Rate limiting utilities
+pub mod rate_limiter;
+
+/// Timeout management utilities
+pub mod timeout;
+
+/// Connection pooling abstraction
+pub mod connection_pool;
+
+/// Progress reporting framework
+pub mod progress;
+
+/// Security utilities for DoS protection and resource limits
+pub mod security;
+
+/// API key management system
+pub mod api_key_manager;
+
+/// Persistent storage for API keys
+pub mod api_key_persistent_storage;
+
+/// Provider-specific rate limiting framework
+pub mod rate_limiting;
+
+/// Circuit breaker pattern for fault tolerance
+pub mod circuit_breaker;
+
+/// Resource limit enforcement framework
+pub mod resource_limits;
+
+/// Resource monitoring and metrics
+pub mod resource_monitoring;
+
+/// Production-ready error handling with information disclosure prevention
+pub mod error_handling;
+
 // Re-export commonly used types and functions
 pub use async_utils::{
     concurrent_map, race_to_success, retry_async, timeout, timeout_with_default, AsyncError,
@@ -107,7 +146,8 @@ pub use params::{
     extract_string_with_default, require_all_of, require_one_of,
 };
 pub use response::{
-    error_response, file_operation_response, list_response, success_response, ResponseBuilder,
+    error_response, file_operation_response, list_response, success_response, validation_response,
+    ErrorDetails, ResponseBuilder, ValidationError,
 };
 pub use search::{
     search_in_directory, search_in_file, should_search_file, SearchMatch, SearchOptions,
@@ -132,8 +172,77 @@ pub use time::{
     subtract_duration, weekday_name, TimeError, TimeResult, DATE_FORMATS,
 };
 pub use validators::{
-    validate_email, validate_enum, validate_file_size, validate_identifier, validate_is_directory,
-    validate_is_file, validate_not_empty, validate_not_empty_collection, validate_path_exists,
-    validate_pattern, validate_range, validate_required_field, validate_string_length,
+    sanitize_string, validate_date_format, validate_email, validate_enum, validate_file_size,
+    validate_identifier, validate_is_directory, validate_is_file, validate_json_schema,
+    validate_no_shell_injection, validate_not_empty, validate_not_empty_collection,
+    validate_path_exists, validate_pattern, validate_range, validate_regex_pattern,
+    validate_required_field, validate_resource_limit, validate_safe_path, validate_string_length,
     validate_url,
+};
+
+#[cfg(unix)]
+pub use validators::validate_file_permissions;
+
+// Re-export retry utilities
+pub use retry::{
+    retry, retry_default, AlwaysRetry, HttpStatusRetryPolicy, RetryBuilder, RetryError, RetryPolicy,
+};
+
+// Re-export rate limiter utilities
+pub use rate_limiter::{
+    RateLimitAlgorithm, RateLimitError, RateLimiter, RateLimiterBuilder, RateLimiterConfig,
+};
+
+// Re-export timeout utilities
+pub use timeout::{
+    with_timeout, with_timeout_config, CancellableTimeout, TimeoutBuilder, TimeoutConfig,
+    TimeoutError, TimeoutExt, TimeoutManager,
+};
+
+// Re-export connection pool utilities
+pub use connection_pool::{
+    ConnectionFactory, ConnectionPool, PoolBuilder, PoolConfig, PoolError, PoolGuard, PoolStats,
+    PoolableConnection,
+};
+
+// Re-export progress utilities
+pub use progress::{
+    ProgressBuilder, ProgressError, ProgressEvent, ProgressIteratorExt, ProgressReporter,
+    ProgressTracker,
+};
+
+// Re-export security utilities
+pub use security::{
+    path::{PathSecurityConfig, PathSecurityValidator},
+    ExpressionAnalyzer, ExpressionComplexity, ExpressionComplexityConfig,
+};
+
+// Re-export API key management utilities
+pub use api_key_manager::{
+    ApiKeyAction, ApiKeyAuditEntry, ApiKeyManager, ApiKeyMetadata, ApiKeyStorage, InMemoryStorage,
+};
+pub use api_key_persistent_storage::PersistentApiKeyStorage;
+
+// Re-export provider rate limiting utilities
+pub use rate_limiting::{
+    BackoffStrategy, MetricsCollector, ProviderLimits, ProviderRateLimitConfig,
+    ProviderRateLimiter, RateLimitInfo, RateLimitMetrics, RetryHandler,
+    RetryPolicy as RateLimitRetryPolicy,
+};
+
+// Re-export circuit breaker utilities
+pub use circuit_breaker::{
+    CircuitBreaker, CircuitBreakerConfig, CircuitBreakerError, CircuitBreakerManager,
+    CircuitBreakerResult, CircuitMetrics, CircuitMetricsCollector, CircuitState, ServicePresets,
+    StateTransition, ThresholdConfig,
+};
+
+// Re-export resource limits utilities
+pub use resource_limits::{
+    ConcurrentGuard, MemoryGuard, ResourceLimits, ResourceMetrics, ResourceTracker,
+};
+
+// Re-export resource monitoring utilities
+pub use resource_monitoring::{
+    MonitoringConfig, ResourceEvent, ResourceEventType, ResourceMonitor, ResourceStatistics,
 };

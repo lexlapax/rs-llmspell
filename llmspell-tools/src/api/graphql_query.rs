@@ -11,11 +11,12 @@ use llmspell_core::{
             ToolCategory, ToolSchema,
         },
     },
-    types::{AgentInput, AgentOutput, ExecutionContext},
-    ComponentMetadata, LLMSpellError, Result,
+    types::{AgentInput, AgentOutput},
+    ComponentMetadata, ExecutionContext, LLMSpellError, Result,
 };
 use llmspell_utils::{
     extract_optional_object, extract_optional_string, extract_parameters, extract_required_string,
+    response::ResponseBuilder,
 };
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
@@ -408,7 +409,7 @@ impl GraphQLQueryTool {
                 .map(String::from)
                 .unwrap_or_default()
         } else {
-            extract_required_string(params, "query")?.to_string()
+            extract_required_string(params, "input")?.to_string()
         };
 
         let variables = params.get("variables").cloned();
@@ -515,19 +516,34 @@ impl BaseAgent for GraphQLQueryTool {
             }
         };
 
-        let output_text = serde_json::to_string_pretty(&result)?;
+        // Create success message
+        let message = match &parameters.operation {
+            GraphQLOperation::Introspection => format!(
+                "GraphQL introspection query completed for {}",
+                parameters.endpoint
+            ),
+            GraphQLOperation::Query => format!(
+                "GraphQL query executed successfully on {}",
+                parameters.endpoint
+            ),
+            GraphQLOperation::Mutation => format!(
+                "GraphQL mutation executed successfully on {}",
+                parameters.endpoint
+            ),
+            GraphQLOperation::Subscription => unreachable!(),
+        };
 
-        // Create metadata
-        let mut metadata = llmspell_core::types::OutputMetadata::default();
-        metadata.extra.insert(
-            "operation".to_string(),
-            Value::String(parameters.operation.to_string()),
-        );
-        metadata
-            .extra
-            .insert("endpoint".to_string(), Value::String(parameters.endpoint));
+        // Build response
+        let response = ResponseBuilder::success(parameters.operation.to_string())
+            .with_message(message)
+            .with_result(json!({
+                "operation": parameters.operation.to_string(),
+                "endpoint": parameters.endpoint,
+                "result": result
+            }))
+            .build();
 
-        Ok(AgentOutput::text(output_text).with_metadata(metadata))
+        Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
     }
 
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
@@ -599,7 +615,7 @@ impl Tool for GraphQLQueryTool {
                     default: None,
                 },
                 ParameterDef {
-                    name: "query".to_string(),
+                    name: "input".to_string(),
                     description: "GraphQL query or mutation string".to_string(),
                     param_type: ParameterType::String,
                     required: false,

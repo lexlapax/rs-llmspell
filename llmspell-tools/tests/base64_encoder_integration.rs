@@ -1,10 +1,7 @@
 // ABOUTME: Integration tests for the Base64 encoder tool
 // ABOUTME: Tests encoding/decoding with files, binary data, and error handling
 
-use llmspell_core::{
-    traits::base_agent::BaseAgent,
-    types::{AgentInput, ExecutionContext},
-};
+use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
 use llmspell_tools::util::Base64EncoderTool;
 use serde_json::{json, Value};
 use std::fs;

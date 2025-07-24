@@ -7,11 +7,13 @@ use llmspell_core::{
         base_agent::BaseAgent,
         tool::{ParameterDef, ParameterType, SecurityLevel, Tool, ToolCategory, ToolSchema},
     },
-    types::{AgentInput, AgentOutput, ExecutionContext},
-    ComponentMetadata, LLMSpellError, Result as LLMResult,
+    types::{AgentInput, AgentOutput},
+    ComponentMetadata, ExecutionContext, LLMSpellError, Result as LLMResult,
 };
 use llmspell_security::sandbox::SandboxContext;
-use llmspell_utils::{extract_optional_u64, extract_parameters, extract_required_string};
+use llmspell_utils::{
+    extract_optional_u64, extract_parameters, extract_required_string, response::ResponseBuilder,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
@@ -581,17 +583,6 @@ impl BaseAgent for ServiceCheckerTool {
         };
 
         // Format response
-        let response = json!({
-            "target": result.target,
-            "check_type": check_type,
-            "available": result.available,
-            "response_time_ms": result.response_time_ms,
-            "status": result.status,
-            "error": result.error,
-            "metadata": result.metadata,
-            "timeout_seconds": timeout_seconds
-        });
-
         let message = if result.available {
             format!(
                 "Service '{}' is available ({}ms response time)",
@@ -601,12 +592,25 @@ impl BaseAgent for ServiceCheckerTool {
             format!(
                 "Service '{}' is not available: {}",
                 result.target,
-                result.error.unwrap_or_else(|| result.status.clone())
+                result.error.as_ref().unwrap_or(&result.status)
             )
         };
 
-        Ok(AgentOutput::text(message)
-            .with_metadata(serde_json::from_value(response).unwrap_or_default()))
+        let response = ResponseBuilder::success("check")
+            .with_message(message)
+            .with_result(json!({
+                "target": result.target,
+                "check_type": check_type,
+                "available": result.available,
+                "response_time_ms": result.response_time_ms,
+                "status": result.status,
+                "error": result.error,
+                "metadata": result.metadata,
+                "timeout_seconds": timeout_seconds
+            }))
+            .build();
+
+        Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
     }
 
     async fn validate_input(&self, input: &AgentInput) -> LLMResult<()> {
@@ -679,10 +683,12 @@ mod tests {
     }
 
     fn create_test_tool_with_custom_config() -> ServiceCheckerTool {
-        let mut config = ServiceCheckerConfig::default();
-        config.default_timeout_seconds = 2;
-        config.max_timeout_seconds = 10;
-        config.allow_any_domain = true;
+        let config = ServiceCheckerConfig {
+            default_timeout_seconds: 2,
+            max_timeout_seconds: 10,
+            allow_any_domain: true,
+            ..Default::default()
+        };
         ServiceCheckerTool::new(config)
     }
 
@@ -916,8 +922,10 @@ mod tests {
         assert!(!tool.is_domain_allowed("example.com")); // Not in allowed list
 
         // Test with allow_any_domain enabled
-        let mut config = ServiceCheckerConfig::default();
-        config.allow_any_domain = true;
+        let config = ServiceCheckerConfig {
+            allow_any_domain: true,
+            ..Default::default()
+        };
         let tool_permissive = ServiceCheckerTool::new(config);
         assert!(tool_permissive.is_domain_allowed("example.com"));
     }

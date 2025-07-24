@@ -10,13 +10,13 @@ use llmspell_core::{
             ToolCategory, ToolSchema,
         },
     },
-    types::{AgentInput, AgentOutput, ExecutionContext},
-    ComponentMetadata, LLMSpellError, Result,
+    types::{AgentInput, AgentOutput},
+    ComponentMetadata, ExecutionContext, LLMSpellError, Result,
 };
 use llmspell_security::sandbox::{FileSandbox, SandboxContext};
 use llmspell_utils::{
     extract_optional_bool, extract_optional_string, extract_parameters, extract_required_string,
-    file_utils,
+    file_utils, response::ResponseBuilder,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -533,18 +533,40 @@ impl FileOperationsTool {
         let operation_str = extract_required_string(params, "operation")?;
         let operation: FileOperation = operation_str.parse()?;
 
-        let path = extract_optional_string(params, "path").map(PathBuf::from);
-        let content = extract_optional_string(params, "content").map(String::from);
-        let from_path = extract_optional_string(params, "from").map(PathBuf::from);
-        let to_path = extract_optional_string(params, "to").map(PathBuf::from);
+        // Validate paths - we don't sanitize because the FileSandbox handles security
+        let path = extract_optional_string(params, "path").map(|p| {
+            // Check for obvious traversal attempts but allow absolute paths
+            // since FileSandbox will enforce the actual security boundaries
+            if p.contains("../") || p.contains("..\\") {
+                warn!("Path traversal attempt detected in path: {}", p);
+            }
+            PathBuf::from(p)
+        });
+
+        let input = extract_optional_string(params, "input").map(String::from);
+
+        let source_path = extract_optional_string(params, "source_path").map(|p| {
+            if p.contains("../") || p.contains("..\\") {
+                warn!("Path traversal attempt detected in source_path: {}", p);
+            }
+            PathBuf::from(p)
+        });
+
+        let target_path = extract_optional_string(params, "target_path").map(|p| {
+            if p.contains("../") || p.contains("..\\") {
+                warn!("Path traversal attempt detected in target_path: {}", p);
+            }
+            PathBuf::from(p)
+        });
+
         let recursive = extract_optional_bool(params, "recursive").unwrap_or(false);
 
         Ok(FileParameters {
             operation,
             path,
-            content,
-            from_path,
-            to_path,
+            input,
+            source_path,
+            target_path,
             recursive,
         })
     }
@@ -554,9 +576,9 @@ impl FileOperationsTool {
 struct FileParameters {
     operation: FileOperation,
     path: Option<PathBuf>,
-    content: Option<String>,
-    from_path: Option<PathBuf>,
-    to_path: Option<PathBuf>,
+    input: Option<String>,        // renamed from content
+    source_path: Option<PathBuf>, // renamed from from_path
+    target_path: Option<PathBuf>, // renamed from to_path
     recursive: bool,
 }
 
@@ -582,57 +604,67 @@ impl BaseAgent for FileOperationsTool {
 
         info!("Executing file operation: {}", parameters.operation);
 
-        let result = match parameters.operation {
+        let (output_text, response_json) = match parameters.operation {
             FileOperation::Read => {
                 let path = parameters.path.ok_or_else(|| LLMSpellError::Validation {
                     message: "Read operation requires 'path' parameter".to_string(),
                     field: Some("path".to_string()),
                 })?;
                 let content = self.read_file(&path, &sandbox).await?;
-                json!({
-                    "operation": "read",
-                    "path": path.to_string_lossy(),
-                    "content": content,
-                    "size": content.len()
-                })
+                let response = ResponseBuilder::success("read")
+                    .with_message(format!(
+                        "Read {} bytes from {}",
+                        content.len(),
+                        path.display()
+                    ))
+                    .with_result(json!({
+                        "input": &content,
+                        "size": content.len()
+                    }))
+                    .with_file_info(path.to_string_lossy(), Some(content.len() as u64))
+                    .build();
+                (content, response)
             }
             FileOperation::Write => {
                 let path = parameters.path.ok_or_else(|| LLMSpellError::Validation {
                     message: "Write operation requires 'path' parameter".to_string(),
                     field: Some("path".to_string()),
                 })?;
-                let content = parameters
-                    .content
-                    .ok_or_else(|| LLMSpellError::Validation {
-                        message: "Write operation requires 'content' parameter".to_string(),
-                        field: Some("content".to_string()),
-                    })?;
+                let content = parameters.input.ok_or_else(|| LLMSpellError::Validation {
+                    message: "Write operation requires 'input' parameter".to_string(),
+                    field: Some("input".to_string()),
+                })?;
                 self.write_file(&path, &content, &sandbox).await?;
-                json!({
-                    "operation": "write",
-                    "path": path.to_string_lossy(),
-                    "size": content.len(),
-                    "success": true
-                })
+                ResponseBuilder::success("write")
+                    .with_message(format!(
+                        "Wrote {} bytes to {}",
+                        content.len(),
+                        path.display()
+                    ))
+                    .with_file_info(path.to_string_lossy(), Some(content.len() as u64))
+                    .build_for_output()
             }
             FileOperation::Append => {
                 let path = parameters.path.ok_or_else(|| LLMSpellError::Validation {
                     message: "Append operation requires 'path' parameter".to_string(),
                     field: Some("path".to_string()),
                 })?;
-                let content = parameters
-                    .content
-                    .ok_or_else(|| LLMSpellError::Validation {
-                        message: "Append operation requires 'content' parameter".to_string(),
-                        field: Some("content".to_string()),
-                    })?;
+                let content = parameters.input.ok_or_else(|| LLMSpellError::Validation {
+                    message: "Append operation requires 'input' parameter".to_string(),
+                    field: Some("input".to_string()),
+                })?;
                 self.append_file(&path, &content, &sandbox).await?;
-                json!({
-                    "operation": "append",
-                    "path": path.to_string_lossy(),
-                    "appended_size": content.len(),
-                    "success": true
-                })
+                ResponseBuilder::success("append")
+                    .with_message(format!(
+                        "Appended {} bytes to {}",
+                        content.len(),
+                        path.display()
+                    ))
+                    .with_result(json!({
+                        "appended_size": content.len()
+                    }))
+                    .with_file_info(path.to_string_lossy(), None)
+                    .build_for_output()
             }
             FileOperation::Delete => {
                 let path = parameters.path.ok_or_else(|| LLMSpellError::Validation {
@@ -640,11 +672,10 @@ impl BaseAgent for FileOperationsTool {
                     field: Some("path".to_string()),
                 })?;
                 self.delete_file(&path, &sandbox).await?;
-                json!({
-                    "operation": "delete",
-                    "path": path.to_string_lossy(),
-                    "success": true
-                })
+                ResponseBuilder::success("delete")
+                    .with_message(format!("Deleted file: {}", path.display()))
+                    .with_file_info(path.to_string_lossy(), None)
+                    .build_for_output()
             }
             FileOperation::CreateDir => {
                 let path = parameters.path.ok_or_else(|| LLMSpellError::Validation {
@@ -653,12 +684,13 @@ impl BaseAgent for FileOperationsTool {
                 })?;
                 self.create_dir(&path, parameters.recursive, &sandbox)
                     .await?;
-                json!({
-                    "operation": "create_dir",
-                    "path": path.to_string_lossy(),
-                    "recursive": parameters.recursive,
-                    "success": true
-                })
+                ResponseBuilder::success("create_dir")
+                    .with_message(format!("Created directory: {}", path.display()))
+                    .with_result(json!({
+                        "recursive": parameters.recursive
+                    }))
+                    .with_file_info(path.to_string_lossy(), None)
+                    .build_for_output()
             }
             FileOperation::ListDir => {
                 let path = parameters.path.ok_or_else(|| LLMSpellError::Validation {
@@ -666,54 +698,62 @@ impl BaseAgent for FileOperationsTool {
                     field: Some("path".to_string()),
                 })?;
                 let entries = self.list_dir(&path, &sandbox).await?;
-                json!({
-                    "operation": "list_dir",
-                    "path": path.to_string_lossy(),
-                    "entries": entries,
-                    "count": entries.len()
-                })
+                ResponseBuilder::success("list_dir")
+                    .with_message(format!(
+                        "Found {} entries in {}",
+                        entries.len(),
+                        path.display()
+                    ))
+                    .with_result(json!({
+                        "entries": entries,
+                        "count": entries.len()
+                    }))
+                    .with_file_info(path.to_string_lossy(), None)
+                    .build_for_output()
             }
             FileOperation::Copy => {
                 let from = parameters
-                    .from_path
+                    .source_path
                     .ok_or_else(|| LLMSpellError::Validation {
-                        message: "Copy operation requires 'from' parameter".to_string(),
-                        field: Some("from".to_string()),
+                        message: "Copy operation requires 'source_path' parameter".to_string(),
+                        field: Some("source_path".to_string()),
                     })?;
                 let to = parameters
-                    .to_path
+                    .target_path
                     .ok_or_else(|| LLMSpellError::Validation {
-                        message: "Copy operation requires 'to' parameter".to_string(),
-                        field: Some("to".to_string()),
+                        message: "Copy operation requires 'target_path' parameter".to_string(),
+                        field: Some("target_path".to_string()),
                     })?;
                 self.copy_file(&from, &to, &sandbox).await?;
-                json!({
-                    "operation": "copy",
-                    "from": from.to_string_lossy(),
-                    "to": to.to_string_lossy(),
-                    "success": true
-                })
+                ResponseBuilder::success("copy")
+                    .with_message(format!("Copied {} to {}", from.display(), to.display()))
+                    .with_result(json!({
+                        "source": from.to_string_lossy(),
+                        "target": to.to_string_lossy()
+                    }))
+                    .build_for_output()
             }
             FileOperation::Move => {
                 let from = parameters
-                    .from_path
+                    .source_path
                     .ok_or_else(|| LLMSpellError::Validation {
-                        message: "Move operation requires 'from' parameter".to_string(),
-                        field: Some("from".to_string()),
+                        message: "Move operation requires 'source_path' parameter".to_string(),
+                        field: Some("source_path".to_string()),
                     })?;
                 let to = parameters
-                    .to_path
+                    .target_path
                     .ok_or_else(|| LLMSpellError::Validation {
-                        message: "Move operation requires 'to' parameter".to_string(),
-                        field: Some("to".to_string()),
+                        message: "Move operation requires 'target_path' parameter".to_string(),
+                        field: Some("target_path".to_string()),
                     })?;
                 self.move_file(&from, &to, &sandbox).await?;
-                json!({
-                    "operation": "move",
-                    "from": from.to_string_lossy(),
-                    "to": to.to_string_lossy(),
-                    "success": true
-                })
+                ResponseBuilder::success("move")
+                    .with_message(format!("Moved {} to {}", from.display(), to.display()))
+                    .with_result(json!({
+                        "source": from.to_string_lossy(),
+                        "target": to.to_string_lossy()
+                    }))
+                    .build_for_output()
             }
             FileOperation::Metadata => {
                 let path = parameters.path.ok_or_else(|| LLMSpellError::Validation {
@@ -721,10 +761,10 @@ impl BaseAgent for FileOperationsTool {
                     field: Some("path".to_string()),
                 })?;
                 let metadata = self.get_metadata(&path, &sandbox).await?;
-                json!({
-                    "operation": "metadata",
-                    "metadata": metadata
-                })
+                ResponseBuilder::success("metadata")
+                    .with_message(format!("Retrieved metadata for {}", path.display()))
+                    .with_result(metadata)
+                    .build_for_output()
             }
             FileOperation::Exists => {
                 let path = parameters.path.ok_or_else(|| LLMSpellError::Validation {
@@ -732,15 +772,19 @@ impl BaseAgent for FileOperationsTool {
                     field: Some("path".to_string()),
                 })?;
                 let exists = self.file_exists(&path, &sandbox).await?;
-                json!({
-                    "operation": "exists",
-                    "path": path.to_string_lossy(),
-                    "exists": exists
-                })
+                ResponseBuilder::success("exists")
+                    .with_message(format!(
+                        "Path {} {}",
+                        path.display(),
+                        if exists { "exists" } else { "does not exist" }
+                    ))
+                    .with_result(json!({
+                        "exists": exists
+                    }))
+                    .with_file_info(path.to_string_lossy(), None)
+                    .build_for_output()
             }
         };
-
-        let output_text = serde_json::to_string_pretty(&result)?;
 
         // Create metadata
         let mut metadata = llmspell_core::types::OutputMetadata::default();
@@ -748,6 +792,7 @@ impl BaseAgent for FileOperationsTool {
             "operation".to_string(),
             Value::String(parameters.operation.to_string()),
         );
+        metadata.extra.insert("response".to_string(), response_json);
 
         Ok(AgentOutput::text(output_text).with_metadata(metadata))
     }
@@ -812,21 +857,21 @@ impl Tool for FileOperationsTool {
                     default: None,
                 },
                 ParameterDef {
-                    name: "content".to_string(),
+                    name: "input".to_string(),
                     description: "Content for write/append operations".to_string(),
                     param_type: ParameterType::String,
                     required: false,
                     default: None,
                 },
                 ParameterDef {
-                    name: "from".to_string(),
+                    name: "source_path".to_string(),
                     description: "Source path for copy/move operations".to_string(),
                     param_type: ParameterType::String,
                     required: false,
                     default: None,
                 },
                 ParameterDef {
-                    name: "to".to_string(),
+                    name: "target_path".to_string(),
                     description: "Destination path for copy/move operations".to_string(),
                     param_type: ParameterType::String,
                     required: false,
@@ -892,5 +937,32 @@ mod tests {
         let tool = FileOperationsTool::new(config);
 
         assert_eq!(tool.metadata().name, "file-operations-tool");
+    }
+
+    #[test]
+    fn test_parse_parameters_standardized() {
+        let tool = FileOperationsTool::default();
+
+        // Test write operation with new 'input' parameter
+        let params = json!({
+            "operation": "write",
+            "path": "/tmp/test.txt",
+            "input": "Hello, World!"
+        });
+        let parsed = tool.parse_parameters(&params).unwrap();
+        assert_eq!(parsed.operation, FileOperation::Write);
+        assert_eq!(parsed.path, Some(PathBuf::from("/tmp/test.txt")));
+        assert_eq!(parsed.input, Some("Hello, World!".to_string()));
+
+        // Test copy operation with new source_path/target_path parameters
+        let params = json!({
+            "operation": "copy",
+            "source_path": "/tmp/source.txt",
+            "target_path": "/tmp/target.txt"
+        });
+        let parsed = tool.parse_parameters(&params).unwrap();
+        assert_eq!(parsed.operation, FileOperation::Copy);
+        assert_eq!(parsed.source_path, Some(PathBuf::from("/tmp/source.txt")));
+        assert_eq!(parsed.target_path, Some(PathBuf::from("/tmp/target.txt")));
     }
 }

@@ -7,13 +7,23 @@ use llmspell_core::{
         base_agent::BaseAgent,
         tool::{ParameterDef, ParameterType, SecurityLevel, Tool, ToolCategory, ToolSchema},
     },
-    types::{AgentInput, AgentOutput, ExecutionContext},
-    ComponentMetadata, LLMSpellError, Result as LLMResult,
+    types::{AgentInput, AgentOutput},
+    ComponentMetadata, ExecutionContext, LLMSpellError, Result as LLMResult,
 };
 use llmspell_security::sandbox::SandboxContext;
 use llmspell_utils::{
-    extract_optional_array, extract_optional_object, extract_optional_string, extract_parameters,
-    extract_required_string, system_info::find_executable,
+    // NEW: Error handling with information disclosure prevention
+    error_handling::{ErrorContext, SafeErrorHandler},
+    extract_optional_array,
+    extract_optional_object,
+    extract_optional_string,
+    extract_parameters,
+    extract_required_string,
+    response::ResponseBuilder,
+    security::input_sanitizer::InputSanitizer,
+    system_info::find_executable,
+    // NEW: Using shared timeout utility
+    timeout::TimeoutBuilder,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -23,7 +33,6 @@ use std::process::Stdio;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::process::Command;
-use tokio::time::timeout;
 use tracing::{debug, info, warn};
 
 /// Process execution result
@@ -139,17 +148,20 @@ impl Default for ProcessExecutorConfig {
 }
 
 /// Process executor tool for safe process execution
-#[derive(Clone)]
 pub struct ProcessExecutorTool {
     metadata: ComponentMetadata,
     config: ProcessExecutorConfig,
     #[allow(dead_code)] // Reserved for future sandbox integration
     sandbox_context: Option<Arc<SandboxContext>>,
+    error_handler: SafeErrorHandler,
 }
 
 impl ProcessExecutorTool {
     /// Create a new process executor tool
     pub fn new(config: ProcessExecutorConfig) -> Self {
+        // Determine if in production mode based on config
+        let is_production = !cfg!(debug_assertions);
+
         Self {
             metadata: ComponentMetadata::new(
                 "process_executor".to_string(),
@@ -157,6 +169,7 @@ impl ProcessExecutorTool {
             ),
             config,
             sandbox_context: None,
+            error_handler: SafeErrorHandler::new(is_production),
         }
     }
 
@@ -165,6 +178,8 @@ impl ProcessExecutorTool {
         config: ProcessExecutorConfig,
         sandbox_context: Arc<SandboxContext>,
     ) -> Self {
+        let is_production = !cfg!(debug_assertions);
+
         Self {
             metadata: ComponentMetadata::new(
                 "process_executor".to_string(),
@@ -172,6 +187,7 @@ impl ProcessExecutorTool {
             ),
             config,
             sandbox_context: Some(sandbox_context),
+            error_handler: SafeErrorHandler::new(is_production),
         }
     }
 
@@ -302,10 +318,20 @@ impl ProcessExecutorTool {
             }
         }
 
-        // Execute with timeout
+        // Execute with timeout using shared utility
         let timeout_duration = Duration::from_secs(self.config.max_execution_time_seconds);
+        let process_name = format!("{} {:?}", exe_path.display(), args);
 
-        let result = match timeout(timeout_duration, cmd.output()).await {
+        let timeout_result = TimeoutBuilder::default()
+            .duration(timeout_duration)
+            .name(process_name.clone())
+            .warn_after(Duration::from_secs(
+                self.config.max_execution_time_seconds / 2,
+            ))
+            .execute(cmd.output())
+            .await;
+
+        let process_result = match timeout_result {
             Ok(Ok(output)) => {
                 let execution_time = start_time.elapsed();
 
@@ -344,6 +370,10 @@ impl ProcessExecutorTool {
             }
             Err(_) => {
                 // Timeout occurred
+                warn!(
+                    "Process '{}' timed out after {:?}",
+                    process_name, timeout_duration
+                );
                 ProcessResult {
                     exit_code: None,
                     stdout: String::new(),
@@ -357,10 +387,10 @@ impl ProcessExecutorTool {
 
         info!(
             "Process execution completed: exit_code={:?}, success={}, time={}ms",
-            result.exit_code, result.success, result.execution_time_ms
+            process_result.exit_code, process_result.success, process_result.execution_time_ms
         );
 
-        Ok(result)
+        Ok(process_result)
     }
 
     /// Validate execution parameters
@@ -442,44 +472,61 @@ impl BaseAgent for ProcessExecutorTool {
         // Extract required parameters
         let executable = extract_required_string(params, "executable")?;
 
+        // Sanitize executable to prevent command injection
+        let sanitizer = InputSanitizer::new();
+        let sanitized_executable = sanitizer.sanitize_command(executable);
+
         // Extract optional parameters
         let args: Vec<String> = extract_optional_array(params, "arguments")
             .map(|arr| {
                 arr.iter()
                     .filter_map(|v| v.as_str())
-                    .map(|s| s.to_string())
+                    .map(|s| {
+                        // Sanitize each argument to prevent injection
+                        sanitizer.sanitize_command(s)
+                    })
                     .collect()
             })
             .unwrap_or_default();
 
-        let working_dir = extract_optional_string(params, "working_directory").map(Path::new);
+        let working_dir_str = extract_optional_string(params, "working_directory");
+        let working_dir = if let Some(dir) = working_dir_str.as_ref() {
+            // Sanitize path to prevent directory traversal
+            match sanitizer.sanitize_path(dir) {
+                Ok(safe_path) => Some(safe_path),
+                Err(_) => {
+                    warn!("Invalid working directory path detected: {}", dir);
+                    None
+                }
+            }
+        } else {
+            None
+        };
+        let working_dir_path = working_dir.as_deref().map(Path::new);
 
         let env_vars: Option<HashMap<String, String>> =
             extract_optional_object(params, "environment").map(|obj| {
                 obj.iter()
-                    .filter_map(|(k, v)| v.as_str().map(|s| (k.clone(), s.to_string())))
+                    .filter_map(|(k, v)| {
+                        v.as_str().map(|s| {
+                            // Sanitize environment variable values
+                            (k.clone(), sanitizer.sanitize_command(s))
+                        })
+                    })
                     .collect()
             });
 
         // Execute the process
         let result = self
-            .execute_process(executable, &args, working_dir, env_vars.as_ref())
+            .execute_process(
+                &sanitized_executable,
+                &args,
+                working_dir_path,
+                env_vars.as_ref(),
+            )
             .await?;
 
         // Format response
-        let response = json!({
-            "executable": executable,
-            "arguments": args,
-            "result": {
-                "exit_code": result.exit_code,
-                "success": result.success,
-                "stdout": result.stdout,
-                "stderr": result.stderr,
-                "execution_time_ms": result.execution_time_ms,
-                "timed_out": result.timed_out
-            }
-        });
-
         let message = if result.success {
             format!(
                 "Process '{}' executed successfully in {}ms",
@@ -497,8 +544,21 @@ impl BaseAgent for ProcessExecutorTool {
             )
         };
 
-        Ok(AgentOutput::text(message)
-            .with_metadata(serde_json::from_value(response).unwrap_or_default()))
+        let response = ResponseBuilder::success("execute")
+            .with_message(message)
+            .with_result(json!({
+                "executable": executable,
+                "arguments": args,
+                "exit_code": result.exit_code,
+                "success": result.success,
+                "stdout": result.stdout,
+                "stderr": result.stderr,
+                "execution_time_ms": result.execution_time_ms,
+                "timed_out": result.timed_out
+            }))
+            .build();
+
+        Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
     }
 
     async fn validate_input(&self, input: &AgentInput) -> LLMResult<()> {
@@ -512,10 +572,17 @@ impl BaseAgent for ProcessExecutorTool {
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> LLMResult<AgentOutput> {
-        Ok(AgentOutput::text(format!(
-            "Process executor error: {}",
-            error
-        )))
+        // Use SafeErrorHandler to sanitize error messages
+        let context = ErrorContext::new()
+            .with_operation("process_execution")
+            .with_metadata("tool", "process_executor");
+
+        let safe_response = self.error_handler.handle_llmspell_error(&error, &context);
+
+        Ok(AgentOutput::text(
+            serde_json::to_string_pretty(&safe_response)
+                .unwrap_or_else(|_| format!("{:?}", safe_response)),
+        ))
     }
 }
 
@@ -576,9 +643,11 @@ mod tests {
     }
 
     fn create_test_tool_with_custom_config() -> ProcessExecutorTool {
-        let mut config = ProcessExecutorConfig::default();
-        config.max_execution_time_seconds = 5;
-        config.max_output_size = 1024;
+        let config = ProcessExecutorConfig {
+            max_execution_time_seconds: 5,
+            max_output_size: 1024,
+            ..Default::default()
+        };
         ProcessExecutorTool::new(config)
     }
 
@@ -838,8 +907,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_arbitrary_commands_disabled() {
-        let mut config = ProcessExecutorConfig::default();
-        config.allow_arbitrary_commands = false;
+        let config = ProcessExecutorConfig {
+            allow_arbitrary_commands: false,
+            ..Default::default()
+        };
         let tool = ProcessExecutorTool::new(config);
 
         // Should not allow arbitrary commands
@@ -848,8 +919,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_arbitrary_commands_enabled() {
-        let mut config = ProcessExecutorConfig::default();
-        config.allow_arbitrary_commands = true;
+        let config = ProcessExecutorConfig {
+            allow_arbitrary_commands: true,
+            ..Default::default()
+        };
         let tool = ProcessExecutorTool::new(config);
 
         // Should allow arbitrary commands (unless blocked)

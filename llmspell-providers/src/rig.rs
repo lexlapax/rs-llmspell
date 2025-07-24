@@ -22,13 +22,14 @@ pub struct RigProvider {
     config: ProviderConfig,
     capabilities: ProviderCapabilities,
     model: RigModel,
+    max_tokens: u64,
 }
 
 impl RigProvider {
     /// Create a new Rig provider instance
     pub fn new(config: ProviderConfig) -> Result<Self, LLMSpellError> {
-        // Create the appropriate model based on provider name
-        let model = match config.name.as_str() {
+        // Create the appropriate model based on provider type
+        let model = match config.provider_type.as_str() {
             "openai" => {
                 let api_key =
                     config
@@ -80,17 +81,17 @@ impl RigProvider {
             }
             _ => {
                 return Err(LLMSpellError::Configuration {
-                    message: format!("Unsupported provider: {}", config.name),
+                    message: format!("Unsupported provider type: {}", config.provider_type),
                     source: None,
                 });
             }
         };
 
-        // Set capabilities based on provider and model
+        // Set capabilities based on provider type and model
         let capabilities = ProviderCapabilities {
             supports_streaming: false, // Rig doesn't expose streaming yet
-            supports_multimodal: matches!(config.name.as_str(), "openai" | "anthropic"),
-            max_context_tokens: Some(match config.name.as_str() {
+            supports_multimodal: matches!(config.provider_type.as_str(), "openai" | "anthropic"),
+            max_context_tokens: Some(match config.provider_type.as_str() {
                 "openai" => match config.model.as_str() {
                     "gpt-4" | "gpt-4-turbo" => 128000,
                     "gpt-3.5-turbo" => 16384,
@@ -109,10 +110,21 @@ impl RigProvider {
             custom_features: Default::default(),
         };
 
+        // Extract max_tokens from custom_config, with defaults based on provider
+        let max_tokens = config
+            .custom_config
+            .get("max_tokens")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(match config.provider_type.as_str() {
+                "anthropic" => 4096, // Anthropic requires max_tokens
+                _ => 2048,           // Default for others
+            });
+
         Ok(Self {
             config,
             capabilities,
             model,
+            max_tokens,
         })
     }
 
@@ -120,6 +132,7 @@ impl RigProvider {
         match &self.model {
             RigModel::OpenAI(model) => model
                 .completion_request(&prompt)
+                .max_tokens(self.max_tokens)
                 .send()
                 .await
                 .map_err(|e| LLMSpellError::Provider {
@@ -139,6 +152,7 @@ impl RigProvider {
                 }),
             RigModel::Anthropic(model) => model
                 .completion_request(&prompt)
+                .max_tokens(self.max_tokens)
                 .send()
                 .await
                 .map_err(|e| LLMSpellError::Provider {
@@ -158,6 +172,7 @@ impl RigProvider {
                 }),
             RigModel::Cohere(model) => model
                 .completion_request(&prompt)
+                .max_tokens(self.max_tokens)
                 .send()
                 .await
                 .map_err(|e| LLMSpellError::Provider {
@@ -248,8 +263,10 @@ impl ProviderInstance for RigProvider {
         }
     }
 
+    #[allow(clippy::misnamed_getters)]
     fn name(&self) -> &str {
-        &self.config.name
+        // Return the provider type for now, but consider using instance_name() for hierarchical naming
+        &self.config.provider_type
     }
 
     fn model(&self) -> &str {

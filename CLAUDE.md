@@ -3,146 +3,218 @@
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 rs-llmspell: **Scriptable LLM interactions** via Lua, JavaScript - Cast scripting spells to animate LLM golems
-## Phase Status
-- ✅ Phase 0: Foundation Infrastructure (COMPLETE)
-- ✅ Phase 1: Core Execution Runtime (COMPLETE)
-- ✅ Phase 2: Self-Contained Tools Library (COMPLETE - 25 tools)
-- 🚀 **Phase 3: Tool Enhancement & Workflow Orchestration** (ACTIVE - Weeks 9-16)
-  - Phase 3.0: Critical Tool Fixes (Weeks 9-10)
-  - Phase 3.1: External Integration Tools (Weeks 11-12)
-  - Phase 3.2: Security & Performance (Weeks 13-14)
-  - Phase 3.3: Workflow Orchestration (Weeks 15-16)
-- ⏳ Phase 4: Vector Storage and Search (Weeks 17-18)
-- ⏳ Phase 5+: Future phases...
 
-## Current Status
+## Primary Documentation
 
-🚀 **Phase 3 - Tool Enhancement & Workflow Orchestration**: STARTING (Phase 2 Complete 2025-07-11)
-- **Completed**: Phases 0, 1, 2 ✅ (25 self-contained tools fully implemented)
-- **Current**: Phase 3.0 - Critical Tool Fixes (Standardization, DRY, Initial Security)
-- **Approach**: Clean break strategy - no migration tools (pre-1.0 freedom)
-- **Timeline**: 8 weeks (Weeks 9-16) divided into 4 sub-phases
+- **Architecture**: `/docs/technical/rs-llmspell-final-architecture.md` - Complete system architecture
+- **Implementation Phases**: `/docs/in-progress/implementation-phases.md` - 16-phase roadmap
+- **Current Phase**: See `/docs/in-progress/PHASE*-TODO.md` for active phase tracking
+- **User Guide**: `/docs/user-guide/README.md` - For end users
+- **Developer Guide**: `/docs/developer-guide/README.md` - For contributors
 
-## Key Commands
+## Development Norms
+
+### Code Quality Standards
+
+- **Zero Warnings Policy**: All code must compile without warnings (`cargo clippy -- -D warnings`)
+- **Test Coverage**: >90% coverage required (enforced in CI)
+- **Documentation**: >95% API documentation coverage required
+- **Formatting**: Run `cargo fmt --all` before every commit
+- **Performance**: Maintain established benchmarks (e.g., <10ms tool initialization)
+
+### Quality Check Commands
 
 ```bash
-# Quality Checks (MANDATORY before commits)
-cargo clippy -- -D warnings            # Zero warnings policy
-cargo fmt --all                        # Apply formatting
+# MANDATORY before commits
 ./scripts/quality-check-minimal.sh     # Quick check (seconds) - formatting, clippy, compilation
 ./scripts/quality-check-fast.sh        # Fast check (~1 min) - adds unit tests & docs
 ./scripts/quality-check.sh             # Full check (5+ min) - all tests & coverage
 
-# Individual Checks
-cargo test --workspace                 # Run all tests (can be slow)
-cargo test --lib --all                 # Run only unit tests (faster)
-cargo check --workspace                # Quick compilation check
-
-# Phase 3 Specific
-cargo test -p llmspell-tools          # Test tools crate
-cargo test -p llmspell-utils          # Test shared utilities
-cargo bench -p llmspell-tools         # Benchmark tool performance
-cargo test --all-features             # Test with all external integrations
+# Test specific components
+./scripts/test-by-tag.sh unit         # Run only unit tests
+./scripts/test-by-tag.sh tool         # Run tool tests
+./scripts/test-by-tag.sh external     # Run external/network tests
+./scripts/list-tests-by-tag.sh all    # List test categories
+SKIP_SLOW_TESTS=true ./scripts/quality-check.sh  # Skip slow tests
 ```
 
-## Architecture Overview
+### Implementation Principles
 
-**Core-Bridge-Script Architecture**: BaseAgent → Tool → Workflow hierarchy with scriptable interfaces.
+1. **State-First Design**: Components communicate through shared state, not direct messaging
+2. **DRY Principle**: Use `llmspell-utils` crate for all shared functionality
+3. **Security First**: All inputs validated, all paths sanitized, resource limits enforced
+4. **Composition Over Inheritance**: Prefer trait composition patterns
+5. **Bridge-First Architecture**: Leverage existing Rust crates rather than reimplementing
+6. **Script API Consistency**: Same API surface across Lua, JavaScript, and Python
 
-**Tech Stack**: `rig` (LLM providers), `mlua` (scripting), `sled`/`rocksdb` (storage), comprehensive testing.
+### Coding Standards
 
-**Phase 3 Focus**: Standardize 25 existing tools, add 16 external integration tools, security hardening, workflow orchestration.
+1. **Parameter Naming**:
+   - Primary data: `input` (not: text, content, data, expression, query, etc.)
+   - File paths: `path` for single files, `source_path`/`target_path` for operations
+   - Operations: Always require explicit `operation` parameter for multi-function tools
 
-## Quality Requirements
+2. **Response Format**:
+   ```json
+   {
+     "operation": "operation_name",
+     "success": true,
+     "result": {...},
+     "error": null,
+     "metadata": {...}
+   }
+   ```
 
-- **Zero Warnings**: All code must compile without warnings
-- **Test Coverage**: >90% coverage enforced in CI
-- **Documentation**: >95% coverage requirement
-- **CI/CD**: All quality gates implemented and enforced
+3. **Error Handling**:
+   - Use `Result<T, E>` for all fallible operations
+   - Create specific error types, not generic strings
+   - Include context in errors (use `anyhow` with `.context()`)
+   - Sanitize error messages (no sensitive paths or data)
 
-### Quality Check Scripts
+4. **File Structure**:
+   - Each tool in its own module under `llmspell-tools/src/`
+   - Shared utilities in `llmspell-utils/src/`
+   - Script bindings in `llmspell-bridge/src/lua/globals/`
+   - Examples in `examples/` with working code
 
-Three levels of quality validation are available:
+### Testing Requirements
 
-1. **Minimal Check** (`quality-check-minimal.sh`) - Runs in seconds
-   - Code formatting verification
-   - Clippy lints with zero warnings
-   - Compilation check
-   
-2. **Fast Check** (`quality-check-fast.sh`) - Runs in ~1 minute
-   - All minimal checks
-   - Unit tests only
-   - Documentation build verification
-   
-3. **Full Check** (`quality-check.sh`) - Runs in 5+ minutes
-   - All fast checks
-   - Full integration test suite
-   - Optional coverage analysis (if cargo-tarpaulin installed)
-   - Security audit (if cargo-audit installed)
+1. **Test Categories** (use `#[cfg_attr(test_category = "...")]`):
+   - `unit`: Fast, isolated component tests
+   - `integration`: Cross-component tests
+   - `tool`: Individual tool functionality tests
+   - `agent`: Agent-specific tests
+   - `workflow`: Workflow pattern tests
+   - `external`: Tests requiring network/external resources
+   - `security`: Security-specific tests
 
-**Recommendation**: Use minimal check before commits, fast check before pushing, and full check before PRs.
+2. **Test Coverage**:
+   - Every public API must have tests
+   - Security edge cases must be tested
+   - Performance benchmarks for critical paths
+   - Script integration tests for all exposed APIs
 
-## Critical Implementation Principles
+### Development Workflow
 
-- **State-First**: Agents communicate through shared state
-- **Tool Composition**: Agents can be wrapped as tools
-- **Security First**: Sandboxing and resource limits enforced
-- **DRY Principle**: Use llmspell-utils for shared functionality
+1. **Before Starting Work**:
+   - Read relevant phase design doc in `/docs/in-progress/`
+   - Check TODO.md for current task status
+   - Run full quality check to ensure clean baseline
 
-## Key Development Reminders
+2. **During Development**:
+   - Follow TDD: Write tests first
+   - Run minimal quality check frequently
+   - Update documentation as you code
+   - No lazy implementations or TODOs without explicit approval
 
-- **Complete Tasks Fully**: No lazy implementations, check Definition of Done
-- **DRY**: Use llmspell-utils for common functionality
-- **Follow TODO.md**: Stick to task hierarchy, don't jump ahead
-- **Zero Warnings**: Maintain compilation without warnings
-- **Update Progress**: Keep TODO.md timestamps current
+3. **Before Committing**:
+   - Run `./scripts/quality-check-fast.sh`
+   - Ensure all tests pass
+   - Update CHANGELOG.md if adding features
+   - Keep commits focused and atomic
 
-## Primary Documentation
+4. **Definition of Done**:
+   - Feature fully implemented (no stubs)
+   - All tests passing
+   - Documentation complete
+   - Quality checks passing
+   - No regression in performance
+   - Security considerations addressed
 
-- **Architecture**: `/docs/technical/rs-llmspell-final-architecture.md`
-- **Current Progress**: `/docs/in-progress/PHASE03-TODO.md` - Phase 3 task tracking
-- **Phase 3 Design**: `/docs/in-progress/phase-03-design-doc.md`
-- **Breaking Changes**: Clean break approach with comprehensive documentation
+### Architecture Patterns
 
-## Phase 3 Plan (41+ Tools Target)
+1. **Trait Hierarchy**:
+   ```
+   BaseAgent ← Agent ← SpecializedAgent
+       ↑
+     Tool ← ToolWrappedAgent
+       ↑
+   Workflow ← Sequential, Parallel, Conditional, Loop
+   ```
 
-**Phase 3.0 (Weeks 9-10)**: Critical Tool Fixes
-- Standardize all 25 tools to consistent interfaces
-- Extract shared utilities (DRY compliance 95%)
-- Implement critical security fixes (Calculator DoS, path traversal)
-- Create breaking changes documentation
+2. **Crate Organization**:
+   - `llmspell-core`: Core traits and types
+   - `llmspell-tools`: Tool implementations
+   - `llmspell-agents`: Agent infrastructure
+   - `llmspell-workflows`: Workflow patterns
+   - `llmspell-bridge`: Script language integration
+   - `llmspell-utils`: Shared utilities
 
-**Phase 3.1 (Weeks 11-12)**: External Integration Tools (16 new)
-- Web & Network: WebSearchTool enhancement, web_scraper, url_analyzer, api_tester, webhook_caller, webpage_monitor, sitemap_crawler
-- Communication: email_sender, database_connector
-- Rate limiting and circuit breaker patterns
+3. **Script Integration**:
+   - All functionality exposed through global objects
+   - Synchronous wrappers for async operations
+   - Consistent error propagation to scripts
+   - Zero-configuration access (globals injected automatically)
 
-**Phase 3.2 (Weeks 13-14)**: Advanced Security & Performance
-- Comprehensive security hardening for all 41 tools
-- Performance optimization (maintain 52,600x target)
-- Resource limit enforcement
+### Breaking Changes Policy
 
-**Phase 3.3 (Weeks 15-16)**: Workflow Orchestration
-- Sequential, Conditional, Loop, Streaming workflows
-- State management and error handling
-- Integration with full tool library
+- Pre-1.0: Clean breaks allowed with documentation, no backward compatibility
+- Post-1.0: Deprecation cycle required
+- Always document in CHANGELOG.md
+- Provide migration examples
+- Update all examples and tests
+- Megathink and widen scope of research in code 
 
-## Phase 3 Breaking Changes
+### Performance Targets
 
-**Clean Break Approach**: As a pre-1.0 project (v0.1.0 → v0.3.0), we're making breaking changes without migration tools.
+- Tool initialization: <10ms
+- Agent creation: <50ms including provider setup
+- Tool invocation overhead: <10ms
+- Workflow step overhead: <20ms
+- Script bridge overhead: <5ms
+- Memory usage: Linear with workload
 
-**Key Changes**:
-- **Parameter Standardization**: `input` as universal primary data parameter
-- **Path Parameters**: `path: PathBuf` for single files, `source_path`/`target_path` for transforms
-- **ResponseBuilder Pattern**: All tools use standardized response format
-- **No Migration Tools**: Clear documentation and examples instead
+### Security Requirements
 
-**Documentation**: See `/docs/in-progress/CHANGELOG_v0.3.0.md` for complete breaking changes.
+1. **Input Validation**:
+   - Length limits on all string inputs
+   - Path traversal prevention
+   - Command injection prevention
+   - URL validation for web operations
 
-## Testing Strategy
+2. **Resource Limits**:
+   - Memory limits enforced
+   - CPU time limits
+   - Operation count limits
+   - Concurrent operation limits
 
-- **Unit Tests**: Individual components
-- **Integration Tests**: Tool interactions and script APIs  
-- **Security Tests**: DoS protection, path traversal, resource limits
-- **Performance**: <10ms tool initialization requirement
-- **Coverage**: >90% enforced in CI
+3. **Sandboxing**:
+   - File system access restrictions
+   - Network access controls
+   - Process spawning limits
+   - Credential protection
+
+### Common Pitfalls to Avoid
+
+1. **Don't** create new files unless absolutely necessary
+2. **Don't** implement features not in the current phase
+3. **Don't** skip tests to make deadlines
+4. **Don't** ignore security implications
+6. **Don't** use unwrap() in production code
+7. **Don't** hardcode configuration values
+8. **Don't** expose internal implementation details
+
+### Useful Commands
+
+```bash
+# Find TODO items
+rg "TODO|FIXME|HACK" --type rust
+
+# Check for unwrap usage
+rg "\.unwrap\(\)" --type rust
+
+# Run specific test
+cargo test -p llmspell-tools test_name_here
+
+# Benchmark performance
+cargo bench -p llmspell-tools
+
+# Generate documentation
+cargo doc --workspace --no-deps --open
+
+# Check dependencies
+cargo tree -d  # Find duplicate dependencies
+cargo audit    # Security audit
+```
+
+Remember: When in doubt, refer to `/docs/technical/rs-llmspell-final-architecture.md` for architectural decisions and `/docs/in-progress/implementation-phases.md` for the roadmap.

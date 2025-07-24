@@ -113,8 +113,9 @@ mod tests {
     use super::*;
     use async_trait::async_trait;
     use llmspell_core::traits::agent::AgentConfig;
-    use llmspell_core::types::{AgentInput, AgentOutput, ExecutionContext};
+    use llmspell_core::types::{AgentInput, AgentOutput};
     use llmspell_core::BaseAgent;
+    use llmspell_core::ExecutionContext;
 
     struct MockAgent {
         metadata: llmspell_core::ComponentMetadata,

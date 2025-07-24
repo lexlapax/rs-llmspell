@@ -116,8 +116,26 @@ pub fn register_all_tools(
     })?;
 
     // Search tools
-    register_tool(registry.clone(), "web_search", || {
+    register_tool_result(registry.clone(), "web_search", || {
         WebSearchTool::new(Default::default())
+    })?;
+
+    // Phase 3.1 Web tools
+    register_tool(registry.clone(), "url-analyzer", UrlAnalyzerTool::new)?;
+    register_tool(registry.clone(), "web-scraper", || {
+        WebScraperTool::new(Default::default())
+    })?;
+    register_tool(registry.clone(), "api-tester", ApiTesterTool::new)?;
+    register_tool(registry.clone(), "webhook-caller", WebhookCallerTool::new)?;
+    register_tool(registry.clone(), "webpage-monitor", WebpageMonitorTool::new)?;
+    register_tool(registry.clone(), "sitemap-crawler", SitemapCrawlerTool::new)?;
+
+    // Phase 3.1 Communication tools
+    register_tool_result(registry.clone(), "email-sender", || {
+        EmailSenderTool::new(Default::default())
+    })?;
+    register_tool_result(registry.clone(), "database-connector", || {
+        DatabaseConnectorTool::new(Default::default())
     })?;
 
     Ok(())

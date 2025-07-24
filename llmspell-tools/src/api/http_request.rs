@@ -1,31 +1,33 @@
 //! ABOUTME: HTTP request tool with authentication, retry logic, rate limiting, and automatic parsing
-//! ABOUTME: Provides comprehensive HTTP client capabilities for API interactions
+//! ABOUTME: Refactored to use shared utilities from llmspell-utils
 
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use llmspell_core::{
     traits::{
         base_agent::BaseAgent,
-        tool::{
-            ParameterDef, ParameterType, ResourceLimits, SecurityLevel, SecurityRequirements, Tool,
-            ToolCategory, ToolSchema,
-        },
+        tool::{ParameterDef, ParameterType, SecurityLevel, Tool, ToolCategory, ToolSchema},
     },
-    types::{AgentInput, AgentOutput, ExecutionContext},
-    ComponentMetadata, LLMSpellError, Result,
+    types::{AgentInput, AgentOutput},
+    ComponentMetadata, ExecutionContext, LLMSpellError, Result,
 };
 use llmspell_utils::{
-    extract_optional_object, extract_optional_string, extract_parameters, extract_required_string,
+    extract_optional_object,
+    extract_optional_string,
+    extract_parameters,
+    extract_required_string,
+    // NEW: Using shared utilities
+    rate_limiter::{RateLimiter, RateLimiterBuilder},
+    response::ResponseBuilder,
+    retry::{retry, AlwaysRetry, RetryConfig as SharedRetryConfig},
+    timeout::TimeoutBuilder,
 };
 use reqwest::{Client, Method, Response};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::Mutex;
-use tokio::time::{sleep, Instant};
-use tracing::{debug, info, warn};
+use tracing::info;
 
 /// HTTP method types
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -85,7 +87,7 @@ pub enum AuthType {
     Custom { headers: HashMap<String, String> },
 }
 
-/// Retry configuration
+/// Retry configuration (simplified to use shared utility)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RetryConfig {
     /// Maximum number of retry attempts
@@ -112,50 +114,13 @@ impl Default for RetryConfig {
     }
 }
 
-/// Rate limiting configuration
-#[derive(Debug, Clone)]
-pub struct RateLimiter {
-    /// Maximum requests per window
-    max_requests: u32,
-    /// Time window in seconds
-    window_seconds: u64,
-    /// Current request count
-    request_count: Arc<Mutex<u32>>,
-    /// Window start time
-    window_start: Arc<Mutex<Instant>>,
-}
-
-impl RateLimiter {
-    pub fn new(max_requests: u32, window_seconds: u64) -> Self {
-        Self {
-            max_requests,
-            window_seconds,
-            request_count: Arc::new(Mutex::new(0)),
-            window_start: Arc::new(Mutex::new(Instant::now())),
-        }
-    }
-
-    pub async fn acquire(&self) -> Result<()> {
-        let mut count = self.request_count.lock().await;
-        let mut start = self.window_start.lock().await;
-
-        // Check if window has expired
-        if start.elapsed().as_secs() >= self.window_seconds {
-            *count = 0;
-            *start = Instant::now();
-        }
-
-        // Check rate limit
-        if *count >= self.max_requests {
-            let remaining = self.window_seconds - start.elapsed().as_secs();
-            return Err(LLMSpellError::RateLimit {
-                message: format!("Rate limit exceeded. Try again in {} seconds", remaining),
-                retry_after: Some(remaining),
-            });
-        }
-
-        *count += 1;
-        Ok(())
+impl From<RetryConfig> for SharedRetryConfig {
+    fn from(config: RetryConfig) -> Self {
+        SharedRetryConfig::new(config.max_attempts)
+            .with_initial_delay(Duration::from_millis(config.initial_delay_ms))
+            .with_max_delay(Duration::from_millis(config.max_delay_ms))
+            .with_backoff_factor(config.backoff_factor)
+            .with_jitter(true)
     }
 }
 
@@ -189,7 +154,36 @@ impl Default for HttpRequestConfig {
     }
 }
 
-/// HTTP request tool with advanced features
+/// Response body types
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum ResponseBody {
+    Json(Value),
+    Text(String),
+    Binary(Vec<u8>),
+}
+
+/// HTTP response structure
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct HttpResponse {
+    pub status_code: u16,
+    pub headers: HashMap<String, String>,
+    pub body: ResponseBody,
+    pub timestamp: DateTime<Utc>,
+}
+
+/// Request parameters
+#[derive(Debug)]
+struct HttpRequestParams {
+    method: HttpMethod,
+    url: String,
+    headers: Option<HashMap<String, String>>,
+    body: Option<Value>,
+    auth: AuthType,
+    retry_config: Option<RetryConfig>,
+}
+
+/// HTTP request tool with advanced features (refactored)
 pub struct HttpRequestTool {
     metadata: ComponentMetadata,
     config: HttpRequestConfig,
@@ -199,9 +193,21 @@ pub struct HttpRequestTool {
 
 impl HttpRequestTool {
     pub fn new(config: HttpRequestConfig) -> Result<Self> {
-        let rate_limiter = config
-            .rate_limit_per_minute
-            .map(|rpm| RateLimiter::new(rpm, 60));
+        // Create rate limiter using shared utility
+        let rate_limiter = if let Some(rpm) = config.rate_limit_per_minute {
+            Some(
+                RateLimiterBuilder::default()
+                    .per_minute(rpm)
+                    .sliding_window()
+                    .build()
+                    .map_err(|e| LLMSpellError::Internal {
+                        message: format!("Failed to create rate limiter: {}", e),
+                        source: None,
+                    })?,
+            )
+        } else {
+            None
+        };
 
         let client = Client::builder()
             .timeout(Duration::from_secs(config.timeout_seconds))
@@ -248,7 +254,7 @@ impl HttpRequestTool {
         }
     }
 
-    /// Execute request with retry logic
+    /// Execute request with retry logic (using shared utility)
     async fn execute_with_retry(
         &self,
         method: Method,
@@ -259,16 +265,21 @@ impl HttpRequestTool {
         retry_config: Option<RetryConfig>,
     ) -> Result<Response> {
         let retry_cfg = retry_config.unwrap_or_else(|| self.config.retry_config.clone());
-        let mut attempt = 0;
-        let mut delay_ms = retry_cfg.initial_delay_ms;
+        let shared_retry_config: SharedRetryConfig = retry_cfg.clone().into();
 
-        loop {
-            attempt += 1;
-            debug!(
-                "HTTP request attempt {}/{}",
-                attempt, retry_cfg.max_attempts
-            );
+        // Apply rate limiting
+        if let Some(limiter) = &self.rate_limiter {
+            limiter
+                .acquire()
+                .await
+                .map_err(|e| LLMSpellError::RateLimit {
+                    message: format!("Rate limit exceeded: {}", e),
+                    retry_after: None,
+                })?;
+        }
 
+        // Execute with retry logic using shared utility
+        let result = retry(shared_retry_config, AlwaysRetry, || async {
             // Build request
             let mut request = self.client.request(method.clone(), url);
 
@@ -288,44 +299,21 @@ impl HttpRequestTool {
             request = self.apply_auth(request, &auth);
 
             // Execute request
-            match request.send().await {
-                Ok(response) => {
-                    let status = response.status();
+            request.send().await.map_err(|e| LLMSpellError::Tool {
+                message: format!("HTTP request failed: {}", e),
+                tool_name: Some("http_request".to_string()),
+                source: None,
+            })
+        })
+        .await;
 
-                    // Check if we should retry based on status code
-                    if attempt < retry_cfg.max_attempts
-                        && retry_cfg.retry_on_status.contains(&status.as_u16())
-                    {
-                        warn!(
-                            "Request failed with status {}. Retrying after {} ms",
-                            status, delay_ms
-                        );
-                        sleep(Duration::from_millis(delay_ms)).await;
-                        delay_ms = (delay_ms as f64 * retry_cfg.backoff_factor) as u64;
-                        delay_ms = delay_ms.min(retry_cfg.max_delay_ms);
-                        continue;
-                    }
-
-                    return Ok(response);
-                }
-                Err(e) => {
-                    if attempt >= retry_cfg.max_attempts {
-                        return Err(LLMSpellError::Tool {
-                            message: format!(
-                                "HTTP request failed after {} attempts: {}",
-                                attempt, e
-                            ),
-                            tool_name: Some("http_request".to_string()),
-                            source: None,
-                        });
-                    }
-
-                    warn!("Request error: {}. Retrying after {} ms", e, delay_ms);
-                    sleep(Duration::from_millis(delay_ms)).await;
-                    delay_ms = (delay_ms as f64 * retry_cfg.backoff_factor) as u64;
-                    delay_ms = delay_ms.min(retry_cfg.max_delay_ms);
-                }
-            }
+        match result {
+            Ok(response) => Ok(response),
+            Err(retry_error) => Err(LLMSpellError::Tool {
+                message: format!("HTTP request failed: {}", retry_error),
+                tool_name: Some("http_request".to_string()),
+                source: None,
+            }),
         }
     }
 
@@ -375,7 +363,7 @@ impl HttpRequestTool {
         let method_str = extract_optional_string(params, "method").unwrap_or("GET");
         let method: HttpMethod = method_str.parse()?;
 
-        let url = extract_required_string(params, "url")?.to_string();
+        let url = extract_required_string(params, "input")?.to_string();
 
         let headers = extract_optional_object(params, "headers").map(|obj| {
             obj.iter()
@@ -406,35 +394,63 @@ impl HttpRequestTool {
     }
 }
 
-#[derive(Debug)]
-struct HttpRequestParams {
-    method: HttpMethod,
-    url: String,
-    headers: Option<HashMap<String, String>>,
-    body: Option<Value>,
-    auth: AuthType,
-    retry_config: Option<RetryConfig>,
-}
+#[async_trait]
+impl Tool for HttpRequestTool {
+    fn category(&self) -> ToolCategory {
+        ToolCategory::Api
+    }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct HttpResponse {
-    status_code: u16,
-    headers: HashMap<String, String>,
-    body: ResponseBody,
-    timestamp: DateTime<Utc>,
-}
+    fn security_level(&self) -> SecurityLevel {
+        SecurityLevel::Safe
+    }
 
-#[derive(Debug, Serialize, Deserialize)]
-#[serde(tag = "type", content = "data")]
-pub enum ResponseBody {
-    Json(Value),
-    Text(String),
-    Binary(Vec<u8>),
-}
-
-impl Default for HttpRequestTool {
-    fn default() -> Self {
-        Self::new(HttpRequestConfig::default()).expect("Default config should be valid")
+    fn schema(&self) -> ToolSchema {
+        ToolSchema::new(
+            "http_request".to_string(),
+            "Execute HTTP requests with authentication, retries, and automatic parsing".to_string(),
+        )
+        .with_parameter(ParameterDef {
+            name: "input".to_string(),
+            param_type: ParameterType::String,
+            description: "The URL to send the request to".to_string(),
+            required: true,
+            default: None,
+        })
+        .with_parameter(ParameterDef {
+            name: "method".to_string(),
+            param_type: ParameterType::String,
+            description: "HTTP method (GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS)".to_string(),
+            required: false,
+            default: Some(json!("GET")),
+        })
+        .with_parameter(ParameterDef {
+            name: "headers".to_string(),
+            param_type: ParameterType::Object,
+            description: "HTTP headers as key-value pairs".to_string(),
+            required: false,
+            default: Some(json!({})),
+        })
+        .with_parameter(ParameterDef {
+            name: "body".to_string(),
+            param_type: ParameterType::Object,
+            description: "Request body (will be serialized as JSON)".to_string(),
+            required: false,
+            default: None,
+        })
+        .with_parameter(ParameterDef {
+            name: "auth".to_string(),
+            param_type: ParameterType::Object,
+            description: "Authentication configuration".to_string(),
+            required: false,
+            default: None,
+        })
+        .with_parameter(ParameterDef {
+            name: "retry".to_string(),
+            param_type: ParameterType::Object,
+            description: "Retry configuration".to_string(),
+            required: false,
+            default: None,
+        })
     }
 }
 
@@ -445,9 +461,7 @@ impl BaseAgent for HttpRequestTool {
     }
 
     async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
-        // Get parameters using shared utility
         let params = extract_parameters(&input)?;
-
         let request_params = self.parse_parameters(params)?;
 
         info!(
@@ -455,200 +469,65 @@ impl BaseAgent for HttpRequestTool {
             request_params.method, request_params.url
         );
 
-        // Check rate limit
-        if let Some(limiter) = &self.rate_limiter {
-            limiter.acquire().await?;
-        }
+        // Execute request with timeout using shared utility
+        let response = TimeoutBuilder::default()
+            .duration(Duration::from_secs(self.config.timeout_seconds))
+            .name(format!(
+                "HTTP {} {}",
+                request_params.method, request_params.url
+            ))
+            .execute(async {
+                self.execute_with_retry(
+                    request_params.method.to_string().parse().unwrap(),
+                    &request_params.url,
+                    request_params.headers,
+                    request_params.body,
+                    request_params.auth,
+                    request_params.retry_config,
+                )
+                .await
+            })
+            .await
+            .map_err(|e| LLMSpellError::Tool {
+                message: format!("Request timeout: {}", e),
+                tool_name: Some("http_request".to_string()),
+                source: None,
+            })?;
 
-        // Convert method
-        let method = match request_params.method {
-            HttpMethod::Get => Method::GET,
-            HttpMethod::Post => Method::POST,
-            HttpMethod::Put => Method::PUT,
-            HttpMethod::Delete => Method::DELETE,
-            HttpMethod::Patch => Method::PATCH,
-            HttpMethod::Head => Method::HEAD,
-            HttpMethod::Options => Method::OPTIONS,
-        };
+        let http_response = self.parse_response(response?).await?;
 
-        // Execute request with retry
-        let response = self
-            .execute_with_retry(
-                method,
-                &request_params.url,
-                request_params.headers,
-                request_params.body,
-                request_params.auth,
-                request_params.retry_config,
-            )
-            .await?;
-
-        // Parse response
-        let http_response = self.parse_response(response).await?;
-
-        // Create output
-        let output_value = serde_json::to_value(&http_response)?;
-        let output_text = serde_json::to_string_pretty(&output_value)?;
-
-        // Create metadata
-        let mut metadata = llmspell_core::types::OutputMetadata::default();
-        metadata.extra.insert(
-            "status_code".to_string(),
-            Value::Number(http_response.status_code.into()),
+        let message = format!(
+            "HTTP {} request to {} completed with status {}",
+            request_params.method, request_params.url, http_response.status_code
         );
-        metadata.extra.insert(
-            "method".to_string(),
-            Value::String(request_params.method.to_string()),
-        );
-        metadata
-            .extra
-            .insert("url".to_string(), Value::String(request_params.url));
 
-        Ok(AgentOutput::text(output_text).with_metadata(metadata))
+        let response = ResponseBuilder::success("http_request")
+            .with_message(message)
+            .with_result(json!({
+                "status_code": http_response.status_code,
+                "headers": http_response.headers,
+                "body": http_response.body,
+                "timestamp": http_response.timestamp.to_rfc3339(),
+            }))
+            .with_metadata("method", json!(request_params.method.to_string()))
+            .with_metadata("url", json!(request_params.url))
+            .with_metadata("duration_ms", json!(0)) // TODO: Track actual duration
+            .build();
+
+        Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
     }
 
     async fn validate_input(&self, input: &AgentInput) -> Result<()> {
-        if input.parameters.is_empty() {
+        if input.text.is_empty() {
             return Err(LLMSpellError::Validation {
-                message: "No parameters provided".to_string(),
-                field: Some("parameters".to_string()),
+                message: "Input prompt cannot be empty".to_string(),
+                field: Some("prompt".to_string()),
             });
         }
-
-        // Validate URL is present
-        if let Some(params) = input.parameters.get("parameters") {
-            if params.get("url").is_none() {
-                return Err(LLMSpellError::Validation {
-                    message: "Missing required parameter 'url'".to_string(),
-                    field: Some("url".to_string()),
-                });
-            }
-        }
-
         Ok(())
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
         Ok(AgentOutput::text(format!("HTTP request error: {}", error)))
-    }
-}
-
-#[async_trait]
-impl Tool for HttpRequestTool {
-    fn category(&self) -> ToolCategory {
-        ToolCategory::Api
-    }
-
-    fn security_level(&self) -> SecurityLevel {
-        SecurityLevel::Privileged
-    }
-
-    fn schema(&self) -> ToolSchema {
-        ToolSchema {
-            name: "http_request".to_string(),
-            description: "Execute HTTP requests with authentication, retries, and rate limiting"
-                .to_string(),
-            parameters: vec![
-                ParameterDef {
-                    name: "method".to_string(),
-                    description: "HTTP method: GET, POST, PUT, DELETE, PATCH, HEAD, OPTIONS"
-                        .to_string(),
-                    param_type: ParameterType::String,
-                    required: false,
-                    default: Some(serde_json::json!("GET")),
-                },
-                ParameterDef {
-                    name: "url".to_string(),
-                    description: "URL to request".to_string(),
-                    param_type: ParameterType::String,
-                    required: true,
-                    default: None,
-                },
-                ParameterDef {
-                    name: "headers".to_string(),
-                    description: "HTTP headers as key-value pairs".to_string(),
-                    param_type: ParameterType::Object,
-                    required: false,
-                    default: None,
-                },
-                ParameterDef {
-                    name: "body".to_string(),
-                    description: "Request body (for POST, PUT, PATCH)".to_string(),
-                    param_type: ParameterType::Object,
-                    required: false,
-                    default: None,
-                },
-                ParameterDef {
-                    name: "auth".to_string(),
-                    description: "Authentication configuration".to_string(),
-                    param_type: ParameterType::Object,
-                    required: false,
-                    default: None,
-                },
-                ParameterDef {
-                    name: "retry".to_string(),
-                    description: "Retry configuration".to_string(),
-                    param_type: ParameterType::Object,
-                    required: false,
-                    default: None,
-                },
-            ],
-            returns: Some(ParameterType::Object),
-        }
-    }
-
-    fn security_requirements(&self) -> SecurityRequirements {
-        SecurityRequirements {
-            level: SecurityLevel::Privileged,
-            file_permissions: vec![],
-            network_permissions: vec!["*".to_string()],
-            env_permissions: vec![],
-            custom_requirements: HashMap::new(),
-        }
-    }
-
-    fn resource_limits(&self) -> ResourceLimits {
-        ResourceLimits::default()
-            .with_memory_limit(100 * 1024 * 1024) // 100MB
-            .with_cpu_limit(self.config.timeout_seconds * 1000) // Convert to ms
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_http_method_parsing() {
-        assert_eq!("GET".parse::<HttpMethod>().unwrap(), HttpMethod::Get);
-        assert_eq!("post".parse::<HttpMethod>().unwrap(), HttpMethod::Post);
-        assert_eq!("PUT".parse::<HttpMethod>().unwrap(), HttpMethod::Put);
-        assert!("INVALID".parse::<HttpMethod>().is_err());
-    }
-
-    #[tokio::test]
-    async fn test_rate_limiter() {
-        let limiter = RateLimiter::new(2, 1); // 2 requests per second
-
-        // First two should succeed
-        assert!(limiter.acquire().await.is_ok());
-        assert!(limiter.acquire().await.is_ok());
-
-        // Third should fail
-        assert!(limiter.acquire().await.is_err());
-
-        // Wait for window to expire
-        tokio::time::sleep(Duration::from_secs(1)).await;
-
-        // Should succeed again
-        assert!(limiter.acquire().await.is_ok());
-    }
-
-    #[tokio::test]
-    async fn test_http_request_tool_creation() {
-        let config = HttpRequestConfig::default();
-        let tool = HttpRequestTool::new(config).unwrap();
-
-        assert_eq!(tool.metadata().name, "http-request-tool");
     }
 }

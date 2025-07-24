@@ -15,7 +15,4 @@ pub use factory::{
     LuaConfig, ModuleResolution, ScriptEnginePlugin, StdlibLevel,
 };
 
-pub use types::{
-    AgentApiDefinition, ApiSurface, ScriptEngineError, StreamType, StreamingApiDefinition,
-    ToolApiDefinition, WorkflowApiDefinition,
-};
+pub use types::ScriptEngineError;

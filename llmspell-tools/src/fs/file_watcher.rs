@@ -18,14 +18,15 @@ use llmspell_core::{
             ToolCategory, ToolSchema,
         },
     },
-    types::{AgentInput, AgentOutput, ExecutionContext},
-    ComponentMetadata, LLMSpellError, Result,
+    types::{AgentInput, AgentOutput},
+    ComponentMetadata, ExecutionContext, LLMSpellError, Result,
 };
 use llmspell_security::sandbox::{FileSandbox, SandboxContext};
 use llmspell_utils::{
     extract_optional_bool, extract_optional_string, extract_optional_u64, extract_parameters,
     extract_required_array, extract_required_string,
     file_monitor::{debounce_events, FileEvent, FileEventType, WatchConfig},
+    response::ResponseBuilder,
 };
 use notify::{RecommendedWatcher, RecursiveMode, Watcher};
 use serde::{Deserialize, Serialize};
@@ -271,14 +272,14 @@ impl BaseAgent for FileWatcherTool {
 
         match operation {
             "watch" => {
-                let paths_array = extract_required_array(params, "paths")?;
+                let paths_array = extract_required_array(params, "input")?;
                 let paths: Vec<PathBuf> = paths_array
                     .iter()
                     .map(|v| {
                         v.as_str()
                             .ok_or_else(|| LLMSpellError::Validation {
                                 message: "Path must be a string".to_string(),
-                                field: Some("paths".to_string()),
+                                field: Some("input".to_string()),
                             })
                             .map(PathBuf::from)
                     })
@@ -322,22 +323,28 @@ impl BaseAgent for FileWatcherTool {
                             source: None,
                         })?;
 
-                let result = json!({
-                    "events": events,
-                    "event_count": events.len()
-                });
+                let response = ResponseBuilder::success("watch")
+                    .with_message(format!("Captured {} file events", events.len()))
+                    .with_result(json!({
+                        "events": events,
+                        "event_count": events.len()
+                    }))
+                    .build();
 
-                Ok(AgentOutput::text(serde_json::to_string_pretty(&result)?))
+                Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
             }
             "config" => {
-                let result = json!({
-                    "max_events": self.config.max_events,
-                    "default_timeout": self.config.default_timeout,
-                    "default_debounce_ms": self.config.default_debounce_ms,
-                    "max_paths": self.config.max_paths
-                });
+                let response = ResponseBuilder::success("config")
+                    .with_message("File watcher configuration")
+                    .with_result(json!({
+                        "max_events": self.config.max_events,
+                        "default_timeout": self.config.default_timeout,
+                        "default_debounce_ms": self.config.default_debounce_ms,
+                        "max_paths": self.config.max_paths
+                    }))
+                    .build();
 
-                Ok(AgentOutput::text(serde_json::to_string_pretty(&result)?))
+                Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
             }
             _ => Err(LLMSpellError::Validation {
                 message: format!("Unknown operation: {}", operation),
@@ -384,7 +391,7 @@ impl Tool for FileWatcherTool {
             default: None,
         })
         .with_parameter(ParameterDef {
-            name: "paths".to_string(),
+            name: "input".to_string(),
             param_type: ParameterType::Array,
             description: "Paths to watch for changes (required for watch operation)".to_string(),
             required: false,
@@ -526,10 +533,10 @@ mod tests {
             .unwrap();
 
         let output: Value = serde_json::from_str(&result.text).unwrap();
-        assert!(output["max_events"].is_number());
-        assert!(output["default_timeout"].is_number());
-        assert!(output["default_debounce_ms"].is_number());
-        assert!(output["max_paths"].is_number());
+        assert!(output["result"]["max_events"].is_number());
+        assert!(output["result"]["default_timeout"].is_number());
+        assert!(output["result"]["default_debounce_ms"].is_number());
+        assert!(output["result"]["max_paths"].is_number());
     }
 
     #[tokio::test]
@@ -557,7 +564,7 @@ mod tests {
         assert!(result
             .unwrap_err()
             .to_string()
-            .contains("Missing required array parameter 'paths'"));
+            .contains("Missing required array parameter 'input'"));
     }
 
     #[tokio::test]
@@ -573,7 +580,7 @@ mod tests {
                     "parameters".to_string(),
                     json!({
                         "operation": "watch",
-                        "paths": ["/nonexistent/path"],
+                        "input": ["/nonexistent/path"],
                         "timeout_seconds": 1
                     }),
                 );
@@ -599,7 +606,7 @@ mod tests {
                     "parameters".to_string(),
                     json!({
                         "operation": "watch",
-                        "paths": [temp_dir.path().to_string_lossy()],
+                        "input": [temp_dir.path().to_string_lossy()],
                         "timeout_seconds": 1,
                         "max_events": 10
                     }),
@@ -615,8 +622,8 @@ mod tests {
             .unwrap();
 
         let output: Value = serde_json::from_str(&result.text).unwrap();
-        assert!(output["events"].is_array());
-        assert!(output["event_count"].is_number());
+        assert!(output["result"]["events"].is_array());
+        assert!(output["result"]["event_count"].is_number());
     }
 
     #[tokio::test]

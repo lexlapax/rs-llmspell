@@ -1,4 +1,9 @@
-//! ABOUTME: llmspell-storage implementation crate
-//! ABOUTME: Foundation stub for future implementation
+//! ABOUTME: Storage backends and persistence for rs-llmspell
+//! ABOUTME: Provides unified storage interface with multiple backend implementations
 
-// Module stub - to be implemented in later phases
+pub mod backends;
+pub mod traits;
+
+// Re-export commonly used types
+pub use backends::{MemoryBackend, SledBackend};
+pub use traits::{StorageBackend, StorageBackendType, StorageCharacteristics, StorageSerialize};

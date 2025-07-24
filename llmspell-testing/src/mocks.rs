@@ -12,8 +12,9 @@
 //! ```rust,no_run
 //! use llmspell_testing::mocks::MockBaseAgent;
 //! use llmspell_core::{
+//!     ExecutionContext,
 //!     traits::base_agent::BaseAgent,
-//!     types::{AgentInput, AgentOutput, ExecutionContext}
+//!     types::{AgentInput, AgentOutput}
 //! };
 //!
 //! # async fn test_example() {
@@ -33,13 +34,14 @@
 
 use async_trait::async_trait;
 use llmspell_core::{
+    execution_context::ExecutionContext,
     traits::{
         agent::{Agent, AgentConfig, ConversationMessage},
         base_agent::BaseAgent,
         tool::{SecurityLevel, Tool, ToolCategory, ToolSchema},
         workflow::{StepResult, Workflow, WorkflowConfig, WorkflowStatus, WorkflowStep},
     },
-    types::{AgentInput, AgentOutput, AgentStream, ExecutionContext, MediaType},
+    types::{AgentInput, AgentOutput, AgentStream, MediaType},
     ComponentId, ComponentMetadata, LLMSpellError, Result,
 };
 use mockall::*;

@@ -1,5 +1,0 @@
-# Git commands for v0.2.0 release
-
-# After you've committed the changes, run:
-git tag -a v0.2.0 -m "Release v0.2.0 - Phase 2 Complete"
-git push origin v0.2.0

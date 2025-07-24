@@ -293,17 +293,20 @@ mod tests {
         let base_time = chrono::Utc::now();
 
         // Add events with different timestamps
-        let mut event1 = FileEvent::new(FileEventType::Create, PathBuf::from("/test/file.txt"));
-        event1.timestamp = base_time;
-        events.push(event1);
+        let mut create_event =
+            FileEvent::new(FileEventType::Create, PathBuf::from("/test/file.txt"));
+        create_event.timestamp = base_time;
+        events.push(create_event);
 
-        let mut event2 = FileEvent::new(FileEventType::Modify, PathBuf::from("/test/file.txt"));
-        event2.timestamp = base_time + chrono::Duration::milliseconds(50);
-        events.push(event2);
+        let mut modify_event1 =
+            FileEvent::new(FileEventType::Modify, PathBuf::from("/test/file.txt"));
+        modify_event1.timestamp = base_time + chrono::Duration::milliseconds(50);
+        events.push(modify_event1);
 
-        let mut event3 = FileEvent::new(FileEventType::Modify, PathBuf::from("/test/file.txt"));
-        event3.timestamp = base_time + chrono::Duration::milliseconds(150);
-        events.push(event3);
+        let mut modify_event2 =
+            FileEvent::new(FileEventType::Modify, PathBuf::from("/test/file.txt"));
+        modify_event2.timestamp = base_time + chrono::Duration::milliseconds(150);
+        events.push(modify_event2);
 
         let debounced = debounce_events(events, 100);
         assert_eq!(debounced.len(), 2); // First and third events should remain

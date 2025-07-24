@@ -48,7 +48,8 @@ async fn test_lua_tool_integration() {
 #[tokio::test]
 async fn test_tool_response_format_consistency() {
     use llmspell_core::traits::base_agent::BaseAgent;
-    use llmspell_core::types::{AgentInput, ExecutionContext};
+    use llmspell_core::types::AgentInput;
+    use llmspell_core::ExecutionContext;
     use serde_json::json;
     
     // Test that all refactored tools return consistent response format
@@ -172,7 +173,8 @@ async fn test_tool_response_format_consistency() {
 #[tokio::test]
 async fn test_tool_error_handling_consistency() {
     use llmspell_core::traits::base_agent::BaseAgent;
-    use llmspell_core::types::{AgentInput, ExecutionContext};
+    use llmspell_core::types::AgentInput;
+    use llmspell_core::ExecutionContext;
     use serde_json::json;
     
     let registry = ToolRegistry::new();

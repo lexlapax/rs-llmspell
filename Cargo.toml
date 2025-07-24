@@ -18,7 +18,7 @@ members = [
 ]
 
 [workspace.package]
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 authors = ["Lex Lapax<lexlapax@gmail.com>"]
 repository = "https://github.com/lexlapax/rs-llmspell"
@@ -54,6 +54,9 @@ tracing-futures = "0.2"
 
 # Configuration management
 config = "0.15"
+
+# Lazy static and once cell
+once_cell = "1.19"
 
 # Testing framework
 mockall = "0.13"
@@ -94,6 +97,9 @@ lazy_static = "1.4"
 
 # Random number generation
 rand = "0.8"
+
+# Testing utilities
+tempfile = "3.10"
 
 # CLI framework
 clap = { version = "4.5", features = ["derive", "env"] }

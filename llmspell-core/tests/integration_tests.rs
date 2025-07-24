@@ -9,8 +9,8 @@ use llmspell_core::{
         base_agent::BaseAgent,
         tool::{ParameterDef, ParameterType, SecurityLevel, Tool, ToolCategory, ToolSchema},
     },
-    types::{AgentInput, AgentOutput, ExecutionContext},
-    ComponentMetadata, LLMSpellError, Result, Version,
+    types::{AgentInput, AgentOutput},
+    ComponentMetadata, ExecutionContext, LLMSpellError, Result, Version,
 };
 use std::sync::{Arc, Mutex};
 
@@ -199,7 +199,7 @@ impl Tool for TestTool {
             });
         }
 
-        if !params.get("text").is_some() {
+        if params.get("text").is_none() {
             return Err(LLMSpellError::Validation {
                 message: "Missing required parameter: text".to_string(),
                 field: Some("text".to_string()),
@@ -408,10 +408,12 @@ async fn test_agent_input_context_manipulation() {
 
 #[tokio::test]
 async fn test_agent_output_metadata() {
-    let mut metadata = llmspell_core::types::OutputMetadata::default();
-    metadata.confidence = Some(0.95);
-    metadata.token_count = Some(100);
-    metadata.model = Some("gpt-4".to_string());
+    let metadata = llmspell_core::types::OutputMetadata {
+        confidence: Some(0.95),
+        token_count: Some(100),
+        model: Some("gpt-4".to_string()),
+        ..Default::default()
+    };
     let output = AgentOutput::text("result".to_string()).with_metadata(metadata);
 
     assert_eq!(output.text, "result");

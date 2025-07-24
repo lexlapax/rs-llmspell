@@ -15,11 +15,13 @@ use llmspell_core::{
         base_agent::BaseAgent,
         tool::{ParameterDef, ParameterType, SecurityLevel, Tool, ToolCategory, ToolSchema},
     },
-    types::{AgentInput, AgentOutput, ExecutionContext},
-    ComponentMetadata, LLMSpellError, Result as LLMResult,
+    types::{AgentInput, AgentOutput},
+    ComponentMetadata, ExecutionContext, LLMSpellError, Result as LLMResult,
 };
 use llmspell_security::sandbox::SandboxContext;
-use llmspell_utils::{extract_optional_string, extract_parameters, extract_required_string};
+use llmspell_utils::{
+    extract_optional_string, extract_parameters, extract_required_string, response::ResponseBuilder,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::path::Path;
@@ -355,8 +357,8 @@ impl AudioProcessorTool {
     /// Convert audio file to another format
     async fn convert_audio(
         &self,
-        input_path: &Path,
-        output_path: &Path,
+        source_path: &Path,
+        target_path: &Path,
         target_format: AudioFormat,
     ) -> LLMResult<()> {
         // Check if conversion is supported
@@ -377,17 +379,20 @@ impl AudioProcessorTool {
         // - M4A/AAC support
         // - Automatic format detection from file contents (not just extension)
 
-        let source_format = self.detect_format(input_path).await?;
+        let source_format = self.detect_format(source_path).await?;
 
         if source_format == AudioFormat::Wav && target_format == AudioFormat::Wav {
             // Simple file copy for same format
-            std::fs::copy(input_path, output_path).map_err(|e| LLMSpellError::Tool {
+            std::fs::copy(source_path, target_path).map_err(|e| LLMSpellError::Tool {
                 message: format!("Failed to copy audio file: {}", e),
                 tool_name: Some("audio_processor".to_string()),
                 source: None,
             })?;
 
-            info!("Copied WAV file from {:?} to {:?}", input_path, output_path);
+            info!(
+                "Copied WAV file from {:?} to {:?}",
+                source_path, target_path
+            );
             Ok(())
         } else {
             Err(LLMSpellError::Tool {
@@ -436,16 +441,16 @@ impl AudioProcessorTool {
 
         // Validate conversion parameters
         if extract_optional_string(params, "operation") == Some("convert") {
-            if params.get("input_path").is_none() {
+            if params.get("source_path").is_none() {
                 return Err(LLMSpellError::Validation {
-                    message: "input_path is required for convert operation".to_string(),
-                    field: Some("input_path".to_string()),
+                    message: "source_path is required for convert operation".to_string(),
+                    field: Some("source_path".to_string()),
                 });
             }
-            if params.get("output_path").is_none() {
+            if params.get("target_path").is_none() {
                 return Err(LLMSpellError::Validation {
-                    message: "output_path is required for convert operation".to_string(),
-                    field: Some("output_path".to_string()),
+                    message: "target_path is required for convert operation".to_string(),
+                    field: Some("target_path".to_string()),
                 });
             }
         }
@@ -490,17 +495,16 @@ impl BaseAgent for AudioProcessorTool {
                 let path = Path::new(file_path);
                 let format = self.detect_format(path).await?;
 
-                let response = json!({
-                    "operation": "detect",
-                    "file_path": file_path,
-                    "format": format,
-                    "supported": format != AudioFormat::Unknown
-                });
+                let response = ResponseBuilder::success("detect")
+                    .with_message(format!("Detected audio format: {:?}", format))
+                    .with_result(json!({
+                        "file_path": file_path,
+                        "format": format,
+                        "supported": format != AudioFormat::Unknown
+                    }))
+                    .build();
 
-                Ok(
-                    AgentOutput::text(format!("Detected audio format: {:?}", format))
-                        .with_metadata(serde_json::from_value(response).unwrap_or_default()),
-                )
+                Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
             }
 
             "metadata" => {
@@ -508,12 +512,6 @@ impl BaseAgent for AudioProcessorTool {
 
                 let path = Path::new(file_path);
                 let metadata = self.extract_metadata(path).await?;
-
-                let response = json!({
-                    "operation": "metadata",
-                    "file_path": file_path,
-                    "metadata": metadata
-                });
 
                 let mut message = format!(
                     "Audio file: {} ({:?})",
@@ -529,14 +527,20 @@ impl BaseAgent for AudioProcessorTool {
                     message.push_str(&format!(", Sample rate: {}Hz", sample_rate));
                 }
 
-                Ok(AgentOutput::text(message)
-                    .with_metadata(serde_json::from_value(response).unwrap_or_default()))
+                let response = ResponseBuilder::success("metadata")
+                    .with_message(message)
+                    .with_result(json!({
+                        "file_path": file_path,
+                        "metadata": metadata
+                    }))
+                    .build();
+
+                Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
             }
 
             "convert" => {
-                let input_path = extract_required_string(params, "input_path")?;
-
-                let output_path = extract_required_string(params, "output_path")?;
+                let source_path = extract_required_string(params, "source_path")?;
+                let target_path = extract_required_string(params, "target_path")?;
 
                 let target_format = extract_optional_string(params, "target_format")
                     .map(|s| match s.to_lowercase().as_str() {
@@ -544,27 +548,28 @@ impl BaseAgent for AudioProcessorTool {
                         "mp3" => AudioFormat::Mp3,
                         _ => AudioFormat::Unknown,
                     })
-                    .unwrap_or_else(|| AudioFormat::from_extension(Path::new(output_path)));
+                    .unwrap_or_else(|| AudioFormat::from_extension(Path::new(target_path)));
 
-                let input = Path::new(input_path);
-                let output = Path::new(output_path);
+                let input = Path::new(source_path);
+                let output = Path::new(target_path);
 
                 self.convert_audio(input, output, target_format.clone())
                     .await?;
 
-                let response = json!({
-                    "operation": "convert",
-                    "input_path": input_path,
-                    "output_path": output_path,
-                    "target_format": target_format,
-                    "success": true
-                });
+                let response = ResponseBuilder::success("convert")
+                    .with_message(format!(
+                        "Converted audio from {} to {} ({:?} format)",
+                        source_path, target_path, target_format
+                    ))
+                    .with_result(json!({
+                        "source_path": source_path,
+                        "target_path": target_path,
+                        "target_format": target_format,
+                        "success": true
+                    }))
+                    .build();
 
-                Ok(AgentOutput::text(format!(
-                    "Converted audio from {} to {} ({:?} format)",
-                    input_path, output_path, target_format
-                ))
-                .with_metadata(serde_json::from_value(response).unwrap_or_default()))
+                Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
             }
 
             _ => unreachable!(), // Already validated
@@ -620,16 +625,16 @@ impl Tool for AudioProcessorTool {
             default: None,
         })
         .with_parameter(ParameterDef {
-            name: "input_path".to_string(),
+            name: "source_path".to_string(),
             param_type: ParameterType::String,
-            description: "Input audio file path (for convert operation)".to_string(),
+            description: "Source audio file path (for convert operation)".to_string(),
             required: false,
             default: None,
         })
         .with_parameter(ParameterDef {
-            name: "output_path".to_string(),
+            name: "target_path".to_string(),
             param_type: ParameterType::String,
-            description: "Output audio file path (for convert operation)".to_string(),
+            description: "Target audio file path (for convert operation)".to_string(),
             required: false,
             default: None,
         })
@@ -814,17 +819,17 @@ mod tests {
     async fn test_wav_to_wav_conversion() {
         let tool = create_test_tool();
         let temp_dir = TempDir::new().unwrap();
-        let input_path = temp_dir.path().join("input.wav");
-        let output_path = temp_dir.path().join("output.wav");
+        let source_path = temp_dir.path().join("input.wav");
+        let target_path = temp_dir.path().join("output.wav");
 
-        create_test_wav_file(&input_path).unwrap();
+        create_test_wav_file(&source_path).unwrap();
 
         let input = create_test_input(
             "Convert audio",
             json!({
                 "operation": "convert",
-                "input_path": input_path.to_str().unwrap(),
-                "output_path": output_path.to_str().unwrap(),
+                "source_path": source_path.to_str().unwrap(),
+                "target_path": target_path.to_str().unwrap(),
                 "target_format": "wav"
             }),
         );
@@ -835,24 +840,24 @@ mod tests {
             .unwrap();
 
         assert!(result.text.contains("Converted audio"));
-        assert!(output_path.exists());
+        assert!(target_path.exists());
     }
 
     #[tokio::test]
     async fn test_unsupported_conversion() {
         let tool = create_test_tool();
         let temp_dir = TempDir::new().unwrap();
-        let input_path = temp_dir.path().join("input.wav");
-        let output_path = temp_dir.path().join("output.flac");
+        let source_path = temp_dir.path().join("input.wav");
+        let target_path = temp_dir.path().join("output.flac");
 
-        create_test_wav_file(&input_path).unwrap();
+        create_test_wav_file(&source_path).unwrap();
 
         let input = create_test_input(
             "Convert audio",
             json!({
                 "operation": "convert",
-                "input_path": input_path.to_str().unwrap(),
-                "output_path": output_path.to_str().unwrap(),
+                "source_path": source_path.to_str().unwrap(),
+                "target_path": target_path.to_str().unwrap(),
                 "target_format": "flac"
             }),
         );
@@ -918,8 +923,8 @@ mod tests {
         let params = &schema.parameters;
         assert!(params.iter().any(|p| p.name == "operation"));
         assert!(params.iter().any(|p| p.name == "file_path"));
-        assert!(params.iter().any(|p| p.name == "input_path"));
-        assert!(params.iter().any(|p| p.name == "output_path"));
+        assert!(params.iter().any(|p| p.name == "source_path"));
+        assert!(params.iter().any(|p| p.name == "target_path"));
         assert!(params.iter().any(|p| p.name == "target_format"));
     }
 

@@ -121,6 +121,7 @@ async fn test_streaming_through_bridge() {
 
 /// Test provider integration through scripts
 #[tokio::test]
+#[ignore = "Requires OPENAI_API_KEY - run with --ignored flag"]
 async fn test_provider_integration() {
     let lua_config = LuaConfig::default();
     let mut engine = EngineFactory::create_lua_engine(&lua_config).unwrap();
@@ -299,7 +300,8 @@ async fn test_bridge_performance_overhead() {
 async fn test_component_registration_integration() {
     use async_trait::async_trait;
     use llmspell_core::error::LLMSpellError;
-    use llmspell_core::types::{AgentInput, AgentOutput, ExecutionContext};
+    use llmspell_core::types::{AgentInput, AgentOutput};
+    use llmspell_core::ExecutionContext;
     use llmspell_core::{BaseAgent, ComponentMetadata};
 
     // Create a mock agent

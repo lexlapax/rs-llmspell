@@ -392,8 +392,9 @@ pub trait Workflow: BaseAgent {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{AgentInput, ExecutionContext};
+    use crate::types::AgentInput;
     use crate::ComponentMetadata;
+    use crate::ExecutionContext;
     use std::sync::Arc;
     use tokio::sync::Mutex;
 

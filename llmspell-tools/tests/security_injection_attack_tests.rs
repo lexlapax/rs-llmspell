@@ -1,10 +1,7 @@
 // ABOUTME: Injection attack tests for Task 2.10.2
 // ABOUTME: Tests that tools are protected against various injection attacks
 
-use llmspell_core::{
-    traits::base_agent::BaseAgent,
-    types::{AgentInput, ExecutionContext},
-};
+use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
 use llmspell_tools::{
     data::JsonProcessorTool,
     system::{EnvironmentReaderTool, ProcessExecutorTool},
@@ -42,7 +39,7 @@ async fn test_template_engine_code_injection() {
             "parameters",
             json!({
                 "operation": "render",
-                "template": template,
+                "input": template,
                 "data": data
             }),
         );
@@ -274,7 +271,7 @@ async fn test_data_validation_regex_dos() {
             "parameters",
             json!({
                 "operation": "validate",
-                "data": input_data,
+                "input": input_data,
                 "rules": {
                     "type": validation_type
                 }

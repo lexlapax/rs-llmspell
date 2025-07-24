@@ -7,8 +7,8 @@ use llmspell_core::{
         base_agent::BaseAgent,
         tool::{ParameterDef, ParameterType, SecurityLevel, Tool, ToolCategory, ToolSchema},
     },
-    types::{AgentInput, AgentOutput, ExecutionContext},
-    ComponentMetadata, LLMSpellError, Result,
+    types::{AgentInput, AgentOutput},
+    ComponentMetadata, ExecutionContext, LLMSpellError, Result,
 };
 use llmspell_utils::{
     error_builders::llmspell::validation_error, params::extract_parameters,
@@ -585,8 +585,8 @@ impl BaseAgent for DataValidationTool {
         let params = extract_parameters(&input)?;
 
         // Extract parameters
-        let data = params.get("data").ok_or_else(|| {
-            validation_error("Missing 'data' parameter", Some("data".to_string()))
+        let data = params.get("input").ok_or_else(|| {
+            validation_error("Missing 'input' parameter", Some("input".to_string()))
         })?;
 
         let rules = params.get("rules").ok_or_else(|| {
@@ -609,7 +609,7 @@ impl BaseAgent for DataValidationTool {
 
         // Perform validation
         let mut errors = Vec::new();
-        self.validate_value("data", data, &validation_rules, &mut errors)?;
+        self.validate_value("input", data, &validation_rules, &mut errors)?;
 
         let result = ValidationResult {
             valid: errors.is_empty(),
@@ -663,7 +663,7 @@ impl Tool for DataValidationTool {
                 .to_string(),
             parameters: vec![
                 ParameterDef {
-                    name: "data".to_string(),
+                    name: "input".to_string(),
                     description: "Data to validate".to_string(),
                     param_type: ParameterType::Object,
                     required: true,
@@ -691,7 +691,7 @@ mod tests {
         let tool = DataValidationTool::new();
 
         let params = serde_json::json!({
-            "data": null,
+            "input": null,
             "rules": {
                 "rules": [
                     {"type": "required"}
@@ -718,7 +718,7 @@ mod tests {
         let tool = DataValidationTool::new();
 
         let params = serde_json::json!({
-            "data": "hello",
+            "input": "hello",
             "rules": {
                 "rules": [
                     {"type": "type", "expected": "number"}
@@ -747,7 +747,7 @@ mod tests {
         let tool = DataValidationTool::new();
 
         let params = serde_json::json!({
-            "data": "hi",
+            "input": "hi",
             "rules": {
                 "rules": [
                     {"type": "length", "min": 3, "max": 10}
@@ -775,7 +775,7 @@ mod tests {
 
         // Valid email
         let params = serde_json::json!({
-            "data": "test@example.com",
+            "input": "test@example.com",
             "rules": {
                 "rules": [
                     {"type": "email"}
@@ -797,7 +797,7 @@ mod tests {
 
         // Invalid email
         let params = serde_json::json!({
-            "data": "not-an-email",
+            "input": "not-an-email",
             "rules": {
                 "rules": [
                     {"type": "email"}
@@ -823,7 +823,7 @@ mod tests {
         let tool = DataValidationTool::new();
 
         let params = serde_json::json!({
-            "data": "+1234567890",
+            "input": "+1234567890",
             "rules": {
                 "rules": [
                     {"type": "custom", "name": "phone"}
@@ -849,7 +849,7 @@ mod tests {
         let tool = DataValidationTool::new();
 
         let params = serde_json::json!({
-            "data": {
+            "input": {
                 "name": "John Doe",
                 "email": "john@example.com",
                 "age": 25

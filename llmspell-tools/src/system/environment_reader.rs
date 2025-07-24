@@ -7,12 +7,13 @@ use llmspell_core::{
         base_agent::BaseAgent,
         tool::{ParameterDef, ParameterType, SecurityLevel, Tool, ToolCategory, ToolSchema},
     },
-    types::{AgentInput, AgentOutput, ExecutionContext},
-    ComponentMetadata, LLMSpellError, Result as LLMResult,
+    types::{AgentInput, AgentOutput},
+    ComponentMetadata, ExecutionContext, LLMSpellError, Result as LLMResult,
 };
 use llmspell_security::sandbox::SandboxContext;
 use llmspell_utils::{
     extract_parameters, extract_required_string,
+    response::ResponseBuilder,
     system_info::{get_all_env_vars, get_env_var, set_env_var_if_allowed},
 };
 use serde::{Deserialize, Serialize};
@@ -347,76 +348,81 @@ impl BaseAgent for EnvironmentReaderTool {
 
                 match self.get_single_var(var_name).await? {
                     Some(value) => {
-                        let response = json!({
-                            "operation": "get",
-                            "variable_name": var_name,
-                            "value": value,
-                            "found": true
-                        });
-                        AgentOutput::text(format!(
-                            "Environment variable '{}' = '{}'",
-                            var_name, value
-                        ))
-                        .with_metadata(serde_json::from_value(response).unwrap_or_default())
+                        let response = ResponseBuilder::success("get")
+                            .with_message(format!(
+                                "Environment variable '{}' = '{}'",
+                                var_name, value
+                            ))
+                            .with_result(json!({
+                                "variable_name": var_name,
+                                "value": value,
+                                "found": true
+                            }))
+                            .build();
+                        AgentOutput::text(serde_json::to_string_pretty(&response)?)
                     }
                     None => {
-                        let response = json!({
-                            "operation": "get",
-                            "variable_name": var_name,
-                            "value": null,
-                            "found": false
-                        });
-                        AgentOutput::text(format!("Environment variable '{}' not found", var_name))
-                            .with_metadata(serde_json::from_value(response).unwrap_or_default())
+                        let response = ResponseBuilder::success("get")
+                            .with_message(format!("Environment variable '{}' not found", var_name))
+                            .with_result(json!({
+                                "variable_name": var_name,
+                                "value": null,
+                                "found": false
+                            }))
+                            .build();
+                        AgentOutput::text(serde_json::to_string_pretty(&response)?)
                     }
                 }
             }
             "list" => {
                 let vars = self.get_all_vars().await?;
-                let response = json!({
-                    "operation": "list",
-                    "variables": vars,
-                    "count": vars.len()
-                });
-                AgentOutput::text(format!(
-                    "Found {} allowed environment variables",
-                    vars.len()
-                ))
-                .with_metadata(serde_json::from_value(response).unwrap_or_default())
+                let response = ResponseBuilder::success("list")
+                    .with_message(format!(
+                        "Found {} allowed environment variables",
+                        vars.len()
+                    ))
+                    .with_result(json!({
+                        "variables": vars,
+                        "count": vars.len()
+                    }))
+                    .build();
+                AgentOutput::text(serde_json::to_string_pretty(&response)?)
             }
             "pattern" => {
                 let pattern = extract_required_string(params, "pattern")?;
 
                 let vars = self.get_vars_by_pattern(pattern).await?;
-                let response = json!({
-                    "operation": "pattern",
-                    "pattern": pattern,
-                    "variables": vars,
-                    "count": vars.len()
-                });
-                AgentOutput::text(format!(
-                    "Found {} environment variables matching pattern '{}'",
-                    vars.len(),
-                    pattern
-                ))
-                .with_metadata(serde_json::from_value(response).unwrap_or_default())
+                let response = ResponseBuilder::success("pattern")
+                    .with_message(format!(
+                        "Found {} environment variables matching pattern '{}'",
+                        vars.len(),
+                        pattern
+                    ))
+                    .with_result(json!({
+                        "pattern": pattern,
+                        "variables": vars,
+                        "count": vars.len()
+                    }))
+                    .build();
+                AgentOutput::text(serde_json::to_string_pretty(&response)?)
             }
             "set" => {
                 let var_name = extract_required_string(params, "variable_name")?;
                 let value = extract_required_string(params, "value")?;
 
                 self.set_var(var_name, value).await?;
-                let response = json!({
-                    "operation": "set",
-                    "variable_name": var_name,
-                    "value": value,
-                    "success": true
-                });
-                AgentOutput::text(format!(
-                    "Set environment variable '{}' = '{}'",
-                    var_name, value
-                ))
-                .with_metadata(serde_json::from_value(response).unwrap_or_default())
+                let response = ResponseBuilder::success("set")
+                    .with_message(format!(
+                        "Set environment variable '{}' = '{}'",
+                        var_name, value
+                    ))
+                    .with_result(json!({
+                        "variable_name": var_name,
+                        "value": value,
+                        "success": true
+                    }))
+                    .build();
+                AgentOutput::text(serde_json::to_string_pretty(&response)?)
             }
             _ => {
                 return Err(LLMSpellError::Validation {
@@ -659,9 +665,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_set_variable_enabled() {
-        let mut config = EnvironmentReaderConfig::default();
-        config.allow_set_variables = true;
-        config.allowed_patterns.push("TEST_*".to_string());
+        let allowed_patterns = vec!["TEST_*".to_string()];
+        let config = EnvironmentReaderConfig {
+            allow_set_variables: true,
+            allowed_patterns,
+            ..Default::default()
+        };
         let tool = EnvironmentReaderTool::new(config);
 
         let input = create_test_input(

@@ -6,8 +6,8 @@ mod media;
 mod streaming;
 
 pub use agent_io::{
-    AgentInput, AgentInputBuilder, AgentOutput, AgentOutputBuilder, ExecutionContext,
-    OutputMetadata, ToolCall, ToolOutput,
+    AgentInput, AgentInputBuilder, AgentOutput, AgentOutputBuilder, OutputMetadata, ToolCall,
+    ToolOutput,
 };
 pub use media::{
     AudioFormat, AudioMetadata, ColorSpace, ImageFormat, ImageMetadata, MediaContent, MediaType,
@@ -18,6 +18,7 @@ pub use streaming::{
 };
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fmt;
 use uuid::Uuid;
 
@@ -182,6 +183,146 @@ impl ComponentMetadata {
     }
 }
 
+/// Metadata for events in the LLMSpell system.
+///
+/// Contains correlation information for tracking events across components,
+/// including trace IDs, span IDs, and custom attributes. Used for event
+/// correlation, debugging, and observability.
+///
+/// # Examples
+///
+/// ```
+/// use llmspell_core::EventMetadata;
+///
+/// let mut metadata = EventMetadata::new();
+/// metadata.set_trace_id("trace-123".to_string());
+/// metadata.set_span_id("span-456".to_string());
+/// metadata.add_attribute("user_id", "user-789");
+///
+/// assert_eq!(metadata.trace_id(), Some("trace-123"));
+/// ```
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct EventMetadata {
+    /// Trace ID for distributed tracing
+    trace_id: Option<String>,
+
+    /// Span ID for the current operation
+    span_id: Option<String>,
+
+    /// Parent span ID for hierarchical tracing
+    parent_span_id: Option<String>,
+
+    /// Event correlation ID
+    correlation_id: Option<String>,
+
+    /// Event timestamp
+    timestamp: Option<chrono::DateTime<chrono::Utc>>,
+
+    /// Source component that generated the event
+    source: Option<ComponentId>,
+
+    /// Custom attributes for additional metadata
+    attributes: HashMap<String, String>,
+}
+
+impl EventMetadata {
+    /// Create new empty event metadata
+    pub fn new() -> Self {
+        Self {
+            timestamp: Some(chrono::Utc::now()),
+            ..Default::default()
+        }
+    }
+
+    /// Create metadata with trace and span IDs
+    pub fn with_trace(trace_id: String, span_id: String) -> Self {
+        Self {
+            trace_id: Some(trace_id),
+            span_id: Some(span_id),
+            timestamp: Some(chrono::Utc::now()),
+            ..Default::default()
+        }
+    }
+
+    /// Get trace ID
+    pub fn trace_id(&self) -> Option<&str> {
+        self.trace_id.as_deref()
+    }
+
+    /// Set trace ID
+    pub fn set_trace_id(&mut self, trace_id: String) {
+        self.trace_id = Some(trace_id);
+    }
+
+    /// Get span ID
+    pub fn span_id(&self) -> Option<&str> {
+        self.span_id.as_deref()
+    }
+
+    /// Set span ID
+    pub fn set_span_id(&mut self, span_id: String) {
+        self.span_id = Some(span_id);
+    }
+
+    /// Get parent span ID
+    pub fn parent_span_id(&self) -> Option<&str> {
+        self.parent_span_id.as_deref()
+    }
+
+    /// Set parent span ID
+    pub fn set_parent_span_id(&mut self, parent_span_id: String) {
+        self.parent_span_id = Some(parent_span_id);
+    }
+
+    /// Get correlation ID
+    pub fn correlation_id(&self) -> Option<&str> {
+        self.correlation_id.as_deref()
+    }
+
+    /// Set correlation ID
+    pub fn set_correlation_id(&mut self, correlation_id: String) {
+        self.correlation_id = Some(correlation_id);
+    }
+
+    /// Get source component
+    pub fn source(&self) -> Option<&ComponentId> {
+        self.source.as_ref()
+    }
+
+    /// Set source component
+    pub fn set_source(&mut self, source: ComponentId) {
+        self.source = Some(source);
+    }
+
+    /// Add custom attribute
+    pub fn add_attribute(&mut self, key: impl Into<String>, value: impl Into<String>) {
+        self.attributes.insert(key.into(), value.into());
+    }
+
+    /// Get custom attribute
+    pub fn get_attribute(&self, key: &str) -> Option<&str> {
+        self.attributes.get(key).map(|s| s.as_str())
+    }
+
+    /// Get all attributes
+    pub fn attributes(&self) -> &HashMap<String, String> {
+        &self.attributes
+    }
+
+    /// Create a child event metadata with new span ID
+    pub fn create_child(&self, span_id: String) -> Self {
+        Self {
+            trace_id: self.trace_id.clone(),
+            span_id: Some(span_id),
+            parent_span_id: self.span_id.clone(),
+            correlation_id: self.correlation_id.clone(),
+            timestamp: Some(chrono::Utc::now()),
+            source: self.source,
+            attributes: HashMap::new(), // Child starts with fresh attributes
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -342,5 +483,90 @@ mod tests {
         assert_eq!(metadata.name, deserialized.name);
         assert_eq!(metadata.version, deserialized.version);
         assert_eq!(metadata.description, deserialized.description);
+    }
+
+    #[test]
+    fn test_event_metadata_creation() {
+        let metadata = EventMetadata::new();
+
+        assert!(metadata.timestamp.is_some());
+        assert!(metadata.trace_id.is_none());
+        assert!(metadata.span_id.is_none());
+        assert!(metadata.attributes.is_empty());
+    }
+
+    #[test]
+    fn test_event_metadata_with_trace() {
+        let trace_id = "trace-123".to_string();
+        let span_id = "span-456".to_string();
+
+        let metadata = EventMetadata::with_trace(trace_id.clone(), span_id.clone());
+
+        assert_eq!(metadata.trace_id(), Some("trace-123"));
+        assert_eq!(metadata.span_id(), Some("span-456"));
+        assert!(metadata.timestamp.is_some());
+    }
+
+    #[test]
+    fn test_event_metadata_setters_getters() {
+        let mut metadata = EventMetadata::new();
+
+        metadata.set_trace_id("trace-789".to_string());
+        metadata.set_span_id("span-012".to_string());
+        metadata.set_parent_span_id("parent-345".to_string());
+        metadata.set_correlation_id("corr-678".to_string());
+        metadata.set_source(ComponentId::from_name("test-component"));
+
+        assert_eq!(metadata.trace_id(), Some("trace-789"));
+        assert_eq!(metadata.span_id(), Some("span-012"));
+        assert_eq!(metadata.parent_span_id(), Some("parent-345"));
+        assert_eq!(metadata.correlation_id(), Some("corr-678"));
+        assert!(metadata.source().is_some());
+    }
+
+    #[test]
+    fn test_event_metadata_attributes() {
+        let mut metadata = EventMetadata::new();
+
+        metadata.add_attribute("user_id", "user-123");
+        metadata.add_attribute("session_id", "session-456");
+
+        assert_eq!(metadata.get_attribute("user_id"), Some("user-123"));
+        assert_eq!(metadata.get_attribute("session_id"), Some("session-456"));
+        assert_eq!(metadata.get_attribute("non_existent"), None);
+        assert_eq!(metadata.attributes().len(), 2);
+    }
+
+    #[test]
+    fn test_event_metadata_create_child() {
+        let mut parent =
+            EventMetadata::with_trace("trace-parent".to_string(), "span-parent".to_string());
+        parent.set_correlation_id("corr-parent".to_string());
+        parent.add_attribute("parent_attr", "parent_value");
+
+        let child = parent.create_child("span-child".to_string());
+
+        assert_eq!(child.trace_id(), Some("trace-parent"));
+        assert_eq!(child.span_id(), Some("span-child"));
+        assert_eq!(child.parent_span_id(), Some("span-parent"));
+        assert_eq!(child.correlation_id(), Some("corr-parent"));
+        assert!(child.attributes().is_empty()); // Child starts with fresh attributes
+    }
+
+    #[test]
+    fn test_event_metadata_serialization() {
+        let mut metadata =
+            EventMetadata::with_trace("trace-ser".to_string(), "span-ser".to_string());
+        metadata.add_attribute("key", "value");
+
+        let json = serde_json::to_string(&metadata).unwrap();
+        let deserialized: EventMetadata = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(metadata.trace_id(), deserialized.trace_id());
+        assert_eq!(metadata.span_id(), deserialized.span_id());
+        assert_eq!(
+            metadata.get_attribute("key"),
+            deserialized.get_attribute("key")
+        );
     }
 }

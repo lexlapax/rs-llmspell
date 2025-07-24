@@ -1,7 +1,8 @@
 //! ABOUTME: BaseAgent trait - foundation for all components
 //! ABOUTME: Provides core functionality for agents, tools, and workflows
 
-use crate::types::{AgentInput, AgentOutput, AgentStream, ExecutionContext, MediaType};
+use crate::execution_context::ExecutionContext;
+use crate::types::{AgentInput, AgentOutput, AgentStream, MediaType};
 use crate::{ComponentMetadata, Result};
 use async_trait::async_trait;
 
@@ -21,8 +22,8 @@ use async_trait::async_trait;
 ///
 /// ```
 /// use llmspell_core::{
-///     ComponentMetadata, Result, LLMSpellError,
-///     types::{AgentInput, AgentOutput, ExecutionContext},
+///     ComponentMetadata, Result, LLMSpellError, ExecutionContext,
+///     types::{AgentInput, AgentOutput},
 ///     traits::base_agent::BaseAgent
 /// };
 /// use async_trait::async_trait;
@@ -196,7 +197,8 @@ pub trait BaseAgent: Send + Sync {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{AgentInput, AgentOutput, ExecutionContext};
+    use crate::types::{AgentInput, AgentOutput};
+    use crate::ExecutionContext;
 
     // Mock implementation for testing
     struct MockAgent {

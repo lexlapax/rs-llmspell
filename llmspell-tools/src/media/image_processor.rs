@@ -16,13 +16,13 @@ use llmspell_core::{
         base_agent::BaseAgent,
         tool::{ParameterDef, ParameterType, SecurityLevel, Tool, ToolCategory, ToolSchema},
     },
-    types::{AgentInput, AgentOutput, ExecutionContext},
-    ComponentMetadata, LLMSpellError, Result as LLMResult,
+    types::{AgentInput, AgentOutput},
+    ComponentMetadata, ExecutionContext, LLMSpellError, Result as LLMResult,
 };
 use llmspell_security::sandbox::SandboxContext;
 use llmspell_utils::{
     extract_optional_bool, extract_optional_string, extract_optional_u64, extract_parameters,
-    extract_required_string,
+    extract_required_string, response::ResponseBuilder,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -445,18 +445,17 @@ impl BaseAgent for ImageProcessorTool {
                 let path = Path::new(file_path);
                 let format = self.detect_format(path).await?;
 
-                let response = json!({
-                    "operation": "detect",
-                    "file_path": file_path,
-                    "format": format,
-                    "mime_type": format.mime_type(),
-                    "supported": format != ImageFormat::Unknown && self.config.supported_formats.contains(&format)
-                });
+                let response = ResponseBuilder::success("detect")
+                    .with_message(format!("Detected image format: {:?}", format))
+                    .with_result(json!({
+                        "file_path": file_path,
+                        "format": format,
+                        "mime_type": format.mime_type(),
+                        "supported": format != ImageFormat::Unknown && self.config.supported_formats.contains(&format)
+                    }))
+                    .build();
 
-                Ok(
-                    AgentOutput::text(format!("Detected image format: {:?}", format))
-                        .with_metadata(serde_json::from_value(response).unwrap_or_default()),
-                )
+                Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
             }
 
             "metadata" => {
@@ -464,12 +463,6 @@ impl BaseAgent for ImageProcessorTool {
 
                 let path = Path::new(file_path);
                 let metadata = self.extract_metadata(path).await?;
-
-                let response = json!({
-                    "operation": "metadata",
-                    "file_path": file_path,
-                    "metadata": metadata
-                });
 
                 let mut message = format!("Image file: {:?} format", metadata.format);
 
@@ -484,13 +477,20 @@ impl BaseAgent for ImageProcessorTool {
 
                 message.push_str(&format!(", Size: {} bytes", metadata.file_size));
 
-                Ok(AgentOutput::text(message)
-                    .with_metadata(serde_json::from_value(response).unwrap_or_default()))
+                let response = ResponseBuilder::success("metadata")
+                    .with_message(message)
+                    .with_result(json!({
+                        "file_path": file_path,
+                        "metadata": metadata
+                    }))
+                    .build();
+
+                Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
             }
 
             "resize" => {
-                let input_path = extract_required_string(params, "input_path")?;
-                let output_path = extract_required_string(params, "output_path")?;
+                let input_path = extract_required_string(params, "source_path")?;
+                let output_path = extract_required_string(params, "target_path")?;
                 let width = extract_optional_u64(params, "width").map(|w| w as u32);
                 let height = extract_optional_u64(params, "height").map(|h| h as u32);
                 let maintain_aspect_ratio =
@@ -505,26 +505,26 @@ impl BaseAgent for ImageProcessorTool {
                 )
                 .await?;
 
-                let response = json!({
-                    "operation": "resize",
-                    "input_path": input_path,
-                    "output_path": output_path,
-                    "width": width,
-                    "height": height,
-                    "maintain_aspect_ratio": maintain_aspect_ratio,
-                    "success": true
-                });
+                let response = ResponseBuilder::success("resize")
+                    .with_message(format!(
+                        "Resized image from {} to {}",
+                        input_path, output_path
+                    ))
+                    .with_result(json!({
+                        "source_path": input_path,
+                        "target_path": output_path,
+                        "width": width,
+                        "height": height,
+                        "maintain_aspect_ratio": maintain_aspect_ratio
+                    }))
+                    .build();
 
-                Ok(AgentOutput::text(format!(
-                    "Resized image from {} to {}",
-                    input_path, output_path
-                ))
-                .with_metadata(serde_json::from_value(response).unwrap_or_default()))
+                Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
             }
 
             "convert" => {
-                let input_path = extract_required_string(params, "input_path")?;
-                let output_path = extract_required_string(params, "output_path")?;
+                let input_path = extract_required_string(params, "source_path")?;
+                let output_path = extract_required_string(params, "target_path")?;
                 let target_format = extract_optional_string(params, "target_format")
                     .map(|s| match s.to_lowercase().as_str() {
                         "png" => ImageFormat::Png,
@@ -542,24 +542,24 @@ impl BaseAgent for ImageProcessorTool {
                 )
                 .await?;
 
-                let response = json!({
-                    "operation": "convert",
-                    "input_path": input_path,
-                    "output_path": output_path,
-                    "target_format": target_format,
-                    "success": true
-                });
+                let response = ResponseBuilder::success("convert")
+                    .with_message(format!(
+                        "Converted image from {} to {} ({:?} format)",
+                        input_path, output_path, target_format
+                    ))
+                    .with_result(json!({
+                        "source_path": input_path,
+                        "target_path": output_path,
+                        "target_format": target_format
+                    }))
+                    .build();
 
-                Ok(AgentOutput::text(format!(
-                    "Converted image from {} to {} ({:?} format)",
-                    input_path, output_path, target_format
-                ))
-                .with_metadata(serde_json::from_value(response).unwrap_or_default()))
+                Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
             }
 
             "crop" => {
-                let input_path = extract_required_string(params, "input_path")?;
-                let output_path = extract_required_string(params, "output_path")?;
+                let input_path = extract_required_string(params, "source_path")?;
+                let output_path = extract_required_string(params, "target_path")?;
 
                 let x = params.get("x").and_then(|v| v.as_u64()).ok_or_else(|| {
                     LLMSpellError::Validation {
@@ -601,50 +601,50 @@ impl BaseAgent for ImageProcessorTool {
                 )
                 .await?;
 
-                let response = json!({
-                    "operation": "crop",
-                    "input_path": input_path,
-                    "output_path": output_path,
-                    "x": x,
-                    "y": y,
-                    "width": width,
-                    "height": height,
-                    "success": true
-                });
+                let response = ResponseBuilder::success("crop")
+                    .with_message(format!(
+                        "Cropped image from {} to {} ({}x{} at {}, {})",
+                        input_path, output_path, width, height, x, y
+                    ))
+                    .with_result(json!({
+                        "source_path": input_path,
+                        "target_path": output_path,
+                        "x": x,
+                        "y": y,
+                        "width": width,
+                        "height": height
+                    }))
+                    .build();
 
-                Ok(AgentOutput::text(format!(
-                    "Cropped image from {} to {} ({}x{} at {}, {})",
-                    input_path, output_path, width, height, x, y
-                ))
-                .with_metadata(serde_json::from_value(response).unwrap_or_default()))
+                Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
             }
 
             "rotate" => {
-                let input_path = extract_required_string(params, "input_path")?;
-                let output_path = extract_required_string(params, "output_path")?;
+                let input_path = extract_required_string(params, "source_path")?;
+                let output_path = extract_required_string(params, "target_path")?;
                 let degrees = params.get("degrees").and_then(|v| v.as_i64()).unwrap_or(90) as i32;
 
                 self.rotate_image(Path::new(input_path), Path::new(output_path), degrees)
                     .await?;
 
-                let response = json!({
-                    "operation": "rotate",
-                    "input_path": input_path,
-                    "output_path": output_path,
-                    "degrees": degrees,
-                    "success": true
-                });
+                let response = ResponseBuilder::success("rotate")
+                    .with_message(format!(
+                        "Rotated image {} degrees from {} to {}",
+                        degrees, input_path, output_path
+                    ))
+                    .with_result(json!({
+                        "source_path": input_path,
+                        "target_path": output_path,
+                        "degrees": degrees
+                    }))
+                    .build();
 
-                Ok(AgentOutput::text(format!(
-                    "Rotated image {} degrees from {} to {}",
-                    degrees, input_path, output_path
-                ))
-                .with_metadata(serde_json::from_value(response).unwrap_or_default()))
+                Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
             }
 
             "thumbnail" => {
-                let input_path = extract_required_string(params, "input_path")?;
-                let output_path = extract_required_string(params, "output_path")?;
+                let input_path = extract_required_string(params, "source_path")?;
+                let output_path = extract_required_string(params, "target_path")?;
                 let max_width = extract_optional_u64(params, "max_width")
                     .map(|w| w as u32)
                     .unwrap_or(200);
@@ -660,20 +660,20 @@ impl BaseAgent for ImageProcessorTool {
                 )
                 .await?;
 
-                let response = json!({
-                    "operation": "thumbnail",
-                    "input_path": input_path,
-                    "output_path": output_path,
-                    "max_width": max_width,
-                    "max_height": max_height,
-                    "success": true
-                });
+                let response = ResponseBuilder::success("thumbnail")
+                    .with_message(format!(
+                        "Generated thumbnail from {} to {} (max {}x{})",
+                        input_path, output_path, max_width, max_height
+                    ))
+                    .with_result(json!({
+                        "source_path": input_path,
+                        "target_path": output_path,
+                        "max_width": max_width,
+                        "max_height": max_height
+                    }))
+                    .build();
 
-                Ok(AgentOutput::text(format!(
-                    "Generated thumbnail from {} to {} (max {}x{})",
-                    input_path, output_path, max_width, max_height
-                ))
-                .with_metadata(serde_json::from_value(response).unwrap_or_default()))
+                Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
             }
 
             _ => unreachable!(), // Already validated
@@ -731,16 +731,16 @@ impl Tool for ImageProcessorTool {
             default: None,
         })
         .with_parameter(ParameterDef {
-            name: "input_path".to_string(),
+            name: "source_path".to_string(),
             param_type: ParameterType::String,
-            description: "Input image file path (for processing operations)".to_string(),
+            description: "Source image file path (for processing operations)".to_string(),
             required: false,
             default: None,
         })
         .with_parameter(ParameterDef {
-            name: "output_path".to_string(),
+            name: "target_path".to_string(),
             param_type: ParameterType::String,
-            description: "Output image file path (for processing operations)".to_string(),
+            description: "Target image file path (for processing operations)".to_string(),
             required: false,
             default: None,
         })
@@ -984,8 +984,8 @@ mod tests {
             "Resize image",
             json!({
                 "operation": "resize",
-                "input_path": input_path.to_str().unwrap(),
-                "output_path": output_path.to_str().unwrap(),
+                "source_path": input_path.to_str().unwrap(),
+                "target_path": output_path.to_str().unwrap(),
                 "width": 100
             }),
         );
@@ -1008,8 +1008,8 @@ mod tests {
             "Convert image",
             json!({
                 "operation": "convert",
-                "input_path": input_path.to_str().unwrap(),
-                "output_path": output_path.to_str().unwrap(),
+                "source_path": input_path.to_str().unwrap(),
+                "target_path": output_path.to_str().unwrap(),
                 "target_format": "jpeg"
             }),
         );
@@ -1062,8 +1062,8 @@ mod tests {
             "Resize image",
             json!({
                 "operation": "resize",
-                "input_path": "/tmp/input.png",
-                "output_path": "/tmp/output.png"
+                "source_path": "/tmp/input.png",
+                "target_path": "/tmp/output.png"
             }),
         );
 
@@ -1084,8 +1084,8 @@ mod tests {
             "Crop image",
             json!({
                 "operation": "crop",
-                "input_path": "/tmp/input.png",
-                "output_path": "/tmp/output.png",
+                "source_path": "/tmp/input.png",
+                "target_path": "/tmp/output.png",
                 "x": 0,
                 "y": 0,
                 "width": 100

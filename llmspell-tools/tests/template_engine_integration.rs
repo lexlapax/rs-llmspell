@@ -3,7 +3,8 @@
 
 use llmspell_core::{
     traits::{base_agent::BaseAgent, tool::Tool},
-    types::{AgentInput, ExecutionContext},
+    types::AgentInput,
+    ExecutionContext,
 };
 use llmspell_tools::TemplateEngineTool;
 use serde_json::{json, Value};
@@ -20,7 +21,7 @@ async fn test_tera_simple_variable_substitution() {
     let tool = TemplateEngineTool::new();
 
     let params = json!({
-        "template": "Hello {{ name }}, welcome to {{ city }}!",
+        "input": "Hello {{ name }}, welcome to {{ city }}!",
         "context": {
             "name": "Alice",
             "city": "Wonderland"
@@ -44,7 +45,7 @@ async fn test_tera_loops_and_conditions() {
     let tool = TemplateEngineTool::new();
 
     let params = json!({
-        "template": r#"
+        "input": r#"
 {% if users %}
 Users:
 {% for user in users %}
@@ -78,7 +79,7 @@ async fn test_handlebars_block_helpers() {
     let tool = TemplateEngineTool::new();
 
     let params = json!({
-        "template": r#"
+        "input": r#"
 {{#if showGreeting}}
 Hello {{name}}!
 {{#each items}}
@@ -113,7 +114,7 @@ async fn test_handlebars_custom_helpers() {
     let tool = TemplateEngineTool::new();
 
     let params = json!({
-        "template": "{{uppercase name}} - {{lowercase city}}",
+        "input": "{{uppercase name}} - {{lowercase city}}",
         "context": {
             "name": "alice",
             "city": "WONDERLAND"
@@ -137,7 +138,7 @@ async fn test_auto_detection() {
 
     // Test Handlebars detection
     let hbs_params = json!({
-        "template": "{{#if condition}}Yes{{/if}}",
+        "input": "{{#if condition}}Yes{{/if}}",
         "context": {"condition": true},
         "auto_detect": true
     });
@@ -153,7 +154,7 @@ async fn test_auto_detection() {
 
     // Test Tera detection
     let tera_params = json!({
-        "template": "{% if condition %}Yes{% endif %}",
+        "input": "{% if condition %}Yes{% endif %}",
         "context": {"condition": true},
         "auto_detect": true
     });
@@ -174,7 +175,7 @@ async fn test_html_escaping() {
 
     // Test with auto-escape enabled (default)
     let params = json!({
-        "template": "<div>{{ content }}</div>",
+        "input": "<div>{{ content }}</div>",
         "context": {
             "content": "<script>alert('XSS')</script>"
         },
@@ -197,7 +198,7 @@ async fn test_complex_data_structures() {
     let tool = TemplateEngineTool::new();
 
     let params = json!({
-        "template": r#"
+        "input": r#"
 Company: {{ company.name }}
 Employees:
 {% for dept, employees in departments %}
@@ -243,7 +244,7 @@ async fn test_error_handling() {
 
     // Test invalid template syntax
     let params = json!({
-        "template": "{{ name",  // Unclosed variable
+        "input": "{{ name",  // Unclosed variable
         "context": {"name": "Test"},
         "engine": "tera"
     });
@@ -271,10 +272,10 @@ async fn test_missing_parameters() {
     // The tool might handle this gracefully and return an error in the response
     assert!(result.is_err());
     let error_msg = result.unwrap_err().to_string();
-    // The error message might have changed slightly with refactoring
+    // The error message should mention missing input parameter (standardized from template)
     assert!(
-        error_msg.contains("template") || error_msg.contains("Template"),
-        "Expected error about missing template, got: {}",
+        error_msg.contains("input") || error_msg.contains("Input"),
+        "Expected error about missing input, got: {}",
         error_msg
     );
 }
@@ -287,10 +288,10 @@ async fn test_tool_schema() {
     assert_eq!(schema.name, "template_engine");
     assert_eq!(schema.parameters.len(), 4);
 
-    // Check required parameters
-    let template_param = &schema.parameters[0];
-    assert_eq!(template_param.name, "template");
-    assert!(template_param.required);
+    // Check required parameters (template parameter renamed to input)
+    let input_param = &schema.parameters[0];
+    assert_eq!(input_param.name, "input");
+    assert!(input_param.required);
 
     // Check optional parameters
     let context_param = &schema.parameters[1];
@@ -312,7 +313,7 @@ async fn test_metadata_in_output() {
 
     let template = "Hello {{ name }}!";
     let params = json!({
-        "template": template,
+        "input": template,
         "context": {"name": "World"},
         "engine": "tera"
     });

@@ -3,7 +3,8 @@
 
 use llmspell_core::{
     traits::{base_agent::BaseAgent, tool::Tool},
-    types::{AgentInput, ExecutionContext},
+    types::AgentInput,
+    ExecutionContext,
 };
 use llmspell_tools::{
     util::{DataValidationConfig, ValidationResult},
@@ -17,7 +18,7 @@ async fn test_simple_required_validation() {
 
     // Test with null value
     let params = json!({
-        "data": null,
+        "input": null,
         "rules": {
             "rules": [
                 {"type": "required"}
@@ -41,7 +42,7 @@ async fn test_simple_required_validation() {
 
     // Test with non-null value
     let params = json!({
-        "data": "hello",
+        "input": "hello",
         "rules": {
             "rules": [
                 {"type": "required"}
@@ -68,7 +69,7 @@ async fn test_multiple_validation_rules() {
     let tool = DataValidationTool::new();
 
     let params = json!({
-        "data": "ab",
+        "input": "ab",
         "rules": {
             "rules": [
                 {"type": "required"},
@@ -100,7 +101,7 @@ async fn test_numeric_range_validation() {
 
     // Test value within range
     let params = json!({
-        "data": 25,
+        "input": 25,
         "rules": {
             "rules": [
                 {"type": "type", "expected": "number"},
@@ -123,7 +124,7 @@ async fn test_numeric_range_validation() {
 
     // Test value outside range
     let params = json!({
-        "data": 70,
+        "input": 70,
         "rules": {
             "rules": [
                 {"type": "range", "min": 18, "max": 65}
@@ -150,7 +151,7 @@ async fn test_enum_validation() {
     let tool = DataValidationTool::new();
 
     let params = json!({
-        "data": "blue",
+        "input": "blue",
         "rules": {
             "rules": [
                 {"type": "enum", "values": ["red", "green", "blue"]}
@@ -172,7 +173,7 @@ async fn test_enum_validation() {
 
     // Test with invalid value
     let params = json!({
-        "data": "yellow",
+        "input": "yellow",
         "rules": {
             "rules": [
                 {"type": "enum", "values": ["red", "green", "blue"]}
@@ -202,7 +203,7 @@ async fn test_email_and_url_validation() {
 
     // Test valid email
     let params = json!({
-        "data": "user@example.com",
+        "input": "user@example.com",
         "rules": {
             "rules": [
                 {"type": "email"}
@@ -224,7 +225,7 @@ async fn test_email_and_url_validation() {
 
     // Test valid URL
     let params = json!({
-        "data": "https://example.com/path?query=value",
+        "input": "https://example.com/path?query=value",
         "rules": {
             "rules": [
                 {"type": "url"}
@@ -250,7 +251,7 @@ async fn test_date_validation() {
     let tool = DataValidationTool::new();
 
     let params = json!({
-        "data": "2023-12-25 14:30:00",
+        "input": "2023-12-25 14:30:00",
         "rules": {
             "rules": [
                 {"type": "date", "format": "%Y-%m-%d %H:%M:%S"}
@@ -272,7 +273,7 @@ async fn test_date_validation() {
 
     // Test invalid date format
     let params = json!({
-        "data": "25/12/2023",
+        "input": "25/12/2023",
         "rules": {
             "rules": [
                 {"type": "date", "format": "%Y-%m-%d"}
@@ -298,7 +299,7 @@ async fn test_array_validation() {
     let tool = DataValidationTool::new();
 
     let params = json!({
-        "data": ["apple", "banana", "cherry"],
+        "input": ["apple", "banana", "cherry"],
         "rules": {
             "rules": [
                 {
@@ -331,7 +332,7 @@ async fn test_array_validation() {
 
     // Test with duplicate items
     let params = json!({
-        "data": ["apple", "banana", "apple"],
+        "input": ["apple", "banana", "apple"],
         "rules": {
             "rules": [
                 {
@@ -361,7 +362,7 @@ async fn test_nested_object_validation() {
     let tool = DataValidationTool::new();
 
     let params = json!({
-        "data": {
+        "input": {
             "user": {
                 "name": "John Doe",
                 "email": "john@example.com",
@@ -456,7 +457,7 @@ async fn test_custom_validators() {
 
     // Test phone validator
     let params = json!({
-        "data": "+1234567890",
+        "input": "+1234567890",
         "rules": {
             "rules": [
                 {"type": "custom", "name": "phone"}
@@ -478,7 +479,7 @@ async fn test_custom_validators() {
 
     // Test UUID validator
     let params = json!({
-        "data": "550e8400-e29b-41d4-a716-446655440000",
+        "input": "550e8400-e29b-41d4-a716-446655440000",
         "rules": {
             "rules": [
                 {"type": "custom", "name": "uuid"}
@@ -500,7 +501,7 @@ async fn test_custom_validators() {
 
     // Test credit card validator
     let params = json!({
-        "data": "4532015112830366", // Valid test credit card number
+        "input": "4532015112830366", // Valid test credit card number
         "rules": {
             "rules": [
                 {"type": "custom", "name": "credit_card"}
@@ -523,12 +524,14 @@ async fn test_custom_validators() {
 
 #[tokio::test]
 async fn test_fail_fast_configuration() {
-    let mut config = DataValidationConfig::default();
-    config.fail_fast = true;
+    let config = DataValidationConfig {
+        fail_fast: true,
+        ..Default::default()
+    };
     let tool = DataValidationTool::with_config(config);
 
     let params = json!({
-        "data": "a", // Too short, wrong pattern
+        "input": "a", // Too short, wrong pattern
         "rules": {
             "rules": [
                 {"type": "length", "min": 3},
@@ -561,7 +564,7 @@ async fn test_tool_metadata() {
     assert_eq!(schema.parameters.len(), 2);
 
     let data_param = &schema.parameters[0];
-    assert_eq!(data_param.name, "data");
+    assert_eq!(data_param.name, "input");
     assert!(data_param.required);
 
     let rules_param = &schema.parameters[1];
@@ -574,7 +577,7 @@ async fn test_validation_error_details() {
     let tool = DataValidationTool::new();
 
     let params = json!({
-        "data": {
+        "input": {
             "email": "invalid-email",
             "age": 200
         },
@@ -621,7 +624,7 @@ async fn test_validation_error_details() {
     assert!(!validation_result.valid);
 
     // We should have at least 1 error (missing name field stops further validation)
-    assert!(validation_result.errors.len() >= 1);
+    assert!(!validation_result.errors.is_empty());
     assert!(validation_result.errors[0]
         .message
         .contains("Missing required field"));

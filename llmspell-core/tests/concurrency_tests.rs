@@ -8,8 +8,8 @@ use llmspell_core::{
         agent::{Agent, AgentConfig, ConversationMessage},
         base_agent::BaseAgent,
     },
-    types::{AgentInput, AgentOutput, ExecutionContext},
-    ComponentId, ComponentMetadata, Result,
+    types::{AgentInput, AgentOutput},
+    ComponentId, ComponentMetadata, ExecutionContext, Result,
 };
 use std::sync::{
     atomic::{AtomicUsize, Ordering},

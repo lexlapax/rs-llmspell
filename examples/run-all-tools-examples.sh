@@ -19,13 +19,13 @@ echo "Date: $(date '+%Y-%m-%d %H:%M:%S')"
 echo ""
 
 # Find all tools-*.lua files (excluding tools-run-all.lua)
-# If we're already in the examples directory, look here, otherwise look in examples/
+# If we're already in the examples directory, look in lua/tools/, otherwise look in examples/lua/tools/
 if [[ $(basename "$PWD") == "examples" ]]; then
-    examples_dir="."
+    tools_dir="lua/tools"
 else
-    examples_dir="examples"
+    tools_dir="examples/lua/tools"
 fi
-example_files=($(ls $examples_dir/tools-*.lua 2>/dev/null | grep -v tools-run-all.lua | sort))
+example_files=($(ls $tools_dir/tools-*.lua 2>/dev/null | grep -v tools-run-all.lua | sort))
 
 echo "Discovered ${#example_files[@]} example files:"
 i=1
@@ -56,11 +56,14 @@ for file in "${example_files[@]}"; do
     
     # Run the file with timeout and capture exit code
     # Redirect output to avoid potential buffering issues
+    # Change to the tools directory to run the file with proper path
     # Use llmspell-test.toml if it exists to avoid API key requirements
+    # Convert to absolute path for the command since we're changing directories
+    abs_llmspell_cmd=$(realpath "$LLMSPELL_CMD")
     if [ -f "llmspell-test.toml" ]; then
-        LLMSPELL_CONFIG=llmspell-test.toml timeout 30 $LLMSPELL_CMD run "$file" 2>&1 | cat
+        (cd "$tools_dir" && LLMSPELL_CONFIG="../../llmspell-test.toml" timeout 30 "$abs_llmspell_cmd" run "$(basename "$file")" 2>&1) | cat
     else
-        timeout 30 $LLMSPELL_CMD run "$file" 2>&1 | cat
+        (cd "$tools_dir" && timeout 30 "$abs_llmspell_cmd" run "$(basename "$file")" 2>&1) | cat
     fi
     exit_code=${PIPESTATUS[0]}
     

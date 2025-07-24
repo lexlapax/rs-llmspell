@@ -1,312 +1,270 @@
-# LLMSpell Examples
+# Rs-LLMSpell Examples
 
-This directory contains comprehensive examples demonstrating the Phase 2 tools library functionality.
+**Current Version**: Phase 3.3 Complete  
+**Available Tools**: 34 production tools  
+**Features**: Agents, Workflows, Tools, State Management
 
-## 📁 Example Files
-
-### Core Examples
-- **`hello.lua`** - Basic LLMSpell script example
-- **`basic-math.lua`** - Lua mathematical operations
-- **`agent_creation_test.lua`** - Agent creation and configuration
-- **`streaming-demo.lua`** - Streaming operations example
-- **`provider-info.lua`** - Provider information and configuration
-- **`multimodal-stub.lua`** - Multimodal interaction example
-
-### Phase 2 Tools Examples (Updated Naming Convention)
-
-All tool example files follow the pattern: `tools-{category}.lua`
-
-#### Tool Demonstrations
-- **`tools-showcase.lua`** - Complete demonstration of all 26 tools
-- **`tools-utility.lua`** - Utility tools (UUID, Base64, Hash, Text, Calculator, DateTime, etc.)
-- **`tools-filesystem.lua`** - File system operations with security sandboxing
-- **`tools-system.lua`** - System integration with security controls
-- **`tools-data.lua`** - Data processing tools (JSON, CSV, HTTP, GraphQL)
-- **`tools-media.lua`** - Media processing tools (Audio, Video, Image)
-- **`tools-security.lua`** - Security features and sandboxing demonstrations
-
-#### Integration Examples (NEW)
-- **`tools-workflow.lua`** - Multi-tool workflow demonstrations showing:
-  - Data processing pipelines
-  - File analysis workflows
-  - System monitoring chains
-  - Error handling and recovery
-- **`tools-performance.lua`** - Performance benchmarking showing:
-  - Tool initialization times (<10ms target)
-  - Operation execution times
-  - Performance by tool category
-  - Optimization recommendations
-
-#### Testing and Reference
-- **`run-all-tools-examples.sh`** - Shell script test runner for all examples
-- **`tools-utility-reference.lua`** - Reference implementation showing correct Tool API usage
-- **`test-helpers.lua`** - Common testing utilities
-
-## 🚀 Running Examples
-
-### Prerequisites
-1. Ensure LLMSpell is installed and configured
-2. Have appropriate API keys configured
-3. Review security settings for system tools
-
-### Basic Usage
-```bash
-# Run basic examples
-llmspell run examples/hello.lua
-llmspell run examples/basic-math.lua
-
-# Run tool demonstrations
-llmspell run examples/tools-utility.lua
-llmspell run examples/tools-filesystem.lua
-```
-
-### Advanced Usage
-```bash
-# Run complete tools showcase
-llmspell run examples/tools-showcase.lua
-
-# Run system integration examples (requires elevated permissions)
-llmspell run examples/tools-system.lua
-
-# Run multi-tool workflows
-llmspell run examples/tools-workflow.lua
-
-# Run performance benchmarks
-llmspell run examples/tools-performance.lua
-
-# Run all examples
-./examples/run-all-tools-examples.sh
-```
-
-## 📋 Tools Covered
-
-### 🔧 Utility Tools (9 tools)
-- **UuidGeneratorTool** - UUID generation and validation
-- **Base64EncoderTool** - Base64 encoding/decoding
-- **HashCalculatorTool** - Hash calculation and verification
-- **TextManipulatorTool** - Text manipulation and transformation
-- **CalculatorTool** - Mathematical expression evaluation
-- **DateTimeHandlerTool** - Date/time parsing and formatting
-- **DiffCalculatorTool** - Text and JSON difference calculation
-- **DataValidationTool** - Data validation with custom rules
-- **TemplateEngineTool** - Template rendering (Handlebars/Tera)
-
-### 📁 File System Tools (5 tools)
-- **FileOperationsTool** - Secure file operations
-- **ArchiveHandlerTool** - Archive creation and extraction
-- **FileWatcherTool** - File system monitoring
-- **FileConverterTool** - File format and encoding conversion
-- **FileSearchTool** - Content search within files
-
-### 🖥️ System Integration Tools (4 tools)
-- **EnvironmentReaderTool** - Environment variable access
-- **ProcessExecutorTool** - Secure command execution
-- **ServiceCheckerTool** - Service availability checking
-- **SystemMonitorTool** - System resource monitoring
-
-### 📊 Data Processing Tools (4 tools)
-- **JsonProcessorTool** - JSON processing with jq queries
-- **CsvAnalyzerTool** - CSV analysis and statistics
-- **HttpRequestTool** - HTTP client operations
-- **GraphQLQueryTool** - GraphQL query execution
-
-### 🎬 Media Processing Tools (3 tools)
-- **AudioProcessorTool** - Audio file analysis
-- **ImageProcessorTool** - Image metadata extraction
-- **VideoProcessorTool** - Video file information
-
-### 🔍 Search Tools (1 tool)
-- **WebSearchTool** - Web search functionality
-
-## 🔒 Security Features
-
-All examples demonstrate secure usage:
-
-### Input Validation
-- Parameter validation for all tools
-- Type checking and range validation
-- Error handling for invalid inputs
-
-### Resource Limits
-- Memory usage limits
-- CPU time limits
-- File size restrictions
-- Network rate limiting
-
-### Sandboxing
-- File system path restrictions
-- Network access controls
-- Process execution limits
-- Environment variable filtering
-
-### Audit Trail
-- Operation logging
-- Security event tracking
-- Performance monitoring
-- Error reporting
-
-## 📖 Example Categories
-
-### Beginner Examples
-- `hello.lua` - Basic script structure
-- `basic-math.lua` - Simple operations
-- `tools-utility.lua` - Safe utility operations
-
-### Intermediate Examples
-- `tools-filesystem.lua` - File operations with security
-- `tools-data.lua` - Data processing operations
-- `tools-showcase.lua` - Multiple tool integration
-
-### Advanced Examples
-- `tools-system.lua` - System-level operations
-- `tools-security.lua` - Security testing and validation
-- `tools-workflow.lua` - Multi-tool integration workflows
-- `tools-performance.lua` - Performance benchmarking
-
-## 🎯 Use Cases
-
-### Development
-- Code generation and transformation
-- File processing and analysis
-- Data validation and cleaning
-- Template rendering
-
-### System Administration
-- System monitoring and health checks
-- File system management
-- Process execution and automation
-- Service availability monitoring
-
-### Data Processing
-- JSON/CSV data analysis
-- HTTP API interactions
-- Content searching and indexing
-- Archive management
-
-### Security
-- Hash calculation and verification
-- Secure file operations
-- Environment variable management
-- Audit trail generation
-
-## 🔧 Configuration
-
-### Tool Configuration
-Each tool can be configured with:
-- Security settings
-- Resource limits
-- Custom parameters
-- Performance tuning
-
-### Example Usage
-```lua
--- Direct Tool API usage (Phase 2)
-local tool = Tool.get("tool_name")
-if tool then
-    local result = tool.execute({
-        operation = "example",
-        parameter1 = "value1",
-        parameter2 = "value2"
-    })
-    
-    if result.success then
-        print("Output:", result.output)
-    else
-        print("Error:", result.error)
-    end
-end
-
--- List all available tools
-local available_tools = Tool.list()
-for i, name in ipairs(available_tools) do
-    print(i, name)
-end
-```
-
-## 📊 Performance Considerations
-
-### Optimization Tips
-- Use appropriate resource limits
-- Implement proper error handling
-- Monitor memory usage
-- Cache frequently used data
-- Use streaming for large files
-
-### Benchmarking
-- Tool initialization time: <10ms
-- Memory usage: Controlled by limits
-- CPU usage: Bounded by timeouts
-- Network requests: Rate limited
-
-## 🚨 Error Handling
-
-All examples include:
-- Proper error handling
-- Informative error messages
-- Graceful degradation
-- Security-conscious error reporting
-
-## 📝 Best Practices
-
-### Security
-1. Always validate inputs
-2. Use appropriate security levels
-3. Monitor resource usage
-4. Implement proper error handling
-5. Follow principle of least privilege
-
-### Performance
-1. Set appropriate resource limits
-2. Use streaming for large data
-3. Cache when appropriate
-4. Monitor and profile operations
-5. Implement proper cleanup
-
-### Code Quality
-1. Use descriptive variable names
-2. Include proper documentation
-3. Follow consistent formatting
-4. Implement comprehensive testing
-5. Use version control
-
-## 🔍 Troubleshooting
-
-### Common Issues
-- **Permission denied**: Check security settings
-- **Resource limits**: Adjust memory/CPU limits
-- **Network errors**: Verify connectivity and permissions
-- **File operations**: Ensure proper paths and permissions
-
-### Debug Mode
-Enable debug logging for detailed information:
-```lua
--- Enable debug mode
-local agent = Agent.create("claude-3-sonnet-20240229", {
-    debug = true,
-    log_level = "debug"
-})
-```
-
-## 📚 Further Reading
-
-- [LLMSpell Documentation](../docs/)
-- [Security Guide](../SECURITY_AUDIT_REPORT.md)
-- [API Reference](../docs/technical/)
-- [Architecture Overview](../docs/technical/rs-llmspell-final-architecture.md)
-
-## 🤝 Contributing
-
-To add new examples:
-1. Follow existing naming conventions
-2. Include comprehensive documentation
-3. Add security considerations
-4. Test thoroughly
-5. Update this README
+**🔗 Navigation**: [← Project Home](../README.md) | [Documentation Hub](../docs/README.md) | [User Guide](../docs/user-guide/README.md)
 
 ---
 
-**Phase 2 Status**: ✅ All 26 tools implemented and documented  
-**Security**: ✅ Comprehensive security validation passed  
-**Examples**: ✅ Complete example suite with integration workflows  
-**Performance**: ✅ All tools meet <10ms initialization target  
-**Ready for**: Phase 3 workflow orchestration
+## Overview
+
+This directory contains working examples demonstrating rs-llmspell capabilities. All examples are tested and work with the current Phase 3.3 implementation.
+
+## 📁 Directory Structure
+
+```
+examples/
+├── hello.lua                    # Basic hello world script
+├── llmspell-demo.lua           # Comprehensive demo
+├── provider-info.lua           # Provider configuration info
+├── streaming-demo.lua          # Streaming responses
+├── multimodal-stub.lua         # Multimodal capabilities
+├── llmspell.toml              # Example configuration
+├── minimal.toml               # Minimal configuration
+├── lua/
+│   ├── agents/                 # Agent examples (10 files)
+│   ├── tools/                  # Tool examples (13 files)
+│   └── workflows/              # Workflow examples (9 files)
+└── *.sh                        # Runner scripts
+```
+
+## 🚀 Quick Start
+
+### Basic Examples
+
+```bash
+# Run hello world
+llmspell run examples/hello.lua
+
+# Run comprehensive demo
+llmspell run examples/llmspell-demo.lua
+
+# Check provider configuration
+llmspell run examples/provider-info.lua
+```
+
+### Agent Examples (Requires API Keys)
+
+```bash
+# Run all agent examples
+./examples/run-all-agent-examples.sh
+
+# Run specific agent example
+llmspell run examples/lua/agents/agent-simple.lua
+llmspell run examples/lua/agents/agent-orchestrator.lua
+```
+
+### Tool Examples
+
+```bash
+# Run all tool examples
+./examples/run-all-tools-examples.sh
+
+# Run specific tool category
+llmspell run examples/lua/tools/tools-filesystem.lua
+llmspell run examples/lua/tools/tools-utility.lua
+```
+
+### Workflow Examples
+
+```bash
+# Run workflow examples
+./examples/run-workflow-examples.sh
+
+# Run specific workflow pattern
+llmspell run examples/lua/workflows/workflow-sequential.lua
+llmspell run examples/lua/workflows/workflow-parallel.lua
+```
+
+## 📋 Example Categories
+
+### Root Examples
+
+- **`hello.lua`** - Simplest possible script
+- **`llmspell-demo.lua`** - Shows core functionality
+- **`provider-info.lua`** - Display configured providers
+- **`streaming-demo.lua`** - Streaming LLM responses
+- **`multimodal-stub.lua`** - Multimodal input examples
+
+### Agent Examples (`lua/agents/`)
+
+Demonstrates agent creation, configuration, and usage patterns:
+
+- **`agent-simple.lua`** - Basic agent creation and execution
+- **`agent-orchestrator.lua`** - Agent coordinating multiple tools
+- **`agent-coordinator.lua`** - Multi-agent coordination
+- **`agent-processor.lua`** - Data processing with agents
+- **`agent-monitor.lua`** - System monitoring agent
+- **`agent-composition.lua`** - Composing agents together
+- **`agent-async-example.lua`** - Async patterns (internal use)
+- **`agent-simple-demo.lua`** - Interactive demo
+- **`agent-simple-benchmark.lua`** - Performance testing
+- **`agent-api-comprehensive.lua`** - Full API demonstration
+
+### Tool Examples (`lua/tools/`)
+
+Shows all 34 available tools organized by category:
+
+- **`tools-showcase.lua`** - Demonstrates all tools
+- **`tools-filesystem.lua`** - File operations (5 tools)
+- **`tools-data.lua`** - Data processing (4 tools)
+- **`tools-web.lua`** - Web & network tools (7 tools)
+- **`tools-system.lua`** - System integration (4 tools)
+- **`tools-utility.lua`** - Utility tools (10 tools)
+- **`tools-media.lua`** - Media processing (3 tools)
+- **`tools-security.lua`** - Security features demo
+- **`tools-integration.lua`** - External integrations
+- **`tools-workflow.lua`** - Tools in workflows
+- **`tools-performance.lua`** - Performance benchmarks
+- **`tools-utility-reference.lua`** - API reference example
+
+### Workflow Examples (`lua/workflows/`)
+
+Demonstrates all 4 workflow patterns:
+
+- **`workflow-sequential.lua`** - Step-by-step execution
+- **`workflow-conditional.lua`** - Branching logic
+- **`workflow-loop.lua`** - Iteration patterns
+- **`workflow-parallel.lua`** - Concurrent execution
+- **`workflow-basics-*.lua`** - Basic pattern examples
+- **`workflow-agent-integration.lua`** - Agents in workflows
+
+## 🔧 Configuration
+
+### Example Configuration Files
+
+- **`llmspell.toml`** - Full configuration example
+- **`minimal.toml`** - Minimal required configuration
+
+### Setting API Keys
+
+```bash
+# OpenAI
+export OPENAI_API_KEY="your-key-here"
+
+# Anthropic
+export ANTHROPIC_API_KEY="your-key-here"
+
+# Other providers as needed
+```
+
+## 📚 Learning Path
+
+### For Beginners
+
+1. Start with `hello.lua`
+2. Explore `tools-utility.lua` for basic tool usage
+3. Try `agent-simple.lua` for agent basics
+4. Move to `workflow-sequential.lua` for workflows
+
+### For Tool Users
+
+1. Browse `tools-showcase.lua` for overview
+2. Deep dive into category-specific examples
+3. Check `tools-security.lua` for security patterns
+4. Study `tools-workflow.lua` for integration
+
+### For Agent Developers
+
+1. Start with `agent-simple.lua`
+2. Progress to `agent-orchestrator.lua`
+3. Explore `agent-coordinator.lua` for multi-agent
+4. Review `agent-api-comprehensive.lua` for full API
+
+### For Workflow Builders
+
+1. Learn patterns in `workflow-basics-*.lua`
+2. Study complete examples in main workflow files
+3. Check `workflow-agent-integration.lua` for AI workflows
+
+## 🏃 Running Examples
+
+### Individual Scripts
+
+```bash
+# Change to llmspell directory
+cd /path/to/rs-llmspell
+
+# Run with llmspell
+llmspell run examples/hello.lua
+
+# Or use cargo run
+cargo run --bin llmspell -- run examples/hello.lua
+```
+
+### Batch Execution
+
+```bash
+# Make scripts executable
+chmod +x examples/*.sh
+
+# Run all examples of a type
+./examples/run-all-agent-examples.sh
+./examples/run-all-tools-examples.sh
+./examples/run-workflow-examples.sh
+```
+
+### With Custom Config
+
+```bash
+# Use specific configuration
+llmspell run --config examples/minimal.toml examples/hello.lua
+```
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+1. **"API key not found"**
+   - Set environment variables for your providers
+   - Check `llmspell.toml` configuration
+
+2. **"Tool not found"**
+   - Ensure you're using correct tool names
+   - Run `Tool.list()` to see available tools
+
+3. **"Agent timeout"**
+   - Check network connectivity
+   - Verify API keys are valid
+   - Increase timeout in agent configuration
+
+4. **"Permission denied"**
+   - Some system tools require elevated permissions
+   - File operations are sandboxed by default
+
+### Debug Mode
+
+Enable debug output:
+
+```lua
+-- In your script
+Logger.set_level("debug")
+
+-- Or via environment
+RUST_LOG=debug llmspell run examples/hello.lua
+```
+
+## 📖 Documentation
+
+For detailed documentation, see:
+
+- [User Guide](../docs/user-guide/) - Complete usage documentation
+- [Tutorial](../docs/user-guide/tutorial-agents-workflows.md) - Step-by-step tutorial
+- [API Reference](../docs/user-guide/api-reference-agents-workflows.md) - Full API docs
+- [Tool Reference](../docs/user-guide/tool-reference.md) - All 34 tools documented
+
+## 🤝 Contributing Examples
+
+To add new examples:
+
+1. Follow existing naming patterns
+2. Include clear comments explaining the example
+3. Test thoroughly before submitting
+4. Update this README if adding new categories
+5. Ensure examples work with current implementation
+
+---
+
+**Happy experimenting with rs-llmspell!** 🚀

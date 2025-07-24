@@ -1,10 +1,7 @@
 //! ABOUTME: Integration tests for CsvAnalyzerTool with real-world CSV scenarios
 //! ABOUTME: Tests complex workflows, large file handling, and error cases
 
-use llmspell_core::{
-    traits::base_agent::BaseAgent,
-    types::{AgentInput, ExecutionContext},
-};
+use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
 use llmspell_tools::CsvAnalyzerTool;
 use serde_json::json;
 
@@ -26,7 +23,7 @@ async fn test_complex_csv_analysis_workflow() {
         "parameters".to_string(),
         json!({
             "operation": "analyze",
-            "content": csv_content
+            "input": csv_content
         }),
     );
 
@@ -51,7 +48,7 @@ async fn test_complex_csv_analysis_workflow() {
         "parameters".to_string(),
         json!({
             "operation": "filter",
-            "content": csv_content,
+            "input": csv_content,
             "options": {
                 "filter": "is_active == \"true\""
             }
@@ -74,7 +71,7 @@ async fn test_complex_csv_analysis_workflow() {
         "parameters".to_string(),
         json!({
             "operation": "convert",
-            "content": csv_content,
+            "input": csv_content,
             "options": {
                 "format": "json"
             }
@@ -110,7 +107,7 @@ newline",300
         "parameters".to_string(),
         json!({
             "operation": "analyze",
-            "content": malformed_csv
+            "input": malformed_csv
         }),
     );
 
@@ -150,7 +147,7 @@ async fn test_large_csv_streaming() {
         "parameters".to_string(),
         json!({
             "operation": "sample",
-            "content": csv_content,
+            "input": csv_content,
             "options": {
                 "size": 10,
                 "method": "random"
@@ -183,7 +180,7 @@ async fn test_csv_validation() {
         "parameters".to_string(),
         json!({
             "operation": "validate",
-            "content": csv_content,
+            "input": csv_content,
             "options": {
                 "rules": {
                     "email": "email",
@@ -222,7 +219,7 @@ Orange,2.00,150
         "parameters".to_string(),
         json!({
             "operation": "transform",
-            "content": csv_content,
+            "input": csv_content,
             "options": {
                 "add_columns": {
                     "total": "price * quantity"
@@ -259,7 +256,7 @@ async fn test_encoding_detection() {
         "parameters".to_string(),
         json!({
             "operation": "analyze",
-            "content": csv_with_special_chars
+            "input": csv_with_special_chars
         }),
     );
 

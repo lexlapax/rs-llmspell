@@ -1,7 +1,7 @@
 //! ABOUTME: LuaEngine implementation of ScriptEngineBridge trait
 //! ABOUTME: Provides Lua 5.4 script execution with coroutine-based streaming
 
-use crate::engine::types::{ApiSurface, ScriptEngineError};
+use crate::engine::types::ScriptEngineError;
 use crate::engine::{
     factory::{LuaConfig, StdlibLevel},
     EngineFeatures, ExecutionContext, ScriptEngineBridge, ScriptMetadata, ScriptOutput,
@@ -21,8 +21,6 @@ pub struct LuaEngine {
     #[cfg(feature = "lua")]
     lua: Arc<parking_lot::Mutex<mlua::Lua>>,
     _config: LuaConfig,
-    #[cfg(feature = "lua")]
-    api_injected: bool,
     execution_context: ExecutionContext,
 }
 
@@ -47,7 +45,6 @@ impl LuaEngine {
             Ok(Self {
                 lua: Arc::new(parking_lot::Mutex::new(lua)),
                 _config: config.clone(),
-                api_injected: false,
                 execution_context: ExecutionContext::default(),
             })
         }
@@ -80,13 +77,6 @@ impl ScriptEngineBridge for LuaEngine {
     async fn execute_script(&self, script: &str) -> Result<ScriptOutput, LLMSpellError> {
         #[cfg(feature = "lua")]
         {
-            if !self.api_injected {
-                return Err(LLMSpellError::Component {
-                    message: "APIs not injected. Call inject_apis first".to_string(),
-                    source: None,
-                });
-            }
-
             let start_time = Instant::now();
 
             // For now, keep synchronous execution but prepare for async tool calls
@@ -132,13 +122,6 @@ impl ScriptEngineBridge for LuaEngine {
     async fn execute_script_streaming(&self, script: &str) -> Result<ScriptStream, LLMSpellError> {
         #[cfg(feature = "lua")]
         {
-            if !self.api_injected {
-                return Err(LLMSpellError::Component {
-                    message: "APIs not injected. Call inject_apis first".to_string(),
-                    source: None,
-                });
-            }
-
             // For now, implement a simple non-streaming execution that returns a single chunk
             // Full streaming with coroutines requires more complex handling due to Send constraints
             let start_time = Instant::now();
@@ -214,30 +197,19 @@ impl ScriptEngineBridge for LuaEngine {
         {
             let lua = self.lua.lock();
 
-            // Get the API surface definition
-            let api_surface = ApiSurface::standard();
+            // API surface no longer needed - using globals system
 
-            // Inject Agent API
-            super::api::inject_agent_api(
-                &lua,
-                &api_surface.agent_api,
-                registry.clone(),
-                providers.clone(),
-            )?;
-
-            // Inject Tool API
-            super::api::inject_tool_api(&lua, &api_surface.tool_api, registry.clone())?;
-
-            // Inject Workflow API
-            super::api::inject_workflow_api(&lua, &api_surface.workflow_api, registry.clone())?;
-
-            // Inject Streaming API
-            super::api::inject_streaming_api(&lua, &api_surface.streaming_api)?;
-
-            // Inject JSON API
-            super::api::inject_json_api(&lua, &api_surface.json_api)?;
-
-            self.api_injected = true;
+            // Inject globals using the new system
+            use crate::globals::{create_standard_registry, GlobalContext, GlobalInjector};
+            let global_context = Arc::new(GlobalContext::new(registry.clone(), providers.clone()));
+            let global_registry =
+                futures::executor::block_on(create_standard_registry(global_context.clone()))
+                    .map_err(|e| LLMSpellError::Component {
+                        message: format!("Failed to create global registry: {}", e),
+                        source: None,
+                    })?;
+            let injector = GlobalInjector::new(Arc::new(global_registry));
+            injector.inject_lua(&lua, &global_context)?;
         }
         Ok(())
     }

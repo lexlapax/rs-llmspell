@@ -1,10 +1,7 @@
 // ABOUTME: Resource exhaustion tests for Task 2.10.2
 // ABOUTME: Tests that tools cannot consume excessive resources
 
-use llmspell_core::{
-    traits::base_agent::BaseAgent,
-    types::{AgentInput, ExecutionContext},
-};
+use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
 use llmspell_tools::{
     data::{CsvAnalyzerTool, JsonProcessorTool},
     fs::ArchiveHandlerTool,
@@ -26,7 +23,7 @@ async fn test_hash_calculator_large_input_limit() {
         json!({
             "operation": "hash",
             "algorithm": "sha256",
-            "data": large_data
+            "input": large_data
         }),
     );
 
@@ -132,7 +129,7 @@ async fn test_calculator_computation_limit() {
         let input = AgentInput::text("calculate").with_parameter(
             "parameters",
             json!({
-                "expression": expr
+                "input": expr
             }),
         );
 
@@ -260,7 +257,7 @@ async fn test_concurrent_resource_usage() {
                 json!({
                     "operation": "hash",
                     "algorithm": "sha256",
-                    "data": format!("test data {}", i).repeat(1000)
+                    "input": format!("test data {}", i).repeat(1000)
                 }),
             );
 

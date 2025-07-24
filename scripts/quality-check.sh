@@ -75,17 +75,41 @@ fi
 # 4. Run tests
 echo ""
 echo "4. Running test suite..."
-print_info "This may take a few minutes..."
-if timeout 300s cargo test --workspace > /dev/null 2>&1; then
-    print_status 0 "Test suite passed"
-else
-    if [ $? -eq 124 ]; then
-        print_status 1 "Test suite timed out (>5 minutes)"
-        print_warning "Consider running tests in smaller batches or use ./scripts/quality-check-fast.sh"
+
+# Check for environment variable to skip slow tests
+if [ "$SKIP_SLOW_TESTS" = "true" ]; then
+    print_info "Running tests (skipping slow/external)..."
+    print_warning "SKIP_SLOW_TESTS is set - ignoring slow and external tests"
+    
+    # Run all tests except ignored ones
+    if timeout 300s cargo test --workspace > /dev/null 2>&1; then
+        print_status 0 "Test suite passed (slow tests skipped)"
     else
-        print_status 1 "Test suite failed"
+        if [ $? -eq 124 ]; then
+            print_status 1 "Test suite timed out (>5 minutes)"
+            print_warning "Consider using ./scripts/test-by-tag.sh to run specific test categories"
+        else
+            print_status 1 "Test suite failed"
+        fi
+        OVERALL_SUCCESS=1
     fi
-    OVERALL_SUCCESS=1
+else
+    print_info "Running all tests including slow/external..."
+    print_info "Set SKIP_SLOW_TESTS=true to skip slow tests"
+    
+    # Run all tests including ignored ones
+    if timeout 300s cargo test --workspace --include-ignored > /dev/null 2>&1; then
+        print_status 0 "Full test suite passed"
+    else
+        if [ $? -eq 124 ]; then
+            print_status 1 "Test suite timed out (>5 minutes)"
+            print_warning "Consider using SKIP_SLOW_TESTS=true or ./scripts/test-by-tag.sh"
+        else
+            print_status 1 "Test suite failed"
+            print_info "Run tests by category with ./scripts/test-by-tag.sh <tag>"
+        fi
+        OVERALL_SUCCESS=1
+    fi
 fi
 
 # 5. Check documentation

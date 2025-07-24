@@ -6,8 +6,46 @@
 //! This module provides a fluent API for building consistent response
 //! objects across all LLMSpell tools, ensuring uniform output structure.
 
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use std::collections::HashMap;
+
+/// Error details for standardized error responses
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ErrorDetails {
+    /// The error message
+    pub message: String,
+    /// Optional error code for categorization
+    pub code: Option<String>,
+    /// Optional additional error details
+    pub details: Option<Value>,
+}
+
+impl ErrorDetails {
+    /// Create a new error with just a message
+    #[must_use]
+    pub fn new(message: impl Into<String>) -> Self {
+        Self {
+            message: message.into(),
+            code: None,
+            details: None,
+        }
+    }
+
+    /// Add an error code
+    #[must_use]
+    pub fn with_code(mut self, code: impl Into<String>) -> Self {
+        self.code = Some(code.into());
+        self
+    }
+
+    /// Add additional error details
+    #[must_use]
+    pub fn with_details(mut self, details: Value) -> Self {
+        self.details = Some(details);
+        self
+    }
+}
 
 /// A builder for creating consistent response objects
 #[derive(Debug, Clone)]
@@ -16,7 +54,7 @@ pub struct ResponseBuilder {
     success: bool,
     message: Option<String>,
     result: Option<Value>,
-    error: Option<String>,
+    error: Option<ErrorDetails>,
     metadata: HashMap<String, Value>,
 }
 
@@ -42,7 +80,7 @@ impl ResponseBuilder {
             success: false,
             message: None,
             result: None,
-            error: Some(error.into()),
+            error: Some(ErrorDetails::new(error)),
             metadata: HashMap::new(),
         }
     }
@@ -58,6 +96,14 @@ impl ResponseBuilder {
     #[must_use]
     pub fn with_result(mut self, result: Value) -> Self {
         self.result = Some(result);
+        self
+    }
+
+    /// Add detailed error information
+    #[must_use]
+    pub fn with_error_details(mut self, error: ErrorDetails) -> Self {
+        self.success = false;
+        self.error = Some(error);
         self
     }
 
@@ -118,7 +164,11 @@ impl ResponseBuilder {
         }
 
         if let Some(error) = self.error {
-            response["error"] = json!(error);
+            response["error"] = serde_json::to_value(error).unwrap_or_else(|_| {
+                json!({
+                    "message": "Failed to serialize error details"
+                })
+            });
         }
 
         if !self.metadata.is_empty() {
@@ -140,7 +190,9 @@ impl ResponseBuilder {
             format!(
                 "Operation '{}' failed: {}",
                 self.operation,
-                self.error.as_deref().unwrap_or("Unknown error")
+                self.error
+                    .as_ref()
+                    .map_or("Unknown error", |e| e.message.as_str())
             )
         };
 
@@ -207,6 +259,54 @@ pub fn list_response<T: serde::Serialize>(
     builder.build()
 }
 
+/// Represents a validation error
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ValidationError {
+    /// The field that failed validation (if applicable)
+    pub field: Option<String>,
+    /// The validation error message
+    pub message: String,
+    /// Optional error code for categorization
+    pub code: Option<String>,
+}
+
+impl ValidationError {
+    /// Create a new validation error
+    #[must_use]
+    pub fn new(message: impl Into<String>) -> Self {
+        Self {
+            field: None,
+            message: message.into(),
+            code: None,
+        }
+    }
+
+    /// Add a field name
+    #[must_use]
+    pub fn with_field(mut self, field: impl Into<String>) -> Self {
+        self.field = Some(field.into());
+        self
+    }
+
+    /// Add an error code
+    #[must_use]
+    pub fn with_code(mut self, code: impl Into<String>) -> Self {
+        self.code = Some(code.into());
+        self
+    }
+}
+
+/// Helper function to create a validation response
+#[must_use]
+pub fn validation_response(valid: bool, errors: &Option<Vec<ValidationError>>) -> Value {
+    ResponseBuilder::success("validate")
+        .with_result(json!({
+            "valid": valid,
+            "errors": errors
+        }))
+        .build()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -228,7 +328,7 @@ mod tests {
 
         assert_eq!(response["operation"], "test_op");
         assert_eq!(response["success"], false);
-        assert_eq!(response["error"], "Something went wrong");
+        assert_eq!(response["error"]["message"], "Something went wrong");
     }
 
     #[test]
@@ -285,7 +385,7 @@ mod tests {
 
         let response = error_response("test", "Failed");
         assert_eq!(response["success"], false);
-        assert_eq!(response["error"], "Failed");
+        assert_eq!(response["error"]["message"], "Failed");
 
         let response =
             file_operation_response("write", "/file.txt", true, Some("Written".to_string()));
@@ -296,5 +396,57 @@ mod tests {
         let response = list_response("list", &items, None);
         assert_eq!(response["result"], json!(["a", "b", "c"]));
         assert_eq!(response["metadata"]["count"], 3);
+    }
+
+    #[test]
+    fn test_error_details() {
+        let error_details = ErrorDetails::new("Test error")
+            .with_code("ERR_001")
+            .with_details(json!({"field": "test"}));
+
+        let response = ResponseBuilder::success("test")
+            .with_error_details(error_details)
+            .build();
+
+        assert_eq!(response["success"], false);
+        assert_eq!(response["error"]["message"], "Test error");
+        assert_eq!(response["error"]["code"], "ERR_001");
+        assert_eq!(response["error"]["details"]["field"], "test");
+    }
+
+    #[test]
+    fn test_validation_response() {
+        let errors = vec![
+            ValidationError::new("Field is required")
+                .with_field("name")
+                .with_code("REQUIRED"),
+            ValidationError::new("Invalid format")
+                .with_field("email")
+                .with_code("FORMAT"),
+        ];
+
+        let response = validation_response(false, &Some(errors));
+
+        assert_eq!(response["operation"], "validate");
+        assert_eq!(response["success"], true);
+        assert_eq!(response["result"]["valid"], false);
+
+        let errors = &response["result"]["errors"];
+        assert_eq!(errors[0]["field"], "name");
+        assert_eq!(errors[0]["message"], "Field is required");
+        assert_eq!(errors[0]["code"], "REQUIRED");
+        assert_eq!(errors[1]["field"], "email");
+        assert_eq!(errors[1]["message"], "Invalid format");
+        assert_eq!(errors[1]["code"], "FORMAT");
+    }
+
+    #[test]
+    fn test_validation_response_success() {
+        let response = validation_response(true, &None);
+
+        assert_eq!(response["operation"], "validate");
+        assert_eq!(response["success"], true);
+        assert_eq!(response["result"]["valid"], true);
+        assert!(response["result"]["errors"].is_null());
     }
 }

@@ -1,10 +1,7 @@
 // ABOUTME: Integration tests for the date/time handler tool
 // ABOUTME: Tests parsing, timezone conversion, arithmetic, and edge cases like DST and leap years
 
-use llmspell_core::{
-    traits::base_agent::BaseAgent,
-    types::{AgentInput, ExecutionContext},
-};
+use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
 use llmspell_tools::util::DateTimeHandlerTool;
 use serde_json::{json, Value};
 

@@ -6,7 +6,6 @@ use llmspell_bridge::{
     providers::{ProviderConfig, ProviderManager, ProviderManagerConfig},
     ComponentRegistry,
 };
-use llmspell_core::error::LLMSpellError;
 use std::sync::Arc;
 
 /// Test provider manager creation
@@ -79,24 +78,30 @@ async fn test_script_list_providers() {
     );
 }
 
-/// Test that scripts without API injection fail appropriately
+/// Test that scripts work but globals need inject_apis
 #[tokio::test]
 async fn test_script_without_api_injection() {
     let lua_config = LuaConfig::default();
     let engine = EngineFactory::create_lua_engine(&lua_config).unwrap();
 
-    // Should fail with Component error
+    // Basic scripts should work
     let result = engine.execute_script("return 42").await;
-    assert!(result.is_err(), "Should fail without API injection");
+    assert!(result.is_ok(), "Basic script should work: {:?}", result);
 
-    match result {
-        Err(LLMSpellError::Component { message, .. }) => {
+    // Globals require inject_apis to be called - check Tool is not available
+    let global_check = engine.execute_script("return Tool").await;
+    match global_check {
+        Ok(output) => {
+            // Tool might be nil which is expected
+            // Check if the output is null/nil
             assert!(
-                message.contains("APIs not injected"),
-                "Error should mention API injection"
+                output.output.is_null(),
+                "Tool should be nil without inject_apis"
             );
         }
-        _ => panic!("Expected Component error"),
+        Err(_) => {
+            // Or it might error which is also fine
+        }
     }
 }
 

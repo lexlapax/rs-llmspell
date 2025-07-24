@@ -16,12 +16,13 @@ use llmspell_core::{
         base_agent::BaseAgent,
         tool::{ParameterDef, ParameterType, SecurityLevel, Tool, ToolCategory, ToolSchema},
     },
-    types::{AgentInput, AgentOutput, ExecutionContext},
-    ComponentMetadata, LLMSpellError, Result as LLMResult,
+    types::{AgentInput, AgentOutput},
+    ComponentMetadata, ExecutionContext, LLMSpellError, Result as LLMResult,
 };
 use llmspell_security::sandbox::SandboxContext;
 use llmspell_utils::{
     extract_optional_f64, extract_optional_string, extract_parameters, extract_required_string,
+    response::ResponseBuilder,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -339,12 +340,12 @@ impl VideoProcessorTool {
         if matches!(
             extract_optional_string(params, "operation"),
             Some("thumbnail") | Some("extract_frame")
-        ) && params.get("output_path").is_none()
+        ) && params.get("target_path").is_none()
         {
             return Err(LLMSpellError::Validation {
-                message: "output_path is required for thumbnail/extract_frame operations"
+                message: "target_path is required for thumbnail/extract_frame operations"
                     .to_string(),
-                field: Some("output_path".to_string()),
+                field: Some("target_path".to_string()),
             });
         }
 
@@ -377,17 +378,19 @@ impl BaseAgent for VideoProcessorTool {
                 let path = Path::new(file_path);
                 let format = self.detect_format(path).await?;
 
-                let response = json!({
-                    "operation": "detect",
-                    "file_path": file_path,
-                    "format": format,
-                    "supported": format != VideoFormat::Unknown && self.config.supported_formats.contains(&format)
-                });
+                let supported = format != VideoFormat::Unknown
+                    && self.config.supported_formats.contains(&format);
 
-                Ok(
-                    AgentOutput::text(format!("Detected video format: {:?}", format))
-                        .with_metadata(serde_json::from_value(response).unwrap_or_default()),
-                )
+                let response = ResponseBuilder::success("detect")
+                    .with_message(format!("Detected video format: {:?}", format))
+                    .with_result(json!({
+                        "file_path": file_path,
+                        "format": format,
+                        "supported": supported
+                    }))
+                    .build();
+
+                Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
             }
 
             "metadata" => {
@@ -395,12 +398,6 @@ impl BaseAgent for VideoProcessorTool {
 
                 let path = Path::new(file_path);
                 let metadata = self.extract_metadata(path).await?;
-
-                let response = json!({
-                    "operation": "metadata",
-                    "file_path": file_path,
-                    "metadata": metadata
-                });
 
                 let mut message = format!("Video file: {:?} format", metadata.format);
 
@@ -419,58 +416,67 @@ impl BaseAgent for VideoProcessorTool {
 
                 message.push_str(&format!(", Size: {} bytes", metadata.file_size));
 
-                Ok(AgentOutput::text(message)
-                    .with_metadata(serde_json::from_value(response).unwrap_or_default()))
+                let response = ResponseBuilder::success("metadata")
+                    .with_message(message)
+                    .with_result(json!({
+                        "file_path": file_path,
+                        "metadata": metadata
+                    }))
+                    .build();
+
+                Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
             }
 
             "thumbnail" => {
                 let video_path = extract_required_string(params, "file_path")?;
-                let output_path = extract_required_string(params, "output_path")?;
+                let target_path = extract_required_string(params, "target_path")?;
                 let timestamp = extract_optional_f64(params, "timestamp_seconds");
 
                 let video = Path::new(video_path);
-                let output = Path::new(output_path);
+                let output = Path::new(target_path);
 
                 self.generate_thumbnail(video, output, timestamp).await?;
 
-                let response = json!({
-                    "operation": "thumbnail",
-                    "video_path": video_path,
-                    "output_path": output_path,
-                    "timestamp_seconds": timestamp,
-                    "success": true
-                });
+                let response = ResponseBuilder::success("thumbnail")
+                    .with_message(format!(
+                        "Generated thumbnail from {} to {}",
+                        video_path, target_path
+                    ))
+                    .with_result(json!({
+                        "video_path": video_path,
+                        "target_path": target_path,
+                        "timestamp_seconds": timestamp,
+                        "success": true
+                    }))
+                    .build();
 
-                Ok(AgentOutput::text(format!(
-                    "Generated thumbnail from {} to {}",
-                    video_path, output_path
-                ))
-                .with_metadata(serde_json::from_value(response).unwrap_or_default()))
+                Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
             }
 
             "extract_frame" => {
                 let video_path = extract_required_string(params, "file_path")?;
-                let output_path = extract_required_string(params, "output_path")?;
+                let target_path = extract_required_string(params, "target_path")?;
                 let timestamp = extract_optional_f64(params, "timestamp_seconds").unwrap_or(0.0);
 
                 let video = Path::new(video_path);
-                let output = Path::new(output_path);
+                let output = Path::new(target_path);
 
                 self.extract_frame(video, output, timestamp).await?;
 
-                let response = json!({
-                    "operation": "extract_frame",
-                    "video_path": video_path,
-                    "output_path": output_path,
-                    "timestamp_seconds": timestamp,
-                    "success": true
-                });
+                let response = ResponseBuilder::success("extract_frame")
+                    .with_message(format!(
+                        "Extracted frame at {}s from {} to {}",
+                        timestamp, video_path, target_path
+                    ))
+                    .with_result(json!({
+                        "video_path": video_path,
+                        "target_path": target_path,
+                        "timestamp_seconds": timestamp,
+                        "success": true
+                    }))
+                    .build();
 
-                Ok(AgentOutput::text(format!(
-                    "Extracted frame at {}s from {} to {}",
-                    timestamp, video_path, output_path
-                ))
-                .with_metadata(serde_json::from_value(response).unwrap_or_default()))
+                Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
             }
 
             _ => unreachable!(), // Already validated
@@ -527,9 +533,9 @@ impl Tool for VideoProcessorTool {
             default: None,
         })
         .with_parameter(ParameterDef {
-            name: "output_path".to_string(),
+            name: "target_path".to_string(),
             param_type: ParameterType::String,
-            description: "Output path for thumbnail or frame extraction".to_string(),
+            description: "Target path for thumbnail or frame extraction".to_string(),
             required: false,
             default: None,
         })
@@ -677,8 +683,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_file_size_limit() {
-        let mut config = VideoProcessorConfig::default();
-        config.max_file_size = 10; // Very small limit
+        let config = VideoProcessorConfig {
+            max_file_size: 10, // Very small limit
+            ..Default::default()
+        };
         let tool = VideoProcessorTool::new(config);
 
         let temp_dir = TempDir::new().unwrap();
@@ -705,7 +713,7 @@ mod tests {
         let tool = create_test_tool();
         let temp_dir = TempDir::new().unwrap();
         let video_path = temp_dir.path().join("video.mp4");
-        let output_path = temp_dir.path().join("thumb.jpg");
+        let target_path = temp_dir.path().join("thumb.jpg");
 
         fs::write(&video_path, b"dummy").unwrap();
 
@@ -714,7 +722,7 @@ mod tests {
             json!({
                 "operation": "thumbnail",
                 "file_path": video_path.to_str().unwrap(),
-                "output_path": output_path.to_str().unwrap()
+                "target_path": target_path.to_str().unwrap()
             }),
         );
 
@@ -728,7 +736,7 @@ mod tests {
         let tool = create_test_tool();
         let temp_dir = TempDir::new().unwrap();
         let video_path = temp_dir.path().join("video.mp4");
-        let output_path = temp_dir.path().join("frame.jpg");
+        let target_path = temp_dir.path().join("frame.jpg");
 
         fs::write(&video_path, b"dummy").unwrap();
 
@@ -737,7 +745,7 @@ mod tests {
             json!({
                 "operation": "extract_frame",
                 "file_path": video_path.to_str().unwrap(),
-                "output_path": output_path.to_str().unwrap(),
+                "target_path": target_path.to_str().unwrap(),
                 "timestamp_seconds": 5.0
             }),
         );
@@ -787,7 +795,7 @@ mod tests {
             .to_string()
             .contains("Missing required parameter 'file_path'"));
 
-        // Missing output_path for thumbnail
+        // Missing target_path for thumbnail
         let input = create_test_input(
             "Generate thumbnail",
             json!({
@@ -801,7 +809,7 @@ mod tests {
         assert!(result
             .unwrap_err()
             .to_string()
-            .contains("output_path is required"));
+            .contains("target_path is required"));
     }
 
     #[tokio::test]
@@ -821,7 +829,7 @@ mod tests {
         let params = &schema.parameters;
         assert!(params.iter().any(|p| p.name == "operation"));
         assert!(params.iter().any(|p| p.name == "file_path"));
-        assert!(params.iter().any(|p| p.name == "output_path"));
+        assert!(params.iter().any(|p| p.name == "target_path"));
         assert!(params.iter().any(|p| p.name == "timestamp_seconds"));
     }
 

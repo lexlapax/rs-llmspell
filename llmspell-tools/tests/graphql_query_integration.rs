@@ -2,7 +2,8 @@
 
 use llmspell_core::{
     traits::{base_agent::BaseAgent, tool::Tool},
-    types::{AgentInput, ExecutionContext},
+    types::AgentInput,
+    ExecutionContext,
 };
 use llmspell_tools::GraphQLQueryTool;
 use serde_json::json;
@@ -54,7 +55,7 @@ async fn test_graphql_query() {
         json!({
             "operation": "query",
             "endpoint": "https://countries.trevorblades.com/",
-            "query": r#"
+            "input": r#"
                 query GetCountry($code: ID!) {
                     country(code: $code) {
                         name
@@ -77,13 +78,22 @@ async fn test_graphql_query() {
 
     // Check response contains expected data
     assert!(output.text.contains("United States"));
-    assert!(output.text.contains("Washington"));
-    assert!(output.text.contains("USD"));
-    assert!(output.text.contains("🇺🇸"));
+    // Parse response
+    let response: serde_json::Value = serde_json::from_str(&output.text).unwrap();
 
-    // Check metadata
-    let metadata = &output.metadata;
-    assert_eq!(metadata.extra["operation"], "query");
+    // Check response structure
+    assert_eq!(response["operation"], "query");
+    assert_eq!(response["success"], true);
+    assert!(response["message"]
+        .as_str()
+        .unwrap()
+        .contains("GraphQL query executed successfully"));
+
+    // Check result contains expected data
+    let result_str = serde_json::to_string(&response["result"]).unwrap();
+    assert!(result_str.contains("Washington"));
+    assert!(result_str.contains("USD"));
+    assert!(result_str.contains("🇺🇸"));
 }
 
 #[tokio::test]
@@ -95,7 +105,7 @@ async fn test_graphql_query_without_variables() {
         "parameters".to_string(),
         json!({
             "endpoint": "https://countries.trevorblades.com/",
-            "query": r#"
+            "input": r#"
                 {
                     continents {
                         code
@@ -126,7 +136,7 @@ async fn test_graphql_with_custom_headers() {
         "parameters".to_string(),
         json!({
             "endpoint": "https://countries.trevorblades.com/",
-            "query": "{ continents { code } }",
+            "input": "{ continents { code } }",
             "headers": {
                 "X-Custom-Header": "test-value"
             }
@@ -151,7 +161,7 @@ async fn test_graphql_error_handling() {
         "parameters".to_string(),
         json!({
             "endpoint": "https://countries.trevorblades.com/",
-            "query": "{ invalidField }"
+            "input": "{ invalidField }"
         }),
     );
 
@@ -201,7 +211,7 @@ async fn test_graphql_depth_limit() {
         "parameters".to_string(),
         json!({
             "endpoint": "https://countries.trevorblades.com/",
-            "query": deep_query
+            "input": deep_query
         }),
     );
 
@@ -222,7 +232,7 @@ async fn test_invalid_endpoint() {
         "parameters".to_string(),
         json!({
             "endpoint": "not-a-valid-url",
-            "query": "{ test }"
+            "input": "{ test }"
         }),
     );
 
@@ -237,7 +247,7 @@ async fn test_missing_endpoint() {
     let input = AgentInput::text("no endpoint").with_parameter(
         "parameters".to_string(),
         json!({
-            "query": "{ test }"
+            "input": "{ test }"
         }),
     );
 
@@ -267,7 +277,7 @@ async fn test_missing_query_for_query_operation() {
     assert!(result.is_err());
 
     if let Err(e) = result {
-        assert!(e.to_string().contains("Missing required parameter 'query'"));
+        assert!(e.to_string().contains("Missing required parameter 'input'"));
     }
 }
 
@@ -280,7 +290,7 @@ async fn test_subscription_not_supported() {
         json!({
             "operation": "subscription",
             "endpoint": "https://countries.trevorblades.com/",
-            "query": "subscription { test }"
+            "input": "subscription { test }"
         }),
     );
 
@@ -302,7 +312,7 @@ async fn test_graphql_with_operation_name() {
         "parameters".to_string(),
         json!({
             "endpoint": "https://countries.trevorblades.com/",
-            "query": r#"
+            "input": r#"
                 query GetUS {
                     country(code: "US") {
                         name

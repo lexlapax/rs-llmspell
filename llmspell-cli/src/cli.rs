@@ -146,6 +146,10 @@ pub enum Commands {
         #[arg(short, long)]
         force: bool,
     },
+
+    /// Manage API keys for external services
+    #[command(subcommand)]
+    Keys(crate::commands::keys::KeysSubcommand),
 }
 
 impl Cli {

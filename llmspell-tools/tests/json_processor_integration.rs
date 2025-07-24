@@ -2,7 +2,8 @@
 
 use llmspell_core::{
     traits::{base_agent::BaseAgent, tool::Tool},
-    types::{AgentInput, ExecutionContext},
+    types::AgentInput,
+    ExecutionContext,
 };
 use llmspell_tools::JsonProcessorTool;
 use serde_json::json;
@@ -401,7 +402,7 @@ async fn test_streaming_json_lines() {
         "parameters".to_string(),
         json!({
             "operation": "stream",
-            "content": log_lines,
+            "input": log_lines,
             "query": ".level"
         }),
     );
@@ -420,7 +421,7 @@ async fn test_streaming_json_lines() {
         "parameters".to_string(),
         json!({
             "operation": "stream",
-            "content": log_lines,
+            "input": log_lines,
             "query": ".level"
         }),
     );

@@ -514,8 +514,11 @@ mod tests {
         assert_eq!(detect_text_encoding(&utf16le_bom), TextEncoding::Utf16Le);
 
         // UTF-16BE with BOM
-        let utf16be_bom = [0xFE, 0xFF, 0x00, b'H', 0x00, b'e'];
-        assert_eq!(detect_text_encoding(&utf16be_bom), TextEncoding::Utf16Be);
+        let utf16be_bom_data = [0xFE, 0xFF, 0x00, b'H', 0x00, b'e'];
+        assert_eq!(
+            detect_text_encoding(&utf16be_bom_data),
+            TextEncoding::Utf16Be
+        );
 
         // Plain ASCII/UTF-8
         let ascii = b"Hello World";
@@ -539,9 +542,10 @@ mod tests {
         assert!(utf16le.is_ok());
         assert!(!utf16le.unwrap().is_empty());
 
-        let utf16be = convert_text_encoding(ascii_bytes, TextEncoding::Utf8, TextEncoding::Utf16Be);
-        assert!(utf16be.is_ok());
-        assert!(!utf16be.unwrap().is_empty());
+        let utf16be_result =
+            convert_text_encoding(ascii_bytes, TextEncoding::Utf8, TextEncoding::Utf16Be);
+        assert!(utf16be_result.is_ok());
+        assert!(!utf16be_result.unwrap().is_empty());
 
         // Test basic Windows-1252 conversion for basic ASCII
         let ascii_only = b"Hello"; // Pure ASCII should work fine

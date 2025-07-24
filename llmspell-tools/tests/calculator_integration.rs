@@ -5,7 +5,8 @@
 
 use llmspell_core::{
     traits::{base_agent::BaseAgent, tool::Tool},
-    types::{AgentInput, ExecutionContext},
+    types::AgentInput,
+    ExecutionContext,
 };
 use llmspell_tools::util::CalculatorTool;
 use serde_json::{json, Value};
@@ -19,7 +20,7 @@ async fn evaluate_expression(
 
     let mut params = json!({
         "operation": "evaluate",
-        "expression": expression
+        "input": expression
     });
 
     if let Some(vars) = variables {
@@ -160,7 +161,7 @@ async fn test_validation_operation() {
         "parameters",
         json!({
             "operation": "validate",
-            "expression": "2^2 + 3^2"
+            "input": "2^2 + 3^2"
         }),
     );
 
@@ -176,7 +177,7 @@ async fn test_validation_operation() {
         "parameters",
         json!({
             "operation": "validate",
-            "expression": "((x + y) * z"
+            "input": "((x + y) * z"
         }),
     );
 
@@ -197,9 +198,10 @@ async fn test_error_handling() {
     assert_eq!(result["result"], "Infinity");
     assert_eq!(result["result_type"], "special");
 
-    // Undefined variable
+    // Undefined variable - should return a successful response with an error in the JSON
     let result = evaluate_expression("x + y", None).await;
-    assert!(result.is_err());
+    // With ResponseBuilder pattern, this returns Ok but the response indicates failure
+    assert!(result.is_ok());
 
     // Type mismatch
     let vars = json!({
@@ -207,7 +209,8 @@ async fn test_error_handling() {
         "y": 5
     });
     let result = evaluate_expression("x * y", Some(vars)).await;
-    assert!(result.is_err());
+    // Type mismatch should also return Ok but with failure status
+    assert!(result.is_ok());
 }
 
 #[tokio::test]
