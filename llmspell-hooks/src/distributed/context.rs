@@ -620,7 +620,7 @@ mod tests {
         let deserialized: DistributedHookContext = serde_json::from_str(&serialized).unwrap();
 
         assert_eq!(deserialized.source_agent, distributed.source_agent);
-        assert_eq!(deserialized.propagation_flags.broadcast, true);
+        assert!(deserialized.propagation_flags.broadcast);
         assert_eq!(
             deserialized.security_context.auth_token,
             Some("test".to_string())

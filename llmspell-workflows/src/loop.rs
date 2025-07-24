@@ -3,16 +3,18 @@
 
 use crate::{
     error_handling::{ErrorAction, ErrorHandler},
+    hooks::{WorkflowExecutionPhase, WorkflowExecutor, WorkflowHookContext},
     state::StateManager,
     step_executor::StepExecutor,
     traits::{ErrorStrategy, StepResult, WorkflowStep as TraitWorkflowStep},
     types::{StepExecutionContext, WorkflowConfig, WorkflowState},
 };
-use llmspell_core::{ComponentId, Result};
+use llmspell_core::{ComponentId, ComponentMetadata, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{
     collections::HashMap,
+    sync::Arc,
     time::{Duration, Instant},
 };
 use tracing::{debug, info, warn};
@@ -155,6 +157,10 @@ pub struct LoopWorkflow {
     step_executor: StepExecutor,
     error_handler: ErrorHandler,
     error_strategy: ErrorStrategy,
+    /// Optional workflow executor for hook integration
+    workflow_executor: Option<Arc<WorkflowExecutor>>,
+    /// Workflow metadata
+    metadata: ComponentMetadata,
 }
 
 impl LoopWorkflow {
@@ -165,6 +171,8 @@ impl LoopWorkflow {
         let state_manager = StateManager::new(workflow_config.clone());
         let step_executor = StepExecutor::new(workflow_config);
 
+        let metadata = ComponentMetadata::new(name.clone(), "Loop workflow".to_string());
+
         Self {
             name,
             config,
@@ -172,6 +180,36 @@ impl LoopWorkflow {
             step_executor,
             error_handler,
             error_strategy,
+            workflow_executor: None,
+            metadata,
+        }
+    }
+
+    /// Create with hook integration
+    pub fn new_with_hooks(
+        name: String,
+        config: LoopConfig,
+        workflow_config: WorkflowConfig,
+        workflow_executor: Arc<WorkflowExecutor>,
+    ) -> Self {
+        let error_strategy = workflow_config.default_error_strategy.clone();
+        let error_handler = ErrorHandler::new(error_strategy.clone());
+        let state_manager =
+            StateManager::new_with_hooks(workflow_config.clone(), workflow_executor.clone());
+        let step_executor =
+            StepExecutor::new_with_hooks(workflow_config, workflow_executor.clone());
+
+        let metadata = ComponentMetadata::new(name.clone(), "Loop workflow with hooks".to_string());
+
+        Self {
+            name,
+            config,
+            state_manager,
+            step_executor,
+            error_handler,
+            error_strategy,
+            workflow_executor: Some(workflow_executor),
+            metadata,
         }
     }
 
@@ -337,13 +375,25 @@ impl LoopWorkflow {
             let shared_data = self.state_manager.get_all_shared_data().await?;
             let mut workflow_state = WorkflowState::new();
             workflow_state.shared_data = shared_data;
+            workflow_state.current_step = step_index;
             let context = StepExecutionContext::new(workflow_state, None);
 
-            // Execute step with retry logic
-            let step_result = self
-                .step_executor
-                .execute_step_with_retry(step, context, &self.error_strategy)
-                .await?;
+            // Execute step with retry logic (with workflow metadata if hooks are enabled)
+            let step_result = if self.workflow_executor.is_some() {
+                self.step_executor
+                    .execute_step_with_retry_and_metadata(
+                        step,
+                        context,
+                        &self.error_strategy,
+                        Some(self.metadata.clone()),
+                        Some("loop".to_string()),
+                    )
+                    .await?
+            } else {
+                self.step_executor
+                    .execute_step_with_retry(step, context, &self.error_strategy)
+                    .await?
+            };
 
             // Record the result
             self.state_manager
@@ -459,6 +509,23 @@ impl LoopWorkflow {
         let start_time = Instant::now();
         info!("Starting loop workflow: {}", self.name);
 
+        // Execute workflow start hooks
+        if let Some(workflow_executor) = &self.workflow_executor {
+            let component_id = llmspell_hooks::ComponentId::new(
+                llmspell_hooks::ComponentType::Workflow,
+                format!("workflow_{}", self.name),
+            );
+            let workflow_state = self.state_manager.get_state_snapshot().await?;
+            let hook_ctx = WorkflowHookContext::new(
+                component_id,
+                self.metadata.clone(),
+                workflow_state,
+                "loop".to_string(),
+                WorkflowExecutionPhase::WorkflowStart,
+            );
+            let _ = workflow_executor.execute_workflow_hooks(hook_ctx).await;
+        }
+
         // Start execution tracking
         self.state_manager.start_execution().await?;
 
@@ -471,6 +538,28 @@ impl LoopWorkflow {
         let mut break_reason = None;
 
         for (iteration, value) in iterator_values {
+            // Execute loop iteration start hooks
+            if let Some(workflow_executor) = &self.workflow_executor {
+                let component_id = llmspell_hooks::ComponentId::new(
+                    llmspell_hooks::ComponentType::Workflow,
+                    format!("workflow_{}", self.name),
+                );
+                let workflow_state = self.state_manager.get_state_snapshot().await?;
+                let mut hook_ctx = WorkflowHookContext::new(
+                    component_id,
+                    self.metadata.clone(),
+                    workflow_state,
+                    "loop".to_string(),
+                    WorkflowExecutionPhase::LoopIterationStart,
+                );
+                hook_ctx = hook_ctx.with_pattern_context(
+                    "iteration".to_string(),
+                    serde_json::Value::Number(iteration.into()),
+                );
+                hook_ctx = hook_ctx.with_pattern_context("value".to_string(), value.clone());
+                let _ = workflow_executor.execute_workflow_hooks(hook_ctx).await;
+            }
+
             // Check timeout
             if let Some(timeout) = self.config.timeout {
                 if start_time.elapsed() > timeout {
@@ -517,11 +606,36 @@ impl LoopWorkflow {
             }
 
             // Execute iteration
-            match self.execute_iteration(iteration, value).await {
+            match self.execute_iteration(iteration, value.clone()).await {
                 Ok(results) => {
                     all_results.push(results);
                     completed_iterations += 1;
                     self.state_manager.advance_step().await?;
+
+                    // Execute loop iteration complete hooks
+                    if let Some(workflow_executor) = &self.workflow_executor {
+                        let component_id = llmspell_hooks::ComponentId::new(
+                            llmspell_hooks::ComponentType::Workflow,
+                            format!("workflow_{}", self.name),
+                        );
+                        let workflow_state = self.state_manager.get_state_snapshot().await?;
+                        let mut hook_ctx = WorkflowHookContext::new(
+                            component_id,
+                            self.metadata.clone(),
+                            workflow_state,
+                            "loop".to_string(),
+                            WorkflowExecutionPhase::LoopIterationComplete,
+                        );
+                        hook_ctx = hook_ctx.with_pattern_context(
+                            "iteration".to_string(),
+                            serde_json::Value::Number(iteration.into()),
+                        );
+                        hook_ctx = hook_ctx.with_pattern_context(
+                            "completed_iterations".to_string(),
+                            serde_json::Value::Number(completed_iterations.into()),
+                        );
+                        let _ = workflow_executor.execute_workflow_hooks(hook_ctx).await;
+                    }
                 }
                 Err(e) => {
                     if self.config.continue_on_error {
@@ -555,6 +669,33 @@ impl LoopWorkflow {
             }
         }
 
+        // Execute loop termination hooks if break occurred
+        if break_reason.is_some() {
+            if let Some(workflow_executor) = &self.workflow_executor {
+                let component_id = llmspell_hooks::ComponentId::new(
+                    llmspell_hooks::ComponentType::Workflow,
+                    format!("workflow_{}", self.name),
+                );
+                let workflow_state = self.state_manager.get_state_snapshot().await?;
+                let mut hook_ctx = WorkflowHookContext::new(
+                    component_id,
+                    self.metadata.clone(),
+                    workflow_state,
+                    "loop".to_string(),
+                    WorkflowExecutionPhase::LoopTermination,
+                );
+                hook_ctx = hook_ctx.with_pattern_context(
+                    "break_reason".to_string(),
+                    serde_json::Value::String(break_reason.clone().unwrap_or_default()),
+                );
+                hook_ctx = hook_ctx.with_pattern_context(
+                    "completed_iterations".to_string(),
+                    serde_json::Value::Number(completed_iterations.into()),
+                );
+                let _ = workflow_executor.execute_workflow_hooks(hook_ctx).await;
+            }
+        }
+
         // Complete execution
         self.state_manager.complete_execution(true).await?;
 
@@ -571,6 +712,23 @@ impl LoopWorkflow {
                 "duration_ms": start_time.elapsed().as_millis(),
             }),
         );
+
+        // Execute workflow completion hooks
+        if let Some(workflow_executor) = &self.workflow_executor {
+            let component_id = llmspell_hooks::ComponentId::new(
+                llmspell_hooks::ComponentType::Workflow,
+                format!("workflow_{}", self.name),
+            );
+            let workflow_state = self.state_manager.get_state_snapshot().await?;
+            let hook_ctx = WorkflowHookContext::new(
+                component_id,
+                self.metadata.clone(),
+                workflow_state,
+                "loop".to_string(),
+                WorkflowExecutionPhase::WorkflowComplete,
+            );
+            let _ = workflow_executor.execute_workflow_hooks(hook_ctx).await;
+        }
 
         Ok(LoopWorkflowResult::success(
             self.name.clone(),
@@ -595,6 +753,7 @@ pub struct LoopWorkflowBuilder {
     timeout: Option<Duration>,
     iteration_delay: Option<Duration>,
     workflow_config: WorkflowConfig,
+    workflow_executor: Option<Arc<WorkflowExecutor>>,
 }
 
 impl LoopWorkflowBuilder {
@@ -610,6 +769,7 @@ impl LoopWorkflowBuilder {
             timeout: None,
             iteration_delay: None,
             workflow_config: WorkflowConfig::default(),
+            workflow_executor: None,
         }
     }
 
@@ -689,6 +849,12 @@ impl LoopWorkflowBuilder {
         self
     }
 
+    /// Enable hook integration with a WorkflowExecutor
+    pub fn with_hooks(mut self, workflow_executor: Arc<WorkflowExecutor>) -> Self {
+        self.workflow_executor = Some(workflow_executor);
+        self
+    }
+
     pub fn build(self) -> Result<LoopWorkflow> {
         let iterator =
             self.iterator
@@ -729,7 +895,16 @@ impl LoopWorkflowBuilder {
             iteration_delay: self.iteration_delay,
         };
 
-        Ok(LoopWorkflow::new(self.name, config, self.workflow_config))
+        if let Some(workflow_executor) = self.workflow_executor {
+            Ok(LoopWorkflow::new_with_hooks(
+                self.name,
+                config,
+                self.workflow_config,
+                workflow_executor,
+            ))
+        } else {
+            Ok(LoopWorkflow::new(self.name, config, self.workflow_config))
+        }
     }
 }
 

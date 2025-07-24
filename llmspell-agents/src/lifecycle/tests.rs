@@ -112,7 +112,7 @@ mod integration_tests {
         println!("Hook points called: {:?}", hook_points);
 
         // Check if we have the expected hook points (may use custom hook points)
-        assert!(hook_points.len() > 0, "Should have called some hooks");
+        assert!(!hook_points.is_empty(), "Should have called some hooks");
 
         // The state machine may use custom hook points, so let's be more flexible
         let has_relevant_hooks = hook_points.iter().any(|hp| {

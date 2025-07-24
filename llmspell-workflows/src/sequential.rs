@@ -2,11 +2,13 @@
 //! ABOUTME: Executes workflow steps in sequence with error handling and state management
 
 use super::error_handling::{ErrorAction, ErrorHandler};
+use super::hooks::{WorkflowExecutionPhase, WorkflowExecutor, WorkflowHookContext};
 use super::state::{ExecutionStats, StateManager};
 use super::step_executor::StepExecutor;
 use super::traits::{ErrorStrategy, StepResult, WorkflowStatus, WorkflowStep};
 use super::types::{StepExecutionContext, WorkflowConfig};
-use llmspell_core::Result;
+use llmspell_core::{ComponentMetadata, Result};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tracing::{debug, error, info, warn};
 
@@ -18,6 +20,10 @@ pub struct SequentialWorkflow {
     step_executor: StepExecutor,
     error_handler: ErrorHandler,
     error_strategy: ErrorStrategy,
+    /// Optional workflow executor for hook integration
+    workflow_executor: Option<Arc<WorkflowExecutor>>,
+    /// Workflow metadata
+    metadata: ComponentMetadata,
 }
 
 impl SequentialWorkflow {
@@ -28,6 +34,8 @@ impl SequentialWorkflow {
         let state_manager = StateManager::new(config.clone());
         let step_executor = StepExecutor::new(config);
 
+        let metadata = ComponentMetadata::new(name.clone(), "Sequential workflow".to_string());
+
         Self {
             name,
             steps: Vec::new(),
@@ -35,6 +43,34 @@ impl SequentialWorkflow {
             step_executor,
             error_handler,
             error_strategy,
+            workflow_executor: None,
+            metadata,
+        }
+    }
+
+    /// Create with hook integration
+    pub fn new_with_hooks(
+        name: String,
+        config: WorkflowConfig,
+        workflow_executor: Arc<WorkflowExecutor>,
+    ) -> Self {
+        let error_strategy = config.default_error_strategy.clone();
+        let error_handler = ErrorHandler::new(error_strategy.clone());
+        let state_manager = StateManager::new_with_hooks(config.clone(), workflow_executor.clone());
+        let step_executor = StepExecutor::new_with_hooks(config, workflow_executor.clone());
+
+        let metadata =
+            ComponentMetadata::new(name.clone(), "Sequential workflow with hooks".to_string());
+
+        Self {
+            name,
+            steps: Vec::new(),
+            state_manager,
+            step_executor,
+            error_handler,
+            error_strategy,
+            workflow_executor: Some(workflow_executor),
+            metadata,
         }
     }
 
@@ -68,6 +104,23 @@ impl SequentialWorkflow {
         let start_time = Instant::now();
         info!("Starting sequential workflow: {}", self.name);
 
+        // Execute workflow start hooks
+        if let Some(workflow_executor) = &self.workflow_executor {
+            let component_id = llmspell_hooks::ComponentId::new(
+                llmspell_hooks::ComponentType::Workflow,
+                format!("workflow_{}", self.name),
+            );
+            let workflow_state = self.state_manager.get_state_snapshot().await?;
+            let hook_ctx = WorkflowHookContext::new(
+                component_id,
+                self.metadata.clone(),
+                workflow_state,
+                "sequential".to_string(),
+                WorkflowExecutionPhase::WorkflowStart,
+            );
+            let _ = workflow_executor.execute_workflow_hooks(hook_ctx).await;
+        }
+
         // Start execution tracking
         self.state_manager.start_execution().await?;
 
@@ -97,13 +150,25 @@ impl SequentialWorkflow {
             let shared_data = self.state_manager.get_all_shared_data().await?;
             let mut workflow_state = crate::types::WorkflowState::new();
             workflow_state.shared_data = shared_data;
-            let context = StepExecutionContext::new(workflow_state, None);
+            workflow_state.current_step = index;
+            let context = StepExecutionContext::new(workflow_state.clone(), None);
 
-            // Execute step with retry logic
-            let step_result = self
-                .step_executor
-                .execute_step_with_retry(step, context, &self.error_strategy)
-                .await?;
+            // Execute step with retry logic (with workflow metadata if hooks are enabled)
+            let step_result = if self.workflow_executor.is_some() {
+                self.step_executor
+                    .execute_step_with_retry_and_metadata(
+                        step,
+                        context,
+                        &self.error_strategy,
+                        Some(self.metadata.clone()),
+                        Some("sequential".to_string()),
+                    )
+                    .await?
+            } else {
+                self.step_executor
+                    .execute_step_with_retry(step, context, &self.error_strategy)
+                    .await?
+            };
 
             // Record the result
             self.state_manager
@@ -175,6 +240,24 @@ impl SequentialWorkflow {
         // All steps completed successfully
         let duration = start_time.elapsed();
         self.state_manager.complete_execution(true).await?;
+
+        // Execute workflow completion hooks
+        if let Some(workflow_executor) = &self.workflow_executor {
+            let component_id = llmspell_hooks::ComponentId::new(
+                llmspell_hooks::ComponentType::Workflow,
+                format!("workflow_{}", self.name),
+            );
+            let workflow_state = self.state_manager.get_state_snapshot().await?;
+            let hook_ctx = WorkflowHookContext::new(
+                component_id,
+                self.metadata.clone(),
+                workflow_state,
+                "sequential".to_string(),
+                WorkflowExecutionPhase::WorkflowComplete,
+            );
+            let _ = workflow_executor.execute_workflow_hooks(hook_ctx).await;
+        }
+
         info!(
             "Sequential workflow '{}' completed successfully in {:?}",
             self.name, duration
@@ -227,6 +310,7 @@ pub struct SequentialWorkflowBuilder {
     config: WorkflowConfig,
     steps: Vec<WorkflowStep>,
     error_strategy: Option<ErrorStrategy>,
+    workflow_executor: Option<Arc<WorkflowExecutor>>,
 }
 
 impl SequentialWorkflowBuilder {
@@ -237,6 +321,7 @@ impl SequentialWorkflowBuilder {
             config: WorkflowConfig::default(),
             steps: Vec::new(),
             error_strategy: None,
+            workflow_executor: None,
         }
     }
 
@@ -264,6 +349,12 @@ impl SequentialWorkflowBuilder {
         self
     }
 
+    /// Enable hook integration with a WorkflowExecutor
+    pub fn with_hooks(mut self, workflow_executor: Arc<WorkflowExecutor>) -> Self {
+        self.workflow_executor = Some(workflow_executor);
+        self
+    }
+
     /// Build the sequential workflow
     pub fn build(mut self) -> SequentialWorkflow {
         // Apply error strategy if provided
@@ -271,7 +362,11 @@ impl SequentialWorkflowBuilder {
             self.config.default_error_strategy = strategy;
         }
 
-        let mut workflow = SequentialWorkflow::new(self.name, self.config);
+        let mut workflow = if let Some(workflow_executor) = self.workflow_executor {
+            SequentialWorkflow::new_with_hooks(self.name, self.config, workflow_executor)
+        } else {
+            SequentialWorkflow::new(self.name, self.config)
+        };
         workflow.add_steps(self.steps);
         workflow
     }

@@ -54,9 +54,9 @@ async fn test_script_execution_through_bridge() {
         .contains("Lua"));
 
     let apis = result.get("apis").unwrap().as_object().unwrap();
-    assert_eq!(apis.get("agent").unwrap().as_bool().unwrap(), true);
-    assert_eq!(apis.get("tool").unwrap().as_bool().unwrap(), true);
-    assert_eq!(apis.get("workflow").unwrap().as_bool().unwrap(), true);
+    assert!(apis.get("agent").unwrap().as_bool().unwrap());
+    assert!(apis.get("tool").unwrap().as_bool().unwrap());
+    assert!(apis.get("workflow").unwrap().as_bool().unwrap());
 }
 
 /// Test engine switching capability (even with only Lua)

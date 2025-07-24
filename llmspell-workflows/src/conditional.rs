@@ -5,13 +5,15 @@ use super::conditions::{
     Condition, ConditionEvaluationContext, ConditionEvaluator, ConditionResult,
 };
 use super::error_handling::{ErrorAction, ErrorHandler};
+use super::hooks::{WorkflowExecutionPhase, WorkflowExecutor, WorkflowHookContext};
 use super::state::{ExecutionStats, StateManager};
 use super::step_executor::StepExecutor;
 use super::traits::{ErrorStrategy, StepResult, WorkflowStatus, WorkflowStep};
 use super::types::{StepExecutionContext, WorkflowConfig};
-use llmspell_core::{ComponentId, Result};
+use llmspell_core::{ComponentId, ComponentMetadata, Result};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tracing::{debug, error, info, warn};
 
@@ -141,6 +143,10 @@ pub struct ConditionalWorkflow {
     error_handler: ErrorHandler,
     condition_evaluator: ConditionEvaluator,
     error_strategy: ErrorStrategy,
+    /// Optional workflow executor for hook integration
+    workflow_executor: Option<Arc<WorkflowExecutor>>,
+    /// Workflow metadata
+    metadata: ComponentMetadata,
 }
 
 impl ConditionalWorkflow {
@@ -155,6 +161,8 @@ impl ConditionalWorkflow {
             config.condition_evaluation_timeout_ms,
         ));
 
+        let metadata = ComponentMetadata::new(name.clone(), "Conditional workflow".to_string());
+
         Self {
             name,
             branches: Vec::new(),
@@ -164,6 +172,42 @@ impl ConditionalWorkflow {
             error_handler,
             condition_evaluator,
             error_strategy,
+            workflow_executor: None,
+            metadata,
+        }
+    }
+
+    /// Create with hook integration
+    pub fn new_with_hooks(
+        name: String,
+        workflow_config: WorkflowConfig,
+        workflow_executor: Arc<WorkflowExecutor>,
+    ) -> Self {
+        let config = ConditionalWorkflowConfig::default();
+        let error_strategy = workflow_config.default_error_strategy.clone();
+        let error_handler = ErrorHandler::new(error_strategy.clone());
+        let state_manager =
+            StateManager::new_with_hooks(workflow_config.clone(), workflow_executor.clone());
+        let step_executor =
+            StepExecutor::new_with_hooks(workflow_config, workflow_executor.clone());
+        let condition_evaluator = ConditionEvaluator::new(Duration::from_millis(
+            config.condition_evaluation_timeout_ms,
+        ));
+
+        let metadata =
+            ComponentMetadata::new(name.clone(), "Conditional workflow with hooks".to_string());
+
+        Self {
+            name,
+            branches: Vec::new(),
+            config,
+            state_manager,
+            step_executor,
+            error_handler,
+            condition_evaluator,
+            error_strategy,
+            workflow_executor: Some(workflow_executor),
+            metadata,
         }
     }
 
@@ -196,6 +240,23 @@ impl ConditionalWorkflow {
     pub async fn execute(&self) -> Result<ConditionalWorkflowResult> {
         let start_time = Instant::now();
         info!("Starting conditional workflow: {}", self.name);
+
+        // Execute workflow start hooks
+        if let Some(workflow_executor) = &self.workflow_executor {
+            let component_id = llmspell_hooks::ComponentId::new(
+                llmspell_hooks::ComponentType::Workflow,
+                format!("workflow_{}", self.name),
+            );
+            let workflow_state = self.state_manager.get_state_snapshot().await?;
+            let hook_ctx = WorkflowHookContext::new(
+                component_id,
+                self.metadata.clone(),
+                workflow_state,
+                "conditional".to_string(),
+                WorkflowExecutionPhase::WorkflowStart,
+            );
+            let _ = workflow_executor.execute_workflow_hooks(hook_ctx).await;
+        }
 
         // Start execution tracking
         self.state_manager.start_execution().await?;
@@ -246,6 +307,31 @@ impl ConditionalWorkflow {
 
             debug!("Evaluating condition for branch: {}", branch.name);
 
+            // Execute condition evaluation hooks
+            if let Some(workflow_executor) = &self.workflow_executor {
+                let component_id = llmspell_hooks::ComponentId::new(
+                    llmspell_hooks::ComponentType::Workflow,
+                    format!("workflow_{}", self.name),
+                );
+                let workflow_state = self.state_manager.get_state_snapshot().await?;
+                let mut hook_ctx = WorkflowHookContext::new(
+                    component_id,
+                    self.metadata.clone(),
+                    workflow_state,
+                    "conditional".to_string(),
+                    WorkflowExecutionPhase::ConditionEvaluation,
+                );
+                hook_ctx = hook_ctx.with_pattern_context(
+                    "branch_name".to_string(),
+                    serde_json::Value::String(branch.name.clone()),
+                );
+                hook_ctx = hook_ctx.with_pattern_context(
+                    "branch_index".to_string(),
+                    serde_json::Value::Number(branches_evaluated.into()),
+                );
+                let _ = workflow_executor.execute_workflow_hooks(hook_ctx).await;
+            }
+
             // Evaluate the condition
             let condition_result = self
                 .condition_evaluator
@@ -255,6 +341,35 @@ impl ConditionalWorkflow {
             if condition_result.is_true {
                 matched_branches.push(branch.clone());
                 debug!("Condition matched for branch: {}", branch.name);
+
+                // Execute branch selection hooks
+                if let Some(workflow_executor) = &self.workflow_executor {
+                    let component_id = llmspell_hooks::ComponentId::new(
+                        llmspell_hooks::ComponentType::Workflow,
+                        format!("workflow_{}", self.name),
+                    );
+                    let workflow_state = self.state_manager.get_state_snapshot().await?;
+                    let mut hook_ctx = WorkflowHookContext::new(
+                        component_id,
+                        self.metadata.clone(),
+                        workflow_state,
+                        "conditional".to_string(),
+                        WorkflowExecutionPhase::BranchSelection,
+                    );
+                    hook_ctx = hook_ctx.with_pattern_context(
+                        "selected_branch".to_string(),
+                        serde_json::Value::String(branch.name.clone()),
+                    );
+                    hook_ctx = hook_ctx.with_pattern_context(
+                        "condition_result".to_string(),
+                        serde_json::json!({
+                            "is_true": condition_result.is_true,
+                            "error": condition_result.error,
+                            "description": condition_result.description
+                        }),
+                    );
+                    let _ = workflow_executor.execute_workflow_hooks(hook_ctx).await;
+                }
 
                 // Execute the branch
                 let branch_result = self.execute_branch(branch, &context).await?;
@@ -295,6 +410,23 @@ impl ConditionalWorkflow {
             !executed_branches.is_empty() && executed_branches.iter().all(|br| br.success);
 
         self.state_manager.complete_execution(success).await?;
+
+        // Execute workflow completion hooks
+        if let Some(workflow_executor) = &self.workflow_executor {
+            let component_id = llmspell_hooks::ComponentId::new(
+                llmspell_hooks::ComponentType::Workflow,
+                format!("workflow_{}", self.name),
+            );
+            let workflow_state = self.state_manager.get_state_snapshot().await?;
+            let hook_ctx = WorkflowHookContext::new(
+                component_id,
+                self.metadata.clone(),
+                workflow_state,
+                "conditional".to_string(),
+                WorkflowExecutionPhase::WorkflowComplete,
+            );
+            let _ = workflow_executor.execute_workflow_hooks(hook_ctx).await;
+        }
 
         if success {
             info!(
@@ -341,13 +473,25 @@ impl ConditionalWorkflow {
             let shared_data = self.state_manager.get_all_shared_data().await?;
             let mut workflow_state = crate::types::WorkflowState::new();
             workflow_state.shared_data = shared_data;
+            workflow_state.current_step = step_results.len();
             let execution_context = StepExecutionContext::new(workflow_state, None);
 
-            // Execute step with retry logic
-            let step_result = self
-                .step_executor
-                .execute_step_with_retry(step, execution_context, &self.error_strategy)
-                .await?;
+            // Execute step with retry logic (with workflow metadata if hooks are enabled)
+            let step_result = if self.workflow_executor.is_some() {
+                self.step_executor
+                    .execute_step_with_retry_and_metadata(
+                        step,
+                        execution_context,
+                        &self.error_strategy,
+                        Some(self.metadata.clone()),
+                        Some("conditional".to_string()),
+                    )
+                    .await?
+            } else {
+                self.step_executor
+                    .execute_step_with_retry(step, execution_context, &self.error_strategy)
+                    .await?
+            };
 
             // Record the result
             self.state_manager
@@ -447,6 +591,7 @@ pub struct ConditionalWorkflowBuilder {
     conditional_config: ConditionalWorkflowConfig,
     branches: Vec<ConditionalBranch>,
     error_strategy: Option<ErrorStrategy>,
+    workflow_executor: Option<Arc<WorkflowExecutor>>,
 }
 
 impl ConditionalWorkflowBuilder {
@@ -458,6 +603,7 @@ impl ConditionalWorkflowBuilder {
             conditional_config: ConditionalWorkflowConfig::default(),
             branches: Vec::new(),
             error_strategy: None,
+            workflow_executor: None,
         }
     }
 
@@ -491,6 +637,12 @@ impl ConditionalWorkflowBuilder {
         self
     }
 
+    /// Enable hook integration with a WorkflowExecutor
+    pub fn with_hooks(mut self, workflow_executor: Arc<WorkflowExecutor>) -> Self {
+        self.workflow_executor = Some(workflow_executor);
+        self
+    }
+
     /// Build the conditional workflow
     pub fn build(mut self) -> ConditionalWorkflow {
         // Apply error strategy if provided
@@ -498,7 +650,11 @@ impl ConditionalWorkflowBuilder {
             self.workflow_config.default_error_strategy = strategy;
         }
 
-        let mut workflow = ConditionalWorkflow::new(self.name, self.workflow_config);
+        let mut workflow = if let Some(workflow_executor) = self.workflow_executor {
+            ConditionalWorkflow::new_with_hooks(self.name, self.workflow_config, workflow_executor)
+        } else {
+            ConditionalWorkflow::new(self.name, self.workflow_config)
+        };
         workflow.config = self.conditional_config;
         workflow.add_branches(self.branches);
         workflow

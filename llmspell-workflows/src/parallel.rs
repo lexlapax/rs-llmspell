@@ -3,12 +3,13 @@
 
 use crate::{
     error_handling::{ErrorAction, ErrorHandler},
+    hooks::{WorkflowExecutionPhase, WorkflowExecutor, WorkflowHookContext},
     state::StateManager,
     step_executor::StepExecutor,
     traits::{StepResult, WorkflowStep as TraitWorkflowStep},
     types::{StepExecutionContext, WorkflowConfig, WorkflowState},
 };
-use llmspell_core::Result;
+use llmspell_core::{ComponentMetadata, Result};
 use serde::{Deserialize, Serialize};
 use std::{
     sync::Arc,
@@ -251,6 +252,10 @@ pub struct ParallelWorkflow {
     state_manager: StateManager,
     step_executor: StepExecutor,
     error_handler: ErrorHandler,
+    /// Optional workflow executor for hook integration
+    workflow_executor: Option<Arc<WorkflowExecutor>>,
+    /// Workflow metadata
+    metadata: ComponentMetadata,
 }
 
 impl ParallelWorkflow {
@@ -266,6 +271,8 @@ impl ParallelWorkflow {
         let state_manager = StateManager::new(workflow_config.clone());
         let step_executor = StepExecutor::new(workflow_config.clone());
 
+        let metadata = ComponentMetadata::new(name.clone(), "Parallel workflow".to_string());
+
         Self {
             name,
             branches,
@@ -274,6 +281,39 @@ impl ParallelWorkflow {
             state_manager,
             step_executor,
             error_handler,
+            workflow_executor: None,
+            metadata,
+        }
+    }
+
+    /// Create with hook integration
+    pub fn new_with_hooks(
+        name: String,
+        branches: Vec<ParallelBranch>,
+        config: ParallelConfig,
+        workflow_config: WorkflowConfig,
+        workflow_executor: Arc<WorkflowExecutor>,
+    ) -> Self {
+        let error_strategy = workflow_config.default_error_strategy.clone();
+        let error_handler = ErrorHandler::new(error_strategy);
+        let state_manager =
+            StateManager::new_with_hooks(workflow_config.clone(), workflow_executor.clone());
+        let step_executor =
+            StepExecutor::new_with_hooks(workflow_config.clone(), workflow_executor.clone());
+
+        let metadata =
+            ComponentMetadata::new(name.clone(), "Parallel workflow with hooks".to_string());
+
+        Self {
+            name,
+            branches,
+            config,
+            workflow_config,
+            state_manager,
+            step_executor,
+            error_handler,
+            workflow_executor: Some(workflow_executor),
+            metadata,
         }
     }
 
@@ -299,6 +339,8 @@ impl ParallelWorkflow {
         state_manager: Arc<Mutex<StateManager>>,
         error_handler: Arc<ErrorHandler>,
         workflow_config: WorkflowConfig,
+        workflow_metadata: Option<ComponentMetadata>,
+        has_hooks: bool,
     ) -> BranchResult {
         let start_time = Instant::now();
         let branch_name = branch.name.clone();
@@ -328,12 +370,25 @@ impl ParallelWorkflow {
                 .unwrap_or_default();
             let mut workflow_state = WorkflowState::new();
             workflow_state.shared_data = shared_data;
+            workflow_state.current_step = index;
             let context = StepExecutionContext::new(workflow_state, branch.timeout);
 
-            // Execute step
-            let step_result = step_executor
-                .execute_step_with_retry(step, context, &workflow_config.default_error_strategy)
-                .await;
+            // Execute step (with workflow metadata if hooks are enabled)
+            let step_result = if has_hooks && workflow_metadata.is_some() {
+                step_executor
+                    .execute_step_with_retry_and_metadata(
+                        step,
+                        context,
+                        &workflow_config.default_error_strategy,
+                        workflow_metadata.clone(),
+                        Some("parallel".to_string()),
+                    )
+                    .await
+            } else {
+                step_executor
+                    .execute_step_with_retry(step, context, &workflow_config.default_error_strategy)
+                    .await
+            };
 
             match step_result {
                 Ok(result) => {
@@ -426,6 +481,23 @@ impl ParallelWorkflow {
             self.branches.len()
         );
 
+        // Execute workflow start hooks
+        if let Some(workflow_executor) = &self.workflow_executor {
+            let component_id = llmspell_hooks::ComponentId::new(
+                llmspell_hooks::ComponentType::Workflow,
+                format!("workflow_{}", self.name),
+            );
+            let workflow_state = self.state_manager.get_state_snapshot().await?;
+            let hook_ctx = WorkflowHookContext::new(
+                component_id,
+                self.metadata.clone(),
+                workflow_state,
+                "parallel".to_string(),
+                WorkflowExecutionPhase::WorkflowStart,
+            );
+            let _ = workflow_executor.execute_workflow_hooks(hook_ctx).await;
+        }
+
         // Start execution tracking
         self.state_manager.start_execution().await?;
 
@@ -442,6 +514,34 @@ impl ParallelWorkflow {
 
         debug!("Spawning {} branches", self.branches.len());
 
+        // Execute parallel fork hooks
+        if let Some(workflow_executor) = &self.workflow_executor {
+            let component_id = llmspell_hooks::ComponentId::new(
+                llmspell_hooks::ComponentType::Workflow,
+                format!("workflow_{}", self.name),
+            );
+            let workflow_state = self.state_manager.get_state_snapshot().await?;
+            let mut hook_ctx = WorkflowHookContext::new(
+                component_id,
+                self.metadata.clone(),
+                workflow_state,
+                "parallel".to_string(),
+                WorkflowExecutionPhase::ParallelFork,
+            );
+            hook_ctx = hook_ctx.with_pattern_context(
+                "branch_count".to_string(),
+                serde_json::Value::Number(self.branches.len().into()),
+            );
+            hook_ctx = hook_ctx.with_pattern_context(
+                "max_concurrency".to_string(),
+                serde_json::Value::Number(self.config.max_concurrency.into()),
+            );
+            let _ = workflow_executor.execute_workflow_hooks(hook_ctx).await;
+        }
+
+        let workflow_metadata = self.metadata.clone();
+        let has_hooks = self.workflow_executor.is_some();
+
         for branch in self.branches.clone() {
             let step_executor = step_executor.clone();
             let state_manager = state_manager.clone();
@@ -450,6 +550,7 @@ impl ParallelWorkflow {
             let semaphore = semaphore.clone();
             let fail_signal = fail_signal.clone();
             let fail_fast = self.config.fail_fast;
+            let workflow_metadata = workflow_metadata.clone();
 
             let handle = tokio::spawn(async move {
                 // Check if we should stop due to fail-fast
@@ -472,6 +573,8 @@ impl ParallelWorkflow {
                     state_manager,
                     error_handler,
                     workflow_config,
+                    Some(workflow_metadata),
+                    has_hooks,
                 )
                 .await;
 
@@ -552,6 +655,31 @@ impl ParallelWorkflow {
         let branch_results = collected_results;
         stopped_early = stopped_early || early_stop;
 
+        // Execute parallel join hooks
+        if let Some(workflow_executor) = &self.workflow_executor {
+            let component_id = llmspell_hooks::ComponentId::new(
+                llmspell_hooks::ComponentType::Workflow,
+                format!("workflow_{}", self.name),
+            );
+            let workflow_state = self.state_manager.get_state_snapshot().await?;
+            let mut hook_ctx = WorkflowHookContext::new(
+                component_id,
+                self.metadata.clone(),
+                workflow_state,
+                "parallel".to_string(),
+                WorkflowExecutionPhase::ParallelJoin,
+            );
+            hook_ctx = hook_ctx.with_pattern_context(
+                "completed_branches".to_string(),
+                serde_json::Value::Number(branch_results.len().into()),
+            );
+            hook_ctx = hook_ctx.with_pattern_context(
+                "stopped_early".to_string(),
+                serde_json::Value::Bool(stopped_early),
+            );
+            let _ = workflow_executor.execute_workflow_hooks(hook_ctx).await;
+        }
+
         // Complete execution tracking
         let all_required_succeeded = branch_results
             .iter()
@@ -565,6 +693,23 @@ impl ParallelWorkflow {
         let duration = start_time.elapsed();
         let result =
             ParallelWorkflowResult::new(self.name.clone(), branch_results, duration, stopped_early);
+
+        // Execute workflow completion hooks
+        if let Some(workflow_executor) = &self.workflow_executor {
+            let component_id = llmspell_hooks::ComponentId::new(
+                llmspell_hooks::ComponentType::Workflow,
+                format!("workflow_{}", self.name),
+            );
+            let workflow_state = self.state_manager.get_state_snapshot().await?;
+            let hook_ctx = WorkflowHookContext::new(
+                component_id,
+                self.metadata.clone(),
+                workflow_state,
+                "parallel".to_string(),
+                WorkflowExecutionPhase::WorkflowComplete,
+            );
+            let _ = workflow_executor.execute_workflow_hooks(hook_ctx).await;
+        }
 
         info!(
             "Parallel workflow '{}' completed: {} branches succeeded, {} failed",
@@ -582,6 +727,7 @@ pub struct ParallelWorkflowBuilder {
     branches: Vec<ParallelBranch>,
     config: ParallelConfig,
     workflow_config: WorkflowConfig,
+    workflow_executor: Option<Arc<WorkflowExecutor>>,
 }
 
 impl ParallelWorkflowBuilder {
@@ -592,6 +738,7 @@ impl ParallelWorkflowBuilder {
             branches: Vec::new(),
             config: ParallelConfig::default(),
             workflow_config: WorkflowConfig::default(),
+            workflow_executor: None,
         }
     }
 
@@ -630,6 +777,12 @@ impl ParallelWorkflowBuilder {
         self
     }
 
+    /// Enable hook integration with a WorkflowExecutor
+    pub fn with_hooks(mut self, workflow_executor: Arc<WorkflowExecutor>) -> Self {
+        self.workflow_executor = Some(workflow_executor);
+        self
+    }
+
     pub fn build(self) -> Result<ParallelWorkflow> {
         if self.branches.is_empty() {
             return Err(llmspell_core::LLMSpellError::Configuration {
@@ -645,12 +798,22 @@ impl ParallelWorkflowBuilder {
             });
         }
 
-        Ok(ParallelWorkflow::new(
-            self.name,
-            self.branches,
-            self.config,
-            self.workflow_config,
-        ))
+        if let Some(workflow_executor) = self.workflow_executor {
+            Ok(ParallelWorkflow::new_with_hooks(
+                self.name,
+                self.branches,
+                self.config,
+                self.workflow_config,
+                workflow_executor,
+            ))
+        } else {
+            Ok(ParallelWorkflow::new(
+                self.name,
+                self.branches,
+                self.config,
+                self.workflow_config,
+            ))
+        }
     }
 }
 
