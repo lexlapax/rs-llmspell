@@ -186,7 +186,7 @@ async fn test_agent_tool_integration() {
             println!("Test failed with error: {:?}", e);
             // For now, we'll allow the test to fail since we don't have tools registered
             // This shows that our API is working but no tools are available
-            assert!(true); // Test passes - we're testing API availability, not tool presence
+            // Test passes - we're testing API availability, not tool presence
         }
     }
 }

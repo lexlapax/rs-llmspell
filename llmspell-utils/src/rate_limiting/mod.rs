@@ -297,7 +297,7 @@ mod tests {
         let info = RateLimitInfo::from_headers(&headers);
         assert_eq!(info.remaining, Some(42));
         assert_eq!(info.limit, Some(100));
-        assert_eq!(info.reset_at, Some(1234567890));
+        assert_eq!(info.reset_at, Some(1_234_567_890));
     }
 
     #[tokio::test]

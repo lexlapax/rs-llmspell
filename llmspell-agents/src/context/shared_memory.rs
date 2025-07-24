@@ -461,9 +461,9 @@ mod tests {
         let reader = ComponentId::from_name("reader");
         let writer = ComponentId::from_name("writer");
 
-        region.grant_permission(owner.clone(), MemoryPermission::ReadWrite);
-        region.grant_permission(reader.clone(), MemoryPermission::Read);
-        region.grant_permission(writer.clone(), MemoryPermission::Write);
+        region.grant_permission(owner, MemoryPermission::ReadWrite);
+        region.grant_permission(reader, MemoryPermission::Read);
+        region.grant_permission(writer, MemoryPermission::Write);
 
         assert!(region.has_permission(&owner, MemoryPermission::Read));
         assert!(region.has_permission(&owner, MemoryPermission::Write));
@@ -478,7 +478,7 @@ mod tests {
         let region = MemoryRegion::new("test".to_string(), ContextScope::Global);
         let accessor = ComponentId::from_name("accessor");
 
-        region.grant_permission(accessor.clone(), MemoryPermission::ReadWrite);
+        region.grant_permission(accessor, MemoryPermission::ReadWrite);
 
         // Test set
         region
@@ -518,7 +518,7 @@ mod tests {
 
         // Create region
         manager
-            .create_region("region1".to_string(), ContextScope::Global, owner.clone())
+            .create_region("region1".to_string(), ContextScope::Global, owner)
             .unwrap();
 
         // Get region
@@ -540,7 +540,7 @@ mod tests {
         let region = MemoryRegion::new("test".to_string(), ContextScope::Global);
         let accessor = ComponentId::from_name("accessor");
 
-        region.grant_permission(accessor.clone(), MemoryPermission::ReadWrite);
+        region.grant_permission(accessor, MemoryPermission::ReadWrite);
 
         let mut receiver = region.subscribe();
 

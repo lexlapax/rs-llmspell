@@ -436,7 +436,7 @@ mod tests {
         let discovery = ToolDiscoveryService::new(registry);
 
         // Test that service was created successfully
-        assert!(discovery.tool_exists("nonexistent").await == false);
+        assert!(!(discovery.tool_exists("nonexistent").await));
     }
 
     #[tokio::test]

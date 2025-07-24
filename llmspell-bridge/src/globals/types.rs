@@ -29,6 +29,7 @@ pub struct GlobalMetadata {
 }
 
 /// Shared context available to all globals during injection
+#[derive(Clone)]
 pub struct GlobalContext {
     /// Component registry for tools and agents
     pub registry: Arc<ComponentRegistry>,

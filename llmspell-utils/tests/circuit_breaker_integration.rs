@@ -330,6 +330,7 @@ use tokio::sync::RwLock;
 
 // Example of using circuit breaker with actual HTTP client
 #[cfg(feature = "rate-limiting-http")]
+#[allow(dead_code)]
 async fn example_http_with_circuit_breaker() -> Result<(), Box<dyn std::error::Error>> {
     let manager = CircuitBreakerManager::with_default_config(ServicePresets::http_api);
 

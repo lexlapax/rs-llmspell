@@ -185,6 +185,7 @@ async fn test_concurrent_rate_limiting() {
 
 // Example of how to integrate with an actual HTTP client
 #[cfg(feature = "rate-limiting-http")]
+#[allow(dead_code)]
 async fn example_http_request_with_rate_limiting() -> Result<(), Box<dyn std::error::Error>> {
     let limiter = ProviderRateLimiter::new();
 

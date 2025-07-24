@@ -573,11 +573,11 @@ mod tests {
 
         for strategy in strategies {
             match strategy {
-                DelegationStrategy::FirstMatch => assert!(true),
-                DelegationStrategy::BestMatch => assert!(true),
-                DelegationStrategy::RoundRobin => assert!(true),
-                DelegationStrategy::Random => assert!(true),
-                DelegationStrategy::LoadBalanced => assert!(true),
+                DelegationStrategy::FirstMatch => {}
+                DelegationStrategy::BestMatch => {}
+                DelegationStrategy::RoundRobin => {}
+                DelegationStrategy::Random => {}
+                DelegationStrategy::LoadBalanced => {}
                 DelegationStrategy::Custom(s) => assert_eq!(s, "test"),
             }
         }
