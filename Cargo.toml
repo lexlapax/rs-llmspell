@@ -13,6 +13,7 @@ members = [
     "llmspell-config",
     "llmspell-security",
     "llmspell-hooks",
+    "llmspell-events",
     "llmspell-testing",
     "llmspell-utils"
 ]
