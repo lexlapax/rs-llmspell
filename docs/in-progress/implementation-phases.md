@@ -311,9 +311,12 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 - Built-in hooks (logging, metrics, debugging)
 - Script-accessible hook registration
 - Agent lifecycle hooks integration
+- Leverage existing event emission infrastructure from Phase 3 (agent state transitions, tool pre/post execution, workflow boundaries)
+- Unified Event-Driven Hook System to eliminate overlap between hooks and events
 
 **Success Criteria**:
 - [ ] Pre/post execution hooks work for agents and tools
+- [ ] Hook execution works for 6 agent states, 34 tools, and 4 workflow patterns
 - [ ] Event emission and subscription functional
 - [ ] Built-in logging and metrics hooks operational
 - [ ] Scripts can register custom hooks
@@ -324,6 +327,7 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 - Event bus performance tests
 - Script hook registration tests
 - Performance impact measurements
+- Performance regression testing from day 1 to ensure <5% overhead
 - Hook error handling tests
 
 ---
