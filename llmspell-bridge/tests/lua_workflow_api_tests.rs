@@ -192,7 +192,7 @@ async fn test_lua_workflow_list() {
     assert_eq!(value["has_workflows"], true);
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_lua_workflow_discover_types() {
     let registry = create_test_registry().await;
     let providers = create_test_providers().await;

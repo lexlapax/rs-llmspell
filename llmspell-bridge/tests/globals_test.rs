@@ -35,7 +35,7 @@ mod lua_globals {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_global_injection_lua() -> Result<()> {
         let lua = Lua::new();
         let context = setup_test_context().await;
@@ -328,7 +328,7 @@ mod lua_globals {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_global_injection_performance() -> Result<()> {
         use std::time::Instant;
 
@@ -352,7 +352,7 @@ mod lua_globals {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_json_global_lua() -> Result<()> {
         let lua = Lua::new();
         let context = setup_test_context().await;
@@ -402,7 +402,7 @@ mod lua_globals {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_hook_global_lua() -> Result<()> {
         let lua = Lua::new();
         let context = setup_test_context().await;
@@ -414,14 +414,17 @@ mod lua_globals {
         // Test Hook global placeholder functions
         lua.load(
             r#"
-            -- Test Hook.register() placeholder
-            local result = Hook.register("test_hook", function() end)
-            assert(type(result) == "string", "Hook.register() should return a string")
-            assert(result:find("placeholder") ~= nil, "Hook.register() should indicate it's a placeholder")
+            -- Test Hook.register() with valid hook point
+            local handle = Hook.register("BeforeToolExecution", function() end)
+            assert(type(handle) == "userdata", "Hook.register() should return a userdata handle")
             
             -- Test Hook.list()
             local hooks = Hook.list()
             assert(type(hooks) == "table", "Hook.list() should return a table")
+            assert(#hooks >= 1, "Should have at least one hook registered")
+            
+            -- Test unregister
+            handle:unregister()
         "#,
         )
         .exec()
@@ -479,7 +482,7 @@ mod lua_globals {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_state_global_lua() -> Result<()> {
         let lua = Lua::new();
         let context = setup_test_context().await;

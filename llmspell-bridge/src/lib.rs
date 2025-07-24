@@ -106,6 +106,9 @@ pub mod event_serialization;
 // Global injection infrastructure
 pub mod globals;
 
+// Hook bridge module
+pub mod hook_bridge;
+
 // Agent bridge modules
 pub mod agent_bridge;
 pub mod agents;

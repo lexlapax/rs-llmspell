@@ -38,7 +38,7 @@ async fn test_lua_agent_creation_with_mock_provider() {
     assert!(runtime.is_err());
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_lua_script_provider_access() {
     let runtime_config = RuntimeConfig::default();
     let runtime = ScriptRuntime::new_with_lua(runtime_config).await.unwrap();

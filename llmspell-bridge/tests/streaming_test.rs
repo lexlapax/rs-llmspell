@@ -10,7 +10,7 @@ mod tests {
     };
     use std::sync::Arc;
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_lua_streaming_api_injection() {
         let config = LuaConfig::default();
         let mut engine = EngineFactory::create_lua_engine(&config).unwrap();
@@ -40,7 +40,7 @@ mod tests {
         }
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_lua_coroutine_streaming() {
         let config = LuaConfig::default();
         let mut engine = EngineFactory::create_lua_engine(&config).unwrap();
@@ -83,7 +83,7 @@ mod tests {
         }
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_lua_tool_api() {
         let config = LuaConfig::default();
         let mut engine = EngineFactory::create_lua_engine(&config).unwrap();
@@ -213,7 +213,7 @@ mod tests {
         }
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_lua_streaming_execution() {
         let config = LuaConfig::default();
         let mut engine = EngineFactory::create_lua_engine(&config).unwrap();
