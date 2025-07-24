@@ -58,6 +58,13 @@ Welcome to the rs-llmspell user documentation! This guide will help you write po
   - Monitoring and logging setup
   - Incident response procedures
 
+- **[LLM Provider Configuration](providers.md)** - Configure LLM providers (OpenAI, Anthropic, etc.)
+  - Provider/model hierarchical syntax
+  - Supported providers and models
+  - Configuration methods and best practices
+  - Provider-specific features
+  - Troubleshooting common issues
+
 - **[API Setup Guides](configuration/api-setup-guides.md)** - Set up external API providers
   - Provider-specific setup instructions
   - API key management
