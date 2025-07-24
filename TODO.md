@@ -476,7 +476,7 @@ agent:invokeTool("calculator", {parameters = {parameters = {expression = "2 + 2"
 
 ## Phase 4.3: Production-Ready Built-in Hooks (Days 4.5-5.5)
 
-### Task 4.3.1: Implement Core Built-in Hooks
+### Task 4.3.1: Implement Core Built-in Hooks ✅
 **Priority**: HIGH  
 **Estimated Time**: 4 hours  
 **Assignee**: Core Team
@@ -484,25 +484,25 @@ agent:invokeTool("calculator", {parameters = {parameters = {expression = "2 + 2"
 **Description**: Create the original built-in hooks (logging, metrics, debugging, security).
 
 **Files to Create:**
-- `llmspell-hooks/src/builtin/mod.rs`
-- `llmspell-hooks/src/builtin/logging.rs`
-- `llmspell-hooks/src/builtin/metrics.rs`
-- `llmspell-hooks/src/builtin/debugging.rs`
-- `llmspell-hooks/src/builtin/security.rs`
+- `llmspell-hooks/src/builtin/mod.rs` ✅
+- `llmspell-hooks/src/builtin/logging.rs` ✅
+- `llmspell-hooks/src/builtin/metrics.rs` ✅
+- `llmspell-hooks/src/builtin/debugging.rs` ✅
+- `llmspell-hooks/src/builtin/security.rs` ✅
 
 **Acceptance Criteria:**
-- [ ] LoggingHook with configurable levels
-- [ ] MetricsHook with histogram support
-- [ ] DebuggingHook with trace capture
-- [ ] SecurityHook with audit logging
-- [ ] All respect performance limits
-- [ ] Configuration via standard API
+- [x] LoggingHook with configurable levels
+- [x] MetricsHook with histogram support
+- [x] DebuggingHook with trace capture
+- [x] SecurityHook with audit logging
+- [x] All respect performance limits
+- [x] Configuration via standard API
 
 **Definition of Done:**
-- Each hook individually tested
-- Performance impact measured
-- Configuration examples provided
-- Documentation complete
+- Each hook individually tested ✅
+- Performance impact measured ✅
+- Configuration examples provided ✅
+- Documentation complete ✅
 
 ### Task 4.3.2: Implement CachingHook
 **Priority**: HIGH  

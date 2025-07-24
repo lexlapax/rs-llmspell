@@ -33,6 +33,7 @@
 //! ```
 
 // Re-export core types
+pub mod builtin;
 pub mod circuit_breaker;
 pub mod context;
 pub mod executor;
@@ -57,15 +58,18 @@ pub use traits::{
 };
 pub use types::{ComponentId, ComponentType, HookMetadata, HookPoint, Language, Priority};
 
+// Re-export built-in hooks for easy access
+pub use builtin::{DebuggingHook, LoggingHook, MetricsHook, SecurityHook};
+
 // Version information
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 /// Prelude module for convenient imports
 pub mod prelude {
     pub use crate::{
-        BreakerState, CircuitBreaker, ComponentId, ComponentType, FnHook, Hook, HookAdapter,
-        HookContext, HookExecutor, HookExt, HookPoint, HookRegistry, HookResult, Language,
-        Priority, ReplayableHook,
+        BreakerState, CircuitBreaker, ComponentId, ComponentType, DebuggingHook, FnHook, Hook,
+        HookAdapter, HookContext, HookExecutor, HookExt, HookPoint, HookRegistry, HookResult,
+        Language, LoggingHook, MetricsHook, Priority, ReplayableHook, SecurityHook,
     };
     pub use anyhow::Result;
     pub use async_trait::async_trait;
