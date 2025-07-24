@@ -37,6 +37,7 @@ pub mod builtin;
 pub mod cache;
 pub mod circuit_breaker;
 pub mod context;
+pub mod distributed;
 pub mod executor;
 pub mod performance;
 pub mod priority;
@@ -49,6 +50,10 @@ pub mod types;
 // Re-export commonly used items at crate root
 pub use circuit_breaker::{BreakerState, CircuitBreaker};
 pub use context::{HookContext, HookContextBuilder, OperationContext};
+pub use distributed::{
+    DistributedHookContext, DistributedHookContextBuilder, PropagationFlags, RemoteAgentId,
+    SecurityContext,
+};
 pub use executor::{HookExecutor, HookExecutorBuilder};
 pub use performance::{PerformanceMetrics, PerformanceMonitor};
 pub use priority::{PriorityBucket, PriorityComparator};
