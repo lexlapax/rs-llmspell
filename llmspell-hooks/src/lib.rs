@@ -62,7 +62,8 @@ pub use types::{ComponentId, ComponentType, HookMetadata, HookPoint, Language, P
 
 // Re-export built-in hooks for easy access
 pub use builtin::{
-    CachingHook, DebuggingHook, LoggingHook, MetricsHook, RateLimitHook, RetryHook, SecurityHook,
+    CachingHook, CostTrackingHook, DebuggingHook, LoggingHook, MetricsHook, RateLimitHook,
+    RetryHook, SecurityHook,
 };
 
 // Re-export cache types for easy access
@@ -75,9 +76,9 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub mod prelude {
     pub use crate::{
         BreakerState, Cache, CacheKey, CachingHook, CircuitBreaker, ComponentId, ComponentType,
-        DebuggingHook, FnHook, Hook, HookAdapter, HookContext, HookExecutor, HookExt, HookPoint,
-        HookRegistry, HookResult, Language, LoggingHook, MetricsHook, Priority, RateLimitHook,
-        ReplayableHook, RetryHook, SecurityHook,
+        CostTrackingHook, DebuggingHook, FnHook, Hook, HookAdapter, HookContext, HookExecutor,
+        HookExt, HookPoint, HookRegistry, HookResult, Language, LoggingHook, MetricsHook, Priority,
+        RateLimitHook, ReplayableHook, RetryHook, SecurityHook,
     };
     pub use anyhow::Result;
     pub use async_trait::async_trait;

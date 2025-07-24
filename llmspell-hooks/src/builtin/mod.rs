@@ -2,6 +2,7 @@
 // ABOUTME: Includes logging, metrics, debugging, security, caching, rate limiting, retry, and cost tracking
 
 pub mod caching;
+pub mod cost_tracking;
 pub mod debugging;
 pub mod logging;
 pub mod metrics;
@@ -11,6 +12,7 @@ pub mod security;
 
 // Re-exports for easy access
 pub use caching::CachingHook;
+pub use cost_tracking::CostTrackingHook;
 pub use debugging::DebuggingHook;
 pub use logging::LoggingHook;
 pub use metrics::MetricsHook;
@@ -63,6 +65,11 @@ mod tests {
         // Test retry hook
         let retry_hook = RetryHook::new();
         let result = retry_hook.execute(&mut context).await.unwrap();
+        assert!(result.should_continue());
+
+        // Test cost tracking hook
+        let cost_tracking_hook = CostTrackingHook::new();
+        let result = cost_tracking_hook.execute(&mut context).await.unwrap();
         assert!(result.should_continue());
     }
 }
