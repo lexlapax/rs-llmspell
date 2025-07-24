@@ -41,7 +41,7 @@ pub trait EventStorage: Send + Sync {
 }
 
 /// Storage statistics
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct StorageStats {
     /// Total number of stored events
     pub total_events: u64,
@@ -53,18 +53,6 @@ pub struct StorageStats {
     pub newest_event: Option<DateTime<Utc>>,
     /// Events by type
     pub events_by_type: HashMap<String, u64>,
-}
-
-impl Default for StorageStats {
-    fn default() -> Self {
-        Self {
-            total_events: 0,
-            storage_size_bytes: 0,
-            oldest_event: None,
-            newest_event: None,
-            events_by_type: HashMap::new(),
-        }
-    }
 }
 
 /// Event storage adapter that uses any StorageBackend

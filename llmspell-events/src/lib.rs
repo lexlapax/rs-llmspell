@@ -62,6 +62,7 @@ pub mod overflow;
 pub mod pattern;
 pub mod serialization;
 pub mod storage_adapter;
+pub mod stream;
 pub mod universal_event;
 
 // Re-export main types
@@ -75,12 +76,14 @@ pub use serialization::EventSerializer;
 pub use storage_adapter::{
     EventPersistenceManager, EventStorage, EventStorageAdapter, PersistenceConfig, StorageStats,
 };
+pub use stream::{EventStream, HighThroughputProcessor, StreamUtils, ThroughputMeasurement};
 pub use universal_event::{EventMetadata, Language, UniversalEvent};
 
 /// Prelude module for convenient imports
 pub mod prelude {
     pub use crate::{
         AsyncEventHandler, BackpressureNotification, EventBus, EventBusBuilder, EventHandler,
-        EventMetadata, EventPattern, FlowController, Language, OverflowStrategy, UniversalEvent,
+        EventMetadata, EventPattern, EventStream, FlowController, HighThroughputProcessor,
+        Language, OverflowStrategy, StreamUtils, UniversalEvent,
     };
 }

@@ -31,3 +31,7 @@ futures = "0.3"
 tokio-test = "0.4"
 criterion = "0.5"
 proptest = "1.4"
+
+[features]
+default = []
+stress_tests = []
