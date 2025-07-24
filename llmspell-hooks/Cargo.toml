@@ -19,6 +19,8 @@ uuid = { version = "1.8", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 dashmap = "5.5"
 parking_lot = "0.12"
+rand = "0.8"
+lru = "0.12"
 serde_json.workspace = true
 thiserror.workspace = true
 log = "0.4"

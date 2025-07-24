@@ -6,6 +6,7 @@ pub mod debugging;
 pub mod logging;
 pub mod metrics;
 pub mod rate_limit;
+pub mod retry;
 pub mod security;
 
 // Re-exports for easy access
@@ -14,6 +15,7 @@ pub use debugging::DebuggingHook;
 pub use logging::LoggingHook;
 pub use metrics::MetricsHook;
 pub use rate_limit::RateLimitHook;
+pub use retry::RetryHook;
 pub use security::SecurityHook;
 
 #[cfg(test)]
@@ -56,6 +58,11 @@ mod tests {
         // Test rate limit hook
         let rate_limit_hook = RateLimitHook::new();
         let result = rate_limit_hook.execute(&mut context).await.unwrap();
+        assert!(result.should_continue());
+
+        // Test retry hook
+        let retry_hook = RetryHook::new();
+        let result = retry_hook.execute(&mut context).await.unwrap();
         assert!(result.should_continue());
     }
 }

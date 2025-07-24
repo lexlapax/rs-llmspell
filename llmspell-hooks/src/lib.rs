@@ -62,7 +62,7 @@ pub use types::{ComponentId, ComponentType, HookMetadata, HookPoint, Language, P
 
 // Re-export built-in hooks for easy access
 pub use builtin::{
-    CachingHook, DebuggingHook, LoggingHook, MetricsHook, RateLimitHook, SecurityHook,
+    CachingHook, DebuggingHook, LoggingHook, MetricsHook, RateLimitHook, RetryHook, SecurityHook,
 };
 
 // Re-export cache types for easy access
@@ -77,7 +77,7 @@ pub mod prelude {
         BreakerState, Cache, CacheKey, CachingHook, CircuitBreaker, ComponentId, ComponentType,
         DebuggingHook, FnHook, Hook, HookAdapter, HookContext, HookExecutor, HookExt, HookPoint,
         HookRegistry, HookResult, Language, LoggingHook, MetricsHook, Priority, RateLimitHook,
-        ReplayableHook, SecurityHook,
+        ReplayableHook, RetryHook, SecurityHook,
     };
     pub use anyhow::Result;
     pub use async_trait::async_trait;
