@@ -318,21 +318,80 @@ pub fn inject_hook_global(
             source: None,
         })?;
 
-    // Hook.list(hook_point) -> array of hook info
+    // Hook.list(filter) -> array of hook info
+    // filter can be:
+    //   - nil: list all hooks
+    //   - string: hook point name
+    //   - table: {hook_point?, language?, priority?, tag?}
     let hook_bridge_clone = hook_bridge.clone();
     let list_fn = lua
-        .create_function(move |lua, hook_point: Option<String>| {
-            let hook_point = hook_point.map(|s| parse_hook_point(&s)).transpose()?;
+        .create_function(move |lua, filter: Option<mlua::Value>| {
             let hook_bridge = hook_bridge_clone.clone();
+
+            // Parse filter
+            let hook_point_filter = match &filter {
+                Some(mlua::Value::String(s)) => Some(parse_hook_point(s.to_str()?)?),
+                Some(mlua::Value::Table(table)) => {
+                    if let Ok(hook_point_str) = table.get::<_, String>("hook_point") {
+                        Some(parse_hook_point(&hook_point_str)?)
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            };
 
             let hooks = block_on_async::<_, _, LLMSpellError>(
                 "hook_list",
-                async move { hook_bridge.list_hooks(hook_point).await },
+                async move { hook_bridge.list_hooks(hook_point_filter).await },
                 None,
             )?;
 
+            // Apply additional filters if provided
+            let filtered_hooks: Vec<_> = if let Some(mlua::Value::Table(filter_table)) = &filter {
+                hooks
+                    .into_iter()
+                    .filter(|hook| {
+                        // Language filter
+                        if let Ok(language_filter) = filter_table.get::<_, String>("language") {
+                            if hook.language.to_string().to_lowercase()
+                                != language_filter.to_lowercase()
+                            {
+                                return false;
+                            }
+                        }
+
+                        // Priority filter
+                        if let Ok(priority_filter) = filter_table.get::<_, String>("priority") {
+                            let matches_priority = match priority_filter.to_lowercase().as_str() {
+                                "highest" => hook.priority.0 == i32::MIN,
+                                "high" => hook.priority.0 == -100,
+                                "normal" => hook.priority.0 == 0,
+                                "low" => hook.priority.0 == 100,
+                                "lowest" => hook.priority.0 == i32::MAX,
+                                _ => false,
+                            };
+                            if !matches_priority {
+                                return false;
+                            }
+                        }
+
+                        // Tag filter
+                        if let Ok(tag_filter) = filter_table.get::<_, String>("tag") {
+                            if !hook.tags.iter().any(|tag| tag.contains(&tag_filter)) {
+                                return false;
+                            }
+                        }
+
+                        true
+                    })
+                    .collect()
+            } else {
+                hooks
+            };
+
             let result = lua.create_table()?;
-            for (i, hook) in hooks.iter().enumerate() {
+            for (i, hook) in filtered_hooks.iter().enumerate() {
                 let hook_info = lua.create_table()?;
                 hook_info.set("name", hook.name.clone())?;
                 hook_info.set("priority", format!("{:?}", hook.priority))?;
@@ -361,6 +420,40 @@ pub fn inject_hook_global(
         .set("list", list_fn)
         .map_err(|e| LLMSpellError::Component {
             message: format!("Failed to set Hook.list: {}", e),
+            source: None,
+        })?;
+
+    // Hook.unregister(handle) -> bool
+    let unregister_fn = lua
+        .create_function(move |_, handle: mlua::AnyUserData| {
+            // Try to cast to LuaHookHandle and call unregister
+            if let Ok(lua_handle) = handle.borrow::<LuaHookHandle>() {
+                block_on_async::<_, _, LLMSpellError>(
+                    "hook_unregister_standalone",
+                    async move {
+                        let mut handle_lock = lua_handle.handle.write().await;
+                        if let Some(h) = handle_lock.take() {
+                            lua_handle.hook_bridge.unregister_hook(&h).await?;
+                            Ok::<bool, LLMSpellError>(true)
+                        } else {
+                            Ok::<bool, LLMSpellError>(false)
+                        }
+                    },
+                    None,
+                )
+            } else {
+                Ok(false) // Invalid handle, return false instead of error
+            }
+        })
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to create Hook.unregister: {}", e),
+            source: None,
+        })?;
+
+    hook_table
+        .set("unregister", unregister_fn)
+        .map_err(|e| LLMSpellError::Component {
+            message: format!("Failed to set Hook.unregister: {}", e),
             source: None,
         })?;
 
