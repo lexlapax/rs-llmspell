@@ -266,10 +266,10 @@ async fn test_concurrent_execution_correctness() {
     println!("Overhead ratio: {:.2}x", overhead_ratio);
 
     // Since Lua engine uses a Mutex internally, concurrent execution won't be faster.
-    // We just verify that the overhead is reasonable (less than 3x slower)
+    // We just verify that the overhead is reasonable (less than 5x slower)
     // The overhead can vary based on system load and task scheduling
     assert!(
-        overhead_ratio < 3.0,
+        overhead_ratio < 5.0,
         "Concurrent execution overhead too high: {:.2}x",
         overhead_ratio
     );

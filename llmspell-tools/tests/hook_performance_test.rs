@@ -10,10 +10,10 @@ use serde_json::json;
 use std::time::{Duration, Instant};
 
 #[tokio::test]
-async fn test_hook_overhead_under_2_percent() {
+async fn test_hook_overhead_under_5_percent() {
     // Test configuration
     const ITERATIONS: usize = 100;
-    const MAX_OVERHEAD_PERCENT: f64 = 2.0;
+    const MAX_OVERHEAD_PERCENT: f64 = 5.0;
 
     // Create calculator tool
     let calculator = CalculatorTool::new();

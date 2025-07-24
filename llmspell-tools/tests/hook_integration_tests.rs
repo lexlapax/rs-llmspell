@@ -353,7 +353,7 @@ async fn test_tool_registry_with_executor() {
     };
 
     // Create tool registry
-    let mut registry = ToolRegistry::new();
+    let registry = ToolRegistry::new();
 
     // Register tools using register method
     registry
