@@ -5,6 +5,7 @@ pub mod caching;
 pub mod debugging;
 pub mod logging;
 pub mod metrics;
+pub mod rate_limit;
 pub mod security;
 
 // Re-exports for easy access
@@ -12,6 +13,7 @@ pub use caching::CachingHook;
 pub use debugging::DebuggingHook;
 pub use logging::LoggingHook;
 pub use metrics::MetricsHook;
+pub use rate_limit::RateLimitHook;
 pub use security::SecurityHook;
 
 #[cfg(test)]
@@ -49,6 +51,11 @@ mod tests {
         // Test caching hook
         let caching_hook = CachingHook::new();
         let result = caching_hook.execute(&mut context).await.unwrap();
+        assert!(result.should_continue());
+
+        // Test rate limit hook
+        let rate_limit_hook = RateLimitHook::new();
+        let result = rate_limit_hook.execute(&mut context).await.unwrap();
         assert!(result.should_continue());
     }
 }

@@ -40,6 +40,7 @@ pub mod context;
 pub mod executor;
 pub mod performance;
 pub mod priority;
+pub mod rate_limiter;
 pub mod registry;
 pub mod result;
 pub mod traits;
@@ -60,7 +61,9 @@ pub use traits::{
 pub use types::{ComponentId, ComponentType, HookMetadata, HookPoint, Language, Priority};
 
 // Re-export built-in hooks for easy access
-pub use builtin::{CachingHook, DebuggingHook, LoggingHook, MetricsHook, SecurityHook};
+pub use builtin::{
+    CachingHook, DebuggingHook, LoggingHook, MetricsHook, RateLimitHook, SecurityHook,
+};
 
 // Re-export cache types for easy access
 pub use cache::{Cache, CacheKey, CacheStats};
@@ -73,8 +76,8 @@ pub mod prelude {
     pub use crate::{
         BreakerState, Cache, CacheKey, CachingHook, CircuitBreaker, ComponentId, ComponentType,
         DebuggingHook, FnHook, Hook, HookAdapter, HookContext, HookExecutor, HookExt, HookPoint,
-        HookRegistry, HookResult, Language, LoggingHook, MetricsHook, Priority, ReplayableHook,
-        SecurityHook,
+        HookRegistry, HookResult, Language, LoggingHook, MetricsHook, Priority, RateLimitHook,
+        ReplayableHook, SecurityHook,
     };
     pub use anyhow::Result;
     pub use async_trait::async_trait;
