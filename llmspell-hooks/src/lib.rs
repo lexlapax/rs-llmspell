@@ -37,6 +37,8 @@ pub mod circuit_breaker;
 pub mod context;
 pub mod executor;
 pub mod performance;
+pub mod priority;
+pub mod registry;
 pub mod result;
 pub mod traits;
 pub mod types;
@@ -46,6 +48,8 @@ pub use circuit_breaker::{BreakerState, CircuitBreaker};
 pub use context::{HookContext, HookContextBuilder, OperationContext};
 pub use executor::{HookExecutor, HookExecutorBuilder};
 pub use performance::{PerformanceMetrics, PerformanceMonitor};
+pub use priority::{PriorityBucket, PriorityComparator};
+pub use registry::{HookRegistry, RegistryError};
 pub use result::{ForkBuilder, HookResult, Operation, RetryBuilder};
 pub use traits::{
     ArcHook, BoxedHook, ComposableHook, FnHook, Hook, HookAdapter, HookExt, MetricHook,
@@ -60,7 +64,8 @@ pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 pub mod prelude {
     pub use crate::{
         BreakerState, CircuitBreaker, ComponentId, ComponentType, FnHook, Hook, HookAdapter,
-        HookContext, HookExecutor, HookExt, HookPoint, HookResult, Language, ReplayableHook,
+        HookContext, HookExecutor, HookExt, HookPoint, HookRegistry, HookResult, Language,
+        Priority, ReplayableHook,
     };
     pub use anyhow::Result;
     pub use async_trait::async_trait;

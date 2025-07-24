@@ -170,7 +170,7 @@ agent:invokeTool("calculator", {parameters = {parameters = {expression = "2 + 2"
 - Performance benchmarks documented ✅
 - Integration tests with various scenarios ✅
 
-### Task 4.1.3: Build HookRegistry with Priority Support
+### Task 4.1.3: Build HookRegistry with Priority Support ✅
 **Priority**: HIGH  
 **Estimated Time**: 4 hours  
 **Assignee**: Core Team
@@ -178,21 +178,21 @@ agent:invokeTool("calculator", {parameters = {parameters = {expression = "2 + 2"
 **Description**: Implement thread-safe HookRegistry with priority-based execution and language awareness.
 
 **Files to Create:**
-- `llmspell-hooks/src/registry.rs` - HookRegistry implementation
-- `llmspell-hooks/src/priority.rs` - Priority ordering logic
+- `llmspell-hooks/src/registry.rs` - HookRegistry implementation ✅
+- `llmspell-hooks/src/priority.rs` - Priority ordering logic ✅
 
 **Acceptance Criteria:**
-- [ ] Thread-safe registration with Arc<RwLock<>>
-- [ ] Priority-based hook ordering
-- [ ] Language-specific hook filtering
-- [ ] Bulk registration support
-- [ ] Hook metadata storage
-- [ ] Efficient lookup by HookPoint
+- [x] Thread-safe registration with Arc<RwLock<>>
+- [x] Priority-based hook ordering
+- [x] Language-specific hook filtering
+- [x] Bulk registration support
+- [x] Hook metadata storage
+- [x] Efficient lookup by HookPoint
 
 **Definition of Done:**
-- Concurrent registration tests pass
-- Priority ordering validated
-- Performance benchmarks complete
+- Concurrent registration tests pass ✅
+- Priority ordering validated ✅
+- Performance benchmarks complete ✅
 
 ### Task 4.1.4: Implement CompositeHook Patterns
 **Priority**: MEDIUM  
