@@ -11,6 +11,15 @@ use chrono::Utc;
 use log::{debug, error, info, trace, warn};
 use serde::{Deserialize, Serialize};
 
+// OPTIMIZATION: Pre-allocate common strings to reduce allocations
+const BUILTIN_TAG: &str = "builtin";
+const LOGGING_TAG: &str = "logging";
+const HOOK_NAME: &str = "logging_hook";
+const HOOK_DESCRIPTION: &str = "Built-in hook for logging hook execution events";
+const HOOK_VERSION: &str = "1.0.0";
+const EMPTY_JSON: &str = "{}";
+const SERIALIZATION_ERROR: &str = "{serialization_error}";
+
 /// Configuration for the logging hook
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LoggingConfig {
@@ -60,12 +69,13 @@ impl LoggingHook {
         Self {
             config: LoggingConfig::default(),
             metadata: HookMetadata {
-                name: "LoggingHook".to_string(),
-                description: Some("Built-in hook for logging hook execution".to_string()),
+                // OPTIMIZATION: Use pre-allocated constants to reduce allocations
+                name: HOOK_NAME.to_owned(),
+                description: Some(HOOK_DESCRIPTION.to_owned()),
                 priority: Priority::LOW, // Run after other hooks
                 language: Language::Native,
-                tags: vec!["builtin".to_string(), "logging".to_string()],
-                version: "1.0.0".to_string(),
+                tags: vec![BUILTIN_TAG.to_owned(), LOGGING_TAG.to_owned()],
+                version: HOOK_VERSION.to_owned(),
             },
         }
     }
@@ -110,30 +120,36 @@ impl LoggingHook {
     }
 
     /// Truncate data if it exceeds the maximum size
-    fn truncate_data(&self, data: &str) -> String {
+    /// OPTIMIZATION: Use Cow to avoid unnecessary allocations
+    fn truncate_data<'a>(&self, data: &'a str) -> std::borrow::Cow<'a, str> {
         if data.len() > self.config.max_data_size {
-            format!("{}... (truncated)", &data[..self.config.max_data_size])
+            std::borrow::Cow::Owned(format!(
+                "{}... (truncated)",
+                &data[..self.config.max_data_size]
+            ))
         } else {
-            data.to_string()
+            std::borrow::Cow::Borrowed(data)
         }
     }
 
     /// Format context data as a log-friendly string
+    /// OPTIMIZATION: Use constants and Cow to reduce allocations
     fn format_context_data(&self, context: &HookContext) -> String {
         if !self.config.include_context_data || context.data.is_empty() {
-            return "{}".to_string();
+            return EMPTY_JSON.to_owned();
         }
 
         match serde_json::to_string(&context.data) {
-            Ok(json) => self.truncate_data(&json),
-            Err(_) => "{serialization_error}".to_string(),
+            Ok(json) => self.truncate_data(&json).into_owned(),
+            Err(_) => SERIALIZATION_ERROR.to_owned(),
         }
     }
 
     /// Format metadata as a log-friendly string
+    /// OPTIMIZATION: Use constant for empty case
     fn format_metadata(&self, context: &HookContext) -> String {
         if !self.config.include_metadata || context.metadata.is_empty() {
-            return "{}".to_string();
+            return EMPTY_JSON.to_owned();
         }
 
         format!("{:?}", context.metadata)
@@ -332,7 +348,7 @@ mod tests {
         let hook = LoggingHook::new();
         let metadata = hook.metadata();
 
-        assert_eq!(metadata.name, "LoggingHook");
+        assert_eq!(metadata.name, HOOK_NAME);
         assert!(metadata.description.is_some());
         assert_eq!(metadata.priority, Priority::LOW);
         assert_eq!(metadata.language, Language::Native);

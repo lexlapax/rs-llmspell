@@ -39,6 +39,37 @@ pub struct BreakerConfig {
 impl Default for BreakerConfig {
     fn default() -> Self {
         Self {
+            // OPTIMIZATION: Reduced failure threshold for faster detection
+            failure_threshold: 3,
+            success_threshold: 2,
+            // OPTIMIZATION: Shorter window for faster recovery
+            failure_window: Duration::from_secs(30),
+            // OPTIMIZATION: Shorter open duration for faster recovery
+            open_duration: Duration::from_secs(15),
+            // OPTIMIZATION: Lower slow call threshold for <5% overhead target
+            slow_call_threshold: 2,
+            // OPTIMIZATION: Stricter slow call duration to maintain performance
+            slow_call_duration: Duration::from_millis(50),
+        }
+    }
+}
+
+impl BreakerConfig {
+    /// Production-optimized configuration for hook system
+    pub fn production_optimized() -> Self {
+        Self {
+            failure_threshold: 2,
+            success_threshold: 1,
+            failure_window: Duration::from_secs(20),
+            open_duration: Duration::from_secs(10),
+            slow_call_threshold: 1,
+            slow_call_duration: Duration::from_millis(25),
+        }
+    }
+
+    /// Conservative configuration for critical hooks
+    pub fn conservative() -> Self {
+        Self {
             failure_threshold: 5,
             success_threshold: 3,
             failure_window: Duration::from_secs(60),

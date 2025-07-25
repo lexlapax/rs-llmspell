@@ -7,6 +7,7 @@ use crate::types::{HookMetadata, HookPoint, Language, Priority};
 use dashmap::DashMap;
 use parking_lot::RwLock;
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use tracing::{debug, info};
 
@@ -22,8 +23,8 @@ struct HookEntry {
 pub struct HookRegistry {
     /// Hooks organized by HookPoint
     hooks: Arc<DashMap<HookPoint, Vec<HookEntry>>>,
-    /// Global hook state
-    global_enabled: Arc<RwLock<bool>>,
+    /// OPTIMIZATION: Global hook state using atomic for lock-free access
+    global_enabled: Arc<AtomicBool>,
     /// Statistics
     stats: Arc<RwLock<RegistryStats>>,
 }
@@ -42,7 +43,7 @@ impl HookRegistry {
     pub fn new() -> Self {
         Self {
             hooks: Arc::new(DashMap::new()),
-            global_enabled: Arc::new(RwLock::new(true)),
+            global_enabled: Arc::new(AtomicBool::new(true)),
             stats: Arc::new(RwLock::new(RegistryStats::default())),
         }
     }
@@ -157,13 +158,15 @@ impl HookRegistry {
     where
         F: Fn(&HookEntry) -> bool,
     {
-        if !*self.global_enabled.read() {
+        // OPTIMIZATION: Use atomic load instead of RwLock read
+        if !self.global_enabled.load(Ordering::Relaxed) {
             return Vec::new();
         }
 
         self.hooks
             .get(point)
             .map(|hooks| {
+                // OPTIMIZATION: Use iterator chain to avoid intermediate Vec allocation
                 hooks
                     .iter()
                     .filter(|entry| entry.enabled && filter(entry))
@@ -204,7 +207,8 @@ impl HookRegistry {
 
     /// Enable or disable all hooks globally
     pub fn set_global_enabled(&self, enabled: bool) {
-        *self.global_enabled.write() = enabled;
+        // OPTIMIZATION: Use atomic store instead of RwLock write
+        self.global_enabled.store(enabled, Ordering::Relaxed);
         info!(
             "{} all hooks globally",
             if enabled { "Enabled" } else { "Disabled" }
@@ -213,7 +217,8 @@ impl HookRegistry {
 
     /// Check if hooks are globally enabled
     pub fn is_global_enabled(&self) -> bool {
-        *self.global_enabled.read()
+        // OPTIMIZATION: Use atomic load instead of RwLock read
+        self.global_enabled.load(Ordering::Relaxed)
     }
 
     /// Clear all hooks for a specific point

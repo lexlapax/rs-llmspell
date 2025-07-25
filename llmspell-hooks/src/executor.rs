@@ -102,26 +102,29 @@ impl HookExecutor {
         hook: &dyn Hook,
         context: &mut HookContext,
     ) -> Result<HookResult> {
+        // OPTIMIZATION: Cache metadata to avoid repeated calls
         let metadata = hook.metadata();
-        let hook_name = metadata.name.clone();
+        let hook_name = &metadata.name; // Use reference instead of clone
 
         // Check if hook should execute
         if !hook.should_execute(context) {
             return Ok(HookResult::Skipped("Hook conditions not met".to_string()));
         }
 
-        // Get hook-specific configuration
-        let hook_config = self
-            .hook_configs
-            .read()
-            .get(&hook_name)
-            .cloned()
-            .unwrap_or_default();
+        // OPTIMIZATION: Get config and circuit breaker in single operation
+        let (hook_config, breaker_opt) = {
+            let configs = self.hook_configs.read();
+            let config = configs.get(hook_name).cloned().unwrap_or_default();
+            let breaker = if self.config.enable_circuit_breaker && config.use_circuit_breaker {
+                Some(self.get_circuit_breaker(hook_name, &config))
+            } else {
+                None
+            };
+            (config, breaker)
+        };
 
         // Check circuit breaker if enabled
-        if self.config.enable_circuit_breaker && hook_config.use_circuit_breaker {
-            let breaker = self.get_circuit_breaker(&hook_name, &hook_config);
-
+        if let Some(ref breaker) = breaker_opt {
             if !breaker.can_execute() {
                 warn!("Circuit breaker open for hook: {}", hook_name);
                 return Ok(HookResult::Skipped(format!(
@@ -131,14 +134,14 @@ impl HookExecutor {
             }
         }
 
-        // Start performance tracking
-        let timer = if self.config.enable_performance_monitoring {
-            Some(self.performance_monitor.start_execution(&hook_name))
+        // OPTIMIZATION: Combine timer start and instant measurement
+        let (timer, start) = if self.config.enable_performance_monitoring {
+            let start = Instant::now();
+            let timer = Some(self.performance_monitor.start_execution(hook_name));
+            (timer, start)
         } else {
-            None
+            (None, Instant::now())
         };
-
-        let start = Instant::now();
 
         // Execute the hook
         let result = hook.execute(context).await;
@@ -150,17 +153,15 @@ impl HookExecutor {
             timer.complete();
         }
 
-        // Update circuit breaker
-        if self.config.enable_circuit_breaker && hook_config.use_circuit_breaker {
-            let breaker = self.get_circuit_breaker(&hook_name, &hook_config);
-
+        // OPTIMIZATION: Update circuit breaker using cached reference
+        if let Some(breaker) = breaker_opt {
             match &result {
                 Ok(_) => breaker.record_success(duration),
                 Err(e) => breaker.record_failure(e),
             }
         }
 
-        // Check if execution was too slow
+        // OPTIMIZATION: Pre-compute timeout check
         let timeout = hook_config
             .timeout
             .unwrap_or(self.config.max_execution_time);

@@ -158,7 +158,7 @@ fn bench_operation_with_hooks(c: &mut Criterion) {
 }
 
 /// Calculate and print hook overhead percentage
-fn calculate_hook_overhead(c: &mut Criterion) {
+fn calculate_hook_overhead(_c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
 
     println!("\n=== Hook Overhead Analysis ===");
