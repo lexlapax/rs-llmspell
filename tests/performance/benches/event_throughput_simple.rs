@@ -2,9 +2,9 @@
 // ABOUTME: Validates the event system can handle 100K+ events per second
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use llmspell_events::{EventBus, UniversalEvent, Language};
-use std::sync::Arc;
+use llmspell_events::{EventBus, Language, UniversalEvent};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 use tokio::runtime::Runtime;
 
@@ -56,7 +56,7 @@ fn bench_event_with_subscribers(c: &mut Criterion) {
                     let cnt = counter.clone();
                     let pattern = format!("test.event.{}", i);
                     let mut receiver = event_bus.subscribe(&pattern).await.unwrap();
-                    
+
                     // Spawn task to handle events
                     tokio::spawn(async move {
                         while let Some(_event) = receiver.recv().await {
@@ -107,7 +107,7 @@ fn bench_pattern_matching(c: &mut Criterion) {
                 for pattern in patterns {
                     let cnt = counter.clone();
                     let mut receiver = event_bus.subscribe(pattern).await.unwrap();
-                    
+
                     // Spawn task to handle events
                     tokio::spawn(async move {
                         while let Some(_event) = receiver.recv().await {
@@ -209,7 +209,7 @@ fn verify_event_throughput(_c: &mut Criterion) {
             let cnt = counter.clone();
             let pattern = format!("perf.sub.{}", i);
             let mut receiver = event_bus_sub.subscribe(&pattern).await.unwrap();
-            
+
             // Spawn task to handle events
             tokio::spawn(async move {
                 while let Some(_event) = receiver.recv().await {
@@ -249,7 +249,7 @@ fn verify_event_throughput(_c: &mut Criterion) {
         for pattern in patterns {
             let cnt = pattern_counter.clone();
             let mut receiver = event_bus_pattern.subscribe(pattern).await.unwrap();
-            
+
             // Spawn task to handle events
             tokio::spawn(async move {
                 while let Some(_event) = receiver.recv().await {

@@ -3,10 +3,7 @@
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use llmspell_agents::testing::mocks::{MockAgent, MockAgentConfig};
-use llmspell_core::{
-    types::AgentInput,
-    BaseAgent, ExecutionContext,
-};
+use llmspell_core::{types::AgentInput, BaseAgent, ExecutionContext};
 use std::collections::HashMap;
 use tokio::runtime::Runtime;
 
@@ -18,7 +15,7 @@ fn bench_agent_baseline(c: &mut Criterion) {
         b.iter(|| {
             rt.block_on(async {
                 let mut agent = MockAgent::new(MockAgentConfig::default());
-                
+
                 let input = AgentInput {
                     text: "test input".to_string(),
                     media: vec![],
@@ -43,12 +40,15 @@ fn bench_agent_with_simulated_hooks(c: &mut Criterion) {
         b.iter(|| {
             rt.block_on(async {
                 let mut agent = MockAgent::new(MockAgentConfig::default());
-                
+
                 // Simulate hook overhead with 5 simple operations
                 for _ in 0..5 {
-                    black_box(format!("hook-operation-{}", chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)));
+                    black_box(format!(
+                        "hook-operation-{}",
+                        chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
+                    ));
                 }
-                
+
                 let input = AgentInput {
                     text: "test input".to_string(),
                     media: vec![],
@@ -75,7 +75,11 @@ fn bench_hook_operations_only(c: &mut Criterion) {
                 // Simulate 5 hook operations without agent execution
                 let mut results = Vec::new();
                 for i in 0..5 {
-                    let hook_result = format!("hook-{}-{}", i, chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0));
+                    let hook_result = format!(
+                        "hook-{}-{}",
+                        i,
+                        chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
+                    );
                     results.push(hook_result);
                 }
                 black_box(results)
@@ -94,11 +98,11 @@ fn bench_memory_overhead(c: &mut Criterion) {
                 // Simulate memory allocations similar to hook system
                 let contexts: Vec<String> = Vec::with_capacity(5);
                 let mut hook_data = HashMap::new();
-                
+
                 for i in 0..5 {
                     hook_data.insert(format!("hook-{}", i), format!("data-{}", i));
                 }
-                
+
                 black_box((contexts, hook_data))
             });
         });
@@ -124,7 +128,7 @@ fn calculate_hook_overhead(_c: &mut Criterion) {
                 output_modalities: vec![],
             };
             let context = ExecutionContext::default();
-            
+
             let _ = agent.execute(input, context).await;
         }
         let baseline = start.elapsed();
@@ -134,9 +138,12 @@ fn calculate_hook_overhead(_c: &mut Criterion) {
         for _ in 0..1000 {
             // Simulate hook overhead
             for _ in 0..5 {
-                black_box(format!("hook-operation-{}", chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)));
+                black_box(format!(
+                    "hook-operation-{}",
+                    chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
+                ));
             }
-            
+
             let mut agent = MockAgent::new(MockAgentConfig::default());
             let input = AgentInput {
                 text: "test input".to_string(),
@@ -146,7 +153,7 @@ fn calculate_hook_overhead(_c: &mut Criterion) {
                 output_modalities: vec![],
             };
             let context = ExecutionContext::default();
-            
+
             let _ = agent.execute(input, context).await;
         }
         let with_hooks = start.elapsed();
@@ -169,7 +176,7 @@ fn calculate_hook_overhead(_c: &mut Criterion) {
 
         // Also test pure hook operation overhead
         println!("\n--- Pure Hook Operations Overhead ---");
-        
+
         let start = tokio::time::Instant::now();
         for _ in 0..10000 {
             black_box(42 + 42); // Baseline operation
@@ -178,12 +185,18 @@ fn calculate_hook_overhead(_c: &mut Criterion) {
 
         let start = tokio::time::Instant::now();
         for _ in 0..10000 {
-            black_box(format!("hook-{}", chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)));
+            black_box(format!(
+                "hook-{}",
+                chrono::Utc::now().timestamp_nanos_opt().unwrap_or(0)
+            ));
         }
         let hook_operations = start.elapsed();
 
-        let hook_only_overhead_ns = hook_operations.as_nanos().saturating_sub(hook_baseline.as_nanos());
-        let hook_only_overhead_percent = (hook_only_overhead_ns as f64 / hook_baseline.as_nanos() as f64) * 100.0;
+        let hook_only_overhead_ns = hook_operations
+            .as_nanos()
+            .saturating_sub(hook_baseline.as_nanos());
+        let hook_only_overhead_percent =
+            (hook_only_overhead_ns as f64 / hook_baseline.as_nanos() as f64) * 100.0;
 
         println!("Hook baseline: {:?}", hook_baseline);
         println!("Hook operations: {:?}", hook_operations);

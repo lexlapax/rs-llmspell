@@ -2,7 +2,7 @@
 // ABOUTME: Validates performance of script runtime and cross-language operations
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use llmspell_bridge::{ScriptRuntime, RuntimeConfig};
+use llmspell_bridge::{RuntimeConfig, ScriptRuntime};
 use llmspell_events::{Language, UniversalEvent};
 use mlua::{Lua, Result as LuaResult};
 use tokio::runtime::Runtime;
@@ -15,15 +15,20 @@ fn bench_lua_script_execution(c: &mut Criterion) {
         b.iter(|| {
             rt.block_on(async {
                 let lua = Lua::new();
-                
-                let result: LuaResult<i32> = lua.load(r#"
+
+                let result: LuaResult<i32> = lua
+                    .load(
+                        r#"
                     local sum = 0
                     for i = 1, 100 do
                         sum = sum + i
                     end
                     return sum
-                "#).eval_async().await;
-                
+                "#,
+                    )
+                    .eval_async()
+                    .await;
+
                 black_box(result)
             });
         });
@@ -38,8 +43,10 @@ fn bench_lua_table_operations(c: &mut Criterion) {
         b.iter(|| {
             rt.block_on(async {
                 let lua = Lua::new();
-                
-                let result: LuaResult<String> = lua.load(r#"
+
+                let result: LuaResult<String> = lua
+                    .load(
+                        r#"
                     local agent = {
                         id = "test-agent",
                         type = "BasicAgent",
@@ -59,8 +66,11 @@ fn bench_lua_table_operations(c: &mut Criterion) {
                     end
                     
                     return agent.id .. "-processed"
-                "#).eval_async().await;
-                
+                "#,
+                    )
+                    .eval_async()
+                    .await;
+
                 black_box(result)
             });
         });
@@ -99,7 +109,7 @@ fn bench_cross_language_event_serialization(c: &mut Criterion) {
                     }),
                     Language::Rust,
                 );
-                
+
                 let lua_event = UniversalEvent::new(
                     "lua.test.event",
                     serde_json::json!({
@@ -109,11 +119,11 @@ fn bench_cross_language_event_serialization(c: &mut Criterion) {
                     }),
                     Language::Lua,
                 );
-                
+
                 // Simulate serialization overhead
                 let rust_serialized = serde_json::to_string(&rust_event).unwrap();
                 let lua_serialized = serde_json::to_string(&lua_event).unwrap();
-                
+
                 black_box((rust_serialized, lua_serialized))
             });
         });
@@ -128,8 +138,10 @@ fn bench_lua_coroutine_overhead(c: &mut Criterion) {
         b.iter(|| {
             rt.block_on(async {
                 let lua = Lua::new();
-                
-                let result: LuaResult<String> = lua.load(r#"
+
+                let result: LuaResult<String> = lua
+                    .load(
+                        r#"
                     local co = coroutine.create(function()
                         local result = ""
                         for i = 1, 10 do
@@ -148,8 +160,11 @@ fn bench_lua_coroutine_overhead(c: &mut Criterion) {
                     end
                     
                     return final_result
-                "#).eval_async().await;
-                
+                "#,
+                    )
+                    .eval_async()
+                    .await;
+
                 black_box(result)
             });
         });
@@ -179,20 +194,25 @@ fn calculate_cross_language_overhead(_c: &mut Criterion) {
         let lua = Lua::new();
         let start = tokio::time::Instant::now();
         for i in 0..1000 {
-            let script = format!(r#"
+            let script = format!(
+                r#"
                 local data = {{
                     test = "data",
                     iteration = {},
                     processed = true
                 }}
                 return data.test .. "-" .. data.iteration
-            "#, i);
-            
+            "#,
+                i
+            );
+
             let _: LuaResult<String> = lua.load(&script).eval_async().await;
         }
         let lua_execution = start.elapsed();
 
-        let overhead_ns = lua_execution.as_nanos().saturating_sub(rust_baseline.as_nanos());
+        let overhead_ns = lua_execution
+            .as_nanos()
+            .saturating_sub(rust_baseline.as_nanos());
         let overhead_percent = (overhead_ns as f64 / rust_baseline.as_nanos() as f64) * 100.0;
 
         println!("Pure Rust operations: {:?}", rust_baseline);
@@ -212,14 +232,14 @@ fn calculate_cross_language_overhead(_c: &mut Criterion) {
 
         // Also test script runtime initialization overhead
         println!("\n--- Script Runtime Initialization Overhead ---");
-        
+
         let start = tokio::time::Instant::now();
         for _ in 0..10 {
             let config = RuntimeConfig::default();
             let _ = ScriptRuntime::new_with_lua(config).await;
         }
         let runtime_init = start.elapsed();
-        
+
         let per_init = runtime_init.as_millis() / 10;
         println!("Runtime initialization (avg): {}ms", per_init);
         println!(

@@ -777,15 +777,15 @@ mod tests {
 **Assignee**: Bridge Team
 **Status**: NOT STARTED
 
-**Description**: Implement state persistence API in the 3-layer script bridge architecture, enabling Lua/JavaScript/Python scripts to save and load state.
+**Description**: Implement state persistence API in the 3-layer script bridge architecture, enabling Lua/JavaScript scripts to save and load state.
 
 **Files to Create/Update:**
 - **UPDATE**: `llmspell-bridge/Cargo.toml` - Add llmspell-state-persistence dependency
-- **UPDATE**: `llmspell-bridge/src/context.rs` - Add StateManager to bridge context
+- **UPDATE**: `llmspell-bridge/src/globals/state_global.rs` - Replace placeholder with StateManager integration
 - **CREATE**: `llmspell-bridge/src/lua/globals/state.rs` - Lua state API implementation
-- **CREATE**: `llmspell-bridge/src/js/globals/state.js` - JavaScript state API
+- **CREATE**: `llmspell-bridge/src/javascript/globals/state.rs` - JavaScript state API implementation
 - **UPDATE**: `llmspell-bridge/src/lua/engine.rs` - Register state globals
-- **UPDATE**: `llmspell-bridge/src/js/engine.rs` - Register state globals
+- **UPDATE**: `llmspell-bridge/src/javascript/engine.rs` - Register state globals
 - **CREATE**: `examples/lua/persistence/state_persistence.lua` - Lua example
 - **CREATE**: `tests/bridge/state_api_tests.rs` - Bridge API tests
 
@@ -800,66 +800,66 @@ mod tests {
 - [⚡] Value conversions handle all JSON-compatible types
 
 **Implementation Steps:**
-1. **Bridge Context Integration** (1 hour):
+1. **Top-Level Global Integration** (1 hour):
    ```rust
-   // llmspell-bridge/src/context.rs
-   pub struct BridgeContext {
-       // ... existing fields
-       state_manager: Arc<StateManager>,
+   // llmspell-bridge/src/globals/state_global.rs
+   pub struct StateGlobal {
+       state_manager: Option<Arc<StateManager>>, // Replace in-memory HashMap
    }
    ```
-   - Add StateManager to context
-   - Handle initialization
+   - Replace placeholder implementation with StateManager
+   - Handle optional StateManager (backward compatibility)
    - Ensure thread safety
 
-2. **Lua Native Globals Implementation** (2 hours):
+2. **Lua Language-Specific Implementation** (2 hours):
    ```rust
    // llmspell-bridge/src/lua/globals/state.rs
-   pub fn state_save(
-       ctx: &BridgeContext,
-       scope: String,
-       key: String,
-       value: Value,
-   ) -> Result<(), BridgeError> {
-       // Convert scope string to StateScope enum
-       // Convert Lua Value to serde_json::Value
-       // Handle async with tokio runtime
-       // Call state_manager.set()
+   pub fn create_state_module(
+       lua: &Lua,
+       state_global: &StateGlobal,
+   ) -> Result<Table, BridgeError> {
+       // Create state table with save/load/delete/list methods
+       // Follow same pattern as agent.rs, tool.rs, workflow.rs
+       // Handle async with block_on_async utility
    }
    ```
-   - Implement all four operations
-   - Handle scope parsing
-   - Convert between mlua::Value and serde_json::Value
-   - Use existing async patterns from workflow.rs
+   - Follow established lua/globals pattern
+   - Use existing conversion utilities
+   - Handle async with sync_utils::block_on_async
+   - Mirror API from state_global.rs
 
-3. **JavaScript Bridge Implementation** (1.5 hours):
-   - Mirror Lua API structure
+3. **JavaScript Language-Specific Implementation** (1.5 hours):
+   ```rust
+   // llmspell-bridge/src/javascript/globals/state.rs
+   pub fn create_state_module(
+       ctx: &mut boa_engine::Context,
+       state_global: &StateGlobal,
+   ) -> Result<(), BridgeError> {
+       // Follow same pattern as javascript/globals/agent.rs
+       // Mirror Lua API functionality
+   }
+   ```
+   - Follow established javascript/globals pattern
    - Use existing JS value conversion utilities
    - Maintain consistency with other JS globals
-   - Handle promises for async operations
 
-4. **Python Bridge Implementation** (1 hour):
-   - Follow existing Python binding patterns
-   - Handle Python object conversions
-   - Maintain API consistency
-
-5. **Script Engine Registration** (0.5 hours):
+4. **Script Engine Registration** (0.5 hours):
    ```rust
-   // In create_lua_globals()
-   globals.set("state", state_module)?;
+   // In lua/engine.rs and javascript/engine.rs
+   // Follow existing global registration patterns
    ```
-   - Register in all three engines
-   - Set up proper namespacing
-   - Add to documentation
+   - Register state globals in both engines
+   - Follow existing global injection patterns
+   - Maintain consistent namespacing
 
 **Definition of Done:**
-- [x] All three script languages can perform state operations
-- [x] Async operations don't block script execution
-- [x] Error messages are clear and actionable
-- [x] Examples demonstrate common use cases
-- [x] Integration tests verify cross-language consistency
-- [x] Performance is acceptable (<5ms overhead per operation)
-- [x] Documentation includes script API reference
+- [ ] Lua and JavaScript can perform state operations (save/load/delete/list)
+- [ ] Async operations don't block script execution
+- [ ] Error messages are clear and actionable
+- [ ] Examples demonstrate common use cases
+- [ ] Integration tests verify cross-language consistency
+- [ ] Performance is acceptable (<5ms overhead per operation)
+- [ ] Documentation includes script API reference
 
 ---
 

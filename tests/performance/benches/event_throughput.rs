@@ -2,7 +2,7 @@
 // ABOUTME: Validates 100K+ events/second capability and event bus performance
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use llmspell_events::{EventBus, UniversalEvent, Language};
+use llmspell_events::{EventBus, Language, UniversalEvent};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::runtime::Runtime;
@@ -59,10 +59,7 @@ fn bench_event_subscription(c: &mut Criterion) {
         group.bench_function(name, |b| {
             b.iter(|| {
                 rt.block_on(async {
-                    let mut receiver = event_bus
-                        .subscribe(pattern)
-                        .await
-                        .unwrap();
+                    let mut receiver = event_bus.subscribe(pattern).await.unwrap();
 
                     // Publish matching events
                     for i in 0..100 {
@@ -201,10 +198,7 @@ fn bench_high_frequency_events(c: &mut Criterion) {
                 for _i in 0..5 {
                     let bus = event_bus.clone();
                     let handle = tokio::spawn(async move {
-                        let mut sub = bus
-                            .subscribe("high_freq.*")
-                            .await
-                            .unwrap();
+                        let mut sub = bus.subscribe("high_freq.*").await.unwrap();
 
                         let mut count = 0;
                         let start = tokio::time::Instant::now();
@@ -266,10 +260,7 @@ fn bench_event_memory_usage(c: &mut Criterion) {
                 // Create 10k subscriptions
                 for i in 0..10_000 {
                     let pattern = format!("memory.test.{}", i % 100);
-                    let sub = event_bus
-                        .subscribe(&pattern)
-                        .await
-                        .unwrap();
+                    let sub = event_bus.subscribe(&pattern).await.unwrap();
                     subscriptions.push(sub);
                 }
 
@@ -289,7 +280,7 @@ fn bench_event_memory_usage(c: &mut Criterion) {
 
                 // Simplified: just track the number of subscriptions created
                 let subscription_count = subscriptions.len();
-                
+
                 // Force all subscriptions to receive at least one event each
                 for mut sub in subscriptions {
                     if let Some(_) = sub.recv().await {
@@ -333,10 +324,7 @@ fn calculate_throughput_metrics(_c: &mut Criterion) {
     // Test 2: End-to-end throughput (publish + receive)
     let e2e_throughput = rt.block_on(async {
         let event_bus = Arc::new(EventBus::new());
-        let mut sub = event_bus
-            .subscribe("e2e.*")
-            .await
-            .unwrap();
+        let mut sub = event_bus.subscribe("e2e.*").await.unwrap();
 
         let events_to_process = 100_000;
 

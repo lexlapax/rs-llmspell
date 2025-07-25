@@ -3,11 +3,13 @@
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use llmspell_state_persistence::{
+    agent_state::{
+        AgentMetadata, AgentStateData, ExecutionState, PersistentAgentState, ToolUsageStats,
+    },
     StateManager, StateScope,
-    agent_state::{PersistentAgentState, AgentStateData, AgentMetadata, ToolUsageStats, ExecutionState},
 };
-use std::sync::Arc;
 use std::collections::HashMap;
+use std::sync::Arc;
 use tokio::runtime::Runtime;
 
 /// Benchmark basic state save operation
@@ -25,7 +27,7 @@ fn bench_state_save_basic(c: &mut Criterion) {
                     "conversation": ["Hello", "Hi there!"],
                     "context": {"topic": "greeting"}
                 });
-                
+
                 let _ = state_manager.set(scope, "state", value).await;
 
                 black_box(state_manager)
@@ -49,7 +51,10 @@ fn bench_state_load_basic(c: &mut Criterion) {
                     "conversation": ["Hello", "Hi there!"],
                     "context": {"topic": "greeting"}
                 });
-                state_manager.set(scope.clone(), "state", value).await.unwrap();
+                state_manager
+                    .set(scope.clone(), "state", value)
+                    .await
+                    .unwrap();
 
                 // Load state
                 let loaded = state_manager.get(scope, "state").await.unwrap();
@@ -108,7 +113,7 @@ fn bench_state_concurrent_access(c: &mut Criterion) {
 
                 // Spawn multiple tasks accessing different agents
                 let mut handles = vec![];
-                
+
                 for i in 0..10 {
                     let sm = state_manager.clone();
                     let handle = tokio::spawn(async move {
@@ -117,7 +122,7 @@ fn bench_state_concurrent_access(c: &mut Criterion) {
                             "agent_id": format!("agent-{}", i),
                             "state": "active"
                         });
-                        
+
                         // Save and load state
                         sm.set(scope.clone(), "state", value).await.unwrap();
                         sm.get(scope, "state").await.unwrap()
@@ -156,7 +161,7 @@ fn bench_state_scope_isolation(c: &mut Criterion) {
                 for (i, scope) in scopes.iter().enumerate() {
                     let key = format!("key-{}", i);
                     let value = serde_json::json!({"data": i});
-                    
+
                     state_manager.set(scope.clone(), &key, value).await.unwrap();
                     let _ = state_manager.get(scope.clone(), &key).await.unwrap();
                 }
@@ -198,7 +203,10 @@ fn bench_agent_state_persistence(c: &mut Criterion) {
 
                 // Save and load agent state
                 state_manager.save_agent_state(&agent_state).await.unwrap();
-                let _ = state_manager.load_agent_state(&agent_state.agent_id).await.unwrap();
+                let _ = state_manager
+                    .load_agent_state(&agent_state.agent_id)
+                    .await
+                    .unwrap();
 
                 black_box(state_manager)
             })
@@ -234,11 +242,16 @@ fn calculate_state_persistence_overhead(_c: &mut Criterion) {
         let start = tokio::time::Instant::now();
         for i in 0..1000 {
             let key = format!("key-{}", i);
-            state_manager.set(scope.clone(), &key, test_data.clone()).await.unwrap();
+            state_manager
+                .set(scope.clone(), &key, test_data.clone())
+                .await
+                .unwrap();
         }
         let with_persistence = start.elapsed();
 
-        let overhead_ns = with_persistence.as_nanos().saturating_sub(baseline.as_nanos());
+        let overhead_ns = with_persistence
+            .as_nanos()
+            .saturating_sub(baseline.as_nanos());
         let overhead_percent = (overhead_ns as f64 / baseline.as_nanos() as f64) * 100.0;
 
         println!("Baseline operation: {:?}", baseline);
@@ -250,13 +263,13 @@ fn calculate_state_persistence_overhead(_c: &mut Criterion) {
             if overhead_percent < 5.0 {
                 "PASS ✅"
             } else {
-                "FAIL ❌"  
+                "FAIL ❌"
             }
         );
 
         // Also test agent state persistence overhead
         println!("\n--- Agent State Persistence Overhead ---");
-        
+
         let agent_state = PersistentAgentState {
             agent_id: "overhead-agent".to_string(),
             agent_type: "BasicAgent".to_string(),
@@ -290,8 +303,11 @@ fn calculate_state_persistence_overhead(_c: &mut Criterion) {
         }
         let agent_with_persistence = start.elapsed();
 
-        let agent_overhead_ns = agent_with_persistence.as_nanos().saturating_sub(agent_baseline.as_nanos());
-        let agent_overhead_percent = (agent_overhead_ns as f64 / agent_baseline.as_nanos() as f64) * 100.0;
+        let agent_overhead_ns = agent_with_persistence
+            .as_nanos()
+            .saturating_sub(agent_baseline.as_nanos());
+        let agent_overhead_percent =
+            (agent_overhead_ns as f64 / agent_baseline.as_nanos() as f64) * 100.0;
 
         println!("Agent baseline operation: {:?}", agent_baseline);
         println!("With agent state persistence: {:?}", agent_with_persistence);
