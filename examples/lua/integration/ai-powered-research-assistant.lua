@@ -264,103 +264,34 @@ local research_workflow = Workflow.sequential({
     description = "Multi-step research workflow with AI agents",
     
     steps = {
-        -- Step 1: Initial research
+        -- Step 1: Initial research using researcher agent
         {
             name = "initial_research",
-            type = "custom",
-            execute = function(context)
-                print("   📚 Step 1: Conducting initial research...")
-                
-                Event.publish("research.workflow.step", {
-                    step = "initial_research",
-                    status = "started",
-                    timestamp = os.time()
-                })
-                
-                -- Use researcher agent to explore the topic
-                local research_prompt = "Research the current state of quantum computing applications in cryptography. Focus on recent developments and practical applications."
-                
-                local result = researcher:invoke({
-                    text = research_prompt
-                })
-                
-                Event.publish("research.workflow.step", {
-                    step = "initial_research",
-                    status = "completed",
-                    result_length = result and result.text and #result.text or 0,
-                    timestamp = os.time()
-                })
-                
-                return {success = true, findings = result and result.text or "No findings"}
-            end
+            type = "agent",
+            agent = "researcher",
+            input = {
+                text = "Research the current state of quantum computing applications in cryptography. Focus on recent developments and practical applications."
+            }
         },
         
-        -- Step 2: Deep analysis
+        -- Step 2: Deep analysis using analyst agent
         {
             name = "deep_analysis",
-            type = "custom",
-            execute = function(context)
-                print("   🔍 Step 2: Performing deep analysis...")
-                
-                Event.publish("research.workflow.step", {
-                    step = "deep_analysis",
-                    status = "started",
-                    timestamp = os.time()
-                })
-                
-                -- Use analyst agent to analyze findings
-                local findings = context.results and context.results.initial_research and context.results.initial_research.findings or "No previous findings"
-                local analysis_prompt = "Analyze the following research findings and identify key cryptographic applications of quantum computing: " .. findings
-                
-                local result = analyst:invoke({
-                    text = analysis_prompt
-                })
-                
-                Event.publish("research.workflow.step", {
-                    step = "deep_analysis",
-                    status = "completed",
-                    timestamp = os.time()
-                })
-                
-                return {success = true, analysis = result and result.text or "No analysis"}
-            end
+            type = "agent",
+            agent = "analyst",
+            input = {
+                text = "Analyze the following research findings and identify key cryptographic applications of quantum computing: {{step:initial_research:output}}"
+            }
         },
         
-        -- Step 3: Synthesis and report generation
+        -- Step 3: Synthesis and report generation using synthesizer agent
         {
             name = "synthesis",
-            type = "custom",
-            execute = function(context)
-                print("   📝 Step 3: Synthesizing findings...")
-                
-                Event.publish("research.workflow.step", {
-                    step = "synthesis",
-                    status = "started",
-                    timestamp = os.time()
-                })
-                
-                -- Use synthesizer agent to create final report
-                local findings = context.results and context.results.initial_research and context.results.initial_research.findings or "No findings"
-                local analysis = context.results and context.results.deep_analysis and context.results.deep_analysis.analysis or "No analysis"
-                
-                local synthesis_prompt = string.format(
-                    "Create a comprehensive summary of quantum computing applications in cryptography based on:\nResearch: %s\nAnalysis: %s",
-                    findings,
-                    analysis
-                )
-                
-                local result = synthesizer:invoke({
-                    text = synthesis_prompt
-                })
-                
-                Event.publish("research.workflow.step", {
-                    step = "synthesis",
-                    status = "completed",
-                    timestamp = os.time()
-                })
-                
-                return {success = true, report = result and result.text or "No report"}
-            end
+            type = "agent",
+            agent = "synthesizer",
+            input = {
+                text = "Create a comprehensive summary of quantum computing applications in cryptography based on:\nResearch: {{step:initial_research:output}}\nAnalysis: {{step:deep_analysis:output}}"
+            }
         }
     }
 })
@@ -371,10 +302,28 @@ print()
 print("5. Executing research workflow:")
 print(string.rep("-", 60))
 
+-- Hook to monitor workflow progress
+local progress_hook = Hook.register("BeforeWorkflowStage", function(context)
+    if context.stage_name then
+        local stage_names = {
+            initial_research = "📚 Step 1: Conducting initial research...",
+            deep_analysis = "🔍 Step 2: Performing deep analysis...",
+            synthesis = "📝 Step 3: Synthesizing findings..."
+        }
+        print("   " .. (stage_names[context.stage_name] or "Processing " .. context.stage_name .. "..."))
+    end
+    return "continue"
+end, "high")
+
 -- Execute the workflow
 local workflow_start = os.clock()
 local workflow_result = research_workflow:execute()
 local workflow_duration = (os.clock() - workflow_start) * 1000
+
+-- Unregister progress hook
+if progress_hook then
+    Hook.unregister(progress_hook)
+end
 
 print(string.rep("-", 60))
 print()
@@ -402,13 +351,14 @@ if config.enable_monitoring then
             if not event then break end
             
             event_count = event_count + 1
-            event_types[event.type] = (event_types[event.type] or 0) + 1
+            local event_type = event.event_type or event.type or "unknown"
+            event_types[event_type] = (event_types[event_type] or 0) + 1
             
             -- Process specific event types
-            if event.type == "research.finding.captured" then
-                print(string.format("   💡 Finding captured from %s", event.data.agent))
-            elseif event.type == "research.tool.web_search" then
-                print(string.format("   🔍 Web search performed: %s", event.data.query))
+            if event_type == "research.finding.captured" then
+                print(string.format("   💡 Finding captured from %s", event.data and event.data.agent or "unknown"))
+            elseif event_type == "research.tool.web_search" then
+                print(string.format("   🔍 Web search performed: %s", event.data and event.data.query or "unknown"))
             end
         end
     end
@@ -449,9 +399,17 @@ if workflow_result.success then
                                string.sub(tostring(finding.finding), 1, 100) .. "..."))
         end
     else
-        print("   • Initial research: " .. tostring(workflow_result.results[1].findings))
-        print("   • Analysis: " .. tostring(workflow_result.results[2].analysis))
-        print("   • Final report: " .. tostring(workflow_result.results[3].report))
+        -- Show workflow results
+        if workflow_result.data and workflow_result.data.steps then
+            print("   • Initial research: [Completed]")
+            print("   • Analysis: [Completed]")
+            print("   • Final report: [Completed]")
+            if workflow_result.data.final_output then
+                print()
+                print("📄 Final Report Summary:")
+                print(string.sub(tostring(workflow_result.data.final_output), 1, 200) .. "...")
+            end
+        end
     end
 else
     print("❌ Research workflow failed")

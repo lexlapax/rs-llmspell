@@ -1524,60 +1524,117 @@ Following the 4.6.1 pattern, map workflow execution lifecycle to hook points:
 
 ## Phase 4.9: Documentation and Polish (Days 10.5-11)
 
-### Task 4.9.1: API Documentation
+### Task 4.9.1: Core Documentation (Technical & API Reference)
 **Priority**: HIGH  
 **Estimated Time**: 4 hours  
 **Assignee**: Documentation Team
 
-**Description**: Complete API documentation for enhanced hook system.
+**Description**: Create comprehensive technical documentation and API references for the hook and event systems.
 
 **Files to Create/Update:**
-- `/docs/user-guide/hooks.md`
-- `/docs/user-guide/events.md`
-- `/docs/user-guide/builtin-hooks.md`
-- `/docs/technical/hook-architecture.md`
-- update the index README.md for each doc directory
 
-**Deliverables:**
-- Complete rustdoc coverage
-- Architecture diagrams
-- Performance tuning guide
-- Cross-language guide
-- Migration from Phase 3
-- Troubleshooting guide
+1. **Create `/docs/user-guide/hooks-events-overview.md`**
+   - High-level introduction to hooks vs events
+   - When to use each system
+   - Architecture diagram showing integration points
+   - Quick start examples
+
+2. **Create `/docs/user-guide/hooks-guide.md`**
+   - Complete hook system guide
+   - All 40+ hook points with descriptions
+   - Hook lifecycle and execution order
+   - Priority system explanation
+   - All 9 HookResult types with use cases
+   - CircuitBreaker behavior and performance guarantees (<5% overhead)
+   - Hook overhead and tuning
+
+3. **Create `/docs/user-guide/events-guide.md`**
+   - Event system architecture
+   - UniversalEvent format specification
+   - Pattern-based subscriptions
+   - FlowController and backpressure
+   - Event persistence with storage backend
+   - Performance characteristics (90K+ events/sec)
+   - Event throughput optimization
+
+4. **Create `/docs/user-guide/builtin-hooks-reference.md`**
+   - Detailed reference for all 8 built-in hooks
+   - Configuration options for each
+   - Usage examples and best practices
+   - Performance implications
+
+5. **Update `/docs/technical/hook-event-architecture.md`**
+   - Replace placeholder with actual implementation details
+   - Cross-language bridge architecture (3-layer pattern)
+   - Performance optimization strategies
+   - Security model and sandboxing
+   - Future extensibility points
+
+6. **Create `/docs/developer-guide/hook-development-guide.md`**
+   - How to create custom hooks in Rust
+   - HookAdapter trait implementation
+   - Testing hooks with mocks
+   - Performance best practices
+   - Cross-language hook development
 
 **Definition of Done:**
-- 100% rustdoc coverage
-- All diagrams created
-- Examples working
+- All 6 documents created/updated
+- Technical accuracy verified
+- Code examples tested
+- Cross-references added
 - Review complete
 
-### Task 4.9.2: User Guide and Examples
+### Task 4.9.2: User Guides and Integration
 **Priority**: HIGH  
 **Estimated Time**: 4 hours  
 **Assignee**: Developer Experience Team
 
-**Description**: Create comprehensive user documentation.
+**Description**: Create user-focused guides showing practical usage and integration patterns.
 
-**Files to Create:**
-- `/docs/user-guide/hooks.md`
-- `/docs/user-guide/events.md`
-- `/docs/user-guide/hook-patterns.md`
-- `/examples/hooks/` (15+ examples)
+**Files to Create/Update:**
 
-**Deliverables:**
-- Hook system overview
-- Built-in hooks reference
-- Custom hook tutorial
-- Event handling patterns
-- Performance best practices
-- Cross-language examples
+7. **Create `/docs/user-guide/hook-patterns.md`**
+   - Common hook patterns and recipes
+   - Composite hooks (Sequential, Parallel, FirstMatch, Voting)
+   - Cross-component coordination patterns
+   - Error handling and recovery
+   - Performance monitoring patterns using MetricsHook
+
+8. **Create `/docs/user-guide/cross-language-integration.md`**
+   - How hooks and events work across languages
+   - Lua integration with examples
+   - JavaScript preparation (Phase 15 preview)
+   - Language adapter patterns
+   - Serialization and data flow
+
+9. **Update `/docs/user-guide/tutorial-agents-workflows.md`**
+   - Add section on enhancing agents with hooks
+   - Show workflow event coordination
+   - Integration examples from real usage
+
+10. **Update `/docs/user-guide/api-reference.md`**
+    - Add Hook and Event global objects
+    - Complete API signatures
+    - Cross-reference with examples
+
+11. **Update main documentation indexes**
+    - `/docs/user-guide/README.md` - Add hooks/events section
+    - `/docs/developer-guide/README.md` - Add hook development
+    - `/docs/technical/README.md` - Update architecture section
+    - `/docs/README.md` - Update main documentation hub
+
+12. **Create `/docs/user-guide/examples/hooks-events-cookbook.md`**
+    - Reference the 23 examples from 4.8.1
+    - Categorize by use case
+    - Show complete working examples
+    - Link to runnable code
 
 **Definition of Done:**
-- All guides complete
-- Examples tested
-- Screenshots added
-- Feedback incorporated
+- All 6 documents created/updated
+- Examples verified against 4.8.1 implementations
+- Cross-references complete
+- Integration patterns clear
+- Review complete
 
 ### Task 4.9.3: Final Optimization
 **Priority**: MEDIUM  
@@ -1661,6 +1718,30 @@ Following the 4.6.1 pattern, map workflow execution lifecycle to hook points:
 - [ ] DistributedHookContext for Phase 16-17
 - [ ] SelectiveHookRegistry for Phase 18
 - [ ] Cost tracking ready for Phase 14
+
+---
+
+
+## Handoff to Phase 5
+
+### Deliverables Package - handoff package
+- [ ] 
+- [ ] 
+
+### Knowledge Transfer Session
+- [ ] 
+- [ ] 
+
+### Phase 4 Deferrals to Future Phases
+1. **Minor Issues (Phase 5 can address)**
+   - 
+   - 
+   - 
+
+2. **Intentional Deferrals (Future phases)**
+   - 
+   - 
+   - 
 
 ---
 
