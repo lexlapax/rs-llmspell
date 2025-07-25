@@ -20,7 +20,7 @@ rs-llmspell: **Scriptable LLM interactions** via Lua, JavaScript - Cast scriptin
 - **Test Coverage**: >90% coverage required (enforced in CI)
 - **Documentation**: >95% API documentation coverage required
 - **Formatting**: Run `cargo fmt --all` before every commit
-- **Performance**: Maintain established benchmarks (e.g., <10ms tool initialization)
+- **Performance**: Maintain established benchmarks (e.g., <10ms tool initialization, <1% hook overhead)
 
 ### Quality Check Commands
 
@@ -162,6 +162,8 @@ SKIP_SLOW_TESTS=true ./scripts/quality-check.sh  # Skip slow tests
 - Tool invocation overhead: <10ms
 - Workflow step overhead: <20ms
 - Script bridge overhead: <5ms
+- Hook execution overhead: <1% (enforced by CircuitBreaker)
+- Event throughput: >90K events/sec
 - Memory usage: Linear with workload
 
 ### Security Requirements

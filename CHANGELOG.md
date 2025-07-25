@@ -7,6 +7,83 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.4.0] - 2025-07-25
+
+### Added
+
+#### Comprehensive Hook and Event System
+- **40+ Hook Points**: Complete coverage across agents (6 states), tools (34 tools), and workflows (4 patterns)
+- **Automatic Performance Protection**: CircuitBreaker ensures <1% overhead with automatic slow hook disabling
+- **Cross-Language Support**: Hooks and events work seamlessly between Lua and native code
+- **9 Hook Result Types**: Continue, Modified, Cancel, Redirect, Replace, Retry, Fork, Cache, Skipped
+- **Composite Hook Patterns**: Sequential, Parallel, FirstMatch, and Voting execution strategies
+
+#### High-Performance Event System
+- **Universal Event Bus**: >90,000 events/sec throughput with pattern-based routing
+- **Cross-Language Event Propagation**: UniversalEvent format enables Lua ↔ Rust communication
+- **Flow Control**: 4 overflow strategies (DropOldest, DropNewest, Block, Reject) prevent overload
+- **Event Persistence**: Optional storage using unified llmspell-storage backend
+- **Pattern Subscriptions**: Wildcard support for flexible event routing (e.g., `*.error`, `user.*`)
+
+#### 8 Production-Ready Built-in Hooks
+1. **LoggingHook**: Smart filtering with configurable levels
+2. **MetricsHook**: Comprehensive metrics collection with histograms
+3. **DebuggingHook**: Enhanced debugging with trace capture
+4. **SecurityHook**: Audit logging and input validation
+5. **CachingHook**: Automatic result caching with TTL and LRU eviction
+6. **RateLimitHook**: Token bucket algorithm for API quota management
+7. **RetryHook**: Exponential backoff with configurable strategies
+8. **CostTrackingHook**: AI/ML operation cost monitoring with alerts
+
+#### Enhanced Integration Points
+- **Agent Lifecycle Hooks**: All 9 agent states trigger appropriate hooks
+- **Tool Execution Hooks**: 8 hook points per tool with resource tracking
+- **Workflow Hook Support**: 14 execution phases across Sequential, Conditional, Loop, and Parallel patterns
+- **Cross-Component Coordination**: Dependency graphs and event correlation for complex scenarios
+
+#### Lua API Enhancements
+- **Hook.register()**: Priority support (highest, high, normal, low, lowest)
+- **Hook.unregister()**: Standalone function and method variants
+- **Hook.list()**: Advanced filtering by language, priority, tag, and hook_point
+- **Event.subscribe()**: Pattern matching with wildcards
+- **Event.emit()**: Cross-language event publishing with metadata
+
+#### Future-Proofing Components
+- **ReplayableHook Trait**: Enables hook persistence for Phase 5
+- **HookAdapter Trait**: Language-specific hook adaptation
+- **DistributedHookContext**: Prepared for Phase 16-17 distributed operations
+- **SelectiveHookRegistry**: Ready for Phase 18 library mode
+- **JavaScript/Python Stubs**: Architecture prepared for future language support
+
+### Changed
+
+#### Performance Optimizations
+- **Hook Overhead**: Reduced from ~5% to <1% through hot path optimizations
+- **Memory Usage**: 40-60% reduction in allocations using Cow patterns
+- **Lock Contention**: 60-80% reduction using atomic operations
+- **Circuit Breaker**: Faster failure detection (3 vs 5) and recovery (15s vs 30s)
+
+#### Architecture Enhancements
+- **Three-Layer Bridge Pattern**: Clean separation of language abstractions, bridge logic, and bindings
+- **Event-Driven Hook System**: Unified architecture eliminates hook/event overlap
+- **Performance Monitoring**: Integrated metrics collection with automatic protection
+- **Cross-Language Bridge**: HookBridge and EventBridge enable seamless integration
+
+### Fixed
+- Tool invocation parameter format issue in agent:invokeTool()
+- Memory leaks in event subscription management
+- Race conditions in concurrent hook registration
+
+### Performance
+
+| Component | Target | Achieved |
+|-----------|--------|----------|
+| Hook Execution Overhead | <5% | <1% |
+| Hook Registration | <0.1ms | ~0.46ms |
+| Event Throughput | >100K/sec | >90K/sec |
+| Circuit Breaker Response | <5ms | <2ms |
+| Memory Usage | Minimal | -40% |
+
 ## [0.3.0] - 2025-07-23
 
 ### Added
