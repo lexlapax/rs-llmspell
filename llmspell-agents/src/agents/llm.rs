@@ -210,7 +210,23 @@ impl BaseAgent for LLMAgent {
         input: AgentInput,
         _context: ExecutionContext,
     ) -> Result<AgentOutput, LLMSpellError> {
-        // Check if agent is in a state that allows execution
+        // Check if agent is in a state that allows execution, auto-initialize if needed
+        let current_state = self.state_machine.current_state().await;
+        
+        // Auto-initialize if in Uninitialized state (like BasicAgent does)
+        if current_state == crate::lifecycle::AgentState::Uninitialized {
+            if let Err(e) = self.state_machine.initialize().await {
+                return Err(LLMSpellError::Component {
+                    message: format!(
+                        "Failed to initialize LLMAgent '{}': {}",
+                        self.metadata.name, e
+                    ),
+                    source: None,
+                });
+            }
+        }
+        
+        // Re-check state after potential initialization
         let current_state = self.state_machine.current_state().await;
         if !current_state.can_execute() {
             return Err(LLMSpellError::Component {
