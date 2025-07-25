@@ -115,7 +115,8 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::len_zero)]
     fn test_version() {
-        assert!(!VERSION.is_empty());
+        assert!(VERSION.len() > 0);
     }
 }

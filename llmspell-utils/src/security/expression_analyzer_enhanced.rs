@@ -331,8 +331,10 @@ mod tests {
 
     #[test]
     fn test_memory_estimation() {
-        let mut config = EnhancedExpressionConfig::default();
-        config.max_memory_bytes = 1000; // Very low for testing
+        let config = EnhancedExpressionConfig {
+            max_memory_bytes: 1000, // Very low for testing
+            ..Default::default()
+        };
         let analyzer = EnhancedExpressionAnalyzer::with_config(config);
 
         let result = analyzer.analyze("sin(x) + cos(y) + tan(z) + exp(a) + log(b)");
@@ -342,8 +344,10 @@ mod tests {
 
     #[test]
     fn test_recursive_depth() {
-        let mut config = EnhancedExpressionConfig::default();
-        config.max_recursive_depth = 2;
+        let config = EnhancedExpressionConfig {
+            max_recursive_depth: 2,
+            ..Default::default()
+        };
         let analyzer = EnhancedExpressionAnalyzer::with_config(config);
 
         // Test with a function that we actually check for
@@ -375,8 +379,10 @@ mod tests {
 
     #[test]
     fn test_variable_counting() {
-        let mut config = EnhancedExpressionConfig::default();
-        config.max_variables = 3;
+        let config = EnhancedExpressionConfig {
+            max_variables: 3,
+            ..Default::default()
+        };
         let analyzer = EnhancedExpressionAnalyzer::with_config(config);
 
         let result = analyzer.analyze("a + b + c");

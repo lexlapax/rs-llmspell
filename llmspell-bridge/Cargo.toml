@@ -17,6 +17,7 @@ llmspell-agents = { path = "../llmspell-agents" }
 llmspell-workflows = { path = "../llmspell-workflows" }
 llmspell-events = { path = "../llmspell-events" }
 llmspell-hooks = { path = "../llmspell-hooks" }
+llmspell-state-persistence = { path = "../llmspell-state-persistence" }
 tokio.workspace = true
 tokio-stream.workspace = true
 async-trait.workspace = true

@@ -600,8 +600,10 @@ mod tests {
 
     #[test]
     fn test_file_size_validation() {
-        let mut config = FileUploadConfig::default();
-        config.max_file_size = 100;
+        let config = FileUploadConfig {
+            max_file_size: 100,
+            ..Default::default()
+        };
 
         let validator = FileUploadValidator::new(config);
 

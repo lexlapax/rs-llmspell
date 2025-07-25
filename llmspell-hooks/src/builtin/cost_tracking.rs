@@ -842,11 +842,13 @@ mod tests {
 
     #[test]
     fn test_cost_metrics_calculations() {
-        let mut metrics = CostTrackingMetrics::default();
-        metrics.total_requests = 100;
-        metrics.total_cost = 50.0;
-        metrics.total_input_tokens = 50000;
-        metrics.total_output_tokens = 25000;
+        let metrics = CostTrackingMetrics {
+            total_requests: 100,
+            total_cost: 50.0,
+            total_input_tokens: 50000,
+            total_output_tokens: 25000,
+            ..Default::default()
+        };
 
         assert_eq!(metrics.average_cost_per_request(), 0.5);
         assert_eq!(metrics.average_tokens_per_request(), 750.0);

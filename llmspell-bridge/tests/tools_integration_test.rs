@@ -67,7 +67,7 @@ async fn test_all_tools_integration() {
     "#;
 
     // Run the test
-    match engine.execute_script(&test_script).await {
+    match engine.execute_script(test_script).await {
         Ok(result) => {
             println!("Integration test output: {:?}", result.output);
 

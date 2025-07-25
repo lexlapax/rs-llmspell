@@ -367,8 +367,10 @@ async fn test_recursive_directory_creation() {
     let test_dir = create_test_dir();
     let nested_dir = test_dir.join("a/b/c/d");
 
-    let mut config = FileOperationsConfig::default();
-    config.allow_recursive = true;
+    let config = FileOperationsConfig {
+        allow_recursive: true,
+        ..Default::default()
+    };
     let tool = FileOperationsTool::new(config);
     let context = create_context();
 
@@ -395,8 +397,10 @@ async fn test_file_size_limits() {
     let test_file = test_dir.join("large.txt");
 
     // Create a custom config with small file size limit
-    let mut config = FileOperationsConfig::default();
-    config.max_file_size = 100; // 100 bytes
+    let config = FileOperationsConfig {
+        max_file_size: 100, // 100 bytes
+        ..Default::default()
+    };
     let tool = FileOperationsTool::new(config);
     let context = create_context();
 

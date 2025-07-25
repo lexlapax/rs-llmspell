@@ -43,8 +43,10 @@ fn bench_circuit_breaker_failure_activation(c: &mut Criterion) {
     c.bench_function("circuit_breaker_failure_activation", |b| {
         b.iter(|| {
             rt.block_on(async {
-                let mut breaker_config = BreakerConfig::default();
-                breaker_config.failure_threshold = 3; // Trip after 3 failures
+                let breaker_config = BreakerConfig {
+                    failure_threshold: 3, // Trip after 3 failures
+                    ..Default::default()
+                };
 
                 let circuit_breaker =
                     CircuitBreaker::with_config("failing-breaker".to_string(), breaker_config);
@@ -75,10 +77,12 @@ fn bench_circuit_breaker_recovery(c: &mut Criterion) {
     c.bench_function("circuit_breaker_recovery", |b| {
         b.iter(|| {
             rt.block_on(async {
-                let mut breaker_config = BreakerConfig::default();
-                breaker_config.failure_threshold = 3;
-                breaker_config.success_threshold = 2;
-                breaker_config.open_duration = Duration::from_millis(10); // Short for testing
+                let breaker_config = BreakerConfig {
+                    failure_threshold: 3,
+                    success_threshold: 2,
+                    open_duration: Duration::from_millis(10), // Short for testing
+                    ..Default::default()
+                };
 
                 let circuit_breaker =
                     CircuitBreaker::with_config("recovery-breaker".to_string(), breaker_config);

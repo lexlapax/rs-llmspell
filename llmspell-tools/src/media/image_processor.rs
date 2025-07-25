@@ -948,8 +948,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_file_size_limit() {
-        let mut config = ImageProcessorConfig::default();
-        config.max_file_size = 10; // Very small limit
+        let config = ImageProcessorConfig {
+            max_file_size: 10, // Very small limit
+            ..Default::default()
+        };
         let tool = ImageProcessorTool::new(config);
 
         let temp_dir = TempDir::new().unwrap();

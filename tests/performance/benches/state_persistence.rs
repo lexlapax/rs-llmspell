@@ -151,7 +151,7 @@ fn bench_state_scope_isolation(c: &mut Criterion) {
                 let state_manager = StateManager::new().await.unwrap();
 
                 // Test different scopes
-                let scopes = vec![
+                let scopes = [
                     StateScope::Global,
                     StateScope::Agent("agent-1".to_string()),
                     StateScope::Workflow("workflow-1".to_string()),

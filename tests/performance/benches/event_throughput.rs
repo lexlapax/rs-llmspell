@@ -9,6 +9,7 @@ use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
 
 /// Benchmark basic event publishing throughput
+#[allow(clippy::redundant_pattern_matching, unused_must_use)]
 fn bench_event_publishing(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
     let event_bus = Arc::new(EventBus::new());
@@ -30,7 +31,7 @@ fn bench_event_publishing(c: &mut Criterion) {
                                 serde_json::json!({"data": format!("event-{}", i)}),
                                 Language::Rust,
                             );
-                            black_box(event_bus.publish(event).await);
+                            let _ = black_box(event_bus.publish(event).await);
                         }
                     });
                 });
@@ -41,6 +42,7 @@ fn bench_event_publishing(c: &mut Criterion) {
 }
 
 /// Benchmark event subscription and filtering
+#[allow(clippy::redundant_pattern_matching, unused_must_use)]
 fn bench_event_subscription(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
     let event_bus = Arc::new(EventBus::new());
@@ -89,6 +91,7 @@ fn bench_event_subscription(c: &mut Criterion) {
 }
 
 /// Benchmark concurrent event publishing and receiving
+#[allow(clippy::redundant_pattern_matching, unused_must_use)]
 fn bench_concurrent_pubsub(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
 
@@ -151,6 +154,7 @@ fn bench_concurrent_pubsub(c: &mut Criterion) {
 }
 
 /// Benchmark event correlation performance
+#[allow(clippy::redundant_pattern_matching, unused_must_use)]
 fn bench_event_correlation(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
     // EventCorrelator not available in current API - simplified benchmark
@@ -185,6 +189,7 @@ fn bench_event_correlation(c: &mut Criterion) {
 }
 
 /// Benchmark high-frequency event scenarios
+#[allow(clippy::redundant_pattern_matching, unused_must_use)]
 fn bench_high_frequency_events(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
 
@@ -248,6 +253,7 @@ fn bench_high_frequency_events(c: &mut Criterion) {
 }
 
 /// Measure event system memory usage under load
+#[allow(clippy::redundant_pattern_matching, unused_must_use)]
 fn bench_event_memory_usage(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
 
@@ -295,6 +301,7 @@ fn bench_event_memory_usage(c: &mut Criterion) {
 }
 
 /// Calculate actual throughput metrics
+#[allow(clippy::redundant_pattern_matching, unused_must_use)]
 fn calculate_throughput_metrics(_c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
 

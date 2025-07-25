@@ -264,5 +264,5 @@ fn test_shared_utility_usage() {
     // validation_error exists but needs type parameters, just proving it exists
 
     // If this test compiles, it proves the utilities exist and are accessible
-    assert!(true, "Shared utilities are properly exposed");
+    // Test passes by compilation - shared utilities are properly exposed
 }

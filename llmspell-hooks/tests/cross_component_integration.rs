@@ -102,7 +102,7 @@ async fn test_coordinator_capacity_limits() {
     // Register two chains (should succeed)
     for i in 0..2 {
         let chain = ExecutionChain::new()
-            .with_name(&format!("chain-{}", i))
+            .with_name(format!("chain-{}", i))
             .add_component(agent_id.clone());
 
         coordinator

@@ -14,8 +14,10 @@ use serde_json::Value;
 #[ignore = "external,integration"]
 async fn test_duckduckgo_real_search() {
     // Create config with only DuckDuckGo
-    let mut config = WebSearchConfig::default();
-    config.default_provider = "duckduckgo".to_string();
+    let config = WebSearchConfig {
+        default_provider: "duckduckgo".to_string(),
+        ..Default::default()
+    };
 
     let tool = WebSearchTool::new(config).expect("Failed to create WebSearchTool");
 

@@ -255,8 +255,10 @@ async fn test_security_enforcement() {
 /// Test memory limits
 #[tokio::test]
 async fn test_memory_limits() {
-    let mut lua_config = LuaConfig::default();
-    lua_config.max_memory = Some(1024 * 1024); // 1MB limit
+    let lua_config = LuaConfig {
+        max_memory: Some(1024 * 1024), // 1MB limit
+        ..Default::default()
+    };
 
     let engine = EngineFactory::create_lua_engine(&lua_config).unwrap();
 
@@ -280,11 +282,11 @@ fn assert_engine_compliance(engine: &dyn ScriptEngineBridge) {
     let name = engine.get_engine_name();
     assert!(!name.is_empty(), "Engine name should not be empty");
 
-    let supports_streaming = engine.supports_streaming();
-    assert!(supports_streaming || !supports_streaming);
+    let _supports_streaming = engine.supports_streaming();
+    // Streaming support exists as boolean capability - test passes by compilation
 
-    let supports_multimodal = engine.supports_multimodal();
-    assert!(supports_multimodal || !supports_multimodal);
+    let _supports_multimodal = engine.supports_multimodal();
+    // Multimodal support exists as boolean capability - test passes by compilation
 
     let features = engine.supported_features();
     // Features should be internally consistent

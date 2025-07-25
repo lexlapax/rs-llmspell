@@ -1,45 +1,100 @@
-//! ABOUTME: State global object providing state management (placeholder for Phase 5)
-//! ABOUTME: Minimal in-memory implementation preparing for persistent state in Phase 5
+//! ABOUTME: State global object providing persistent state management
+//! ABOUTME: Integrates with StateManager for full persistent state functionality
 
 use crate::globals::types::{GlobalContext, GlobalMetadata, GlobalObject};
 use llmspell_core::error::LLMSpellError;
+use llmspell_state_persistence::{StateManager, StateScope};
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-/// State global object providing state management
+/// State global object providing persistent state management
 ///
-/// NOTE: This is a placeholder implementation with in-memory storage only.
-/// Full persistent state with sled/rocksdb, migrations, and backup/restore
-/// will be implemented in Phase 5.
+/// Integrates with StateManager for full persistent state functionality.
+/// Falls back to in-memory storage when StateManager is not available.
 pub struct StateGlobal {
-    /// In-memory state storage (placeholder for Phase 5 persistent storage)
-    state: Arc<RwLock<HashMap<String, serde_json::Value>>>,
+    /// StateManager for persistent storage (optional for backward compatibility)
+    pub state_manager: Option<Arc<StateManager>>,
+    /// Fallback in-memory state storage (when StateManager is not available)
+    pub fallback_state: Arc<RwLock<HashMap<String, serde_json::Value>>>,
 }
 
 impl StateGlobal {
-    /// Create a new State global
+    /// Create a new State global without StateManager (fallback mode)
     pub fn new() -> Self {
         Self {
-            state: Arc::new(RwLock::new(HashMap::new())),
+            state_manager: None,
+            fallback_state: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    /// Create a new State global with StateManager integration
+    pub fn with_state_manager(state_manager: Arc<StateManager>) -> Self {
+        Self {
+            state_manager: Some(state_manager),
+            fallback_state: Arc::new(RwLock::new(HashMap::new())),
+        }
+    }
+
+    /// Helper method to parse scope string to StateScope enum
+    pub fn parse_scope(scope_str: &str) -> StateScope {
+        if scope_str.starts_with("agent:") {
+            StateScope::Agent(
+                scope_str
+                    .strip_prefix("agent:")
+                    .unwrap_or("unknown")
+                    .to_string(),
+            )
+        } else if scope_str.starts_with("workflow:") {
+            StateScope::Workflow(
+                scope_str
+                    .strip_prefix("workflow:")
+                    .unwrap_or("unknown")
+                    .to_string(),
+            )
+        } else if scope_str.starts_with("session:") {
+            StateScope::Session(
+                scope_str
+                    .strip_prefix("session:")
+                    .unwrap_or("unknown")
+                    .to_string(),
+            )
+        } else if scope_str.starts_with("custom:") {
+            StateScope::Custom(
+                scope_str
+                    .strip_prefix("custom:")
+                    .unwrap_or("unknown")
+                    .to_string(),
+            )
+        } else if scope_str == "global" {
+            StateScope::Global
+        } else {
+            StateScope::Custom(scope_str.to_string())
         }
     }
 }
 
 impl GlobalObject for StateGlobal {
     fn metadata(&self) -> GlobalMetadata {
+        let description = if self.state_manager.is_some() {
+            "State management system with persistent storage".to_string()
+        } else {
+            "State management system (in-memory fallback)".to_string()
+        };
+
         GlobalMetadata {
             name: "State".to_string(),
-            version: "0.1.0".to_string(), // Placeholder version
-            description: "State management system (in-memory placeholder)".to_string(),
-            dependencies: vec![],
+            version: "1.0.0".to_string(), // Phase 5 version with StateManager
+            description,
+            dependencies: vec![], // StateManager is optional - gracefully falls back to in-memory
             required: false,
         }
     }
 
     #[cfg(feature = "lua")]
     fn inject_lua(&self, lua: &mlua::Lua, _context: &GlobalContext) -> Result<(), LLMSpellError> {
-        let state_clone = self.state.clone();
+        let state_manager = self.state_manager.clone();
+        let fallback_state = self.fallback_state.clone();
 
         // Create State table
         let state_table = lua.create_table().map_err(|e| LLMSpellError::Component {
@@ -47,17 +102,51 @@ impl GlobalObject for StateGlobal {
             source: None,
         })?;
 
-        // Get method - retrieve state value
-        let state_get = state_clone.clone();
+        // Get method - retrieve state value (scope, key)
+        let get_state_manager = state_manager.clone();
+        let get_fallback_state = fallback_state.clone();
         let get_fn = lua
-            .create_function(move |lua, key: String| {
-                let state = state_get.read();
-                match state.get(&key) {
-                    Some(value) => {
-                        let lua_value = crate::lua::conversion::json_to_lua_value(lua, value)?;
-                        Ok(lua_value)
+            .create_function(move |lua, args: mlua::Variadic<String>| {
+                let (scope_str, key) = match args.len() {
+                    1 => ("Global".to_string(), args[0].clone()),
+                    2 => (args[0].clone(), args[1].clone()),
+                    _ => {
+                        return Err(mlua::Error::RuntimeError(
+                            "State.get() expects 1 or 2 arguments: get(key) or get(scope, key)"
+                                .to_string(),
+                        ))
                     }
-                    None => Ok(mlua::Value::Nil),
+                };
+                // Use async wrapper for StateManager operations
+                if let Some(state_mgr) = &get_state_manager {
+                    let scope = Self::parse_scope(&scope_str);
+                    let runtime = tokio::runtime::Handle::try_current()
+                        .or_else(|_| tokio::runtime::Runtime::new().map(|rt| rt.handle().clone()))
+                        .map_err(|e| {
+                            mlua::Error::RuntimeError(format!("No tokio runtime: {}", e))
+                        })?;
+
+                    let result = runtime.block_on(async { state_mgr.get(scope, &key).await });
+
+                    match result {
+                        Ok(Some(value)) => {
+                            let lua_value = crate::lua::conversion::json_to_lua_value(lua, &value)?;
+                            Ok(lua_value)
+                        }
+                        Ok(None) => Ok(mlua::Value::Nil),
+                        Err(e) => Err(mlua::Error::RuntimeError(format!("State get error: {}", e))),
+                    }
+                } else {
+                    // Fallback to in-memory storage
+                    let full_key = format!("{}:{}", scope_str, key);
+                    let state = get_fallback_state.read();
+                    match state.get(&full_key) {
+                        Some(value) => {
+                            let lua_value = crate::lua::conversion::json_to_lua_value(lua, value)?;
+                            Ok(lua_value)
+                        }
+                        None => Ok(mlua::Value::Nil),
+                    }
                 }
             })
             .map_err(|e| LLMSpellError::Component {
@@ -72,16 +161,62 @@ impl GlobalObject for StateGlobal {
                 source: None,
             })?;
 
-        // Set method - store state value
-        let state_set = state_clone.clone();
+        // Set method - store state value (scope, key, value)
+        let set_state_manager = state_manager.clone();
+        let set_fallback_state = fallback_state.clone();
         let set_fn = lua
-            .create_function(move |_, (key, value): (String, mlua::Value)| {
-                let json_value = crate::lua::conversion::lua_value_to_json(value)?;
-                let mut state = state_set.write();
-                state.insert(key, json_value);
-                // TODO: Phase 5 - Persist to storage backend
-                Ok(())
-            })
+            .create_function(
+                move |_, args: mlua::Variadic<mlua::Value>| {
+                    let (scope_str, key, value) = match args.len() {
+                        2 => {
+                            let key = args[0].as_str().ok_or_else(|| {
+                                mlua::Error::RuntimeError("First argument must be a string (key)".to_string())
+                            })?.to_string();
+                            ("Global".to_string(), key, args[1].clone())
+                        },
+                        3 => {
+                            let scope = args[0].as_str().ok_or_else(|| {
+                                mlua::Error::RuntimeError("First argument must be a string (scope)".to_string())
+                            })?.to_string();
+                            let key = args[1].as_str().ok_or_else(|| {
+                                mlua::Error::RuntimeError("Second argument must be a string (key)".to_string())
+                            })?.to_string();
+                            (scope, key, args[2].clone())
+                        },
+                        _ => return Err(mlua::Error::RuntimeError(
+                            "State.set() expects 2 or 3 arguments: set(key, value) or set(scope, key, value)".to_string()
+                        )),
+                    };
+                    let json_value = crate::lua::conversion::lua_value_to_json(value)?;
+
+                    if let Some(state_mgr) = &set_state_manager {
+                        let scope = Self::parse_scope(&scope_str);
+                        let runtime = tokio::runtime::Handle::try_current()
+                            .or_else(|_| {
+                                tokio::runtime::Runtime::new().map(|rt| rt.handle().clone())
+                            })
+                            .map_err(|e| {
+                                mlua::Error::RuntimeError(format!("No tokio runtime: {}", e))
+                            })?;
+
+                        let result = runtime
+                            .block_on(async { state_mgr.set(scope, &key, json_value).await });
+
+                        match result {
+                            Ok(()) => Ok(()),
+                            Err(e) => {
+                                Err(mlua::Error::RuntimeError(format!("State set error: {}", e)))
+                            }
+                        }
+                    } else {
+                        // Fallback to in-memory storage
+                        let full_key = format!("{}:{}", scope_str, key);
+                        let mut state = set_fallback_state.write();
+                        state.insert(full_key, json_value);
+                        Ok(())
+                    }
+                },
+            )
             .map_err(|e| LLMSpellError::Component {
                 message: format!("Failed to create State.set: {}", e),
                 source: None,
@@ -94,14 +229,42 @@ impl GlobalObject for StateGlobal {
                 source: None,
             })?;
 
-        // Delete method
-        let state_delete = state_clone.clone();
+        // Delete method - remove state value (scope, key)
+        let delete_state_manager = state_manager.clone();
+        let delete_fallback_state = fallback_state.clone();
         let delete_fn = lua
-            .create_function(move |_, key: String| {
-                let mut state = state_delete.write();
-                state.remove(&key);
-                // TODO: Phase 5 - Remove from storage backend
-                Ok(())
+            .create_function(move |_, args: mlua::Variadic<String>| {
+                let (scope_str, key) = match args.len() {
+                    1 => ("Global".to_string(), args[0].clone()),
+                    2 => (args[0].clone(), args[1].clone()),
+                    _ => return Err(mlua::Error::RuntimeError(
+                        "State.delete() expects 1 or 2 arguments: delete(key) or delete(scope, key)".to_string()
+                    )),
+                };
+                if let Some(state_mgr) = &delete_state_manager {
+                    let scope = Self::parse_scope(&scope_str);
+                    let runtime = tokio::runtime::Handle::try_current()
+                        .or_else(|_| tokio::runtime::Runtime::new().map(|rt| rt.handle().clone()))
+                        .map_err(|e| {
+                            mlua::Error::RuntimeError(format!("No tokio runtime: {}", e))
+                        })?;
+
+                    let result = runtime.block_on(async { state_mgr.delete(scope, &key).await });
+
+                    match result {
+                        Ok(_) => Ok(()),
+                        Err(e) => Err(mlua::Error::RuntimeError(format!(
+                            "State delete error: {}",
+                            e
+                        ))),
+                    }
+                } else {
+                    // Fallback to in-memory storage
+                    let full_key = format!("{}:{}", scope_str, key);
+                    let mut state = delete_fallback_state.write();
+                    state.remove(&full_key);
+                    Ok(())
+                }
             })
             .map_err(|e| LLMSpellError::Component {
                 message: format!("Failed to create State.delete: {}", e),
@@ -115,18 +278,51 @@ impl GlobalObject for StateGlobal {
                 source: None,
             })?;
 
-        // List method - get all keys
-        let state_list = state_clone;
+        // List method - get all keys for a scope
+        let list_state_manager = state_manager.clone();
+        let list_fallback_state = fallback_state.clone();
         let list_fn = lua
-            .create_function(move |lua, ()| {
-                let state = state_list.read();
-                let keys: Vec<String> = state.keys().cloned().collect();
+            .create_function(move |lua, scope_str: Option<String>| {
+                let scope_str = scope_str.unwrap_or_else(|| "Global".to_string());
+                if let Some(state_mgr) = &list_state_manager {
+                    let scope = Self::parse_scope(&scope_str);
+                    let runtime = tokio::runtime::Handle::try_current()
+                        .or_else(|_| tokio::runtime::Runtime::new().map(|rt| rt.handle().clone()))
+                        .map_err(|e| {
+                            mlua::Error::RuntimeError(format!("No tokio runtime: {}", e))
+                        })?;
 
-                let table = lua.create_table()?;
-                for (i, key) in keys.iter().enumerate() {
-                    table.set(i + 1, key.clone())?;
+                    let result = runtime.block_on(async { state_mgr.list_keys(scope).await });
+
+                    match result {
+                        Ok(keys) => {
+                            let table = lua.create_table()?;
+                            for (i, key) in keys.iter().enumerate() {
+                                table.set(i + 1, key.clone())?;
+                            }
+                            Ok(table)
+                        }
+                        Err(e) => Err(mlua::Error::RuntimeError(format!(
+                            "State list error: {}",
+                            e
+                        ))),
+                    }
+                } else {
+                    // Fallback to in-memory storage
+                    let state = list_fallback_state.read();
+                    let prefix = format!("{}:", scope_str);
+                    let keys: Vec<String> = state
+                        .keys()
+                        .filter(|k| k.starts_with(&prefix))
+                        .map(|k| k.strip_prefix(&prefix).unwrap_or(k).to_string())
+                        .collect();
+
+                    let table = lua.create_table()?;
+                    for (i, key) in keys.iter().enumerate() {
+                        table.set(i + 1, key.clone())?;
+                    }
+                    Ok(table)
                 }
-                Ok(table)
             })
             .map_err(|e| LLMSpellError::Component {
                 message: format!("Failed to create State.list: {}", e),
@@ -176,21 +372,21 @@ mod tests {
         let global = StateGlobal::new();
         let metadata = global.metadata();
         assert_eq!(metadata.name, "State");
-        assert_eq!(metadata.version, "0.1.0"); // Placeholder version
+        assert_eq!(metadata.version, "1.0.0"); // Phase 5 version with StateManager
     }
 
     #[test]
     fn test_state_in_memory_storage() {
         let global = StateGlobal::new();
 
-        // Test basic storage operations
+        // Test basic storage operations (fallback mode)
         {
-            let mut state = global.state.write();
+            let mut state = global.fallback_state.write();
             state.insert("test_key".to_string(), serde_json::json!("test_value"));
         }
 
         {
-            let state = global.state.read();
+            let state = global.fallback_state.read();
             assert_eq!(
                 state.get("test_key"),
                 Some(&serde_json::json!("test_value"))

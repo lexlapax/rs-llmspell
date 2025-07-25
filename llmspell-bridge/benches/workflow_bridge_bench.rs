@@ -68,10 +68,7 @@ fn benchmark_workflow_discovery(c: &mut Criterion) {
     c.bench_function("get_workflow_info", |b| {
         b.iter(|| {
             rt.block_on(async {
-                let info = bridge
-                    .get_workflow_info(&"sequential".to_string())
-                    .await
-                    .unwrap();
+                let info = bridge.get_workflow_info("sequential").await.unwrap();
                 black_box(info);
             })
         })

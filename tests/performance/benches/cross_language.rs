@@ -13,7 +13,7 @@ fn bench_lua_script_execution(c: &mut Criterion) {
 
     c.bench_function("lua_script_basic_execution", |b| {
         b.iter(|| {
-            rt.block_on(async {
+            let _ = rt.block_on(async {
                 let lua = Lua::new();
 
                 let result: LuaResult<i32> = lua
@@ -41,7 +41,7 @@ fn bench_lua_table_operations(c: &mut Criterion) {
 
     c.bench_function("lua_table_operations", |b| {
         b.iter(|| {
-            rt.block_on(async {
+            let _ = rt.block_on(async {
                 let lua = Lua::new();
 
                 let result: LuaResult<String> = lua
@@ -83,7 +83,7 @@ fn bench_script_runtime_initialization(c: &mut Criterion) {
 
     c.bench_function("script_runtime_initialization", |b| {
         b.iter(|| {
-            rt.block_on(async {
+            let _ = rt.block_on(async {
                 let config = RuntimeConfig::default();
                 let runtime_result = ScriptRuntime::new_with_lua(config).await;
                 black_box(runtime_result)
@@ -136,7 +136,7 @@ fn bench_lua_coroutine_overhead(c: &mut Criterion) {
 
     c.bench_function("lua_coroutine_overhead", |b| {
         b.iter(|| {
-            rt.block_on(async {
+            let _ = rt.block_on(async {
                 let lua = Lua::new();
 
                 let result: LuaResult<String> = lua

@@ -202,16 +202,24 @@ mod tests {
 
     #[test]
     fn test_injection_metrics() {
-        let mut metrics = InjectionMetrics::default();
-
-        metrics.total_injection_time_us = 3000; // 3ms
-        metrics.globals_injected = 10;
+        let metrics = InjectionMetrics {
+            total_injection_time_us: 3000, // 3ms
+            globals_injected: 10,
+            ..Default::default()
+        };
 
         assert!(metrics.is_within_bounds());
         assert_eq!(metrics.average_time_us(), 300);
+    }
 
+    #[test]
+    fn test_injection_metrics_failure_case() {
         // Test failure case
-        metrics.total_injection_time_us = 6000; // 6ms
+        let metrics = InjectionMetrics {
+            total_injection_time_us: 6000, // 6ms
+            globals_injected: 10,
+            ..Default::default()
+        };
         assert!(!metrics.is_within_bounds());
     }
 }

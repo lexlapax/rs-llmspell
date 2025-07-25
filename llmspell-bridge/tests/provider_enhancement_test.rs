@@ -6,13 +6,14 @@ use llmspell_bridge::runtime::{RuntimeConfig, ScriptRuntime};
 
 // Helper to create a runtime without any provider configuration
 fn create_test_runtime_config() -> RuntimeConfig {
-    let mut config = RuntimeConfig::default();
     // Ensure no providers are configured
-    config.providers = ProviderManagerConfig {
-        default_provider: None,
-        providers: std::collections::HashMap::new(),
-    };
-    config
+    RuntimeConfig {
+        providers: ProviderManagerConfig {
+            default_provider: None,
+            providers: std::collections::HashMap::new(),
+        },
+        ..Default::default()
+    }
 }
 
 #[tokio::test(flavor = "multi_thread")]

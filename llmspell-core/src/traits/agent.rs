@@ -314,9 +314,11 @@ mod tests {
 
     #[test]
     fn test_agent_config_serialization() {
-        let mut config = AgentConfig::default();
-        config.system_prompt = Some("You are a helpful assistant".to_string());
-        config.temperature = Some(0.9);
+        let config = AgentConfig {
+            system_prompt: Some("You are a helpful assistant".to_string()),
+            temperature: Some(0.9),
+            ..Default::default()
+        };
 
         let json = serde_json::to_string(&config).unwrap();
         let deserialized: AgentConfig = serde_json::from_str(&json).unwrap();
@@ -334,8 +336,10 @@ mod tests {
 
     impl MockLLMAgent {
         fn new() -> Self {
-            let mut config = AgentConfig::default();
-            config.system_prompt = Some("You are a test assistant".to_string());
+            let config = AgentConfig {
+                system_prompt: Some("You are a test assistant".to_string()),
+                ..Default::default()
+            };
 
             Self {
                 metadata: ComponentMetadata::new(

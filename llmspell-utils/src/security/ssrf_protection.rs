@@ -633,9 +633,11 @@ mod tests {
 
     #[test]
     fn test_custom_config() {
-        let mut config = SsrfProtectionConfig::default();
-        config.allowed_hosts = vec!["trusted.com".to_string()];
-        config.allowed_ports = vec![80, 443];
+        let config = SsrfProtectionConfig {
+            allowed_hosts: vec!["trusted.com".to_string()],
+            allowed_ports: vec![80, 443],
+            ..Default::default()
+        };
 
         let protector = SsrfProtector::with_config(config);
 

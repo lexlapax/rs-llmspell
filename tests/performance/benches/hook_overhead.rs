@@ -13,8 +13,8 @@ fn bench_agent_baseline(c: &mut Criterion) {
 
     c.bench_function("agent_execution_baseline", |b| {
         b.iter(|| {
-            rt.block_on(async {
-                let mut agent = MockAgent::new(MockAgentConfig::default());
+            let _ = rt.block_on(async {
+                let agent = MockAgent::new(MockAgentConfig::default());
 
                 let input = AgentInput {
                     text: "test input".to_string(),
@@ -38,8 +38,8 @@ fn bench_agent_with_simulated_hooks(c: &mut Criterion) {
 
     c.bench_function("agent_execution_with_simulated_hooks", |b| {
         b.iter(|| {
-            rt.block_on(async {
-                let mut agent = MockAgent::new(MockAgentConfig::default());
+            let _ = rt.block_on(async {
+                let agent = MockAgent::new(MockAgentConfig::default());
 
                 // Simulate hook overhead with 5 simple operations
                 for _ in 0..5 {
@@ -119,7 +119,7 @@ fn calculate_hook_overhead(_c: &mut Criterion) {
         // Baseline: Agent execution without hooks
         let start = tokio::time::Instant::now();
         for _ in 0..1000 {
-            let mut agent = MockAgent::new(MockAgentConfig::default());
+            let agent = MockAgent::new(MockAgentConfig::default());
             let input = AgentInput {
                 text: "test input".to_string(),
                 media: vec![],
@@ -144,7 +144,7 @@ fn calculate_hook_overhead(_c: &mut Criterion) {
                 ));
             }
 
-            let mut agent = MockAgent::new(MockAgentConfig::default());
+            let agent = MockAgent::new(MockAgentConfig::default());
             let input = AgentInput {
                 text: "test input".to_string(),
                 media: vec![],

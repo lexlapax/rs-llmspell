@@ -532,8 +532,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_step_executor_with_retry() {
-        let mut config = WorkflowConfig::default();
-        config.exponential_backoff = false; // Use fixed delay for faster test
+        let config = WorkflowConfig {
+            exponential_backoff: false, // Use fixed delay for faster test
+            ..Default::default()
+        };
         let executor = StepExecutor::new(config);
 
         // Create a step that will fail (empty tool name)

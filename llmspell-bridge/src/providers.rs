@@ -315,8 +315,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_provider_config_validation() {
-        let mut config = ProviderManagerConfig::default();
-        config.default_provider = Some("nonexistent".to_string());
+        let config = ProviderManagerConfig {
+            default_provider: Some("nonexistent".to_string()),
+            ..Default::default()
+        };
 
         let result = ProviderManager::new(config).await;
         assert!(result.is_err());

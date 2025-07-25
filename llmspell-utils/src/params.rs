@@ -277,7 +277,7 @@ mod tests {
     use super::*;
     use serde_json::json;
 
-    fn create_test_input(params: Value) -> AgentInput {
+    fn create_test_input(params: &Value) -> AgentInput {
         AgentInput {
             text: "test".to_string(),
             media: vec![],
@@ -289,7 +289,7 @@ mod tests {
 
     #[test]
     fn test_extract_parameters() {
-        let input = create_test_input(json!({ "key": "value" }));
+        let input = create_test_input(&json!({ "key": "value" }));
         let params = extract_parameters(&input).unwrap();
         assert_eq!(params, &json!({ "key": "value" }));
     }
@@ -333,12 +333,15 @@ mod tests {
         let params = json!({
             "int": 42,
             "uint": 42,
-            "float": 3.14159
+            "float": std::f64::consts::PI
         });
 
         assert_eq!(extract_required_i64(&params, "int").unwrap(), 42);
         assert_eq!(extract_required_u64(&params, "uint").unwrap(), 42);
-        assert!((extract_required_f64(&params, "float").unwrap() - 3.14159).abs() < 0.00001);
+        assert!(
+            (extract_required_f64(&params, "float").unwrap() - std::f64::consts::PI).abs()
+                < 0.00001
+        );
     }
 
     #[test]

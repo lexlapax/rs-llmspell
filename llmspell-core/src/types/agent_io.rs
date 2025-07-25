@@ -439,9 +439,11 @@ mod tests {
             result: None,
         };
 
-        let mut metadata = OutputMetadata::default();
-        metadata.model = Some("gpt-4".to_string());
-        metadata.token_count = Some(150);
+        let metadata = OutputMetadata {
+            model: Some("gpt-4".to_string()),
+            token_count: Some(150),
+            ..Default::default()
+        };
 
         let output = AgentOutput::builder()
             .text("Calculated result")

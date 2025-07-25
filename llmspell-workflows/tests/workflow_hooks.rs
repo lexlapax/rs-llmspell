@@ -285,9 +285,11 @@ async fn test_nested_workflow_patterns() {
 #[tokio::test]
 async fn test_workflow_lifecycle_config() {
     // Test workflow with custom lifecycle configuration
-    let mut config = WorkflowLifecycleConfig::default();
-    config.enable_circuit_breaker = true;
-    config.max_hook_execution_time = std::time::Duration::from_millis(100);
+    let config = WorkflowLifecycleConfig {
+        enable_circuit_breaker: true,
+        max_hook_execution_time: std::time::Duration::from_millis(100),
+        ..Default::default()
+    };
 
     let workflow_executor = Arc::new(WorkflowExecutor::new(config, None, None));
 
