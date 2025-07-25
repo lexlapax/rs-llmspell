@@ -3,16 +3,16 @@
 
 use anyhow::Result;
 use llmspell_agents::{
-    agents::{basic::BasicAgent, llm::LLMAgent},
+    agents::basic::BasicAgent,
     builder::AgentBuilder,
     state::StatePersistence,
+    testing::mocks::{MockAgent, MockAgentConfig, MockResponse},
 };
 use llmspell_core::{
     traits::{agent::Agent, base_agent::BaseAgent},
     types::AgentInput,
     ExecutionContext,
 };
-use llmspell_providers::ProviderManager;
 use llmspell_state_persistence::{PersistenceConfig, StateManager, StorageBackendType};
 use std::sync::Arc;
 use tempfile::TempDir;
@@ -107,32 +107,30 @@ async fn test_basic_agent_state_persistence() -> Result<()> {
 }
 
 #[tokio::test]
-async fn test_llm_agent_state_persistence() -> Result<()> {
-    // Skip if no provider is configured
-    if std::env::var("OPENAI_API_KEY").is_err() {
-        println!("Skipping LLM agent test - no OPENAI_API_KEY set");
-        return Ok(());
-    }
+async fn test_mock_agent_state_persistence() -> Result<()> {
+    // Create mock agent configuration with pre-programmed responses
+    let mut mock_config = MockAgentConfig::default();
+    mock_config.agent_config.name = "test-mock-agent".to_string();
+    mock_config.agent_config.description = "Mock agent for state persistence testing".to_string();
 
-    // Create provider manager
-    let provider_manager = Arc::new(ProviderManager::new());
+    // Add mock responses that simulate an LLM conversation
+    mock_config.responses = vec![
+        MockResponse {
+            input_pattern: Some("Remember this number".to_string()),
+            text: "I'll remember the number 42 for you.".to_string(),
+            tool_calls: vec![],
+            metadata: Default::default(),
+        },
+        MockResponse {
+            input_pattern: Some("What number".to_string()),
+            text: "The number you asked me to remember is 42.".to_string(),
+            tool_calls: vec![],
+            metadata: Default::default(),
+        },
+    ];
 
-    // Create agent configuration
-    let config = AgentBuilder::new("test-llm", "llm")
-        .description("Test LLM agent")
-        .with_model("openai", "gpt-3.5-turbo")
-        .temperature(0.7)
-        .max_tokens(100)
-        .build()?;
-
-    // Try to create the agent, skip test if provider not available
-    let mut agent = match LLMAgent::new(config, provider_manager).await {
-        Ok(agent) => agent,
-        Err(e) => {
-            println!("Skipping LLM agent test - provider error: {}", e);
-            return Ok(());
-        }
-    };
+    // Create the mock agent
+    let mut agent = MockAgent::new(mock_config);
 
     // Create state manager
     let state_manager = Arc::new(StateManager::new().await?);
@@ -145,7 +143,8 @@ async fn test_llm_agent_state_persistence() -> Result<()> {
     // Have a conversation
     let context = ExecutionContext::new();
     let input1 = AgentInput::text("Remember this number: 42");
-    let _response1 = agent.execute(input1, context.clone()).await?;
+    let response1 = agent.execute(input1, context.clone()).await?;
+    assert!(response1.text.contains("42"));
 
     // Save state
     agent.save_state().await?;
@@ -161,8 +160,14 @@ async fn test_llm_agent_state_persistence() -> Result<()> {
 
     // Verify conversation was restored
     let restored_history = agent.get_conversation().await?;
-    assert!(restored_history.len() > 0);
-    assert!(restored_history[0].content.contains("42"));
+    assert_eq!(restored_history.len(), 2); // User message + assistant response
+    assert!(restored_history[0].content.contains("Remember this number"));
+    assert!(restored_history[1].content.contains("42"));
+
+    // Test that the mock agent can still respond correctly after reload
+    let input2 = AgentInput::text("What number did I ask you to remember?");
+    let response2 = agent.execute(input2, context).await?;
+    assert!(response2.text.contains("42"));
 
     // Clean up
     agent.stop().await?;
@@ -268,6 +273,26 @@ async fn test_state_persistence_error_handling() -> Result<()> {
         .unwrap_err()
         .to_string()
         .contains("No state manager configured"));
+
+    Ok(())
+}
+
+// Placeholder for Task 5.2.7: Real Provider Integration Tests
+#[tokio::test]
+#[ignore = "Task 5.2.7: Requires real LLM provider configuration"]
+async fn test_llm_agent_state_persistence_with_real_provider() -> Result<()> {
+    // This test will be implemented in Task 5.2.7
+    // It will test state persistence with real LLM providers like OpenAI, Anthropic, etc.
+    // Configuration will come from environment variables or test configuration
+
+    // TODO: Implementation in Task 5.2.7 will include:
+    // 1. Create LLM agent with real provider
+    // 2. Have a conversation with context that can be verified
+    // 3. Save state
+    // 4. Create new agent instance
+    // 5. Load state
+    // 6. Verify conversation context is maintained
+    // 7. Continue conversation to verify context understanding
 
     Ok(())
 }

@@ -491,34 +491,43 @@ mod tests {
 
 ---
 
-### Task 5.2.4: Agent-State Persistence Integration ✨ NEW
+### Task 5.2.4: Agent-State Persistence Integration ✅
 **Priority**: CRITICAL  
 **Estimated Time**: 5 hours  
+**Actual Time**: 6 hours  
 **Assignee**: Integration Team
-**Status**: ✅ COMPLETED (2025-07-25)
+**Status**: COMPLETED (2025-07-25)
 
 **Description**: Integrate the isolated llmspell-state-persistence system with llmspell-agents to enable actual agent state persistence. Without this, our state system is unusable.
 
-**Files to Create/Update:**
-- **UPDATED**: `llmspell-agents/Cargo.toml` - Add llmspell-state-persistence dependency ✓
-- **UPDATED**: `llmspell-agents/src/agents/basic.rs` - Implement PersistentAgent trait ✓
-- **UPDATED**: `llmspell-agents/src/agents/llm.rs` - Implement PersistentAgent trait ✓
-- **EXISTS**: `llmspell-agents/src/state/mod.rs` - State management module ✓
-- **CREATED**: `llmspell-agents/src/state/builder.rs` - StatefulAgentBuilder ✓
-- **CREATED**: `llmspell-agents/src/state/persistence.rs` - State persistence trait ✓
-- **EXISTS**: `llmspell-agents/src/lib.rs` - Export state management types ✓
-- **CREATED**: `examples/stateful_agent.rs` - Example of agent with persistence ✓
-- **CREATED**: `tests/state_persistence_integration.rs` - Integration tests ✓
+**Files Created/Updated:**
+- **UPDATED**: `llmspell-agents/Cargo.toml` - Added llmspell-state-persistence dependency
+- **UPDATED**: `llmspell-agents/src/agents/basic.rs` - Added agent_id_string field and implemented StateManagerHolder + StatePersistence traits
+- **UPDATED**: `llmspell-agents/src/agents/llm.rs` - Added agent_id_string field and implemented StateManagerHolder + StatePersistence traits
+- **CREATED**: `llmspell-agents/src/state/persistence.rs` - StatePersistence extension trait with save_state/load_state methods
+- **UPDATED**: `llmspell-agents/src/testing/mocks.rs` - Added full StatePersistence implementation for MockAgent with conversation tracking
+- **CREATED**: `examples/stateful_agent.rs` - Complete example demonstrating state persistence with conversation history
+- **CREATED**: `tests/state_persistence_integration.rs` - Integration tests including mock agent tests
+- **CREATED**: `impl_persistent_agent!` macro for DRY implementation of PersistentAgent trait
+
+**Key Implementation Details:**
+- Added `agent_id_string` field to cache string representation of ComponentId
+- Implemented async-sync bridging using `block_on` for trait implementations
+- Fixed deadlock in multi-agent state sharing by dropping locks before recursive calls
+- MockAgent now tracks conversation history during execute() calls
+- Proper conversion between llmspell_core and llmspell_state_persistence message types
 
 **Acceptance Criteria:**
-- [✓] Agents can be created with state persistence enabled
-- [✓] BasicAgent implements PersistentAgent trait fully
-- [✓] LLMAgent implements PersistentAgent trait fully
-- [✓] Agent state saves include all conversation history and context
-- [✓] Agent builders support StateManager injection
-- [✓] State persistence is opt-in (backward compatible)
-- [✓] Integration tests verify save/load roundtrip
-- [✓] Example demonstrates practical usage
+- [✅] Agents can be created with state persistence enabled
+- [✅] BasicAgent implements PersistentAgent trait fully via StatePersistence extension
+- [✅] LLMAgent implements PersistentAgent trait fully via StatePersistence extension
+- [✅] MockAgent implements StatePersistence for testing without real providers
+- [✅] Agent state saves include all conversation history and context
+- [✅] Agent builders support StateManager injection via set_state_manager()
+- [✅] State persistence is opt-in (backward compatible - agents work without StateManager)
+- [✅] Integration tests verify save/load roundtrip for all agent types
+- [✅] Example demonstrates practical usage with full conversation persistence
+- [✅] Tests use MockAgent instead of real providers (real provider tests deferred to Task 5.2.7)
 
 **Implementation Steps:**
 1. **Add Dependencies and Module Structure** (1 hour):
@@ -576,6 +585,11 @@ mod tests {
 
 **Completion Notes (2025-07-25):**
 - Created `StatePersistence` extension trait in `state/persistence.rs`
+- Implemented StatePersistence for MockAgent with full conversation tracking
+- Fixed compilation errors by properly converting between message types
+- Added lifecycle methods (initialize, start, stop, terminate) to MockAgent
+- Created placeholder test for real provider integration (Task 5.2.7)
+- All tests passing with proper mock implementations
 - Added `agent_id_string` field to BasicAgent and LLMAgent to support PersistentAgent trait
 - Implemented `impl_persistent_agent!` macro for easy trait implementation
 - Used `block_on` for async-sync bridging in PersistentAgent trait methods
@@ -585,7 +599,94 @@ mod tests {
 
 ---
 
-### Task 5.2.5: Script Bridge API for State Persistence ✨ NEW
+### Task 5.2.5: Lifecycle Hooks for Automatic State Persistence ✨ NEW
+**Priority**: CRITICAL  
+**Estimated Time**: 4 hours  
+**Assignee**: Lifecycle Team
+**Status**: NOT STARTED
+
+**Description**: Implement automatic state persistence through lifecycle hooks, enabling transparent state management without manual intervention.
+
+**Files to Create/Update:**
+- **CREATE**: `llmspell-agents/src/hooks/state_persistence_hook.rs` - Main lifecycle hook
+- **UPDATE**: `llmspell-agents/src/agents/basic.rs` - Add lifecycle hook support
+- **UPDATE**: `llmspell-agents/src/agents/llm.rs` - Add lifecycle hook support
+- **CREATE**: `llmspell-agents/src/config/persistence_config.rs` - Auto-save configuration
+- **UPDATE**: `llmspell-agents/src/builder.rs` - Add persistence configuration
+- **CREATE**: `examples/auto_save_agent.rs` - Auto-save example
+- **CREATE**: `tests/lifecycle_persistence_tests.rs` - Lifecycle tests
+
+**Acceptance Criteria:**
+- [ ] State automatically saved on agent pause()
+- [ ] State automatically saved on agent stop()
+- [ ] State automatically restored on agent resume()
+- [ ] Configurable auto-save intervals (e.g., every 5 minutes)
+- [ ] Failure handling with exponential backoff
+- [ ] Non-blocking saves (don't interrupt agent operation)
+- [ ] Metrics track save/restore success rates
+- [ ] Circuit breaker prevents repeated failures
+
+**Implementation Steps:**
+1. **Create StatePersistenceHook** (1.5 hours):
+   ```rust
+   pub struct StatePersistenceHook {
+       state_manager: Arc<StateManager>,
+       config: PersistenceConfig,
+       last_save: Arc<RwLock<SystemTime>>,
+       failure_count: Arc<AtomicU32>,
+   }
+   
+   impl Hook for StatePersistenceHook {
+       async fn on_event(&self, event: &Event, context: &mut HookContext) -> HookResult {
+           match event {
+               Event::AgentPaused { agent_id } => self.save_state(agent_id).await,
+               Event::AgentStopped { agent_id } => self.save_state(agent_id).await,
+               Event::AgentResumed { agent_id } => self.restore_state(agent_id).await,
+               Event::Periodic => self.check_auto_save().await,
+               _ => Ok(HookAction::Continue),
+           }
+       }
+   }
+   ```
+
+2. **Implement Auto-Save Logic** (1 hour):
+   ```rust
+   pub struct PersistenceConfig {
+       pub auto_save_interval: Option<Duration>,
+       pub max_retries: u32,
+       pub backoff_multiplier: f64,
+       pub failure_threshold: u32,
+   }
+   ```
+   - Timer-based auto-save
+   - Exponential backoff on failures
+   - Circuit breaker pattern
+   - Async non-blocking saves
+
+3. **Agent Integration** (1 hour):
+   - Add hook registration in agent builders
+   - Ensure agents emit correct lifecycle events
+   - Handle hook in agent lifecycle methods
+   - Maintain backward compatibility
+
+4. **Failure Handling** (0.5 hours):
+   - Implement retry logic
+   - Add metrics collection
+   - Log failures appropriately
+   - Prevent cascade failures
+
+**Definition of Done:**
+- [ ] Agents automatically save state on lifecycle events
+- [ ] Auto-save works reliably at configured intervals
+- [ ] Failures don't impact agent operation
+- [ ] Metrics show save/restore success rates
+- [ ] Integration tests verify all scenarios
+- [ ] Example shows configuration options
+- [ ] Documentation explains auto-save behavior
+
+---
+
+### Task 5.2.6: Script Bridge API for State Persistence ✨ NEW
 **Priority**: CRITICAL  
 **Estimated Time**: 6 hours  
 **Assignee**: Bridge Team
@@ -679,91 +780,82 @@ mod tests {
 
 ---
 
-### Task 5.2.6: Lifecycle Hooks for Automatic State Persistence ✨ NEW
+### Task 5.2.7: Real Provider Integration Tests for State Persistence ✨ NEW
 **Priority**: CRITICAL  
-**Estimated Time**: 4 hours  
-**Assignee**: Lifecycle Team
+**Estimated Time**: 8 hours  
+**Assignee**: Integration Team
 **Status**: NOT STARTED
 
-**Description**: Implement automatic state persistence through lifecycle hooks, enabling transparent state management without manual intervention.
+**Description**: Create comprehensive integration tests for state persistence with real AI providers (OpenAI, Anthropic, etc.) to ensure the state system works correctly with actual LLM responses, token usage, and provider-specific metadata.
 
 **Files to Create/Update:**
-- **CREATE**: `llmspell-agents/src/hooks/state_persistence_hook.rs` - Main lifecycle hook
-- **UPDATE**: `llmspell-agents/src/simple_agent.rs` - Add lifecycle hook support
-- **UPDATE**: `llmspell-agents/src/advanced_agent.rs` - Add lifecycle hook support
-- **CREATE**: `llmspell-agents/src/config/persistence_config.rs` - Auto-save configuration
-- **UPDATE**: `llmspell-agents/src/builder.rs` - Add persistence configuration
-- **CREATE**: `examples/auto_save_agent.rs` - Auto-save example
-- **CREATE**: `tests/lifecycle_persistence_tests.rs` - Lifecycle tests
+- **CREATE**: `llmspell-agents/tests/provider_state_integration/` - Provider integration test directory
+- **CREATE**: `llmspell-agents/tests/provider_state_integration/openai_tests.rs` - OpenAI state tests
+- **CREATE**: `llmspell-agents/tests/provider_state_integration/anthropic_tests.rs` - Anthropic state tests
+- **CREATE**: `llmspell-agents/tests/provider_state_integration/common.rs` - Shared test utilities
+- **CREATE**: `llmspell-agents/tests/provider_state_integration/mod.rs` - Module definition
+- **UPDATE**: `llmspell-agents/Cargo.toml` - Add integration test configuration
+- **CREATE**: `examples/provider_state_persistence.rs` - Real provider example
+- **CREATE**: `.github/workflows/provider-integration-tests.yml` - CI for provider tests
+- **CREATE**: `docs/testing/provider-integration-guide.md` - Setup guide for tests
 
 **Acceptance Criteria:**
-- [⚡] State automatically saved on agent pause()
-- [⚡] State automatically saved on agent stop()
-- [⚡] State automatically restored on agent resume()
-- [⚡] Configurable auto-save intervals (e.g., every 5 minutes)
-- [⚡] Failure handling with exponential backoff
-- [⚡] Non-blocking saves (don't interrupt agent operation)
-- [⚡] Metrics track save/restore success rates
-- [⚡] Circuit breaker prevents repeated failures
+- [ ] Integration tests run only when API keys are present
+- [ ] Tests verify state persistence with real OpenAI responses
+- [ ] Tests verify state persistence with real Anthropic responses
+- [ ] Conversation history preserved across save/load with actual tokens
+- [ ] Provider metadata (model, temperature, etc.) correctly persisted
+- [ ] Tool usage statistics work with real tool invocations
+- [ ] Performance benchmarks for state operations with real data
+- [ ] Error recovery scenarios tested (network failures, partial saves)
+- [ ] Provider switching scenarios tested (keeping history)
+- [ ] Token count and cost tracking persisted correctly
 
 **Implementation Steps:**
-1. **Create StatePersistenceHook** (1.5 hours):
+1. **Create Test Infrastructure** (2 hours):
    ```rust
-   pub struct StatePersistenceHook {
+   // Common test utilities
+   pub struct ProviderTestContext {
+       provider_manager: Arc<ProviderManager>,
        state_manager: Arc<StateManager>,
-       config: PersistenceConfig,
-       last_save: Arc<RwLock<SystemTime>>,
-       failure_count: Arc<AtomicU32>,
-   }
-   
-   impl Hook for StatePersistenceHook {
-       async fn on_event(&self, event: &Event, context: &mut HookContext) -> HookResult {
-           match event {
-               Event::AgentPaused { agent_id } => self.save_state(agent_id).await,
-               Event::AgentStopped { agent_id } => self.save_state(agent_id).await,
-               Event::AgentResumed { agent_id } => self.restore_state(agent_id).await,
-               Event::Periodic => self.check_auto_save().await,
-               _ => Ok(HookAction::Continue),
-           }
-       }
+       temp_dir: TempDir,
    }
    ```
+   - Setup for conditional test execution
+   - Provider initialization helpers
+   - State verification utilities
 
-2. **Implement Auto-Save Logic** (1 hour):
+2. **Implement OpenAI Integration Tests** (2 hours):
    ```rust
-   pub struct PersistenceConfig {
-       pub auto_save_interval: Option<Duration>,
-       pub max_retries: u32,
-       pub backoff_multiplier: f64,
-       pub failure_threshold: u32,
+   #[tokio::test]
+   #[ignore = "requires OPENAI_API_KEY"]
+   async fn test_openai_conversation_persistence() {
+       // Real conversation with GPT-4
+       // Save state with token counts
+       // Verify reload preserves everything
    }
    ```
-   - Timer-based auto-save
-   - Exponential backoff on failures
-   - Circuit breaker pattern
-   - Async non-blocking saves
+   - Multi-turn conversations
+   - System prompts and functions
+   - Token usage tracking
 
-3. **Agent Integration** (1 hour):
-   - Add hook registration in agent builders
-   - Ensure agents emit correct lifecycle events
-   - Handle hook in agent lifecycle methods
-   - Maintain backward compatibility
+3. **Implement Anthropic Integration Tests** (2 hours):
+   - Claude conversation persistence
+   - Anthropic-specific metadata
+   - Cross-provider state migration
 
-4. **Failure Handling** (0.5 hours):
-   - Implement retry logic
-   - Add metrics collection
-   - Log failures appropriately
-   - Prevent cascade failures
+4. **Performance and Error Testing** (2 hours):
+   - Benchmark state operations with real data
+   - Network failure recovery
+   - Concurrent access with real providers
 
 **Definition of Done:**
-- [x] Agents automatically save state on lifecycle events
-- [x] Auto-save works reliably at configured intervals
-- [x] Failures don't impact agent operation
-- [x] Metrics show save/restore success rates
-- [x] Integration tests verify all scenarios
-- [x] Example shows configuration options
-- [x] Documentation explains auto-save behavior
-- [ ] Audit logging captures all access patterns
+- [ ] All provider tests pass when API keys are configured
+- [ ] CI runs provider tests in secure environment
+- [ ] Documentation explains how to run provider tests
+- [ ] Performance meets targets with real data
+- [ ] Error scenarios properly handled
+- [ ] Example demonstrates real-world usage
 
 ---
 

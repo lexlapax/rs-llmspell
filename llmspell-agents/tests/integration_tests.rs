@@ -236,29 +236,10 @@ async fn test_agent_state_persistence() {
         .unwrap();
     assert_eq!(output1.text, "Hello response");
 
-    // Add conversation message
-    use llmspell_core::traits::agent::{Agent, ConversationMessage, MessageRole};
-    agent
-        .add_message(ConversationMessage {
-            role: MessageRole::User,
-            content: "hello".to_string(),
-            timestamp: chrono::Utc::now(),
-        })
-        .await
-        .unwrap();
-
-    agent
-        .add_message(ConversationMessage {
-            role: MessageRole::Assistant,
-            content: "Hello response".to_string(),
-            timestamp: chrono::Utc::now(),
-        })
-        .await
-        .unwrap();
-
-    // Check conversation
+    // Check conversation - MockAgent now automatically tracks conversation during execute
+    use llmspell_core::traits::agent::Agent;
     let conversation = agent.get_conversation().await.unwrap();
-    assert_eq!(conversation.len(), 2);
+    assert_eq!(conversation.len(), 2); // User message + Assistant response
 
     // Second execution
     let input2 = AgentInput::text("goodbye");
@@ -267,6 +248,10 @@ async fn test_agent_state_persistence() {
         .await
         .unwrap();
     assert_eq!(output2.text, "Goodbye response");
+
+    // Check conversation after second execution
+    let conversation = agent.get_conversation().await.unwrap();
+    assert_eq!(conversation.len(), 4); // 2 from first execution + 2 from second
 
     // Clear conversation
     agent.clear_conversation().await.unwrap();
