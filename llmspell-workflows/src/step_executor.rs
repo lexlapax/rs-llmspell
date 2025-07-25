@@ -1,9 +1,11 @@
 //! ABOUTME: Step execution engine for basic workflows
 //! ABOUTME: Handles individual step execution with timeout, retry, and error handling
 
+use super::hooks::{StepContext, WorkflowExecutionPhase, WorkflowExecutor, WorkflowHookContext};
 use super::traits::{ErrorStrategy, StepResult, StepType, WorkflowStep};
 use super::types::{StepExecutionContext, WorkflowConfig};
-use llmspell_core::{ComponentId, LLMSpellError, Result};
+use llmspell_core::{ComponentId, ComponentMetadata, LLMSpellError, Result};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::time::timeout;
 use tracing::{debug, error, warn};
@@ -12,12 +14,28 @@ use tracing::{debug, error, warn};
 #[derive(Clone)]
 pub struct StepExecutor {
     config: WorkflowConfig,
+    /// Optional workflow executor for hook integration
+    workflow_executor: Option<Arc<WorkflowExecutor>>,
 }
 
 impl StepExecutor {
     /// Create a new step executor with configuration
     pub fn new(config: WorkflowConfig) -> Self {
-        Self { config }
+        Self {
+            config,
+            workflow_executor: None,
+        }
+    }
+
+    /// Create a new step executor with hook integration
+    pub fn new_with_hooks(
+        config: WorkflowConfig,
+        workflow_executor: Arc<WorkflowExecutor>,
+    ) -> Self {
+        Self {
+            config,
+            workflow_executor: Some(workflow_executor),
+        }
     }
 
     /// Execute a single step with retry logic
@@ -25,6 +43,18 @@ impl StepExecutor {
         &self,
         step: &WorkflowStep,
         context: StepExecutionContext,
+    ) -> Result<StepResult> {
+        self.execute_step_with_metadata(step, context, None, None)
+            .await
+    }
+
+    /// Execute a single step with workflow metadata for hooks
+    pub async fn execute_step_with_metadata(
+        &self,
+        step: &WorkflowStep,
+        context: StepExecutionContext,
+        workflow_metadata: Option<ComponentMetadata>,
+        workflow_type: Option<String>,
     ) -> Result<StepResult> {
         let start_time = Instant::now();
         let step_timeout = step.timeout.unwrap_or(self.config.default_step_timeout);
@@ -34,56 +64,119 @@ impl StepExecutor {
             step.name, step.id, step_timeout
         );
 
+        // Execute pre-step hooks if available
+        if let (Some(workflow_executor), Some(metadata), Some(wf_type)) =
+            (&self.workflow_executor, &workflow_metadata, &workflow_type)
+        {
+            let step_ctx = self.create_step_context(step, &context, None);
+            let _ = workflow_executor
+                .execute_step_hooks(
+                    metadata.clone(),
+                    context.workflow_state.clone(),
+                    wf_type.clone(),
+                    step_ctx,
+                    true, // is_pre_execution
+                )
+                .await;
+        }
+
         // Execute with timeout
         let result = timeout(step_timeout, self.execute_step_internal(step, &context)).await;
 
         let duration = start_time.elapsed();
 
-        match result {
+        let step_result = match result {
             Ok(Ok(output)) => {
                 debug!(
                     "Step '{}' completed successfully in {:?}",
                     step.name, duration
                 );
-                Ok(StepResult::success(
-                    step.id,
-                    step.name.clone(),
-                    output,
-                    duration,
-                ))
+                StepResult::success(step.id, step.name.clone(), output, duration)
             }
             Ok(Err(err)) => {
                 warn!(
                     "Step '{}' failed: {} (duration: {:?})",
                     step.name, err, duration
                 );
-                Ok(StepResult::failure(
+
+                // Execute error hooks if available
+                if let (Some(workflow_executor), Some(metadata), Some(wf_type)) =
+                    (&self.workflow_executor, &workflow_metadata, &workflow_type)
+                {
+                    let component_id = llmspell_hooks::ComponentId::new(
+                        llmspell_hooks::ComponentType::Workflow,
+                        format!("workflow_{}", metadata.name),
+                    );
+                    let mut hook_ctx = WorkflowHookContext::new(
+                        component_id,
+                        metadata.clone(),
+                        context.workflow_state.clone(),
+                        wf_type.clone(),
+                        WorkflowExecutionPhase::ErrorHandling,
+                    );
+                    let step_ctx = self.create_step_context(step, &context, Some(err.to_string()));
+                    hook_ctx = hook_ctx.with_step_context(step_ctx);
+                    let _ = workflow_executor.execute_workflow_hooks(hook_ctx).await;
+                }
+
+                StepResult::failure(
                     step.id,
                     step.name.clone(),
                     err.to_string(),
                     duration,
                     context.retry_attempt,
-                ))
+                )
             }
             Err(_) => {
                 error!("Step '{}' timed out after {:?}", step.name, step_timeout);
-                Ok(StepResult::failure(
+                StepResult::failure(
                     step.id,
                     step.name.clone(),
                     format!("Step timed out after {:?}", step_timeout),
                     duration,
                     context.retry_attempt,
-                ))
+                )
             }
+        };
+
+        // Execute post-step hooks if available
+        if let (Some(workflow_executor), Some(metadata), Some(wf_type)) =
+            (&self.workflow_executor, &workflow_metadata, &workflow_type)
+        {
+            let step_ctx = self.create_step_context_with_result(step, &context, &step_result);
+            let _ = workflow_executor
+                .execute_step_hooks(
+                    metadata.clone(),
+                    context.workflow_state.clone(),
+                    wf_type.clone(),
+                    step_ctx,
+                    false, // is_pre_execution
+                )
+                .await;
         }
+
+        Ok(step_result)
     }
 
     /// Execute a step with retry logic
     pub async fn execute_step_with_retry(
         &self,
         step: &WorkflowStep,
+        context: StepExecutionContext,
+        error_strategy: &ErrorStrategy,
+    ) -> Result<StepResult> {
+        self.execute_step_with_retry_and_metadata(step, context, error_strategy, None, None)
+            .await
+    }
+
+    /// Execute a step with retry logic and workflow metadata
+    pub async fn execute_step_with_retry_and_metadata(
+        &self,
+        step: &WorkflowStep,
         mut context: StepExecutionContext,
         error_strategy: &ErrorStrategy,
+        workflow_metadata: Option<ComponentMetadata>,
+        workflow_type: Option<String>,
     ) -> Result<StepResult> {
         let max_attempts = match error_strategy {
             ErrorStrategy::Retry { max_attempts, .. } => *max_attempts,
@@ -102,7 +195,14 @@ impl StepExecutor {
                 max_attempts
             );
 
-            let result = self.execute_step(step, context.clone()).await?;
+            let result = self
+                .execute_step_with_metadata(
+                    step,
+                    context.clone(),
+                    workflow_metadata.clone(),
+                    workflow_type.clone(),
+                )
+                .await?;
 
             if result.success {
                 return Ok(result);
@@ -313,6 +413,52 @@ impl StepExecutor {
         tokio::time::sleep(Duration::from_millis(15)).await;
 
         Ok(output)
+    }
+
+    /// Create a StepContext for hooks
+    fn create_step_context(
+        &self,
+        step: &WorkflowStep,
+        context: &StepExecutionContext,
+        error: Option<String>,
+    ) -> StepContext {
+        let step_type = match &step.step_type {
+            StepType::Tool { .. } => "tool",
+            StepType::Agent { .. } => "agent",
+            StepType::Custom { .. } => "custom",
+        };
+
+        StepContext {
+            name: step.name.clone(),
+            index: context.workflow_state.current_step,
+            step_type: step_type.to_string(),
+            input: Some(serde_json::to_value(&step.step_type).unwrap_or(serde_json::Value::Null)),
+            output: error.map(serde_json::Value::String),
+            duration_ms: None,
+        }
+    }
+
+    /// Create a StepContext with result for post-execution hooks
+    fn create_step_context_with_result(
+        &self,
+        step: &WorkflowStep,
+        context: &StepExecutionContext,
+        result: &StepResult,
+    ) -> StepContext {
+        let step_type = match &step.step_type {
+            StepType::Tool { .. } => "tool",
+            StepType::Agent { .. } => "agent",
+            StepType::Custom { .. } => "custom",
+        };
+
+        StepContext {
+            name: step.name.clone(),
+            index: context.workflow_state.current_step,
+            step_type: step_type.to_string(),
+            input: Some(serde_json::to_value(&step.step_type).unwrap_or(serde_json::Value::Null)),
+            output: Some(serde_json::Value::String(result.output.clone())),
+            duration_ms: Some(result.duration.as_millis() as u64),
+        }
     }
 }
 

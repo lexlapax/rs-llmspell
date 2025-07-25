@@ -547,6 +547,90 @@ impl Tool for JsonProcessorTool {
     }
 }
 
+impl JsonProcessorTool {
+    /// Check if this tool supports hook integration
+    pub fn supports_hooks(&self) -> bool {
+        true // All tools that implement Tool automatically support hooks
+    }
+
+    /// Get hook integration metadata for this tool
+    pub fn hook_metadata(&self) -> serde_json::Value {
+        use serde_json::json;
+        json!({
+            "tool_name": self.metadata().name,
+            "hook_points_supported": [
+                "parameter_validation",
+                "security_check",
+                "resource_allocation",
+                "pre_execution",
+                "post_execution",
+                "error_handling",
+                "resource_cleanup",
+                "timeout"
+            ],
+            "security_level": self.security_level(),
+            "resource_limits": {
+                "memory_mb": self.config.max_input_size / (1024 * 1024),
+                "cpu_time_ms": self.config.max_execution_time_ms,
+                "max_input_size_bytes": self.config.max_input_size,
+                "data_processing_critical": true
+            },
+            "hook_integration_benefits": [
+                "JSON query validation and sanitization",
+                "Input size limits enforcement for DoS protection",
+                "Memory usage monitoring for large JSON processing",
+                "jq query complexity analysis and timeouts",
+                "Schema validation performance tracking",
+                "Error handling for malformed JSON and invalid queries"
+            ],
+            "security_considerations": [
+                "Safe security level for JSON processing",
+                "Input size limits to prevent memory exhaustion",
+                "Query execution time limits to prevent infinite loops",
+                "JSON schema validation for data integrity"
+            ],
+            "supported_operations": [
+                "query (full jq syntax support)",
+                "validate (JSON schema validation)",
+                "format (pretty print and minify)",
+                "extract (field extraction)"
+            ]
+        })
+    }
+
+    /// Demonstrate hook-aware execution for JSON processing
+    /// This method showcases how the JSON processor tool works with the hook system
+    pub async fn demonstrate_hook_integration(
+        &self,
+        tool_executor: &crate::lifecycle::ToolExecutor,
+        operation: &str,
+        json_data: &str,
+        query_or_schema: Option<&str>,
+    ) -> Result<AgentOutput> {
+        let mut params = serde_json::json!({
+            "operation": operation,
+            "input": json_data,
+            "hook_integration": true  // Flag to indicate this is a hook demo
+        });
+
+        if let Some(query_or_schema) = query_or_schema {
+            match operation {
+                "query" => params["query"] = serde_json::json!(query_or_schema),
+                "validate" => params["schema"] = serde_json::json!(query_or_schema),
+                _ => {}
+            };
+        }
+
+        let input = AgentInput::text("JSON processing hook demonstration")
+            .with_parameter("parameters", params);
+        let context = ExecutionContext::default();
+
+        // Execute with hooks using the HookableToolExecution trait
+        use crate::lifecycle::HookableToolExecution;
+        self.execute_with_hooks(input, context, tool_executor).await
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -611,5 +695,71 @@ mod tests {
             .unwrap();
         assert_eq!(results.len(), 1);
         assert_eq!(results[0], serde_json::json!(30.0)); // Average age
+    }
+
+    #[test]
+    fn test_hook_integration_metadata() {
+        let tool = JsonProcessorTool::default();
+
+        // Test that the tool supports hooks
+        assert!(tool.supports_hooks());
+
+        // Test hook metadata
+        let metadata = tool.hook_metadata();
+        assert_eq!(metadata["tool_name"], "json-processor-tool");
+        assert!(metadata["hook_points_supported"].is_array());
+        assert_eq!(
+            metadata["hook_points_supported"].as_array().unwrap().len(),
+            8
+        );
+        assert!(metadata["hook_integration_benefits"].is_array());
+        assert!(metadata["security_considerations"].is_array());
+        assert_eq!(metadata["security_level"], "Safe");
+        assert!(metadata["supported_operations"].is_array());
+    }
+
+    #[tokio::test]
+    async fn test_json_processor_hook_integration() {
+        use crate::lifecycle::{ToolExecutor, ToolLifecycleConfig};
+        let tool = JsonProcessorTool::default();
+
+        let config = ToolLifecycleConfig::default();
+        let tool_executor = ToolExecutor::new(config, None, None);
+
+        // Demonstrate hook integration with a simple JSON query
+        let test_json = r#"{"name": "test", "value": 42}"#;
+        let result = tool
+            .demonstrate_hook_integration(&tool_executor, "query", test_json, Some(".name"))
+            .await;
+
+        assert!(result.is_ok());
+        let output = result.unwrap();
+        assert!(output.text.contains("success") || output.text.contains("test"));
+    }
+
+    #[tokio::test]
+    async fn test_hookable_tool_execution_trait_json() {
+        use crate::lifecycle::{HookableToolExecution, ToolExecutor, ToolLifecycleConfig};
+        let tool = JsonProcessorTool::default();
+
+        // Verify the tool implements HookableToolExecution
+        let config = ToolLifecycleConfig::default();
+        let tool_executor = ToolExecutor::new(config, None, None);
+
+        let input = AgentInput::text("Hook trait test").with_parameter(
+            "parameters",
+            serde_json::json!({
+                "operation": "query",
+                "input": r#"{"test": "data"}"#,
+                "query": ".test"
+            }),
+        );
+        let context = ExecutionContext::default();
+
+        // This should compile and execute without errors
+        let result = tool
+            .execute_with_hooks(input, context, &tool_executor)
+            .await;
+        assert!(result.is_ok());
     }
 }

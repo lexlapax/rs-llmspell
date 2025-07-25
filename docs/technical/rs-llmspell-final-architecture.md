@@ -11215,6 +11215,8 @@ impl WorkflowBuilder {
 
 ## Hook and Event System
 
+> **Implementation Status**: Planned for Phase 4. See `/docs/technical/hook-implementation.md` for detailed implementation guide.
+
 Rs-LLMSpell implements a comprehensive hook and event system that enables extensibility, monitoring, and reactive programming patterns across all components. This system unifies synchronous callbacks (hooks) and asynchronous events into a cohesive architecture.
 
 ### Architecture Overview

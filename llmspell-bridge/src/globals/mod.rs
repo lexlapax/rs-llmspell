@@ -34,7 +34,11 @@ pub async fn create_standard_registry(context: Arc<GlobalContext>) -> Result<Glo
     builder.register(Arc::new(core::UtilsGlobal::new()));
     // TODO: Add Security global when implemented
     builder.register(Arc::new(event_global::EventGlobal::new()));
-    builder.register(Arc::new(hook_global::HookGlobal::new()));
+
+    // Create HookBridge for hook system integration
+    let hook_bridge = Arc::new(crate::hook_bridge::HookBridge::new(context.clone()).await?);
+    builder.register(Arc::new(hook_global::HookGlobal::new(hook_bridge.clone())));
+
     builder.register(Arc::new(tool_global::ToolGlobal::new(
         context.registry.clone(),
     )));

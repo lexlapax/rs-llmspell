@@ -20,7 +20,7 @@ async fn test_provider_manager_creation() {
 }
 
 /// Test injecting providers into engine
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_inject_providers() {
     let lua_config = LuaConfig::default();
     let mut engine = EngineFactory::create_lua_engine(&lua_config).unwrap();
@@ -35,7 +35,7 @@ async fn test_inject_providers() {
 }
 
 /// Test accessing providers from script
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_script_provider_access() {
     let lua_config = LuaConfig::default();
     let mut engine = EngineFactory::create_lua_engine(&lua_config).unwrap();
@@ -57,7 +57,7 @@ async fn test_script_provider_access() {
 }
 
 /// Test listing providers from script
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_script_list_providers() {
     let lua_config = LuaConfig::default();
     let mut engine = EngineFactory::create_lua_engine(&lua_config).unwrap();
@@ -138,7 +138,7 @@ async fn test_provider_config_validation() {
 }
 
 /// Test concurrent provider access
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_concurrent_provider_access() {
     let lua_config = LuaConfig::default();
     let mut engine = EngineFactory::create_lua_engine(&lua_config).unwrap();
@@ -170,7 +170,7 @@ async fn test_concurrent_provider_access() {
 }
 
 /// Test provider error handling in scripts
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_script_provider_error_handling() {
     let lua_config = LuaConfig::default();
     let mut engine = EngineFactory::create_lua_engine(&lua_config).unwrap();

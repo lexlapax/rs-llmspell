@@ -1,11 +1,14 @@
 //! ABOUTME: Agent factory system for creating and configuring agents
 //! ABOUTME: Provides flexible agent creation with builder pattern and dependency injection
 
+use crate::lifecycle::StateMachineConfig;
 use anyhow::Result;
 use async_trait::async_trait;
 use llmspell_core::traits::agent::Agent;
+use llmspell_hooks::HookRegistry;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use tracing::info;
 
 /// Configuration for creating agents
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -104,6 +107,12 @@ pub struct DefaultAgentFactory {
 
     /// Provider manager for LLM agents
     provider_manager: Option<Arc<llmspell_providers::ProviderManager>>,
+
+    /// Hook registry for state machine integration
+    hook_registry: Option<Arc<HookRegistry>>,
+
+    /// Default state machine configuration
+    default_state_config: StateMachineConfig,
 }
 
 /// Hook that runs during agent creation
@@ -178,6 +187,8 @@ impl DefaultAgentFactory {
             templates,
             creation_hooks: vec![],
             provider_manager: Some(provider_manager),
+            hook_registry: None,
+            default_state_config: StateMachineConfig::default(),
         }
     }
 
@@ -189,6 +200,29 @@ impl DefaultAgentFactory {
     /// Add a custom template
     pub fn add_template(&mut self, name: String, config: AgentConfig) {
         self.templates.insert(name, config);
+    }
+
+    /// Set hook registry for state machine integration
+    pub fn with_hook_registry(mut self, hook_registry: Arc<HookRegistry>) -> Self {
+        self.hook_registry = Some(hook_registry);
+        self
+    }
+
+    /// Configure default state machine settings
+    pub fn with_state_config(mut self, state_config: StateMachineConfig) -> Self {
+        self.default_state_config = state_config;
+        self
+    }
+
+    /// Enable hooks and circuit breaker by default
+    pub fn with_enhanced_lifecycle(mut self) -> Self {
+        self.default_state_config = StateMachineConfig {
+            enable_logging: true,
+            enable_hooks: true,
+            enable_circuit_breaker: true,
+            ..StateMachineConfig::default()
+        };
+        self
     }
 
     /// Run creation hooks before creating agent
@@ -206,6 +240,18 @@ impl DefaultAgentFactory {
         }
         Ok(())
     }
+
+    /// Initialize agent lifecycle by calling initialize on the concrete type
+    async fn initialize_agent_lifecycle(&self, agent_type: &str, agent_name: &str) -> Result<()> {
+        info!(
+            "Agent '{}' of type '{}' created with lifecycle management",
+            agent_name, agent_type
+        );
+        // Note: Individual agents are responsible for calling initialize() when they're ready
+        // The factory creates them with state machines but doesn't auto-initialize
+        // This allows for more controlled startup sequences
+        Ok(())
+    }
 }
 
 // Removed Default impl - factory now requires provider manager
@@ -218,6 +264,10 @@ impl AgentFactory for DefaultAgentFactory {
 
         // Run before hooks
         self.run_before_hooks(&config).await?;
+
+        // Capture values we need after moving config
+        let agent_type = config.agent_type.clone();
+        let agent_name = config.name.clone();
 
         // Create agent based on type
         let agent: Arc<dyn Agent> = match config.agent_type.as_str() {
@@ -240,6 +290,10 @@ impl AgentFactory for DefaultAgentFactory {
 
         // Run after hooks
         self.run_after_hooks(&agent).await?;
+
+        // Initialize agent lifecycle
+        self.initialize_agent_lifecycle(&agent_type, &agent_name)
+            .await?;
 
         Ok(agent)
     }

@@ -2,10 +2,15 @@
 //! ABOUTME: Defines hook points and interfaces for future implementation
 
 pub mod builder;
+pub mod integration;
 pub mod lifecycle;
 pub mod types;
 
 pub use builder::HookBuilder;
+pub use integration::{
+    HookableWorkflowExecution, WorkflowExecutionPhase, WorkflowExecutor, WorkflowHookContext,
+    WorkflowLifecycleConfig,
+};
 pub use lifecycle::{HookPoint, WithHooks, WorkflowHooks};
 pub use types::{HookContext, HookError, HookResult, StepContext};
 

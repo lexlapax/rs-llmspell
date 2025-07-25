@@ -410,7 +410,7 @@ mod workflow_tool_tests {
         match result {
             Err(_) => {
                 // Timeout resulted in error
-                assert!(true);
+                // Timeout resulted in error - this is expected
             }
             Ok(res) => {
                 // Check if execution failed due to timeout

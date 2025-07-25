@@ -6,7 +6,7 @@ use llmspell_bridge::{
     runtime::{RuntimeConfig, ScriptRuntime},
 };
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_runtime_with_lua_engine() {
     let config = RuntimeConfig::default();
     assert_eq!(config.default_engine, "lua");
@@ -20,7 +20,7 @@ async fn test_runtime_with_lua_engine() {
     assert!(runtime.supports_multimodal());
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_runtime_with_engine_name() {
     let config = RuntimeConfig::default();
 
@@ -35,7 +35,7 @@ async fn test_runtime_with_engine_name() {
     assert_eq!(runtime.get_engine_name(), "lua");
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_runtime_execute_script() {
     let config = RuntimeConfig::default();
     let runtime = ScriptRuntime::new_with_lua(config).await.unwrap();
@@ -51,7 +51,7 @@ async fn test_runtime_execute_script() {
     }
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_runtime_capability_detection() {
     let config = RuntimeConfig::default();
     let runtime = ScriptRuntime::new_with_lua(config).await.unwrap();
@@ -68,7 +68,7 @@ async fn test_runtime_capability_detection() {
     assert!(runtime.supports_multimodal());
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_runtime_configuration() {
     let mut config = RuntimeConfig::default();
 
@@ -85,7 +85,7 @@ async fn test_runtime_configuration() {
     assert_eq!(runtime.get_engine_name(), "lua");
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_runtime_execution_context() {
     let config = RuntimeConfig::default();
     let runtime = ScriptRuntime::new_with_lua(config).await.unwrap();
@@ -105,7 +105,7 @@ async fn test_runtime_execution_context() {
     assert_eq!(updated.state, serde_json::json!({ "test": "value" }));
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_runtime_engine_switching_placeholder() {
     // This test demonstrates the architecture supports engine switching
     // even though JavaScript engine is not yet implemented

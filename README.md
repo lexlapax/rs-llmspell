@@ -1,10 +1,10 @@
 # rs-llmspell
 
-Scriptable LLM interactions via Lua and JavaScript
+Scriptable LLM interactions via Lua and JavaScript - Cast scripting spells to animate LLM golems
 
 ## Overview
 
-Rs-LLMSpell provides script-driven workflows for LLM interactions with 34 built-in tools, agent coordination, and state management. Currently Phase 3.3 complete, working toward 1.0 release.
+Rs-LLMSpell provides script-driven workflows for LLM interactions with 34 built-in tools, agent coordination, state management, and a powerful hook/event system for extensibility. Currently v0.4.0 (Phase 4 complete), working toward 1.0 release.
 
 ## Quick Example
 
@@ -28,6 +28,27 @@ local response = agent:execute({
 Logger.info("Summary", {result = response.output})
 ```
 
+### Hook and Event Example (v0.4.0)
+
+```lua
+-- Register a hook to monitor agent execution
+Hook.register("agent:before_execution", function(context)
+    Logger.info("Agent starting", {agent_id = context.agent_id})
+    return {continue_execution = true}
+end)
+
+-- Subscribe to error events
+Event.subscribe("*.error", function(event)
+    Alert.send("Error occurred", event.payload)
+end)
+
+-- Emit custom events
+Event.emit({
+    event_type = "custom:analysis_complete",
+    payload = {duration_ms = 250, records = 1000}
+})
+```
+
 ## Installation
 
 ```bash
@@ -46,12 +67,16 @@ cargo build --release
 - **Agent Coordination**: Create and orchestrate LLM agents with different models
 - **Workflow Patterns**: Sequential, parallel, conditional, and loop execution
 - **State Management**: Thread-safe state sharing between agents and workflows
+- **Hook System**: 40+ extensibility points with <1% performance overhead
+- **Event Bus**: Cross-language event propagation at >90K events/sec
+- **Built-in Hooks**: Logging, metrics, caching, rate limiting, retry, cost tracking, and security
 - **Security**: Comprehensive sandboxing and resource limits
 - **Multi-Provider**: Support for OpenAI, Anthropic, and local models
 
 ## Current Status
 
-- **v0.3.0 Released**: 34 tools, agent infrastructure, and workflows (2025-01-30)
+- **v0.4.0 Released**: Hook and event system with cross-language support (2025-07-25)
+- **v0.3.0 Released**: 34 tools, agent infrastructure, and workflows (2025-07-23)
 - **Phase 3.3 Complete**: Agent infrastructure and workflow integration done
 - **Pre-1.0 Software**: Breaking changes expected before stable release
 - **Not Production Ready**: Use for experimentation and development only

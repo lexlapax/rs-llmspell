@@ -14,7 +14,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 /// Test complete script execution through bridge abstraction
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_script_execution_through_bridge() {
     // Create engine through factory
     let lua_config = LuaConfig::default();
@@ -54,9 +54,9 @@ async fn test_script_execution_through_bridge() {
         .contains("Lua"));
 
     let apis = result.get("apis").unwrap().as_object().unwrap();
-    assert_eq!(apis.get("agent").unwrap().as_bool().unwrap(), true);
-    assert_eq!(apis.get("tool").unwrap().as_bool().unwrap(), true);
-    assert_eq!(apis.get("workflow").unwrap().as_bool().unwrap(), true);
+    assert!(apis.get("agent").unwrap().as_bool().unwrap());
+    assert!(apis.get("tool").unwrap().as_bool().unwrap());
+    assert!(apis.get("workflow").unwrap().as_bool().unwrap());
 }
 
 /// Test engine switching capability (even with only Lua)
@@ -87,7 +87,7 @@ async fn test_engine_switching_integration() {
 }
 
 /// Test streaming capabilities through bridge
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_streaming_through_bridge() {
     let lua_config = LuaConfig::default();
     let mut engine = EngineFactory::create_lua_engine(&lua_config).unwrap();
@@ -167,7 +167,7 @@ async fn test_provider_integration() {
 }
 
 /// Test error propagation from scripts
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_error_propagation() {
     let lua_config = LuaConfig::default();
     let mut engine = EngineFactory::create_lua_engine(&lua_config).unwrap();
@@ -196,7 +196,7 @@ async fn test_error_propagation() {
 }
 
 /// Test multimodal type access from scripts
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_multimodal_types_access() {
     let lua_config = LuaConfig::default();
     let mut engine = EngineFactory::create_lua_engine(&lua_config).unwrap();
@@ -234,7 +234,7 @@ async fn test_multimodal_types_access() {
 }
 
 /// Test execution context management
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_execution_context_integration() {
     let lua_config = LuaConfig::default();
     let mut engine = EngineFactory::create_lua_engine(&lua_config).unwrap();
@@ -265,7 +265,7 @@ async fn test_execution_context_integration() {
 }
 
 /// Test performance benchmarks with bridge overhead
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_bridge_performance_overhead() {
     use std::time::Instant;
 
@@ -296,7 +296,7 @@ async fn test_bridge_performance_overhead() {
 }
 
 /// Test component registration and access
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_component_registration_integration() {
     use async_trait::async_trait;
     use llmspell_core::error::LLMSpellError;
@@ -382,7 +382,7 @@ async fn test_component_registration_integration() {
 }
 
 /// Test concurrent script execution
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_concurrent_script_execution() {
     let lua_config = LuaConfig::default();
     let mut engine = EngineFactory::create_lua_engine(&lua_config).unwrap();

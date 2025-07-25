@@ -35,7 +35,7 @@ mod lua_globals {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_global_injection_lua() -> Result<()> {
         let lua = Lua::new();
         let context = setup_test_context().await;
@@ -328,7 +328,7 @@ mod lua_globals {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_global_injection_performance() -> Result<()> {
         use std::time::Instant;
 
@@ -352,7 +352,7 @@ mod lua_globals {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_json_global_lua() -> Result<()> {
         let lua = Lua::new();
         let context = setup_test_context().await;
@@ -402,7 +402,7 @@ mod lua_globals {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_hook_global_lua() -> Result<()> {
         let lua = Lua::new();
         let context = setup_test_context().await;
@@ -414,14 +414,17 @@ mod lua_globals {
         // Test Hook global placeholder functions
         lua.load(
             r#"
-            -- Test Hook.register() placeholder
-            local result = Hook.register("test_hook", function() end)
-            assert(type(result) == "string", "Hook.register() should return a string")
-            assert(result:find("placeholder") ~= nil, "Hook.register() should indicate it's a placeholder")
+            -- Test Hook.register() with valid hook point
+            local handle = Hook.register("BeforeToolExecution", function() end)
+            assert(type(handle) == "userdata", "Hook.register() should return a userdata handle")
             
             -- Test Hook.list()
             local hooks = Hook.list()
             assert(type(hooks) == "table", "Hook.list() should return a table")
+            assert(#hooks >= 1, "Should have at least one hook registered")
+            
+            -- Test unregister
+            handle:unregister()
         "#,
         )
         .exec()
@@ -433,7 +436,7 @@ mod lua_globals {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_event_global_lua() -> Result<()> {
         let lua = Lua::new();
         let context = setup_test_context().await;
@@ -442,22 +445,32 @@ mod lua_globals {
 
         injector.inject_lua(&lua, &context)?;
 
-        // Test Event global placeholder functions
+        // Test Event global implemented functions
         lua.load(
             r#"
-            -- Test Event.emit() placeholder
-            local result = Event.emit("test_event", {data = "test"})
-            assert(type(result) == "string", "Event.emit() should return a string")
-            assert(result:find("placeholder") ~= nil, "Event.emit() should indicate it's a placeholder")
+            -- Test Event.publish() 
+            local success = Event.publish("test_event", {data = "test"})
+            assert(success == true, "Event.publish() should return true")
             
-            -- Test Event.subscribe() placeholder
-            result = Event.subscribe("test_event", function() end)
-            assert(type(result) == "string", "Event.subscribe() should return a string")
-            assert(result:find("placeholder") ~= nil, "Event.subscribe() should indicate it's a placeholder")
+            -- Test Event.subscribe()
+            local subscription_id = Event.subscribe("test_event.*")
+            assert(type(subscription_id) == "string", "Event.subscribe() should return a subscription ID string")
+            assert(#subscription_id > 0, "Subscription ID should not be empty")
+            
+            -- Test Event.list_subscriptions()
+            local subscriptions = Event.list_subscriptions()
+            assert(type(subscriptions) == "table", "Event.list_subscriptions() should return a table")
+            assert(#subscriptions >= 1, "Should have at least one subscription")
+            
+            -- Test Event.get_stats()
+            local stats = Event.get_stats()
+            assert(type(stats) == "table", "Event.get_stats() should return a table")
+            assert(stats.event_bus_stats ~= nil, "Stats should have event_bus_stats")
+            assert(stats.bridge_stats ~= nil, "Stats should have bridge_stats")
             
             -- Test Event.unsubscribe()
-            local success = Event.unsubscribe("test_subscription")
-            assert(success == true, "Event.unsubscribe() should return true")
+            local success = Event.unsubscribe(subscription_id)
+            assert(success == true, "Event.unsubscribe() should return true for valid subscription")
         "#,
         )
         .exec()
@@ -469,7 +482,7 @@ mod lua_globals {
         Ok(())
     }
 
-    #[tokio::test]
+    #[tokio::test(flavor = "multi_thread")]
     async fn test_state_global_lua() -> Result<()> {
         let lua = Lua::new();
         let context = setup_test_context().await;

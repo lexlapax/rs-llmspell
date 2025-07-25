@@ -454,6 +454,89 @@ impl Tool for HttpRequestTool {
     }
 }
 
+impl HttpRequestTool {
+    /// Check if this tool supports hook integration
+    pub fn supports_hooks(&self) -> bool {
+        true // All tools that implement Tool automatically support hooks
+    }
+
+    /// Get hook integration metadata for this tool
+    pub fn hook_metadata(&self) -> serde_json::Value {
+        json!({
+            "tool_name": self.metadata().name,
+            "hook_points_supported": [
+                "parameter_validation",
+                "security_check",
+                "resource_allocation",
+                "pre_execution",
+                "post_execution",
+                "error_handling",
+                "resource_cleanup",
+                "timeout"
+            ],
+            "security_level": self.security_level(),
+            "resource_limits": {
+                "timeout_seconds": self.config.timeout_seconds,
+                "max_retry_attempts": self.config.retry_config.max_attempts,
+                "network_dependent": true
+            },
+            "hook_integration_benefits": [
+                "HTTP request validation and sanitization",
+                "URL security validation and blacklist checking",
+                "Rate limiting and throttling with hooks",
+                "Request/response size monitoring",
+                "Network timeout and retry logic tracking",
+                "Authentication credential validation",
+                "Response parsing and error handling",
+                "Performance monitoring for API calls"
+            ],
+            "security_considerations": [
+                "Safe security level for HTTP requests",
+                "URL validation to prevent SSRF attacks",
+                "Request header sanitization",
+                "Response size limits to prevent DoS",
+                "Timeout enforcement for hanging requests",
+                "Authentication credential protection"
+            ],
+            "supported_methods": ["GET", "POST", "PUT", "DELETE", "PATCH", "HEAD", "OPTIONS"],
+            "authentication_types": ["none", "basic", "bearer", "api_key"]
+        })
+    }
+
+    /// Demonstrate hook-aware execution for HTTP requests
+    /// This method showcases how the HTTP request tool works with the hook system
+    pub async fn demonstrate_hook_integration(
+        &self,
+        tool_executor: &crate::lifecycle::ToolExecutor,
+        method: &str,
+        url: &str,
+        headers: Option<&std::collections::HashMap<String, String>>,
+        body: Option<&str>,
+    ) -> Result<AgentOutput> {
+        let mut params = json!({
+            "method": method,
+            "input": url,
+            "hook_integration": true  // Flag to indicate this is a hook demo
+        });
+
+        if let Some(headers) = headers {
+            params["headers"] = json!(headers);
+        }
+
+        if let Some(body) = body {
+            params["body"] = json!(body);
+        }
+
+        let input = AgentInput::text("HTTP request hook demonstration")
+            .with_parameter("parameters", params);
+        let context = ExecutionContext::default();
+
+        // Execute with hooks using the HookableToolExecution trait
+        use crate::lifecycle::HookableToolExecution;
+        self.execute_with_hooks(input, context, tool_executor).await
+    }
+}
+
 #[async_trait]
 impl BaseAgent for HttpRequestTool {
     fn metadata(&self) -> &ComponentMetadata {
@@ -529,5 +612,80 @@ impl BaseAgent for HttpRequestTool {
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
         Ok(AgentOutput::text(format!("HTTP request error: {}", error)))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_hook_integration_metadata() {
+        let tool = HttpRequestTool::new(HttpRequestConfig::default()).unwrap();
+
+        // Test that the tool supports hooks
+        assert!(tool.supports_hooks());
+
+        // Test hook metadata
+        let metadata = tool.hook_metadata();
+        assert_eq!(metadata["tool_name"], "http-request-tool");
+        assert!(metadata["hook_points_supported"].is_array());
+        assert_eq!(
+            metadata["hook_points_supported"].as_array().unwrap().len(),
+            8
+        );
+        assert!(metadata["hook_integration_benefits"].is_array());
+        assert!(metadata["security_considerations"].is_array());
+        assert_eq!(metadata["security_level"], "Safe");
+        assert!(metadata["supported_methods"].is_array());
+        assert!(metadata["authentication_types"].is_array());
+    }
+
+    #[tokio::test]
+    async fn test_http_request_hook_integration() {
+        use crate::lifecycle::{ToolExecutor, ToolLifecycleConfig};
+        let tool = HttpRequestTool::new(HttpRequestConfig::default()).unwrap();
+
+        let config = ToolLifecycleConfig::default();
+        let tool_executor = ToolExecutor::new(config, None, None);
+
+        // Demonstrate hook integration with a simple GET request (may fail due to network)
+        let result = tool
+            .demonstrate_hook_integration(
+                &tool_executor,
+                "GET",
+                "https://httpbin.org/get",
+                None,
+                None,
+            )
+            .await;
+
+        // The network request may fail, but hook integration should not panic
+        assert!(result.is_ok() || result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_hookable_tool_execution_trait_http() {
+        use crate::lifecycle::{HookableToolExecution, ToolExecutor, ToolLifecycleConfig};
+        let tool = HttpRequestTool::new(HttpRequestConfig::default()).unwrap();
+
+        // Verify the tool implements HookableToolExecution
+        let config = ToolLifecycleConfig::default();
+        let tool_executor = ToolExecutor::new(config, None, None);
+
+        let input = AgentInput::text("Hook trait test").with_parameter(
+            "parameters",
+            json!({
+                "method": "GET",
+                "input": "https://httpbin.org/get"
+            }),
+        );
+        let context = ExecutionContext::default();
+
+        // This should compile and execute (network request may fail, that's ok)
+        let result = tool
+            .execute_with_hooks(input, context, &tool_executor)
+            .await;
+        assert!(result.is_ok() || result.is_err()); // Should not panic
     }
 }

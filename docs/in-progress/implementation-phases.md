@@ -299,32 +299,46 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 ---
 ## Production Features Phases
 
-### **Phase 4: Hook and Event System (Weeks 17-18)**
+### **Phase 4: Hook and Event System (Weeks 17-18.5)** 
 
-**Goal**: Implement comprehensive hooks and events system  
+**Goal**: Implement comprehensive hooks and events system with cross-language support and production patterns  
 **Priority**: HIGH (Production Essential)
 **Dependencies**: Requires Phase 3.3 Agent Infrastructure
+**Timeline Note**: Extended by 2-3 days for future-proofing, saves 2+ weeks in later phases
 
 **Components**:
-- Hook execution framework with 20+ hook points
-- Event bus using `tokio-stream` + `crossbeam`
-- Built-in hooks (logging, metrics, debugging)
-- Script-accessible hook registration
-- Agent lifecycle hooks integration
+- Hook execution framework with 20+ hook points and **HookAdapter trait for language flexibility**
+- Event bus using `tokio-stream` + `crossbeam` with **FlowController for backpressure handling**
+- Built-in hooks (logging, metrics, debugging, **caching, rate limiting, retry, cost tracking, security**)
+- Script-accessible hook registration with **language-specific adapters (Lua sync, JS promises, Python async)**
+- Agent lifecycle hooks integration with **ReplayableHook trait for Phase 5 persistence**
+- **CircuitBreaker for automatic performance protection (<5% overhead guaranteed)**
+- **UniversalEvent format for cross-language event propagation**
+- **DistributedHookContext for future A2A protocol support (Phase 16-17)**
+- **CompositeHook patterns (Sequential, Parallel, FirstMatch, Voting)**
+- **Enhanced HookResult enum (Continue, Modified, Cancel, Redirect, Replace, Retry, Fork, Cache, Skipped)**
 
 **Success Criteria**:
-- [ ] Pre/post execution hooks work for agents and tools
-- [ ] Event emission and subscription functional
-- [ ] Built-in logging and metrics hooks operational
-- [ ] Scripts can register custom hooks
-- [ ] Hook execution doesn't significantly impact performance (<5% overhead)
+- [ ] Pre/post execution hooks work for agents and tools with **automatic circuit breaking**
+- [ ] Hook execution works for 6 agent states, 34 tools, and 4 workflow patterns
+- [ ] Event emission and subscription functional with **backpressure handling**
+- [ ] Built-in logging, metrics, **caching, rate limiting, retry, cost tracking, and security** hooks operational
+- [ ] Scripts can register custom hooks in **Lua (sync), JavaScript (promises), and Python (async) patterns**
+- [ ] Hook execution doesn't significantly impact performance (<5% overhead **enforced by CircuitBreaker**)
+- [ ] **Cross-language event propagation works (Lua→JS, JS→Lua, etc.)**
+- [ ] **ReplayableHook trait enables hook persistence for Phase 5**
+- [ ] **Performance monitoring integrated with automatic hook disabling**
 
 **Testing Requirements**:
 - Hook execution order validation
-- Event bus performance tests
-- Script hook registration tests
+- Event bus performance tests with **backpressure scenarios**
+- Script hook registration tests **across languages**
 - Performance impact measurements
+- Performance regression testing from day 1 to ensure <5% overhead
 - Hook error handling tests
+- **CircuitBreaker triggering and recovery tests**
+- **Cross-language event propagation tests**
+- **Composite hook execution tests**
 
 ---
 
@@ -333,6 +347,7 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 **Goal**: Implement persistent state storage with sled/rocksdb  
 **Priority**: MEDIUM (Production Important)
 **Dependencies**: Requires Phase 4 Hook System for state change notifications
+**Phase 4 Integration**: This phase leverages the ReplayableHook trait and HookContext serialization from Phase 4 to enable state replay and hook history persistence.
 
 **Note**: This phase will leverage the `llmspell-storage` infrastructure implemented in Phase 3.3, extending it for general state management beyond agent registry persistence.
 
@@ -342,6 +357,9 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 - State migration and versioning
 - Backup and recovery mechanisms
 - Hook integration for state change events
+- **Hook history persistence using ReplayableHook trait from Phase 4**
+- **State replay with hook execution reconstruction**
+- **Event correlation for state timeline visualization**
 
 **Success Criteria**:
 - [ ] Agent state persists across application restarts
@@ -349,6 +367,9 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 - [ ] Multiple agents can have independent state
 - [ ] State migrations work for schema changes
 - [ ] Backup/restore operations functional
+- [ ] **Hook history is persisted and replayable**
+- [ ] **State changes trigger appropriate hooks**
+- [ ] **Event correlation IDs link state changes**
 
 **Testing Requirements**:
 - State persistence integration tests
@@ -356,25 +377,29 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 - Migration pathway validation
 - Backup/restore functionality tests
 - Multi-agent state isolation tests
+- **Hook replay functionality tests**
+- **State timeline reconstruction tests**
 
 ---
-
 
 ### **Phase 6: Session and Artifact Management (Weeks 21-22)**
 
 **Goal**: Implement session management and artifact storage  
 **Priority**: MEDIUM (Production Enhancement)
 **Dependencies**: Requires Phase 5 Persistent State Management
+**Phase 4 Integration**: Session boundaries are managed through hooks (session:start, session:end) with automatic artifact collection and event correlation.
 
 **Note**: Session and artifact storage will use the `llmspell-storage` backend infrastructure for consistent persistence patterns across the system.
 
 **Components**:
-- Session lifecycle management
+- Session lifecycle management **with built-in hooks**
 - Artifact storage and retrieval system (using llmspell-storage)
-- Session context preservation
+- Session context preservation **via HookContext**
 - Artifact versioning and metadata
-- Session replay capabilities
+- Session replay capabilities **using ReplayableHook**
 - Integration with state management
+- **Automatic artifact collection hooks**
+- **Cross-session event correlation via UniversalEvent**
 
 **Success Criteria**:
 - [ ] Sessions can be created, saved, and restored
@@ -382,6 +407,9 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 - [ ] Session context preserved across restarts
 - [ ] Artifact versioning and history tracking works
 - [ ] Session replay functionality operational
+- [ ] **Session hooks fire at appropriate boundaries**
+- [ ] **Artifacts are automatically collected via hooks**
+- [ ] **Event correlation links session activities**
 
 **Testing Requirements**:
 - Session lifecycle tests
@@ -389,6 +417,8 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 - Session context preservation validation
 - Artifact versioning tests
 - Session replay functionality tests
+- **Session hook integration tests**
+- **Artifact collection hook tests**
 
 ---
 
@@ -397,6 +427,7 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 **Goal**: Implement vector storage backends and advanced search capabilities
 **Priority**: MEDIUM (Advanced Features)
 **Dependencies**: Requires Phase 6 Session Management for search context
+**Phase 4 Integration**: High-frequency embedding events handled by FlowController, with CachingHook for embedding reuse and performance monitoring.
 
 **Components**:
 - `VectorStorageBackend` trait implementations (memory, disk, external)
@@ -404,6 +435,9 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 - `SemanticSearchTool` implementation using vector storage
 - `CodeSearchTool` implementation with tree-sitter integration
 - Agent memory system integration with vector storage
+- **Integration with CachingHook for embedding caching**
+- **Event-driven vector indexing with backpressure control**
+- **Performance monitoring for vector operations**
 
 **Essential Components**:
 - Vector similarity search algorithms (cosine, euclidean, dot product)
@@ -419,6 +453,8 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 - [ ] RAG pipeline patterns implemented
 - [ ] Agent memory can store and retrieve semantic information
 - [ ] Performance acceptable for medium datasets (<10k vectors)
+- [ ] **Embedding cache hit rate >80% for repeated content**
+- [ ] **Vector indexing handles high-frequency updates via backpressure**
 
 **Testing Requirements**:
 - Vector similarity search accuracy tests
@@ -426,6 +462,8 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 - Code parsing and search validation
 - Performance benchmarks for vector operations
 - Agent memory integration tests
+- **Embedding cache effectiveness tests**
+- **Backpressure handling under load tests**
 
 ---
 
@@ -434,6 +472,7 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 **Goal**: Enhance basic workflows with enterprise-grade features leveraging full infrastructure
 **Priority**: MEDIUM (Advanced Orchestration)
 **Dependencies**: Requires Phase 7 Vector Storage and all infrastructure phases
+**Phase 4 Integration**: CompositeHook and Fork/Retry patterns from Phase 4 enable advanced workflow orchestration with less custom code.
 
 **Components**:
 - **Advanced Workflow Features**:
@@ -441,6 +480,8 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
   - Hook/event integration for workflow lifecycle (builds on Phase 4 Hooks)
   - Session-aware workflow context (builds on Phase 6 Sessions)
   - Vector storage for workflow context and templates
+  - **Fork and Retry patterns using Phase 4 HookResult enhancements**
+  - **CompositeHook patterns for workflow-level hook composition**
 - **Advanced Workflow Patterns**:
   - `StreamingWorkflow` for real-time data processing
   - `ParallelWorkflow` with complex synchronization
@@ -461,6 +502,9 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 - [ ] Workflow monitoring and observability operational
 - [ ] Performance optimization delivers measurable improvements
 - [ ] Enterprise-grade error recovery mechanisms working
+- [ ] **Fork operations from hooks create parallel workflow branches**
+- [ ] **Retry patterns with exponential backoff work via hooks**
+- [ ] **Workflow hooks can modify execution flow dynamically**
 
 **Testing Requirements**:
 - Advanced workflow pattern unit tests
@@ -470,6 +514,8 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 - Workflow persistence and session integration tests
 - Distributed workflow execution tests
 - Workflow template marketplace validation
+- **Fork/Retry pattern integration tests**
+- **Dynamic flow modification tests**
 
 ---
 
@@ -480,6 +526,7 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 **Goal**: Implement comprehensive multimodal processing tools  
 **Priority**: MEDIUM (Feature Enhancement)
 **Dependencies**: Requires Phase 8 Workflow Orchestration for multimodal workflows
+**Phase 4 Integration**: Media processing hooks enable dynamic parameter adjustment, progress tracking, and cost monitoring for expensive operations.
 
 **Components**:
 - Image processing tools (resize, crop, format conversion)
@@ -488,6 +535,9 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 - Audio transcription tool (stub with interface)
 - Media format conversion utilities
 - Integration with multimodal workflows
+- **Hook-based parameter optimization for large media files**
+- **Progress hooks for long-running operations**
+- **Cost tracking for AI-powered media analysis**
 
 **Success Criteria**:
 - [ ] Image processing tools handle common formats (PNG, JPEG, WebP)
@@ -496,6 +546,9 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 - [ ] Audio transcription interface defined (implementation can be stub)
 - [ ] Tools integrate smoothly with streaming workflows
 - [ ] Media type validation works correctly
+- [ ] **Hooks automatically optimize processing for large files**
+- [ ] **Progress events emitted for operations >1 second**
+- [ ] **Cost tracking accurate for AI operations**
 
 **Testing Requirements**:
 - Individual tool functionality tests
@@ -503,6 +556,8 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 - Integration tests with workflows
 - Performance benchmarks for media processing
 - Error handling for invalid media
+- **Hook-based optimization tests**
+- **Progress tracking accuracy tests**
 
 ---
 
@@ -511,6 +566,7 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 **Goal**: Implement interactive REPL for development and debugging  
 **Priority**: MEDIUM (Developer Experience)
 **Dependencies**: Requires Phase 9 Multimodal Tools for media preview
+**Phase 4 Integration**: Hook introspection for debugging, real-time event stream visualization, and performance monitoring display.
 
 **Components**:
 - `llmspell repl` command
@@ -521,6 +577,9 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 - Streaming output display with progress indicators
 - Media file input/output support
 - Multimodal content preview capabilities
+- **Hook introspection commands (.hooks list, .hooks trace)**
+- **Real-time event stream visualization**
+- **Performance monitoring display with circuit breaker status**
 
 **Success Criteria**:
 - [ ] REPL starts and accepts commands
@@ -531,6 +590,9 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 - [ ] Streaming outputs display progressively
 - [ ] Can load and display media files
 - [ ] Multimodal outputs preview correctly
+- [ ] **Hook debugging commands functional**
+- [ ] **Event stream can be monitored in real-time**
+- [ ] **Performance metrics displayed on demand**
 
 **Testing Requirements**:
 - REPL command execution tests
@@ -538,6 +600,8 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 - User interaction simulation tests
 - Tab completion functionality tests
 - History management tests
+- **Hook introspection command tests**
+- **Event stream display tests**
 
 ---
 
@@ -545,12 +609,16 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 
 **Goal**: Implement long-running daemon mode with scheduler  
 **Priority**: LOW (Advanced Feature)
+**Phase 4 Integration**: FlowController and CircuitBreaker from Phase 4 are CRITICAL for daemon stability, preventing memory exhaustion and runaway operations in long-running services.
 
 **Components**:
 - `llmspell serve` command
 - `Scheduler` component with cron/interval triggers
 - Service integration (systemd/launchd)
 - API endpoints for external control
+- **Automatic FlowController integration for event overflow prevention**
+- **CircuitBreaker protection for all scheduled tasks**
+- **Built-in monitoring via Phase 4 performance hooks**
 - **Model Specification Support**:
   - REST API must accept both full configuration and "provider/model" formats
   - Configuration file schema should support convenience syntax
@@ -564,6 +632,9 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 - [ ] Service can be controlled via system service manager
 - [ ] API endpoints respond to external requests
 - [ ] Resource usage remains stable over long periods
+- [ ] **Event overflow prevented by FlowController**
+- [ ] **Runaway tasks stopped by CircuitBreaker**
+- [ ] **Performance metrics available via monitoring hooks**
 - [ ] REST API accepts both model specification formats
 - [ ] Configuration files support convenience syntax
 - [ ] Backward compatibility maintained for existing configs
@@ -575,6 +646,9 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 - Service integration tests
 - API endpoint functionality tests
 - Resource usage monitoring tests
+- **Event overflow stress tests**
+- **Circuit breaker activation tests**
+- **Monitoring hook accuracy tests**
 
 ---
 
@@ -636,12 +710,16 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 
 **Goal**: Implement AI and ML dependent complex tools  
 **Priority**: MEDIUM (Advanced AI Features)
+**Phase 4 Integration**: CostTrackingHook, RateLimitHook, and RetryHook from Phase 4 are essential for production AI/ML tool deployment.
 
 **Components**:
 - **AI/ML Tools** (6 tools): text_summarizer, sentiment_analyzer, language_detector, text_classifier, named_entity_recognizer, embedding_generator
 - **Advanced Multimodal** (8 tools): image_analyzer, ocr_extractor, audio_transcriber, image_generator, media_converter, face_detector, scene_analyzer
 - Model loading and inference infrastructure
 - Local model support and optimization
+- **AI/ML Tools with automatic cost tracking via Phase 4 hooks**
+- **Rate limiting with backoff for API quota management**
+- **Retry mechanisms for transient AI service failures**
 
 **Success Criteria**:
 - [ ] All AI/ML tools functional with local models
@@ -649,6 +727,9 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 - [ ] Model loading and caching optimized
 - [ ] Performance acceptable for production use
 - [ ] Integration with vector storage (from Phase 7)
+- [ ] **Cost tracking accurate for all AI operations**
+- [ ] **Rate limiting prevents API quota exhaustion**
+- [ ] **Automatic retry handles transient failures**
 
 **Testing Requirements**:
 - AI/ML tool accuracy validation
@@ -663,6 +744,7 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 
 **Goal**: Add JavaScript as second script engine using existing ScriptEngineBridge infrastructure  
 **Priority**: MEDIUM (Enhancement)
+**Phase 4 Preparation**: JavaScriptHookAdapter, Promise-based patterns, and UniversalEvent cross-language support already designed in Phase 4, significantly reducing implementation complexity.
 
 **Components**:
 - JavaScript engine integration (`boa` or `quickjs`)
@@ -672,6 +754,8 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 - JavaScript Promise-based async patterns
 - Streaming support via async generators
 - Media type marshalling (base64/typed arrays)
+- **JavaScriptHookAdapter from Phase 4 for Promise-based hooks**
+- **UniversalEvent handling for Lua↔JS event propagation**
 - **Model Specification Features**:
   - Implement same ModelSpecifier parsing in JavaScript bridge
   - Ensure JavaScript API matches Lua API for model specification
@@ -689,6 +773,9 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 - [ ] Media types properly marshalled through bridge abstraction
 - [ ] Performance comparable to Lua execution
 - [ ] Error handling consistent across engines
+- [ ] **JavaScript Promise-based hooks work via JavaScriptHookAdapter from Phase 4**
+- [ ] **Cross-language events propagate correctly (Lua↔JS) via UniversalEvent**
+- [ ] **Async/await patterns in hooks handled transparently**
 - [ ] Model specification syntax identical between Lua and JavaScript
 - [ ] "provider/model" convenience syntax works in JavaScript scripts
 - [ ] JavaScript tests validate all model specification formats
@@ -822,12 +909,15 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 
 **Goal**: Performance optimization and production hardening  
 **Priority**: HIGH (Production Readiness)
+**Phase 4 Benefit**: CircuitBreaker, PerformanceMonitor, and SecurityHook from Phase 4 provide built-in protection, reducing this phase's scope by ~1 week.
 
 **Components**:
-- Performance profiling and optimization
+- Performance profiling and optimization **(building on Phase 4 monitoring)**
 - Memory usage optimization
-- Comprehensive observability (metrics, tracing)
-- Security audit and hardening
+- Comprehensive observability **(extending Phase 4 metrics)**
+- Security audit and hardening **(leveraging SecurityHook patterns)**
+- **Fine-tuning of existing CircuitBreaker thresholds**
+- **Optimization of hook execution paths**
 
 **Success Criteria**:
 - [ ] Performance benchmarks meet targets
@@ -835,6 +925,9 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 - [ ] Full observability stack functional
 - [ ] Security audit passes
 - [ ] Production deployment validated
+- [ ] **CircuitBreaker thresholds optimized for production**
+- [ ] **Hook execution overhead remains <5%**
+- [ ] **Security patterns from Phase 4 validated**
 
 **Testing Requirements**:
 - Performance benchmark validation
@@ -842,6 +935,8 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 - Observability stack integration tests
 - Security penetration testing
 - Production deployment simulation
+- **Hook performance regression tests**
+- **Circuit breaker threshold optimization tests**
 
 ---
 
@@ -961,13 +1056,17 @@ Each phase must pass:
 - **Phase 3**: Depends on comprehensive tools (Phase 2.5)
 - **Phases 4+**: Depends on MVP completion (Phases 0-3)
 - **Phase 4**: Hook System depends on Phase 3.3 Agent Infrastructure
-- **Phase 5**: State Management depends on Phase 4 Hook System
+- **Phase 5**: State Management depends on Phase 4 Hook System **(specifically ReplayableHook trait)**
 - **Phase 6**: Session Management depends on Phase 5 State Management
 - **Phase 7**: Vector Storage depends on Phase 6 Session Management
 - **Phase 8**: Workflow Orchestration depends on Phase 7 Vector Storage
 - **Phase 9**: Multimodal Tools depends on Phase 8 Workflows
 - **Phase 10**: REPL depends on Phase 9 Multimodal Tools
-- **Phase 15**: JavaScript Engine Support depends on MVP completion + ScriptEngineBridge foundation from Phase 1.2
+- **Phase 11**: Daemon Mode depends on Phase 4 **(FlowController and CircuitBreaker critical)**
+- **Phase 14**: AI/ML Tools depends on Phase 4 **(CostTrackingHook essential)**
+- **Phase 15**: JavaScript Engine Support depends on MVP completion + ScriptEngineBridge foundation from Phase 1.2 **(greatly simplified by Phase 4 JavaScriptHookAdapter)**
+- **Phase 16-17**: A2A Protocol depends on Phase 4 **(DistributedHookContext required)**
+- **Phase 18**: Library Mode depends on Phase 4 **(SelectiveHookRegistry needed)**
 - **Cross-language testing**: Can begin in Phase 1 with bridge abstraction tests
 - **Engine implementations**: Can be developed in parallel once ScriptEngineBridge is stable
 - **Third-party engines**: Can be added after Phase 1.2 completion using bridge pattern
@@ -981,10 +1080,10 @@ Each phase must pass:
 
 - **MVP Foundation**: ✅ COMPLETE (Phases 0-2, delivered in 8 weeks)
 - **MVP with External Tools & Agent Infrastructure**: 16 weeks (Phases 0-3)
-- **Production Infrastructure**: 26 weeks (Phases 0-7, includes hooks, state, sessions, vectors)
-- **Advanced Features**: 30 weeks (Phases 0-10, includes workflows, multimodal, REPL)
-- **Multi-Language Ready**: 40 weeks (Phases 0-15, JavaScript support)
-- **Full Feature Set**: 52 weeks (All 21 phases)
+- **Production Infrastructure**: 26.5 weeks (Phases 0-7, includes enhanced hooks +3 days)
+- **Advanced Features**: 29.5 weeks (Phases 0-10, includes workflows -3 days saved, multimodal, REPL)
+- **Multi-Language Ready**: 39.5 weeks (Phases 0-15, JavaScript support -3 days saved)
+- **Full Feature Set**: 51 weeks (All 21 phases, -1 week from Phase 20 optimization)
 
 ### Resource Requirements
 
@@ -1004,11 +1103,16 @@ Each phase must pass:
   - **Bridge trait design**: Get trait design right in Phase 1.2, hard to change later
 - **Performance risks**: Early benchmarking and optimization
   - **Performance Risk**: Bridge abstraction must not add significant overhead
+  - **Performance Risk**: CircuitBreaker in Phase 4 guarantees <5% overhead across all phases
 - **Complexity risks**: Phased approach allows course correction
   - **Bridge Abstraction Complexity**: Start simple, ensure it works with Lua first
   - **API Injection Complexity**: Design language-agnostic APIs carefully
 - **Integration risks**: Comprehensive testing at each phase
 - **Architecture Risk**: CRITICAL - implement bridge pattern correctly in Phase 1.2 or face major refactoring in Phase 12
+- **Architecture Risk**: Phase 4 hook system designed with future phases in mind, preventing Phase 3-style rework
+- **Cross-Language Risk**: UniversalEvent and language adapters prepared in Phase 4
+- **Distributed Risk**: DistributedHookContext ready for Phase 16-17 A2A protocol
+- **Cost Risk**: Built-in cost tracking hooks prevent runaway AI/ML expenses
 
 ---
 

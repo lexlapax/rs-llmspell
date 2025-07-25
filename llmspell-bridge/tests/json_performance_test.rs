@@ -51,7 +51,7 @@ fn test_json_parse_performance() {
     let start = Instant::now();
     let iterations = 1000;
     for _ in 0..iterations {
-        lua.load(&format!(
+        lua.load(format!(
             r#"
             local parsed = JSON.parse('{}')
             assert(parsed.success == true)
@@ -68,7 +68,7 @@ fn test_json_parse_performance() {
     let start = Instant::now();
     let iterations = 100;
     for _ in 0..iterations {
-        lua.load(&format!(
+        lua.load(format!(
             r#"
             local parsed = JSON.parse('{}')
             assert(parsed.success == true)
@@ -85,7 +85,7 @@ fn test_json_parse_performance() {
     let start = Instant::now();
     let iterations = 10;
     for _ in 0..iterations {
-        lua.load(&format!(
+        lua.load(format!(
             r#"
             local parsed = JSON.parse('{}')
             assert(parsed.success == true)
@@ -208,7 +208,7 @@ fn test_json_roundtrip_performance() {
     let iterations = 100;
 
     for _ in 0..iterations {
-        lua.load(&format!(
+        lua.load(format!(
             r#"
             local original = '{}'
             local parsed = JSON.parse(original)

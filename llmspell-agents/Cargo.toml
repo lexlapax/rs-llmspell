@@ -12,7 +12,9 @@ llmspell-core = { path = "../llmspell-core" }
 llmspell-providers = { path = "../llmspell-providers" }
 llmspell-storage = { path = "../llmspell-storage" }
 llmspell-tools = { path = "../llmspell-tools" }
+llmspell-hooks = { path = "../llmspell-hooks" }
 tokio.workspace = true
+tokio-util.workspace = true
 async-trait.workspace = true
 serde.workspace = true
 serde_json.workspace = true

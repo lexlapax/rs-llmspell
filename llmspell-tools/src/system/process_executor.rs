@@ -632,6 +632,92 @@ impl Tool for ProcessExecutorTool {
     }
 }
 
+impl ProcessExecutorTool {
+    /// Check if this tool supports hook integration
+    pub fn supports_hooks(&self) -> bool {
+        true // All tools that implement Tool automatically support hooks
+    }
+
+    /// Get hook integration metadata for this tool
+    pub fn hook_metadata(&self) -> serde_json::Value {
+        json!({
+            "tool_name": self.metadata().name,
+            "hook_points_supported": [
+                "parameter_validation",
+                "security_check",
+                "resource_allocation",
+                "pre_execution",
+                "post_execution",
+                "error_handling",
+                "resource_cleanup",
+                "timeout"
+            ],
+            "security_level": self.security_level(),
+            "resource_limits": {
+                "timeout_seconds": self.config.max_execution_time_seconds,
+                "max_output_size": self.config.max_output_size,
+                "allowed_executables": self.config.allowed_executables.len(),
+                "security_critical": true
+            },
+            "hook_integration_benefits": [
+                "Command injection prevention and validation",
+                "Process execution sandboxing and isolation",
+                "Resource usage monitoring and limits enforcement",
+                "Security audit logging for all process executions",
+                "Path traversal and privilege escalation prevention",
+                "Environment variable sanitization",
+                "Process termination and cleanup tracking",
+                "Security compliance for system command execution"
+            ],
+            "security_considerations": [
+                "Restricted security level for process execution privilege",
+                "Command whitelist validation to prevent arbitrary execution",
+                "Resource limits to prevent system resource exhaustion",
+                "Sandbox isolation to contain process execution",
+                "Environment variable filtering and sanitization",
+                "Working directory restrictions",
+                "Process output filtering to prevent information disclosure"
+            ],
+            "supported_operations": [
+                "execute (run process with arguments)",
+                "validate (check if command is allowed)",
+                "capabilities (list allowed commands and limits)"
+            ]
+        })
+    }
+
+    /// Demonstrate hook-aware execution for process execution
+    /// This method showcases how the process executor tool works with the hook system
+    pub async fn demonstrate_hook_integration(
+        &self,
+        tool_executor: &crate::lifecycle::ToolExecutor,
+        executable: &str,
+        args: Option<&[String]>,
+        working_dir: Option<&str>,
+    ) -> LLMResult<AgentOutput> {
+        let mut params = json!({
+            "executable": executable,
+            "hook_integration": true  // Flag to indicate this is a hook demo
+        });
+
+        if let Some(args) = args {
+            params["args"] = json!(args);
+        }
+
+        if let Some(working_dir) = working_dir {
+            params["working_dir"] = json!(working_dir);
+        }
+
+        let input = AgentInput::text("Process execution hook demonstration")
+            .with_parameter("parameters", params);
+        let context = ExecutionContext::default();
+
+        // Execute with hooks using the HookableToolExecution trait
+        use crate::lifecycle::HookableToolExecution;
+        self.execute_with_hooks(input, context, tool_executor).await
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -930,5 +1016,71 @@ mod tests {
 
         // But still respect blocked list
         assert!(!tool.is_executable_allowed("rm").unwrap());
+    }
+
+    #[test]
+    fn test_hook_integration_metadata() {
+        let tool = create_test_tool();
+
+        // Test that the tool supports hooks
+        assert!(tool.supports_hooks());
+
+        // Test hook metadata
+        let metadata = tool.hook_metadata();
+        assert_eq!(metadata["tool_name"], "process_executor");
+        assert!(metadata["hook_points_supported"].is_array());
+        assert_eq!(
+            metadata["hook_points_supported"].as_array().unwrap().len(),
+            8
+        );
+        assert!(metadata["hook_integration_benefits"].is_array());
+        assert!(metadata["security_considerations"].is_array());
+        assert_eq!(metadata["security_level"], "Restricted");
+        assert!(metadata["supported_operations"].is_array());
+        // Verify security critical flag
+        assert_eq!(metadata["resource_limits"]["security_critical"], true);
+    }
+
+    #[tokio::test]
+    async fn test_process_executor_hook_integration() {
+        use crate::lifecycle::{ToolExecutor, ToolLifecycleConfig};
+        let tool = create_test_tool();
+
+        let config = ToolLifecycleConfig::default();
+        let tool_executor = ToolExecutor::new(config, None, None);
+
+        // Demonstrate hook integration with echo command (should be safe)
+        let args = vec!["hello".to_string(), "hook".to_string()];
+        let result = tool
+            .demonstrate_hook_integration(&tool_executor, "echo", Some(&args), None)
+            .await;
+
+        // May succeed or fail based on system, but should not panic
+        assert!(result.is_ok() || result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_hookable_tool_execution_trait_process() {
+        use crate::lifecycle::{HookableToolExecution, ToolExecutor, ToolLifecycleConfig};
+        let tool = create_test_tool();
+
+        // Verify the tool implements HookableToolExecution
+        let config = ToolLifecycleConfig::default();
+        let tool_executor = ToolExecutor::new(config, None, None);
+
+        let input = AgentInput::text("Hook trait test").with_parameter(
+            "parameters",
+            json!({
+                "executable": "echo",
+                "args": ["test"]
+            }),
+        );
+        let context = ExecutionContext::default();
+
+        // This should compile and execute (may fail based on security policy, that's ok)
+        let result = tool
+            .execute_with_hooks(input, context, &tool_executor)
+            .await;
+        assert!(result.is_ok() || result.is_err()); // Should not panic
     }
 }

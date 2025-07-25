@@ -477,7 +477,7 @@ mod tests {
 
         // Subscribe different contexts
         bus.subscribe(
-            ContextScope::Agent(agent1.clone()),
+            ContextScope::Agent(agent1),
             vec!["test_event".to_string()],
             handler1.clone(),
         )
@@ -485,7 +485,7 @@ mod tests {
         .unwrap();
 
         bus.subscribe(
-            ContextScope::Agent(agent2.clone()),
+            ContextScope::Agent(agent2),
             vec!["test_event".to_string()],
             handler2.clone(),
         )

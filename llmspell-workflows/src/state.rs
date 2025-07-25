@@ -1,9 +1,10 @@
 //! ABOUTME: Memory-based state management for workflows
 //! ABOUTME: Provides in-memory state storage and step coordination
 
+use super::hooks::{WorkflowExecutionPhase, WorkflowExecutor, WorkflowHookContext};
 use super::traits::{StepResult, WorkflowStatus};
 use super::types::{WorkflowConfig, WorkflowState};
-use llmspell_core::{ComponentId, LLMSpellError, Result};
+use llmspell_core::{ComponentId, ComponentMetadata, LLMSpellError, Result};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
@@ -11,23 +12,74 @@ use std::time::{Duration, Instant};
 use tracing::{debug, warn};
 
 /// Memory-based state manager for workflows
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct StateManager {
     state: Arc<RwLock<WorkflowState>>,
     config: WorkflowConfig,
     execution_history: Arc<RwLock<Vec<StepResult>>>,
     workflow_status: Arc<RwLock<WorkflowStatus>>,
+    /// Optional workflow executor for hook integration
+    workflow_executor: Option<Arc<WorkflowExecutor>>,
+    /// Component ID for hooks (using hook's ComponentId type)
+    component_id: llmspell_hooks::ComponentId,
+    metadata: ComponentMetadata,
 }
 
 impl StateManager {
     /// Create a new state manager
     pub fn new(config: WorkflowConfig) -> Self {
+        let component_id = llmspell_hooks::ComponentId::new(
+            llmspell_hooks::ComponentType::Workflow,
+            "state_manager".to_string(),
+        );
+        let metadata = ComponentMetadata::new(
+            "state_manager".to_string(),
+            "Workflow state manager".to_string(),
+        );
+
         Self {
             state: Arc::new(RwLock::new(WorkflowState::new())),
             config,
             execution_history: Arc::new(RwLock::new(Vec::new())),
             workflow_status: Arc::new(RwLock::new(WorkflowStatus::Pending)),
+            workflow_executor: None,
+            component_id,
+            metadata,
         }
+    }
+
+    /// Create with hook integration
+    pub fn new_with_hooks(
+        config: WorkflowConfig,
+        workflow_executor: Arc<WorkflowExecutor>,
+    ) -> Self {
+        let component_id = llmspell_hooks::ComponentId::new(
+            llmspell_hooks::ComponentType::Workflow,
+            "state_manager".to_string(),
+        );
+        let metadata = ComponentMetadata::new(
+            "state_manager".to_string(),
+            "Workflow state manager with hooks".to_string(),
+        );
+
+        Self {
+            state: Arc::new(RwLock::new(WorkflowState::new())),
+            config,
+            execution_history: Arc::new(RwLock::new(Vec::new())),
+            workflow_status: Arc::new(RwLock::new(WorkflowStatus::Pending)),
+            workflow_executor: Some(workflow_executor),
+            component_id,
+            metadata,
+        }
+    }
+
+    /// Enable hook integration
+    pub fn with_hooks(&mut self, workflow_executor: Arc<WorkflowExecutor>) {
+        self.workflow_executor = Some(workflow_executor);
+        self.metadata = ComponentMetadata::new(
+            "state_manager".to_string(),
+            "Workflow state manager with hooks".to_string(),
+        );
     }
 
     /// Start workflow execution
@@ -139,14 +191,39 @@ impl StateManager {
 
     /// Set shared data
     pub async fn set_shared_data(&self, key: String, value: Value) -> Result<()> {
-        let mut state = self.state.write().map_err(|e| LLMSpellError::Workflow {
-            message: format!("Failed to acquire state lock: {}", e),
-            step: None,
-            source: None,
-        })?;
+        // Get old value and update state in a single lock scope
+        let old_value = {
+            let mut state = self.state.write().map_err(|e| LLMSpellError::Workflow {
+                message: format!("Failed to acquire state lock: {}", e),
+                step: None,
+                source: None,
+            })?;
 
-        state.set_shared_data(key.clone(), value);
-        debug!("Set shared data key: {}", key);
+            let old = state.get_shared_data(&key).cloned();
+            state.set_shared_data(key.clone(), value.clone());
+            debug!("Set shared data key: {}", key);
+            old
+        }; // Lock is dropped here
+
+        // Execute state change hooks if available
+        if let Some(workflow_executor) = &self.workflow_executor {
+            let workflow_state = self.get_state_snapshot().await?;
+            let mut hook_ctx = WorkflowHookContext::new(
+                self.component_id.clone(),
+                self.metadata.clone(),
+                workflow_state,
+                "state_manager".to_string(),
+                WorkflowExecutionPhase::StateChange,
+            );
+            hook_ctx = hook_ctx
+                .with_pattern_context("key".to_string(), serde_json::Value::String(key.clone()));
+            hook_ctx = hook_ctx.with_pattern_context(
+                "old_value".to_string(),
+                old_value.unwrap_or(serde_json::Value::Null),
+            );
+            hook_ctx = hook_ctx.with_pattern_context("new_value".to_string(), value);
+            let _ = workflow_executor.execute_workflow_hooks(hook_ctx).await;
+        }
 
         Ok(())
     }
@@ -361,6 +438,36 @@ impl StateManager {
 
         Ok(state.clone())
     }
+
+    /// Track shared data access for hooks (call after get operations)
+    pub async fn track_shared_data_access(
+        &self,
+        key: Option<&str>,
+        access_type: &str,
+    ) -> Result<()> {
+        if let Some(workflow_executor) = &self.workflow_executor {
+            let workflow_state = self.get_state_snapshot().await?;
+            let mut hook_ctx = WorkflowHookContext::new(
+                self.component_id.clone(),
+                self.metadata.clone(),
+                workflow_state,
+                "state_manager".to_string(),
+                WorkflowExecutionPhase::SharedDataAccess,
+            );
+            hook_ctx = hook_ctx.with_pattern_context(
+                "access_type".to_string(),
+                serde_json::Value::String(access_type.to_string()),
+            );
+            if let Some(k) = key {
+                hook_ctx = hook_ctx.with_pattern_context(
+                    "key".to_string(),
+                    serde_json::Value::String(k.to_string()),
+                );
+            }
+            let _ = workflow_executor.execute_workflow_hooks(hook_ctx).await;
+        }
+        Ok(())
+    }
 }
 
 /// Execution statistics for workflow monitoring
@@ -374,6 +481,18 @@ pub struct ExecutionStats {
     pub total_retries: u32,
     pub execution_start_time: Option<Instant>,
     pub current_step: usize,
+}
+
+impl std::fmt::Debug for StateManager {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("StateManager")
+            .field("config", &self.config)
+            .field("workflow_status", &self.workflow_status)
+            .field("has_hooks", &self.workflow_executor.is_some())
+            .field("component_id", &self.component_id)
+            .field("metadata", &self.metadata)
+            .finish()
+    }
 }
 
 impl ExecutionStats {

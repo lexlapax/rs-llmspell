@@ -1,0 +1,37 @@
+[package]
+name = "llmspell-events"
+version = "0.4.0"
+edition = "2021"
+authors = ["LLMSpell Contributors"]
+description = "Event bus and cross-language event system for rs-llmspell"
+repository = "https://github.com/lexlapax/rs-llmspell"
+license = "MIT OR Apache-2.0"
+keywords = ["llm", "events", "async", "cross-language"]
+categories = ["asynchronous", "api-bindings"]
+
+[dependencies]
+llmspell-utils = { path = "../llmspell-utils" }
+llmspell-storage = { path = "../llmspell-storage" }
+anyhow = "1.0"
+async-trait = "0.1"
+thiserror = "1.0"
+tokio = { version = "1.37", features = ["full"] }
+tokio-stream = { version = "0.1", features = ["sync"] }
+crossbeam = { version = "0.8", features = ["crossbeam-channel"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tracing = "0.1"
+chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1.8", features = ["v4", "serde"] }
+dashmap = "6.0"
+parking_lot = "0.12"
+futures = "0.3"
+
+[dev-dependencies]
+tokio-test = "0.4"
+criterion = "0.5"
+proptest = "1.4"
+
+[features]
+default = []
+stress_tests = []

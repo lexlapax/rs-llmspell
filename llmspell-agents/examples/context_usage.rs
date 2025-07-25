@@ -189,13 +189,13 @@ async fn shared_memory_example() -> Result<()> {
     memory_manager.create_region(
         "workflow-state".to_string(),
         ContextScope::Workflow("workflow-1".to_string()),
-        agent1.clone(),
+        agent1,
     )?;
 
     // Get the region and grant permissions
     if let Some(region) = memory_manager.get_region("workflow-state") {
         // Grant read permission to agent2
-        region.grant_permission(agent2.clone(), MemoryPermission::Read);
+        region.grant_permission(agent2, MemoryPermission::Read);
 
         // Agent1 writes data
         region.set(
@@ -340,7 +340,7 @@ async fn complete_workflow_example() -> Result<()> {
     if let Some(region) = memory_manager.get_region("pipeline-state") {
         let extractor_id = ComponentId::from_name("extractor");
         region.grant_permission(
-            extractor_id.clone(),
+            extractor_id,
             llmspell_agents::context::shared_memory::MemoryPermission::ReadWrite,
         );
 

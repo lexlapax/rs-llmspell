@@ -7,8 +7,10 @@ use serde_json::json;
 #[tokio::test]
 async fn test_http_timeout_with_short_timeout() {
     // Create tool with very short timeout
-    let mut config = HttpRequestConfig::default();
-    config.timeout_seconds = 1; // 1 second timeout
+    let config = HttpRequestConfig {
+        timeout_seconds: 1, // 1 second timeout
+        ..Default::default()
+    };
 
     let tool = HttpRequestTool::new(config).unwrap();
 
@@ -41,8 +43,10 @@ async fn test_http_timeout_with_short_timeout() {
 #[tokio::test]
 async fn test_http_no_timeout_with_long_timeout() {
     // Create tool with long timeout
-    let mut config = HttpRequestConfig::default();
-    config.timeout_seconds = 10; // 10 second timeout
+    let config = HttpRequestConfig {
+        timeout_seconds: 10, // 10 second timeout
+        ..Default::default()
+    };
 
     let tool = HttpRequestTool::new(config).unwrap();
 

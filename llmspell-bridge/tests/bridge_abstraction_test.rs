@@ -97,7 +97,7 @@ async fn test_execution_context() {
 }
 
 /// Test API injection mechanism
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_api_injection() {
     let lua_config = LuaConfig::default();
     let mut engine = EngineFactory::create_lua_engine(&lua_config).unwrap();
@@ -122,7 +122,7 @@ async fn test_api_injection() {
 }
 
 /// Test error handling across bridge
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_bridge_error_handling() {
     let lua_config = LuaConfig::default();
     let mut engine = EngineFactory::create_lua_engine(&lua_config).unwrap();
@@ -158,7 +158,7 @@ async fn test_bridge_error_handling() {
 }
 
 /// Test script output format consistency
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_output_format_consistency() {
     let lua_config = LuaConfig::default();
     let mut engine = EngineFactory::create_lua_engine(&lua_config).unwrap();
@@ -189,7 +189,7 @@ async fn test_output_format_consistency() {
 }
 
 /// Test console output capture
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_console_output_capture() {
     let lua_config = LuaConfig::default();
     let mut engine = EngineFactory::create_lua_engine(&lua_config).unwrap();
@@ -215,7 +215,7 @@ async fn test_console_output_capture() {
 }
 
 /// Test metadata in script output
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_output_metadata() {
     let lua_config = LuaConfig::default();
     let mut engine = EngineFactory::create_lua_engine(&lua_config).unwrap();

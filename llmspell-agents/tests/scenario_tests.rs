@@ -191,18 +191,27 @@ async fn test_scenario_with_harness() {
     let test_result = harness
         .await
         .run_test(agent_config, |agent| async move {
+            // Note: Agent starts in Uninitialized state but should handle this gracefully
+            // The execute method will initialize automatically if needed
+
             // Run scenario against agent
             let scenario_result = ScenarioRunner::run_scenario(agent.as_ref(), &scenario).await?;
 
             if scenario_result.passed {
                 Ok(())
             } else {
-                Err(anyhow::anyhow!("Scenario failed"))
+                Err(anyhow::anyhow!("Scenario failed: {:?}", scenario_result))
             }
         })
         .await
         .unwrap();
 
+    if !test_result.passed {
+        if let Some(error) = &test_result.error {
+            println!("Test failed with error: {}", error);
+        }
+        println!("Test result: {:?}", test_result);
+    }
     assert!(test_result.passed);
     // Note: Interactions might be empty depending on harness implementation
     // Just check that the test ran successfully

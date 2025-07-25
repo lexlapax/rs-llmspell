@@ -2,6 +2,7 @@
 //! ABOUTME: The fundamental agent type that powers intelligent behavior through LLMs
 
 use crate::factory::AgentConfig;
+use crate::lifecycle::{AgentStateMachine, StateMachineConfig};
 use anyhow::Result;
 use async_trait::async_trait;
 use llmspell_core::{
@@ -14,6 +15,7 @@ use llmspell_core::{
 };
 use llmspell_providers::{ModelSpecifier, ProviderInstance, ProviderManager};
 use std::sync::{Arc, Mutex};
+use tracing::{debug, error, info, warn};
 
 /// LLM-powered agent implementation
 pub struct LLMAgent {
@@ -23,6 +25,7 @@ pub struct LLMAgent {
     core_config: CoreAgentConfig,
     conversation: Arc<Mutex<Vec<ConversationMessage>>>,
     provider: Arc<Box<dyn ProviderInstance>>,
+    state_machine: Arc<AgentStateMachine>,
 }
 
 impl LLMAgent {
@@ -83,12 +86,27 @@ impl LLMAgent {
             max_tokens: model_config.max_tokens.map(|v| v as usize),
         };
 
+        // Create state machine configuration optimized for LLM agents
+        let state_config = StateMachineConfig {
+            enable_logging: true,
+            enable_hooks: true,           // Enable hooks for LLM agents
+            enable_circuit_breaker: true, // Critical for LLM reliability
+            max_transition_time: std::time::Duration::from_secs(30), // Longer for LLM operations
+            ..StateMachineConfig::default()
+        };
+
+        let state_machine = Arc::new(AgentStateMachine::new(
+            format!("llm-{}", config.name),
+            state_config,
+        ));
+
         Ok(Self {
             metadata,
             config,
             core_config,
             conversation: Arc::new(Mutex::new(Vec::new())),
             provider,
+            state_machine,
         })
     }
 
@@ -121,6 +139,64 @@ impl LLMAgent {
 
         Ok(messages)
     }
+
+    /// Get state machine for lifecycle management
+    pub fn state_machine(&self) -> &Arc<AgentStateMachine> {
+        &self.state_machine
+    }
+
+    /// Initialize the agent and its state machine
+    pub async fn initialize(&self) -> Result<()> {
+        info!("Initializing LLMAgent '{}'", self.metadata.name);
+        self.state_machine.initialize().await?;
+        debug!("LLMAgent '{}' initialization completed", self.metadata.name);
+        Ok(())
+    }
+
+    /// Start the agent execution
+    pub async fn start(&self) -> Result<()> {
+        info!("Starting LLMAgent '{}'", self.metadata.name);
+        self.state_machine.start().await?;
+        debug!("LLMAgent '{}' started successfully", self.metadata.name);
+        Ok(())
+    }
+
+    /// Pause the agent execution
+    pub async fn pause(&self) -> Result<()> {
+        info!("Pausing LLMAgent '{}'", self.metadata.name);
+        self.state_machine.pause().await?;
+        debug!("LLMAgent '{}' paused", self.metadata.name);
+        Ok(())
+    }
+
+    /// Resume the agent execution
+    pub async fn resume(&self) -> Result<()> {
+        info!("Resuming LLMAgent '{}'", self.metadata.name);
+        self.state_machine.resume().await?;
+        debug!("LLMAgent '{}' resumed", self.metadata.name);
+        Ok(())
+    }
+
+    /// Stop the agent execution
+    pub async fn stop(&self) -> Result<()> {
+        info!("Stopping LLMAgent '{}'", self.metadata.name);
+        self.state_machine.stop().await?;
+        debug!("LLMAgent '{}' stopped", self.metadata.name);
+        Ok(())
+    }
+
+    /// Terminate the agent
+    pub async fn terminate(&self) -> Result<()> {
+        info!("Terminating LLMAgent '{}'", self.metadata.name);
+        self.state_machine.terminate().await?;
+        debug!("LLMAgent '{}' terminated", self.metadata.name);
+        Ok(())
+    }
+
+    /// Check if agent is healthy
+    pub async fn is_healthy(&self) -> bool {
+        self.state_machine.is_healthy().await
+    }
 }
 
 #[async_trait]
@@ -134,6 +210,71 @@ impl BaseAgent for LLMAgent {
         input: AgentInput,
         _context: ExecutionContext,
     ) -> Result<AgentOutput, LLMSpellError> {
+        // Check if agent is in a state that allows execution, auto-initialize if needed
+        let current_state = self.state_machine.current_state().await;
+
+        // Auto-initialize if in Uninitialized state (like BasicAgent does)
+        if current_state == crate::lifecycle::AgentState::Uninitialized {
+            if let Err(e) = self.state_machine.initialize().await {
+                return Err(LLMSpellError::Component {
+                    message: format!(
+                        "Failed to initialize LLMAgent '{}': {}",
+                        self.metadata.name, e
+                    ),
+                    source: None,
+                });
+            }
+        }
+
+        // Re-check state after potential initialization
+        let current_state = self.state_machine.current_state().await;
+        if !current_state.can_execute() {
+            return Err(LLMSpellError::Component {
+                message: format!(
+                    "LLMAgent '{}' cannot execute in state {:?}",
+                    self.metadata.name, current_state
+                ),
+                source: None,
+            });
+        }
+
+        // Ensure agent is running
+        if !self
+            .state_machine
+            .is_state(crate::lifecycle::AgentState::Running)
+            .await
+        {
+            // Try to start the agent if it's ready
+            if self
+                .state_machine
+                .is_state(crate::lifecycle::AgentState::Ready)
+                .await
+            {
+                if let Err(e) = self.state_machine.start().await {
+                    return Err(LLMSpellError::Component {
+                        message: format!(
+                            "Failed to start LLMAgent '{}': {}",
+                            self.metadata.name, e
+                        ),
+                        source: None,
+                    });
+                }
+            } else {
+                return Err(LLMSpellError::Component {
+                    message: format!(
+                        "LLMAgent '{}' is not ready for execution (current state: {:?})",
+                        self.metadata.name, current_state
+                    ),
+                    source: None,
+                });
+            }
+        }
+
+        debug!(
+            "LLMAgent '{}' executing with input: {}",
+            self.metadata.name, input.text
+        );
+
         // Build messages for the provider
         let messages = self.build_messages(&input.text)?;
 
@@ -168,6 +309,7 @@ impl BaseAgent for LLMAgent {
             conv.push(ConversationMessage::assistant(response.text.clone()));
         }
 
+        debug!("LLMAgent '{}' completed execution", self.metadata.name);
         Ok(response)
     }
 
@@ -198,6 +340,31 @@ impl BaseAgent for LLMAgent {
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput, LLMSpellError> {
+        error!(
+            "LLMAgent '{}' encountered error: {}",
+            self.metadata.name, error
+        );
+
+        // Transition to error state for serious errors
+        match &error {
+            LLMSpellError::Component { .. } | LLMSpellError::Provider { .. } => {
+                if let Err(state_error) = self
+                    .state_machine
+                    .error(format!("LLM Agent error: {}", error))
+                    .await
+                {
+                    warn!(
+                        "Failed to transition LLMAgent '{}' to error state: {}",
+                        self.metadata.name, state_error
+                    );
+                }
+            }
+            _ => {
+                // Minor errors don't require state transition
+                warn!("LLMAgent '{}' minor error: {}", self.metadata.name, error);
+            }
+        }
+
         // For LLM agents, we might want to use the LLM to generate error responses
         // For now, return a formatted error
         Ok(AgentOutput::text(format!(

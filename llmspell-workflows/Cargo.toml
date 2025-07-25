@@ -9,6 +9,7 @@ license.workspace = true
 
 [dependencies]
 llmspell-core = { path = "../llmspell-core" }
+llmspell-hooks = { path = "../llmspell-hooks" }
 tokio.workspace = true
 async-trait.workspace = true
 serde.workspace = true
@@ -20,3 +21,12 @@ parking_lot = "0.12"
 
 [dev-dependencies]
 tracing-subscriber = "0.3"
+criterion = { version = "0.5", features = ["async_tokio"] }
+
+[[test]]
+name = "workflow_hooks"
+path = "tests/workflow_hooks.rs"
+
+[[bench]]
+name = "workflow_hook_overhead"
+harness = false

@@ -2,7 +2,7 @@
 //! ABOUTME: Verifies Agent.register(), Agent.get() and other new methods work correctly
 
 #[cfg(feature = "lua")]
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_agent_new_methods() -> Result<(), Box<dyn std::error::Error>> {
     use llmspell_bridge::globals::{create_standard_registry, GlobalContext, GlobalInjector};
     use llmspell_bridge::{ComponentRegistry, ProviderManager, ProviderManagerConfig};

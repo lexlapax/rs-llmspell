@@ -51,6 +51,7 @@ cargo test -p llmspell-core --lib
 - **[Tool Development Guide](tool-development-guide.md)** 📋 *Missing - Phase 3 Priority*
 - **[Agent Development Guide](agent-development-guide.md)** 📋 *Missing - Phase 3 Priority*
 - **[Bridge Development Guide](bridge-development-guide.md)** 📋 *Missing - Phase 3 Priority*
+- **[Hook Development Guide](hook-development-guide.md)** ✅ *Phase 4* - Creating custom hooks in Rust
 
 ---
 
