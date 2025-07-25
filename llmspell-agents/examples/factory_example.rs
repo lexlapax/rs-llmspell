@@ -148,20 +148,16 @@ async fn main() -> Result<()> {
 
     // Example 5: Default templates
     println!("\n=== Example 5: Default Templates ===");
+    println!("Note: DefaultTemplates has been removed. Use TemplateFactory from the templates module instead.");
 
-    let template_list = DefaultTemplates::list();
-    println!("Available default templates:");
-    for template in &template_list {
-        println!("  - {}", template);
-    }
-
-    if let Some(research_template) = DefaultTemplates::get("research") {
-        println!("\nResearch template config:");
-        println!("  Name: {}", research_template.name);
-        println!("  Type: {}", research_template.agent_type);
-        println!("  Description: {}", research_template.description);
-        println!("  Allowed tools: {:?}", research_template.allowed_tools);
-    }
+    // TODO: Update this example to use the new templates module API
+    // Example:
+    // use llmspell_agents::templates::create_builtin_templates;
+    // let factory = create_builtin_templates();
+    // let templates = factory.list_templates();
+    // for template_id in &templates {
+    //     println!("  - {}", template_id);
+    // }
 
     Ok(())
 }

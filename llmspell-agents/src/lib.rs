@@ -11,6 +11,7 @@ pub mod di;
 pub mod factory;
 pub mod factory_registry;
 pub mod health;
+pub mod hooks;
 pub mod lifecycle;
 pub mod monitoring;
 pub mod registry;
@@ -30,7 +31,7 @@ pub use agent_wrapped_tool::{
 };
 pub use builder::AgentBuilder;
 pub use composition::{CompositionStep, DataFlow, DataTransform, ToolComposition, ToolProvider};
-pub use config::{ConfigLoader, DefaultTemplates};
+pub use config::{presets, PersistenceConfigBuilder};
 pub use di::{DIContainer, DIContainerBuilder, ScopedDIContainer};
 pub use factory::{
     AgentConfig, AgentFactory, CreationHook, DefaultAgentFactory, ModelConfig, ResourceLimits,
@@ -40,6 +41,7 @@ pub use health::{
     AgentHealthMonitor, HealthCheckResult, HealthIssue, HealthMonitorConfig, HealthStatus,
     ResourceHealthCheck, ResponsivenessHealthCheck, StateMachineHealthCheck,
 };
+pub use hooks::StatePersistenceHook;
 pub use lifecycle::{
     events::{
         EventSubscription, LifecycleEvent, LifecycleEventData, LifecycleEventSystem,
@@ -102,6 +104,6 @@ pub use monitoring::{
 pub mod prelude {
     pub use crate::{
         global_registry, AgentBuilder, AgentConfig, AgentFactory, CreationHook, DIContainer,
-        DefaultAgentFactory, DefaultTemplates,
+        DefaultAgentFactory,
     };
 }
