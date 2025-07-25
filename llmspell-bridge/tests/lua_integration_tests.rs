@@ -160,7 +160,10 @@ async fn test_complex_hook_event_scenario() {
     "#;
 
     let result: mlua::Result<bool> = lua.load(complex_scenario).eval();
-    assert!(result.is_ok() && result.unwrap(), "Complex hook-event scenario failed");
+    assert!(
+        result.is_ok() && result.unwrap(),
+        "Complex hook-event scenario failed"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -218,7 +221,10 @@ async fn test_error_resilience() {
     "#;
 
     let result: mlua::Result<bool> = lua.load(error_resilience_test).eval();
-    assert!(result.is_ok() && result.unwrap(), "Error resilience test failed");
+    assert!(
+        result.is_ok() && result.unwrap(),
+        "Error resilience test failed"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -259,7 +265,10 @@ async fn test_api_completeness() {
     "#;
 
     let result: mlua::Result<bool> = lua.load(api_completeness_test).eval();
-    assert!(result.is_ok() && result.unwrap(), "API completeness test failed");
+    assert!(
+        result.is_ok() && result.unwrap(),
+        "API completeness test failed"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -314,7 +323,10 @@ async fn test_resource_cleanup_integration() {
     "#;
 
     let result: mlua::Result<bool> = lua.load(cleanup_test).eval();
-    assert!(result.is_ok() && result.unwrap(), "Resource cleanup integration test failed");
+    assert!(
+        result.is_ok() && result.unwrap(),
+        "Resource cleanup integration test failed"
+    );
 }
 
 #[tokio::test(flavor = "multi_thread")]
@@ -382,5 +394,8 @@ async fn test_concurrent_access_simulation() {
     "#;
 
     let result: mlua::Result<bool> = lua.load(concurrent_test).eval();
-    assert!(result.is_ok() && result.unwrap(), "Concurrent access simulation test failed");
+    assert!(
+        result.is_ok() && result.unwrap(),
+        "Concurrent access simulation test failed"
+    );
 }

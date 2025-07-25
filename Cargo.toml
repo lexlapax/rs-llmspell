@@ -15,7 +15,8 @@ members = [
     "llmspell-hooks",
     "llmspell-events",
     "llmspell-testing",
-    "llmspell-utils"
+    "llmspell-utils",
+    "tests/performance"
 ]
 
 [workspace.package]

@@ -1,0 +1,68 @@
+[package]
+name = "llmspell-performance-tests"
+version = "0.3.0"
+edition = "2021"
+publish = false
+
+[[bench]]
+name = "minimal_test"
+harness = false
+
+[[bench]]
+name = "hook_overhead_simple"
+harness = false
+
+[[bench]]
+name = "hook_overhead"
+harness = false
+
+[[bench]]
+name = "event_throughput_simple"
+harness = false
+
+[[bench]]
+name = "event_throughput"
+harness = false
+
+[[bench]]
+name = "circuit_breaker"
+harness = false
+
+[[bench]]
+name = "cross_language"
+harness = false
+
+[dependencies]
+# Core crates
+llmspell-core = { path = "../../llmspell-core" }
+llmspell-agents = { path = "../../llmspell-agents" }
+llmspell-tools = { path = "../../llmspell-tools" }
+llmspell-workflows = { path = "../../llmspell-workflows" }
+llmspell-hooks = { path = "../../llmspell-hooks" }
+llmspell-events = { path = "../../llmspell-events" }
+llmspell-bridge = { path = "../../llmspell-bridge" }
+
+# Async runtime
+tokio = { version = "1.45", features = ["full"] }
+async-trait = "0.1"
+anyhow = "1.0"
+
+# Benchmarking
+criterion = { version = "0.5", features = ["async_tokio", "html_reports"] }
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Date/Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Lua bindings
+mlua = { version = "0.10", features = ["lua54", "vendored", "async", "send", "serialize"] }
+
+# Random
+rand = "0.8"
+
+[dev-dependencies]
+# Test utilities
+proptest = "1.5"
