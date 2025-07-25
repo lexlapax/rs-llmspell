@@ -70,13 +70,46 @@ Welcome to the rs-llmspell user documentation! This guide will help you write po
   - API key management
   - Rate limiting configuration
 
-### Advanced Topics
-- **[Hooks Overview](advanced/hooks-overview.md)** - Lifecycle management (Phase 4)
-  - Hook points for workflow events
-  - Performance monitoring patterns
-  - Error recovery strategies
-  - Current workarounds using State and Event
+### Hooks and Events (Phase 4)
+- **[Hooks & Events Overview](hooks-events-overview.md)** - Introduction to extensibility systems
+  - Understanding hooks vs events
+  - Architecture and performance characteristics
+  - Quick start examples
+  - When to use each system
 
+- **[Hooks Guide](hooks-guide.md)** - Comprehensive hook system documentation
+  - All 40+ hook points with descriptions
+  - 9 HookResult types for control flow
+  - Priority system and execution order
+  - CircuitBreaker protection (<5% overhead)
+  - Practical examples and patterns
+
+- **[Events Guide](events-guide.md)** - Master the event system
+  - UniversalEvent format and pattern subscriptions
+  - FlowController and backpressure handling
+  - 90K+ events/sec throughput
+  - Event persistence and replay
+  - Cross-language event propagation
+
+- **[Built-in Hooks Reference](builtin-hooks-reference.md)** - Production-ready hooks
+  - 18+ built-in hooks for common use cases
+  - Security, caching, rate limiting, monitoring
+  - Configuration and performance impact
+  - Combining hooks for complex scenarios
+
+- **[Hook Patterns](hook-patterns.md)** - Common patterns and recipes
+  - Composite hooks (Sequential, Parallel, Voting)
+  - Cross-component coordination
+  - Error handling and recovery
+  - Performance monitoring patterns
+
+- **[Cross-Language Integration](cross-language-integration.md)** - Multi-language support
+  - Hook and event system across Lua/JS/Rust
+  - Language adapters and serialization
+  - Performance considerations
+  - Security and sandboxing
+
+### Advanced Topics
 - **[Performance Tips](advanced/performance-tips.md)** - Optimization strategies
   - Script optimization techniques
   - Resource usage patterns

@@ -159,23 +159,131 @@ local result = file_tool:execute({
 | `Utils.hash(data)` | `data`: string | string | Hash data |
 | `Utils.sleep(seconds)` | `seconds`: number | nil | Sleep (blocks) |
 
-## Hook Global 📋 **Phase 4 Feature**
-
-*Hook system will be available in Phase 4*
+## Hook Global
 
 | Method | Parameters | Returns | Description |
 |--------|------------|---------|-------------|
-| `Hook.register(name, fn)` 📋 | `name`: string, `fn`: function | nil | Register hook (Phase 4) |
-| `Hook.list()` 📋 | none | {string} | List hooks (Phase 4) |
+| `Hook.register(point, handler, priority)` | `point`: string, `handler`: function, `priority`: string/number (opt) | HookHandle | Register a hook |
+| `Hook.unregister(handle)` | `handle`: HookHandle | boolean | Unregister a hook |
+| `Hook.list(filter)` | `filter`: string/table (optional) | {hook_info} | List registered hooks |
+| `Hook.enable_builtin(name, config)` | `name`: string/table, `config`: table (opt) | nil | Enable built-in hooks |
+| `Hook.disable_builtin(name)` | `name`: string/table | nil | Disable built-in hooks |
 
-## Event Global 📋 **Phase 4 Feature**
+### Hook Registration
+```lua
+-- Register with priority
+local handle = Hook.register("BeforeAgentExecution", function(context)
+    print("Agent executing:", context.component_id.name)
+    return "continue"  -- or {action = "modified", ...}
+end, "high")  -- Priority: highest, high, normal, low, lowest
 
-*Event system will be available in Phase 4*
+-- Unregister
+Hook.unregister(handle)
+-- or
+handle:unregister()
+```
+
+### Hook Context
+```lua
+context = {
+    hook_point = "BeforeAgentExecution",
+    component_id = {id = "...", name = "...", component_type = "..."},
+    correlation_id = "...",
+    data = {input = {...}, output = {...}, ...},
+    metadata = {...},
+    language = "lua",
+    state = {}
+}
+```
+
+### Hook Results
+```lua
+-- Continue execution
+return "continue"
+
+-- Modify data
+return {
+    action = "modified",
+    modified_data = {input = {text = "modified text"}}
+}
+
+-- Cancel execution
+return {
+    action = "cancel",
+    reason = "Validation failed"
+}
+
+-- Retry with backoff
+return {
+    action = "retry",
+    max_attempts = 3,
+    backoff_ms = 1000
+}
+```
+
+## Event Global
 
 | Method | Parameters | Returns | Description |
 |--------|------------|---------|-------------|
-| `Event.emit(name, data)` 📋 | `name`: string, `data`: table | nil | Emit event (Phase 4) |
-| `Event.subscribe(name, fn)` 📋 | `name`: string, `fn`: function | nil | Subscribe to event (Phase 4) |
+| `Event.publish(event_type, data, options)` | `event_type`: string, `data`: table, `options`: table (opt) | nil | Publish an event |
+| `Event.subscribe(pattern)` | `pattern`: string/table | Subscription | Subscribe to event pattern(s) |
+| `Event.receive(subscription, timeout_ms)` | `subscription`: Subscription, `timeout_ms`: number | event or nil | Receive next event |
+| `Event.receive_batch(sub, options)` | `sub`: Subscription, `options`: table | {events} | Receive multiple events |
+| `Event.unsubscribe(subscription)` | `subscription`: Subscription | nil | Unsubscribe |
+| `Event.list_subscriptions()` | none | {sub_info} | List active subscriptions |
+| `Event.subscription_stats(sub)` | `sub`: Subscription | {stats} | Get subscription statistics |
+
+### Event Publishing
+```lua
+-- Simple publish
+Event.publish("user.action.completed", {
+    action = "search",
+    results = 10
+})
+
+-- With options
+Event.publish("system.alert", {
+    level = "warning",
+    message = "High CPU usage"
+}, {
+    language = "lua",
+    correlation_id = "req-123",
+    ttl_seconds = 3600
+})
+```
+
+### Event Subscription
+```lua
+-- Subscribe to pattern
+local sub = Event.subscribe("user.*")  -- Wildcards supported
+
+-- Receive events
+local event = Event.receive(sub, 1000)  -- 1 second timeout
+if event then
+    print("Event:", event.event_type)
+    print("Data:", event.data)
+end
+
+-- Clean up
+Event.unsubscribe(sub)
+```
+
+### Event Format
+```lua
+event = {
+    id = "uuid",
+    event_type = "user.action.completed",
+    timestamp = "2025-07-25T10:30:45.123Z",
+    version = "1.0",
+    source = {
+        component = "script",
+        instance_id = "...",
+        language = "lua"
+    },
+    data = {...},
+    metadata = {...}
+}
+```
 
 ## Error Handling
 

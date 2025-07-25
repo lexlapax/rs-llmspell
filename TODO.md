@@ -1664,6 +1664,30 @@ Following the 4.6.1 pattern, map workflow execution lifecycle to hook points:
 
 ---
 
+
+## Handoff to Phase 5
+
+### Deliverables Package - handoff package `docs/in-progress/PHASE04_HANDOFF_PACKAGE.md`
+- [ ] 
+- [ ] 
+
+### Knowledge Transfer Session
+- [ ] 
+- [ ] 
+
+### Phase 4 Deferrals to Future Phases
+1. **Minor Issues (Phase 5 can address)**
+   - 
+   - 
+   - 
+
+2. **Intentional Deferrals (Future phases)**
+   - 
+   - 
+   - 
+
+---
+
 ## Risk Management
 
 ### High-Risk Items
@@ -1719,29 +1743,6 @@ Following the 4.6.1 pattern, map workflow execution lifecycle to hook points:
 - [ ] SelectiveHookRegistry for Phase 18
 - [ ] Cost tracking ready for Phase 14
 
----
-
-
-## Handoff to Phase 5
-
-### Deliverables Package - handoff package
-- [ ] 
-- [ ] 
-
-### Knowledge Transfer Session
-- [ ] 
-- [ ] 
-
-### Phase 4 Deferrals to Future Phases
-1. **Minor Issues (Phase 5 can address)**
-   - 
-   - 
-   - 
-
-2. **Intentional Deferrals (Future phases)**
-   - 
-   - 
-   - 
 
 ---
 

@@ -31,10 +31,11 @@
 
 ---
 
-## Future Architecture (Phase 4+)
+## Current Architecture (Phase 4)
 
-### Hook System
-- **[hook-implementation.md](hook-implementation.md)** - 📋 **Phase 4 Design** - Hook system architecture with context structures, return values, implementation patterns, and migration strategies
+### Hook and Event System
+- **[hook-event-architecture.md](hook-event-architecture.md)** - ✅ **Phase 4 Complete** - Comprehensive hook and event system architecture with 40+ hook points, CircuitBreaker protection, and cross-language support
+- **[hook-implementation.md](hook-implementation.md)** - 📋 **Phase 4 Design Reference** - Original hook system design document (see hook-event-architecture.md for current implementation)
 
 ---
 
@@ -65,10 +66,11 @@
 - **Security Architecture**: Defense-in-depth with STRIDE analysis, comprehensive hardening
 - **State Management**: Thread-safe workflow state with scoping and isolation
 
-### 📋 **Phase 4 Planned** (Q3 2025)
-- **Hook System**: Lifecycle hooks with performance monitoring and error recovery
-- **Event Architecture**: Pub/sub system for workflow coordination
-- **Advanced State**: Persistent backends with distributed synchronization
+### ✅ **Phase 4 Complete** (July 2025)
+- **Hook System**: 40+ hook points with CircuitBreaker protection (<5% overhead)
+- **Event Architecture**: High-throughput pub/sub system (90K+ events/sec)
+- **Cross-Language Support**: Hooks and events work across Lua/JS/Rust
+- **Built-in Hooks**: 18+ production-ready hooks for common patterns
 
 ### 🚀 **Phase 5+ Future**
 - **Persistent Storage**: Sled/RocksDB backends with crash recovery

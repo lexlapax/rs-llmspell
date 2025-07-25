@@ -17,8 +17,9 @@
 3. [Building Workflows](#building-workflows)
 4. [Combining Agents and Workflows](#combining-agents-and-workflows)
 5. [Advanced Patterns](#advanced-patterns)
-6. [Best Practices](#best-practices)
-7. [Troubleshooting](#troubleshooting)
+6. [Enhancing with Hooks and Events](#enhancing-with-hooks-and-events)
+7. [Best Practices](#best-practices)
+8. [Troubleshooting](#troubleshooting)
 
 ## Getting Started
 
@@ -638,6 +639,269 @@ end
 -- Use it
 emit_event("data_received", { source = "api", data = "..." })
 check_for_events()
+```
+
+## Enhancing with Hooks and Events
+
+### Hook Integration for Agents
+
+Hooks allow you to intercept and modify agent behavior at key points in their lifecycle:
+
+```lua
+-- Monitor agent execution
+Hook.register("BeforeAgentExecution", function(context)
+    print(string.format("[%s] Agent %s starting execution", 
+        os.date("%H:%M:%S"), 
+        context.component_id.name
+    ))
+    
+    -- Add request ID for tracking
+    return {
+        action = "modified",
+        modified_data = {
+            metadata = {
+                request_id = generateUUID(),
+                start_time = os.time()
+            }
+        }
+    }
+end, "high")
+
+-- Track costs
+Hook.register("AfterAgentExecution", function(context)
+    local tokens = context.data.tokens_used or {}
+    local cost = calculate_cost(tokens.input or 0, tokens.output or 0)
+    
+    -- Emit cost event
+    Event.publish("agent.cost", {
+        agent = context.component_id.name,
+        tokens = tokens,
+        cost = cost
+    })
+    
+    return "continue"
+end, "low")
+
+-- Handle agent errors gracefully
+Hook.register("AgentError", function(context)
+    local error_msg = context.data.error
+    
+    -- Retry on rate limits
+    if error_msg:match("rate_limit") then
+        return {
+            action = "retry",
+            max_attempts = 3,
+            backoff_ms = 2000
+        }
+    end
+    
+    -- Log other errors
+    Event.publish("agent.error", {
+        agent = context.component_id.name,
+        error = error_msg
+    })
+    
+    return "continue"
+end, "high")
+```
+
+### Event-Driven Workflows
+
+Use events to coordinate complex workflows:
+
+```lua
+-- Create event-driven workflow coordinator
+local WorkflowCoordinator = {
+    init = function()
+        -- Subscribe to workflow events
+        local sub = Event.subscribe("workflow.*")
+        
+        Task.spawn(function()
+            while true do
+                local event = Event.receive(sub, 1000)
+                if event then
+                    if event.event_type == "workflow.stage.completed" then
+                        -- Trigger next stage based on results
+                        local next_stage = determine_next_stage(event.data)
+                        if next_stage then
+                            Event.publish("workflow.trigger", {
+                                workflow = next_stage,
+                                input = event.data.output
+                            })
+                        end
+                    elseif event.event_type == "workflow.error" then
+                        -- Handle workflow errors
+                        handle_workflow_error(event.data)
+                    end
+                end
+            end
+        end)
+    end
+}
+
+-- Usage
+WorkflowCoordinator.init()
+
+-- Create workflow that publishes events
+local monitored_workflow = Workflow.sequential({
+    name = "data_pipeline",
+    
+    -- Hook integration
+    hooks = {
+        before_stage = function(stage_name)
+            Event.publish("workflow.stage.started", {
+                workflow = "data_pipeline",
+                stage = stage_name
+            })
+        end,
+        
+        after_stage = function(stage_name, result)
+            Event.publish("workflow.stage.completed", {
+                workflow = "data_pipeline",
+                stage = stage_name,
+                success = result.success,
+                output = result.data
+            })
+        end
+    },
+    
+    steps = {
+        -- Your workflow steps
+    }
+})
+```
+
+### Cross-Component Coordination
+
+Combine hooks and events for sophisticated patterns:
+
+```lua
+-- Rate limiting across all agents
+local rate_limiter = {
+    requests = {},
+    limit = 100,  -- 100 requests per minute
+    window = 60   -- 60 seconds
+}
+
+Hook.register("BeforeAgentExecution", function(context)
+    local now = os.time()
+    local window_start = now - rate_limiter.window
+    
+    -- Clean old requests
+    local new_requests = {}
+    for _, timestamp in ipairs(rate_limiter.requests) do
+        if timestamp > window_start then
+            table.insert(new_requests, timestamp)
+        end
+    end
+    rate_limiter.requests = new_requests
+    
+    -- Check limit
+    if #rate_limiter.requests >= rate_limiter.limit then
+        Event.publish("rate_limit.exceeded", {
+            component = "agents",
+            current = #rate_limiter.requests,
+            limit = rate_limiter.limit
+        })
+        
+        return {
+            action = "cancel",
+            reason = "Rate limit exceeded"
+        }
+    end
+    
+    -- Track request
+    table.insert(rate_limiter.requests, now)
+    
+    return "continue"
+end, "highest")
+
+-- Monitor rate limit events
+local monitor_sub = Event.subscribe("rate_limit.exceeded")
+Task.spawn(function()
+    while true do
+        local event = Event.receive(monitor_sub, 1000)
+        if event then
+            -- Could trigger alerts, scaling, etc.
+            print("Rate limit hit:", event.data.component)
+        end
+    end
+end)
+```
+
+### Performance Monitoring
+
+Track performance across your entire system:
+
+```lua
+-- Global performance monitor
+Hook.register("AfterAgentExecution", function(context)
+    if context.data.duration_ms then
+        Event.publish("performance.metric", {
+            component_type = "agent",
+            component_name = context.component_id.name,
+            metric = "execution_time",
+            value = context.data.duration_ms,
+            tags = {
+                model = context.data.model,
+                success = context.data.success
+            }
+        })
+    end
+    return "continue"
+end, "lowest")
+
+Hook.register("AfterToolExecution", function(context)
+    if context.data.duration_ms then
+        Event.publish("performance.metric", {
+            component_type = "tool",
+            component_name = context.data.tool_name,
+            metric = "execution_time",
+            value = context.data.duration_ms
+        })
+    end
+    return "continue"
+end, "lowest")
+
+-- Aggregate performance metrics
+local metrics_sub = Event.subscribe("performance.metric")
+local metrics_aggregator = {}
+
+Task.spawn(function()
+    while true do
+        local event = Event.receive(metrics_sub, 100)
+        if event then
+            local key = event.data.component_type .. ":" .. event.data.component_name
+            
+            if not metrics_aggregator[key] then
+                metrics_aggregator[key] = {
+                    count = 0,
+                    total_time = 0,
+                    min_time = math.huge,
+                    max_time = 0
+                }
+            end
+            
+            local metrics = metrics_aggregator[key]
+            metrics.count = metrics.count + 1
+            metrics.total_time = metrics.total_time + event.data.value
+            metrics.min_time = math.min(metrics.min_time, event.data.value)
+            metrics.max_time = math.max(metrics.max_time, event.data.value)
+            
+            -- Report every 100 executions
+            if metrics.count % 100 == 0 then
+                print(string.format(
+                    "%s - Avg: %.2fms, Min: %.2fms, Max: %.2fms (n=%d)",
+                    key,
+                    metrics.total_time / metrics.count,
+                    metrics.min_time,
+                    metrics.max_time,
+                    metrics.count
+                ))
+            end
+        end
+    end
+end)
 ```
 
 ## Best Practices
