@@ -69,6 +69,9 @@ pub use tool_errors::{
 pub use tool_invocation::{InvocationConfig, InvocationMetrics, InvocationResult, ToolInvoker};
 pub use tool_manager::{ToolManager, ToolManagerConfig};
 
+// Re-export state types
+pub use state::{StateManagerHolder, StatePersistence, ToolStats};
+
 // Re-export monitoring types
 pub use monitoring::{
     alerts::{

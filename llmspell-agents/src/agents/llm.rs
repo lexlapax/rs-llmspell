@@ -3,6 +3,7 @@
 
 use crate::factory::AgentConfig;
 use crate::lifecycle::{AgentStateMachine, StateMachineConfig};
+use crate::state::persistence::{StateManagerHolder, StatePersistence};
 use anyhow::Result;
 use async_trait::async_trait;
 use llmspell_core::{
@@ -14,24 +15,28 @@ use llmspell_core::{
     ComponentMetadata, ExecutionContext, LLMSpellError,
 };
 use llmspell_providers::{ModelSpecifier, ProviderInstance, ProviderManager};
+use llmspell_state_persistence::StateManager;
 use std::sync::{Arc, Mutex};
 use tracing::{debug, error, info, warn};
 
 /// LLM-powered agent implementation
 pub struct LLMAgent {
     metadata: ComponentMetadata,
+    agent_id_string: String, // Cache string representation of agent ID
     #[allow(dead_code)]
     config: AgentConfig,
     core_config: CoreAgentConfig,
     conversation: Arc<Mutex<Vec<ConversationMessage>>>,
     provider: Arc<Box<dyn ProviderInstance>>,
     state_machine: Arc<AgentStateMachine>,
+    state_manager: Option<Arc<StateManager>>,
 }
 
 impl LLMAgent {
     /// Create a new LLM agent
     pub async fn new(config: AgentConfig, provider_manager: Arc<ProviderManager>) -> Result<Self> {
         let metadata = ComponentMetadata::new(config.name.clone(), config.description.clone());
+        let agent_id_string = metadata.id.to_string();
 
         // Extract model configuration
         let model_config = config
@@ -102,11 +107,13 @@ impl LLMAgent {
 
         Ok(Self {
             metadata,
+            agent_id_string,
             config,
             core_config,
             conversation: Arc::new(Mutex::new(Vec::new())),
             provider,
             state_machine,
+            state_manager: None,
         })
     }
 
@@ -410,6 +417,32 @@ impl Agent for LLMAgent {
             })
     }
 }
+
+// Implement StateManagerHolder
+impl StateManagerHolder for LLMAgent {
+    fn state_manager(&self) -> Option<&Arc<StateManager>> {
+        self.state_manager.as_ref()
+    }
+
+    fn set_state_manager(&mut self, state_manager: Arc<StateManager>) {
+        self.state_manager = Some(state_manager);
+    }
+}
+
+// Implement StatePersistence
+#[async_trait]
+impl StatePersistence for LLMAgent {
+    fn state_manager(&self) -> Option<&Arc<StateManager>> {
+        StateManagerHolder::state_manager(self)
+    }
+
+    fn set_state_manager(&mut self, state_manager: Arc<StateManager>) {
+        StateManagerHolder::set_state_manager(self, state_manager)
+    }
+}
+
+// Implement PersistentAgent using the macro
+crate::impl_persistent_agent!(LLMAgent);
 
 #[cfg(test)]
 mod tests {

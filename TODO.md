@@ -495,29 +495,30 @@ mod tests {
 **Priority**: CRITICAL  
 **Estimated Time**: 5 hours  
 **Assignee**: Integration Team
-**Status**: NOT STARTED
+**Status**: ✅ COMPLETED (2025-07-25)
 
 **Description**: Integrate the isolated llmspell-state-persistence system with llmspell-agents to enable actual agent state persistence. Without this, our state system is unusable.
 
 **Files to Create/Update:**
-- **UPDATE**: `llmspell-agents/Cargo.toml` - Add llmspell-state-persistence dependency
-- **UPDATE**: `llmspell-agents/src/simple_agent.rs` - Implement PersistentAgent trait
-- **UPDATE**: `llmspell-agents/src/advanced_agent.rs` - Implement PersistentAgent trait
-- **CREATE**: `llmspell-agents/src/state/mod.rs` - State management module
-- **CREATE**: `llmspell-agents/src/state/builder.rs` - StatefulAgentBuilder
-- **UPDATE**: `llmspell-agents/src/lib.rs` - Export state management types
-- **CREATE**: `examples/stateful_agent.rs` - Example of agent with persistence
-- **CREATE**: `tests/agent_state_persistence.rs` - Integration tests
+- **UPDATED**: `llmspell-agents/Cargo.toml` - Add llmspell-state-persistence dependency ✓
+- **UPDATED**: `llmspell-agents/src/agents/basic.rs` - Implement PersistentAgent trait ✓
+- **UPDATED**: `llmspell-agents/src/agents/llm.rs` - Implement PersistentAgent trait ✓
+- **EXISTS**: `llmspell-agents/src/state/mod.rs` - State management module ✓
+- **CREATED**: `llmspell-agents/src/state/builder.rs` - StatefulAgentBuilder ✓
+- **CREATED**: `llmspell-agents/src/state/persistence.rs` - State persistence trait ✓
+- **EXISTS**: `llmspell-agents/src/lib.rs` - Export state management types ✓
+- **CREATED**: `examples/stateful_agent.rs` - Example of agent with persistence ✓
+- **CREATED**: `tests/state_persistence_integration.rs` - Integration tests ✓
 
 **Acceptance Criteria:**
-- [⚡] Agents can be created with state persistence enabled
-- [⚡] SimpleAgent implements PersistentAgent trait fully
-- [⚡] AdvancedAgent implements PersistentAgent trait fully
-- [⚡] Agent state saves include all conversation history and context
-- [⚡] Agent builders support StateManager injection
-- [⚡] State persistence is opt-in (backward compatible)
-- [⚡] Integration tests verify save/load roundtrip
-- [⚡] Example demonstrates practical usage
+- [✓] Agents can be created with state persistence enabled
+- [✓] BasicAgent implements PersistentAgent trait fully
+- [✓] LLMAgent implements PersistentAgent trait fully
+- [✓] Agent state saves include all conversation history and context
+- [✓] Agent builders support StateManager injection
+- [✓] State persistence is opt-in (backward compatible)
+- [✓] Integration tests verify save/load roundtrip
+- [✓] Example demonstrates practical usage
 
 **Implementation Steps:**
 1. **Add Dependencies and Module Structure** (1 hour):
@@ -572,6 +573,15 @@ mod tests {
 - [x] Example code clearly shows how to use stateful agents
 - [x] No performance regression for non-stateful agents
 - [x] Documentation updated with state persistence usage
+
+**Completion Notes (2025-07-25):**
+- Created `StatePersistence` extension trait in `state/persistence.rs`
+- Added `agent_id_string` field to BasicAgent and LLMAgent to support PersistentAgent trait
+- Implemented `impl_persistent_agent!` macro for easy trait implementation
+- Used `block_on` for async-sync bridging in PersistentAgent trait methods
+- Created comprehensive integration tests covering multiple scenarios
+- Example demonstrates full save/load cycle with state restoration
+- State persistence is completely opt-in via `set_state_manager()`
 
 ---
 

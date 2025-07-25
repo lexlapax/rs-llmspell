@@ -3,6 +3,7 @@
 
 use crate::factory::AgentConfig;
 use crate::lifecycle::{AgentStateMachine, StateMachineConfig};
+use crate::state::persistence::{StateManagerHolder, StatePersistence};
 use anyhow::Result;
 use async_trait::async_trait;
 use llmspell_core::{
@@ -13,22 +14,26 @@ use llmspell_core::{
     types::{AgentInput, AgentOutput},
     ComponentMetadata, ExecutionContext, LLMSpellError,
 };
+use llmspell_state_persistence::StateManager;
 use std::sync::{Arc, Mutex};
 use tracing::{debug, error, info, warn};
 
 /// Basic agent implementation
 pub struct BasicAgent {
     metadata: ComponentMetadata,
+    agent_id_string: String, // Cache string representation of agent ID
     config: AgentConfig,
     core_config: CoreAgentConfig,
     conversation: Arc<Mutex<Vec<ConversationMessage>>>,
     state_machine: Arc<AgentStateMachine>,
+    state_manager: Option<Arc<StateManager>>,
 }
 
 impl BasicAgent {
     /// Create a new basic agent
     pub fn new(config: AgentConfig) -> Result<Self> {
         let metadata = ComponentMetadata::new(config.name.clone(), config.description.clone());
+        let agent_id_string = metadata.id.to_string();
 
         let core_config = CoreAgentConfig {
             max_conversation_length: Some(100),
@@ -52,10 +57,12 @@ impl BasicAgent {
 
         Ok(Self {
             metadata,
+            agent_id_string,
             config,
             core_config,
             conversation: Arc::new(Mutex::new(Vec::new())),
             state_machine,
+            state_manager: None,
         })
     }
 
@@ -306,6 +313,32 @@ impl Agent for BasicAgent {
             })
     }
 }
+
+// Implement StateManagerHolder
+impl StateManagerHolder for BasicAgent {
+    fn state_manager(&self) -> Option<&Arc<StateManager>> {
+        self.state_manager.as_ref()
+    }
+
+    fn set_state_manager(&mut self, state_manager: Arc<StateManager>) {
+        self.state_manager = Some(state_manager);
+    }
+}
+
+// Implement StatePersistence
+#[async_trait]
+impl StatePersistence for BasicAgent {
+    fn state_manager(&self) -> Option<&Arc<StateManager>> {
+        StateManagerHolder::state_manager(self)
+    }
+
+    fn set_state_manager(&mut self, state_manager: Arc<StateManager>) {
+        StateManagerHolder::set_state_manager(self, state_manager)
+    }
+}
+
+// Implement PersistentAgent using the macro
+crate::impl_persistent_agent!(BasicAgent);
 
 #[cfg(test)]
 mod tests {

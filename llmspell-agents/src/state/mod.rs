@@ -2,6 +2,7 @@
 // ABOUTME: Provides secure multi-agent state isolation with controlled sharing patterns
 
 pub mod isolation;
+pub mod persistence;
 pub mod sharing;
 
 pub use isolation::{
@@ -14,3 +15,5 @@ pub use sharing::{
     SharedStateAccessor, SharedStateAgent, SharedStateChannel, SharingPattern, StateMessage,
     StateSharingManager,
 };
+
+pub use persistence::{StateManagerHolder, StatePersistence, ToolStats};
