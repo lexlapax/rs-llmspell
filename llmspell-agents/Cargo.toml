@@ -25,6 +25,7 @@ once_cell.workspace = true
 chrono.workspace = true
 uuid.workspace = true
 futures.workspace = true
+parking_lot.workspace = true
 regex = "1.11"
 rand = "0.8"
 

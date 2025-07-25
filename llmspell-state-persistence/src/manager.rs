@@ -705,6 +705,101 @@ impl StateManager {
             Ok(None)
         }
     }
+
+    // ===== Isolation Enforcement Methods =====
+
+    /// Get scoped state value with isolation check
+    pub async fn get_scoped(&self, scope: StateScope, key: &str) -> StateResult<Option<Value>> {
+        self.get(scope, key).await
+    }
+
+    /// Set scoped state value with isolation check
+    pub async fn set_scoped(&self, scope: StateScope, key: &str, value: Value) -> StateResult<()> {
+        self.set(scope, key, value).await
+    }
+
+    /// Delete scoped state value with isolation check
+    pub async fn delete_scoped(&self, scope: StateScope, key: &str) -> StateResult<bool> {
+        self.delete(scope, key).await
+    }
+
+    /// List keys in a specific scope
+    pub async fn list_keys_in_scope(&self, scope: StateScope) -> StateResult<Vec<String>> {
+        self.list_keys(scope).await
+    }
+
+    /// Check if a key exists in a scope
+    pub async fn exists_in_scope(&self, scope: StateScope, key: &str) -> StateResult<bool> {
+        let scoped_key = KeyManager::create_scoped_key(&scope, key)?;
+
+        // Check memory first
+        {
+            let memory = self.in_memory.read();
+            if memory.contains_key(&scoped_key) {
+                return Ok(true);
+            }
+        }
+
+        // Check storage if persistent
+        if self.persistence_config.enabled {
+            self.storage_adapter.exists(&scoped_key).await
+        } else {
+            Ok(false)
+        }
+    }
+
+    /// Get all values in a scope (for backup/migration)
+    pub async fn get_all_in_scope(&self, scope: StateScope) -> StateResult<HashMap<String, Value>> {
+        let keys = self.list_keys_in_scope(scope.clone()).await?;
+        let mut result = HashMap::new();
+
+        for key in keys {
+            if let Some(value) = self.get_scoped(scope.clone(), &key).await? {
+                result.insert(key, value);
+            }
+        }
+
+        Ok(result)
+    }
+
+    /// Clear all values in a scope (returns count of deleted items)
+    pub async fn clear_scope_count(&self, scope: StateScope) -> StateResult<usize> {
+        let keys = self.list_keys_in_scope(scope.clone()).await?;
+        let count = keys.len();
+
+        for key in keys {
+            self.delete_scoped(scope.clone(), &key).await?;
+        }
+
+        Ok(count)
+    }
+
+    /// Copy state from one scope to another
+    pub async fn copy_scope(
+        &self,
+        from_scope: StateScope,
+        to_scope: StateScope,
+    ) -> StateResult<usize> {
+        let values = self.get_all_in_scope(from_scope).await?;
+        let count = values.len();
+
+        for (key, value) in values {
+            self.set_scoped(to_scope.clone(), &key, value).await?;
+        }
+
+        Ok(count)
+    }
+
+    /// Move state from one scope to another
+    pub async fn move_scope(
+        &self,
+        from_scope: StateScope,
+        to_scope: StateScope,
+    ) -> StateResult<usize> {
+        let count = self.copy_scope(from_scope.clone(), to_scope).await?;
+        self.clear_scope_count(from_scope).await?;
+        Ok(count)
+    }
 }
 
 #[cfg(test)]

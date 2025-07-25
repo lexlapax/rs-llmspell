@@ -14,6 +14,7 @@ pub mod health;
 pub mod lifecycle;
 pub mod monitoring;
 pub mod registry;
+pub mod state;
 pub mod templates;
 pub mod tool_context;
 pub mod tool_discovery;
