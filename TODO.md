@@ -1,7 +1,9 @@
 # Phase 5: Persistent State Management - TODO List
 
-**Version**: 1.0  
+**Version**: 1.1  
 **Date**: July 2025  
+**Last Updated**: 2025-07-25  
+**Design Document Status**: Updated with implementation realities and integration requirements  
 **Status**: Implementation In Progress (5/21 tasks completed)  
 **Phase**: 5 (Persistent State Management with Hook Integration)  
 **Timeline**: Weeks 19-20 (10 working days)  
@@ -292,7 +294,7 @@ mod tests {
 
 ---
 
-## Phase 5.2: Agent State Serialization System (Days 2-3) ⚙️ PARTIALLY COMPLETED (2/3 tasks)
+## Phase 5.2: Agent State Serialization System (Days 2-5) ⚙️ PARTIALLY COMPLETED (2/6 tasks)
 
 ### Task 5.2.1: Extend StorageSerialize for Agent State ✅
 **Priority**: CRITICAL  
@@ -438,6 +440,7 @@ mod tests {
 **Priority**: HIGH  
 **Estimated Time**: 3 hours  
 **Assignee**: Security Team
+**Status**: NOT STARTED
 
 **Description**: Ensure robust isolation between agent states while supporting controlled sharing patterns.
 
@@ -477,6 +480,271 @@ mod tests {
 - [ ] Sharing mechanisms work as designed
 - [ ] Security tests validate isolation guarantees
 - [ ] Performance impact minimal
+
+---
+
+### Task 5.2.4: Agent-State Persistence Integration ✨ NEW
+**Priority**: CRITICAL  
+**Estimated Time**: 5 hours  
+**Assignee**: Integration Team
+**Status**: NOT STARTED
+
+**Description**: Integrate the isolated llmspell-state-persistence system with llmspell-agents to enable actual agent state persistence. Without this, our state system is unusable.
+
+**Files to Create/Update:**
+- **UPDATE**: `llmspell-agents/Cargo.toml` - Add llmspell-state-persistence dependency
+- **UPDATE**: `llmspell-agents/src/simple_agent.rs` - Implement PersistentAgent trait
+- **UPDATE**: `llmspell-agents/src/advanced_agent.rs` - Implement PersistentAgent trait
+- **CREATE**: `llmspell-agents/src/state/mod.rs` - State management module
+- **CREATE**: `llmspell-agents/src/state/builder.rs` - StatefulAgentBuilder
+- **UPDATE**: `llmspell-agents/src/lib.rs` - Export state management types
+- **CREATE**: `examples/stateful_agent.rs` - Example of agent with persistence
+- **CREATE**: `tests/agent_state_persistence.rs` - Integration tests
+
+**Acceptance Criteria:**
+- [⚡] Agents can be created with state persistence enabled
+- [⚡] SimpleAgent implements PersistentAgent trait fully
+- [⚡] AdvancedAgent implements PersistentAgent trait fully
+- [⚡] Agent state saves include all conversation history and context
+- [⚡] Agent builders support StateManager injection
+- [⚡] State persistence is opt-in (backward compatible)
+- [⚡] Integration tests verify save/load roundtrip
+- [⚡] Example demonstrates practical usage
+
+**Implementation Steps:**
+1. **Add Dependencies and Module Structure** (1 hour):
+   ```toml
+   # llmspell-agents/Cargo.toml
+   llmspell-state-persistence = { path = "../llmspell-state-persistence" }
+   ```
+   - Create state module structure
+   - Export necessary types
+   - Set up feature flags if needed
+
+2. **Implement PersistentAgent for SimpleAgent** (1.5 hours):
+   ```rust
+   impl PersistentAgent for SimpleAgent {
+       fn agent_id(&self) -> &str { &self.id }
+       
+       fn get_persistent_state(&self) -> StateResult<PersistentAgentState> {
+           // Extract conversation history, context, metadata
+           // Convert to PersistentAgentState
+       }
+       
+       fn apply_persistent_state(&mut self, state: PersistentAgentState) -> StateResult<()> {
+           // Restore conversation history
+           // Restore context variables
+           // Update internal state
+       }
+   }
+   ```
+
+3. **Implement PersistentAgent for AdvancedAgent** (1.5 hours):
+   - Similar to SimpleAgent but handle additional state
+   - Tool usage statistics
+   - Advanced context management
+   - Custom agent data
+
+4. **Create StatefulAgentBuilder** (1 hour):
+   ```rust
+   pub struct StatefulAgentBuilder {
+       state_manager: Option<Arc<StateManager>>,
+       auto_save_interval: Option<Duration>,
+       // ... other builder fields
+   }
+   ```
+   - Builder pattern for agents with state
+   - Configure auto-save behavior
+   - Set up lifecycle hooks
+
+**Definition of Done:**
+- [x] All agents can persist and restore their complete state
+- [x] Backward compatibility maintained (state is optional)
+- [x] Integration tests pass with multiple save/load cycles
+- [x] Example code clearly shows how to use stateful agents
+- [x] No performance regression for non-stateful agents
+- [x] Documentation updated with state persistence usage
+
+---
+
+### Task 5.2.5: Script Bridge API for State Persistence ✨ NEW
+**Priority**: CRITICAL  
+**Estimated Time**: 6 hours  
+**Assignee**: Bridge Team
+**Status**: NOT STARTED
+
+**Description**: Implement state persistence API in the 3-layer script bridge architecture, enabling Lua/JavaScript/Python scripts to save and load state.
+
+**Files to Create/Update:**
+- **UPDATE**: `llmspell-bridge/Cargo.toml` - Add llmspell-state-persistence dependency
+- **UPDATE**: `llmspell-bridge/src/context.rs` - Add StateManager to bridge context
+- **CREATE**: `llmspell-bridge/src/lua/globals/state.rs` - Lua state API implementation
+- **CREATE**: `llmspell-bridge/src/js/globals/state.js` - JavaScript state API
+- **CREATE**: `llmspell-bridge/src/python/globals/state.py` - Python state API
+- **UPDATE**: `llmspell-bridge/src/lua/engine.rs` - Register state globals
+- **UPDATE**: `llmspell-bridge/src/js/engine.rs` - Register state globals
+- **CREATE**: `examples/scripts/state_persistence.lua` - Lua example
+- **CREATE**: `examples/scripts/state_persistence.js` - JavaScript example
+- **CREATE**: `tests/bridge/state_api_tests.rs` - Bridge API tests
+
+**Acceptance Criteria:**
+- [⚡] Scripts can save state: `llmspell.state.save(scope, key, value)`
+- [⚡] Scripts can load state: `llmspell.state.load(scope, key)`
+- [⚡] Scripts can delete state: `llmspell.state.delete(scope, key)`
+- [⚡] Scripts can list keys: `llmspell.state.list_keys(scope)`
+- [⚡] Async operations properly bridged to sync script context
+- [⚡] Consistent API across Lua, JavaScript, and Python
+- [⚡] Error handling follows existing bridge patterns
+- [⚡] Value conversions handle all JSON-compatible types
+
+**Implementation Steps:**
+1. **Bridge Context Integration** (1 hour):
+   ```rust
+   // llmspell-bridge/src/context.rs
+   pub struct BridgeContext {
+       // ... existing fields
+       state_manager: Arc<StateManager>,
+   }
+   ```
+   - Add StateManager to context
+   - Handle initialization
+   - Ensure thread safety
+
+2. **Lua Native Globals Implementation** (2 hours):
+   ```rust
+   // llmspell-bridge/src/lua/globals/state.rs
+   pub fn state_save(
+       ctx: &BridgeContext,
+       scope: String,
+       key: String,
+       value: Value,
+   ) -> Result<(), BridgeError> {
+       // Convert scope string to StateScope enum
+       // Convert Lua Value to serde_json::Value
+       // Handle async with tokio runtime
+       // Call state_manager.set()
+   }
+   ```
+   - Implement all four operations
+   - Handle scope parsing
+   - Convert between mlua::Value and serde_json::Value
+   - Use existing async patterns from workflow.rs
+
+3. **JavaScript Bridge Implementation** (1.5 hours):
+   - Mirror Lua API structure
+   - Use existing JS value conversion utilities
+   - Maintain consistency with other JS globals
+   - Handle promises for async operations
+
+4. **Python Bridge Implementation** (1 hour):
+   - Follow existing Python binding patterns
+   - Handle Python object conversions
+   - Maintain API consistency
+
+5. **Script Engine Registration** (0.5 hours):
+   ```rust
+   // In create_lua_globals()
+   globals.set("state", state_module)?;
+   ```
+   - Register in all three engines
+   - Set up proper namespacing
+   - Add to documentation
+
+**Definition of Done:**
+- [x] All three script languages can perform state operations
+- [x] Async operations don't block script execution
+- [x] Error messages are clear and actionable
+- [x] Examples demonstrate common use cases
+- [x] Integration tests verify cross-language consistency
+- [x] Performance is acceptable (<5ms overhead per operation)
+- [x] Documentation includes script API reference
+
+---
+
+### Task 5.2.6: Lifecycle Hooks for Automatic State Persistence ✨ NEW
+**Priority**: CRITICAL  
+**Estimated Time**: 4 hours  
+**Assignee**: Lifecycle Team
+**Status**: NOT STARTED
+
+**Description**: Implement automatic state persistence through lifecycle hooks, enabling transparent state management without manual intervention.
+
+**Files to Create/Update:**
+- **CREATE**: `llmspell-agents/src/hooks/state_persistence_hook.rs` - Main lifecycle hook
+- **UPDATE**: `llmspell-agents/src/simple_agent.rs` - Add lifecycle hook support
+- **UPDATE**: `llmspell-agents/src/advanced_agent.rs` - Add lifecycle hook support
+- **CREATE**: `llmspell-agents/src/config/persistence_config.rs` - Auto-save configuration
+- **UPDATE**: `llmspell-agents/src/builder.rs` - Add persistence configuration
+- **CREATE**: `examples/auto_save_agent.rs` - Auto-save example
+- **CREATE**: `tests/lifecycle_persistence_tests.rs` - Lifecycle tests
+
+**Acceptance Criteria:**
+- [⚡] State automatically saved on agent pause()
+- [⚡] State automatically saved on agent stop()
+- [⚡] State automatically restored on agent resume()
+- [⚡] Configurable auto-save intervals (e.g., every 5 minutes)
+- [⚡] Failure handling with exponential backoff
+- [⚡] Non-blocking saves (don't interrupt agent operation)
+- [⚡] Metrics track save/restore success rates
+- [⚡] Circuit breaker prevents repeated failures
+
+**Implementation Steps:**
+1. **Create StatePersistenceHook** (1.5 hours):
+   ```rust
+   pub struct StatePersistenceHook {
+       state_manager: Arc<StateManager>,
+       config: PersistenceConfig,
+       last_save: Arc<RwLock<SystemTime>>,
+       failure_count: Arc<AtomicU32>,
+   }
+   
+   impl Hook for StatePersistenceHook {
+       async fn on_event(&self, event: &Event, context: &mut HookContext) -> HookResult {
+           match event {
+               Event::AgentPaused { agent_id } => self.save_state(agent_id).await,
+               Event::AgentStopped { agent_id } => self.save_state(agent_id).await,
+               Event::AgentResumed { agent_id } => self.restore_state(agent_id).await,
+               Event::Periodic => self.check_auto_save().await,
+               _ => Ok(HookAction::Continue),
+           }
+       }
+   }
+   ```
+
+2. **Implement Auto-Save Logic** (1 hour):
+   ```rust
+   pub struct PersistenceConfig {
+       pub auto_save_interval: Option<Duration>,
+       pub max_retries: u32,
+       pub backoff_multiplier: f64,
+       pub failure_threshold: u32,
+   }
+   ```
+   - Timer-based auto-save
+   - Exponential backoff on failures
+   - Circuit breaker pattern
+   - Async non-blocking saves
+
+3. **Agent Integration** (1 hour):
+   - Add hook registration in agent builders
+   - Ensure agents emit correct lifecycle events
+   - Handle hook in agent lifecycle methods
+   - Maintain backward compatibility
+
+4. **Failure Handling** (0.5 hours):
+   - Implement retry logic
+   - Add metrics collection
+   - Log failures appropriately
+   - Prevent cascade failures
+
+**Definition of Done:**
+- [x] Agents automatically save state on lifecycle events
+- [x] Auto-save works reliably at configured intervals
+- [x] Failures don't impact agent operation
+- [x] Metrics show save/restore success rates
+- [x] Integration tests verify all scenarios
+- [x] Example shows configuration options
+- [x] Documentation explains auto-save behavior
 - [ ] Audit logging captures all access patterns
 
 ---

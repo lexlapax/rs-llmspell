@@ -4,9 +4,10 @@
 **Date**: July 2025  
 **Status**: Implementation Ready  
 **Phase**: 5 (Persistent State Management)  
-**Timeline**: Weeks 19-20  
+**Timeline**: Weeks 19-20 (Extended to accommodate integration complexity)  
 **Priority**: MEDIUM (Production Important)  
-**Dependencies**: Phase 4 Hook System (COMPLETE), Phase 3.3 llmspell-storage (AVAILABLE)
+**Dependencies**: Phase 4 Hook System (COMPLETE), Phase 3.3 llmspell-storage (AVAILABLE)  
+**Crate Structure**: New `llmspell-state-persistence` crate to avoid circular dependencies
 
 > **📋 Detailed Implementation Guide**: This document provides complete specifications for implementing Phase 5 persistent state management for rs-llmspell, leveraging Phase 4's ReplayableHook trait and Phase 3.3's llmspell-storage infrastructure.
 
@@ -22,6 +23,8 @@ Implement persistent state storage with sled/rocksdb backend, enabling state per
 - **Storage Abstraction**: Build on Phase 3.3's llmspell-storage infrastructure with StorageSerialize trait
 - **Backward Compatibility**: Maintain existing State API surface while adding persistence
 - **Performance Preservation**: <5ms persistence overhead, maintain current in-memory performance characteristics
+- **Crate Separation**: Isolated `llmspell-state-persistence` crate prevents circular dependencies
+- **3-Layer Bridge Architecture**: Script integration respects Native Bridge → Native Globals → Script Engine pattern
 
 ### Success Criteria
 - [ ] Agent state persists across application restarts
@@ -32,6 +35,12 @@ Implement persistent state storage with sled/rocksdb backend, enabling state per
 - [ ] **Hook history is persisted and replayable** (Phase 4 integration)
 - [ ] **State changes trigger appropriate hooks** (Phase 4 integration)
 - [ ] **Event correlation IDs link state changes** (Phase 4 integration)
+- [ ] **Circular references in agent state handled correctly**
+- [ ] **Sensitive data (API keys) properly protected during serialization**
+- [ ] **Concurrent access to agent state properly synchronized**
+- [ ] **Agent-State persistence fully integrated with llmspell-agents**
+- [ ] **Script Bridge API exposes state persistence to Lua/JS/Python**
+- [ ] **Lifecycle hooks enable automatic state persistence**
 
 ---
 
@@ -42,10 +51,14 @@ Implement persistent state storage with sled/rocksdb backend, enabling state per
 **Core StateManager Enhancement:**
 
 ```rust
-// Enhanced StateManager leveraging llmspell-storage
+// Enhanced StateManager in llmspell-state-persistence crate
+// Avoids circular dependency: llmspell-core → llmspell-storage → llmspell-core
 use llmspell_storage::{StorageBackend, StorageSerialize, StorageDeserialize};
 use llmspell_hooks::{ReplayableHook, HookExecutor, HookContext};
 use llmspell_events::{UniversalEvent, EventBus};
+use parking_lot::RwLock;
+use std::collections::HashMap;
+use std::sync::Arc;
 
 pub struct StateManager {
     // Existing in-memory state (Phase 3.3)
@@ -66,6 +79,13 @@ pub struct StateManager {
     
     // Event correlation for timeline reconstruction
     correlation_tracker: EventCorrelationTracker,
+    
+    // Concurrent access synchronization - per-agent locks
+    agent_state_locks: Arc<RwLock<HashMap<String, Arc<RwLock<()>>>>>,
+    
+    // Security components
+    sensitive_data_protector: SensitiveDataProtector,
+    circular_ref_detector: CircularReferenceDetector,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -115,11 +135,12 @@ impl StateManager {
         let correlation_id = uuid::Uuid::new_v4();
         
         // Create hook context for state change
-        let hook_context = HookContext::new()
-            .with_correlation_id(correlation_id)
-            .with_operation("state_set")
-            .with_metadata("scope", scope.to_string())
-            .with_metadata("key", key);
+        // Create hook context using correct API
+        let mut hook_context = HookContext::new();
+        hook_context.insert_metadata("correlation_id", correlation_id.to_string());
+        hook_context.insert_metadata("operation", "state_set".to_string());
+        hook_context.insert_metadata("scope", scope.to_string());
+        hook_context.insert_metadata("key", key.to_string());
         
         // Execute pre-state-change hooks
         let pre_result = self.hook_executor.execute_hooks(
@@ -290,7 +311,19 @@ pub struct PersistentAgentState {
 
 impl StorageSerialize for PersistentAgentState {
     fn serialize_for_storage(&self) -> Result<Vec<u8>, llmspell_storage::StorageError> {
-        bincode::serialize(self)
+        // Check for circular references before serialization
+        if let Err(e) = self.check_circular_references() {
+            return Err(llmspell_storage::StorageError::SerializationFailed(
+                format!("Circular reference detected: {}", e)
+            ));
+        }
+        
+        // Protect sensitive data
+        let mut safe_state = self.clone();
+        safe_state.redact_sensitive_data(&SensitiveDataConfig::default())
+            .map_err(|e| llmspell_storage::StorageError::SerializationFailed(e))?;
+        
+        bincode::serialize(&safe_state)
             .map_err(|e| llmspell_storage::StorageError::SerializationFailed(e.to_string()))
     }
     
@@ -323,21 +356,29 @@ pub trait PersistentAgent: Agent {
 
 impl<T: Agent> PersistentAgent for T {
     async fn save_state(&self, state_manager: &StateManager) -> Result<()> {
-        let persistent_state = PersistentAgentState {
-            agent_id: self.id().to_string(),
-            agent_type: self.agent_type().to_string(),
-            state: self.state().clone(),
-            metadata: self.metadata().clone(),
-            creation_time: self.creation_time(),
-            last_modified: SystemTime::now(),
-            schema_version: 1,
-            hook_registrations: self.get_hook_registrations(),
-            last_hook_execution: self.last_hook_execution(),
-            correlation_context: self.current_correlation_id(),
-        };
-        
+        // Acquire agent-specific lock for concurrent access safety
+        let safe_state = {
+            let agent_lock = state_manager.get_agent_lock(&self.id().to_string());
+            let _guard = agent_lock.write();
+            
+            // Perform state operations while lock is held
+            let persistent_state = PersistentAgentState {
+                agent_id: self.id().to_string(),
+                agent_type: self.agent_type().to_string(),
+                state: self.state().clone(),
+                metadata: self.metadata().clone(),
+                creation_time: self.creation_time(),
+                last_modified: SystemTime::now(),
+                schema_version: 1,
+                hook_registrations: self.get_hook_registrations(),
+                last_hook_execution: self.last_hook_execution(),
+                correlation_context: self.current_correlation_id(),
+            };
+            persistent_state
+        }; // Lock released here before async operation
+        // Store state with lock already released to avoid Send issues
         state_manager.storage_backend
-            .store(&persistent_state.storage_key(), &persistent_state)
+            .store(&safe_state.storage_key(), &safe_state)
             .await?;
         
         Ok(())
@@ -486,7 +527,43 @@ impl StateMigration for V1ToV2Migration {
 
 ## 2. Architectural Considerations
 
+### 2.0 Crate Architecture and Dependency Resolution
+
+**New Crate Structure:**
+
+To avoid circular dependencies discovered during implementation, Phase 5 introduces a new crate:
+
+```toml
+# llmspell-state-persistence/Cargo.toml
+[package]
+name = "llmspell-state-persistence"
+
+[dependencies]
+llmspell-storage = { path = "../llmspell-storage" }
+llmspell-hooks = { path = "../llmspell-hooks" }
+llmspell-events = { path = "../llmspell-events" }
+# Note: Does NOT depend on llmspell-core
+```
+
+**Dependency Graph:**
+```
+llmspell-core
+    ↓
+llmspell-agents → llmspell-state-persistence
+    ↓                         ↓
+llmspell-storage ← ← ← ← ← ← ↓
+```
+
+This prevents the circular dependency that would occur if state persistence was in llmspell-core.
+
 ### 2.1 Phase 4 Hook System Integration
+
+**Critical Integration Requirements:**
+
+1. **HookContext API Compliance**: Use `insert_metadata()` instead of builder pattern
+2. **ComponentType Mapping**: Map state operations to appropriate ComponentType enum values
+3. **Priority Constants**: Use Phase 4's Priority constants (HIGH, NORMAL, LOW)
+4. **Language Enum**: Map script contexts to Phase 4's Language enum
 
 **ReplayableHook Integration Points:**
 
@@ -571,6 +648,22 @@ impl StateStorageAdapter {
 ```
 
 ### 2.3 Backward Compatibility Strategy
+
+**Integration Points for Existing Systems:**
+
+1. **Agent Integration**: Agents must explicitly opt-in to state persistence
+2. **Script Bridge**: New global objects for state access from scripts
+3. **Lifecycle Hooks**: Automatic state save/load on agent lifecycle events
+
+```rust
+// Integration with existing Agent trait
+impl Agent {
+    // New methods added via extension trait
+    fn with_persistence(self, state_manager: Arc<StateManager>) -> PersistentAgentWrapper {
+        PersistentAgentWrapper::new(self, state_manager)
+    }
+}
+```
 
 **API Preservation:**
 
@@ -854,6 +947,49 @@ impl Default for StateConfig {
 
 ## 5. Performance and Security
 
+### 5.0 Security Enhancements
+
+**Circular Reference Detection:**
+
+```rust
+use crate::circular_ref::CircularReferenceDetector;
+
+impl StateManager {
+    async fn safe_serialize_state(&self, value: &serde_json::Value) -> Result<Vec<u8>> {
+        let mut detector = CircularReferenceDetector::new();
+        detector.check_value(value)?;
+        // Proceed with serialization only if no circular refs
+        Ok(serde_json::to_vec(value)?)
+    }
+}
+```
+
+**Sensitive Data Protection:**
+
+```rust
+use crate::sensitive_data::{SensitiveDataProtector, SensitiveDataConfig};
+use regex::Regex;
+use once_cell::sync::Lazy;
+
+// Patterns for detecting API keys and sensitive data
+static API_KEY_PATTERNS: Lazy<Vec<Regex>> = Lazy::new(|| {
+    vec![
+        Regex::new(r"sk-[a-zA-Z0-9]{48}").unwrap(), // OpenAI
+        Regex::new(r"sk-ant-[a-zA-Z0-9-]{95}").unwrap(), // Anthropic
+        Regex::new(r"AKIA[0-9A-Z]{16}").unwrap(), // AWS
+        Regex::new(r"ghp_[a-zA-Z0-9]{36}").unwrap(), // GitHub
+    ]
+});
+
+impl StateManager {
+    async fn protect_sensitive_data(&self, value: &mut serde_json::Value) -> Result<()> {
+        let mut protector = SensitiveDataProtector::with_default();
+        protector.redact_value(value);
+        Ok(())
+    }
+}
+```
+
 ### 5.1 Performance Targets
 
 **Quantified Performance Goals:**
@@ -909,6 +1045,9 @@ impl StatePerformanceMonitor {
 2. **Access Control**: State scoping prevents unauthorized access
 3. **Audit Logging**: All state changes logged with correlation IDs
 4. **Backup Security**: Encrypted backups with integrity verification
+5. **API Key Redaction**: Automatic detection and redaction of API keys
+6. **Circular Reference Prevention**: Detection prevents serialization infinite loops
+7. **Concurrent Access Control**: Per-agent locks prevent race conditions
 
 ```rust
 #[derive(Debug, Clone)]
@@ -1057,4 +1196,96 @@ impl ArtifactCollector for StateArtifactCollector {
 
 ---
 
-This design document provides comprehensive specifications for Phase 5 implementation, leveraging all available infrastructure from Phases 3.3 and 4 while preparing integration points for Phase 6. The implementation maintains backward compatibility while adding powerful persistence capabilities with hook integration and event correlation.
+## 7. Implementation Roadmap
+
+### 7.1 Task Organization
+
+Phase 5 implementation is organized into the following task groups:
+
+1. **Core Infrastructure (Tasks 5.1.1-5.1.3)**: StateManager, scoping, hook integration
+2. **Agent State Persistence (Tasks 5.2.1-5.2.6)**: Agent integration with security enhancements
+3. **Hook History Storage (Tasks 5.3.1-5.3.3)**: ReplayableHook persistence and timeline
+4. **State Migration (Tasks 5.4.1-5.4.3)**: Schema versioning and migration framework
+5. **Backup/Recovery (Tasks 5.5.1-5.5.3)**: Atomic backups with point-in-time recovery
+6. **Integration Testing (Tasks 5.6.1-5.6.3)**: Comprehensive test coverage
+7. **Session Preparation (Tasks 5.7.1-5.7.3)**: Phase 6 integration points
+
+### 7.2 Critical Integration Tasks
+
+**Task 5.2.4: Agent-State Persistence Integration**
+- Modify llmspell-agents to use llmspell-state-persistence
+- Add state lifecycle methods to Agent trait
+- Implement automatic state save/load on agent events
+
+**Task 5.2.5: Script Bridge API for State Persistence**
+- Create Lua globals: `State.save()`, `State.load()`, `State.query()`
+- Add JavaScript bindings via Native Bridge pattern
+- Implement Python API compatibility layer
+
+**Task 5.2.6: Lifecycle Hooks for Automatic State Persistence**
+- Hook into agent creation/destruction events
+- Add workflow start/complete state snapshots
+- Implement configurable auto-save intervals
+
+### 7.3 3-Layer Bridge Architecture Compliance
+
+**Key Manager Integration:**
+
+The implementation includes a comprehensive key management system:
+
+```rust
+use crate::key_manager::{KeyManager, StatePermission, StateAccessControl};
+
+impl KeyManager {
+    // Validate keys to prevent traversal attacks
+    pub fn validate_key(key: &str) -> StateResult<()> {
+        if key.contains("..") || key.contains("\\") || key.contains("//") {
+            return Err(StateError::InvalidKey(
+                "Key contains invalid path traversal characters".to_string(),
+            ));
+        }
+        Ok(())
+    }
+    
+    // Create scoped keys with proper namespacing
+    pub fn create_scoped_key(scope: &StateScope, key: &str) -> StateResult<String> {
+        Self::validate_key(key)?;
+        let normalized_key = key.nfc().collect::<String>();
+        Ok(format!("{}{}", scope.prefix(), normalized_key))
+    }
+}
+```
+
+### 7.4 Implementation Timeline Adjustments
+
+Based on implementation experience:
+- Phase 5.2 extended from "Days 2-3" to "Days 2-5" due to integration complexity
+- Added 3 critical integration tasks (5.2.4, 5.2.5, 5.2.6)
+- Security enhancements added as acceptance criteria for existing tasks
+
+All script integrations follow the established pattern:
+
+```rust
+// Layer 1: Native Bridge (Rust)
+pub struct StatePersistenceBridge {
+    state_manager: Arc<StateManager>,
+}
+
+// Layer 2: Native Globals (Lua/JS/Python specific)
+mlua::UserData for StatePersistenceBridge {
+    fn add_methods<'lua, M: mlua::UserDataMethods<'lua, Self>>(methods: &mut M) {
+        methods.add_method("save", |_, this, key: String| {
+            // Bridge to native implementation
+        });
+    }
+}
+
+// Layer 3: Script Engine (User scripts)
+-- Lua usage
+State.save("agent_config", config_data)
+local loaded = State.load("agent_config")
+```
+
+---
+
+This design document provides comprehensive specifications for Phase 5 implementation, leveraging all available infrastructure from Phases 3.3 and 4 while preparing integration points for Phase 6. The implementation maintains backward compatibility while adding powerful persistence capabilities with hook integration and event correlation. The new crate structure avoids circular dependencies while enabling deep integration with the existing system.
