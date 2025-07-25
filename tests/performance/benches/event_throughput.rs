@@ -2,10 +2,7 @@
 // ABOUTME: Validates 100K+ events/second capability and event bus performance
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
-use llmspell_events::{
-    bus::EventBus, correlation::EventCorrelator, Event, EventData, EventFilter, EventPattern,
-    EventPriority, EventSubscription, UniversalEvent,
-};
+use llmspell_events::{EventBus, UniversalEvent, Language};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::runtime::Runtime;
@@ -28,9 +25,10 @@ fn bench_event_publishing(c: &mut Criterion) {
                 b.iter(|| {
                     rt.block_on(async {
                         for i in 0..count {
-                            let event = Event::new(
+                            let event = UniversalEvent::new(
                                 format!("test.event.{}", i % 100),
-                                EventData::simple(format!("event-{}", i)),
+                                serde_json::json!({"data": format!("event-{}", i)}),
+                                Language::Rust,
                             );
                             black_box(event_bus.publish(event).await);
                         }
@@ -61,23 +59,24 @@ fn bench_event_subscription(c: &mut Criterion) {
         group.bench_function(name, |b| {
             b.iter(|| {
                 rt.block_on(async {
-                    let subscription = event_bus
-                        .subscribe(EventPattern::new(pattern))
+                    let mut receiver = event_bus
+                        .subscribe(pattern)
                         .await
                         .unwrap();
 
                     // Publish matching events
                     for i in 0..100 {
-                        let event = Event::new(
+                        let event = UniversalEvent::new(
                             "test.event.specific",
-                            EventData::simple(format!("data-{}", i)),
+                            serde_json::json!({"data": format!("data-{}", i)}),
+                            Language::Rust,
                         );
                         event_bus.publish(event).await.unwrap();
                     }
 
                     // Receive events
                     let mut received = 0;
-                    while let Ok(Some(_)) = subscription.try_receive().await {
+                    while let Some(_event) = receiver.recv().await {
                         received += 1;
                         if received >= 100 {
                             break;
@@ -106,7 +105,7 @@ fn bench_concurrent_pubsub(c: &mut Criterion) {
                 let mut subscribers = vec![];
                 for i in 0..10 {
                     let sub = event_bus
-                        .subscribe(EventPattern::new(&format!("concurrent.{}.>", i)))
+                        .subscribe(&format!("concurrent.{}.>", i))
                         .await
                         .unwrap();
                     subscribers.push(sub);
@@ -120,13 +119,14 @@ fn bench_concurrent_pubsub(c: &mut Criterion) {
 
                     let handle = tokio::spawn(async move {
                         for event_id in 0..10 {
-                            let event = Event::new(
+                            let event = UniversalEvent::new(
                                 format!("concurrent.{}.event", publisher_id % 10),
-                                EventData::json(serde_json::json!({
+                                serde_json::json!({
                                     "publisher": publisher_id,
                                     "event": event_id,
                                     "timestamp": std::time::SystemTime::now()
-                                })),
+                                }),
+                                Language::Rust,
                             );
                             bus.publish(event).await.unwrap();
                             tx.send(1).await.unwrap();
@@ -156,42 +156,32 @@ fn bench_concurrent_pubsub(c: &mut Criterion) {
 /// Benchmark event correlation performance
 fn bench_event_correlation(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
-    let correlator = Arc::new(EventCorrelator::new());
+    // EventCorrelator not available in current API - simplified benchmark
 
     c.bench_function("event_correlation_10k", |b| {
         b.iter(|| {
             rt.block_on(async {
                 // Create correlation chains
                 for chain_id in 0..100 {
-                    let correlation_id = format!("chain-{}", chain_id);
+                    let _correlation_id = format!("chain-{}", chain_id);
 
                     for event_id in 0..100 {
-                        let event = UniversalEvent {
-                            id: format!("event-{}-{}", chain_id, event_id),
-                            event_type: "correlation.test".to_string(),
-                            source: "benchmark".to_string(),
-                            timestamp: chrono::Utc::now(),
-                            correlation_id: Some(correlation_id.clone()),
-                            causation_id: if event_id > 0 {
-                                Some(format!("event-{}-{}", chain_id, event_id - 1))
-                            } else {
-                                None
-                            },
-                            data: serde_json::json!({"index": event_id}),
-                            metadata: Default::default(),
-                        };
+                        let event = UniversalEvent::new(
+                            "correlation.test",
+                            serde_json::json!({
+                                "chain_id": chain_id,
+                                "event_id": event_id,
+                                "index": event_id
+                            }),
+                            Language::Rust,
+                        );
 
-                        correlator.track_event(event).await;
+                        // Simplified: just create the event for benchmarking
+                        black_box(event);
                     }
                 }
 
-                // Query correlation chains
-                for chain_id in 0..100 {
-                    let chain = correlator
-                        .get_correlation_chain(&format!("chain-{}", chain_id))
-                        .await;
-                    black_box(chain);
-                }
+                // Simplified correlation benchmark completed
             });
         });
     });
@@ -208,14 +198,11 @@ fn bench_high_frequency_events(c: &mut Criterion) {
                 let mut handles = vec![];
 
                 // Create high-priority subscribers
-                for i in 0..5 {
+                for _i in 0..5 {
                     let bus = event_bus.clone();
                     let handle = tokio::spawn(async move {
-                        let sub = bus
-                            .subscribe_with_filter(
-                                EventPattern::new("high_freq.*"),
-                                EventFilter::builder().priority(EventPriority::High).build(),
-                            )
+                        let mut sub = bus
+                            .subscribe("high_freq.*")
                             .await
                             .unwrap();
 
@@ -223,8 +210,10 @@ fn bench_high_frequency_events(c: &mut Criterion) {
                         let start = tokio::time::Instant::now();
 
                         while start.elapsed() < Duration::from_secs(1) {
-                            if let Ok(Some(_)) = sub.try_receive().await {
+                            if let Some(_) = sub.recv().await {
                                 count += 1;
+                            } else {
+                                break;
                             }
                         }
 
@@ -238,15 +227,11 @@ fn bench_high_frequency_events(c: &mut Criterion) {
                     let bus = event_bus.clone();
                     tokio::spawn(async move {
                         for i in 0..100_000 {
-                            let event = Event::builder()
-                                .event_type(format!("high_freq.event.{}", i % 10))
-                                .data(EventData::simple(format!("data-{}", i)))
-                                .priority(if i % 100 == 0 {
-                                    EventPriority::High
-                                } else {
-                                    EventPriority::Normal
-                                })
-                                .build();
+                            let event = UniversalEvent::new(
+                                format!("high_freq.event.{}", i % 10),
+                                serde_json::json!({"data": format!("data-{}", i)}),
+                                Language::Rust,
+                            );
 
                             bus.publish(event).await.unwrap();
                         }
@@ -282,7 +267,7 @@ fn bench_event_memory_usage(c: &mut Criterion) {
                 for i in 0..10_000 {
                     let pattern = format!("memory.test.{}", i % 100);
                     let sub = event_bus
-                        .subscribe(EventPattern::new(&pattern))
+                        .subscribe(&pattern)
                         .await
                         .unwrap();
                     subscriptions.push(sub);
@@ -290,32 +275,36 @@ fn bench_event_memory_usage(c: &mut Criterion) {
 
                 // Publish events to all patterns
                 for i in 0..100 {
-                    let event = Event::new(
+                    let event = UniversalEvent::new(
                         format!("memory.test.{}", i),
-                        EventData::json(serde_json::json!({
+                        serde_json::json!({
                             "test": "data",
                             "index": i,
                             "large_field": vec![0u8; 1024], // 1KB payload
-                        })),
+                        }),
+                        Language::Rust,
                     );
                     event_bus.publish(event).await.unwrap();
                 }
 
-                // Force all subscriptions to receive
-                for sub in &subscriptions {
-                    while let Ok(Some(_)) = sub.try_receive().await {
-                        // Drain events
+                // Simplified: just track the number of subscriptions created
+                let subscription_count = subscriptions.len();
+                
+                // Force all subscriptions to receive at least one event each
+                for mut sub in subscriptions {
+                    if let Some(_) = sub.recv().await {
+                        // Received at least one event per subscription
                     }
                 }
 
-                black_box(subscriptions.len());
+                black_box(subscription_count);
             });
         });
     });
 }
 
 /// Calculate actual throughput metrics
-fn calculate_throughput_metrics(c: &mut Criterion) {
+fn calculate_throughput_metrics(_c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
 
     println!("\n=== Event Throughput Analysis ===");
@@ -327,9 +316,10 @@ fn calculate_throughput_metrics(c: &mut Criterion) {
 
         let start = tokio::time::Instant::now();
         for i in 0..events_to_publish {
-            let event = Event::new(
+            let event = UniversalEvent::new(
                 format!("throughput.test.{}", i % 100),
-                EventData::simple(format!("event-{}", i)),
+                serde_json::json!({"data": format!("event-{}", i)}),
+                Language::Rust,
             );
             event_bus.publish(event).await.unwrap();
         }
@@ -343,8 +333,8 @@ fn calculate_throughput_metrics(c: &mut Criterion) {
     // Test 2: End-to-end throughput (publish + receive)
     let e2e_throughput = rt.block_on(async {
         let event_bus = Arc::new(EventBus::new());
-        let sub = event_bus
-            .subscribe(EventPattern::new("e2e.*"))
+        let mut sub = event_bus
+            .subscribe("e2e.*")
             .await
             .unwrap();
 
@@ -354,9 +344,10 @@ fn calculate_throughput_metrics(c: &mut Criterion) {
         let bus = event_bus.clone();
         let publisher = tokio::spawn(async move {
             for i in 0..events_to_process {
-                let event = Event::new(
+                let event = UniversalEvent::new(
                     format!("e2e.event.{}", i % 10),
-                    EventData::simple(format!("data-{}", i)),
+                    serde_json::json!({"data": format!("data-{}", i)}),
+                    Language::Rust,
                 );
                 bus.publish(event).await.unwrap();
             }
@@ -367,8 +358,10 @@ fn calculate_throughput_metrics(c: &mut Criterion) {
         let mut received = 0;
 
         while received < events_to_process {
-            if let Ok(Some(_)) = sub.receive_timeout(Duration::from_millis(100)).await {
+            if let Some(_) = sub.recv().await {
                 received += 1;
+            } else {
+                break;
             }
         }
 

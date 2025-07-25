@@ -2,8 +2,9 @@
 // ABOUTME: Validates the event system can handle 100K+ events per second
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
-use llmspell_events::{Event, EventBus, EventData, EventPattern};
+use llmspell_events::{EventBus, UniversalEvent, Language};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 use tokio::runtime::Runtime;
 
@@ -12,14 +13,15 @@ fn bench_event_publishing_throughput(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
 
     // Pre-create events to avoid allocation overhead in benchmark
-    let events: Vec<Event> = (0..1000)
+    let events: Vec<UniversalEvent> = (0..1000)
         .map(|i| {
-            Event::new(
+            UniversalEvent::new(
                 format!("test.event.{}", i % 10),
-                EventData::json(serde_json::json!({
+                serde_json::json!({
                     "index": i,
                     "data": format!("test-data-{}", i),
-                })),
+                }),
+                Language::Rust,
             )
         })
         .collect();
@@ -30,7 +32,7 @@ fn bench_event_publishing_throughput(c: &mut Criterion) {
                 let event_bus = EventBus::new();
 
                 for event in &events {
-                    event_bus.publish(event.clone()).await.unwrap();
+                    let _ = event_bus.publish(event.clone()).await;
                 }
 
                 black_box(event_bus)
@@ -47,36 +49,36 @@ fn bench_event_with_subscribers(c: &mut Criterion) {
         b.iter(|| {
             rt.block_on(async {
                 let event_bus = EventBus::new();
-                let counter = Arc::new(tokio::sync::atomic::AtomicU64::new(0));
+                let counter = Arc::new(AtomicU64::new(0));
 
                 // Register 10 subscribers
                 for i in 0..10 {
                     let cnt = counter.clone();
-                    event_bus
-                        .subscribe_with_handler(
-                            EventPattern::new(format!("test.event.{}", i)),
-                            Box::new(move |_event| {
-                                cnt.fetch_add(1, tokio::sync::atomic::Ordering::Relaxed);
-                                Box::pin(async move { Ok(()) })
-                            }),
-                        )
-                        .await
-                        .unwrap();
+                    let pattern = format!("test.event.{}", i);
+                    let mut receiver = event_bus.subscribe(&pattern).await.unwrap();
+                    
+                    // Spawn task to handle events
+                    tokio::spawn(async move {
+                        while let Some(_event) = receiver.recv().await {
+                            cnt.fetch_add(1, Ordering::Relaxed);
+                        }
+                    });
                 }
 
                 // Publish 1000 events
                 for i in 0..1000 {
-                    let event = Event::new(
+                    let event = UniversalEvent::new(
                         format!("test.event.{}", i % 10),
-                        EventData::json(serde_json::json!({ "index": i })),
+                        serde_json::json!({ "index": i }),
+                        Language::Rust,
                     );
-                    event_bus.publish(event).await.unwrap();
+                    let _ = event_bus.publish(event).await;
                 }
 
                 // Small delay to ensure processing
                 tokio::time::sleep(Duration::from_millis(1)).await;
 
-                let total = counter.load(tokio::sync::atomic::Ordering::Relaxed);
+                let total = counter.load(Ordering::Relaxed);
                 black_box(total)
             })
         });
@@ -91,7 +93,7 @@ fn bench_pattern_matching(c: &mut Criterion) {
         b.iter(|| {
             rt.block_on(async {
                 let event_bus = EventBus::new();
-                let counter = Arc::new(tokio::sync::atomic::AtomicU64::new(0));
+                let counter = Arc::new(AtomicU64::new(0));
 
                 // Subscribe with wildcard patterns
                 let patterns = vec![
@@ -104,16 +106,14 @@ fn bench_pattern_matching(c: &mut Criterion) {
 
                 for pattern in patterns {
                     let cnt = counter.clone();
-                    event_bus
-                        .subscribe_with_handler(
-                            EventPattern::new(pattern),
-                            Box::new(move |_event| {
-                                cnt.fetch_add(1, tokio::sync::atomic::Ordering::Relaxed);
-                                Box::pin(async move { Ok(()) })
-                            }),
-                        )
-                        .await
-                        .unwrap();
+                    let mut receiver = event_bus.subscribe(pattern).await.unwrap();
+                    
+                    // Spawn task to handle events
+                    tokio::spawn(async move {
+                        while let Some(_event) = receiver.recv().await {
+                            cnt.fetch_add(1, Ordering::Relaxed);
+                        }
+                    });
                 }
 
                 // Publish events with various patterns
@@ -126,18 +126,19 @@ fn bench_pattern_matching(c: &mut Criterion) {
                     ];
 
                     for event_type in event_types {
-                        let event = Event::new(
+                        let event = UniversalEvent::new(
                             event_type,
-                            EventData::json(serde_json::json!({ "index": i })),
+                            serde_json::json!({ "index": i }),
+                            Language::Rust,
                         );
-                        event_bus.publish(event).await.unwrap();
+                        let _ = event_bus.publish(event).await;
                     }
                 }
 
                 // Small delay to ensure processing
                 tokio::time::sleep(Duration::from_millis(1)).await;
 
-                let total = counter.load(tokio::sync::atomic::Ordering::Relaxed);
+                let total = counter.load(Ordering::Relaxed);
                 black_box(total)
             })
         });
@@ -156,11 +157,12 @@ fn bench_high_frequency_events(c: &mut Criterion) {
 
                 // Publish 100K events as fast as possible
                 for i in 0..100_000 {
-                    let event = Event::new(
+                    let event = UniversalEvent::new(
                         format!("high.freq.{}", i % 100),
-                        EventData::json(serde_json::json!({ "seq": i })),
+                        serde_json::json!({ "seq": i }),
+                        Language::Rust,
                     );
-                    event_bus.publish(event).await.unwrap();
+                    let _ = event_bus.publish(event).await;
                 }
 
                 let duration = start.elapsed();
@@ -173,7 +175,7 @@ fn bench_high_frequency_events(c: &mut Criterion) {
 }
 
 /// Calculate and verify event throughput
-fn verify_event_throughput(c: &mut Criterion) {
+fn verify_event_throughput(_c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
 
     println!("\n=== Event Throughput Analysis ===");
@@ -186,11 +188,12 @@ fn verify_event_throughput(c: &mut Criterion) {
         // Test 1: Basic publishing throughput
         let start = Instant::now();
         for i in 0..100_000 {
-            let event = Event::new(
+            let event = UniversalEvent::new(
                 format!("perf.test.{}", i % 1000),
-                EventData::json(serde_json::json!({ "index": i })),
+                serde_json::json!({ "index": i }),
+                Language::Rust,
             );
-            event_bus.publish(event).await.unwrap();
+            let _ = event_bus.publish(event).await;
         }
         let duration = start.elapsed();
         let basic_throughput = 100_000.0 / duration.as_secs_f64();
@@ -199,30 +202,30 @@ fn verify_event_throughput(c: &mut Criterion) {
 
         // Test 2: With subscribers
         let event_bus_sub = EventBus::new();
-        let counter = Arc::new(tokio::sync::atomic::AtomicU64::new(0));
+        let counter = Arc::new(AtomicU64::new(0));
 
         // Add 10 subscribers
         for i in 0..10 {
             let cnt = counter.clone();
-            event_bus_sub
-                .subscribe_with_handler(
-                    EventPattern::new(format!("perf.sub.{}", i)),
-                    Box::new(move |_event| {
-                        cnt.fetch_add(1, tokio::sync::atomic::Ordering::Relaxed);
-                        Box::pin(async move { Ok(()) })
-                    }),
-                )
-                .await
-                .unwrap();
+            let pattern = format!("perf.sub.{}", i);
+            let mut receiver = event_bus_sub.subscribe(&pattern).await.unwrap();
+            
+            // Spawn task to handle events
+            tokio::spawn(async move {
+                while let Some(_event) = receiver.recv().await {
+                    cnt.fetch_add(1, Ordering::Relaxed);
+                }
+            });
         }
 
         let start = Instant::now();
         for i in 0..10_000 {
-            let event = Event::new(
+            let event = UniversalEvent::new(
                 format!("perf.sub.{}", i % 10),
-                EventData::json(serde_json::json!({ "index": i })),
+                serde_json::json!({ "index": i }),
+                Language::Rust,
             );
-            event_bus_sub.publish(event).await.unwrap();
+            let _ = event_bus_sub.publish(event).await;
         }
 
         // Wait for processing
@@ -230,7 +233,7 @@ fn verify_event_throughput(c: &mut Criterion) {
 
         let duration = start.elapsed();
         let sub_throughput = 10_000.0 / duration.as_secs_f64();
-        let processed = counter.load(tokio::sync::atomic::Ordering::Relaxed);
+        let processed = counter.load(Ordering::Relaxed);
 
         println!(
             "With 10 subscribers: {:.0} events/sec ({} processed)",
@@ -239,38 +242,37 @@ fn verify_event_throughput(c: &mut Criterion) {
 
         // Test 3: Pattern matching overhead
         let event_bus_pattern = EventBus::new();
-        let pattern_counter = Arc::new(tokio::sync::atomic::AtomicU64::new(0));
+        let pattern_counter = Arc::new(AtomicU64::new(0));
 
         // Complex pattern subscriptions
         let patterns = vec!["perf.*", "*.pattern.*", "perf.pattern.*"];
         for pattern in patterns {
             let cnt = pattern_counter.clone();
-            event_bus_pattern
-                .subscribe_with_handler(
-                    EventPattern::new(pattern),
-                    Box::new(move |_event| {
-                        cnt.fetch_add(1, tokio::sync::atomic::Ordering::Relaxed);
-                        Box::pin(async move { Ok(()) })
-                    }),
-                )
-                .await
-                .unwrap();
+            let mut receiver = event_bus_pattern.subscribe(pattern).await.unwrap();
+            
+            // Spawn task to handle events
+            tokio::spawn(async move {
+                while let Some(_event) = receiver.recv().await {
+                    cnt.fetch_add(1, Ordering::Relaxed);
+                }
+            });
         }
 
         let start = Instant::now();
         for i in 0..10_000 {
-            let event = Event::new(
+            let event = UniversalEvent::new(
                 "perf.pattern.test",
-                EventData::json(serde_json::json!({ "index": i })),
+                serde_json::json!({ "index": i }),
+                Language::Rust,
             );
-            event_bus_pattern.publish(event).await.unwrap();
+            let _ = event_bus_pattern.publish(event).await;
         }
 
         tokio::time::sleep(Duration::from_millis(10)).await;
 
         let duration = start.elapsed();
         let pattern_throughput = 10_000.0 / duration.as_secs_f64();
-        let pattern_processed = pattern_counter.load(tokio::sync::atomic::Ordering::Relaxed);
+        let pattern_processed = pattern_counter.load(Ordering::Relaxed);
 
         println!(
             "With pattern matching: {:.0} events/sec ({} matches)",

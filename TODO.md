@@ -4,7 +4,7 @@
 **Date**: July 2025  
 **Last Updated**: 2025-07-25  
 **Design Document Status**: Updated with implementation realities and integration requirements  
-**Status**: Implementation In Progress (6/21 tasks completed)  
+**Status**: Implementation In Progress (7/22 tasks completed)  
 **Phase**: 5 (Persistent State Management with Hook Integration)  
 **Timeline**: Weeks 19-20 (10 working days)  
 **Priority**: MEDIUM (Production Important)  
@@ -16,7 +16,7 @@
 
 ## Completion Summary
 - **Phase 5.1**: ✅ COMPLETED (3/3 tasks) - StateManager infrastructure with hook integration
-- **Phase 5.2**: ✅ COMPLETED (3/3 tasks) - Agent state serialization 
+- **Phase 5.2**: ⚙️ IN PROGRESS (5/8 tasks) - Agent state serialization 
 - **Phase 5.3**: 📋 TODO (0/3 tasks) - Hook storage and replay
 - **Phase 5.4**: 📋 TODO (0/3 tasks) - State migration framework
 - **Phase 5.5**: 📋 TODO (0/3 tasks) - Backup and recovery
@@ -698,7 +698,80 @@ mod tests {
 
 ---
 
-### Task 5.2.6: Script Bridge API for State Persistence ✨ NEW
+### Task 5.2.6: Fix Performance Benchmarks 🔧 NEW
+**Priority**: HIGH  
+**Estimated Time**: 8 hours  
+**Assignee**: Performance Team
+**Status**: IN PROGRESS (Started: 2025-07-25)
+
+**Description**: Update all performance benchmarks to work with the current API and architecture. The benchmarks were written for an earlier version and need significant updates.
+
+**Files to Update:**
+- **UPDATED**: `tests/performance/benches/circuit_breaker.rs` - ✅ Updated imports and API usage (COMPLETED)
+- **UPDATED**: `tests/performance/benches/event_throughput_simple.rs` - ✅ Changed to UniversalEvent (COMPLETED)
+- **UPDATE**: `tests/performance/benches/event_throughput.rs` - Update event system usage
+- **UPDATE**: `tests/performance/benches/hook_overhead.rs` - Replace HookSystem with registry
+- **UPDATE**: `tests/performance/benches/cross_language.rs` - Update bridge API usage
+- **CREATE**: `tests/performance/benches/state_persistence.rs` - New benchmarks for Phase 5
+- **UPDATE**: `tests/performance/Cargo.toml` - Update dependencies if needed
+
+**Acceptance Criteria:**
+- [ ] All benchmarks compile without errors
+- [ ] Event benchmarks use UniversalEvent instead of Event/EventData
+- [ ] Hook benchmarks use registry pattern instead of HookSystem
+- [ ] Import paths updated to current module structure
+- [ ] New state persistence benchmarks validate <5% overhead requirement
+- [ ] All benchmarks produce meaningful performance metrics
+- [ ] CI can run benchmarks without failures
+- [ ] Documentation updated with benchmark usage
+
+**Implementation Steps:**
+1. **Update Event System Usage** (2 hours):
+   ```rust
+   // Old:
+   use llmspell_events::{Event, EventData};
+   let event = Event::new("type", EventData::json(data));
+   
+   // New:
+   use llmspell_events::UniversalEvent;
+   let event = UniversalEvent::new("type", data, Language::Rust);
+   ```
+
+2. **Fix Hook System Usage** (2 hours):
+   ```rust
+   // Old:
+   let hook_system = HookSystem::new();
+   
+   // New:
+   use llmspell_hooks::registry::HookRegistry;
+   let registry = HookRegistry::new();
+   ```
+
+3. **Update Import Paths** (1 hour):
+   - Find correct paths for CircuitBreakerConfig, CorrelationId, etc.
+   - Update all use statements
+   - Remove references to non-existent types
+
+4. **Create State Persistence Benchmarks** (2 hours):
+   - Benchmark state save/load operations
+   - Measure overhead of state persistence
+   - Validate <5% performance requirement
+
+5. **Test and Document** (1 hour):
+   - Ensure all benchmarks run correctly
+   - Update benchmark documentation
+   - Add CI configuration if needed
+
+**Definition of Done:**
+- [ ] All performance benchmarks compile and run
+- [ ] Benchmarks use current APIs correctly
+- [ ] State persistence overhead measured and <5%
+- [ ] Documentation explains how to run benchmarks
+- [ ] CI can execute benchmarks successfully
+
+---
+
+### Task 5.2.7: Script Bridge API for State Persistence ✨ NEW
 **Priority**: CRITICAL  
 **Estimated Time**: 6 hours  
 **Assignee**: Bridge Team
@@ -711,11 +784,9 @@ mod tests {
 - **UPDATE**: `llmspell-bridge/src/context.rs` - Add StateManager to bridge context
 - **CREATE**: `llmspell-bridge/src/lua/globals/state.rs` - Lua state API implementation
 - **CREATE**: `llmspell-bridge/src/js/globals/state.js` - JavaScript state API
-- **CREATE**: `llmspell-bridge/src/python/globals/state.py` - Python state API
 - **UPDATE**: `llmspell-bridge/src/lua/engine.rs` - Register state globals
 - **UPDATE**: `llmspell-bridge/src/js/engine.rs` - Register state globals
-- **CREATE**: `examples/scripts/state_persistence.lua` - Lua example
-- **CREATE**: `examples/scripts/state_persistence.js` - JavaScript example
+- **CREATE**: `examples/lua/persistence/state_persistence.lua` - Lua example
 - **CREATE**: `tests/bridge/state_api_tests.rs` - Bridge API tests
 
 **Acceptance Criteria:**
@@ -792,7 +863,7 @@ mod tests {
 
 ---
 
-### Task 5.2.7: Real Provider Integration Tests for State Persistence ✨ NEW
+### Task 5.2.8: Real Provider Integration Tests for State Persistence ✨ NEW
 **Priority**: CRITICAL  
 **Estimated Time**: 8 hours  
 **Assignee**: Integration Team

@@ -4,14 +4,13 @@ use anyhow::Result;
 use llmspell_agents::{
     agents::basic::BasicAgent,
     builder::AgentBuilder,
+    config::{presets, PersistenceConfigBuilder},
     hooks::StatePersistenceHook,
     lifecycle::events::{
         EventSystemConfig, LifecycleEvent, LifecycleEventData, LifecycleEventSystem,
         LifecycleEventType,
     },
-    presets,
     state::StatePersistence,
-    PersistenceConfigBuilder,
 };
 use llmspell_core::{
     traits::{agent::Agent, base_agent::BaseAgent},

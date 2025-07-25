@@ -32,6 +32,10 @@ harness = false
 name = "cross_language"
 harness = false
 
+[[bench]]
+name = "state_persistence"
+harness = false
+
 [dependencies]
 # Core crates
 llmspell-core = { path = "../../llmspell-core" }
@@ -41,6 +45,9 @@ llmspell-workflows = { path = "../../llmspell-workflows" }
 llmspell-hooks = { path = "../../llmspell-hooks" }
 llmspell-events = { path = "../../llmspell-events" }
 llmspell-bridge = { path = "../../llmspell-bridge" }
+llmspell-state-persistence = { path = "../../llmspell-state-persistence" }
+llmspell-storage = { path = "../../llmspell-storage" }
+llmspell-utils = { path = "../../llmspell-utils" }
 
 # Async runtime
 tokio = { version = "1.45", features = ["full"] }
@@ -62,6 +69,9 @@ mlua = { version = "0.10", features = ["lua54", "vendored", "async", "send", "se
 
 # Random
 rand = "0.8"
+
+# UUID
+uuid = { version = "1.0", features = ["v4", "serde"] }
 
 [dev-dependencies]
 # Test utilities
