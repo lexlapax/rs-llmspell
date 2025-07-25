@@ -17,7 +17,7 @@ members = [
     "llmspell-testing",
     "llmspell-utils",
     "tests/performance"
-]
+, "llmspell-state-persistence"]
 
 [workspace.package]
 version = "0.4.0"
