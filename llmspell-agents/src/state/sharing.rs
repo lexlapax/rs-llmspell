@@ -102,6 +102,10 @@ impl StateSharingManager {
         let mut message_queue = self.message_queue.write();
         message_queue.insert(channel_id.to_string(), Vec::new());
 
+        // Drop locks before calling subscribe_agent to avoid deadlock
+        drop(message_queue);
+        drop(channels);
+
         // Subscribe creator to channel
         self.subscribe_agent(creator_agent_id, channel_id)?;
 
@@ -579,9 +583,23 @@ impl SharedStateAccessor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Once;
+
+    static INIT: Once = Once::new();
+
+    fn init_tracing() {
+        INIT.call_once(|| {
+            // Initialize tracing subscriber for tests to prevent hangs with #[instrument]
+            let _ = tracing_subscriber::fmt()
+                .with_test_writer()
+                .with_max_level(tracing::Level::DEBUG)
+                .try_init();
+        });
+    }
 
     #[tokio::test]
     async fn test_broadcast_channel() {
+        init_tracing();
         // Mock state manager for testing
         struct MockStateManager;
         let state_manager = Arc::new(MockStateManager);
@@ -634,6 +652,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_collaborative_workspace() {
+        init_tracing();
         // Mock state manager for testing
         struct MockStateManager;
         let state_manager = Arc::new(MockStateManager);
@@ -682,6 +701,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_pipeline_processing() {
+        init_tracing();
         // Mock state manager for testing
         struct MockStateManager;
         let state_manager = Arc::new(MockStateManager);
