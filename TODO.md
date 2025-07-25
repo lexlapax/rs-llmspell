@@ -21,6 +21,34 @@
 - **Phase 5.6**: 📋 TODO (0/3 tasks) - Integration testing
 - **Phase 5.7**: 📋 TODO (0/3 tasks) - Phase 6 preparation
 
+## ⚠️ CRITICAL MISSING COMPONENTS (Discovered During Implementation)
+
+### Critical Integration Gap
+**Problem**: We built llmspell-state-persistence in isolation without integrating it with existing agents and systems.
+
+**Missing Components**:
+1. **Agent Integration** - llmspell-agents doesn't depend on or use llmspell-state-persistence
+2. **Script API** - No Lua/JavaScript functions to save/load agent state  
+3. **Lifecycle Hooks** - pause()/stop() don't save state, resume()/start() don't restore
+4. **Registry Integration** - PersistentAgentRegistry uses old storage, not our new system
+
+**Impact**: Our entire state persistence system is currently unusable by agents!
+
+**Immediate Actions Required**:
+- [ ] Add llmspell-state-persistence to llmspell-agents dependencies
+- [ ] Implement PersistentAgent trait for BasicAgent and LLMAgent
+- [ ] Add state save to AgentStateMachine::pause() and ::stop()
+- [ ] Create llmspell-bridge/src/globals/state_global.rs with Lua API
+- [ ] Update agent methods in lua/globals/agent.rs with save_state/load_state
+
+**Why This Happened**: 
+The TODO specified creating files in llmspell-core and llmspell-agents, but we created a new crate (llmspell-state-persistence) to avoid circular dependencies. However, we never went back to integrate this new crate with the existing systems.
+
+**When to Fix**: 
+- **NOW**: Agent integration is critical - without it, Phase 5 is incomplete
+- **NEXT**: Script API should be done before moving to Phase 5.3
+- **LATER**: Registry integration can wait until Phase 5.6 testing
+
 > **📋 Production-Ready State Persistence**: This document implements comprehensive persistent state management with hook integration, preparing the foundation for advanced session management and distributed operations.
 
 ---
@@ -289,8 +317,21 @@ mod tests {
 - [✅] Version tagging enables backward compatibility checking
 - [✅] Schema validation prevents corrupt state from breaking agents
 - [✅] Large state objects serialize efficiently (<100ms for typical agents)
-- [ ] Circular references in agent state handled correctly
-- [ ] Sensitive data (API keys) properly protected during serialization
+- [✅] Circular references in agent state handled correctly - **FIXED: Added CircularReferenceDetector in circular_ref.rs**
+- [✅] Sensitive data (API keys) properly protected during serialization - **FIXED: Added SensitiveDataProtector in sensitive_data.rs**
+
+**Fixes Applied:**
+1. **Circular Reference Detection** (circular_ref.rs):
+   - CircularReferenceDetector tracks visited objects via hash
+   - Detects cycles before serialization to prevent stack overflow
+   - safe_serialize() wrapper enforces circular ref check
+   - Integrated into PersistentAgentState::safe_to_storage_bytes()
+
+2. **Sensitive Data Protection** (sensitive_data.rs):
+   - SensitiveDataProtector with regex patterns for API keys, tokens, passwords
+   - Automatic redaction of sensitive field names and values
+   - Configurable redaction with hash tracking for recovery
+   - safe_serialize_with_redaction() applies protection during serialization
 
 **Implementation Steps:**
 1. **Enhance StorageSerialize Trait** (2 hours):
@@ -356,7 +397,7 @@ mod tests {
 - [✅] Automatic state saving on agent lifecycle events (pause, stop)
 - [✅] Lua script API for manual state save/restore operations
 - [✅] Atomic operations prevent partial state corruption
-- [ ] Concurrent access to agent state properly synchronized
+- [✅] Concurrent access to agent state properly synchronized - **FIXED: Added per-agent RwLock synchronization**
 
 **Implementation Steps:**
 1. **Implement Core Persistence Operations** (2 hours):
@@ -374,6 +415,14 @@ mod tests {
    - Lua functions for state management
    - Error propagation to scripts
    - Security checks for state access
+
+**Fixes Applied:**
+3. **Concurrent Access Synchronization** (manager.rs):
+   - Added agent_state_locks: HashMap<String, Arc<RwLock<()>>>
+   - get_agent_lock() method creates per-agent locks on demand
+   - Save operations use write lock, load uses read lock, delete uses write lock
+   - Locks scoped to avoid holding across await points (Send safety)
+   - Each agent has independent lock for fine-grained concurrency
 
 **Definition of Done:**
 - [✅] All persistence operations work correctly (save/load/delete/list)

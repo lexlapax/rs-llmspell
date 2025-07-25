@@ -2,8 +2,8 @@
 // ABOUTME: Defines persistence configuration and state schema structures
 
 use serde::{Deserialize, Serialize};
-use std::time::Duration;
 use std::collections::HashMap;
+use std::time::Duration;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PersistenceConfig {

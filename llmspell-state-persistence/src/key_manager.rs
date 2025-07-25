@@ -14,52 +14,52 @@ impl KeyManager {
         if key.is_empty() {
             return Err(StateError::InvalidKey("Key cannot be empty".to_string()));
         }
-        
+
         // Check key length
         if key.len() > 256 {
             return Err(StateError::InvalidKey(
                 "Key cannot be longer than 256 characters".to_string(),
             ));
         }
-        
+
         // Prevent path traversal
         if key.contains("..") || key.contains("\\") || key.contains("//") {
             return Err(StateError::InvalidKey(
                 "Key contains invalid path traversal characters".to_string(),
             ));
         }
-        
+
         // Check for invalid characters
         if key.contains('\0') || key.contains('\n') || key.contains('\r') {
             return Err(StateError::InvalidKey(
                 "Key contains invalid control characters".to_string(),
             ));
         }
-        
+
         // Check for reserved prefixes
         if key.starts_with("__") || key.starts_with("$$") {
             return Err(StateError::InvalidKey(
                 "Key cannot start with reserved prefixes __ or $$".to_string(),
             ));
         }
-        
+
         Ok(())
     }
 
     /// Create a scoped key with namespace prefix
     pub fn create_scoped_key(scope: &StateScope, key: &str) -> StateResult<String> {
         Self::validate_key(key)?;
-        
+
         let normalized_key = key.nfc().collect::<String>();
         let scoped_key = format!("{}{}", scope.prefix(), normalized_key);
-        
+
         // Ensure final key is still within limits
         if scoped_key.len() > 512 {
             return Err(StateError::InvalidKey(
                 "Scoped key exceeds maximum length".to_string(),
             ));
         }
-        
+
         Ok(scoped_key)
     }
 
@@ -90,7 +90,7 @@ impl KeyManager {
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_nanos();
-        
+
         format!("__{}:{}:{}", prefix, id, timestamp)
     }
 
@@ -113,15 +113,14 @@ pub enum StatePermission {
 }
 
 /// Access control for state operations
+#[derive(Default)]
 pub struct StateAccessControl {
     permissions: std::collections::HashMap<(StateScope, String), Vec<StatePermission>>,
 }
 
 impl StateAccessControl {
     pub fn new() -> Self {
-        Self {
-            permissions: std::collections::HashMap::new(),
-        }
+        Self::default()
     }
 
     /// Grant permission to an agent for a scope
@@ -132,7 +131,7 @@ impl StateAccessControl {
         permission: StatePermission,
     ) {
         let key = (scope, agent_id.to_string());
-        let perms = self.permissions.entry(key).or_insert_with(Vec::new);
+        let perms = self.permissions.entry(key).or_default();
         if !perms.contains(&permission) {
             perms.push(permission);
         }

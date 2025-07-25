@@ -1,7 +1,9 @@
 // ABOUTME: Agent state persistence structures and serialization
 // ABOUTME: Implements StorageSerialize for agent state with Phase 4 hook integration
 
-use crate::error::StateResult;
+use crate::circular_ref::CircularReferenceCheck;
+use crate::error::{StateError, StateResult};
+use crate::sensitive_data::{safe_serialize_with_redaction, SensitiveDataConfig};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::SystemTime;
@@ -17,7 +19,7 @@ pub struct PersistentAgentState {
     pub creation_time: SystemTime,
     pub last_modified: SystemTime,
     pub schema_version: u32,
-    
+
     // Hook integration fields (Phase 4)
     pub hook_registrations: Vec<String>,
     pub last_hook_execution: Option<SystemTime>,
@@ -63,7 +65,7 @@ pub enum MessageRole {
 }
 
 /// Tool usage statistics
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ToolUsageStats {
     pub total_invocations: u64,
     pub successful_invocations: u64,
@@ -107,12 +109,12 @@ impl PersistentAgentState {
             correlation_context: None,
         }
     }
-    
+
     /// Update the last modified timestamp
     pub fn touch(&mut self) {
         self.last_modified = SystemTime::now();
     }
-    
+
     /// Add a conversation message
     pub fn add_message(&mut self, role: MessageRole, content: String) {
         self.state.conversation_history.push(ConversationMessage {
@@ -123,7 +125,7 @@ impl PersistentAgentState {
         });
         self.touch();
     }
-    
+
     /// Update tool usage statistics
     pub fn record_tool_usage(&mut self, tool_name: &str, duration_ms: u64, success: bool) {
         self.state.tool_usage_stats.total_invocations += 1;
@@ -132,8 +134,11 @@ impl PersistentAgentState {
         } else {
             self.state.tool_usage_stats.failed_invocations += 1;
         }
-        
-        let performance = self.state.tool_usage_stats.tool_performance
+
+        let performance = self
+            .state
+            .tool_usage_stats
+            .tool_performance
             .entry(tool_name.to_string())
             .or_insert(ToolPerformance {
                 invocation_count: 0,
@@ -141,13 +146,13 @@ impl PersistentAgentState {
                 average_duration_ms: 0.0,
                 last_used: SystemTime::now(),
             });
-        
+
         performance.invocation_count += 1;
         performance.total_duration_ms += duration_ms;
-        performance.average_duration_ms = 
+        performance.average_duration_ms =
             performance.total_duration_ms as f64 / performance.invocation_count as f64;
         performance.last_used = SystemTime::now();
-        
+
         self.touch();
     }
 }
@@ -177,46 +182,58 @@ impl Default for AgentMetadata {
     }
 }
 
-impl Default for ToolUsageStats {
-    fn default() -> Self {
-        Self {
-            total_invocations: 0,
-            successful_invocations: 0,
-            failed_invocations: 0,
-            tool_performance: HashMap::new(),
-        }
-    }
-}
-
 // StorageSerialize is automatically implemented via blanket implementation
 // for all types that implement Serialize + Deserialize
+
+impl PersistentAgentState {
+    /// Serialize with circular reference check and sensitive data protection
+    pub fn safe_to_storage_bytes(&self) -> StateResult<Vec<u8>> {
+        // Check for circular references first
+        self.check_circular_references().map_err(|e| {
+            StateError::ValidationError(format!("Circular reference detected: {}", e))
+        })?;
+
+        // Serialize with sensitive data protection
+        let config = SensitiveDataConfig::default();
+        safe_serialize_with_redaction(self, &config).map_err(StateError::SerializationError)
+    }
+
+    /// Deserialize from storage bytes (no special handling needed on read)
+    pub fn safe_from_storage_bytes(bytes: &[u8]) -> StateResult<Self> {
+        use llmspell_storage::StorageSerialize;
+        Self::from_storage_bytes(bytes).map_err(|e| StateError::DeserializationError(e.to_string()))
+    }
+}
 
 /// Agent state operations trait
 #[async_trait::async_trait]
 pub trait PersistentAgent {
     /// Get the agent's ID
     fn agent_id(&self) -> &str;
-    
+
     /// Get the current persistent state
     fn get_persistent_state(&self) -> StateResult<PersistentAgentState>;
-    
+
     /// Apply a persistent state to the agent
     fn apply_persistent_state(&mut self, state: PersistentAgentState) -> StateResult<()>;
-    
+
     /// Save the agent's state
     async fn save_state(&self, state_manager: &crate::manager::StateManager) -> StateResult<()> {
         let state = self.get_persistent_state()?;
         state_manager.save_agent_state(&state).await
     }
-    
+
     /// Load the agent's state
-    async fn load_state(&mut self, state_manager: &crate::manager::StateManager) -> StateResult<()> {
+    async fn load_state(
+        &mut self,
+        state_manager: &crate::manager::StateManager,
+    ) -> StateResult<()> {
         if let Some(state) = state_manager.load_agent_state(self.agent_id()).await? {
             self.apply_persistent_state(state)?;
         }
         Ok(())
     }
-    
+
     /// Delete the agent's state
     async fn delete_state(&self, state_manager: &crate::manager::StateManager) -> StateResult<()> {
         state_manager.delete_agent_state(self.agent_id()).await?;
@@ -227,39 +244,34 @@ pub trait PersistentAgent {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_persistent_agent_state_creation() {
-        let state = PersistentAgentState::new(
-            "agent_123".to_string(),
-            "assistant".to_string()
-        );
-        
+        let state = PersistentAgentState::new("agent_123".to_string(), "assistant".to_string());
+
         assert_eq!(state.agent_id, "agent_123");
         assert_eq!(state.agent_type, "assistant");
         assert_eq!(state.schema_version, 1);
         assert!(state.hook_registrations.is_empty());
         assert!(state.correlation_context.is_none());
     }
-    
+
     #[test]
     fn test_agent_state_serialization() {
         use llmspell_storage::StorageSerialize;
-        
-        let mut state = PersistentAgentState::new(
-            "agent_456".to_string(),
-            "researcher".to_string()
-        );
-        
+
+        let mut state =
+            PersistentAgentState::new("agent_456".to_string(), "researcher".to_string());
+
         // Add some data
         state.add_message(MessageRole::User, "Hello".to_string());
         state.add_message(MessageRole::Assistant, "Hi there!".to_string());
         state.record_tool_usage("web_search", 150, true);
-        
+
         // Serialize and deserialize using StorageSerialize trait
         let bytes = state.to_storage_bytes().unwrap();
         let restored = PersistentAgentState::from_storage_bytes(&bytes).unwrap();
-        
+
         assert_eq!(restored.agent_id, state.agent_id);
         assert_eq!(restored.state.conversation_history.len(), 2);
         assert_eq!(restored.state.tool_usage_stats.total_invocations, 1);

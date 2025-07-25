@@ -38,18 +38,21 @@
 
 pub mod agent_state;
 pub mod backend_adapter;
+pub mod circular_ref;
 pub mod config;
 pub mod error;
 pub mod hooks;
 pub mod key_manager;
 pub mod manager;
 pub mod scope;
+pub mod sensitive_data;
 
 // Re-export main types
 pub use agent_state::{
     AgentMetadata, AgentStateData, ConversationMessage, ExecutionState, MessageRole,
     PersistentAgent, PersistentAgentState, ToolPerformance, ToolUsageStats,
 };
+pub use circular_ref::{CircularReferenceCheck, CircularReferenceDetector, CircularReferenceError};
 pub use config::{
     CompatibilityLevel, EncryptionAlgorithm, EncryptionConfig, FieldSchema, KeyDerivationConfig,
     MigrationStep, PerformanceConfig, PersistenceConfig, RocksDBConfig, SledConfig, StateSchema,
@@ -57,17 +60,16 @@ pub use config::{
 };
 pub use error::{StateError, StateResult};
 pub use key_manager::{KeyManager, StateAccessControl, StatePermission};
-pub use manager::{
-    HookReplayManager, SerializableState, SerializedHookExecution, StateManager,
-};
+pub use manager::{HookReplayManager, SerializableState, SerializedHookExecution, StateManager};
 pub use scope::StateScope;
+pub use sensitive_data::{RedactSensitiveData, SensitiveDataConfig, SensitiveDataProtector};
 
 pub use serde_json::{json, Value};
 
 /// Prelude module for common imports
 pub mod prelude {
     pub use crate::{
-        StateError, StateManager, StateResult, StateScope,
         config::{PersistenceConfig, StorageBackendType},
+        StateError, StateManager, StateResult, StateScope,
     };
 }

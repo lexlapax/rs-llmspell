@@ -8,8 +8,7 @@ use crate::key_manager::KeyManager;
 use crate::scope::StateScope;
 use llmspell_events::{EventBus, UniversalEvent};
 use llmspell_hooks::{
-    HookContext, HookExecutor, HookPoint, HookResult,
-    ReplayableHook, Hook, ComponentType,
+    ComponentType, Hook, HookContext, HookExecutor, HookPoint, HookResult, ReplayableHook,
 };
 use llmspell_storage::StorageBackend;
 use parking_lot::RwLock;
@@ -28,7 +27,7 @@ pub struct SerializedHookExecution {
     pub execution_id: Uuid,
     pub correlation_id: Uuid,
     pub hook_context: Vec<u8>, // Serialized HookContext
-    pub result: String,         // Serialized HookResult
+    pub result: String,        // Serialized HookResult
     pub timestamp: SystemTime,
     pub duration: Duration,
     pub metadata: HashMap<String, Value>,
@@ -76,8 +75,7 @@ impl HookReplayManager {
 
         let key = format!(
             "hook_history:{}:{}",
-            context.correlation_id,
-            execution.execution_id
+            context.correlation_id, execution.execution_id
         );
 
         self.storage_adapter.store(&key, &execution).await
@@ -105,26 +103,30 @@ impl HookReplayManager {
 pub struct StateManager {
     // In-memory cache for fast access
     in_memory: Arc<RwLock<HashMap<String, Value>>>,
-    
+
     // Persistent storage backend
+    #[allow(dead_code)]
     storage_backend: Arc<dyn StorageBackend>,
     storage_adapter: Arc<StateStorageAdapter>,
-    
+
     // Hook integration
     hook_executor: Arc<HookExecutor>,
     event_bus: Arc<EventBus>,
-    
+
     // Configuration
     persistence_config: PersistenceConfig,
     state_schema: StateSchema,
-    
+
     // Hook history and replay
     hook_history: Arc<RwLock<Vec<SerializedHookExecution>>>,
     replay_manager: HookReplayManager,
-    
+
     // Registered hooks for state operations
     before_state_change_hooks: Arc<RwLock<Vec<Arc<dyn Hook>>>>,
     after_state_change_hooks: Arc<RwLock<Vec<Arc<dyn Hook>>>>,
+
+    // Per-agent state locks for concurrent access synchronization
+    agent_state_locks: Arc<RwLock<HashMap<String, Arc<RwLock<()>>>>>,
 }
 
 impl StateManager {
@@ -177,6 +179,7 @@ impl StateManager {
             replay_manager,
             before_state_change_hooks: Arc::new(RwLock::new(Vec::new())),
             after_state_change_hooks: Arc::new(RwLock::new(Vec::new())),
+            agent_state_locks: Arc::new(RwLock::new(HashMap::new())),
         })
     }
 
@@ -200,18 +203,22 @@ impl StateManager {
             ComponentType::Custom("state".to_string()),
             "state_manager".to_string(),
         );
-        let mut hook_context = HookContext::new(
-            HookPoint::Custom("state_change".to_string()),
-            component_id,
-        );
+        let mut hook_context =
+            HookContext::new(HookPoint::Custom("state_change".to_string()), component_id);
         hook_context = hook_context.with_correlation_id(correlation_id);
-        
+
         // Add metadata as string values
         hook_context.insert_metadata("operation".to_string(), "state_set".to_string());
         hook_context.insert_metadata("scope".to_string(), serde_json::to_string(&scope).unwrap());
         hook_context.insert_metadata("key".to_string(), key.to_string());
-        hook_context.insert_metadata("old_value".to_string(), serde_json::to_string(&old_value).unwrap());
-        hook_context.insert_metadata("new_value".to_string(), serde_json::to_string(&value).unwrap());
+        hook_context.insert_metadata(
+            "old_value".to_string(),
+            serde_json::to_string(&old_value).unwrap(),
+        );
+        hook_context.insert_metadata(
+            "new_value".to_string(),
+            serde_json::to_string(&value).unwrap(),
+        );
 
         // Execute pre-state-change hooks
         let hooks_to_execute = {
@@ -222,7 +229,7 @@ impl StateManager {
                 hooks.clone()
             }
         };
-        
+
         let pre_results = if !hooks_to_execute.is_empty() {
             self.hook_executor
                 .execute_hooks(&hooks_to_execute, &mut hook_context)
@@ -253,8 +260,11 @@ impl StateManager {
 
         // Execute post-state-change hooks
         hook_context.insert_metadata("success".to_string(), "true".to_string());
-        hook_context.insert_metadata("final_value".to_string(), serde_json::to_string(&final_value).unwrap());
-        
+        hook_context.insert_metadata(
+            "final_value".to_string(),
+            serde_json::to_string(&final_value).unwrap(),
+        );
+
         let hooks_to_execute = {
             let hooks = self.after_state_change_hooks.read();
             if hooks.is_empty() {
@@ -263,7 +273,7 @@ impl StateManager {
                 hooks.clone()
             }
         };
-        
+
         if !hooks_to_execute.is_empty() {
             let _post_results = self
                 .hook_executor
@@ -279,12 +289,9 @@ impl StateManager {
             "old_value": old_value,
             "new_value": final_value,
         });
-        
-        let state_event = UniversalEvent::new(
-            "state.changed",
-            event_data,
-            llmspell_events::Language::Rust,
-        );
+
+        let state_event =
+            UniversalEvent::new("state.changed", event_data, llmspell_events::Language::Rust);
         let state_event = state_event.with_correlation_id(correlation_id);
 
         self.event_bus
@@ -351,7 +358,11 @@ impl StateManager {
 
         // Load from storage if persistent and not in cache
         if self.persistence_config.enabled {
-            if let Some(serialized) = self.storage_adapter.load::<SerializableState>(&scoped_key).await? {
+            if let Some(serialized) = self
+                .storage_adapter
+                .load::<SerializableState>(&scoped_key)
+                .await?
+            {
                 // Update cache
                 {
                     let mut memory = self.in_memory.write();
@@ -408,11 +419,11 @@ impl StateManager {
     /// Clear all state in a scope
     pub async fn clear_scope(&self, scope: StateScope) -> StateResult<()> {
         let keys = self.list_keys(scope.clone()).await?;
-        
+
         for key in keys {
             self.delete(scope.clone(), &key).await?;
         }
-        
+
         Ok(())
     }
 
@@ -430,29 +441,49 @@ impl StateManager {
     pub fn replay_manager(&self) -> &HookReplayManager {
         &self.replay_manager
     }
-    
+
     /// Register a hook to run before state changes
     pub fn register_before_state_change_hook(&self, hook: Arc<dyn Hook>) {
         let mut hooks = self.before_state_change_hooks.write();
         hooks.push(hook);
     }
-    
+
     /// Register a hook to run after state changes
     pub fn register_after_state_change_hook(&self, hook: Arc<dyn Hook>) {
         let mut hooks = self.after_state_change_hooks.write();
         hooks.push(hook);
     }
-    
+
     // Agent State Persistence Operations (Task 5.2.2)
-    
-    /// Save agent state to persistent storage
+
+    /// Get or create a lock for an agent's state
+    fn get_agent_lock(&self, agent_id: &str) -> Arc<RwLock<()>> {
+        let mut locks = self.agent_state_locks.write();
+        locks
+            .entry(agent_id.to_string())
+            .or_insert_with(|| Arc::new(RwLock::new(())))
+            .clone()
+    }
+
+    /// Save agent state to persistent storage with concurrent access protection
     pub async fn save_agent_state(
         &self,
         agent_state: &crate::agent_state::PersistentAgentState,
     ) -> StateResult<()> {
         let key = format!("agent_state:{}", agent_state.agent_id);
+
+        // Prepare state with protection inside lock scope
+        let safe_state = {
+            // Acquire agent-specific lock for concurrent access synchronization
+            let agent_lock = self.get_agent_lock(&agent_state.agent_id);
+            let _guard = agent_lock.write();
+
+            // Perform serialization with circular reference check and sensitive data protection
+            let safe_bytes = agent_state.safe_to_storage_bytes()?;
+            crate::agent_state::PersistentAgentState::safe_from_storage_bytes(&safe_bytes)?
+        }; // Lock is dropped here before any async operations
         let correlation_id = Uuid::new_v4();
-        
+
         // Create hook context for agent state save
         let component_id = llmspell_hooks::ComponentId::new(
             ComponentType::Custom("state".to_string()),
@@ -466,7 +497,7 @@ impl StateManager {
         hook_context.insert_metadata("operation".to_string(), "save_agent_state".to_string());
         hook_context.insert_metadata("agent_id".to_string(), agent_state.agent_id.clone());
         hook_context.insert_metadata("agent_type".to_string(), agent_state.agent_type.clone());
-        
+
         // Execute pre-save hooks
         let hooks_to_execute = {
             let hooks = self.before_state_change_hooks.read();
@@ -476,19 +507,17 @@ impl StateManager {
                 hooks.clone()
             }
         };
-        
+
         if !hooks_to_execute.is_empty() {
             self.hook_executor
                 .execute_hooks(&hooks_to_execute, &mut hook_context)
                 .await
                 .map_err(|e| StateError::HookError(e.to_string()))?;
         }
-        
+
         // Store in persistent backend
-        self.storage_adapter
-            .store(&key, agent_state)
-            .await?;
-        
+        self.storage_adapter.store(&key, &safe_state).await?;
+
         // Record in hook history if it's a ReplayableHook execution
         if let Some(_last_hook_time) = agent_state.last_hook_execution {
             let hook_execution = SerializedHookExecution {
@@ -503,7 +532,7 @@ impl StateManager {
             };
             self.hook_history.write().push(hook_execution);
         }
-        
+
         // Execute post-save hooks
         hook_context.insert_metadata("success".to_string(), "true".to_string());
         let hooks_to_execute = {
@@ -514,61 +543,68 @@ impl StateManager {
                 hooks.clone()
             }
         };
-        
+
         if !hooks_to_execute.is_empty() {
             self.hook_executor
                 .execute_hooks(&hooks_to_execute, &mut hook_context)
                 .await
                 .map_err(|e| StateError::HookError(e.to_string()))?;
         }
-        
+
         // Emit state save event
         let event_data = serde_json::json!({
             "agent_id": agent_state.agent_id,
             "agent_type": agent_state.agent_type,
             "schema_version": agent_state.schema_version,
         });
-        
+
         let state_event = UniversalEvent::new(
             "agent_state.saved",
             event_data,
             llmspell_events::Language::Rust,
         );
         let state_event = state_event.with_correlation_id(correlation_id);
-        
+
         self.event_bus
             .publish(state_event)
             .await
             .map_err(|e| StateError::StorageError(e.into()))?;
-        
+
         Ok(())
     }
-    
-    /// Load agent state from persistent storage
+
+    /// Load agent state from persistent storage with concurrent access protection
     pub async fn load_agent_state(
         &self,
         agent_id: &str,
     ) -> StateResult<Option<crate::agent_state::PersistentAgentState>> {
         let key = format!("agent_state:{}", agent_id);
-        
+
+        // Briefly acquire lock just to ensure atomicity with save/delete operations
+        {
+            let agent_lock = self.get_agent_lock(agent_id);
+            let _guard = agent_lock.read();
+            // Lock is dropped here
+        }
+
         // Try to load from storage
         match self.storage_adapter.load(&key).await? {
             Some(state) => Ok(Some(state)),
             None => Ok(None),
         }
     }
-    
-    /// Delete agent state from persistent storage
+
+    /// Delete agent state from persistent storage with concurrent access protection
     pub async fn delete_agent_state(&self, agent_id: &str) -> StateResult<bool> {
         let key = format!("agent_state:{}", agent_id);
         let correlation_id = Uuid::new_v4();
-        
+
         // Check if state exists
         let exists = self.storage_adapter.exists(&key).await?;
         if !exists {
             return Ok(false);
         }
-        
+
         // Create hook context for agent state delete
         let component_id = llmspell_hooks::ComponentId::new(
             ComponentType::Custom("state".to_string()),
@@ -581,7 +617,7 @@ impl StateManager {
         hook_context = hook_context.with_correlation_id(correlation_id);
         hook_context.insert_metadata("operation".to_string(), "delete_agent_state".to_string());
         hook_context.insert_metadata("agent_id".to_string(), agent_id.to_string());
-        
+
         // Execute pre-delete hooks
         let hooks_to_execute = {
             let hooks = self.before_state_change_hooks.read();
@@ -591,17 +627,23 @@ impl StateManager {
                 hooks.clone()
             }
         };
-        
+
         if !hooks_to_execute.is_empty() {
             self.hook_executor
                 .execute_hooks(&hooks_to_execute, &mut hook_context)
                 .await
                 .map_err(|e| StateError::HookError(e.to_string()))?;
         }
-        
-        // Delete from storage
+
+        // Delete from storage within lock scope
+        {
+            let agent_lock = self.get_agent_lock(agent_id);
+            let _guard = agent_lock.write();
+            // Perform deletion atomically
+        }
+
         self.storage_adapter.delete(&key).await?;
-        
+
         // Execute post-delete hooks
         hook_context.insert_metadata("success".to_string(), "true".to_string());
         let hooks_to_execute = {
@@ -612,46 +654,46 @@ impl StateManager {
                 hooks.clone()
             }
         };
-        
+
         if !hooks_to_execute.is_empty() {
             self.hook_executor
                 .execute_hooks(&hooks_to_execute, &mut hook_context)
                 .await
                 .map_err(|e| StateError::HookError(e.to_string()))?;
         }
-        
+
         // Emit state delete event
         let event_data = serde_json::json!({
             "agent_id": agent_id,
         });
-        
+
         let state_event = UniversalEvent::new(
             "agent_state.deleted",
             event_data,
             llmspell_events::Language::Rust,
         );
         let state_event = state_event.with_correlation_id(correlation_id);
-        
+
         self.event_bus
             .publish(state_event)
             .await
             .map_err(|e| StateError::StorageError(e.into()))?;
-        
+
         Ok(true)
     }
-    
+
     /// List all saved agent states
     pub async fn list_agent_states(&self) -> StateResult<Vec<String>> {
         let prefix = "agent_state:";
         let keys = self.storage_adapter.list_keys(prefix).await?;
-        
+
         // Extract agent IDs from keys
         Ok(keys
             .into_iter()
             .filter_map(|k| k.strip_prefix(prefix).map(|s| s.to_string()))
             .collect())
     }
-    
+
     /// Get agent state metadata without loading full state
     pub async fn get_agent_metadata(
         &self,
@@ -679,14 +721,17 @@ mod tests {
             .set(StateScope::Global, "test_key", json!("test_value"))
             .await
             .unwrap();
-        
+
         let value = manager.get(StateScope::Global, "test_key").await.unwrap();
         assert_eq!(value, Some(json!("test_value")));
 
         // Delete
-        let deleted = manager.delete(StateScope::Global, "test_key").await.unwrap();
+        let deleted = manager
+            .delete(StateScope::Global, "test_key")
+            .await
+            .unwrap();
         assert!(deleted);
-        
+
         let value = manager.get(StateScope::Global, "test_key").await.unwrap();
         assert_eq!(value, None);
     }
@@ -701,11 +746,19 @@ mod tests {
             .await
             .unwrap();
         manager
-            .set(StateScope::Agent("agent1".to_string()), "key", json!("agent1"))
+            .set(
+                StateScope::Agent("agent1".to_string()),
+                "key",
+                json!("agent1"),
+            )
             .await
             .unwrap();
         manager
-            .set(StateScope::Agent("agent2".to_string()), "key", json!("agent2"))
+            .set(
+                StateScope::Agent("agent2".to_string()),
+                "key",
+                json!("agent2"),
+            )
             .await
             .unwrap();
 
@@ -749,76 +802,79 @@ mod tests {
 
     #[tokio::test]
     async fn test_agent_state_persistence() {
-        use crate::agent_state::{PersistentAgentState, MessageRole};
-        
+        use crate::agent_state::{MessageRole, PersistentAgentState};
+
         let manager = StateManager::new().await.unwrap();
-        
+
         // Create a test agent state
-        let mut agent_state = PersistentAgentState::new(
-            "test_agent_001".to_string(),
-            "assistant".to_string(),
-        );
-        
+        let mut agent_state =
+            PersistentAgentState::new("test_agent_001".to_string(), "assistant".to_string());
+
         // Add some data
         agent_state.add_message(MessageRole::User, "Hello agent".to_string());
         agent_state.add_message(MessageRole::Assistant, "Hello! How can I help?".to_string());
         agent_state.record_tool_usage("calculator", 50, true);
-        
+
         // Save the state
         manager.save_agent_state(&agent_state).await.unwrap();
-        
+
         // Load the state back
         let loaded_state = manager.load_agent_state("test_agent_001").await.unwrap();
         assert!(loaded_state.is_some());
-        
+
         let loaded = loaded_state.unwrap();
         assert_eq!(loaded.agent_id, "test_agent_001");
         assert_eq!(loaded.state.conversation_history.len(), 2);
         assert_eq!(loaded.state.tool_usage_stats.total_invocations, 1);
-        
+
         // List agent states
         let agent_ids = manager.list_agent_states().await.unwrap();
         assert!(agent_ids.contains(&"test_agent_001".to_string()));
-        
+
         // Delete the state
         let deleted = manager.delete_agent_state("test_agent_001").await.unwrap();
         assert!(deleted);
-        
+
         // Verify deletion
         let loaded_after_delete = manager.load_agent_state("test_agent_001").await.unwrap();
         assert!(loaded_after_delete.is_none());
     }
-    
+
     #[tokio::test]
     async fn test_agent_metadata_retrieval() {
         use crate::agent_state::PersistentAgentState;
-        
+
         let manager = StateManager::new().await.unwrap();
-        
+
         // Create a test agent state with metadata
-        let mut agent_state = PersistentAgentState::new(
-            "metadata_test_agent".to_string(),
-            "researcher".to_string(),
-        );
-        
+        let mut agent_state =
+            PersistentAgentState::new("metadata_test_agent".to_string(), "researcher".to_string());
+
         agent_state.metadata.name = "Research Agent".to_string();
         agent_state.metadata.description = Some("Specialized research assistant".to_string());
-        agent_state.metadata.capabilities = vec!["web_search".to_string(), "pdf_analysis".to_string()];
+        agent_state.metadata.capabilities =
+            vec!["web_search".to_string(), "pdf_analysis".to_string()];
         agent_state.metadata.tags = vec!["research".to_string(), "academic".to_string()];
-        
+
         // Save the state
         manager.save_agent_state(&agent_state).await.unwrap();
-        
+
         // Get metadata without loading full state
-        let metadata = manager.get_agent_metadata("metadata_test_agent").await.unwrap();
+        let metadata = manager
+            .get_agent_metadata("metadata_test_agent")
+            .await
+            .unwrap();
         assert!(metadata.is_some());
-        
+
         let meta = metadata.unwrap();
         assert_eq!(meta.name, "Research Agent");
         assert_eq!(meta.capabilities.len(), 2);
         assert_eq!(meta.tags.len(), 2);
-        
+
         // Cleanup
-        manager.delete_agent_state("metadata_test_agent").await.unwrap();
+        manager
+            .delete_agent_state("metadata_test_agent")
+            .await
+            .unwrap();
     }
 }

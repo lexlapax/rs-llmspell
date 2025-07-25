@@ -1,8 +1,8 @@
 // ABOUTME: State change hook definitions and integration
 // ABOUTME: Provides hook points for state operations
 
-use llmspell_hooks::{Hook, HookContext, HookResult, HookMetadata, Priority, Language};
 use async_trait::async_trait;
+use llmspell_hooks::{Hook, HookContext, HookMetadata, HookResult, Language, Priority};
 use serde_json::Value;
 
 /// State change event for hooks
@@ -34,8 +34,11 @@ impl Hook for StateValidationHook {
         if let Some(new_value) = context.get_metadata("new_value") {
             if let Ok(value) = serde_json::from_str::<Value>(new_value) {
                 let size = serde_json::to_string(&value)?.len();
-                if size > 1_000_000 { // 1MB limit
-                    return Ok(HookResult::Cancel("State value exceeds size limit".to_string()));
+                if size > 1_000_000 {
+                    // 1MB limit
+                    return Ok(HookResult::Cancel(
+                        "State value exceeds size limit".to_string(),
+                    ));
                 }
             }
         }
@@ -64,7 +67,7 @@ impl Hook for StateAuditHook {
         let scope = context.get_metadata("scope").unwrap_or("unknown");
         let key = context.get_metadata("key").unwrap_or("unknown");
         let operation = context.get_metadata("operation").unwrap_or("unknown");
-        
+
         tracing::info!(
             "State operation: {} on {}/{} by component {:?}",
             operation,
@@ -72,7 +75,7 @@ impl Hook for StateAuditHook {
             key,
             context.component_id
         );
-        
+
         Ok(HookResult::Continue)
     }
 
@@ -120,14 +123,14 @@ pub fn aggregate_hook_results(results: &[HookResult]) -> HookResult {
             return HookResult::Cancel(reason.clone());
         }
     }
-    
+
     // If any hook modifies data, use the last modification
     for result in results.iter().rev() {
         if let HookResult::Modified(data) = result {
             return HookResult::Modified(data.clone());
         }
     }
-    
+
     // Otherwise continue
     HookResult::Continue
 }

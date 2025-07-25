@@ -17,14 +17,14 @@ pub async fn create_storage_backend(
         }
         StorageBackendType::Sled(config) => {
             let backend = llmspell_storage::SledBackend::new_with_path(&config.path)
-                .map_err(|e| StateError::StorageError(e.into()))?;
+                .map_err(StateError::StorageError)?;
             Ok(Arc::new(backend) as Arc<dyn StorageBackend>)
         }
         StorageBackendType::RocksDB(_config) => {
             // RocksDB backend to be implemented in future phase
-            Err(StateError::StorageError(
-                anyhow::anyhow!("RocksDB backend not yet implemented"),
-            ))
+            Err(StateError::StorageError(anyhow::anyhow!(
+                "RocksDB backend not yet implemented"
+            )))
         }
     }
 }
@@ -46,17 +46,17 @@ impl StateStorageAdapter {
         let bytes = value
             .to_storage_bytes()
             .map_err(|e| StateError::SerializationError(e.to_string()))?;
-        
+
         self.backend
             .set(&namespaced_key, bytes)
             .await
-            .map_err(|e| StateError::StorageError(e))
+            .map_err(StateError::StorageError)
     }
 
     /// Load a value with state-specific key formatting
     pub async fn load<T: StorageSerialize>(&self, key: &str) -> StateResult<Option<T>> {
         let namespaced_key = self.make_key(key);
-        
+
         match self.backend.get(&namespaced_key).await {
             Ok(Some(bytes)) => {
                 let value = T::from_storage_bytes(&bytes)
@@ -74,16 +74,16 @@ impl StateStorageAdapter {
         self.backend
             .delete(&namespaced_key)
             .await
-            .map_err(|e| StateError::StorageError(e))
+            .map_err(StateError::StorageError)
     }
-    
+
     /// Check if a key exists
     pub async fn exists(&self, key: &str) -> StateResult<bool> {
         let namespaced_key = self.make_key(key);
         self.backend
             .exists(&namespaced_key)
             .await
-            .map_err(|e| StateError::StorageError(e))
+            .map_err(StateError::StorageError)
     }
 
     /// List all keys in the namespace
@@ -93,8 +93,8 @@ impl StateStorageAdapter {
             .backend
             .list_keys(&namespaced_prefix)
             .await
-            .map_err(|e| StateError::StorageError(e))?;
-        
+            .map_err(StateError::StorageError)?;
+
         // Remove namespace prefix from keys
         let prefix_len = self.namespace.len() + 1;
         Ok(keys
@@ -113,11 +113,11 @@ impl StateStorageAdapter {
     pub async fn clear_namespace(&self) -> StateResult<()> {
         let keys = self.list_keys("").await?;
         let namespaced_keys: Vec<_> = keys.iter().map(|k| self.make_key(k)).collect();
-        
+
         self.backend
             .delete_batch(&namespaced_keys)
             .await
-            .map_err(|e| StateError::StorageError(e))
+            .map_err(StateError::StorageError)
     }
 
     fn make_key(&self, key: &str) -> String {

@@ -9,7 +9,10 @@ pub enum StateScope {
     Global,
     Agent(String),
     Workflow(String),
-    Step { workflow_id: String, step_name: String },
+    Step {
+        workflow_id: String,
+        step_name: String,
+    },
     Session(String), // Preparation for Phase 6
     Custom(String),
 }
@@ -21,7 +24,10 @@ impl StateScope {
             StateScope::Global => String::new(),
             StateScope::Agent(id) => format!("agent:{}:", id),
             StateScope::Workflow(id) => format!("workflow:{}:", id),
-            StateScope::Step { workflow_id, step_name } => {
+            StateScope::Step {
+                workflow_id,
+                step_name,
+            } => {
                 format!("workflow:{}:step:{}:", workflow_id, step_name)
             }
             StateScope::Session(id) => format!("session:{}:", id),
@@ -69,7 +75,10 @@ impl std::fmt::Display for StateScope {
             StateScope::Global => write!(f, "Global"),
             StateScope::Agent(id) => write!(f, "Agent({})", id),
             StateScope::Workflow(id) => write!(f, "Workflow({})", id),
-            StateScope::Step { workflow_id, step_name } => {
+            StateScope::Step {
+                workflow_id,
+                step_name,
+            } => {
                 write!(f, "Step({}/{})", workflow_id, step_name)
             }
             StateScope::Session(id) => write!(f, "Session({})", id),
