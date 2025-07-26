@@ -452,7 +452,8 @@ mod tests {
             .unwrap();
 
         let compatible = registry.find_compatible_schemas(&v1_0_0);
-        assert_eq!(compatible.len(), 2); // v1.1.0 and v1.2.0
+        assert_eq!(compatible.len(), 3); // v1.0.0, v1.1.0 and v1.2.0
+        assert!(compatible.contains(&v1_0_0)); // Version is compatible with itself
         assert!(compatible.contains(&v1_1_0));
         assert!(compatible.contains(&v1_2_0));
         assert!(!compatible.contains(&v2_0_0)); // Different major version

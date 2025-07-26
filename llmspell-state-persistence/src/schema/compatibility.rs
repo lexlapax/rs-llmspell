@@ -208,6 +208,7 @@ impl CompatibilityChecker {
                     new_field: new_field.clone(),
                 },
             );
+            result.migration_required = true; // Adding fields requires migration
         }
 
         // Check for modified fields
@@ -535,7 +536,7 @@ mod tests {
             result.compatibility_level,
             CompatibilityLevel::BackwardCompatible
         );
-        assert_eq!(result.risk_level, RiskLevel::Low);
+        assert_eq!(result.risk_level, RiskLevel::Medium); // Adding fields requires migration
         assert!(result.breaking_changes.is_empty());
         assert_eq!(result.warnings.len(), 2); // Version upgrade + field added
     }
@@ -556,9 +557,9 @@ mod tests {
         assert!(result.migration_required);
 
         // Test field removal breaking change
+        let original_schema = create_test_schema(SemanticVersion::new(1, 0, 0));
         schema_v1.remove_field("test_field");
-        let empty_schema = create_test_schema(SemanticVersion::new(1, 1, 0));
-        let result2 = CompatibilityChecker::check_compatibility(&schema_v1, &empty_schema);
+        let result2 = CompatibilityChecker::check_compatibility(&original_schema, &schema_v1);
 
         assert!(!result2.compatible);
         assert!(result2.migration_required);
