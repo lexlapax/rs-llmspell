@@ -44,6 +44,7 @@ pub mod error;
 pub mod hooks;
 pub mod key_manager;
 pub mod manager;
+pub mod migration;
 pub mod schema;
 pub mod scope;
 pub mod sensitive_data;
@@ -62,6 +63,10 @@ pub use config::{
 pub use error::{StateError, StateResult};
 pub use key_manager::{KeyManager, StateAccessControl, StatePermission};
 pub use manager::{HookReplayManager, SerializableState, SerializedHookExecution, StateManager};
+pub use migration::{
+    DataTransformer, MigrationConfig, MigrationEngine, MigrationResult, MigrationStatus,
+    ValidationLevel, ValidationResult,
+};
 pub use schema::{
     CompatibilityChecker, CompatibilityResult, EnhancedStateSchema, MigrationPlan,
     MigrationPlanner, SchemaRegistry, SchemaVersion, SemanticVersion,
