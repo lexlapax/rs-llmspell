@@ -8,6 +8,7 @@ pub mod hook_global;
 pub mod injection;
 pub mod json_global;
 pub mod registry;
+pub mod replay_global;
 pub mod state_global;
 pub mod streaming_global;
 pub mod tool_global;
@@ -38,6 +39,9 @@ pub async fn create_standard_registry(context: Arc<GlobalContext>) -> Result<Glo
     // Create HookBridge for hook system integration
     let hook_bridge = Arc::new(crate::hook_bridge::HookBridge::new(context.clone()).await?);
     builder.register(Arc::new(hook_global::HookGlobal::new(hook_bridge.clone())));
+
+    // Register replay global for hook debugging
+    builder.register(Arc::new(replay_global::ReplayGlobal::new()));
 
     builder.register(Arc::new(tool_global::ToolGlobal::new(
         context.registry.clone(),

@@ -49,6 +49,7 @@ pub mod persistence;
 pub mod priority;
 pub mod rate_limiter;
 pub mod registry;
+pub mod replay;
 pub mod result;
 pub mod selective;
 pub mod traits;

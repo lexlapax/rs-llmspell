@@ -16,6 +16,10 @@ struct TestHook {
 
 #[async_trait]
 impl Hook for TestHook {
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
     async fn execute(&self, _context: &mut HookContext) -> anyhow::Result<HookResult> {
         // Minimal processing
         Ok(HookResult::Continue)
