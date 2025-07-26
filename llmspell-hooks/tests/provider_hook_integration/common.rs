@@ -353,6 +353,7 @@ pub fn check_api_key(provider: &str) -> bool {
 }
 
 /// Skip test if API key is not available
+#[allow(dead_code)]
 pub fn skip_if_no_api_key(provider: &str) {
     if !check_api_key(provider) {
         let key_name = match provider {
@@ -369,6 +370,7 @@ pub mod test_data {
     use serde_json::json;
 
     /// Generate test LLM request data
+    #[allow(dead_code)]
     pub fn llm_request_data(model: &str, prompt: &str) -> serde_json::Value {
         json!({
             "model": model,
@@ -380,6 +382,7 @@ pub mod test_data {
     }
 
     /// Generate test LLM response data
+    #[allow(dead_code)]
     pub fn llm_response_data(content: &str, tokens: u32) -> serde_json::Value {
         json!({
             "content": content,
@@ -394,6 +397,7 @@ pub mod test_data {
     }
 
     /// Generate test tool execution data
+    #[allow(dead_code)]
     pub fn tool_execution_data(tool_name: &str, input: &str) -> serde_json::Value {
         json!({
             "tool": tool_name,

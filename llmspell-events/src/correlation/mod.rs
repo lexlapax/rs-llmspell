@@ -532,8 +532,10 @@ mod tests {
 
     #[test]
     fn test_correlation_cleanup() {
-        let mut config = CorrelationConfig::default();
-        config.max_events_per_correlation = 2;
+        let config = CorrelationConfig {
+            max_events_per_correlation: 2,
+            ..Default::default()
+        };
 
         let tracker = EventCorrelationTracker::new(config);
         let correlation_id = Uuid::new_v4();

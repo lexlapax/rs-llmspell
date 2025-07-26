@@ -112,7 +112,7 @@ impl StateSchema {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct FieldSchema {
     pub field_type: String,
     pub required: bool,
@@ -120,14 +120,14 @@ pub struct FieldSchema {
     pub validators: Vec<String>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub enum CompatibilityLevel {
     BackwardCompatible,
     ForwardCompatible,
     BreakingChange,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct MigrationStep {
     pub from_version: u32,
     pub to_version: u32,
