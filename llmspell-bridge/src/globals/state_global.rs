@@ -25,6 +25,8 @@ pub struct StateGlobal {
     pub migration_engine: Option<Arc<MigrationEngine>>,
     /// Schema registry for migration planning (optional)
     pub schema_registry: Option<Arc<SchemaRegistry>>,
+    /// Backup manager for state backup/restore operations (optional)
+    pub backup_manager: Option<Arc<llmspell_state_persistence::backup::BackupManager>>,
 }
 
 impl StateGlobal {
@@ -35,6 +37,7 @@ impl StateGlobal {
             fallback_state: Arc::new(RwLock::new(HashMap::new())),
             migration_engine: None,
             schema_registry: None,
+            backup_manager: None,
         }
     }
 
@@ -45,6 +48,7 @@ impl StateGlobal {
             fallback_state: Arc::new(RwLock::new(HashMap::new())),
             migration_engine: None,
             schema_registry: None,
+            backup_manager: None,
         }
     }
 
@@ -59,6 +63,7 @@ impl StateGlobal {
             fallback_state: Arc::new(RwLock::new(HashMap::new())),
             migration_engine: Some(migration_engine),
             schema_registry: Some(schema_registry),
+            backup_manager: None,
         }
     }
 

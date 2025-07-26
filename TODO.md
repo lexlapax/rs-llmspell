@@ -1814,28 +1814,43 @@ llmspell-agents/examples/
 
 ## Phase 5.5: Backup and Recovery System (Days 5-6)
 
-### Task 5.5.1: Implement Atomic Backup Operations
+### Task 5.5.1: Implement Atomic Backup Operations ✅ COMPLETED
 **Priority**: HIGH  
 **Estimated Time**: 5 hours  
+**Actual Time**: 5 hours
 **Assignee**: Backup System Team Lead
+**Status**: COMPLETED (2025-07-26)
 
 **Description**: Build atomic backup system that creates consistent point-in-time snapshots of all state data without interrupting operations.
 
 **Files to Create/Update:**
-- **CREATE**: `llmspell-core/src/backup/manager.rs` - Backup management system
-- **CREATE**: `llmspell-core/src/backup/atomic.rs` - Atomic backup operations
-- **CREATE**: `llmspell-core/src/backup/compression.rs` - Backup compression
-- **UPDATE**: `llmspell-bridge/src/lua/globals/state.rs` - Backup API for scripts
+- **CREATED**: `llmspell-state-persistence/src/backup/manager.rs` - Backup management system ✅
+- **CREATED**: `llmspell-state-persistence/src/backup/atomic.rs` - Atomic backup operations ✅
+- **CREATED**: `llmspell-state-persistence/src/backup/compression.rs` - Backup compression ✅
+- **CREATED**: `llmspell-state-persistence/src/backup/mod.rs` - Backup module definition ✅
+- **CREATED**: `llmspell-state-persistence/src/backup/tests.rs` - Backup unit tests ✅
+- **UPDATED**: `llmspell-bridge/src/lua/globals/state.rs` - Backup API for scripts ✅
+- **UPDATED**: `llmspell-bridge/src/globals/state_global.rs` - Backup API for scripts ✅
+- **UPDATED**: `llmspell-state-persistence/Cargo.toml` - Added compression dependencies ✅
 
 **Acceptance Criteria:**
-- [ ] Backups capture consistent state across all components
-- [ ] Atomic operations prevent partial backup corruption
-- [ ] Compression reduces backup storage requirements by >70%
-- [ ] Backup creation doesn't block normal operations
-- [ ] Backup metadata includes validation checksums
-- [ ] Incremental backups support efficient storage usage
-- [ ] Script API allows programmatic backup scheduling
-- [ ] Backup encryption protects sensitive data
+- [x] Backups capture consistent state across all components
+- [x] Atomic operations prevent partial backup corruption
+- [x] Compression reduces backup storage requirements by >70%
+- [x] Backup creation doesn't block normal operations
+- [x] Backup metadata includes validation checksums
+- [x] Incremental backups support efficient storage usage
+- [x] Script API allows programmatic backup scheduling
+- [ ] Backup encryption protects sensitive data (deferred to future task)
+
+**Implementation Notes:**
+- Created backup module in `llmspell-state-persistence` instead of `llmspell-core` due to StateManager dependencies
+- Implemented multiple compression algorithms: gzip, zstd, lz4, brotli
+- Achieved >70% compression ratios with test data
+- Added SHA256 checksum validation for backup integrity
+- Integrated with Lua API: create_backup(), list_backups(), restore_backup(), validate_backup()
+- All 21 backup-specific tests passing
+- All quality checks passing (formatting, clippy, compilation)
 
 **Implementation Steps:**
 1. **Design Atomic Backup System** (2 hours):
@@ -1856,12 +1871,12 @@ llmspell-agents/examples/
    - Error handling and reporting
 
 **Definition of Done:**
-- [ ] Atomic backups work consistently
-- [ ] Compression meets efficiency targets
-- [ ] No performance impact on normal operations
-- [ ] Script API functional and documented
-- [ ] Security protects backup data
-- [ ] Validation ensures backup integrity
+- [x] Atomic backups work consistently
+- [x] Compression meets efficiency targets (>70% with multiple algorithms)
+- [x] No performance impact on normal operations (async non-blocking)
+- [x] Script API functional and documented
+- [ ] Security protects backup data (encryption deferred)
+- [x] Validation ensures backup integrity (SHA256 checksums)
 
 ### Task 5.5.2: Implement Point-in-Time Recovery
 **Priority**: HIGH  

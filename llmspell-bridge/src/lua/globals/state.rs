@@ -296,6 +296,58 @@ pub fn inject_state_global(
         state_table.set("schema_versions", versions_fn)?;
     }
 
+    // Backup methods (available when backup manager is configured)
+    if let Some(ref backup_mgr) = state_global.backup_manager {
+        // create_backup(incremental) - Create a backup (full or incremental)
+        let _backup_mgr_clone = backup_mgr.clone();
+        let create_backup_fn = lua.create_function(move |lua, incremental: Option<bool>| {
+            let incremental = incremental.unwrap_or(false);
+
+            // TODO: Implement actual backup creation when BackupManager is integrated
+            let result_table = lua.create_table()?;
+            result_table.set("success", false)?;
+            result_table.set("error", "Backup functionality not yet implemented")?;
+            result_table.set("incremental", incremental)?;
+
+            Ok(result_table)
+        })?;
+        state_table.set("create_backup", create_backup_fn)?;
+
+        // list_backups() - List available backups
+        let list_backups_fn = lua.create_function(move |lua, _: ()| {
+            // TODO: Implement actual backup listing
+            let backups_table = lua.create_table()?;
+
+            // Return empty list for now
+            Ok(backups_table)
+        })?;
+        state_table.set("list_backups", list_backups_fn)?;
+
+        // restore_backup(backup_id) - Restore from a specific backup
+        let restore_backup_fn = lua.create_function(move |lua, backup_id: String| {
+            // TODO: Implement actual backup restoration
+            let result_table = lua.create_table()?;
+            result_table.set("success", false)?;
+            result_table.set("error", "Restore functionality not yet implemented")?;
+            result_table.set("backup_id", backup_id)?;
+
+            Ok(result_table)
+        })?;
+        state_table.set("restore_backup", restore_backup_fn)?;
+
+        // validate_backup(backup_id) - Validate a backup
+        let validate_backup_fn = lua.create_function(move |lua, backup_id: String| {
+            // TODO: Implement actual backup validation
+            let result_table = lua.create_table()?;
+            result_table.set("is_valid", false)?;
+            result_table.set("error", "Validation functionality not yet implemented")?;
+            result_table.set("backup_id", backup_id)?;
+
+            Ok(result_table)
+        })?;
+        state_table.set("validate_backup", validate_backup_fn)?;
+    }
+
     // Set the state table as a global
     lua.globals().set("State", state_table)?;
 

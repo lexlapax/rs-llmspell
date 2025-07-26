@@ -38,6 +38,7 @@
 
 pub mod agent_state;
 pub mod backend_adapter;
+pub mod backup;
 pub mod circular_ref;
 pub mod config;
 pub mod error;
