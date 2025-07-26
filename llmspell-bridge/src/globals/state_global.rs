@@ -3,7 +3,11 @@
 
 use crate::globals::types::{GlobalContext, GlobalMetadata, GlobalObject};
 use llmspell_core::error::LLMSpellError;
-use llmspell_state_persistence::{StateManager, StateScope};
+use llmspell_state_persistence::{
+    migration::MigrationEngine,
+    schema::{SchemaRegistry, SemanticVersion},
+    StateManager, StateScope,
+};
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -17,6 +21,10 @@ pub struct StateGlobal {
     pub state_manager: Option<Arc<StateManager>>,
     /// Fallback in-memory state storage (when StateManager is not available)
     pub fallback_state: Arc<RwLock<HashMap<String, serde_json::Value>>>,
+    /// Migration engine for schema transitions (optional)
+    pub migration_engine: Option<Arc<MigrationEngine>>,
+    /// Schema registry for migration planning (optional)
+    pub schema_registry: Option<Arc<SchemaRegistry>>,
 }
 
 impl StateGlobal {
@@ -25,6 +33,8 @@ impl StateGlobal {
         Self {
             state_manager: None,
             fallback_state: Arc::new(RwLock::new(HashMap::new())),
+            migration_engine: None,
+            schema_registry: None,
         }
     }
 
@@ -33,6 +43,22 @@ impl StateGlobal {
         Self {
             state_manager: Some(state_manager),
             fallback_state: Arc::new(RwLock::new(HashMap::new())),
+            migration_engine: None,
+            schema_registry: None,
+        }
+    }
+
+    /// Create a new State global with full migration support
+    pub fn with_migration_support(
+        state_manager: Arc<StateManager>,
+        migration_engine: Arc<MigrationEngine>,
+        schema_registry: Arc<SchemaRegistry>,
+    ) -> Self {
+        Self {
+            state_manager: Some(state_manager),
+            fallback_state: Arc::new(RwLock::new(HashMap::new())),
+            migration_engine: Some(migration_engine),
+            schema_registry: Some(schema_registry),
         }
     }
 
@@ -335,6 +361,197 @@ impl GlobalObject for StateGlobal {
                 message: format!("Failed to set State.list: {}", e),
                 source: None,
             })?;
+
+        // Migration methods (only available when migration support is enabled)
+        if let (Some(migration_engine), Some(schema_registry)) =
+            (&self.migration_engine, &self.schema_registry)
+        {
+            // migrate_to_version(target_version) - Trigger migration to target schema version
+            let migrate_engine = migration_engine.clone();
+            let migrate_registry = schema_registry.clone();
+            let migrate_fn = lua
+                .create_function(move |lua, target_version: String| {
+                    let runtime = tokio::runtime::Handle::try_current()
+                        .or_else(|_| tokio::runtime::Runtime::new().map(|rt| rt.handle().clone()))
+                        .map_err(|e| {
+                            mlua::Error::RuntimeError(format!("No tokio runtime: {}", e))
+                        })?;
+
+                    // Parse target version
+                    let target_ver: SemanticVersion = target_version.parse().map_err(|e| {
+                        mlua::Error::RuntimeError(format!(
+                            "Invalid version format '{}': {}",
+                            target_version, e
+                        ))
+                    })?;
+
+                    // Get current schema version from registry
+                    let current_schema =
+                        migrate_registry.get_current_schema().ok_or_else(|| {
+                            mlua::Error::RuntimeError("No current schema found".to_string())
+                        })?;
+                    let current_ver = current_schema.version.clone();
+
+                    if current_ver == target_ver {
+                        // Already at target version - return success result
+                        let result_table = lua.create_table()?;
+                        result_table.set("success", true)?;
+                        result_table.set("status", "completed")?;
+                        result_table.set("from_version", current_ver.to_string())?;
+                        result_table.set("to_version", target_ver.to_string())?;
+                        result_table.set("message", "Already at target version")?;
+                        return Ok(result_table);
+                    }
+
+                    // Create migration config with default settings
+                    let migration_config = llmspell_state_persistence::migration::MigrationConfig {
+                        dry_run: false,
+                        create_backup: true,
+                        batch_size: 100,
+                        timeout: std::time::Duration::from_secs(300),
+                        max_concurrent_migrations: 1,
+                        validation_level:
+                            llmspell_state_persistence::migration::ValidationLevel::Strict,
+                        rollback_on_error: true,
+                    };
+
+                    // Execute migration
+                    let result = runtime.block_on(async {
+                        migrate_engine
+                            .migrate(&current_ver, &target_ver, migration_config)
+                            .await
+                    });
+
+                    match result {
+                        Ok(migration_result) => {
+                            let result_table = lua.create_table()?;
+                            result_table.set("success", true)?;
+                            result_table.set("status", format!("{:?}", migration_result.status))?;
+                            result_table
+                                .set("from_version", migration_result.from_version.to_string())?;
+                            result_table
+                                .set("to_version", migration_result.to_version.to_string())?;
+                            result_table.set("items_migrated", migration_result.items_migrated)?;
+                            result_table
+                                .set("duration_ms", migration_result.duration.as_millis() as u64)?;
+
+                            // Add warnings if any
+                            if !migration_result.warnings.is_empty() {
+                                let warnings_table = lua.create_table()?;
+                                for (i, warning) in migration_result.warnings.iter().enumerate() {
+                                    warnings_table.set(i + 1, warning.clone())?;
+                                }
+                                result_table.set("warnings", warnings_table)?;
+                            }
+
+                            Ok(result_table)
+                        }
+                        Err(e) => {
+                            let result_table = lua.create_table()?;
+                            result_table.set("success", false)?;
+                            result_table.set("error", format!("Migration failed: {}", e))?;
+                            result_table.set("from_version", current_ver.to_string())?;
+                            result_table.set("to_version", target_ver.to_string())?;
+                            Ok(result_table)
+                        }
+                    }
+                })
+                .map_err(|e| LLMSpellError::Component {
+                    message: format!("Failed to create State.migrate_to_version: {}", e),
+                    source: None,
+                })?;
+
+            state_table
+                .set("migrate_to_version", migrate_fn)
+                .map_err(|e| LLMSpellError::Component {
+                    message: format!("Failed to set State.migrate_to_version: {}", e),
+                    source: None,
+                })?;
+
+            // get_migration_status() - Get current migration information
+            let status_registry = schema_registry.clone();
+            let status_fn = lua
+                .create_function(move |lua, _: ()| {
+                    let status_table = lua.create_table()?;
+
+                    if let Some(current_schema) = status_registry.get_current_schema() {
+                        status_table.set("current_version", current_schema.version.to_string())?;
+
+                        let stats = status_registry.get_stats();
+                        status_table.set("total_schemas", stats.total_schemas)?;
+                        status_table.set("major_versions_count", stats.major_versions_count)?;
+
+                        if let Some(latest) = stats.latest_version {
+                            status_table.set("latest_version", latest.to_string())?;
+                        }
+                        if let Some(oldest) = stats.oldest_version {
+                            status_table.set("oldest_version", oldest.to_string())?;
+                        }
+
+                        // Get available migration targets
+                        let compatible_versions =
+                            status_registry.find_compatible_schemas(&current_schema.version);
+                        let migration_candidates =
+                            status_registry.find_migration_candidates(&current_schema.version);
+
+                        let compatible_table = lua.create_table()?;
+                        for (i, version) in compatible_versions.iter().enumerate() {
+                            compatible_table.set(i + 1, version.to_string())?;
+                        }
+                        status_table.set("compatible_versions", compatible_table)?;
+
+                        let candidates_table = lua.create_table()?;
+                        for (i, version) in migration_candidates.iter().enumerate() {
+                            candidates_table.set(i + 1, version.to_string())?;
+                        }
+                        status_table.set("migration_candidates", candidates_table)?;
+
+                        status_table.set("migration_available", true)?;
+                    } else {
+                        status_table.set("current_version", "unknown")?;
+                        status_table.set("migration_available", false)?;
+                        status_table.set("error", "No current schema found")?;
+                    }
+
+                    Ok(status_table)
+                })
+                .map_err(|e| LLMSpellError::Component {
+                    message: format!("Failed to create State.get_migration_status: {}", e),
+                    source: None,
+                })?;
+
+            state_table
+                .set("get_migration_status", status_fn)
+                .map_err(|e| LLMSpellError::Component {
+                    message: format!("Failed to set State.get_migration_status: {}", e),
+                    source: None,
+                })?;
+
+            // list_schema_versions() - List all available schema versions
+            let list_registry = schema_registry.clone();
+            let list_versions_fn = lua
+                .create_function(move |lua, _: ()| {
+                    let versions = list_registry.list_versions();
+                    let versions_table = lua.create_table()?;
+
+                    for (i, version) in versions.iter().enumerate() {
+                        versions_table.set(i + 1, version.to_string())?;
+                    }
+
+                    Ok(versions_table)
+                })
+                .map_err(|e| LLMSpellError::Component {
+                    message: format!("Failed to create State.list_schema_versions: {}", e),
+                    source: None,
+                })?;
+
+            state_table
+                .set("list_schema_versions", list_versions_fn)
+                .map_err(|e| LLMSpellError::Component {
+                    message: format!("Failed to set State.list_schema_versions: {}", e),
+                    source: None,
+                })?;
+        }
 
         lua.globals()
             .set("State", state_table)

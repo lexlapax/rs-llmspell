@@ -137,7 +137,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     let schema_registry = SchemaRegistry::new();
 
-    // Register both schemas
+    // Register both schemas in registry
     schema_registry.register_schema(schema_v1.clone(), None)?;
     schema_registry.register_schema(schema_v1_1.clone(), None)?;
 
@@ -159,10 +159,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     );
     println!("   - Risk level: {:?}", compatibility.risk_level);
 
-    // 7. Create migration planner
-    let mut planner = MigrationPlanner::with_registry(schema_registry.clone());
-    planner.register_schema(schema_v1.clone())?;
-    planner.register_schema(schema_v1_1.clone())?;
+    // 7. Create migration planner (use existing registry to avoid conflicts)
+    let planner = MigrationPlanner::with_registry(schema_registry.clone());
 
     let v1_0_0 = SemanticVersion::new(1, 0, 0);
     let v1_1_0 = SemanticVersion::new(1, 1, 0);
