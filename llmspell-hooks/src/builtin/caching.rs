@@ -398,6 +398,10 @@ impl Hook for CachingHook {
         // Always execute to check cache
         self.should_cache_hook_point(&context.point)
     }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 #[async_trait]

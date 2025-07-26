@@ -55,6 +55,10 @@ impl Hook for StateValidationHook {
             tags: vec!["state".to_string(), "validation".to_string()],
         }
     }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 /// Built-in state audit hook
@@ -89,6 +93,10 @@ impl Hook for StateAuditHook {
             tags: vec!["state".to_string(), "audit".to_string()],
         }
     }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 /// Built-in state cache invalidation hook
@@ -112,6 +120,10 @@ impl Hook for StateCacheHook {
             language: Language::Native,
             tags: vec!["state".to_string(), "cache".to_string()],
         }
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }
 

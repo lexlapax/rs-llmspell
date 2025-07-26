@@ -444,6 +444,10 @@ impl Hook for MetricsHook {
         // Always execute metrics hook
         true
     }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 #[async_trait]

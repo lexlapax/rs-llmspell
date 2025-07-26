@@ -4,9 +4,11 @@
 use crate::circuit_breaker::{BreakerConfig, CircuitBreaker, CircuitBreakerManager};
 use crate::context::HookContext;
 use crate::performance::{PerformanceConfig, PerformanceMetrics, PerformanceMonitor};
+use crate::persistence::HookPersistenceManager;
 use crate::result::HookResult;
 use crate::traits::Hook;
 use anyhow::Result;
+use llmspell_events::{EventCorrelationTracker, EventLink, EventRelationship, UniversalEvent};
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -20,6 +22,8 @@ pub struct HookExecutorConfig {
     pub enable_circuit_breaker: bool,
     /// Enable performance monitoring
     pub enable_performance_monitoring: bool,
+    /// Enable hook persistence
+    pub enable_persistence: bool,
     /// Maximum execution time before circuit breaker triggers
     pub max_execution_time: Duration,
     /// Performance overhead target (e.g., 5%)
@@ -35,6 +39,7 @@ impl Default for HookExecutorConfig {
         Self {
             enable_circuit_breaker: true,
             enable_performance_monitoring: true,
+            enable_persistence: false, // Opt-in for backward compatibility
             max_execution_time: Duration::from_millis(100),
             performance_overhead_target: 0.05, // 5%
             breaker_config: BreakerConfig::default(),
@@ -49,6 +54,8 @@ pub struct HookExecutor {
     circuit_breakers: Arc<CircuitBreakerManager>,
     performance_monitor: Arc<PerformanceMonitor>,
     hook_configs: Arc<RwLock<HashMap<String, HookExecutionConfig>>>,
+    persistence_manager: Option<Arc<HookPersistenceManager>>,
+    correlation_tracker: Option<Arc<EventCorrelationTracker>>,
 }
 
 /// Per-hook execution configuration
@@ -60,6 +67,10 @@ pub struct HookExecutionConfig {
     pub use_circuit_breaker: bool,
     /// Custom circuit breaker config
     pub breaker_config: Option<BreakerConfig>,
+    /// Whether to persist this hook's executions
+    pub persist_executions: bool,
+    /// Retention priority for persistence
+    pub retention_priority: i32,
 }
 
 impl Default for HookExecutionConfig {
@@ -68,6 +79,8 @@ impl Default for HookExecutionConfig {
             timeout: None,
             use_circuit_breaker: true,
             breaker_config: None,
+            persist_executions: true,
+            retention_priority: 0,
         }
     }
 }
@@ -93,6 +106,8 @@ impl HookExecutor {
             circuit_breakers,
             performance_monitor,
             hook_configs: Arc::new(RwLock::new(HashMap::new())),
+            persistence_manager: None, // Set later via set_persistence_manager
+            correlation_tracker: None, // Set later via set_correlation_tracker
         }
     }
 
@@ -143,10 +158,72 @@ impl HookExecutor {
             (None, Instant::now())
         };
 
+        // Create hook execution event for correlation tracking
+        let execution_event = if let Some(ref tracker) = self.correlation_tracker {
+            let event_data = serde_json::json!({
+                "hook_name": hook_name,
+                "hook_language": metadata.language,
+                "component_id": context.component_id.name,
+                "component_type": context.component_id.component_type,
+                "hook_point": context.point,
+                "operation": "hook_execution_start"
+            });
+
+            let event = UniversalEvent::new(
+                "hook.execution.start",
+                event_data,
+                llmspell_events::Language::Rust,
+            )
+            .with_correlation_id(context.correlation_id)
+            .with_source("hook_executor")
+            .with_tag("hook_execution");
+
+            tracker.track_event(event.clone());
+            Some(event)
+        } else {
+            None
+        };
+
         // Execute the hook
         let result = hook.execute(context).await;
 
         let duration = start.elapsed();
+
+        // Create hook completion event and link to start event
+        if let Some(ref tracker) = self.correlation_tracker {
+            let success = result.is_ok();
+            let event_data = serde_json::json!({
+                "hook_name": hook_name,
+                "success": success,
+                "duration_ms": duration.as_millis(),
+                "operation": "hook_execution_complete"
+            });
+
+            let completion_event = UniversalEvent::new(
+                "hook.execution.complete",
+                event_data,
+                llmspell_events::Language::Rust,
+            )
+            .with_correlation_id(context.correlation_id)
+            .with_source("hook_executor")
+            .with_tag("hook_execution");
+
+            tracker.track_event(completion_event.clone());
+
+            // Create link between start and completion events
+            if let Some(start_event) = execution_event {
+                let link = EventLink::new(
+                    start_event.id,
+                    completion_event.id,
+                    EventRelationship::PartOf,
+                )
+                .with_strength(1.0)
+                .with_metadata("relationship", "execution_pair")
+                .with_metadata("hook_name", hook_name.to_string());
+
+                tracker.add_link(link);
+            }
+        }
 
         // Complete performance tracking
         if let Some(timer) = timer {
@@ -172,6 +249,69 @@ impl HookExecutor {
             );
         }
 
+        // Persist hook execution if enabled
+        if self.config.enable_persistence && hook_config.persist_executions {
+            if let Some(ref _persistence_manager) = self.persistence_manager {
+                // For now, we can't persist hooks that don't implement ReplayableHook
+                // This would require all hooks to implement ReplayableHook or a different approach
+                // TODO: Consider alternative persistence strategies
+                /*
+                if let Ok(ref hook_result) = result {
+                        // Create hook metadata
+                        let mut metadata = HookMetadata::new(
+                            hook_name.clone(),
+                            context.component_id.component_type.clone(),
+                            context.component_id.name.clone(),
+                        );
+
+                        // Set metadata properties
+                        metadata.retention_priority = hook_config.retention_priority;
+                        metadata.modified_operation = matches!(
+                            hook_result,
+                            HookResult::Modified(_) | HookResult::Replace(_)
+                        );
+
+                        // Add tags based on result
+                        match hook_result {
+                            HookResult::Cancel(_) => metadata.add_tag("cancelled".to_string()),
+                            HookResult::Replace(_) => metadata.add_tag("replaced".to_string()),
+                            HookResult::Modified(_) => metadata.add_tag("modified".to_string()),
+                            HookResult::Skipped(_) => metadata.add_tag("skipped".to_string()),
+                            _ => {}
+                        }
+
+                        // Add performance tags if slow
+                        if duration > timeout {
+                            metadata.add_tag("slow_execution".to_string());
+                        }
+
+                        // Calculate context size
+                        if let Ok(serialized) = replayable_hook.serialize_context(context) {
+                            metadata.context_size = serialized.len();
+                        }
+
+                        // Persist the execution
+                        if let Err(e) = persistence_manager
+                            .persist_execution(
+                                replayable_hook,
+                                context,
+                                hook_result,
+                                duration,
+                                metadata,
+                            )
+                            .await
+                        {
+                            debug!(
+                                "Failed to persist hook execution for {}: {}",
+                                hook_name, e
+                            );
+                        }
+                    }
+                }
+                */
+            }
+        }
+
         result
     }
 
@@ -182,6 +322,28 @@ impl HookExecutor {
         context: &mut HookContext,
     ) -> Result<Vec<HookResult>> {
         let mut results = Vec::with_capacity(hooks.len());
+
+        // Create batch execution event for correlation tracking
+        if let Some(ref tracker) = self.correlation_tracker {
+            let event_data = serde_json::json!({
+                "hook_count": hooks.len(),
+                "component_id": context.component_id.name,
+                "component_type": context.component_id.component_type,
+                "hook_point": context.point,
+                "operation": "batch_hook_execution_start"
+            });
+
+            let batch_event = UniversalEvent::new(
+                "hook.batch_execution.start",
+                event_data,
+                llmspell_events::Language::Rust,
+            )
+            .with_correlation_id(context.correlation_id)
+            .with_source("hook_executor")
+            .with_tag("batch_execution");
+
+            tracker.track_event(batch_event);
+        }
 
         for hook in hooks {
             let result = self.execute_hook(hook.as_ref(), context).await?;
@@ -202,6 +364,26 @@ impl HookExecutor {
                     results.push(result);
                 }
             }
+        }
+
+        // Create batch completion event for correlation tracking
+        if let Some(ref tracker) = self.correlation_tracker {
+            let event_data = serde_json::json!({
+                "hook_count": hooks.len(),
+                "results_count": results.len(),
+                "operation": "batch_hook_execution_complete"
+            });
+
+            let batch_completion_event = UniversalEvent::new(
+                "hook.batch_execution.complete",
+                event_data,
+                llmspell_events::Language::Rust,
+            )
+            .with_correlation_id(context.correlation_id)
+            .with_source("hook_executor")
+            .with_tag("batch_execution");
+
+            tracker.track_event(batch_completion_event);
         }
 
         Ok(results)
@@ -282,6 +464,31 @@ impl HookExecutor {
         self.performance_monitor
             .generate_report(self.config.max_execution_time)
     }
+
+    /// Set the persistence manager for hook execution history
+    pub fn set_persistence_manager(&mut self, manager: Arc<HookPersistenceManager>) {
+        self.persistence_manager = Some(manager);
+    }
+
+    /// Check if persistence is enabled
+    pub fn is_persistence_enabled(&self) -> bool {
+        self.config.enable_persistence && self.persistence_manager.is_some()
+    }
+
+    /// Set the correlation tracker for hook execution correlation
+    pub fn set_correlation_tracker(&mut self, tracker: Arc<EventCorrelationTracker>) {
+        self.correlation_tracker = Some(tracker);
+    }
+
+    /// Check if correlation tracking is enabled
+    pub fn is_correlation_tracking_enabled(&self) -> bool {
+        self.correlation_tracker.is_some()
+    }
+
+    /// Get the correlation tracker
+    pub fn correlation_tracker(&self) -> Option<Arc<EventCorrelationTracker>> {
+        self.correlation_tracker.clone()
+    }
 }
 
 impl Default for HookExecutor {
@@ -324,6 +531,11 @@ impl HookExecutorBuilder {
 
     pub fn with_breaker_config(mut self, config: BreakerConfig) -> Self {
         self.config.breaker_config = config;
+        self
+    }
+
+    pub fn with_persistence(mut self, enabled: bool) -> Self {
+        self.config.enable_persistence = enabled;
         self
     }
 
@@ -494,6 +706,8 @@ mod tests {
                 timeout: Some(Duration::from_millis(200)),
                 use_circuit_breaker: true,
                 breaker_config: None,
+                persist_executions: true,
+                retention_priority: 0,
             },
         );
 

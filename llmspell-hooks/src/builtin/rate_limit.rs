@@ -474,6 +474,10 @@ impl Hook for RateLimitHook {
         // Always execute rate limiting
         true
     }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 #[async_trait]

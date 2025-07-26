@@ -461,6 +461,10 @@ impl Hook for RetryHook {
     fn should_execute(&self, _context: &HookContext) -> bool {
         true
     }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 #[async_trait]

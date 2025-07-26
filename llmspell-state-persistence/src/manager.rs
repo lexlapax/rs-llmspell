@@ -6,7 +6,7 @@ use crate::config::{PersistenceConfig, StateSchema};
 use crate::error::{StateError, StateResult};
 use crate::key_manager::KeyManager;
 use crate::scope::StateScope;
-use llmspell_events::{EventBus, UniversalEvent};
+use llmspell_events::{CorrelationContext, EventBus, EventCorrelationTracker, UniversalEvent};
 use llmspell_hooks::{
     ComponentType, Hook, HookContext, HookExecutor, HookPoint, HookResult, ReplayableHook,
 };
@@ -113,6 +113,9 @@ pub struct StateManager {
     hook_executor: Arc<HookExecutor>,
     event_bus: Arc<EventBus>,
 
+    // Event correlation tracking
+    correlation_tracker: Arc<EventCorrelationTracker>,
+
     // Configuration
     persistence_config: PersistenceConfig,
     state_schema: StateSchema,
@@ -151,6 +154,7 @@ impl StateManager {
         ));
         let hook_executor = Arc::new(HookExecutor::new());
         let event_bus = Arc::new(EventBus::new());
+        let correlation_tracker = Arc::new(EventCorrelationTracker::default());
         let replay_manager = HookReplayManager::new(storage_adapter.clone());
 
         // Load existing state from storage if persistent
@@ -173,6 +177,7 @@ impl StateManager {
             storage_adapter,
             hook_executor,
             event_bus,
+            correlation_tracker,
             persistence_config: config,
             state_schema: StateSchema::v1(),
             hook_history: Arc::new(RwLock::new(Vec::new())),
@@ -257,6 +262,22 @@ impl StateManager {
         // Perform state update
         self.set_state_internal(scope.clone(), key, final_value.clone())
             .await?;
+
+        // Publish state change event and track correlation
+        let event = self.create_state_change_event(
+            "state.changed",
+            &scope,
+            key,
+            &old_value,
+            &final_value,
+            correlation_id,
+        );
+
+        // Track the event for correlation
+        self.correlation_tracker.track_event(event.clone());
+
+        // Publish the event (if event bus is configured for publishing)
+        // Note: We don't call publish directly as it might not be set up for external publishing
 
         // Execute post-state-change hooks
         hook_context.insert_metadata("success".to_string(), "true".to_string());
@@ -799,6 +820,42 @@ impl StateManager {
         let count = self.copy_scope(from_scope.clone(), to_scope).await?;
         self.clear_scope_count(from_scope).await?;
         Ok(count)
+    }
+
+    /// Create a state change event for correlation tracking
+    fn create_state_change_event(
+        &self,
+        event_type: &str,
+        scope: &StateScope,
+        key: &str,
+        old_value: &Option<Value>,
+        new_value: &Value,
+        correlation_id: Uuid,
+    ) -> UniversalEvent {
+        let event_data = serde_json::json!({
+            "scope": scope,
+            "key": key,
+            "old_value": old_value,
+            "new_value": new_value,
+            "timestamp": SystemTime::now(),
+        });
+
+        UniversalEvent::new(event_type, event_data, llmspell_events::Language::Rust)
+            .with_correlation_id(correlation_id)
+            .with_source("state_manager")
+            .with_tag("state_change")
+    }
+
+    /// Get the correlation tracker for external use
+    pub fn correlation_tracker(&self) -> Arc<EventCorrelationTracker> {
+        self.correlation_tracker.clone()
+    }
+
+    /// Create a correlation context for state operations
+    pub fn create_correlation_context(&self) -> CorrelationContext {
+        CorrelationContext::new_root()
+            .with_metadata("component", "state_manager")
+            .with_tag("state_operation")
     }
 }
 

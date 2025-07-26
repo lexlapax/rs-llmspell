@@ -64,6 +64,10 @@ impl Hook for LanguageHookWrapper {
     fn should_execute(&self, context: &HookContext) -> bool {
         context.point == self.inner.hook_point
     }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 /// Hook registration handle for cleanup

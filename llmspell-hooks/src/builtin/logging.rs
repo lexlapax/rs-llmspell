@@ -225,6 +225,10 @@ impl Hook for LoggingHook {
         // Always execute logging hook unless explicitly disabled
         true
     }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 #[async_trait]

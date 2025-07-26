@@ -25,6 +25,10 @@
 //!
 //! #[async_trait]
 //! impl Hook for MyHook {
+//!     fn as_any(&self) -> &dyn std::any::Any {
+//!         self
+//!     }
+//!     
 //!     async fn execute(&self, context: &mut HookContext) -> Result<HookResult> {
 //!         println!("Hook executed at {:?}", context.point);
 //!         Ok(HookResult::Continue)
@@ -41,6 +45,7 @@ pub mod coordination;
 pub mod distributed;
 pub mod executor;
 pub mod performance;
+pub mod persistence;
 pub mod priority;
 pub mod rate_limiter;
 pub mod registry;
@@ -62,6 +67,10 @@ pub use distributed::{
 };
 pub use executor::{HookExecutor, HookExecutorBuilder};
 pub use performance::{PerformanceMetrics, PerformanceMonitor};
+pub use persistence::{
+    HookMetadata as PersistenceHookMetadata, HookPersistenceManager, RetentionManager,
+    RetentionPolicy,
+};
 pub use priority::{PriorityBucket, PriorityComparator};
 pub use registry::{HookRegistry, RegistryError};
 pub use result::{ForkBuilder, HookResult, Operation, RetryBuilder};

@@ -418,6 +418,10 @@ impl Hook for DebuggingHook {
         // Execute for all contexts unless specifically disabled
         true
     }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 #[async_trait]

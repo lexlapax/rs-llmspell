@@ -592,6 +592,10 @@ impl Hook for SecurityHook {
         // Always execute security hook
         true
     }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 #[async_trait]

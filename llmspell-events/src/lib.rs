@@ -55,6 +55,7 @@
 //! ```
 
 pub mod bus;
+pub mod correlation;
 pub mod flow_controller;
 pub mod handler;
 pub mod metrics;
@@ -67,6 +68,7 @@ pub mod universal_event;
 
 // Re-export main types
 pub use bus::{EventBus, EventBusBuilder};
+pub use correlation::{CorrelationContext, EventCorrelationTracker, EventLink, EventRelationship};
 pub use flow_controller::{BackpressureNotification, FlowController};
 pub use handler::{AsyncEventHandler, EventHandler};
 pub use metrics::{EventMetrics, MetricsCollector};
@@ -82,8 +84,9 @@ pub use universal_event::{EventMetadata, Language, UniversalEvent};
 /// Prelude module for convenient imports
 pub mod prelude {
     pub use crate::{
-        AsyncEventHandler, BackpressureNotification, EventBus, EventBusBuilder, EventHandler,
-        EventMetadata, EventPattern, EventStream, FlowController, HighThroughputProcessor,
-        Language, OverflowStrategy, StreamUtils, UniversalEvent,
+        AsyncEventHandler, BackpressureNotification, CorrelationContext, EventBus, EventBusBuilder,
+        EventCorrelationTracker, EventHandler, EventLink, EventMetadata, EventPattern,
+        EventRelationship, EventStream, FlowController, HighThroughputProcessor, Language,
+        OverflowStrategy, StreamUtils, UniversalEvent,
     };
 }

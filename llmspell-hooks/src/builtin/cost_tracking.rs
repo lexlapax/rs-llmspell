@@ -635,6 +635,10 @@ impl Hook for CostTrackingHook {
     fn should_execute(&self, _context: &HookContext) -> bool {
         true
     }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 #[async_trait]

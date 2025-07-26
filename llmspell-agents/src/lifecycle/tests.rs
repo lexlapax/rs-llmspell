@@ -42,6 +42,10 @@ mod integration_tests {
 
     #[async_trait]
     impl Hook for TestHook {
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
+        }
+
         async fn execute(&self, context: &mut HookContext) -> Result<HookResult> {
             // Track the call
             {
@@ -281,6 +285,10 @@ mod integration_tests {
 
         #[async_trait]
         impl Hook for MetadataVerifyHook {
+            fn as_any(&self) -> &dyn std::any::Any {
+                self
+            }
+
             async fn execute(&self, context: &mut HookContext) -> Result<HookResult> {
                 // Verify expected metadata is present
                 if let Some(agent_id) = context.get_metadata("agent_id") {
@@ -330,6 +338,10 @@ mod integration_tests {
 
         #[async_trait]
         impl Hook for FastHook {
+            fn as_any(&self) -> &dyn std::any::Any {
+                self
+            }
+
             async fn execute(&self, _context: &mut HookContext) -> Result<HookResult> {
                 // Just return - realistic production hook overhead
                 Ok(HookResult::Continue)
