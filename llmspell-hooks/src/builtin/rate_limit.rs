@@ -4,7 +4,7 @@
 use crate::context::HookContext;
 use crate::rate_limiter::{RateLimiter, TokenBucketConfig};
 use crate::result::HookResult;
-use crate::traits::{Hook, MetricHook};
+use crate::traits::{Hook, MetricHook, ReplayableHook};
 use crate::types::{HookMetadata, Language, Priority};
 use anyhow::Result;
 use async_trait::async_trait;
@@ -509,6 +509,62 @@ impl MetricHook for RateLimitHook {
     }
 }
 
+#[async_trait]
+impl ReplayableHook for RateLimitHook {
+    fn is_replayable(&self) -> bool {
+        true
+    }
+
+    fn serialize_context(&self, ctx: &HookContext) -> Result<Vec<u8>> {
+        // Create a serializable version of the context with rate limit config
+        let mut context_data = ctx.data.clone();
+
+        // Add rate limit configuration for replay context
+        context_data.insert(
+            "_rate_limit_config".to_string(),
+            serde_json::json!({
+                "strategy": serde_json::to_value(&self.config.strategy)?,
+                "rate_limited_action": serde_json::to_value(&self.config.rate_limited_action)?,
+                "warning_threshold": self.config.warning_threshold,
+                "header_prefix": self.config.header_prefix,
+                "allow_burst": self.config.allow_burst,
+                "bucket_capacity": self.config.bucket_config.capacity,
+                "refill_rate": self.config.bucket_config.refill_rate,
+                "burst_capacity": self.config.bucket_config.burst_capacity,
+            }),
+        );
+
+        // Add current metrics snapshot for debugging
+        let metrics = self.metrics.read().unwrap();
+        context_data.insert(
+            "_rate_limit_metrics".to_string(),
+            serde_json::to_value(&*metrics)?,
+        );
+
+        // Note: We don't serialize the actual rate limiter state as it's runtime-specific
+        // and replays should start with fresh rate limits
+
+        let mut replay_context = ctx.clone();
+        replay_context.data = context_data;
+
+        Ok(serde_json::to_vec(&replay_context)?)
+    }
+
+    fn deserialize_context(&self, data: &[u8]) -> Result<HookContext> {
+        let mut context: HookContext = serde_json::from_slice(data)?;
+
+        // Remove the rate limit specific data from context
+        context.data.remove("_rate_limit_config");
+        context.data.remove("_rate_limit_metrics");
+
+        Ok(context)
+    }
+
+    fn replay_id(&self) -> String {
+        format!("{}:{}", self.metadata.name, self.metadata.version)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -701,5 +757,43 @@ mod tests {
         assert!(config.add_headers);
         assert_eq!(config.header_prefix, "X-RateLimit-");
         assert_eq!(config.warning_threshold, 0.8);
+    }
+
+    #[tokio::test]
+    async fn test_replayable_hook_implementation() {
+        let hook = RateLimitHook::new()
+            .with_rate_per_second(10.0)
+            .with_burst(5)
+            .with_strategy(RateLimitStrategy::PerComponent);
+        let component_id = ComponentId::new(ComponentType::Agent, "test-agent".to_string());
+        let mut context = HookContext::new(HookPoint::BeforeAgentExecution, component_id);
+
+        // Add test data
+        context.insert_data("test_key".to_string(), serde_json::json!("test_value"));
+        context.insert_metadata("user_id".to_string(), "test_user".to_string());
+
+        // Execute to create some state
+        hook.execute(&mut context).await.unwrap();
+
+        // Test serialization
+        let serialized = hook.serialize_context(&context).unwrap();
+        assert!(!serialized.is_empty());
+
+        // Test deserialization
+        let deserialized = hook.deserialize_context(&serialized).unwrap();
+        assert_eq!(deserialized.point, context.point);
+        assert_eq!(deserialized.component_id, context.component_id);
+        assert_eq!(
+            deserialized.data.get("test_key"),
+            context.data.get("test_key")
+        );
+
+        // Ensure rate limit specific data was removed
+        assert!(deserialized.data.get("_rate_limit_config").is_none());
+        assert!(deserialized.data.get("_rate_limit_metrics").is_none());
+
+        // Test replay ID
+        assert_eq!(hook.replay_id(), "RateLimitHook:1.0.0");
+        assert!(hook.is_replayable());
     }
 }

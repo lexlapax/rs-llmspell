@@ -1,8 +1,11 @@
 // ABOUTME: State change hook definitions and integration
 // ABOUTME: Provides hook points for state operations
 
+use anyhow::Result;
 use async_trait::async_trait;
-use llmspell_hooks::{Hook, HookContext, HookMetadata, HookResult, Language, Priority};
+use llmspell_hooks::{
+    Hook, HookContext, HookMetadata, HookResult, Language, Priority, ReplayableHook,
+};
 use serde_json::Value;
 
 /// State change event for hooks
@@ -145,4 +148,110 @@ pub fn aggregate_hook_results(results: &[HookResult]) -> HookResult {
 
     // Otherwise continue
     HookResult::Continue
+}
+
+#[async_trait]
+impl ReplayableHook for StateValidationHook {
+    fn is_replayable(&self) -> bool {
+        true
+    }
+
+    fn serialize_context(&self, ctx: &HookContext) -> Result<Vec<u8>> {
+        // For state validation, we just need to preserve the context as-is
+        // since validation logic should be deterministic
+        Ok(serde_json::to_vec(ctx)?)
+    }
+
+    fn deserialize_context(&self, data: &[u8]) -> Result<HookContext> {
+        Ok(serde_json::from_slice(data)?)
+    }
+
+    fn replay_id(&self) -> String {
+        format!("{}:{}", self.metadata().name, self.metadata().version)
+    }
+}
+
+#[async_trait]
+impl ReplayableHook for StateAuditHook {
+    fn is_replayable(&self) -> bool {
+        true
+    }
+
+    fn serialize_context(&self, ctx: &HookContext) -> Result<Vec<u8>> {
+        // For state audit, we preserve the context including state change information
+        let mut context_data = ctx.data.clone();
+
+        // Add state audit specific information
+        context_data.insert(
+            "_state_audit_info".to_string(),
+            serde_json::json!({
+                "hook_type": "state_audit",
+                "timestamp": std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs(),
+            }),
+        );
+
+        let mut replay_context = ctx.clone();
+        replay_context.data = context_data;
+
+        Ok(serde_json::to_vec(&replay_context)?)
+    }
+
+    fn deserialize_context(&self, data: &[u8]) -> Result<HookContext> {
+        let mut context: HookContext = serde_json::from_slice(data)?;
+
+        // Remove the state audit specific data
+        context.data.remove("_state_audit_info");
+
+        Ok(context)
+    }
+
+    fn replay_id(&self) -> String {
+        format!("{}:{}", self.metadata().name, self.metadata().version)
+    }
+}
+
+#[async_trait]
+impl ReplayableHook for StateCacheHook {
+    fn is_replayable(&self) -> bool {
+        true
+    }
+
+    fn serialize_context(&self, ctx: &HookContext) -> Result<Vec<u8>> {
+        // For cache hook, we include cache-related metadata
+        let mut context_data = ctx.data.clone();
+
+        // Add cache invalidation info
+        context_data.insert(
+            "_cache_invalidation_info".to_string(),
+            serde_json::json!({
+                "hook_type": "state_cache",
+                "invalidation_time": std::time::SystemTime::now()
+                    .duration_since(std::time::UNIX_EPOCH)
+                    .unwrap()
+                    .as_secs(),
+                "affected_key": ctx.get_metadata("key").unwrap_or("unknown"),
+            }),
+        );
+
+        let mut replay_context = ctx.clone();
+        replay_context.data = context_data;
+
+        Ok(serde_json::to_vec(&replay_context)?)
+    }
+
+    fn deserialize_context(&self, data: &[u8]) -> Result<HookContext> {
+        let mut context: HookContext = serde_json::from_slice(data)?;
+
+        // Remove the cache specific data
+        context.data.remove("_cache_invalidation_info");
+
+        Ok(context)
+    }
+
+    fn replay_id(&self) -> String {
+        format!("{}:{}", self.metadata().name, self.metadata().version)
+    }
 }

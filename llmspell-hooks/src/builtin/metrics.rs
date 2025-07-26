@@ -3,7 +3,7 @@
 
 use crate::context::HookContext;
 use crate::result::HookResult;
-use crate::traits::{Hook, MetricHook};
+use crate::traits::{Hook, MetricHook, ReplayableHook};
 use crate::types::{HookMetadata, HookPoint, Language, Priority};
 use anyhow::Result;
 use async_trait::async_trait;
@@ -498,6 +498,54 @@ impl MetricHook for MetricsHook {
     }
 }
 
+#[async_trait]
+impl ReplayableHook for MetricsHook {
+    fn is_replayable(&self) -> bool {
+        true
+    }
+
+    fn serialize_context(&self, ctx: &HookContext) -> Result<Vec<u8>> {
+        // Create a serializable version of the context
+        // Note: We don't serialize the actual metrics storage as it's runtime state
+        let mut context_data = ctx.data.clone();
+
+        // Add metadata about the metrics hook configuration
+        context_data.insert(
+            "_metrics_config".to_string(),
+            serde_json::json!({
+                "collect_custom_metrics": self.collect_custom_metrics,
+                "hook_name": self.metadata.name,
+                "version": self.metadata.version,
+            }),
+        );
+
+        // Add current metrics snapshot for context
+        context_data.insert(
+            "_metrics_snapshot".to_string(),
+            serde_json::to_value(self.get_summary())?,
+        );
+
+        let mut replay_context = ctx.clone();
+        replay_context.data = context_data;
+
+        Ok(serde_json::to_vec(&replay_context)?)
+    }
+
+    fn deserialize_context(&self, data: &[u8]) -> Result<HookContext> {
+        let mut context: HookContext = serde_json::from_slice(data)?;
+
+        // Remove the metrics-specific data from context
+        context.data.remove("_metrics_config");
+        context.data.remove("_metrics_snapshot");
+
+        Ok(context)
+    }
+
+    fn replay_id(&self) -> String {
+        format!("{}:{}", self.metadata.name, self.metadata.version)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -650,5 +698,39 @@ mod tests {
         assert_eq!(metadata.language, Language::Native);
         assert!(metadata.tags.contains(&"builtin".to_string()));
         assert!(metadata.tags.contains(&"metrics".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_replayable_hook_implementation() {
+        let hook = MetricsHook::new().with_custom_metrics(true);
+        let component_id = ComponentId::new(ComponentType::Agent, "test-agent".to_string());
+        let mut context = HookContext::new(HookPoint::BeforeAgentExecution, component_id);
+
+        // Add test data
+        context.insert_data("test_key".to_string(), serde_json::json!("test_value"));
+
+        // Execute the hook to generate some metrics
+        hook.execute(&mut context).await.unwrap();
+
+        // Test serialization
+        let serialized = hook.serialize_context(&context).unwrap();
+        assert!(!serialized.is_empty());
+
+        // Test deserialization
+        let deserialized = hook.deserialize_context(&serialized).unwrap();
+        assert_eq!(deserialized.point, context.point);
+        assert_eq!(deserialized.component_id, context.component_id);
+        assert_eq!(
+            deserialized.data.get("test_key"),
+            context.data.get("test_key")
+        );
+
+        // Ensure metrics-specific data was removed
+        assert!(deserialized.data.get("_metrics_config").is_none());
+        assert!(deserialized.data.get("_metrics_snapshot").is_none());
+
+        // Test replay ID
+        assert_eq!(hook.replay_id(), "MetricsHook:1.0.0");
+        assert!(hook.is_replayable());
     }
 }

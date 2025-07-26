@@ -3,7 +3,7 @@
 
 use crate::context::HookContext;
 use crate::result::HookResult;
-use crate::traits::{Hook, MetricHook};
+use crate::traits::{Hook, MetricHook, ReplayableHook};
 use crate::types::{HookMetadata, Language, Priority};
 use anyhow::Result;
 use async_trait::async_trait;
@@ -683,5 +683,97 @@ mod tests {
         assert!(config.retry_on_rate_limit);
         assert!(config.retryable_errors.contains("timeout"));
         assert!(config.retryable_errors.contains("connection_error"));
+    }
+}
+
+#[async_trait]
+impl ReplayableHook for RetryHook {
+    fn is_replayable(&self) -> bool {
+        true
+    }
+
+    fn serialize_context(&self, ctx: &HookContext) -> Result<Vec<u8>> {
+        // Create a serializable version of the context with retry config
+        let mut context_data = ctx.data.clone();
+
+        // Add retry configuration for replay
+        context_data.insert(
+            "_retry_config".to_string(),
+            serde_json::json!({
+                "max_attempts": self.config.max_attempts,
+                "backoff_strategy": match &self.config.backoff_strategy {
+                    BackoffStrategy::Fixed(d) => serde_json::json!({
+                        "type": "fixed",
+                        "delay_ms": d.as_millis()
+                    }),
+                    BackoffStrategy::Linear { base, increment } => serde_json::json!({
+                        "type": "linear",
+                        "base_ms": base.as_millis(),
+                        "increment_ms": increment.as_millis()
+                    }),
+                    BackoffStrategy::Exponential { base, multiplier, max } => serde_json::json!({
+                        "type": "exponential",
+                        "base_ms": base.as_millis(),
+                        "multiplier": multiplier,
+                        "max_ms": max.as_millis()
+                    }),
+                    BackoffStrategy::Fibonacci { base, max } => serde_json::json!({
+                        "type": "fibonacci",
+                        "base_ms": base.as_millis(),
+                        "max_ms": max.as_millis()
+                    }),
+                },
+                "jitter_strategy": match &self.config.jitter_strategy {
+                    JitterStrategy::None => "none",
+                    JitterStrategy::Full => "full",
+                    JitterStrategy::Equal => "equal",
+                    JitterStrategy::Decorrelated { .. } => "decorrelated",
+                },
+                "retry_on_timeout": self.config.retry_on_timeout,
+                "retry_on_rate_limit": self.config.retry_on_rate_limit,
+                "retryable_errors_count": self.config.retryable_errors.len(),
+                "non_retryable_errors_count": self.config.non_retryable_errors.len(),
+            }),
+        );
+
+        // Add retry state if present
+        let retry_states = self.attempt_tracker.read();
+        if let Some(state) = retry_states.get(&ctx.correlation_id.to_string()) {
+            context_data.insert(
+                "_retry_state".to_string(),
+                serde_json::json!({
+                    "attempts": state.attempts,
+                    "last_delay_ms": state.last_delay.map(|d| d.as_millis()),
+                    "total_delay_ms": state.total_delay.as_millis(),
+                }),
+            );
+        }
+
+        // Add metrics snapshot
+        let metrics = self.metrics.read().unwrap();
+        context_data.insert(
+            "_retry_metrics".to_string(),
+            serde_json::to_value(&*metrics)?,
+        );
+
+        let mut replay_context = ctx.clone();
+        replay_context.data = context_data;
+
+        Ok(serde_json::to_vec(&replay_context)?)
+    }
+
+    fn deserialize_context(&self, data: &[u8]) -> Result<HookContext> {
+        let mut context: HookContext = serde_json::from_slice(data)?;
+
+        // Remove the retry-specific data from context
+        context.data.remove("_retry_config");
+        context.data.remove("_retry_state");
+        context.data.remove("_retry_metrics");
+
+        Ok(context)
+    }
+
+    fn replay_id(&self) -> String {
+        format!("{}:{}", self.metadata.name, self.metadata.version)
     }
 }

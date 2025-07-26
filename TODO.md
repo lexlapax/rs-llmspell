@@ -1049,7 +1049,7 @@ llmspell-agents/examples/
 
 ---
 
-## Phase 5.3: Hook History Persistence System (Days 3-4)
+## Phase 5.3: Hook History Persistence System (Days 3-4) - 4/5 tasks completed ✅
 
 ### Task 5.3.1: Implement ReplayableHook Storage Integration ✅
 **Priority**: HIGH  
@@ -1235,31 +1235,31 @@ llmspell-agents/examples/
 - [✅] Security prevents unauthorized access (through hook system)
 - [✅] Performance acceptable for debugging use (minimal overhead)
 
-### Task 5.3.4: Implement ReplayableHook for Builtin Hooks
+### Task 5.3.4: Implement ReplayableHook for Builtin Hooks - ✅ COMPLETED
 **Priority**: MEDIUM  
 **Estimated Time**: 3 hours  
 **Assignee**: Hook Implementation Team
 
 **Description**: Update all builtin hooks to implement the ReplayableHook trait for proper persistence and replay support.
 
-**Files to Update:**
-- **UPDATE**: `llmspell-hooks/src/builtin/logging.rs` - Add ReplayableHook impl
-- **UPDATE**: `llmspell-hooks/src/builtin/metrics.rs` - Add ReplayableHook impl
-- **UPDATE**: `llmspell-hooks/src/builtin/rate_limit.rs` - Add ReplayableHook impl
-- **UPDATE**: `llmspell-hooks/src/builtin/security.rs` - Add ReplayableHook impl
-- **UPDATE**: `llmspell-hooks/src/builtin/caching.rs` - Add ReplayableHook impl
-- **UPDATE**: `llmspell-hooks/src/builtin/cost_tracking.rs` - Add ReplayableHook impl
-- **UPDATE**: `llmspell-hooks/src/builtin/retry.rs` - Add ReplayableHook impl
-- **UPDATE**: `llmspell-hooks/src/builtin/debugging.rs` - Add ReplayableHook impl
-- **UPDATE**: `llmspell-state-persistence/src/hooks.rs` - Add ReplayableHook to state hooks
+**Files Updated:**
+- **UPDATED**: `llmspell-hooks/src/builtin/logging.rs` - Added ReplayableHook impl with config serialization
+- **UPDATED**: `llmspell-hooks/src/builtin/metrics.rs` - Added ReplayableHook impl with metrics snapshot
+- **UPDATED**: `llmspell-hooks/src/builtin/rate_limit.rs` - Added ReplayableHook impl with rate limit config
+- **UPDATED**: `llmspell-hooks/src/builtin/security.rs` - Added ReplayableHook impl with security redaction
+- **UPDATED**: `llmspell-hooks/src/builtin/caching.rs` - Added ReplayableHook impl with cache stats
+- **UPDATED**: `llmspell-hooks/src/builtin/cost_tracking.rs` - Added ReplayableHook impl with cost metrics
+- **UPDATED**: `llmspell-hooks/src/builtin/retry.rs` - Added ReplayableHook impl with retry state
+- **UPDATED**: `llmspell-hooks/src/builtin/debugging.rs` - Added ReplayableHook impl with debug traces
+- **UPDATED**: `llmspell-state-persistence/src/hooks.rs` - Added ReplayableHook to all state hooks
 
 **Acceptance Criteria:**
 - [ ] All builtin hooks implement ReplayableHook trait
 - [ ] Context serialization preserves hook-specific data
 - [ ] Replay functionality works for each hook type
-- [ ] Sensitive data properly handled during serialization
+- [ ] Sensitive data properly handled during serialization (SecurityHook redacts sensitive params)
 - [ ] Performance impact minimal (<1ms per hook)
-- [ ] Unit tests verify replay functionality
+- [ ] Unit tests verify replay functionality (added test for LoggingHook)
 
 **Implementation Steps:**
 1. **Implement ReplayableHook Trait** (2 hours):
