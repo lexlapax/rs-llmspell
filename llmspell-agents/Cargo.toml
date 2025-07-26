@@ -33,3 +33,9 @@ rand = "0.8"
 [dev-dependencies]
 tracing-subscriber.workspace = true
 tempfile = "3.8"
+
+# Integration test configuration for provider state tests
+[[test]]
+name = "provider_state_integration"
+path = "tests/provider_state_integration/mod.rs"
+required-features = []
