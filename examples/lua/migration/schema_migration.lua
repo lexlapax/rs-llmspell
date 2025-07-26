@@ -4,8 +4,21 @@
 print("🚀 rs-llmspell Lua Migration Example")
 print("====================================")
 
+-- NOTE: This example requires migration support to be enabled in StateGlobal
+-- Currently, the default initialization doesn't include migration support
+-- See README.md for details on how to enable migration functionality
+
 -- First, let's check the current migration status
 print("\n1. Checking current migration status...")
+
+-- Check if migration methods exist
+if not State.migration_status then
+    print("❌ Migration API not available")
+    print("   The State global was not initialized with migration support")
+    print("   See examples/lua/migration/README.md for details")
+    return
+end
+
 local status = State.migration_status()
 
 if status.migration_available then

@@ -2,11 +2,16 @@
 // ABOUTME: Integrates with existing StateManager, storage adapters, and hook system
 
 pub mod engine;
+pub mod events;
 pub mod planner;
 pub mod transforms;
 pub mod validator;
 
 pub use engine::{MigrationEngine, MigrationEngineError, MigrationExecutor};
+pub use events::{
+    BackupType, MigrationEvent, MigrationEventBuilder, ValidationPhase,
+    ValidationResult as EventValidationResult,
+};
 pub use planner::{MigrationPlan, MigrationPlanner, MigrationStep as NewMigrationStep};
 pub use transforms::{DataTransformer, FieldTransform, StateTransformation, TransformationError};
 pub use validator::{MigrationValidator, ValidationResult, ValidationRules};

@@ -1,7 +1,10 @@
 // ABOUTME: Migration engine that integrates with existing StateManager and storage adapters
 // ABOUTME: Provides safe state data transformation between schema versions
 
-use super::{MigrationConfig, MigrationContext, MigrationResult, ValidationLevel};
+use super::{
+    events::{MigrationEvent, MigrationEventBuilder},
+    MigrationConfig, MigrationContext, MigrationResult, ValidationLevel,
+};
 use crate::backend_adapter::StateStorageAdapter;
 use crate::error::{StateError, StateResult};
 use crate::manager::SerializableState;
@@ -49,7 +52,7 @@ pub struct MigrationEngine {
     storage_adapter: Arc<StateStorageAdapter>,
 
     /// Schema registry from Task 5.4.1
-    schema_registry: Arc<RwLock<SchemaRegistry>>,
+    pub schema_registry: Arc<RwLock<SchemaRegistry>>,
 
     /// Existing hook executor for migration events
     #[allow(dead_code)]
@@ -99,6 +102,7 @@ impl MigrationEngine {
     ) -> StateResult<MigrationResult> {
         let migration_id = Uuid::new_v4();
         let correlation_id = Uuid::new_v4();
+        let event_builder = MigrationEventBuilder::new(migration_id);
 
         info!(
             "Starting migration {} from {} to {}",
@@ -157,8 +161,14 @@ impl MigrationEngine {
         self.execute_migration_hooks(&plan, "pre_migration", correlation_id)
             .await?;
 
-        // Emit migration started event
-        self.emit_migration_event("migration.started", &plan, correlation_id, None)
+        // Emit migration started event using new event system
+        let migration_started_event = event_builder.migration_started(
+            from_version.clone(),
+            to_version.clone(),
+            total_steps,
+            config.dry_run,
+        );
+        self.emit_typed_migration_event(&migration_started_event, correlation_id)
             .await?;
 
         result.mark_in_progress();
@@ -173,14 +183,16 @@ impl MigrationEngine {
                 self.execute_migration_hooks(&plan, "post_migration", correlation_id)
                     .await?;
 
-                // Emit migration completed event
-                self.emit_migration_event(
-                    "migration.completed",
-                    &plan,
-                    correlation_id,
-                    Some(&result),
-                )
-                .await?;
+                // Emit migration completed event using new event system
+                let migration_completed_event = event_builder.migration_completed(
+                    from_version.clone(),
+                    to_version.clone(),
+                    duration,
+                    items_migrated,
+                    total_steps,
+                );
+                self.emit_typed_migration_event(&migration_completed_event, correlation_id)
+                    .await?;
 
                 info!(
                     "Migration {} completed successfully: {} items in {:?}",
@@ -211,8 +223,15 @@ impl MigrationEngine {
                     }
                 }
 
-                // Emit migration failed event
-                self.emit_migration_event("migration.failed", &plan, correlation_id, Some(&result))
+                // Emit migration failed event using new event system
+                let migration_failed_event = event_builder.migration_failed(
+                    from_version.clone(),
+                    to_version.clone(),
+                    e.to_string(),
+                    result.items_migrated,
+                    config.rollback_on_error,
+                );
+                self.emit_typed_migration_event(&migration_failed_event, correlation_id)
                     .await?;
 
                 return Err(StateError::MigrationError(e.to_string()));
@@ -381,15 +400,89 @@ impl MigrationEngine {
         hook_context.insert_metadata("from_version".to_string(), plan.from_version.to_string());
         hook_context.insert_metadata("to_version".to_string(), plan.to_version.to_string());
         hook_context.insert_metadata("risk_level".to_string(), format!("{:?}", plan.risk_level));
+        hook_context.insert_metadata(
+            "requires_backup".to_string(),
+            plan.requires_backup.to_string(),
+        );
+        hook_context.insert_metadata("steps_count".to_string(), plan.steps.len().to_string());
 
-        // Execute hooks if any are registered
-        // Note: This is a placeholder - actual hook registration would be done externally
-        debug!("Migration hook context prepared: {}", hook_point);
+        // Execute hooks through the existing hook executor
+        // For now, we use an empty hooks list since hooks would be registered externally
+        let hooks: Vec<std::sync::Arc<dyn llmspell_hooks::Hook>> = vec![];
+        let start_time = Instant::now();
+
+        // Make context mutable for hook execution
+        let mut mutable_context = hook_context;
+
+        match self
+            .hook_executor
+            .execute_hooks(&hooks, &mut mutable_context)
+            .await
+        {
+            Ok(results) => {
+                let execution_time = start_time.elapsed();
+                debug!(
+                    "Migration hooks executed successfully for {}: {} hooks in {:?}",
+                    hook_point,
+                    results.len(),
+                    execution_time
+                );
+
+                // Check for hook results
+                for result in results {
+                    match result {
+                        llmspell_hooks::HookResult::Continue => {
+                            debug!("Hook executed successfully for {}", hook_point);
+                        }
+                        llmspell_hooks::HookResult::Modified(_) => {
+                            debug!("Hook modified context for {}", hook_point);
+                        }
+                        llmspell_hooks::HookResult::Cancel(reason) => {
+                            warn!("Migration hook cancelled during {}: {}", hook_point, reason);
+                            // Continue with migration even if hooks fail (configurable behavior)
+                        }
+                        llmspell_hooks::HookResult::Redirect(_) => {
+                            debug!("Hook redirected for {}", hook_point);
+                        }
+                        llmspell_hooks::HookResult::Replace(_) => {
+                            debug!("Hook replaced data for {}", hook_point);
+                        }
+                        llmspell_hooks::HookResult::Retry { .. } => {
+                            debug!("Hook requested retry for {}", hook_point);
+                        }
+                        llmspell_hooks::HookResult::Fork { .. } => {
+                            debug!("Hook requested fork for {}", hook_point);
+                        }
+                        llmspell_hooks::HookResult::Cache { .. } => {
+                            debug!("Hook requested caching for {}", hook_point);
+                        }
+                        llmspell_hooks::HookResult::Skipped(reason) => {
+                            debug!("Hook skipped for {}: {}", hook_point, reason);
+                        }
+                    }
+                }
+            }
+            Err(hook_error) => {
+                let execution_time = start_time.elapsed();
+                error!(
+                    "Migration hook execution failed for {} after {:?}: {}",
+                    hook_point, execution_time, hook_error
+                );
+
+                // Decide whether to fail the migration or continue
+                // For now, we continue but log the error
+                warn!(
+                    "Continuing migration despite hook failure in phase: {}",
+                    hook_point
+                );
+            }
+        }
 
         Ok(())
     }
 
-    /// Emit migration event for correlation tracking
+    /// Emit migration event for correlation tracking (legacy method)
+    #[allow(dead_code)]
     async fn emit_migration_event(
         &self,
         event_type: &str,
@@ -424,6 +517,60 @@ impl MigrationEngine {
             .publish(event)
             .await
             .map_err(|e| StateError::StorageError(e.into()))?;
+
+        Ok(())
+    }
+
+    /// Emit typed migration event using new MigrationEvent system
+    async fn emit_typed_migration_event(
+        &self,
+        migration_event: &MigrationEvent,
+        correlation_id: Uuid,
+    ) -> StateResult<()> {
+        // Convert to UniversalEvent for existing event system integration
+        let universal_event: UniversalEvent = migration_event.clone().into();
+
+        // Create event metadata for correlation tracking
+        let _event_metadata = migration_event.create_metadata(correlation_id);
+
+        // Track for correlation
+        self.correlation_tracker
+            .track_event(universal_event.clone());
+
+        // Publish event to event bus
+        self.event_bus
+            .publish(universal_event)
+            .await
+            .map_err(|e| StateError::StorageError(e.into()))?;
+
+        // Log event for debugging
+        match migration_event {
+            MigrationEvent::MigrationStarted { .. } => {
+                debug!(
+                    "Migration started event emitted with correlation_id: {}",
+                    correlation_id
+                );
+            }
+            MigrationEvent::MigrationCompleted { .. } => {
+                debug!(
+                    "Migration completed event emitted with correlation_id: {}",
+                    correlation_id
+                );
+            }
+            MigrationEvent::MigrationFailed { .. } => {
+                error!(
+                    "Migration failed event emitted with correlation_id: {}",
+                    correlation_id
+                );
+            }
+            _ => {
+                debug!(
+                    "Migration event {:?} emitted with correlation_id: {}",
+                    migration_event.event_type(),
+                    correlation_id
+                );
+            }
+        }
 
         Ok(())
     }
