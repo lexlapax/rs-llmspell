@@ -4,7 +4,7 @@
 **Date**: July 2025  
 **Last Updated**: 2025-07-25  
 **Design Document Status**: Updated with implementation realities and integration requirements  
-**Status**: Implementation In Progress (16/22 tasks completed)  
+**Status**: Implementation In Progress (16/24 tasks completed)  
 **Phase**: 5 (Persistent State Management with Hook Integration)  
 **Timeline**: Weeks 19-20 (10 working days)  
 **Priority**: MEDIUM (Production Important)  
@@ -18,7 +18,7 @@
 - **Phase 5.1**: ✅ COMPLETED (3/3 tasks) - StateManager infrastructure with hook integration
 - **Phase 5.2**: ✅ COMPLETED (8/8 tasks) - Agent state serialization 
 - **Phase 5.3**: ✅ COMPLETED (5/5 tasks) - Hook storage and replay
-- **Phase 5.4**: 📋 TODO (0/3 tasks) - State migration framework
+- **Phase 5.4**: 📋 TODO (0/5 tasks) - State migration framework
 - **Phase 5.5**: 📋 TODO (0/3 tasks) - Backup and recovery
 - **Phase 5.6**: 📋 TODO (0/3 tasks) - Integration testing
 - **Phase 5.7**: 📋 TODO (0/3 tasks) - Phase 6 preparation
@@ -1363,156 +1363,308 @@ llmspell-agents/examples/
 
 ---
 
-## Phase 5.4: State Migration and Versioning System (Days 4-5)
+## Phase 5.4: State Migration and Versioning System (Days 4-5) 📋 TODO (0/5 tasks)
 
-### Task 5.4.1: Implement State Schema Versioning
+**🔍 MEGATHINK ANALYSIS UPDATE**: This phase has been redesigned based on comprehensive codebase analysis to properly build on existing architecture in `llmspell-state-persistence` crate.
+
+**Key Architectural Discoveries:**
+- ✅ `StateSchema`, `FieldSchema`, `MigrationStep` already exist in `config.rs`
+- ✅ `StateError` already has `MigrationError` and `SchemaVersionMismatch` variants  
+- ✅ `StateManager` uses `StateSchema::v1()` with hook integration infrastructure
+- ✅ Complete storage adapter, error handling, and concurrent access patterns in place
+
+### Task 5.4.1: Enhance Existing Schema Versioning System
 **Priority**: CRITICAL  
-**Estimated Time**: 5 hours  
+**Estimated Time**: 4 hours  
 **Assignee**: Schema Management Team Lead
 
-**Description**: Build comprehensive schema versioning system that enables safe state evolution across rs-llmspell versions. Enhance existing StateSchema and MigrationStep structures.
+**Description**: Build on existing StateSchema infrastructure in config.rs to add semantic versioning, schema registry, and compatibility validation. Integrate with existing StateManager and storage adapters.
 
 **Files to Create/Update:**
-- **CREATE**: `llmspell-state-persistence/src/schema/mod.rs` - Schema module structure
-- **CREATE**: `llmspell-state-persistence/src/schema/version.rs` - Enhanced versioning
-- **CREATE**: `llmspell-state-persistence/src/schema/registry.rs` - Schema registry
-- **CREATE**: `llmspell-state-persistence/src/migration/mod.rs` - Migration framework
-- **CREATE**: `llmspell-state-persistence/src/migration/executor.rs` - Migration executor
-- **UPDATE**: `llmspell-state-persistence/src/config.rs` - Enhance StateSchema
-- **UPDATE**: `llmspell-state-persistence/src/manager.rs` - Schema validation integration
+- **CREATE**: `llmspell-state-persistence/src/schema/mod.rs` - Schema management module
+- **CREATE**: `llmspell-state-persistence/src/schema/registry.rs` - Schema registry with compatibility checking
+- **CREATE**: `llmspell-state-persistence/src/schema/versioning.rs` - Semantic versioning for schemas
+- **CREATE**: `llmspell-state-persistence/src/schema/validator.rs` - Schema validation and compatibility
+- **ENHANCE**: `llmspell-state-persistence/src/config.rs` - Add semantic version fields to StateSchema
+- **UPDATE**: `llmspell-state-persistence/src/manager.rs` - Integrate schema registry with StateManager
+- **UPDATE**: `llmspell-state-persistence/src/lib.rs` - Export new schema management types
 
 **Acceptance Criteria:**
-- [ ] Schema versions tracked with semantic versioning
-- [ ] Schema registry validates compatibility before operations
-- [ ] Breaking changes detected and handled gracefully  
-- [ ] Schema evolution supports additive and transformative changes
-- [ ] Validation prevents incompatible schema usage
-- [ ] Performance impact minimal for schema checks (<1ms)
-- [ ] Schema documentation generated automatically
-- [ ] Development tools support schema evolution testing
+- [ ] Semantic versioning added to existing StateSchema (major.minor.patch format)
+- [ ] Schema registry integrates with existing StateManager.state_schema field
+- [ ] Compatibility validation uses existing CompatibilityLevel enum
+- [ ] Breaking changes detected using existing StateError::SchemaVersionMismatch
+- [ ] Schema validation integrates with existing StateStorageAdapter
+- [ ] Performance impact <1ms using existing RwLock patterns
+- [ ] Registry works with existing hook system for schema change events
+- [ ] Integration maintains existing API compatibility for StateManager
 
 **Implementation Steps:**
-1. **Enhance Existing Schema System** (2 hours):
-   - Build on existing StateSchema in config.rs
-   - Add semantic versioning support
-   - Enhance MigrationStep with migration logic
-   - Note: StateSchema, FieldSchema, CompatibilityLevel, and MigrationStep already exist in llmspell-state-persistence/src/config.rs
+1. **Enhance Existing StateSchema** (1.5 hours):
+   ```rust
+   // Enhance existing StateSchema in config.rs
+   pub struct StateSchema {
+       pub version: u32,        // existing
+       pub semantic_version: SemanticVersion, // NEW: major.minor.patch
+       pub hash: String,        // existing
+       pub fields: HashMap<String, FieldSchema>, // existing
+       pub compatibility: CompatibilityLevel, // existing
+       pub migration_path: Vec<MigrationStep>, // existing
+       pub dependencies: Vec<SchemaId>, // NEW: schema dependencies
+   }
+   ```
 
-2. **Implement Schema Registry** (2 hours):
-   - Schema registration and lookup
-   - Compatibility checking
-   - Validation rule enforcement
-   - Schema dependency management
+2. **Create Schema Registry** (2 hours):
+   - Build registry that manages multiple StateSchema versions
+   - Integrate with existing StateManager architecture
+   - Use existing error handling patterns (StateError, StateResult)
+   - Follow existing concurrency patterns (Arc<RwLock<T>>)
 
-3. **Add Development Tools** (1 hour):
-   - Schema evolution testing
-   - Compatibility validation
-   - Documentation generation
+3. **Add Validation Integration** (0.5 hours):
+   - Integrate with existing StateManager.set_with_hooks()
+   - Use existing state change hook infrastructure
+   - Maintain existing performance characteristics
 
 **Definition of Done:**
-- [ ] Schema versioning system functional
-- [ ] Registry validates schemas correctly
-- [ ] Compatibility checking prevents issues
-- [ ] Development tools support schema evolution
-- [ ] Performance meets requirements
-- [ ] Documentation comprehensive
+- [ ] Schema versioning enhances (not replaces) existing StateSchema
+- [ ] Registry integrates seamlessly with existing StateManager
+- [ ] All existing tests continue to pass
+- [ ] Performance maintains existing <1ms state operation targets
+- [ ] Hook integration works with existing state change hooks
+- [ ] Error handling uses existing StateError patterns
 
-### Task 5.4.2: Build State Migration Framework
+### Task 5.4.2: Build State Migration Framework Integration
 **Priority**: CRITICAL  
 **Estimated Time**: 6 hours  
 **Assignee**: Migration Framework Team
 
-**Description**: Implement robust migration framework that safely transforms state data between schema versions without data loss.
+**Description**: Build migration framework within llmspell-state-persistence that integrates with existing StateManager, StateStorageAdapter, and hook system. Transform state data between schema versions while preserving existing architecture patterns.
 
 **Files to Create/Update:**
-- **CREATE**: `llmspell-core/src/state/migration/migrator.rs` - Core migration engine
-- **CREATE**: `llmspell-core/src/state/migration/transforms.rs` - Migration transformations
-- **CREATE**: `llmspell-core/src/state/migration/validator.rs` - Migration validation
-- **CREATE**: `tests/state/migration_tests.rs` - Comprehensive migration tests
+- **CREATE**: `llmspell-state-persistence/src/migration/mod.rs` - Migration module structure
+- **CREATE**: `llmspell-state-persistence/src/migration/engine.rs` - Migration engine using StateStorageAdapter
+- **CREATE**: `llmspell-state-persistence/src/migration/transforms.rs` - Migration transformations
+- **CREATE**: `llmspell-state-persistence/src/migration/validator.rs` - Migration validation
+- **CREATE**: `llmspell-state-persistence/src/migration/planner.rs` - Migration planning and execution
+- **ENHANCE**: `llmspell-state-persistence/src/config.rs` - Add migration configuration to MigrationStep
+- **UPDATE**: `llmspell-state-persistence/src/manager.rs` - Integrate migration with StateManager
+- **CREATE**: `llmspell-state-persistence/tests/migration_tests.rs` - Migration integration tests
 
 **Acceptance Criteria:**
-- [ ] Migration engine applies transformations safely
-- [ ] Data validation prevents corruption during migration
-- [ ] Rollback capability in case of migration failures
-- [ ] Incremental migrations support complex transformation chains
-- [ ] Performance acceptable for large state datasets
-- [ ] Migration logging tracks all transformations
-- [ ] Dry-run mode allows migration testing
-- [ ] Custom migration scripts supported for complex cases
+- [ ] Migration engine integrates with existing StateStorageAdapter patterns
+- [ ] Migration uses existing StateError::MigrationError for error handling
+- [ ] Migration triggers existing state change hooks during transformation
+- [ ] Rollback uses existing storage backend transaction capabilities
+- [ ] Migration respects existing agent_state_locks for concurrent access
+- [ ] Performance integrates with existing StateManager performance monitoring
+- [ ] Migration events integrate with existing EventCorrelationTracker
+- [ ] Agent state migration works with existing PersistentAgent trait (from 5.2.4)
 
 **Implementation Steps:**
-1. **Build Migration Engine** (3 hours):
-   - Migration plan generation
-   - Transform application with validation
-   - Error handling and rollback
-   - Progress tracking for large migrations
+1. **Build Migration Engine with Existing Architecture** (2.5 hours):
+   ```rust
+   // Migration engine that uses existing patterns
+   pub struct MigrationEngine {
+       storage_adapter: Arc<StateStorageAdapter>, // existing
+       schema_registry: Arc<SchemaRegistry>,      // from 5.4.1
+       hook_executor: Arc<HookExecutor>,          // existing
+       correlation_tracker: Arc<EventCorrelationTracker>, // existing
+   }
+   ```
+   - Use existing StateStorageAdapter for all storage operations
+   - Integrate with existing hook system for migration events
+   - Follow existing error handling patterns (StateResult<T>)
 
-2. **Implement Standard Transformations** (2 hours):
-   - Field addition/removal/renaming
-   - Type conversions and validation
-   - Data restructuring operations
-   - Custom transformation scripting
+2. **Add Agent State Migration Integration** (2 hours):
+   - Support PersistentAgent trait migration (conversation history, tool stats)
+   - Use existing agent_state_locks for concurrent migration safety
+   - Integrate with existing agent state serialization from agent_state.rs
 
-3. **Add Safety Features** (1 hour):
-   - Pre-migration validation
-   - Atomic migration operations
-   - Backup creation before migration
-   - Migration verification
+3. **Create Migration Transformations** (1 hour):
+   - Field transformations using existing FieldSchema validation
+   - Work with existing SerializableState structure
+   - Use existing sensitive data protection from sensitive_data.rs
+
+4. **Add Safety and Rollback** (0.5 hours):
+   - Use existing storage backend transaction support
+   - Leverage existing backup creation patterns from StateManager
+   - Integrate with existing state validation hooks
 
 **Definition of Done:**
-- [ ] Migration engine handles all transformation types
-- [ ] Safety features prevent data loss
-- [ ] Performance acceptable for production use
-- [ ] Rollback capability works correctly
-- [ ] Validation ensures migration correctness
-- [ ] Logging provides complete audit trail
+- [ ] Migration framework follows all existing architectural patterns
+- [ ] Integration with StateManager, storage adapters, and hook system complete
+- [ ] Agent state migration works with existing PersistentAgent infrastructure
+- [ ] All existing performance and concurrency guarantees maintained
+- [ ] Migration events properly tracked in existing correlation system
+- [ ] Error handling consistent with existing StateError patterns
 
-### Task 5.4.3: Create Migration Testing and Validation Tools
+### Task 5.4.3: Migration Testing and Integration Validation
 **Priority**: HIGH  
-**Estimated Time**: 4 hours  
+**Estimated Time**: 3 hours  
 **Assignee**: Migration Testing Team
 
-**Description**: Build comprehensive testing tools that validate migration correctness and performance across different scenarios.
+**Description**: Create comprehensive migration tests within existing test structure and migration examples following established patterns. Integrate with existing performance benchmark infrastructure.
 
 **Files to Create/Update:**
-- **CREATE**: `tools/state_migration/test_migrations.rs` - Migration testing tool
-- **CREATE**: `tools/state_migration/validate_schema.rs` - Schema validation tool
-- **CREATE**: `scripts/test_migration_performance.sh` - Performance testing script
-- **CREATE**: `examples/state_migration/` - Migration examples
+- **ENHANCE**: `llmspell-state-persistence/tests/migration_tests.rs` - Comprehensive migration test suite
+- **CREATE**: `llmspell-state-persistence/examples/migration_example.rs` - Migration usage example
+- **CREATE**: `llmspell-state-persistence/examples/schema_evolution.rs` - Schema evolution patterns
+- **ENHANCE**: `tests/performance/benches/state_persistence.rs` - Add migration performance benchmarks
+- **CREATE**: `llmspell-state-persistence/tests/integration/migration_integration.rs` - Integration tests
 
 **Acceptance Criteria:**
-- [ ] Migration testing tool validates all migration paths
-- [ ] Performance testing identifies bottlenecks
-- [ ] Schema validation prevents incompatible migrations
-- [ ] Examples demonstrate common migration scenarios
-- [ ] Automated testing integrates with CI/CD pipeline
-- [ ] Test data generation supports various scenarios
-- [ ] Regression testing prevents migration failures
-- [ ] Documentation guides migration development
+- [ ] Migration tests integrate with existing llmspell-state-persistence test structure
+- [ ] Performance benchmarks integrate with existing tests/performance/ infrastructure
+- [ ] Schema validation tests use existing StateError patterns
+- [ ] Examples follow existing examples/ patterns (migration_example.rs, schema_evolution.rs)
+- [ ] Integration tests work with existing StateManager and storage adapters
+- [ ] Test coverage includes agent state migration with PersistentAgent trait
+- [ ] Performance regression testing for existing <1ms state operation targets
+- [ ] Tests validate migration with existing hook system integration
 
 **Implementation Steps:**
-1. **Build Testing Tools** (2 hours):
-   - Migration correctness validation
-   - Performance benchmarking
-   - Test data generation
-   - Automated test execution
+1. **Create Migration Test Suite** (1.5 hours):
+   ```rust
+   // Integration with existing test patterns
+   #[cfg(test)]
+   mod migration_tests {
+       use super::*;
+       use llmspell_state_persistence::{StateManager, StateSchema, MigrationEngine};
+       
+       #[tokio::test]
+       async fn test_agent_state_migration() { /* ... */ }
+       
+       #[tokio::test] 
+       async fn test_schema_compatibility_validation() { /* ... */ }
+       
+       #[tokio::test]
+       async fn test_migration_with_hooks() { /* ... */ }
+   }
+   ```
 
-2. **Create Examples and Documentation** (1 hour):
-   - Common migration patterns
-   - Best practices guide
-   - Troubleshooting documentation
+2. **Add Performance Benchmarks** (1 hour):
+   - Enhance existing `tests/performance/benches/state_persistence.rs`
+   - Add migration-specific benchmarks
+   - Measure performance against existing <1ms targets
 
-3. **Integrate with CI/CD** (1 hour):
-   - Automated migration testing
-   - Performance regression detection
-   - Schema compatibility validation
+3. **Create Migration Examples** (0.5 hours):
+   - migration_example.rs showing basic schema evolution
+   - schema_evolution.rs showing complex transformation patterns
+   - Follow existing example structure and patterns
 
 **Definition of Done:**
-- [ ] Testing tools validate migrations correctly
-- [ ] Performance testing identifies issues
-- [ ] Examples demonstrate migration patterns
-- [ ] CI/CD integration functional
-- [ ] Documentation comprehensive and clear
+- [ ] All migration tests pass within existing test infrastructure
+- [ ] Performance benchmarks integrated with existing benchmark suite
+- [ ] Examples demonstrate real-world migration scenarios
+- [ ] Test coverage validates integration with existing architecture
+- [ ] Performance meets existing targets for state operations
+
+### Task 5.4.4: Script Bridge Integration for Migration
+**Priority**: MEDIUM  
+**Estimated Time**: 2 hours  
+**Assignee**: Bridge Integration Team
+
+**Description**: Integrate migration functionality with existing Lua/JavaScript bridge API from Task 5.2.7. Allow scripts to trigger and monitor state migrations programmatically.
+
+**Files to Create/Update:**
+- **ENHANCE**: `llmspell-bridge/src/globals/state_global.rs` - Add migration operations to StateGlobal
+- **ENHANCE**: `llmspell-bridge/src/lua/globals/state.rs` - Add migration functions to Lua State API
+- **ENHANCE**: `llmspell-bridge/src/javascript/globals/state.rs` - Add migration functions to JS State API  
+- **CREATE**: `examples/lua/migration/schema_migration.lua` - Lua migration example
+- **CREATE**: `llmspell-state-persistence/tests/bridge_migration_tests.rs` - Bridge migration tests
+
+**Acceptance Criteria:**
+- [ ] Scripts can trigger migration: `State.migrate_to_version(target_version)` 
+- [ ] Scripts can check migration status: `State.get_migration_status()`
+- [ ] Migration operations integrate with existing State bridge API patterns
+- [ ] Async migration operations properly bridged to sync script context
+- [ ] Error handling follows existing bridge error propagation patterns
+- [ ] Migration progress callbacks supported for long-running migrations
+- [ ] Script API maintains consistency with existing State operations
+- [ ] Integration preserves existing StateManager thread safety
+
+**Implementation Steps:**
+1. **Enhance StateGlobal** (0.5 hours):
+   - Add migration operations to existing StateGlobal struct
+   - Use existing StateManager integration patterns
+   - Follow existing async-to-sync bridging approach
+
+2. **Add Lua/JS Bridge Methods** (1 hour):
+   - Extend existing State API with migration methods
+   - Use existing error handling and value conversion utilities
+   - Follow patterns from existing state save/load operations
+
+3. **Create Examples and Tests** (0.5 hours):
+   - Lua migration example following existing examples/lua/ patterns
+   - Bridge tests following existing bridge test patterns
+   - Integration with existing script testing infrastructure
+
+**Definition of Done:**
+- [ ] Migration operations available in both Lua and JavaScript
+- [ ] Integration follows all existing bridge architectural patterns
+- [ ] Performance acceptable for script-triggered migrations (<10ms overhead)
+- [ ] Error handling consistent with existing bridge error patterns
+- [ ] Examples demonstrate practical migration use cases
+
+### Task 5.4.5: Migration Event and Hook Integration
+**Priority**: MEDIUM  
+**Estimated Time**: 2 hours  
+**Assignee**: Event Integration Team
+
+**Description**: Integrate migration operations with existing event correlation system (Task 5.3.2) and state change hooks (Task 5.1.3). Ensure migration events are properly tracked and migration triggers appropriate hooks.
+
+**Files to Create/Update:**
+- **ENHANCE**: `llmspell-state-persistence/src/migration/engine.rs` - Add event emission and hook integration
+- **CREATE**: `llmspell-state-persistence/src/migration/events.rs` - Migration-specific events
+- **ENHANCE**: `llmspell-state-persistence/src/hooks.rs` - Migration state change hooks
+- **ENHANCE**: `llmspell-events/src/correlation/timeline.rs` - Migration event correlation
+- **CREATE**: `llmspell-state-persistence/tests/migration_events_tests.rs` - Migration event tests
+
+**Acceptance Criteria:**
+- [ ] Migration operations emit events to existing EventCorrelationTracker
+- [ ] Migration triggers existing state change hooks (before/after migration)
+- [ ] Migration events include correlation IDs for timeline reconstruction  
+- [ ] Migration hook execution integrates with existing HookExecutor
+- [ ] Migration failures properly tracked in event timeline
+- [ ] Migration events support existing event filtering and querying
+- [ ] Hook execution during migration respects existing performance limits
+- [ ] Migration rollback events properly correlated with original migration
+
+**Implementation Steps:**
+1. **Add Migration Event Integration** (1 hour):
+   ```rust
+   // Integration with existing event correlation
+   pub struct MigrationEngine {
+       correlation_tracker: Arc<EventCorrelationTracker>, // existing
+       hook_executor: Arc<HookExecutor>,                  // existing
+       // ... other fields
+   }
+   
+   // Migration events that integrate with existing timeline
+   pub enum MigrationEvent {
+       MigrationStarted { from_version: u32, to_version: u32 },
+       MigrationCompleted { duration: Duration, state_count: usize },
+       MigrationFailed { error: String, rollback_completed: bool },
+   }
+   ```
+
+2. **Integrate Migration Hooks** (0.5 hours):
+   - Use existing state change hook infrastructure
+   - Trigger hooks before/after each state transformation
+   - Follow existing hook execution patterns and error handling
+
+3. **Add Timeline Integration** (0.5 hours):
+   - Ensure migration events appear in existing timeline reconstruction
+   - Add migration-specific event correlation patterns
+   - Test timeline reconstruction with migration operations
+
+**Definition of Done:**
+- [ ] Migration events properly tracked in existing correlation system
+- [ ] Migration hooks integrate seamlessly with existing state change hooks
+- [ ] Timeline reconstruction includes migration operations with causality chains
+- [ ] Performance overhead for event tracking <1% of migration time
+- [ ] All migration operations visible in existing event query interface
+- [ ] Hook failures during migration handled gracefully
 
 ---
 
