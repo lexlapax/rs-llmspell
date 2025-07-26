@@ -1056,13 +1056,15 @@ llmspell-agents/examples/
 **Estimated Time**: 5 hours  
 **Assignee**: Hook Persistence Team Lead
 
-**Description**: Integrate Phase 4's ReplayableHook trait with persistent storage to enable hook execution history and replay capabilities.
+**Description**: Integrate Phase 4's ReplayableHook trait with persistent storage to enable hook execution history and replay capabilities. Build on existing HookReplayManager in StateManager.
 
 **Files to Create/Update:**
-- **CREATE**: `llmspell-hooks/src/persistence/hook_storage.rs` - Hook execution storage
+- **CREATE**: `llmspell-hooks/src/persistence/mod.rs` - Persistence module structure
+- **CREATE**: `llmspell-hooks/src/persistence/storage.rs` - Hook-specific storage adapter
 - **UPDATE**: `llmspell-hooks/src/executor.rs` - Add persistence to hook execution
 - **CREATE**: `llmspell-hooks/src/persistence/replay.rs` - Hook replay functionality
-- **CREATE**: `llmspell-hooks/src/persistence/serialization.rs` - Hook serialization
+- **UPDATE**: `llmspell-state-persistence/src/manager.rs` - Enhance HookReplayManager
+- **CREATE**: `llmspell-hooks/src/persistence/retention.rs` - Retention policy implementation
 
 **Acceptance Criteria:**
 - [ ] All ReplayableHook implementations store execution history
@@ -1075,20 +1077,11 @@ llmspell-agents/examples/
 - [ ] Sensitive data in hook context properly redacted/encrypted
 
 **Implementation Steps:**
-1. **Define Hook Storage Schema** (1 hour):
-   ```rust
-   #[derive(Debug, Clone, Serialize, Deserialize)]
-   pub struct SerializedHookExecution {
-       pub hook_id: String,
-       pub execution_id: Uuid,
-       pub correlation_id: EventCorrelationId,
-       pub hook_context: SerializedHookContext,
-       pub result: HookResult,
-       pub timestamp: SystemTime,
-       pub duration: Duration,
-       pub metadata: HookExecutionMetadata,
-   }
-   ```
+1. **Enhance Existing Hook Storage** (1 hour):
+   - Build on existing SerializedHookExecution in StateManager
+   - Add hook-specific metadata and retention policies
+   - Integrate with HookExecutor for automatic persistence
+   - Note: SerializedHookExecution already exists in llmspell-state-persistence/src/manager.rs
 
 2. **Implement Storage Operations** (2 hours):
    - Hook execution persistence on completion
@@ -1115,13 +1108,15 @@ llmspell-agents/examples/
 **Estimated Time**: 4 hours  
 **Assignee**: Event Correlation Team
 
-**Description**: Build comprehensive event correlation system that links state changes, hook executions, and agent actions for complete timeline reconstruction.
+**Description**: Build comprehensive event correlation system that links state changes, hook executions, and agent actions for complete timeline reconstruction. Leverage existing correlation_id in UniversalEvent.
 
 **Files to Create/Update:**
-- **CREATE**: `llmspell-core/src/events/correlation.rs` - Event correlation system
-- **UPDATE**: `llmspell-core/src/state/manager.rs` - Add correlation tracking
+- **CREATE**: `llmspell-events/src/correlation/mod.rs` - Event correlation system
+- **CREATE**: `llmspell-events/src/correlation/timeline.rs` - Timeline reconstruction
+- **UPDATE**: `llmspell-state-persistence/src/manager.rs` - Add correlation tracking
 - **UPDATE**: `llmspell-hooks/src/executor.rs` - Hook correlation integration
-- **CREATE**: `llmspell-core/src/events/timeline.rs` - Timeline reconstruction
+- **CREATE**: `llmspell-events/src/correlation/query.rs` - Timeline query interface
+- **UPDATE**: `llmspell-events/src/universal_event.rs` - Enhance correlation support
 
 **Acceptance Criteria:**
 - [ ] All events tagged with correlation IDs for tracing
@@ -1134,10 +1129,11 @@ llmspell-agents/examples/
 - [ ] Privacy controls prevent sensitive data leakage
 
 **Implementation Steps:**
-1. **Implement Correlation ID System** (1 hour):
-   - UUID-based correlation IDs
-   - Automatic ID propagation
-   - Parent-child relationship tracking
+1. **Enhance Existing Correlation System** (1 hour):
+   - Build on existing correlation_id in EventMetadata
+   - Add parent-child relationship tracking
+   - Implement correlation context propagation
+   - Note: correlation_id already exists in llmspell-events/src/universal_event.rs
 
 2. **Build Timeline Reconstruction** (2 hours):
    - Event ordering and causality analysis
@@ -1162,12 +1158,15 @@ llmspell-agents/examples/
 **Estimated Time**: 4 hours  
 **Assignee**: Replay Management Team
 
-**Description**: Build management interface for hook replay operations including replay scheduling, parameter modification, and result comparison.
+**Description**: Build management interface for hook replay operations including replay scheduling, parameter modification, and result comparison. Integrate with existing HookReplayManager.
 
 **Files to Create/Update:**
-- **CREATE**: `llmspell-hooks/src/replay/manager.rs` - Replay management system
+- **CREATE**: `llmspell-hooks/src/replay/mod.rs` - Replay module structure
+- **CREATE**: `llmspell-hooks/src/replay/manager.rs` - Enhanced replay management
 - **CREATE**: `llmspell-hooks/src/replay/scheduler.rs` - Replay scheduling
+- **CREATE**: `llmspell-hooks/src/replay/comparator.rs` - Result comparison
 - **UPDATE**: `llmspell-bridge/src/lua/globals/hook.rs` - Replay API for scripts
+- **UPDATE**: `llmspell-bridge/src/javascript/globals/hook.rs` - JS replay API
 - **CREATE**: `examples/hook_replay/` - Hook replay examples
 
 **Acceptance Criteria:**
@@ -1203,6 +1202,113 @@ llmspell-agents/examples/
 - [ ] Security prevents unauthorized access
 - [ ] Performance acceptable for debugging use
 
+### Task 5.3.4: Implement ReplayableHook for Builtin Hooks
+**Priority**: MEDIUM  
+**Estimated Time**: 3 hours  
+**Assignee**: Hook Implementation Team
+
+**Description**: Update all builtin hooks to implement the ReplayableHook trait for proper persistence and replay support.
+
+**Files to Update:**
+- **UPDATE**: `llmspell-hooks/src/builtin/logging.rs` - Add ReplayableHook impl
+- **UPDATE**: `llmspell-hooks/src/builtin/metrics.rs` - Add ReplayableHook impl
+- **UPDATE**: `llmspell-hooks/src/builtin/rate_limit.rs` - Add ReplayableHook impl
+- **UPDATE**: `llmspell-hooks/src/builtin/security.rs` - Add ReplayableHook impl
+- **UPDATE**: `llmspell-hooks/src/builtin/caching.rs` - Add ReplayableHook impl
+- **UPDATE**: `llmspell-hooks/src/builtin/cost_tracking.rs` - Add ReplayableHook impl
+- **UPDATE**: `llmspell-hooks/src/builtin/retry.rs` - Add ReplayableHook impl
+- **UPDATE**: `llmspell-hooks/src/builtin/debugging.rs` - Add ReplayableHook impl
+- **UPDATE**: `llmspell-state-persistence/src/hooks.rs` - Add ReplayableHook to state hooks
+
+**Acceptance Criteria:**
+- [ ] All builtin hooks implement ReplayableHook trait
+- [ ] Context serialization preserves hook-specific data
+- [ ] Replay functionality works for each hook type
+- [ ] Sensitive data properly handled during serialization
+- [ ] Performance impact minimal (<1ms per hook)
+- [ ] Unit tests verify replay functionality
+
+**Implementation Steps:**
+1. **Implement ReplayableHook Trait** (2 hours):
+   - Add trait implementation to each builtin hook
+   - Handle hook-specific context serialization
+   - Ensure security for sensitive data
+
+2. **Add Tests and Validation** (1 hour):
+   - Unit tests for each hook's replay functionality
+   - Integration tests for replay scenarios
+   - Performance benchmarks
+
+**Definition of Done:**
+- [ ] All builtin hooks support replay
+- [ ] Tests pass for all implementations
+- [ ] Documentation updated
+- [ ] Performance within acceptable limits
+
+### Task 5.3.5: Real Provider Integration Tests for Hook Persistence
+**Priority**: CRITICAL  
+**Estimated Time**: 6 hours  
+**Assignee**: Integration Testing Team
+
+**Description**: Create comprehensive integration tests for hook persistence and replay system with real AI providers (OpenAI, Anthropic). Test hook execution, persistence, and replay during actual LLM interactions.
+
+**Files to Create/Update:**
+- **CREATE**: `llmspell-hooks/tests/provider_hook_integration/mod.rs` - Test module structure
+- **CREATE**: `llmspell-hooks/tests/provider_hook_integration/common.rs` - Shared test utilities
+- **CREATE**: `llmspell-hooks/tests/provider_hook_integration/openai_hook_tests.rs` - OpenAI hook tests
+- **CREATE**: `llmspell-hooks/tests/provider_hook_integration/anthropic_hook_tests.rs` - Anthropic hook tests
+- **CREATE**: `llmspell-hooks/tests/provider_hook_integration/replay_tests.rs` - Hook replay with real providers
+- **CREATE**: `llmspell-hooks/tests/provider_hook_integration/correlation_tests.rs` - Event correlation tests
+- **CREATE**: `llmspell-hooks/tests/provider_hook_integration/timeline_tests.rs` - Timeline reconstruction
+- **CREATE**: `llmspell-hooks/tests/provider_hook_integration/tool_hook_tests.rs` - Tool-triggered hook tests
+- **CREATE**: `llmspell-hooks/tests/provider_hook_integration/workflow_hook_tests.rs` - Workflow hook tests
+- **CREATE**: `examples/hook_persistence_real_providers.rs` - Real provider hook demo
+
+**Acceptance Criteria:**
+- [ ] Hook executions persist during real OpenAI API calls
+- [ ] Hook executions persist during real Anthropic API calls
+- [ ] Replay accurately reproduces hook behavior with real responses
+- [ ] Event correlation tracks real agent/tool/LLM interactions
+- [ ] Timeline reconstruction shows actual causality chains
+- [ ] Performance acceptable with real-world latencies
+- [ ] Rate limiting hooks work with actual API limits
+- [ ] Cost tracking hooks calculate real token costs
+- [ ] Security hooks properly redact sensitive API data
+- [ ] Tool execution hooks capture complete context and results
+- [ ] Workflow hooks track multi-step agent interactions
+- [ ] Hook chains (pre/post/error) persist correctly
+- [ ] Concurrent hook executions don't interfere
+- [ ] Tests gracefully skip when API keys not present
+
+**Implementation Steps:**
+1. **Create Provider Test Infrastructure** (2 hours):
+   - Test context with real provider setup
+   - API key management and test skipping
+   - Mock vs real mode switching
+   - Performance measurement utilities
+
+2. **Implement Hook Persistence Tests** (2 hours):
+   - Test all builtin hooks with real LLM calls
+   - Verify complete context serialization
+   - Test concurrent hook executions
+   - Validate retention policies
+
+3. **Implement Replay and Correlation Tests** (2 hours):
+   - Replay hooks with parameter modification
+   - Test timeline reconstruction accuracy
+   - Verify cross-component correlation
+   - Performance benchmarks with real latency
+
+**Definition of Done:**
+- [ ] All tests pass with real API keys configured
+- [ ] Tests gracefully skip without API keys
+- [ ] Hook persistence verified with actual LLM responses
+- [ ] Replay functionality works with real providers
+- [ ] Performance meets targets with network latency
+- [ ] Examples demonstrate production usage patterns
+- [ ] Test structure follows pattern from Task 5.2.8
+- [ ] Total of 20+ integration tests covering all scenarios
+
 ---
 
 ## Phase 5.4: State Migration and Versioning System (Days 4-5)
@@ -1212,13 +1318,16 @@ llmspell-agents/examples/
 **Estimated Time**: 5 hours  
 **Assignee**: Schema Management Team Lead
 
-**Description**: Build comprehensive schema versioning system that enables safe state evolution across rs-llmspell versions.
+**Description**: Build comprehensive schema versioning system that enables safe state evolution across rs-llmspell versions. Enhance existing StateSchema and MigrationStep structures.
 
 **Files to Create/Update:**
-- **CREATE**: `llmspell-core/src/state/schema/version.rs` - Schema versioning system
-- **CREATE**: `llmspell-core/src/state/schema/registry.rs` - Schema registry
-- **CREATE**: `llmspell-core/src/state/migration/mod.rs` - Migration framework
-- **UPDATE**: `llmspell-core/src/state/manager.rs` - Schema validation integration
+- **CREATE**: `llmspell-state-persistence/src/schema/mod.rs` - Schema module structure
+- **CREATE**: `llmspell-state-persistence/src/schema/version.rs` - Enhanced versioning
+- **CREATE**: `llmspell-state-persistence/src/schema/registry.rs` - Schema registry
+- **CREATE**: `llmspell-state-persistence/src/migration/mod.rs` - Migration framework
+- **CREATE**: `llmspell-state-persistence/src/migration/executor.rs` - Migration executor
+- **UPDATE**: `llmspell-state-persistence/src/config.rs` - Enhance StateSchema
+- **UPDATE**: `llmspell-state-persistence/src/manager.rs` - Schema validation integration
 
 **Acceptance Criteria:**
 - [ ] Schema versions tracked with semantic versioning
@@ -1231,24 +1340,11 @@ llmspell-agents/examples/
 - [ ] Development tools support schema evolution testing
 
 **Implementation Steps:**
-1. **Define Schema Versioning System** (2 hours):
-   ```rust
-   #[derive(Debug, Clone, Serialize, Deserialize)]
-   pub struct StateSchema {
-       pub version: SchemaVersion,
-       pub hash: String,
-       pub fields: HashMap<String, FieldSchema>,
-       pub compatibility: CompatibilityLevel,
-       pub migration_path: Vec<MigrationStep>,
-   }
-   
-   #[derive(Debug, Clone)]
-   pub enum CompatibilityLevel {
-       BackwardCompatible,
-       ForwardCompatible,
-       BreakingChange,
-   }
-   ```
+1. **Enhance Existing Schema System** (2 hours):
+   - Build on existing StateSchema in config.rs
+   - Add semantic versioning support
+   - Enhance MigrationStep with migration logic
+   - Note: StateSchema, FieldSchema, CompatibilityLevel, and MigrationStep already exist in llmspell-state-persistence/src/config.rs
 
 2. **Implement Schema Registry** (2 hours):
    - Schema registration and lookup
