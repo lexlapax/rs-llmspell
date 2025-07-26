@@ -1125,13 +1125,23 @@ llmspell-agents/examples/
 
 **Description**: Build comprehensive event correlation system that links state changes, hook executions, and agent actions for complete timeline reconstruction. Leverage existing correlation_id in UniversalEvent.
 
+**Implementation Summary**:
+- Created comprehensive EventCorrelationTracker in llmspell-events that tracks events across components
+- Built timeline reconstruction system with causality analysis and depth calculation
+- Integrated correlation tracking into StateManager for state change events
+- Added hook execution event tracking to HookExecutor (start/complete events with links)
+- Implemented powerful query interface for filtering and searching correlations
+- Added automatic link detection between related events based on timing and patterns
+- Implemented memory management with configurable limits and automatic cleanup
+- All quality checks passing (formatting, clippy, tests)
+
 **Files to Create/Update:**
-- **CREATE**: `llmspell-events/src/correlation/mod.rs` - Event correlation system
-- **CREATE**: `llmspell-events/src/correlation/timeline.rs` - Timeline reconstruction
-- **UPDATE**: `llmspell-state-persistence/src/manager.rs` - Add correlation tracking
-- **UPDATE**: `llmspell-hooks/src/executor.rs` - Hook correlation integration
-- **CREATE**: `llmspell-events/src/correlation/query.rs` - Timeline query interface
-- **UPDATE**: `llmspell-events/src/universal_event.rs` - Enhance correlation support
+- **CREATE**: `llmspell-events/src/correlation/mod.rs` - Event correlation system ✅
+- **CREATE**: `llmspell-events/src/correlation/timeline.rs` - Timeline reconstruction ✅
+- **UPDATE**: `llmspell-state-persistence/src/manager.rs` - Add correlation tracking ✅
+- **UPDATE**: `llmspell-hooks/src/executor.rs` - Hook correlation integration ✅
+- **CREATE**: `llmspell-events/src/correlation/query.rs` - Timeline query interface ✅
+- **UPDATE**: `llmspell-events/src/universal_event.rs` - Enhance correlation support (Not needed - already had correlation_id)
 
 **Acceptance Criteria:**
 - [x] All events tagged with correlation IDs for tracing
@@ -1144,28 +1154,31 @@ llmspell-agents/examples/
 - [x] Privacy controls prevent sensitive data leakage
 
 **Implementation Steps:**
-1. **Enhance Existing Correlation System** (1 hour):
-   - Build on existing correlation_id in EventMetadata
-   - Add parent-child relationship tracking
-   - Implement correlation context propagation
+1. **Enhance Existing Correlation System** (1 hour): ✅ COMPLETED
+   - ✅ Build on existing correlation_id in EventMetadata
+   - ✅ Add parent-child relationship tracking via CorrelationContext
+   - ✅ Implement correlation context propagation
+   - ✅ Created EventCorrelationTracker with full correlation management
    - Note: correlation_id already exists in llmspell-events/src/universal_event.rs
 
-2. **Build Timeline Reconstruction** (2 hours):
-   - Event ordering and causality analysis
-   - Cross-component correlation
-   - Timeline query interface
-   - Visualization support
+2. **Build Timeline Reconstruction** (2 hours): ✅ COMPLETED
+   - ✅ Event ordering and causality analysis in timeline.rs
+   - ✅ Cross-component correlation with EventLink relationships
+   - ✅ Timeline query interface in query.rs
+   - ✅ Visualization support via TimelineEntry and CausalityChain structures
+   - ✅ Implemented TimelineBuilder with causality depth calculation
 
-3. **Add Performance Optimization** (1 hour):
-   - Efficient correlation data storage
-   - Index optimization for queries
-   - Memory usage control
+3. **Add Performance Optimization** (1 hour): ✅ COMPLETED
+   - ✅ Efficient correlation data storage with VecDeque and size limits
+   - ✅ Index optimization for queries using event_index HashMap
+   - ✅ Memory usage control with configurable limits and cleanup
+   - ✅ Auto-cleanup of old correlations to prevent memory leaks
 
 **Definition of Done:**
-- [ ] Correlation IDs track events across components
-- [ ] Timeline reconstruction works accurately
-- [ ] Query performance meets requirements
-- [ ] Memory usage stays within bounds
+- [x] Correlation IDs track events across components
+- [x] Timeline reconstruction works accurately
+- [x] Query performance meets requirements
+- [x] Memory usage stays within bounds
 - [x] Debugging capabilities significantly improved
 
 ### Task 5.3.3: Create Hook Replay Management System
