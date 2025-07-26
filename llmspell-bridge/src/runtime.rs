@@ -117,7 +117,9 @@ impl ScriptRuntime {
     /// ```
     pub async fn new_with_lua(config: RuntimeConfig) -> Result<Self, LLMSpellError> {
         let lua_config = config.engines.lua.clone();
-        let engine = EngineFactory::create_lua_engine(&lua_config)?;
+        let config_arc = Arc::new(config.clone());
+        let engine =
+            EngineFactory::create_lua_engine_with_runtime(&lua_config, Some(config_arc.clone()))?;
         Self::new_with_engine(engine, config).await
     }
 
@@ -320,6 +322,8 @@ pub struct GlobalRuntimeConfig {
     pub enable_streaming: bool,
     /// Security settings
     pub security: SecurityConfig,
+    /// State persistence settings
+    pub state_persistence: StatePersistenceConfig,
 }
 
 impl Default for GlobalRuntimeConfig {
@@ -329,6 +333,7 @@ impl Default for GlobalRuntimeConfig {
             script_timeout_seconds: 300,
             enable_streaming: true,
             security: SecurityConfig::default(),
+            state_persistence: StatePersistenceConfig::default(),
         }
     }
 }
@@ -357,6 +362,37 @@ impl Default for SecurityConfig {
             allow_process_spawn: false,
             max_memory_bytes: Some(50_000_000),   // 50MB
             max_execution_time_ms: Some(300_000), // 5 minutes
+        }
+    }
+}
+
+/// State persistence configuration
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(default)]
+pub struct StatePersistenceConfig {
+    /// Enable state persistence
+    pub enabled: bool,
+    /// Backend type for storage (memory, file, redis, etc.)
+    pub backend_type: String,
+    /// Enable migration functionality
+    pub migration_enabled: bool,
+    /// Directory for schema definitions
+    pub schema_directory: Option<String>,
+    /// Automatic backup on migration
+    pub backup_on_migration: bool,
+    /// Maximum state size per key in bytes
+    pub max_state_size_bytes: Option<usize>,
+}
+
+impl Default for StatePersistenceConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            backend_type: "memory".to_string(),
+            migration_enabled: false,
+            schema_directory: None,
+            backup_on_migration: true,
+            max_state_size_bytes: Some(10_000_000), // 10MB per key
         }
     }
 }

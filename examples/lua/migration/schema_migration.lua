@@ -12,17 +12,26 @@ print("====================================")
 print("\n1. Checking current migration status...")
 
 -- Check if migration methods exist
-if not State.migration_status then
+if not State.get_migration_status then
     print("❌ Migration API not available")
     print("   The State global was not initialized with migration support")
     print("   See examples/lua/migration/README.md for details")
     return
 end
 
-local status = State.migration_status()
+local status = State.get_migration_status()
 
-if status.migration_available then
-    print("✅ Migration system available")
+if status.error and status.error == "No current schema found" then
+    print("⚠️  No schemas registered yet")
+    print("   This is expected for a fresh system.")
+    print("   In a real application, you would:")
+    print("   1. Register your schema definitions")
+    print("   2. The system would detect existing state")
+    print("   3. Then migrations could be performed")
+    print("\n   Migration API is available and ready to use!")
+    return
+elseif status.migration_available then
+    print("✅ Migration system active")
     print("   Current version: " .. status.current_version)
     
     if status.latest_version then
@@ -42,7 +51,7 @@ if status.migration_available then
         print("   No migration targets available")
     end
 else
-    print("❌ Migration system not available")
+    print("❌ Migration system error")
     if status.error then
         print("   Error: " .. status.error)
     end
@@ -51,7 +60,7 @@ end
 
 -- List all available schema versions
 print("\n2. Available schema versions:")
-local versions = State.schema_versions()
+local versions = State.list_schema_versions()
 for i, version in ipairs(versions) do
     print("   " .. i .. ". " .. version)
 end
@@ -67,7 +76,7 @@ if #targets > 0 then
     print("   Attempting migration to: " .. target_version)
     
     -- Trigger migration
-    local result = State.migrate(target_version)
+    local result = State.migrate_to_version(target_version)
     
     if result.success then
         print("✅ Migration successful!")
@@ -105,7 +114,7 @@ if #targets > 0 then
 else
     print("   No migration targets available - trying to migrate to same version")
     local current_version = State.migration_status().current_version
-    local result = State.migrate(current_version)
+    local result = State.migrate_to_version(current_version)
     
     if result.success and result.status == "already_current" then
         print("✅ Already at current version: " .. result.current_version)

@@ -10,6 +10,7 @@ pub mod json_global;
 pub mod registry;
 pub mod replay_global;
 pub mod state_global;
+pub mod state_infrastructure;
 pub mod streaming_global;
 pub mod tool_global;
 pub mod types;
@@ -31,7 +32,52 @@ pub async fn create_standard_registry(context: Arc<GlobalContext>) -> Result<Glo
     builder.register(Arc::new(json_global::JsonGlobal::new()));
     builder.register(Arc::new(core::LoggerGlobal::new()));
     builder.register(Arc::new(core::ConfigGlobal::new(serde_json::json!({}))));
-    builder.register(Arc::new(state_global::StateGlobal::new()));
+
+    // Create StateGlobal with migration support if configured
+    let state_global = if let Some(runtime_config) =
+        context.get_bridge::<crate::runtime::RuntimeConfig>("runtime_config")
+    {
+        if runtime_config.runtime.state_persistence.enabled {
+            // Initialize state infrastructure
+            use crate::globals::state_infrastructure::get_or_create_state_infrastructure;
+            match get_or_create_state_infrastructure(
+                &context,
+                &runtime_config.runtime.state_persistence,
+            )
+            .await
+            {
+                Ok(infrastructure) => {
+                    if let (Some(migration_engine), Some(schema_registry)) = (
+                        infrastructure.migration_engine,
+                        infrastructure.schema_registry,
+                    ) {
+                        Arc::new(state_global::StateGlobal::with_migration_support(
+                            infrastructure.state_manager,
+                            migration_engine,
+                            schema_registry,
+                        ))
+                    } else {
+                        Arc::new(state_global::StateGlobal::with_state_manager(
+                            infrastructure.state_manager,
+                        ))
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        "Failed to initialize state infrastructure: {}, falling back to in-memory",
+                        e
+                    );
+                    Arc::new(state_global::StateGlobal::new())
+                }
+            }
+        } else {
+            Arc::new(state_global::StateGlobal::new())
+        }
+    } else {
+        Arc::new(state_global::StateGlobal::new())
+    };
+
+    builder.register(state_global);
     builder.register(Arc::new(core::UtilsGlobal::new()));
     // TODO: Add Security global when implemented
     builder.register(Arc::new(event_global::EventGlobal::new()));

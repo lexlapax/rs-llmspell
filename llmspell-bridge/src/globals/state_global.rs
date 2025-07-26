@@ -146,13 +146,14 @@ impl GlobalObject for StateGlobal {
                 // Use async wrapper for StateManager operations
                 if let Some(state_mgr) = &get_state_manager {
                     let scope = Self::parse_scope(&scope_str);
-                    let runtime = tokio::runtime::Handle::try_current()
-                        .or_else(|_| tokio::runtime::Runtime::new().map(|rt| rt.handle().clone()))
-                        .map_err(|e| {
-                            mlua::Error::RuntimeError(format!("No tokio runtime: {}", e))
-                        })?;
+                    // Use sync_utils to bridge async operation
+                    use crate::lua::sync_utils::block_on_async;
 
-                    let result = runtime.block_on(async { state_mgr.get(scope, &key).await });
+                    let result = block_on_async(
+                        "state_get",
+                        async move { state_mgr.get(scope, &key).await },
+                        None,
+                    );
 
                     match result {
                         Ok(Some(value)) => {
@@ -160,7 +161,7 @@ impl GlobalObject for StateGlobal {
                             Ok(lua_value)
                         }
                         Ok(None) => Ok(mlua::Value::Nil),
-                        Err(e) => Err(mlua::Error::RuntimeError(format!("State get error: {}", e))),
+                        Err(e) => Err(e),
                     }
                 } else {
                     // Fallback to in-memory storage
@@ -217,22 +218,18 @@ impl GlobalObject for StateGlobal {
 
                     if let Some(state_mgr) = &set_state_manager {
                         let scope = Self::parse_scope(&scope_str);
-                        let runtime = tokio::runtime::Handle::try_current()
-                            .or_else(|_| {
-                                tokio::runtime::Runtime::new().map(|rt| rt.handle().clone())
-                            })
-                            .map_err(|e| {
-                                mlua::Error::RuntimeError(format!("No tokio runtime: {}", e))
-                            })?;
+                        // Use sync_utils to bridge async operation
+                        use crate::lua::sync_utils::block_on_async;
 
-                        let result = runtime
-                            .block_on(async { state_mgr.set(scope, &key, json_value).await });
+                        let result = block_on_async(
+                            "state_set",
+                            async move { state_mgr.set(scope, &key, json_value).await },
+                            None
+                        );
 
                         match result {
                             Ok(()) => Ok(()),
-                            Err(e) => {
-                                Err(mlua::Error::RuntimeError(format!("State set error: {}", e)))
-                            }
+                            Err(e) => Err(e)
                         }
                     } else {
                         // Fallback to in-memory storage
@@ -269,20 +266,18 @@ impl GlobalObject for StateGlobal {
                 };
                 if let Some(state_mgr) = &delete_state_manager {
                     let scope = Self::parse_scope(&scope_str);
-                    let runtime = tokio::runtime::Handle::try_current()
-                        .or_else(|_| tokio::runtime::Runtime::new().map(|rt| rt.handle().clone()))
-                        .map_err(|e| {
-                            mlua::Error::RuntimeError(format!("No tokio runtime: {}", e))
-                        })?;
+                    // Use sync_utils to bridge async operation
+                    use crate::lua::sync_utils::block_on_async;
 
-                    let result = runtime.block_on(async { state_mgr.delete(scope, &key).await });
+                    let result = block_on_async(
+                        "state_delete",
+                        async move { state_mgr.delete(scope, &key).await },
+                        None
+                    );
 
                     match result {
                         Ok(_) => Ok(()),
-                        Err(e) => Err(mlua::Error::RuntimeError(format!(
-                            "State delete error: {}",
-                            e
-                        ))),
+                        Err(e) => Err(e)
                     }
                 } else {
                     // Fallback to in-memory storage
@@ -312,13 +307,14 @@ impl GlobalObject for StateGlobal {
                 let scope_str = scope_str.unwrap_or_else(|| "Global".to_string());
                 if let Some(state_mgr) = &list_state_manager {
                     let scope = Self::parse_scope(&scope_str);
-                    let runtime = tokio::runtime::Handle::try_current()
-                        .or_else(|_| tokio::runtime::Runtime::new().map(|rt| rt.handle().clone()))
-                        .map_err(|e| {
-                            mlua::Error::RuntimeError(format!("No tokio runtime: {}", e))
-                        })?;
+                    // Use sync_utils to bridge async operation
+                    use crate::lua::sync_utils::block_on_async;
 
-                    let result = runtime.block_on(async { state_mgr.list_keys(scope).await });
+                    let result = block_on_async(
+                        "state_list_keys",
+                        async move { state_mgr.list_keys(scope).await },
+                        None,
+                    );
 
                     match result {
                         Ok(keys) => {
@@ -328,10 +324,7 @@ impl GlobalObject for StateGlobal {
                             }
                             Ok(table)
                         }
-                        Err(e) => Err(mlua::Error::RuntimeError(format!(
-                            "State list error: {}",
-                            e
-                        ))),
+                        Err(e) => Err(e),
                     }
                 } else {
                     // Fallback to in-memory storage
@@ -371,11 +364,8 @@ impl GlobalObject for StateGlobal {
             let migrate_registry = schema_registry.clone();
             let migrate_fn = lua
                 .create_function(move |lua, target_version: String| {
-                    let runtime = tokio::runtime::Handle::try_current()
-                        .or_else(|_| tokio::runtime::Runtime::new().map(|rt| rt.handle().clone()))
-                        .map_err(|e| {
-                            mlua::Error::RuntimeError(format!("No tokio runtime: {}", e))
-                        })?;
+                    // Use sync_utils for async operations
+                    use crate::lua::sync_utils::block_on_async;
 
                     // Parse target version
                     let target_ver: SemanticVersion = target_version.parse().map_err(|e| {
@@ -416,11 +406,19 @@ impl GlobalObject for StateGlobal {
                     };
 
                     // Execute migration
-                    let result = runtime.block_on(async {
-                        migrate_engine
-                            .migrate(&current_ver, &target_ver, migration_config)
-                            .await
-                    });
+                    let migrate_engine_clone = migrate_engine.clone();
+                    let current_ver_clone = current_ver.clone();
+                    let target_ver_clone = target_ver.clone();
+
+                    let result = block_on_async(
+                        "state_migrate",
+                        async move {
+                            migrate_engine_clone
+                                .migrate(&current_ver_clone, &target_ver_clone, migration_config)
+                                .await
+                        },
+                        None,
+                    );
 
                     match result {
                         Ok(migration_result) => {
