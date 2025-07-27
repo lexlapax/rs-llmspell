@@ -97,6 +97,9 @@ mod retention_test;
 mod retention_automatic_test;
 
 #[cfg(test)]
+mod recovery_tests;
+
+#[cfg(test)]
 mod simple_tests {
     use super::*;
 

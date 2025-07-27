@@ -186,6 +186,12 @@ impl ImportanceBasedPolicy {
     }
 }
 
+impl Default for ImportanceBasedPolicy {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RetentionPolicy for ImportanceBasedPolicy {
     fn evaluate(&self, backup: &BackupMetadata, context: &RetentionContext) -> RetentionDecision {
         let priority = self.calculate_importance(backup, context);
@@ -219,6 +225,12 @@ impl CompositePolicy {
     pub fn add_policy(mut self, policy: Box<dyn RetentionPolicy>) -> Self {
         self.policies.push(policy);
         self
+    }
+}
+
+impl Default for CompositePolicy {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

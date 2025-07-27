@@ -486,7 +486,7 @@ mod integration_tests {
             .await
             .expect("Failed to set state");
 
-        let full_backup = backup_manager
+        let _full_backup = backup_manager
             .create_backup(false)
             .await
             .expect("Failed to create full backup");
@@ -519,7 +519,7 @@ mod integration_tests {
         };
 
         // Create new backup manager with aggressive retention
-        let aggressive_manager = Arc::new(
+        let _aggressive_manager = Arc::new(
             BackupManager::new(config, state_manager.clone())
                 .expect("Failed to create backup manager"),
         );

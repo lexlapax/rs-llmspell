@@ -346,6 +346,38 @@ pub fn inject_state_global(
             Ok(result_table)
         })?;
         state_table.set("validate_backup", validate_backup_fn)?;
+
+        // get_storage_usage() - Get backup storage usage information
+        let get_storage_usage_fn = lua.create_function(move |lua, _: ()| {
+            // TODO: Implement actual storage usage calculation
+            let usage_table = lua.create_table()?;
+            usage_table.set("total_backups", 0)?;
+            usage_table.set("total_size", 0)?;
+            usage_table.set("full_backups", 0)?;
+            usage_table.set("incremental_backups", 0)?;
+            usage_table.set("oldest_backup", mlua::Value::Nil)?;
+            usage_table.set("newest_backup", mlua::Value::Nil)?;
+
+            Ok(usage_table)
+        })?;
+        state_table.set("get_storage_usage", get_storage_usage_fn)?;
+
+        // cleanup_backups(dry_run) - Apply retention policies and cleanup old backups
+        let cleanup_backups_fn = lua.create_function(move |lua, dry_run: Option<bool>| {
+            let dry_run = dry_run.unwrap_or(false);
+
+            // TODO: Implement actual cleanup when BackupManager is integrated
+            let result_table = lua.create_table()?;
+            result_table.set("success", false)?;
+            result_table.set("error", "Cleanup functionality not yet implemented")?;
+            result_table.set("dry_run", dry_run)?;
+            result_table.set("deleted_count", 0)?;
+            result_table.set("retained_count", 0)?;
+            result_table.set("space_freed", 0)?;
+
+            Ok(result_table)
+        })?;
+        state_table.set("cleanup_backups", cleanup_backups_fn)?;
     }
 
     // Set the state table as a global

@@ -112,6 +112,32 @@ pub enum BackupEvent {
         warnings: Vec<String>,
         correlation_id: Uuid,
     },
+
+    /// Cleanup operation started
+    CleanupStarted {
+        total_backups: usize,
+        retention_policy: String,
+        dry_run: bool,
+        correlation_id: Uuid,
+    },
+
+    /// Individual backup deleted during cleanup
+    BackupDeleted {
+        backup_id: BackupId,
+        size_freed: u64,
+        reason: String,
+        correlation_id: Uuid,
+    },
+
+    /// Cleanup operation completed
+    CleanupCompleted {
+        evaluated_count: usize,
+        deleted_count: usize,
+        retained_count: usize,
+        space_freed: u64,
+        duration: Duration,
+        correlation_id: Uuid,
+    },
 }
 
 impl BackupEvent {
@@ -130,6 +156,9 @@ impl BackupEvent {
             Self::RollbackCompleted { .. } => "rollback.completed",
             Self::ValidationStarted { .. } => "validation.started",
             Self::ValidationCompleted { .. } => "validation.completed",
+            Self::CleanupStarted { .. } => "cleanup.started",
+            Self::BackupDeleted { .. } => "backup.deleted",
+            Self::CleanupCompleted { .. } => "cleanup.completed",
         };
 
         let correlation_id = match self {
@@ -144,7 +173,10 @@ impl BackupEvent {
             | Self::RollbackStarted { correlation_id, .. }
             | Self::RollbackCompleted { correlation_id, .. }
             | Self::ValidationStarted { correlation_id, .. }
-            | Self::ValidationCompleted { correlation_id, .. } => *correlation_id,
+            | Self::ValidationCompleted { correlation_id, .. }
+            | Self::CleanupStarted { correlation_id, .. }
+            | Self::BackupDeleted { correlation_id, .. }
+            | Self::CleanupCompleted { correlation_id, .. } => *correlation_id,
         };
 
         UniversalEvent::new(event_type, json!(self), Language::Rust)
@@ -166,7 +198,10 @@ impl BackupEvent {
             | Self::RollbackStarted { correlation_id, .. }
             | Self::RollbackCompleted { correlation_id, .. }
             | Self::ValidationStarted { correlation_id, .. }
-            | Self::ValidationCompleted { correlation_id, .. } => *correlation_id,
+            | Self::ValidationCompleted { correlation_id, .. }
+            | Self::CleanupStarted { correlation_id, .. }
+            | Self::BackupDeleted { correlation_id, .. }
+            | Self::CleanupCompleted { correlation_id, .. } => *correlation_id,
         }
     }
 }
@@ -253,6 +288,55 @@ impl BackupEventBuilder {
             total_backups,
             entries_restored,
             total_entries,
+            correlation_id: self.correlation_id,
+        }
+    }
+
+    /// Build cleanup started event
+    pub fn cleanup_started(
+        &self,
+        total_backups: usize,
+        retention_policy: String,
+        dry_run: bool,
+    ) -> BackupEvent {
+        BackupEvent::CleanupStarted {
+            total_backups,
+            retention_policy,
+            dry_run,
+            correlation_id: self.correlation_id,
+        }
+    }
+
+    /// Build backup deleted event
+    pub fn backup_deleted(
+        &self,
+        backup_id: BackupId,
+        size_freed: u64,
+        reason: String,
+    ) -> BackupEvent {
+        BackupEvent::BackupDeleted {
+            backup_id,
+            size_freed,
+            reason,
+            correlation_id: self.correlation_id,
+        }
+    }
+
+    /// Build cleanup completed event
+    pub fn cleanup_completed(
+        &self,
+        evaluated_count: usize,
+        deleted_count: usize,
+        retained_count: usize,
+        space_freed: u64,
+        duration: Duration,
+    ) -> BackupEvent {
+        BackupEvent::CleanupCompleted {
+            evaluated_count,
+            deleted_count,
+            retained_count,
+            space_freed,
+            duration,
             correlation_id: self.correlation_id,
         }
     }

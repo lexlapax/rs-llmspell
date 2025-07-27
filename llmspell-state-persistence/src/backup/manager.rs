@@ -3,6 +3,7 @@
 
 use super::{
     cleanup::BackupCleanup,
+    events::BackupEventBuilder,
     retention::{
         CompositePolicy, CountBasedPolicy, RetentionContext, RetentionPolicy, RetentionReport,
         TimeBasedPolicy,
@@ -483,7 +484,7 @@ impl BackupManager {
             self.config.compression_type,
             CompressionLevel::new(self.config.compression_level.into())?,
         );
-        Ok(compressor.compress(data)?)
+        compressor.compress(data)
     }
 
     async fn get_current_schema_version(&self) -> BackupResult<String> {
@@ -545,6 +546,9 @@ impl BackupManager {
     async fn restore_single_backup(&self, backup_id: &str) -> BackupResult<()> {
         info!("Restoring single backup: {}", backup_id);
 
+        // TODO: Execute pre-restore hooks when hook infrastructure supports custom points
+        // For now, the restore process will emit events that can trigger hooks
+
         // Load backup metadata
         let metadata = self.get_backup_metadata(backup_id).await?;
 
@@ -594,6 +598,9 @@ impl BackupManager {
             metadata.stats.total_entries, backup_id
         );
 
+        // TODO: Execute post-restore hooks when hook infrastructure supports custom points
+        // The atomic restore process already triggers state change hooks for each restored entry
+
         Ok(())
     }
 
@@ -602,16 +609,13 @@ impl BackupManager {
         let mut loaded_backups = Vec::new();
 
         if let Ok(entries) = std::fs::read_dir(&self.config.backup_dir) {
-            for entry in entries {
-                if let Ok(entry) = entry {
-                    let path = entry.path();
-                    if path.extension().and_then(|s| s.to_str()) == Some("meta") {
-                        // Load metadata file
-                        if let Ok(contents) = std::fs::read_to_string(&path) {
-                            if let Ok(metadata) = serde_json::from_str::<BackupMetadata>(&contents)
-                            {
-                                loaded_backups.push((metadata.id.clone(), metadata));
-                            }
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().and_then(|s| s.to_str()) == Some("meta") {
+                    // Load metadata file
+                    if let Ok(contents) = std::fs::read_to_string(&path) {
+                        if let Ok(metadata) = serde_json::from_str::<BackupMetadata>(&contents) {
+                            loaded_backups.push((metadata.id.clone(), metadata));
                         }
                     }
                 }
@@ -638,6 +642,7 @@ impl BackupManager {
     /// Apply retention policies to manage backup storage
     pub async fn apply_retention_policies(&self) -> BackupResult<RetentionReport> {
         let start_time = Instant::now();
+        let event_builder = BackupEventBuilder::new();
 
         // Build composite retention policy based on configuration
         let mut composite_policy = CompositePolicy::new();
@@ -660,6 +665,24 @@ impl BackupManager {
         let index = self.backup_index.read().await;
         let all_backups: Vec<BackupMetadata> = index.values().cloned().collect();
 
+        // Emit cleanup started event
+        let cleanup_started_event = event_builder.cleanup_started(
+            all_backups.len(),
+            format!(
+                "max_backups={:?}, max_age={:?}",
+                self.config.max_backups, self.config.max_backup_age
+            ),
+            false,
+        );
+        if let Err(e) = self
+            .state_manager
+            .event_bus()
+            .publish(cleanup_started_event.to_universal_event())
+            .await
+        {
+            debug!("Failed to emit cleanup started event: {}", e);
+        }
+
         // Calculate total storage usage
         let total_size: u64 = all_backups.iter().map(|b| b.stats.total_size).sum();
 
@@ -680,7 +703,7 @@ impl BackupManager {
 
         // Execute cleanup
         let cleanup = BackupCleanup::new(self.config.backup_dir.clone(), false);
-        let cleanup_result = cleanup.execute_cleanup(decisions.clone(), &*index).await?;
+        let cleanup_result = cleanup.execute_cleanup(decisions.clone(), &index).await?;
 
         // Remove deleted backups from index
         if cleanup_result.deleted_count > 0 {
@@ -688,6 +711,22 @@ impl BackupManager {
             let mut index = self.backup_index.write().await;
             for decision in &decisions {
                 if !decision.should_retain {
+                    // Emit backup deleted event
+                    if let Some(metadata) = index.get(&decision.backup_id) {
+                        let deleted_event = event_builder.backup_deleted(
+                            decision.backup_id.clone(),
+                            metadata.stats.total_size,
+                            decision.reason.clone(),
+                        );
+                        if let Err(e) = self
+                            .state_manager
+                            .event_bus()
+                            .publish(deleted_event.to_universal_event())
+                            .await
+                        {
+                            debug!("Failed to emit backup deleted event: {}", e);
+                        }
+                    }
                     index.remove(&decision.backup_id);
                 }
             }
@@ -701,6 +740,23 @@ impl BackupManager {
             decisions,
             execution_time: start_time.elapsed(),
         };
+
+        // Emit cleanup completed event
+        let cleanup_completed_event = event_builder.cleanup_completed(
+            report.evaluated_count,
+            report.deleted_count,
+            report.retained_count,
+            report.space_freed,
+            report.execution_time,
+        );
+        if let Err(e) = self
+            .state_manager
+            .event_bus()
+            .publish(cleanup_completed_event.to_universal_event())
+            .await
+        {
+            debug!("Failed to emit cleanup completed event: {}", e);
+        }
 
         Ok(report)
     }

@@ -72,6 +72,17 @@ pub enum BackupSubcommand {
         /// Backup ID to inspect
         backup_id: String,
     },
+
+    /// Clean up old backups according to retention policies
+    Cleanup {
+        /// Perform dry run without deleting backups
+        #[arg(short, long)]
+        dry_run: bool,
+
+        /// Show detailed information about cleanup decisions
+        #[arg(short, long)]
+        verbose: bool,
+    },
 }
 
 /// Execute backup command
@@ -112,6 +123,9 @@ pub async fn execute_backup(
         }
         BackupSubcommand::Info { backup_id } => {
             show_backup_info(backup_manager, backup_id, output_format).await
+        }
+        BackupSubcommand::Cleanup { dry_run, verbose } => {
+            cleanup_backups(backup_manager, dry_run, verbose, output_format).await
         }
     }
 }
@@ -405,4 +419,135 @@ fn truncate_string(s: &str, max_len: usize) -> String {
     } else {
         format!("{}...", &s[..max_len - 3])
     }
+}
+
+/// Clean up backups according to retention policies
+async fn cleanup_backups(
+    backup_manager: Arc<BackupManager>,
+    dry_run: bool,
+    verbose: bool,
+    output_format: OutputFormat,
+) -> Result<()> {
+    eprintln!(
+        "🧹 Running backup cleanup {}...",
+        if dry_run { "(dry run)" } else { "" }
+    );
+
+    // For dry run, we need to simulate the cleanup without actually deleting
+    if dry_run {
+        // Get current backup list
+        let backups = backup_manager.list_backups().await?;
+        eprintln!("Found {} backups", backups.len());
+
+        // Run the actual cleanup to get the report
+        let report = backup_manager.apply_retention_policies().await?;
+
+        // Show what would be deleted
+        let mut would_delete = Vec::new();
+        let mut would_retain = Vec::new();
+
+        for decision in &report.decisions {
+            if decision.should_retain {
+                would_retain.push(&decision.backup_id);
+            } else {
+                would_delete.push(&decision.backup_id);
+            }
+        }
+
+        eprintln!("\n📊 Cleanup Summary (DRY RUN):");
+        eprintln!("  - Total backups evaluated: {}", report.evaluated_count);
+        eprintln!("  - Backups to retain: {}", would_retain.len());
+        eprintln!("  - Backups to delete: {}", would_delete.len());
+        eprintln!(
+            "  - Space that would be freed: {}",
+            format_bytes(report.space_freed)
+        );
+
+        if verbose && !would_delete.is_empty() {
+            eprintln!("\n🗑️  Backups that would be deleted:");
+            for (i, backup_id) in would_delete.iter().enumerate() {
+                if let Some(decision) = report.decisions.iter().find(|d| &d.backup_id == *backup_id)
+                {
+                    eprintln!("  {}. {} - {}", i + 1, backup_id, decision.reason);
+                }
+            }
+        }
+
+        if verbose && !would_retain.is_empty() {
+            eprintln!("\n✅ Backups that would be retained:");
+            for (i, backup_id) in would_retain.iter().enumerate() {
+                if let Some(decision) = report.decisions.iter().find(|d| &d.backup_id == *backup_id)
+                {
+                    eprintln!("  {}. {} - {}", i + 1, backup_id, decision.reason);
+                }
+            }
+        }
+
+        let result = json!({
+            "dry_run": true,
+            "evaluated_count": report.evaluated_count,
+            "would_retain": would_retain.len(),
+            "would_delete": would_delete.len(),
+            "space_to_free": report.space_freed,
+            "decisions": report.decisions,
+            "execution_time_ms": report.execution_time.as_millis(),
+        });
+
+        match output_format {
+            OutputFormat::Json | OutputFormat::Pretty => {
+                println!("{}", serde_json::to_string_pretty(&result)?)
+            }
+            OutputFormat::Text => {}
+        }
+    } else {
+        // Actually perform the cleanup
+        let report = backup_manager.cleanup_backups().await?;
+
+        eprintln!("\n✅ Cleanup completed successfully!");
+        eprintln!("📊 Cleanup Summary:");
+        eprintln!("  - Total backups evaluated: {}", report.evaluated_count);
+        eprintln!("  - Backups retained: {}", report.retained_count);
+        eprintln!("  - Backups deleted: {}", report.deleted_count);
+        eprintln!("  - Space freed: {}", format_bytes(report.space_freed));
+        eprintln!(
+            "  - Execution time: {:.2}s",
+            report.execution_time.as_secs_f64()
+        );
+
+        if verbose {
+            eprintln!("\n📋 Retention decisions:");
+            for (i, decision) in report.decisions.iter().enumerate() {
+                eprintln!(
+                    "  {}. {} - {} ({})",
+                    i + 1,
+                    decision.backup_id,
+                    if decision.should_retain {
+                        "RETAINED"
+                    } else {
+                        "DELETED"
+                    },
+                    decision.reason
+                );
+            }
+        }
+
+        let result = json!({
+            "dry_run": false,
+            "evaluated_count": report.evaluated_count,
+            "retained_count": report.retained_count,
+            "deleted_count": report.deleted_count,
+            "space_freed": report.space_freed,
+            "decisions": report.decisions,
+            "execution_time_ms": report.execution_time.as_millis(),
+        });
+
+        match output_format {
+            OutputFormat::Json | OutputFormat::Pretty => {
+                println!("{}", serde_json::to_string_pretty(&result)?)
+            }
+            OutputFormat::Text => {}
+        }
+    }
+
+    Ok(())
 }

@@ -3,7 +3,6 @@
 
 #[cfg(test)]
 mod test {
-    use crate::backup::cleanup::*;
     use crate::backup::retention::*;
     use crate::backup::*;
     use std::collections::HashMap;

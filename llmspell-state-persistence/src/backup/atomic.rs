@@ -63,7 +63,7 @@ pub struct StateSnapshot {
 
 /// Individual snapshot entry
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct SnapshotEntry {
+pub struct SnapshotEntry {
     pub scope: StateScope,
     pub key: String,
     pub data: Value,
