@@ -45,6 +45,7 @@ impl ProviderTestContext {
                     compression: true,
                     encryption: None,
                     backup_retention: Duration::from_secs(300),
+                    backup: None,
                     performance: Default::default(),
                 },
             )

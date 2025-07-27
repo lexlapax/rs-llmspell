@@ -46,22 +46,12 @@ pub async fn create_standard_registry(context: Arc<GlobalContext>) -> Result<Glo
             )
             .await
             {
-                Ok(infrastructure) => {
-                    if let (Some(migration_engine), Some(schema_registry)) = (
-                        infrastructure.migration_engine,
-                        infrastructure.schema_registry,
-                    ) {
-                        Arc::new(state_global::StateGlobal::with_migration_support(
-                            infrastructure.state_manager,
-                            migration_engine,
-                            schema_registry,
-                        ))
-                    } else {
-                        Arc::new(state_global::StateGlobal::with_state_manager(
-                            infrastructure.state_manager,
-                        ))
-                    }
-                }
+                Ok(infrastructure) => Arc::new(state_global::StateGlobal::with_full_support(
+                    infrastructure.state_manager,
+                    infrastructure.migration_engine,
+                    infrastructure.schema_registry,
+                    infrastructure.backup_manager,
+                )),
                 Err(e) => {
                     tracing::warn!(
                         "Failed to initialize state infrastructure: {}, falling back to in-memory",

@@ -67,6 +67,22 @@ impl StateGlobal {
         }
     }
 
+    /// Create a new State global with full infrastructure support
+    pub fn with_full_support(
+        state_manager: Arc<StateManager>,
+        migration_engine: Option<Arc<MigrationEngine>>,
+        schema_registry: Option<Arc<SchemaRegistry>>,
+        backup_manager: Option<Arc<llmspell_state_persistence::backup::BackupManager>>,
+    ) -> Self {
+        Self {
+            state_manager: Some(state_manager),
+            fallback_state: Arc::new(RwLock::new(HashMap::new())),
+            migration_engine,
+            schema_registry,
+            backup_manager,
+        }
+    }
+
     /// Helper method to parse scope string to StateScope enum
     pub fn parse_scope(scope_str: &str) -> StateScope {
         if scope_str.starts_with("agent:") {
@@ -552,6 +568,209 @@ impl GlobalObject for StateGlobal {
                 .set("list_schema_versions", list_versions_fn)
                 .map_err(|e| LLMSpellError::Component {
                     message: format!("Failed to set State.list_schema_versions: {}", e),
+                    source: None,
+                })?;
+        }
+
+        // Backup methods (available when backup manager is configured)
+        if let Some(ref backup_mgr) = self.backup_manager {
+            // create_backup(incremental) - Create a backup (full or incremental)
+            let backup_mgr_clone = backup_mgr.clone();
+            let create_backup_fn = lua
+                .create_function(move |lua, incremental: Option<bool>| {
+                    let incremental = incremental.unwrap_or(false);
+                    use crate::lua::sync_utils::block_on_async;
+
+                    let backup_mgr = backup_mgr_clone.clone();
+                    let result = block_on_async(
+                        "backup_create",
+                        async move { backup_mgr.create_backup(incremental).await },
+                        None,
+                    );
+
+                    match result {
+                        Ok(status) => {
+                            let result_table = lua.create_table()?;
+                            result_table.set("success", true)?;
+                            result_table.set("backup_id", status.id.clone())?;
+                            result_table.set("size_bytes", status.size_bytes)?;
+                            result_table.set("entry_count", status.entry_count)?;
+                            result_table.set("incremental", incremental)?;
+                            if let Some(parent_id) = status.parent_id {
+                                result_table.set("parent_id", parent_id)?;
+                            }
+                            Ok(result_table)
+                        }
+                        Err(e) => {
+                            let result_table = lua.create_table()?;
+                            result_table.set("success", false)?;
+                            result_table.set("error", format!("Backup failed: {}", e))?;
+                            result_table.set("incremental", incremental)?;
+                            Ok(result_table)
+                        }
+                    }
+                })
+                .map_err(|e| LLMSpellError::Component {
+                    message: format!("Failed to create State.create_backup: {}", e),
+                    source: None,
+                })?;
+
+            state_table
+                .set("create_backup", create_backup_fn)
+                .map_err(|e| LLMSpellError::Component {
+                    message: format!("Failed to set State.create_backup: {}", e),
+                    source: None,
+                })?;
+
+            // list_backups() - List available backups
+            let list_backup_mgr = backup_mgr.clone();
+            let list_backups_fn = lua
+                .create_function(move |lua, _: ()| {
+                    use crate::lua::sync_utils::block_on_async;
+
+                    let backup_mgr = list_backup_mgr.clone();
+                    let result = block_on_async(
+                        "backup_list",
+                        async move { backup_mgr.list_backups().await },
+                        None,
+                    );
+
+                    match result {
+                        Ok(backups) => {
+                            let backups_table = lua.create_table()?;
+                            for (i, backup) in backups.iter().enumerate() {
+                                let backup_entry = lua.create_table()?;
+                                backup_entry.set("id", backup.id.clone())?;
+                                backup_entry.set(
+                                    "created_at",
+                                    backup
+                                        .created_at
+                                        .duration_since(std::time::UNIX_EPOCH)
+                                        .unwrap()
+                                        .as_secs() as i64,
+                                )?;
+                                backup_entry.set("size_bytes", backup.size_bytes)?;
+                                backup_entry.set("is_incremental", backup.is_incremental)?;
+                                if let Some(ref parent_id) = backup.parent_id {
+                                    backup_entry.set("parent_id", parent_id.clone())?;
+                                }
+                                backups_table.set(i + 1, backup_entry)?;
+                            }
+                            Ok(backups_table)
+                        }
+                        Err(e) => Err(mlua::Error::RuntimeError(format!(
+                            "Failed to list backups: {}",
+                            e
+                        ))),
+                    }
+                })
+                .map_err(|e| LLMSpellError::Component {
+                    message: format!("Failed to create State.list_backups: {}", e),
+                    source: None,
+                })?;
+
+            state_table
+                .set("list_backups", list_backups_fn)
+                .map_err(|e| LLMSpellError::Component {
+                    message: format!("Failed to set State.list_backups: {}", e),
+                    source: None,
+                })?;
+
+            // restore_backup(backup_id) - Restore from a specific backup
+            let restore_backup_mgr = backup_mgr.clone();
+            let restore_backup_fn = lua
+                .create_function(move |lua, backup_id: String| {
+                    use crate::lua::sync_utils::block_on_async;
+
+                    let backup_mgr = restore_backup_mgr.clone();
+                    let backup_id_clone = backup_id.clone();
+                    let result = block_on_async(
+                        "backup_restore",
+                        async move {
+                            backup_mgr
+                                .restore_backup(
+                                    &backup_id_clone,
+                                    llmspell_state_persistence::backup::RestoreOptions::default(),
+                                )
+                                .await
+                        },
+                        None,
+                    );
+
+                    let result_table = lua.create_table()?;
+                    match result {
+                        Ok(()) => {
+                            result_table.set("success", true)?;
+                            result_table.set("backup_id", backup_id)?;
+                        }
+                        Err(e) => {
+                            result_table.set("success", false)?;
+                            result_table.set("error", format!("Restore failed: {}", e))?;
+                            result_table.set("backup_id", backup_id)?;
+                        }
+                    }
+                    Ok(result_table)
+                })
+                .map_err(|e| LLMSpellError::Component {
+                    message: format!("Failed to create State.restore_backup: {}", e),
+                    source: None,
+                })?;
+
+            state_table
+                .set("restore_backup", restore_backup_fn)
+                .map_err(|e| LLMSpellError::Component {
+                    message: format!("Failed to set State.restore_backup: {}", e),
+                    source: None,
+                })?;
+
+            // validate_backup(backup_id) - Validate a backup
+            let validate_backup_mgr = backup_mgr.clone();
+            let validate_backup_fn = lua
+                .create_function(move |lua, backup_id: String| {
+                    use crate::lua::sync_utils::block_on_async;
+
+                    let backup_mgr = validate_backup_mgr.clone();
+                    let backup_id_clone = backup_id.clone();
+                    let result = block_on_async(
+                        "backup_validate",
+                        async move { backup_mgr.validate_backup(&backup_id_clone).await },
+                        None,
+                    );
+
+                    match result {
+                        Ok(validation) => {
+                            let result_table = lua.create_table()?;
+                            result_table.set("is_valid", validation.is_valid)?;
+                            result_table.set("checksum_valid", validation.checksum_valid)?;
+                            result_table.set("integrity_valid", validation.integrity_valid)?;
+                            result_table.set("backup_id", backup_id)?;
+                            if !validation.errors.is_empty() {
+                                let errors_table = lua.create_table()?;
+                                for (i, error) in validation.errors.iter().enumerate() {
+                                    errors_table.set(i + 1, error.clone())?;
+                                }
+                                result_table.set("errors", errors_table)?;
+                            }
+                            Ok(result_table)
+                        }
+                        Err(e) => {
+                            let result_table = lua.create_table()?;
+                            result_table.set("is_valid", false)?;
+                            result_table.set("error", format!("Validation failed: {}", e))?;
+                            result_table.set("backup_id", backup_id)?;
+                            Ok(result_table)
+                        }
+                    }
+                })
+                .map_err(|e| LLMSpellError::Component {
+                    message: format!("Failed to create State.validate_backup: {}", e),
+                    source: None,
+                })?;
+
+            state_table
+                .set("validate_backup", validate_backup_fn)
+                .map_err(|e| LLMSpellError::Component {
+                    message: format!("Failed to set State.validate_backup: {}", e),
                     source: None,
                 })?;
         }

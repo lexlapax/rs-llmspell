@@ -84,7 +84,7 @@ impl BackupCompression {
         };
 
         let compressed_size = compressed.len();
-        let ratio = if start_size > 0 {
+        let ratio = if start_size > 0 && compressed_size < start_size {
             ((start_size - compressed_size) as f64 / start_size as f64) * 100.0
         } else {
             0.0
@@ -232,7 +232,7 @@ impl BackupCompression {
         let _ = self.decompress(&compressed);
         let decompression_time = decompress_start.elapsed();
 
-        let compression_ratio = if original_size > 0 {
+        let compression_ratio = if original_size > 0 && compressed_size < original_size {
             ((original_size - compressed_size) as f64 / original_size as f64) * 100.0
         } else {
             0.0
@@ -371,5 +371,51 @@ mod tests {
         assert!(analysis.is_compressible);
         assert!(analysis.compression_ratio > 50.0); // Should achieve >50% compression
         assert!(analysis.compressed_size < analysis.original_size);
+    }
+
+    #[test]
+    fn test_compression_edge_cases() {
+        // Test 1: Empty data
+        let empty_data = b"";
+        let compressor = BackupCompression::new(CompressionType::Zstd, CompressionLevel::default());
+        let compressed = compressor.compress(empty_data).unwrap();
+        assert!(!compressed.is_empty()); // Even empty data has compression headers
+        let decompressed = compressor.decompress(&compressed).unwrap();
+        assert_eq!(decompressed, empty_data);
+
+        // Test 2: Small incompressible data (may expand due to compression headers)
+        let small_data = b"xyz123";
+        let compressed_small = compressor.compress(small_data).unwrap();
+        // This might be larger than original due to compression overhead
+        let decompressed_small = compressor.decompress(&compressed_small).unwrap();
+        assert_eq!(decompressed_small, small_data);
+
+        // Test 3: Already compressed/random data
+        let random_data = vec![0xFF, 0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE];
+        let compressed_random = compressor.compress(&random_data).unwrap();
+        let decompressed_random = compressor.decompress(&compressed_random).unwrap();
+        assert_eq!(decompressed_random, random_data);
+    }
+
+    #[test]
+    fn test_compression_ratio_calculation() {
+        // Test that compression ratio calculation doesn't panic
+        let compressor = BackupCompression::new(CompressionType::Gzip, CompressionLevel::default());
+        
+        // Case 1: Data that compresses well
+        let good_data = b"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA".to_vec();
+        let analysis1 = compressor.analyze_compression(&good_data);
+        assert!(analysis1.compression_ratio > 0.0);
+        
+        // Case 2: Data that doesn't compress (might expand)
+        let bad_data = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+        let analysis2 = compressor.analyze_compression(&bad_data);
+        // Should not panic even if compression ratio is 0 or negative
+        assert!(analysis2.compression_ratio >= 0.0);
+        
+        // Case 3: Empty data
+        let empty_data = vec![];
+        let analysis3 = compressor.analyze_compression(&empty_data);
+        assert_eq!(analysis3.compression_ratio, 0.0);
     }
 }

@@ -17,6 +17,8 @@ llmspell-config = { path = "../llmspell-config" }
 llmspell-bridge = { path = "../llmspell-bridge" }
 llmspell-providers = { path = "../llmspell-providers" }
 llmspell-utils = { path = "../llmspell-utils" }
+llmspell-state-persistence = { path = "../llmspell-state-persistence" }
+llmspell-storage = { path = "../llmspell-storage" }
 tokio.workspace = true
 clap = { workspace = true, features = ["derive", "env"] }
 serde.workspace = true

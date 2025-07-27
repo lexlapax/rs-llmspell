@@ -38,6 +38,7 @@ async fn main() -> Result<()> {
                 compression: false,
                 encryption: None,
                 backup_retention: std::time::Duration::from_secs(7 * 24 * 60 * 60),
+                backup: None,
                 performance: Default::default(),
             },
         )

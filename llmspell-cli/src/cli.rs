@@ -150,6 +150,9 @@ pub enum Commands {
     /// Manage API keys for external services
     #[command(subcommand)]
     Keys(crate::commands::keys::KeysSubcommand),
+
+    /// Backup and restore state data
+    Backup(crate::commands::backup::BackupCommand),
 }
 
 impl Cli {

@@ -6,7 +6,7 @@ print("=================================")
 
 -- First, let's create some test state data
 print("\n1. Creating test state data...")
-State.save("global", "app_config", {
+State.set("global", "app_config", {
     version = "1.0.0",
     settings = {
         theme = "dark",
@@ -15,13 +15,13 @@ State.save("global", "app_config", {
     }
 })
 
-State.save("global", "user_preferences", {
+State.set("global", "user_preferences", {
     display_name = "Test User",
     email = "test@example.com",
     created_at = os.time()
 })
 
-State.save("global", "app_stats", {
+State.set("global", "app_stats", {
     total_users = 1000,
     active_sessions = 42,
     last_backup = "never"
@@ -31,9 +31,9 @@ print("✅ Test data created successfully")
 
 -- List current state keys
 print("\n2. Current state keys:")
-local keys = State.list_keys("global")
+local keys = State.list("global")
 for i, key in ipairs(keys) do
-    local value = State.load("global", key)
+    local value = State.get("global", key)
     print("   - " .. key .. " = " .. tostring(value))
 end
 
@@ -52,7 +52,7 @@ end
 
 -- Modify some data
 print("\n4. Modifying state data...")
-State.save("global", "app_config", {
+State.set("global", "app_config", {
     version = "1.0.1", -- Changed version
     settings = {
         theme = "light", -- Changed theme
@@ -61,7 +61,7 @@ State.save("global", "app_config", {
     }
 })
 
-State.save("global", "app_stats", {
+State.set("global", "app_stats", {
     total_users = 1050, -- Increased users
     active_sessions = 38,
     last_backup = os.time()
@@ -131,12 +131,12 @@ print("❌ Critical data deleted!")
 
 -- Show current state
 print("\n9. Current state after data loss:")
-keys = State.list_keys("global")
+keys = State.list("global")
 if #keys == 0 then
     print("   No keys found - all data lost!")
 else
     for i, key in ipairs(keys) do
-        local value = State.load("global", key)
+        local value = State.get("global", key)
         print("   - " .. key .. " = " .. tostring(value))
     end
 end
@@ -152,9 +152,9 @@ if #backups > 0 then
         
         -- Show restored state
         print("\n11. State after restoration:")
-        keys = State.list_keys("global")
+        keys = State.list("global")
         for i, key in ipairs(keys) do
-            local value = State.load("global", key)
+            local value = State.get("global", key)
             print("   - " .. key .. " = " .. tostring(value))
         end
     else
@@ -172,6 +172,4 @@ print("  • Validating backup integrity")
 print("  • Restoring state from backups")
 print("  • Recovering from data loss scenarios")
 
--- Note about current implementation
-print("\n⚠️  Note: Backup functionality is currently stubbed.")
-print("   Full implementation will be available when BackupManager is integrated.")
+-- The backup functionality is now fully implemented and integrated!

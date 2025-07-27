@@ -1,7 +1,10 @@
 // ABOUTME: Backup manager for coordinating backup operations and lifecycle
 // ABOUTME: Handles scheduling, retention, validation, and restoration of backups
 
-use super::{AtomicBackup, BackupConfig, BackupId, BackupResult, BackupValidation, RestoreOptions};
+use super::{
+    AtomicBackup, BackupCompression, BackupConfig, BackupId, BackupResult, BackupValidation,
+    CompressionLevel, RestoreOptions,
+};
 use crate::{error::StateError, manager::StateManager};
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
@@ -138,14 +141,14 @@ pub struct BackupSchedule {
 /// Backup manager for coordinating backup operations
 pub struct BackupManager {
     config: BackupConfig,
-    state_manager: Arc<RwLock<StateManager>>,
+    state_manager: Arc<StateManager>,
     backup_index: Arc<RwLock<HashMap<BackupId, BackupMetadata>>>,
     _active_backups: Arc<RwLock<HashMap<BackupId, BackupStatus>>>,
 }
 
 impl BackupManager {
     /// Create a new backup manager
-    pub fn new(config: BackupConfig, state_manager: Arc<RwLock<StateManager>>) -> Result<Self> {
+    pub fn new(config: BackupConfig, state_manager: Arc<StateManager>) -> Result<Self> {
         // Ensure backup directory exists
         std::fs::create_dir_all(&config.backup_dir).context("Failed to create backup directory")?;
 
@@ -464,9 +467,11 @@ impl BackupManager {
     }
 
     async fn compress_backup(&self, data: &[u8]) -> BackupResult<Vec<u8>> {
-        // Compression will be implemented in compression.rs
-        // For now, return data as-is
-        Ok(data.to_vec())
+        let compressor = BackupCompression::new(
+            self.config.compression_type,
+            CompressionLevel::new(self.config.compression_level.into())?
+        );
+        Ok(compressor.compress(data)?)
     }
 
     async fn get_current_schema_version(&self) -> BackupResult<String> {
@@ -482,12 +487,89 @@ impl BackupManager {
     }
 
     async fn build_restore_chain(&self, backup_id: &str) -> BackupResult<Vec<BackupId>> {
-        // TODO: Build chain of backups needed for incremental restore
-        Ok(vec![backup_id.to_string()])
+        let mut chain = Vec::new();
+        let mut current_id = backup_id.to_string();
+
+        loop {
+            let metadata = self.get_backup_metadata(&current_id).await?;
+            chain.push(current_id.clone());
+
+            // If this is a full backup or has no parent, we're done
+            if metadata.backup_type == BackupType::Full || metadata.parent_id.is_none() {
+                break;
+            }
+
+            // Move to parent backup
+            if let Some(parent_id) = metadata.parent_id {
+                current_id = parent_id;
+            } else {
+                break;
+            }
+        }
+
+        // Reverse to get oldest-first order for restoration
+        chain.reverse();
+
+        debug!(
+            "Built restore chain of {} backups for {}",
+            chain.len(),
+            backup_id
+        );
+
+        Ok(chain)
     }
 
-    async fn restore_single_backup(&self, _backup_id: &str) -> BackupResult<()> {
-        // TODO: Implement actual restore logic
+    async fn restore_single_backup(&self, backup_id: &str) -> BackupResult<()> {
+        info!("Restoring single backup: {}", backup_id);
+
+        // Load backup metadata
+        let metadata = self.get_backup_metadata(backup_id).await?;
+
+        // Load backup data from file
+        let backup_path = self.get_backup_path(backup_id);
+        let compressed_data = tokio::fs::read(&backup_path).await.map_err(|e| {
+            StateError::StorageError(anyhow::anyhow!("Failed to read backup: {}", e))
+        })?;
+
+        // Decompress if needed
+        let backup_data = if let Some(ref compression_info) = metadata.compression {
+            let reduction_percent = if compression_info.original_size > 0 && compression_info.compressed_size < compression_info.original_size {
+                ((compression_info.original_size - compression_info.compressed_size) as f64
+                    / compression_info.original_size as f64)
+                    * 100.0
+            } else {
+                0.0
+            };
+            debug!(
+                "Decompressing backup with {} ({:.1}% reduction)",
+                compression_info.algorithm,
+                reduction_percent
+            );
+
+            let compressor = BackupCompression::new(
+                self.config.compression_type,
+                CompressionLevel::new(compression_info.level)?,
+            );
+            compressor.decompress(&compressed_data)?
+        } else {
+            compressed_data
+        };
+
+        // Create atomic backup instance for restoration
+        let atomic_backup = AtomicBackup::new(
+            backup_id.to_string(),
+            self.state_manager.clone(),
+            metadata.parent_id.clone(),
+        )?;
+
+        // Perform the restoration
+        atomic_backup.restore(&backup_data).await?;
+
+        info!(
+            "Successfully restored {} entries from backup {}",
+            metadata.stats.total_entries, backup_id
+        );
+
         Ok(())
     }
 

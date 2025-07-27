@@ -47,6 +47,7 @@ async fn test_basic_agent_state_persistence() -> Result<()> {
                 compression: true,
                 encryption: None,
                 backup_retention: std::time::Duration::from_secs(3600),
+                backup: None,
                 performance: Default::default(),
             },
         )

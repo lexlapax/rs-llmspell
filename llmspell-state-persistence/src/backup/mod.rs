@@ -3,11 +3,19 @@
 
 pub mod atomic;
 pub mod compression;
+pub mod events;
 pub mod manager;
+pub mod recovery;
 
 pub use atomic::{AtomicBackup, AtomicBackupBuilder, BackupOperation};
 pub use compression::{BackupCompression, CompressionAnalysis, CompressionLevel};
-pub use manager::{BackupManager, BackupMetadata, BackupSchedule, BackupStatus, IncrementalBackup};
+pub use events::{BackupEvent, BackupEventBuilder};
+pub use manager::{
+    BackupManager, BackupMetadata, BackupSchedule, BackupStatus, BackupType, IncrementalBackup,
+};
+pub use recovery::{
+    AdvancedRecoveryOptions, RecoveryOrchestrator, RecoveryProgress, RecoveryState, RecoveryStatus,
+};
 
 // Re-export backup config from config module
 pub use crate::config::{BackupConfig, CompressionType};

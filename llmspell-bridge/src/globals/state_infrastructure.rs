@@ -28,10 +28,14 @@ pub async fn get_or_create_state_infrastructure(
         let migration_engine = context.get_bridge::<MigrationEngine>("migration_engine");
         let schema_registry = context.get_bridge::<SchemaRegistry>("schema_registry");
 
+        let backup_manager = context
+            .get_bridge::<llmspell_state_persistence::backup::BackupManager>("backup_manager");
+
         return Ok(StateInfrastructure {
             state_manager,
             migration_engine,
             schema_registry,
+            backup_manager,
         });
     }
 
@@ -49,7 +53,7 @@ pub async fn get_or_create_state_infrastructure(
     };
 
     let state_manager = Arc::new(
-        StateManager::with_backend(backend_type, persistence_config)
+        StateManager::with_backend(backend_type.clone(), persistence_config.clone())
             .await
             .map_err(|e| LLMSpellError::Component {
                 message: format!("Failed to create StateManager: {}", e),
@@ -111,10 +115,77 @@ pub async fn get_or_create_state_infrastructure(
         (None, None)
     };
 
+    // Initialize backup infrastructure if enabled
+    let backup_manager = if config.backup_enabled {
+        debug!("Initializing backup infrastructure");
+
+        // Get backup config or use defaults
+        let backup_config = if let Some(ref backup_cfg) = config.backup {
+            // Convert from runtime BackupConfig to state-persistence BackupConfig
+            llmspell_state_persistence::config::BackupConfig {
+                backup_dir: std::path::PathBuf::from(
+                    backup_cfg.backup_dir.as_deref().unwrap_or("./backups"),
+                ),
+                compression_enabled: backup_cfg.compression_enabled,
+                compression_type: match backup_cfg.compression_type.as_str() {
+                    "gzip" => llmspell_state_persistence::config::CompressionType::Gzip,
+                    "zstd" => llmspell_state_persistence::config::CompressionType::Zstd,
+                    "lz4" => llmspell_state_persistence::config::CompressionType::Lz4,
+                    "brotli" => llmspell_state_persistence::config::CompressionType::Brotli,
+                    _ => llmspell_state_persistence::config::CompressionType::Zstd,
+                },
+                compression_level: backup_cfg.compression_level,
+                encryption_enabled: false, // Not exposed in runtime config yet
+                max_backups: backup_cfg.max_backups,
+                max_backup_age: backup_cfg
+                    .max_backup_age
+                    .map(std::time::Duration::from_secs),
+                incremental_enabled: backup_cfg.incremental_enabled,
+                full_backup_interval: std::time::Duration::from_secs(86400), // 24 hours default
+            }
+        } else {
+            llmspell_state_persistence::config::BackupConfig::default()
+        };
+
+        // Create backup manager
+        // Note: BackupManager expects Arc<RwLock<StateManager>> but we have Arc<StateManager>
+        // For now, create a separate StateManager instance for backup functionality
+        // TODO: Refactor to share the same StateManager instance
+        let backup_state_manager = Arc::new(tokio::sync::RwLock::new(
+            StateManager::with_backend(backend_type.clone(), persistence_config.clone())
+                .await
+                .map_err(|e| LLMSpellError::Component {
+                    message: format!("Failed to create backup StateManager: {}", e),
+                    source: None,
+                })?,
+        ));
+        match llmspell_state_persistence::backup::BackupManager::new(
+            backup_config,
+            backup_state_manager,
+        ) {
+            Ok(mgr) => {
+                let backup_mgr = Arc::new(mgr);
+                context.set_bridge("backup_manager", backup_mgr.clone());
+                Some(backup_mgr)
+            }
+            Err(e) => {
+                warn!(
+                    "Failed to create backup manager: {}, backup functionality disabled",
+                    e
+                );
+                None
+            }
+        }
+    } else {
+        debug!("Backup support disabled in configuration");
+        None
+    };
+
     Ok(StateInfrastructure {
         state_manager,
         migration_engine,
         schema_registry,
+        backup_manager,
     })
 }
 
@@ -185,6 +256,7 @@ pub struct StateInfrastructure {
     pub state_manager: Arc<StateManager>,
     pub migration_engine: Option<Arc<MigrationEngine>>,
     pub schema_registry: Option<Arc<SchemaRegistry>>,
+    pub backup_manager: Option<Arc<llmspell_state_persistence::backup::BackupManager>>,
 }
 
 #[cfg(test)]

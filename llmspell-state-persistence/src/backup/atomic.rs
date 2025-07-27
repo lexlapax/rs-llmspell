@@ -273,6 +273,58 @@ impl AtomicBackup {
         Ok(())
     }
 
+    /// Restore state from snapshot data with progress tracking
+    pub async fn restore_with_progress<F>(
+        &self,
+        snapshot_data: &[u8],
+        mut progress_callback: F,
+    ) -> Result<(), StateError>
+    where
+        F: FnMut(usize, usize) + Send,
+    {
+        let _lock = self.operation_lock.lock().await;
+        info!(
+            "Starting atomic restore from backup: {} (with progress)",
+            self.backup_id
+        );
+
+        // Deserialize snapshot
+        let snapshot: StateSnapshot = rmp_serde::from_slice(snapshot_data)
+            .map_err(|e| StateError::DeserializationError(e.to_string()))?;
+
+        // Validate snapshot
+        self.validate_snapshot(&snapshot)?;
+
+        let total_entries = snapshot.entries.len();
+        debug!("Restoring {} entries", total_entries);
+
+        // Restore state atomically with progress reporting
+        let state_manager = self.state_manager.write().await;
+        let mut restored_count = 0;
+
+        for (idx, (key, entry)) in snapshot.entries.into_iter().enumerate() {
+            match state_manager.set(entry.scope, &entry.key, entry.data).await {
+                Ok(_) => {
+                    restored_count += 1;
+                    // Report progress every 10 entries or on last entry
+                    if restored_count % 10 == 0 || idx == total_entries - 1 {
+                        progress_callback(restored_count, total_entries);
+                    }
+                }
+                Err(e) => {
+                    error!("Failed to restore key {}: {}", key, e);
+                    return Err(e);
+                }
+            }
+        }
+
+        info!(
+            "Atomic restore completed: {} entries restored",
+            restored_count
+        );
+        Ok(())
+    }
+
     /// Validate snapshot before restore
     fn validate_snapshot(&self, snapshot: &StateSnapshot) -> Result<(), StateError> {
         // Basic validation

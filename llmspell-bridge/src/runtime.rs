@@ -382,6 +382,29 @@ pub struct StatePersistenceConfig {
     pub backup_on_migration: bool,
     /// Maximum state size per key in bytes
     pub max_state_size_bytes: Option<usize>,
+    /// Enable backup functionality
+    pub backup_enabled: bool,
+    /// Backup configuration
+    pub backup: Option<BackupConfig>,
+}
+
+/// Backup configuration for state persistence
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct BackupConfig {
+    /// Directory for backup storage
+    pub backup_dir: Option<String>,
+    /// Enable compression for backups
+    pub compression_enabled: bool,
+    /// Compression type to use
+    pub compression_type: String,
+    /// Compression level (1-9)
+    pub compression_level: u8,
+    /// Enable incremental backups
+    pub incremental_enabled: bool,
+    /// Maximum number of backups to keep
+    pub max_backups: Option<usize>,
+    /// Maximum age of backups in seconds
+    pub max_backup_age: Option<u64>,
 }
 
 impl Default for StatePersistenceConfig {
@@ -393,6 +416,22 @@ impl Default for StatePersistenceConfig {
             schema_directory: None,
             backup_on_migration: true,
             max_state_size_bytes: Some(10_000_000), // 10MB per key
+            backup_enabled: false,
+            backup: None,
+        }
+    }
+}
+
+impl Default for BackupConfig {
+    fn default() -> Self {
+        Self {
+            backup_dir: Some("./backups".to_string()),
+            compression_enabled: true,
+            compression_type: "zstd".to_string(),
+            compression_level: 3,
+            incremental_enabled: true,
+            max_backups: Some(10),
+            max_backup_age: Some(2592000), // 30 days
         }
     }
 }

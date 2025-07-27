@@ -65,6 +65,7 @@ async fn main() -> Result<()> {
                 compression: true,
                 encryption: None,
                 backup_retention: Duration::from_secs(3600),
+                backup: None,
                 performance: Default::default(),
             },
         )
