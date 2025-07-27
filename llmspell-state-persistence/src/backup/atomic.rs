@@ -8,13 +8,13 @@ use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Instant, SystemTime};
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::Mutex;
 use tracing::{debug, error, info};
 
 /// Atomic backup operation handle
 pub struct AtomicBackup {
     backup_id: String,
-    state_manager: Arc<RwLock<StateManager>>,
+    state_manager: Arc<StateManager>,
     parent_backup: Option<String>,
     snapshot_time: SystemTime,
     operation_lock: Arc<Mutex<()>>,
@@ -55,7 +55,7 @@ pub enum OperationStatus {
 
 /// Snapshot data structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct StateSnapshot {
+pub struct StateSnapshot {
     pub timestamp: SystemTime,
     pub entries: HashMap<String, SnapshotEntry>,
     pub metadata: SnapshotMetadata,
@@ -73,7 +73,7 @@ struct SnapshotEntry {
 
 /// Snapshot metadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct SnapshotMetadata {
+pub struct SnapshotMetadata {
     pub backup_id: String,
     pub parent_id: Option<String>,
     pub created_at: SystemTime,
@@ -86,7 +86,7 @@ impl AtomicBackup {
     /// Create a new atomic backup operation
     pub fn new(
         backup_id: String,
-        state_manager: Arc<RwLock<StateManager>>,
+        state_manager: Arc<StateManager>,
         parent_backup: Option<String>,
     ) -> Result<Self> {
         Ok(Self {
@@ -146,7 +146,6 @@ impl AtomicBackup {
 
     /// Create consistent snapshot of state data
     async fn create_snapshot(&self) -> Result<StateSnapshot, StateError> {
-        let state_manager = self.state_manager.read().await;
         let mut entries = HashMap::new();
         let mut total_size = 0u64;
 
@@ -155,7 +154,7 @@ impl AtomicBackup {
 
         // Capture state for each scope
         for scope in scopes {
-            match self.capture_scope_data(&state_manager, &scope).await {
+            match self.capture_scope_data(&scope).await {
                 Ok(scope_entries) => {
                     for (key, entry) in scope_entries {
                         // Estimate size of JSON value
@@ -191,7 +190,6 @@ impl AtomicBackup {
     /// Capture data for a specific scope
     async fn capture_scope_data(
         &self,
-        state_manager: &StateManager,
         scope: &StateScope,
     ) -> Result<HashMap<String, SnapshotEntry>, StateError> {
         let mut entries = HashMap::new();
@@ -203,10 +201,10 @@ impl AtomicBackup {
         }
 
         // Get all keys for scope
-        let keys = state_manager.list_keys(scope.clone()).await?;
+        let keys = self.state_manager.list_keys(scope.clone()).await?;
 
         for key in keys {
-            match state_manager.get(scope.clone(), &key).await {
+            match self.state_manager.get(scope.clone(), &key).await {
                 Ok(Some(data)) => {
                     let entry = SnapshotEntry {
                         scope: scope.clone(),
@@ -251,11 +249,14 @@ impl AtomicBackup {
         self.validate_snapshot(&snapshot)?;
 
         // Restore state atomically
-        let state_manager = self.state_manager.write().await;
         let mut restored_count = 0;
 
         for (key, entry) in snapshot.entries {
-            match state_manager.set(entry.scope, &entry.key, entry.data).await {
+            match self
+                .state_manager
+                .set(entry.scope, &entry.key, entry.data)
+                .await
+            {
                 Ok(_) => {
                     restored_count += 1;
                 }
@@ -299,11 +300,14 @@ impl AtomicBackup {
         debug!("Restoring {} entries", total_entries);
 
         // Restore state atomically with progress reporting
-        let state_manager = self.state_manager.write().await;
         let mut restored_count = 0;
 
         for (idx, (key, entry)) in snapshot.entries.into_iter().enumerate() {
-            match state_manager.set(entry.scope, &entry.key, entry.data).await {
+            match self
+                .state_manager
+                .set(entry.scope, &entry.key, entry.data)
+                .await
+            {
                 Ok(_) => {
                     restored_count += 1;
                     // Report progress every 10 entries or on last entry
@@ -334,11 +338,7 @@ impl AtomicBackup {
             ));
         }
 
-        if snapshot.entries.is_empty() {
-            return Err(StateError::ValidationError(
-                "Backup validation failed: Empty snapshot".to_string(),
-            ));
-        }
+        // Empty snapshots are valid - they represent an empty state
 
         Ok(())
     }
@@ -376,10 +376,7 @@ impl AtomicBackupBuilder {
     }
 
     /// Build the atomic backup instance
-    pub fn build(
-        self,
-        state_manager: Arc<RwLock<StateManager>>,
-    ) -> Result<AtomicBackup, StateError> {
+    pub fn build(self, state_manager: Arc<StateManager>) -> Result<AtomicBackup, StateError> {
         Ok(AtomicBackup {
             backup_id: self.backup_id,
             state_manager,

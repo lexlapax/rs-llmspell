@@ -2,19 +2,27 @@
 // ABOUTME: Implements non-blocking backup operations with compression and encryption
 
 pub mod atomic;
+pub mod cleanup;
 pub mod compression;
 pub mod events;
 pub mod manager;
 pub mod recovery;
+pub mod retention;
 
 pub use atomic::{AtomicBackup, AtomicBackupBuilder, BackupOperation};
+pub use cleanup::{BackupCleanup, CleanupResult, CleanupScheduler};
 pub use compression::{BackupCompression, CompressionAnalysis, CompressionLevel};
 pub use events::{BackupEvent, BackupEventBuilder};
 pub use manager::{
-    BackupManager, BackupMetadata, BackupSchedule, BackupStatus, BackupType, IncrementalBackup,
+    BackupManager, BackupMetadata, BackupSchedule, BackupStats, BackupStatus, BackupType,
+    IncrementalBackup,
 };
 pub use recovery::{
     AdvancedRecoveryOptions, RecoveryOrchestrator, RecoveryProgress, RecoveryState, RecoveryStatus,
+};
+pub use retention::{
+    CompositePolicy, CountBasedPolicy, ImportanceBasedPolicy, RetentionContext, RetentionDecision,
+    RetentionPolicy, RetentionPriority, RetentionReport, TimeBasedPolicy,
 };
 
 // Re-export backup config from config module
@@ -81,6 +89,12 @@ impl Default for RestoreOptions {
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod retention_test;
+
+#[cfg(test)]
+mod retention_automatic_test;
 
 #[cfg(test)]
 mod simple_tests {

@@ -1,0 +1,28 @@
+{
+  "id": "backup_1753635347_7f8e49eafec8c1a5",
+  "created_at": {
+    "secs_since_epoch": 1753635347,
+    "nanos_since_epoch": 427597000
+  },
+  "backup_type": "Incremental",
+  "parent_id": "backup_1753635347_33211d22a8a881b6",
+  "schema_version": "1.0.0",
+  "checksums": {
+    "sha256": "2645f73e891af7076671feb1525e9b495d32ba94f4eeaefdb889a8139b991faf"
+  },
+  "compression": {
+    "algorithm": "zstd",
+    "level": 3,
+    "original_size": 440,
+    "compressed_size": 322
+  },
+  "encryption": null,
+  "stats": {
+    "total_entries": 3,
+    "total_size": 322,
+    "duration_ms": 0,
+    "scopes_backed_up": [
+      "global"
+    ]
+  }
+}

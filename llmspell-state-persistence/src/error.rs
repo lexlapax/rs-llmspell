@@ -40,6 +40,9 @@ pub enum StateError {
 
     #[error("State validation failed: {0}")]
     ValidationError(String),
+
+    #[error("Resource not found: {0}")]
+    NotFound(String),
 }
 
 impl From<std::io::Error> for StateError {

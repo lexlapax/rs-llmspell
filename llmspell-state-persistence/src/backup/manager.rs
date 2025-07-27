@@ -2,6 +2,11 @@
 // ABOUTME: Handles scheduling, retention, validation, and restoration of backups
 
 use super::{
+    cleanup::BackupCleanup,
+    retention::{
+        CompositePolicy, CountBasedPolicy, RetentionContext, RetentionPolicy, RetentionReport,
+        TimeBasedPolicy,
+    },
     AtomicBackup, BackupCompression, BackupConfig, BackupId, BackupResult, BackupValidation,
     CompressionLevel, RestoreOptions,
 };
@@ -11,7 +16,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use tokio::sync::RwLock;
 use tracing::{debug, info};
 
@@ -195,6 +200,16 @@ impl BackupManager {
         let backup_data = atomic_backup.capture().await?;
         let duration = start_time.elapsed();
 
+        // Extract entry count from snapshot metadata
+        let snapshot: crate::backup::atomic::StateSnapshot = rmp_serde::from_slice(&backup_data)
+            .map_err(|e| {
+                StateError::DeserializationError(format!(
+                    "Failed to deserialize snapshot for metadata: {}",
+                    e
+                ))
+            })?;
+        let entry_count = snapshot.metadata.entry_count;
+
         // Compress if enabled
         let (data, compression_info) = if self.config.compression_enabled {
             let compressed = self.compress_backup(&backup_data).await?;
@@ -214,9 +229,6 @@ impl BackupManager {
         tokio::fs::write(&backup_path, &data)
             .await
             .context("Failed to write backup file")?;
-
-        // Count entries - for now use a placeholder
-        let entry_count = 100; // TODO: Get actual count from atomic backup
 
         // Create metadata
         let metadata = BackupMetadata {
@@ -469,7 +481,7 @@ impl BackupManager {
     async fn compress_backup(&self, data: &[u8]) -> BackupResult<Vec<u8>> {
         let compressor = BackupCompression::new(
             self.config.compression_type,
-            CompressionLevel::new(self.config.compression_level.into())?
+            CompressionLevel::new(self.config.compression_level.into())?,
         );
         Ok(compressor.compress(data)?)
     }
@@ -482,7 +494,18 @@ impl BackupManager {
     // TODO: Implement event emission when StateEvent includes backup events
 
     async fn cleanup_old_backups(&self) -> BackupResult<()> {
-        // TODO: Implement backup retention policy
+        // Only run cleanup if retention policies are configured
+        if self.config.max_backups.is_none() && self.config.max_backup_age.is_none() {
+            debug!("No retention policies configured, skipping cleanup");
+            return Ok(());
+        }
+
+        info!("Applying backup retention policies");
+
+        // Apply retention policies
+        let report = self.apply_retention_policies().await?;
+        report.log_summary();
+
         Ok(())
     }
 
@@ -533,7 +556,9 @@ impl BackupManager {
 
         // Decompress if needed
         let backup_data = if let Some(ref compression_info) = metadata.compression {
-            let reduction_percent = if compression_info.original_size > 0 && compression_info.compressed_size < compression_info.original_size {
+            let reduction_percent = if compression_info.original_size > 0
+                && compression_info.compressed_size < compression_info.original_size
+            {
                 ((compression_info.original_size - compression_info.compressed_size) as f64
                     / compression_info.original_size as f64)
                     * 100.0
@@ -542,8 +567,7 @@ impl BackupManager {
             };
             debug!(
                 "Decompressing backup with {} ({:.1}% reduction)",
-                compression_info.algorithm,
-                reduction_percent
+                compression_info.algorithm, reduction_percent
             );
 
             let compressor = BackupCompression::new(
@@ -574,8 +598,117 @@ impl BackupManager {
     }
 
     fn load_backup_index(&mut self) -> Result<()> {
-        // TODO: Load existing backup metadata from disk
+        // Load existing backup metadata from disk
+        let mut loaded_backups = Vec::new();
+
+        if let Ok(entries) = std::fs::read_dir(&self.config.backup_dir) {
+            for entry in entries {
+                if let Ok(entry) = entry {
+                    let path = entry.path();
+                    if path.extension().and_then(|s| s.to_str()) == Some("meta") {
+                        // Load metadata file
+                        if let Ok(contents) = std::fs::read_to_string(&path) {
+                            if let Ok(metadata) = serde_json::from_str::<BackupMetadata>(&contents)
+                            {
+                                loaded_backups.push((metadata.id.clone(), metadata));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let loaded_count = loaded_backups.len();
+
+        // Update index with loaded backups
+        // Since we're in the constructor, we can use try_write().unwrap() safely
+        if let Ok(mut index) = self.backup_index.try_write() {
+            for (id, metadata) in loaded_backups {
+                index.insert(id, metadata);
+            }
+        }
+
+        if loaded_count > 0 {
+            info!("Loaded {} existing backups from disk", loaded_count);
+        }
+
         Ok(())
+    }
+
+    /// Apply retention policies to manage backup storage
+    pub async fn apply_retention_policies(&self) -> BackupResult<RetentionReport> {
+        let start_time = Instant::now();
+
+        // Build composite retention policy based on configuration
+        let mut composite_policy = CompositePolicy::new();
+
+        // Add time-based policy if configured
+        if let Some(max_age) = self.config.max_backup_age {
+            composite_policy = composite_policy.add_policy(Box::new(TimeBasedPolicy::new(max_age)));
+        }
+
+        // Add count-based policy if configured
+        if let Some(max_count) = self.config.max_backups {
+            composite_policy =
+                composite_policy.add_policy(Box::new(CountBasedPolicy::new(max_count)));
+        }
+
+        // Don't add importance-based policy by default - it overrides count/time limits
+        // Users can add it explicitly if they want importance-based retention
+
+        // Get all backups
+        let index = self.backup_index.read().await;
+        let all_backups: Vec<BackupMetadata> = index.values().cloned().collect();
+
+        // Calculate total storage usage
+        let total_size: u64 = all_backups.iter().map(|b| b.stats.total_size).sum();
+
+        // Create retention context
+        let context = RetentionContext {
+            all_backups: all_backups.clone(),
+            total_size,
+            storage_limit: None, // Could be configured in the future
+            current_time: SystemTime::now(),
+        };
+
+        // Evaluate retention for each backup
+        let mut decisions = Vec::new();
+        for backup in &all_backups {
+            let decision = composite_policy.evaluate(backup, &context);
+            decisions.push(decision);
+        }
+
+        // Execute cleanup
+        let cleanup = BackupCleanup::new(self.config.backup_dir.clone(), false);
+        let cleanup_result = cleanup.execute_cleanup(decisions.clone(), &*index).await?;
+
+        // Remove deleted backups from index
+        if cleanup_result.deleted_count > 0 {
+            drop(index); // Release read lock
+            let mut index = self.backup_index.write().await;
+            for decision in &decisions {
+                if !decision.should_retain {
+                    index.remove(&decision.backup_id);
+                }
+            }
+        }
+
+        let report = RetentionReport {
+            evaluated_count: all_backups.len(),
+            retained_count: decisions.iter().filter(|d| d.should_retain).count(),
+            deleted_count: cleanup_result.deleted_count,
+            space_freed: cleanup_result.space_freed,
+            decisions,
+            execution_time: start_time.elapsed(),
+        };
+
+        Ok(report)
+    }
+
+    /// Manually trigger retention policy application
+    pub async fn cleanup_backups(&self) -> BackupResult<RetentionReport> {
+        info!("Manually triggering backup cleanup");
+        self.apply_retention_policies().await
     }
 }
 

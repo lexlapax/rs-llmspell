@@ -8,7 +8,6 @@ use llmspell_state_persistence::backup::{BackupManager, RestoreOptions};
 use llmspell_state_persistence::manager::StateManager;
 use serde_json::json;
 use std::sync::Arc;
-use tokio::sync::RwLock;
 
 use crate::cli::OutputFormat;
 
@@ -120,17 +119,17 @@ pub async fn execute_backup(
 /// Initialize backup infrastructure
 async fn initialize_backup_infrastructure(
     _config: &RuntimeConfig,
-) -> Result<(Arc<RwLock<StateManager>>, Arc<BackupManager>)> {
+) -> Result<(Arc<StateManager>, Arc<BackupManager>)> {
     use llmspell_state_persistence::config::{BackupConfig, StorageBackendType};
 
     // For now, we'll use default state config
 
     // Create state manager with memory backend
-    let state_manager = Arc::new(RwLock::new(
+    let state_manager = Arc::new(
         StateManager::with_backend(StorageBackendType::Memory, Default::default())
             .await
             .context("Failed to create state manager")?,
-    ));
+    );
 
     // Create backup manager
     let backup_config = BackupConfig {

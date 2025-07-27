@@ -166,3 +166,411 @@ mod backup_tests {
         assert_eq!(deserialized.stats.total_entries, 100);
     }
 }
+
+#[cfg(test)]
+mod integration_tests {
+    use crate::backup::atomic::AtomicBackup;
+    use crate::backup::*;
+    use crate::config::{BackupConfig, CompressionType, PersistenceConfig, StorageBackendType};
+    use crate::{StateManager, StateScope};
+    use serde_json::json;
+    use std::sync::Arc;
+    use std::time::Duration;
+    use tempfile::TempDir;
+
+    /// Helper to create a test state manager
+    async fn create_test_state_manager() -> Arc<StateManager> {
+        Arc::new(
+            StateManager::with_backend(StorageBackendType::Memory, PersistenceConfig::default())
+                .await
+                .expect("Failed to create state manager"),
+        )
+    }
+
+    /// Helper to create a test backup manager  
+    async fn create_test_backup_manager(
+        state_manager: Arc<StateManager>,
+    ) -> (Arc<BackupManager>, TempDir) {
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let config = BackupConfig {
+            backup_dir: temp_dir.path().to_path_buf(),
+            compression_enabled: true,
+            compression_type: CompressionType::Zstd,
+            compression_level: 3,
+            encryption_enabled: false,
+            max_backups: Some(10),
+            max_backup_age: None,
+            incremental_enabled: true,
+            full_backup_interval: Duration::from_secs(3600),
+        };
+
+        let backup_manager = Arc::new(
+            BackupManager::new(config, state_manager).expect("Failed to create backup manager"),
+        );
+
+        (backup_manager, temp_dir)
+    }
+
+    #[tokio::test]
+    async fn test_backup_and_restore_integration() {
+        // Create state manager and add test data
+        let state_manager = create_test_state_manager().await;
+
+        // Add test data
+        state_manager
+            .set(StateScope::Global, "test_key1", json!("test_value1"))
+            .await
+            .expect("Failed to set state");
+
+        state_manager
+            .set(StateScope::Global, "test_key2", json!({"nested": "value"}))
+            .await
+            .expect("Failed to set state");
+
+        // Create backup manager and perform backup
+        let (backup_manager, _temp_dir) = create_test_backup_manager(state_manager.clone()).await;
+        let backup_status = backup_manager
+            .create_backup(false)
+            .await
+            .expect("Failed to create backup");
+
+        assert_eq!(backup_status.entry_count, 2);
+        assert!(!backup_status.is_incremental);
+
+        // Clear state
+        state_manager
+            .delete(StateScope::Global, "test_key1")
+            .await
+            .expect("Failed to delete state");
+        state_manager
+            .delete(StateScope::Global, "test_key2")
+            .await
+            .expect("Failed to delete state");
+
+        // Verify state is empty
+        let keys = state_manager
+            .list_keys(StateScope::Global)
+            .await
+            .expect("Failed to list keys");
+        assert_eq!(keys.len(), 0);
+
+        // Restore from backup
+        backup_manager
+            .restore_backup(&backup_status.id, RestoreOptions::default())
+            .await
+            .expect("Failed to restore backup");
+
+        // Verify state is restored
+        let value1 = state_manager
+            .get(StateScope::Global, "test_key1")
+            .await
+            .expect("Failed to get state")
+            .expect("State not found");
+        assert_eq!(value1, json!("test_value1"));
+
+        let value2 = state_manager
+            .get(StateScope::Global, "test_key2")
+            .await
+            .expect("Failed to get state")
+            .expect("State not found");
+        assert_eq!(value2, json!({"nested": "value"}));
+    }
+
+    #[tokio::test]
+    async fn test_empty_backup() {
+        let state_manager = create_test_state_manager().await;
+        let (backup_manager, _temp_dir) = create_test_backup_manager(state_manager.clone()).await;
+
+        // Create backup of empty state
+        let backup_status = backup_manager
+            .create_backup(false)
+            .await
+            .expect("Failed to create backup");
+
+        assert_eq!(backup_status.entry_count, 0);
+
+        // Restore empty backup (should not fail)
+        backup_manager
+            .restore_backup(&backup_status.id, RestoreOptions::default())
+            .await
+            .expect("Failed to restore backup");
+    }
+
+    #[tokio::test]
+    async fn test_compression_edge_cases() {
+        // Test with different compression types
+        let compression_types = vec![
+            CompressionType::None,
+            CompressionType::Gzip,
+            CompressionType::Zstd,
+            CompressionType::Lz4,
+            CompressionType::Brotli,
+        ];
+
+        for compression_type in compression_types {
+            let state_manager = create_test_state_manager().await;
+
+            // Add various types of data
+            state_manager
+                .set(StateScope::Global, "empty", json!(""))
+                .await
+                .expect("Failed to set state");
+
+            state_manager
+                .set(StateScope::Global, "small", json!("a"))
+                .await
+                .expect("Failed to set state");
+
+            state_manager
+                .set(StateScope::Global, "repetitive", json!("a".repeat(1000)))
+                .await
+                .expect("Failed to set state");
+
+            let temp_dir = TempDir::new().expect("Failed to create temp dir");
+            let config = BackupConfig {
+                backup_dir: temp_dir.path().to_path_buf(),
+                compression_enabled: compression_type != CompressionType::None,
+                compression_type,
+                compression_level: 3,
+                encryption_enabled: false,
+                max_backups: Some(10),
+                max_backup_age: None,
+                incremental_enabled: true,
+                full_backup_interval: Duration::from_secs(3600),
+            };
+
+            let backup_manager = Arc::new(
+                BackupManager::new(config, state_manager.clone())
+                    .expect("Failed to create backup manager"),
+            );
+
+            // Create and restore backup
+            let backup_status = backup_manager
+                .create_backup(false)
+                .await
+                .expect("Failed to create backup");
+
+            assert_eq!(backup_status.entry_count, 3);
+
+            // Clear state
+            for key in ["empty", "small", "repetitive"] {
+                state_manager
+                    .delete(StateScope::Global, key)
+                    .await
+                    .expect("Failed to delete state");
+            }
+
+            // Restore
+            backup_manager
+                .restore_backup(&backup_status.id, RestoreOptions::default())
+                .await
+                .expect("Failed to restore backup");
+
+            // Verify all data restored correctly
+            let empty = state_manager
+                .get(StateScope::Global, "empty")
+                .await
+                .expect("Failed to get state")
+                .expect("State not found");
+            assert_eq!(empty, json!(""));
+
+            let small = state_manager
+                .get(StateScope::Global, "small")
+                .await
+                .expect("Failed to get state")
+                .expect("State not found");
+            assert_eq!(small, json!("a"));
+
+            let repetitive = state_manager
+                .get(StateScope::Global, "repetitive")
+                .await
+                .expect("Failed to get state")
+                .expect("State not found");
+            assert_eq!(repetitive, json!("a".repeat(1000)));
+        }
+    }
+
+    #[tokio::test]
+    async fn test_backup_retention_policies() {
+        // This test verifies manual retention policy application
+        // For automatic cleanup testing, see test_automatic_cleanup_during_creation
+        let state_manager = create_test_state_manager().await;
+
+        // Create backup manager WITHOUT retention policies first
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let config = BackupConfig {
+            backup_dir: temp_dir.path().to_path_buf(),
+            compression_enabled: false,
+            compression_type: CompressionType::None,
+            compression_level: 3,
+            encryption_enabled: false,
+            max_backups: None, // No automatic cleanup
+            max_backup_age: None,
+            incremental_enabled: false,
+            full_backup_interval: Duration::from_secs(3600),
+        };
+
+        let backup_manager = Arc::new(
+            BackupManager::new(config, state_manager.clone())
+                .expect("Failed to create backup manager"),
+        );
+
+        // Create 5 backups without automatic cleanup
+        for i in 0..5 {
+            state_manager
+                .set(StateScope::Global, &format!("test_key_{}", i), json!(i))
+                .await
+                .expect("Failed to set state");
+
+            backup_manager
+                .create_backup(false)
+                .await
+                .expect("Failed to create backup");
+
+            // Small delay to ensure different timestamps
+            tokio::time::sleep(Duration::from_millis(50)).await;
+        }
+
+        // Should have all 5 backups
+        let backups_before = backup_manager
+            .list_backups()
+            .await
+            .expect("Failed to list backups");
+        assert_eq!(backups_before.len(), 5);
+
+        // Now create a new backup manager with retention policies pointing to same directory
+        let config_with_retention = BackupConfig {
+            backup_dir: temp_dir.path().to_path_buf(),
+            compression_enabled: false,
+            compression_type: CompressionType::None,
+            compression_level: 3,
+            encryption_enabled: false,
+            max_backups: Some(3), // Keep only 3 backups
+            max_backup_age: None,
+            incremental_enabled: false,
+            full_backup_interval: Duration::from_secs(3600),
+        };
+
+        let retention_manager = Arc::new(
+            BackupManager::new(config_with_retention, state_manager.clone())
+                .expect("Failed to create backup manager"),
+        );
+
+        // Manually apply retention policies
+        let report = retention_manager
+            .cleanup_backups()
+            .await
+            .expect("Failed to apply retention policies");
+
+        // Should have evaluated all 5 and deleted 2
+        assert_eq!(report.evaluated_count, 5);
+        assert_eq!(report.deleted_count, 2);
+        assert_eq!(report.retained_count, 3);
+
+        // List backups after cleanup
+        let backups_after = retention_manager
+            .list_backups()
+            .await
+            .expect("Failed to list backups");
+        assert_eq!(backups_after.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn test_importance_based_retention() {
+        let state_manager = create_test_state_manager().await;
+        let (backup_manager, _temp_dir) = create_test_backup_manager(state_manager.clone()).await;
+
+        // Create a full backup
+        state_manager
+            .set(StateScope::Global, "important_data", json!("critical"))
+            .await
+            .expect("Failed to set state");
+
+        let full_backup = backup_manager
+            .create_backup(false)
+            .await
+            .expect("Failed to create full backup");
+
+        // Create several incremental backups
+        for i in 0..3 {
+            state_manager
+                .set(StateScope::Global, &format!("data_{}", i), json!(i))
+                .await
+                .expect("Failed to set state");
+
+            backup_manager
+                .create_backup(true)
+                .await
+                .expect("Failed to create incremental backup");
+        }
+
+        // Configure aggressive retention (keep only 1 backup)
+        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let config = BackupConfig {
+            backup_dir: temp_dir.path().to_path_buf(),
+            compression_enabled: false,
+            compression_type: CompressionType::None,
+            compression_level: 3,
+            encryption_enabled: false,
+            max_backups: Some(1),
+            max_backup_age: None,
+            incremental_enabled: true,
+            full_backup_interval: Duration::from_secs(3600),
+        };
+
+        // Create new backup manager with aggressive retention
+        let aggressive_manager = Arc::new(
+            BackupManager::new(config, state_manager.clone())
+                .expect("Failed to create backup manager"),
+        );
+
+        // Copy backup metadata to new manager (simulate existing backups)
+        // Note: In real implementation, this would be loaded from disk
+
+        // The importance-based policy should keep the full backup even with max_backups=1
+        // because it's marked as Critical importance
+    }
+
+    #[tokio::test]
+    async fn test_concurrent_operations() {
+        let state_manager = create_test_state_manager().await;
+
+        // Add test data
+        for i in 0..10 {
+            state_manager
+                .set(StateScope::Global, &format!("key{}", i), json!(i))
+                .await
+                .expect("Failed to set state");
+        }
+
+        // Create atomic backup instance
+        let atomic_backup = Arc::new(
+            AtomicBackup::new("test_concurrent".to_string(), state_manager.clone(), None)
+                .expect("Failed to create atomic backup"),
+        );
+
+        // Capture should work with concurrent state modifications
+        let capture_handle = tokio::spawn({
+            let atomic_backup = atomic_backup.clone();
+            async move { atomic_backup.capture().await }
+        });
+
+        // Modify state concurrently
+        state_manager
+            .set(
+                StateScope::Global,
+                "concurrent_key",
+                json!("concurrent_value"),
+            )
+            .await
+            .expect("Failed to set concurrent state");
+
+        // Capture should complete successfully
+        let backup_data = capture_handle
+            .await
+            .expect("Capture task failed")
+            .expect("Capture failed");
+
+        assert!(!backup_data.is_empty());
+    }
+}

@@ -401,18 +401,18 @@ mod tests {
     fn test_compression_ratio_calculation() {
         // Test that compression ratio calculation doesn't panic
         let compressor = BackupCompression::new(CompressionType::Gzip, CompressionLevel::default());
-        
+
         // Case 1: Data that compresses well
         let good_data = b"AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA".to_vec();
         let analysis1 = compressor.analyze_compression(&good_data);
         assert!(analysis1.compression_ratio > 0.0);
-        
+
         // Case 2: Data that doesn't compress (might expand)
         let bad_data = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
         let analysis2 = compressor.analyze_compression(&bad_data);
         // Should not panic even if compression ratio is 0 or negative
         assert!(analysis2.compression_ratio >= 0.0);
-        
+
         // Case 3: Empty data
         let empty_data = vec![];
         let analysis3 = compressor.analyze_compression(&empty_data);

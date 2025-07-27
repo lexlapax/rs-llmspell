@@ -147,21 +147,10 @@ pub async fn get_or_create_state_infrastructure(
             llmspell_state_persistence::config::BackupConfig::default()
         };
 
-        // Create backup manager
-        // Note: BackupManager expects Arc<RwLock<StateManager>> but we have Arc<StateManager>
-        // For now, create a separate StateManager instance for backup functionality
-        // TODO: Refactor to share the same StateManager instance
-        let backup_state_manager = Arc::new(tokio::sync::RwLock::new(
-            StateManager::with_backend(backend_type.clone(), persistence_config.clone())
-                .await
-                .map_err(|e| LLMSpellError::Component {
-                    message: format!("Failed to create backup StateManager: {}", e),
-                    source: None,
-                })?,
-        ));
+        // Create backup manager using the same StateManager instance
         match llmspell_state_persistence::backup::BackupManager::new(
             backup_config,
-            backup_state_manager,
+            state_manager.clone(),
         ) {
             Ok(mgr) => {
                 let backup_mgr = Arc::new(mgr);
