@@ -6,8 +6,10 @@ use llmspell_state_persistence::{
     agent_state::{
         AgentMetadata, AgentStateData, ExecutionState, PersistentAgentState, ToolUsageStats,
     },
-    migration::*,
-    schema::*,
+    migration::{
+        DataTransformer, FieldTransform, MigrationValidator, StateTransformation, ValidationRules,
+    },
+    schema::{CompatibilityChecker, EnhancedStateSchema, MigrationPlanner, SemanticVersion},
     StateManager, StateScope,
 };
 use std::collections::HashMap;

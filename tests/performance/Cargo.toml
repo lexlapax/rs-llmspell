@@ -36,6 +36,10 @@ harness = false
 name = "state_persistence"
 harness = false
 
+[[bench]]
+name = "state_operations"
+harness = false
+
 [dependencies]
 # Core crates
 llmspell-core = { path = "../../llmspell-core" }
@@ -72,6 +76,12 @@ rand = "0.8"
 
 # UUID
 uuid = { version = "1.0", features = ["v4", "serde"] }
+
+# Tempfile
+tempfile = "3.13"
+
+# Base64
+base64 = "0.22"
 
 [dev-dependencies]
 # Test utilities

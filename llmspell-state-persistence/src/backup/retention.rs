@@ -1,7 +1,7 @@
 // ABOUTME: Backup retention policy system for intelligent storage management
 // ABOUTME: Implements configurable policies to preserve important backups while managing disk usage
 
-use super::{BackupId, BackupMetadata, BackupStats, BackupType};
+use super::{BackupId, BackupMetadata, BackupType};
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, SystemTime};
 use tracing::info;
@@ -296,6 +296,7 @@ impl RetentionReport {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::backup::BackupStats;
 
     #[test]
     fn test_retention_priority_ordering() {

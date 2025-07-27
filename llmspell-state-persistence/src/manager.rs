@@ -162,8 +162,24 @@ impl StateManager {
             let mut state = HashMap::new();
             let keys = storage_adapter.list_keys("").await?;
             for key in keys {
-                if let Some(serialized) = storage_adapter.load::<SerializableState>(&key).await? {
-                    state.insert(key, serialized.value);
+                // Skip keys that belong to other subsystems
+                if key.starts_with("agent_state:") || key.starts_with("hook_history:") {
+                    continue;
+                }
+
+                // Try to load as SerializableState, skip if it fails
+                // This provides forward compatibility if other subsystems add new data types
+                match storage_adapter.load::<SerializableState>(&key).await {
+                    Ok(Some(serialized)) => {
+                        state.insert(key, serialized.value);
+                    }
+                    Ok(None) => {
+                        // Key doesn't exist anymore, skip
+                    }
+                    Err(e) => {
+                        // Failed to deserialize - this might be data from another subsystem
+                        debug!("Skipping key '{}' during state load: {}", key, e);
+                    }
                 }
             }
             Arc::new(RwLock::new(state))
