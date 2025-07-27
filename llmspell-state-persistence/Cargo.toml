@@ -41,6 +41,9 @@ sha2 = "0.10"
 # Random for backup IDs
 rand = "0.8"
 
+# Performance optimizations
+crossbeam-skiplist = "0.1"
+
 # Internal dependencies
 llmspell-storage = { path = "../llmspell-storage" }
 llmspell-hooks = { path = "../llmspell-hooks" }

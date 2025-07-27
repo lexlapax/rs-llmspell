@@ -46,6 +46,7 @@ pub mod hooks;
 pub mod key_manager;
 pub mod manager;
 pub mod migration;
+pub mod performance;
 pub mod schema;
 pub mod scope;
 pub mod sensitive_data;
@@ -68,6 +69,7 @@ pub use migration::{
     DataTransformer, MigrationConfig, MigrationEngine, MigrationResult, MigrationStatus,
     ValidationLevel, ValidationResult,
 };
+pub use performance::{FastPathConfig, FastPathManager, StateClass};
 pub use schema::{
     CompatibilityChecker, CompatibilityResult, EnhancedStateSchema, MigrationPlan,
     MigrationPlanner, SchemaRegistry, SchemaVersion, SemanticVersion,

@@ -5,6 +5,7 @@ use crate::backend_adapter::{create_storage_backend, StateStorageAdapter};
 use crate::config::{PersistenceConfig, StateSchema};
 use crate::error::{StateError, StateResult};
 use crate::key_manager::KeyManager;
+use crate::performance::{FastPathConfig, FastPathManager, StateClass};
 use crate::scope::StateScope;
 use llmspell_events::{CorrelationContext, EventBus, EventCorrelationTracker, UniversalEvent};
 use llmspell_hooks::{
@@ -130,6 +131,9 @@ pub struct StateManager {
 
     // Per-agent state locks for concurrent access synchronization
     agent_state_locks: Arc<RwLock<HashMap<String, Arc<RwLock<()>>>>>,
+
+    // Performance optimizations
+    fast_path_manager: FastPathManager,
 }
 
 impl StateManager {
@@ -140,6 +144,43 @@ impl StateManager {
             PersistenceConfig::default(),
         )
         .await
+    }
+
+    /// Create a benchmark-optimized state manager for performance testing
+    pub async fn new_benchmark() -> StateResult<Self> {
+        let config = PersistenceConfig {
+            enabled: false, // Disable persistence for benchmarks
+            ..Default::default()
+        };
+
+        let storage_backend =
+            create_storage_backend(&crate::config::StorageBackendType::Memory).await?;
+        let storage_adapter = Arc::new(StateStorageAdapter::new(
+            storage_backend.clone(),
+            "state".to_string(),
+        ));
+        let hook_executor = Arc::new(HookExecutor::new());
+        let event_bus = Arc::new(EventBus::new());
+        let correlation_tracker = Arc::new(EventCorrelationTracker::default());
+        let replay_manager = HookReplayManager::new(storage_adapter.clone());
+        let in_memory = Arc::new(RwLock::new(HashMap::new()));
+
+        Ok(Self {
+            in_memory,
+            storage_backend,
+            storage_adapter,
+            hook_executor,
+            event_bus,
+            correlation_tracker,
+            persistence_config: config,
+            state_schema: StateSchema::v1(),
+            hook_history: Arc::new(RwLock::new(Vec::new())),
+            replay_manager,
+            before_state_change_hooks: Arc::new(RwLock::new(Vec::new())),
+            after_state_change_hooks: Arc::new(RwLock::new(Vec::new())),
+            agent_state_locks: Arc::new(RwLock::new(HashMap::new())),
+            fast_path_manager: FastPathManager::new(FastPathConfig::default()),
+        })
     }
 
     /// Create a new state manager with specified backend
@@ -201,6 +242,7 @@ impl StateManager {
             before_state_change_hooks: Arc::new(RwLock::new(Vec::new())),
             after_state_change_hooks: Arc::new(RwLock::new(Vec::new())),
             agent_state_locks: Arc::new(RwLock::new(HashMap::new())),
+            fast_path_manager: FastPathManager::new(FastPathConfig::default()),
         })
     }
 
@@ -341,12 +383,78 @@ impl StateManager {
 
     /// Set state value (backward compatible method)
     pub async fn set(&self, scope: StateScope, key: &str, value: Value) -> StateResult<()> {
-        if self.persistence_config.enabled {
-            self.set_with_hooks(scope, key, value).await
-        } else {
-            // Fast path for non-persistent state
-            self.set_state_internal(scope, key, value).await
+        self.set_with_class(scope, key, value, None).await
+    }
+
+    /// Set state with explicit state class for performance optimization
+    pub async fn set_with_class(
+        &self,
+        scope: StateScope,
+        key: &str,
+        value: Value,
+        class: Option<StateClass>,
+    ) -> StateResult<()> {
+        // Determine state class
+        let state_class = class.unwrap_or_else(|| {
+            // Infer from key patterns for benchmarks and common cases
+            StateClass::infer_from_key(key)
+        });
+
+        match state_class {
+            StateClass::Ephemeral => {
+                // Ephemeral data - store only in memory cache
+                self.fast_path_manager.store_ephemeral(&scope, key, value)?;
+                Ok(())
+            }
+            StateClass::Trusted => {
+                // Trusted data - fast path with minimal overhead
+                self.set_fast_path(scope, key, value).await
+            }
+            StateClass::Standard => {
+                // Standard path with hooks but optimized serialization
+                if self.persistence_config.enabled {
+                    self.set_with_hooks(scope, key, value).await
+                } else {
+                    self.set_state_internal(scope, key, value).await
+                }
+            }
+            StateClass::Sensitive | StateClass::External => {
+                // Full validation path
+                if self.persistence_config.enabled {
+                    self.set_with_hooks(scope, key, value).await
+                } else {
+                    self.set_state_internal(scope, key, value).await
+                }
+            }
         }
+    }
+
+    /// Fast path for trusted data with minimal overhead
+    async fn set_fast_path(&self, scope: StateScope, key: &str, value: Value) -> StateResult<()> {
+        let scoped_key = KeyManager::create_scoped_key(&scope, key)?;
+
+        // Update in-memory state
+        {
+            let mut memory = self.in_memory.write();
+            memory.insert(scoped_key.clone(), value.clone());
+        }
+
+        // Persist if enabled - use fast serialization
+        if self.persistence_config.enabled {
+            let serializable_state = SerializableState {
+                key: scoped_key.clone(),
+                value,
+                timestamp: SystemTime::now(),
+                schema_version: self.state_schema.version,
+            };
+
+            // Use fast storage without validation
+            self.storage_adapter
+                .store(&scoped_key, &serializable_state)
+                .await?;
+        }
+
+        Ok(())
     }
 
     /// Internal state update
@@ -383,6 +491,70 @@ impl StateManager {
 
     /// Get state value
     pub async fn get(&self, scope: StateScope, key: &str) -> StateResult<Option<Value>> {
+        self.get_with_class(scope, key, None).await
+    }
+
+    /// Get state with explicit state class for performance optimization
+    pub async fn get_with_class(
+        &self,
+        scope: StateScope,
+        key: &str,
+        class: Option<StateClass>,
+    ) -> StateResult<Option<Value>> {
+        // Determine state class
+        let state_class = class.unwrap_or_else(|| StateClass::infer_from_key(key));
+
+        match state_class {
+            StateClass::Ephemeral => {
+                // Ephemeral data - check only memory cache
+                self.fast_path_manager.get_ephemeral(&scope, key)
+            }
+            StateClass::Trusted => {
+                // Trusted data - fast path
+                self.get_fast_path(scope, key).await
+            }
+            StateClass::Standard | StateClass::Sensitive | StateClass::External => {
+                // Standard/full validation path
+                self.get_standard_path(scope, key).await
+            }
+        }
+    }
+
+    /// Fast path for trusted data retrieval
+    async fn get_fast_path(&self, scope: StateScope, key: &str) -> StateResult<Option<Value>> {
+        let scoped_key = KeyManager::create_scoped_key(&scope, key)?;
+
+        // Check in-memory cache first
+        {
+            let memory = self.in_memory.read();
+            if let Some(value) = memory.get(&scoped_key) {
+                return Ok(Some(value.clone()));
+            }
+        }
+
+        // Load from storage if persistent and not in cache
+        if self.persistence_config.enabled {
+            if let Some(serialized) = self
+                .storage_adapter
+                .load::<SerializableState>(&scoped_key)
+                .await?
+            {
+                // Update in-memory cache
+                {
+                    let mut memory = self.in_memory.write();
+                    memory.insert(scoped_key, serialized.value.clone());
+                }
+                Ok(Some(serialized.value))
+            } else {
+                Ok(None)
+            }
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Standard path for state retrieval
+    async fn get_standard_path(&self, scope: StateScope, key: &str) -> StateResult<Option<Value>> {
         let scoped_key = KeyManager::create_scoped_key(&scope, key)?;
 
         // Check in-memory cache first

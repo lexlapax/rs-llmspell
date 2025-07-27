@@ -43,6 +43,9 @@ pub enum StateError {
 
     #[error("Resource not found: {0}")]
     NotFound(String),
+
+    #[error("Compression/decompression failed: {0}")]
+    CompressionError(String),
 }
 
 impl From<std::io::Error> for StateError {
