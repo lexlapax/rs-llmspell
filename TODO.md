@@ -2164,7 +2164,106 @@ llmspell-agents/examples/
 - All tests use realistic scenarios with proper error handling and performance validation
 - Tests verify <5% overhead requirement and proper state isolation between components
 
-### Task 5.6.2: State Migration Integration Testing
+### Task 5.6.2: State Persistence Performance Architecture Overhaul
+**Priority**: CRITICAL (BLOCKING ALL OTHER 5.6.x TASKS)  
+**Estimated Time**: 8 hours  
+**Assignee**: Performance Architecture Team
+
+**Current Crisis**: State persistence exhibits catastrophic performance overhead:
+- Basic state operations: **197% overhead** (vs <5% target)
+- Agent state persistence: **26,562% overhead** (vs <5% target)
+- **System Status**: BROKEN - renders entire application unusable
+
+**Description**: Complete architectural overhaul of state persistence system to achieve <5% overhead target. Implement tiered performance architecture with multiple optimization paths based on data sensitivity and performance requirements.
+
+**Root Cause Analysis**:
+1. **Multiple Serialization Passes**: Circular reference check + sensitive data redaction + storage serialization
+2. **Over-Engineering Edge Cases**: Every operation assumes worst-case scenario (circular refs, sensitive data)
+3. **Lock Contention**: Per-agent write locks even for independent operations
+4. **Synchronous Hook Execution**: Hooks execute in critical path under locks
+
+**Files to Create/Update:**
+- **CREATE**: `llmspell-state-persistence/src/performance/mod.rs` - Performance module structure
+- **CREATE**: `llmspell-state-persistence/src/performance/state_class.rs` - StateClass classification system
+- **CREATE**: `llmspell-state-persistence/src/performance/fast_path.rs` - Optimized fast paths
+- **UPDATE**: `llmspell-state-persistence/src/manager.rs` - Tiered state operations
+- **CREATE**: `llmspell-state-persistence/src/performance/lockfree_agent.rs` - Lock-free agent state
+- **CREATE**: `llmspell-state-persistence/src/performance/async_hooks.rs` - Async hook processing
+- **CREATE**: `llmspell-state-persistence/src/performance/unified_serialization.rs` - Single-pass serialization
+- **UPDATE**: `llmspell-state-persistence/src/agent_state.rs` - Performance-optimized agent state
+- **UPDATE**: `tests/performance/benches/state_persistence.rs` - Validate <5% overhead target
+
+**Acceptance Criteria:**
+- [ ] **CRITICAL**: Basic state operations <5% overhead (currently 197%)
+- [ ] **CRITICAL**: Agent state operations <5% overhead (currently 26,562%)
+- [ ] StateClass system enables performance-appropriate processing paths
+- [ ] Fast path (Trusted/Ephemeral) <1% overhead with zero validation
+- [ ] Standard path (Standard) <3% overhead with basic validation  
+- [ ] Sensitive path (Sensitive/External) <10% overhead with full protection
+- [ ] Lock-free agent state eliminates lock contention
+- [ ] Async hook processing removes hooks from critical path
+- [ ] Unified serialization eliminates redundant serialization passes
+- [ ] Benchmark mode configuration for performance testing
+- [ ] Zero-copy operations for read-heavy workloads
+
+**Implementation Steps:**
+
+**Phase 1: StateClass System & Fast Paths** (2 hours):
+1. **Create StateClass Enum** (30 min):
+   ```rust
+   enum StateClass { Ephemeral, Trusted, Standard, Sensitive, External }
+   ```
+2. **Implement Fast Path Operations** (90 min):
+   - Direct serialization for Trusted/Ephemeral (skip all checks)
+   - MessagePack serialization for performance
+   - Bypass circular reference checking
+   - Skip sensitive data redaction
+
+**Phase 2: Lock-Free Agent State** (2 hours):
+1. **Replace Agent Locks** (90 min):
+   - Implement crossbeam SkipMap for concurrent access
+   - Add versioned updates with CAS operations
+   - Remove per-agent write locks
+2. **Lock-Free State Updates** (30 min):
+   - Read-copy-update pattern for state modifications
+   - Atomic version tracking for consistency
+
+**Phase 3: Async Hook Processing** (2 hours):
+1. **Create Async Hook Queue** (60 min):
+   - SegQueue for lock-free hook event queuing
+   - Background task for async hook processing
+2. **Remove Hooks from Critical Path** (60 min):
+   - Immediate state save + async hook notification
+   - Hook processing outside of state operation timing
+
+**Phase 4: Unified Serialization Pipeline** (2 hours):
+1. **Single-Pass Transformer Chain** (90 min):
+   - Pluggable transformer architecture
+   - StateClass-aware transformer selection
+   - In-place value transformations
+2. **Eliminate Redundant Serializations** (30 min):
+   - Single serialization pass at pipeline end
+   - Streaming transformations without intermediate serialization
+
+**Definition of Done:**
+- [ ] **Primary Target**: Basic state overhead <5% (measured in benchmarks)
+- [ ] **Primary Target**: Agent state overhead <5% (measured in benchmarks)  
+- [ ] All existing functionality preserved with performance improvements
+- [ ] StateClass system deployed throughout codebase
+- [ ] Lock-free operations eliminate contention bottlenecks
+- [ ] Async hooks remove synchronous blocking from state operations
+- [ ] Single serialization pass eliminates redundant processing
+- [ ] Performance benchmarks validate all targets met
+- [ ] **Breaking Change Acceptable**: No backward compatibility required
+- [ ] **Enabler**: Makes 5.6.3+ tasks viable with working performance
+
+**Post-Completion Validation:**
+- Run `cargo bench state_persistence` and verify <5% overhead for all operations
+- Confirm agent state persistence shows <5% overhead vs baseline
+- Validate async hook processing doesn't impact state operation timing
+- Ensure lock-free operations maintain data consistency under concurrent access
+
+### Task 5.6.3: State Migration Integration Testing
 **Priority**: HIGH  
 **Estimated Time**: 4 hours  
 **Assignee**: Migration Testing Team
@@ -2211,7 +2310,7 @@ llmspell-agents/examples/
 - [ ] Rollback functionality verified
 - [ ] Complex migrations complete successfully
 
-### Task 5.6.3: Backup and Recovery Integration Testing
+### Task 5.6.4: Backup and Recovery Integration Testing
 **Priority**: HIGH  
 **Estimated Time**: 3 hours  
 **Assignee**: Backup Testing Team
@@ -2258,8 +2357,7 @@ llmspell-agents/examples/
 - [ ] Performance impact minimal
 - [ ] Operational procedures documented
 
-
-### Task 5.6.4: State Persistence Integration with Components
+### Task 5.6.5: State Persistence Integration with Components
 **Priority**: CRITICAL  
 **Estimated Time**: 5 hours  
 **Assignee**: Integration Team
@@ -2301,7 +2399,7 @@ llmspell-agents/examples/
 - [ ] Recovery scenarios work correctly
 - [ ] Performance impact measured and acceptable
 - [ ] Integration tests pass consistently
-### Task 5.6.5: Performance Validation and Benchmarking
+### Task 5.6.6: Performance Validation and Benchmarking
 **Priority**: HIGH  
 **Estimated Time**: 4 hours  
 **Assignee**: Performance Team
@@ -2342,7 +2440,7 @@ llmspell-agents/examples/
 - [ ] Performance report documented
 - [ ] Optimization opportunities identified
 - [ ] Production readiness confirmed
-### Task 5.6.6: Complete Scripting Bridge Implementation
+### Task 5.6.7: Complete Scripting Bridge Implementation
 **Priority**: CRITICAL  
 **Estimated Time**: 6 hours  
 **Assignee**: Bridge Team

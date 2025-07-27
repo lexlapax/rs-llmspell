@@ -549,18 +549,17 @@ fn bench_migration_planner(c: &mut Criterion) {
                 },
             );
 
-            planner.register_schema(schema_v1).unwrap();
-            planner.register_schema(schema_v1_1).unwrap();
+            planner.register_schema(schema_v1);
+            planner.register_schema(schema_v1_1);
 
-            // Test complexity estimation
-            let is_possible = planner.is_migration_possible(&v1_0_0, &v1_1_0);
-            let complexity = if is_possible {
-                planner.estimate_complexity(&v1_0_0, &v1_1_0).ok()
-            } else {
-                None
+            // Test migration plan creation
+            let plan_result = planner.create_migration_plan(&v1_0_0, &v1_1_0);
+            let (is_possible, risk_level) = match plan_result {
+                Ok(plan) => (true, Some(plan.risk_level)),
+                Err(_) => (false, None),
             };
 
-            black_box((is_possible, complexity))
+            black_box((is_possible, risk_level))
         });
     });
 }
