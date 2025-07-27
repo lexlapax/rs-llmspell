@@ -32,8 +32,8 @@ pub enum StateError {
     #[error("Hook execution failed during state operation: {0}")]
     HookError(String),
 
-    #[error("State operation timeout after {0:?}")]
-    Timeout(std::time::Duration),
+    #[error("State operation timeout: {0}")]
+    Timeout(String),
 
     #[error("State corruption detected: {0}")]
     CorruptedState(String),
@@ -46,6 +46,12 @@ pub enum StateError {
 
     #[error("Compression/decompression failed: {0}")]
     CompressionError(String),
+
+    #[error("Resource already exists: {0}")]
+    AlreadyExists(String),
+
+    #[error("Background task error: {0}")]
+    BackgroundTaskError(String),
 }
 
 impl From<std::io::Error> for StateError {

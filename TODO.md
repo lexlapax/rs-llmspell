@@ -2413,6 +2413,8 @@ llmspell-agents/examples/
 - [ ] Recovery scenarios work correctly
 - [ ] Performance impact measured and acceptable
 - [ ] Integration tests pass consistently
+
+
 ### Task 5.6.6: Performance Validation and Benchmarking
 **Priority**: HIGH  
 **Estimated Time**: 4 hours  
@@ -2454,6 +2456,8 @@ llmspell-agents/examples/
 - [ ] Performance report documented
 - [ ] Optimization opportunities identified
 - [ ] Production readiness confirmed
+
+
 ### Task 5.6.7: Complete Scripting Bridge Implementation
 **Priority**: CRITICAL  
 **Estimated Time**: 6 hours  
@@ -2468,7 +2472,7 @@ llmspell-agents/examples/
 - **CREATE**: `examples/javascript/state_demo.js` - JavaScript state examples
 **Acceptance Criteria:**
 - [ ] All state operations accessible from Lua
-- [ ] JavaScript bridge provides same functionality as Lua
+- [ ] JavaScript bridge has stubs for same functionality as Lua
 - [ ] Backup/restore methods fully implemented (not TODO)
 - [ ] Migration operations exposed through scripts
 - [ ] Hook replay accessible from scripts

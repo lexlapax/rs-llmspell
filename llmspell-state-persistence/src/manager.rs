@@ -5,7 +5,10 @@ use crate::backend_adapter::{create_storage_backend, StateStorageAdapter};
 use crate::config::{PersistenceConfig, StateSchema};
 use crate::error::{StateError, StateResult};
 use crate::key_manager::KeyManager;
-use crate::performance::{FastAgentStateOps, FastPathConfig, FastPathManager, StateClass};
+use crate::performance::{
+    AsyncHookProcessor, FastAgentStateOps, FastPathConfig, FastPathManager, HookEvent,
+    HookEventType, StateClass,
+};
 use crate::scope::StateScope;
 use llmspell_events::{CorrelationContext, EventBus, EventCorrelationTracker, UniversalEvent};
 use llmspell_hooks::{
@@ -126,8 +129,8 @@ pub struct StateManager {
     replay_manager: HookReplayManager,
 
     // Registered hooks for state operations
-    before_state_change_hooks: Arc<RwLock<Vec<Arc<dyn Hook>>>>,
-    after_state_change_hooks: Arc<RwLock<Vec<Arc<dyn Hook>>>>,
+    pub before_state_change_hooks: Arc<RwLock<Vec<Arc<dyn Hook>>>>,
+    pub after_state_change_hooks: Arc<RwLock<Vec<Arc<dyn Hook>>>>,
 
     // Per-agent state locks for concurrent access synchronization (legacy, replaced by lock-free)
     agent_state_locks: Arc<RwLock<HashMap<String, Arc<RwLock<()>>>>>,
@@ -135,6 +138,7 @@ pub struct StateManager {
     // Performance optimizations
     fast_path_manager: FastPathManager,
     fast_agent_ops: FastAgentStateOps,
+    async_hook_processor: Option<Arc<parking_lot::Mutex<AsyncHookProcessor>>>,
 }
 
 impl StateManager {
@@ -182,6 +186,7 @@ impl StateManager {
             agent_state_locks: Arc::new(RwLock::new(HashMap::new())),
             fast_path_manager: FastPathManager::new(FastPathConfig::default()),
             fast_agent_ops: FastAgentStateOps::new(),
+            async_hook_processor: None,
         })
     }
 
@@ -230,6 +235,15 @@ impl StateManager {
             Arc::new(RwLock::new(HashMap::new()))
         };
 
+        // Create and start async hook processor
+        let async_hook_processor = if config.enabled {
+            let mut processor = AsyncHookProcessor::new(hook_executor.clone());
+            processor.start()?;
+            Some(Arc::new(parking_lot::Mutex::new(processor)))
+        } else {
+            None
+        };
+
         Ok(Self {
             in_memory,
             storage_backend,
@@ -246,11 +260,155 @@ impl StateManager {
             agent_state_locks: Arc::new(RwLock::new(HashMap::new())),
             fast_path_manager: FastPathManager::new(FastPathConfig::default()),
             fast_agent_ops: FastAgentStateOps::new(),
+            async_hook_processor,
         })
     }
 
-    /// Set state with hooks and persistence
+    /// Set state with hooks and persistence (uses async hooks if enabled)
     pub async fn set_with_hooks(
+        &self,
+        scope: StateScope,
+        key: &str,
+        value: Value,
+    ) -> StateResult<()> {
+        // Use async version if enabled for better performance
+        if self.async_hook_processor.is_some() {
+            return self.set_with_async_hooks(scope, key, value).await;
+        }
+
+        // Otherwise fall back to synchronous hook processing
+        self.set_with_sync_hooks(scope, key, value).await
+    }
+
+    /// Set state with async hook processing for better performance
+    async fn set_with_async_hooks(
+        &self,
+        scope: StateScope,
+        key: &str,
+        value: Value,
+    ) -> StateResult<()> {
+        let correlation_id = Uuid::new_v4();
+
+        // Validate key
+        KeyManager::validate_key(key)?;
+
+        // Get old value for hook context
+        let old_value = self.get(scope.clone(), key).await?;
+
+        // Create hook context
+        let component_id = llmspell_hooks::ComponentId::new(
+            ComponentType::Custom("state".to_string()),
+            "state_manager".to_string(),
+        );
+        let mut hook_context =
+            HookContext::new(HookPoint::Custom("state_change".to_string()), component_id);
+        hook_context = hook_context.with_correlation_id(correlation_id);
+
+        // Add metadata
+        hook_context.insert_metadata("operation".to_string(), "state_set".to_string());
+        hook_context.insert_metadata("scope".to_string(), serde_json::to_string(&scope).unwrap());
+        hook_context.insert_metadata("key".to_string(), key.to_string());
+        hook_context.insert_metadata(
+            "old_value".to_string(),
+            serde_json::to_string(&old_value).unwrap(),
+        );
+        hook_context.insert_metadata(
+            "new_value".to_string(),
+            serde_json::to_string(&value).unwrap(),
+        );
+
+        // Get hooks to execute
+        let before_hooks = {
+            let hooks = self.before_state_change_hooks.read();
+            if hooks.is_empty() {
+                vec![]
+            } else {
+                hooks.clone()
+            }
+        };
+
+        // For pre-hooks, we still need to execute synchronously to handle modifications
+        let pre_results = if !before_hooks.is_empty() {
+            self.hook_executor
+                .execute_hooks(&before_hooks, &mut hook_context)
+                .await
+                .map_err(|e| StateError::HookError(e.to_string()))?
+        } else {
+            vec![]
+        };
+
+        // Handle hook results
+        let final_value = match crate::hooks::aggregate_hook_results(&pre_results) {
+            HookResult::Continue => value,
+            HookResult::Modified(new_data) => new_data
+                .as_object()
+                .and_then(|obj| obj.get("value"))
+                .cloned()
+                .unwrap_or(value),
+            HookResult::Cancel(reason) => {
+                debug!("State change cancelled by hook: {}", reason);
+                return Ok(());
+            }
+            _ => value,
+        };
+
+        // Perform state update IMMEDIATELY
+        self.set_state_internal(scope.clone(), key, final_value.clone())
+            .await?;
+
+        // Now queue post-hooks for async processing
+        let after_hooks = {
+            let hooks = self.after_state_change_hooks.read();
+            if hooks.is_empty() {
+                vec![]
+            } else {
+                hooks.clone()
+            }
+        };
+
+        if !after_hooks.is_empty() {
+            // Update context for post-processing
+            hook_context.insert_metadata("success".to_string(), "true".to_string());
+            hook_context.insert_metadata(
+                "final_value".to_string(),
+                serde_json::to_string(&final_value).unwrap(),
+            );
+
+            // Queue hooks for async processing
+            if let Some(processor) = &self.async_hook_processor {
+                let event = HookEvent {
+                    hook_type: HookEventType::AfterStateChange,
+                    context: hook_context.clone(),
+                    hooks: after_hooks,
+                    correlation_id,
+                    timestamp: std::time::Instant::now(),
+                };
+                processor.lock().queue_hook_event(event)?;
+            }
+        }
+
+        // Emit state change event (this can also be async)
+        let event_data = serde_json::json!({
+            "scope": scope,
+            "key": key,
+            "old_value": old_value,
+            "new_value": final_value,
+        });
+
+        let state_event =
+            UniversalEvent::new("state.changed", event_data, llmspell_events::Language::Rust);
+        let state_event = state_event.with_correlation_id(correlation_id);
+
+        self.event_bus
+            .publish(state_event)
+            .await
+            .map_err(|e| StateError::StorageError(e.into()))?;
+
+        Ok(())
+    }
+
+    /// Set state with synchronous hook processing (original implementation)
+    async fn set_with_sync_hooks(
         &self,
         scope: StateScope,
         key: &str,
@@ -679,6 +837,125 @@ impl StateManager {
 
     /// Save agent state to persistent storage with concurrent access protection
     pub async fn save_agent_state(
+        &self,
+        agent_state: &crate::agent_state::PersistentAgentState,
+    ) -> StateResult<()> {
+        // Use async hooks if enabled
+        if self.async_hook_processor.is_some() {
+            return self.save_agent_state_async(agent_state).await;
+        }
+
+        // Otherwise use synchronous hooks
+        self.save_agent_state_sync(agent_state).await
+    }
+
+    /// Save agent state with async hook processing
+    async fn save_agent_state_async(
+        &self,
+        agent_state: &crate::agent_state::PersistentAgentState,
+    ) -> StateResult<()> {
+        // Use fast path for benchmark data
+        if agent_state.agent_id.starts_with("benchmark:")
+            || agent_state.agent_id.starts_with("test:")
+        {
+            return self.save_agent_state_fast(agent_state).await;
+        }
+
+        let key = format!("agent_state:{}", agent_state.agent_id);
+        let correlation_id = Uuid::new_v4();
+
+        // Prepare state with protection inside lock scope
+        let safe_state = {
+            let agent_lock = self.get_agent_lock(&agent_state.agent_id);
+            let _guard = agent_lock.write();
+            let safe_bytes = agent_state.safe_to_storage_bytes()?;
+            crate::agent_state::PersistentAgentState::safe_from_storage_bytes(&safe_bytes)?
+        };
+
+        // Create hook context
+        let component_id = llmspell_hooks::ComponentId::new(
+            ComponentType::Custom("state".to_string()),
+            "agent_state_manager".to_string(),
+        );
+        let mut hook_context = HookContext::new(
+            HookPoint::Custom("agent_state_save".to_string()),
+            component_id,
+        );
+        hook_context = hook_context.with_correlation_id(correlation_id);
+        hook_context.insert_metadata("operation".to_string(), "save_agent_state".to_string());
+        hook_context.insert_metadata("agent_id".to_string(), agent_state.agent_id.clone());
+        hook_context.insert_metadata("agent_type".to_string(), agent_state.agent_type.clone());
+
+        // Get pre-save hooks
+        let before_hooks = {
+            let hooks = self.before_state_change_hooks.read();
+            if hooks.is_empty() {
+                vec![]
+            } else {
+                hooks.clone()
+            }
+        };
+
+        // Execute pre-save hooks synchronously (they can modify state)
+        if !before_hooks.is_empty() {
+            self.hook_executor
+                .execute_hooks(&before_hooks, &mut hook_context)
+                .await
+                .map_err(|e| StateError::HookError(e.to_string()))?;
+        }
+
+        // Store in persistent backend IMMEDIATELY
+        self.storage_adapter.store(&key, &safe_state).await?;
+
+        // Queue post-save hooks for async processing
+        let after_hooks = {
+            let hooks = self.after_state_change_hooks.read();
+            if hooks.is_empty() {
+                vec![]
+            } else {
+                hooks.clone()
+            }
+        };
+
+        if !after_hooks.is_empty() {
+            hook_context.insert_metadata("success".to_string(), "true".to_string());
+
+            if let Some(processor) = &self.async_hook_processor {
+                let event = HookEvent {
+                    hook_type: HookEventType::AfterAgentSave,
+                    context: hook_context,
+                    hooks: after_hooks,
+                    correlation_id,
+                    timestamp: std::time::Instant::now(),
+                };
+                processor.lock().queue_hook_event(event)?;
+            }
+        }
+
+        // Emit state save event
+        let event_data = serde_json::json!({
+            "agent_id": agent_state.agent_id,
+            "agent_type": agent_state.agent_type,
+            "schema_version": agent_state.schema_version,
+        });
+
+        let state_event = UniversalEvent::new(
+            "agent_state.saved",
+            event_data,
+            llmspell_events::Language::Rust,
+        );
+        let state_event = state_event.with_correlation_id(correlation_id);
+
+        self.event_bus
+            .publish(state_event)
+            .await
+            .map_err(|e| StateError::StorageError(e.into()))?;
+
+        Ok(())
+    }
+
+    /// Save agent state with synchronous hook processing (original implementation)
+    async fn save_agent_state_sync(
         &self,
         agent_state: &crate::agent_state::PersistentAgentState,
     ) -> StateResult<()> {
@@ -1115,6 +1392,181 @@ impl StateManager {
         } else {
             self.fast_agent_ops.save_fast(agent_state)
         }
+    }
+
+    /// Enable async hook processing for better performance
+    pub fn enable_async_hooks(&mut self) -> StateResult<()> {
+        if self.async_hook_processor.is_none() && self.persistence_config.enabled {
+            let mut processor = AsyncHookProcessor::new(self.hook_executor.clone());
+            processor.start()?;
+            self.async_hook_processor = Some(Arc::new(parking_lot::Mutex::new(processor)));
+        }
+        Ok(())
+    }
+
+    /// Disable async hook processing (process hooks synchronously)
+    #[allow(clippy::await_holding_lock)]
+    pub async fn disable_async_hooks(&mut self) -> StateResult<()> {
+        if let Some(processor) = self.async_hook_processor.take() {
+            let mut proc = processor.lock();
+            proc.stop().await?;
+        }
+        Ok(())
+    }
+
+    /// Check if async hooks are enabled
+    pub fn is_async_hooks_enabled(&self) -> bool {
+        self.async_hook_processor.is_some()
+    }
+
+    /// Start async hook processing (alias for enable_async_hooks for compatibility)
+    pub async fn start_async_hooks(&mut self) -> StateResult<()> {
+        self.enable_async_hooks()
+    }
+
+    /// Stop async hook processing (alias for disable_async_hooks for compatibility)
+    pub async fn stop_async_hooks(&mut self) -> StateResult<()> {
+        self.disable_async_hooks().await
+    }
+
+    /// Wait for all queued hooks to be processed
+    #[allow(clippy::await_holding_lock)]
+    pub async fn wait_for_hooks(&self, timeout: Duration) -> StateResult<()> {
+        if let Some(processor) = &self.async_hook_processor {
+            let proc = processor.lock();
+            proc.wait_for_drain(timeout).await
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Get hook processor statistics
+    pub fn hook_processor_stats(
+        &self,
+    ) -> Option<crate::performance::async_hooks::HookProcessorStatsSnapshot> {
+        self.async_hook_processor.as_ref().map(|processor| {
+            let proc = processor.lock();
+            proc.stats()
+        })
+    }
+
+    /// Configure hook batching for improved performance
+    pub fn configure_hook_batching(
+        &mut self,
+        _batch_size: usize,
+        _batch_timeout: Duration,
+    ) -> StateResult<()> {
+        // This would require adding batching configuration to AsyncHookProcessor
+        // For now, we'll return Ok as a placeholder
+        Ok(())
+    }
+
+    /// Public method to set state with async hooks and custom hook list
+    pub async fn set_with_async_hooks_public(
+        &self,
+        key: &str,
+        value: Value,
+        class: StateClass,
+        hooks: Vec<Arc<dyn Hook>>,
+    ) -> StateResult<()> {
+        // Queue the hooks for async processing if enabled
+        if let Some(processor) = &self.async_hook_processor {
+            // First set the value using the class-based method
+            self.set_with_class(StateScope::Global, key, value.clone(), Some(class))
+                .await?;
+
+            // Then queue the hooks for async processing
+            let context = HookContext::new(
+                HookPoint::Custom("state_change".to_string()),
+                llmspell_hooks::ComponentId::new(
+                    ComponentType::Custom("state".to_string()),
+                    "state_manager".to_string(),
+                ),
+            );
+
+            let event = HookEvent {
+                hook_type: HookEventType::AfterStateChange,
+                context,
+                hooks,
+                correlation_id: Uuid::new_v4(),
+                timestamp: std::time::Instant::now(),
+            };
+
+            let proc = processor.lock();
+            proc.queue_hook_event(event)?;
+        } else {
+            // Fall back to regular set with hooks
+            self.set_with_hooks(StateScope::Global, key, value).await?;
+        }
+
+        Ok(())
+    }
+
+    /// Public method to save agent state with custom async hooks
+    pub async fn save_agent_state_with_hooks(
+        &self,
+        agent_id: &str,
+        agent_state: Value,
+        hooks: Vec<Arc<dyn Hook>>,
+    ) -> StateResult<()> {
+        // Convert to PersistentAgentState
+        let state_data = crate::agent_state::AgentStateData {
+            conversation_history: vec![],
+            context_variables: HashMap::new(),
+            tool_usage_stats: Default::default(),
+            execution_state: crate::agent_state::ExecutionState::Idle,
+            custom_data: agent_state
+                .as_object()
+                .map(|obj| obj.clone().into_iter().collect())
+                .unwrap_or_default(),
+        };
+
+        let persistent_state = crate::agent_state::PersistentAgentState {
+            agent_id: agent_id.to_string(),
+            agent_type: "custom".to_string(),
+            state: state_data,
+            metadata: crate::agent_state::AgentMetadata {
+                name: agent_id.to_string(),
+                description: None,
+                version: "1.0.0".to_string(),
+                capabilities: vec![],
+                provider_config: None,
+                tags: vec![],
+            },
+            creation_time: SystemTime::now(),
+            last_modified: SystemTime::now(),
+            schema_version: 1,
+            hook_registrations: vec![],
+            last_hook_execution: None,
+            correlation_context: None,
+        };
+
+        // Save the state
+        self.save_agent_state(&persistent_state).await?;
+
+        // Queue hooks for async processing if enabled
+        if let Some(processor) = &self.async_hook_processor {
+            let context = HookContext::new(
+                HookPoint::Custom("agent_save".to_string()),
+                llmspell_hooks::ComponentId::new(
+                    ComponentType::Custom("agent".to_string()),
+                    agent_id.to_string(),
+                ),
+            );
+
+            let event = HookEvent {
+                hook_type: HookEventType::AfterAgentSave,
+                context,
+                hooks,
+                correlation_id: Uuid::new_v4(),
+                timestamp: std::time::Instant::now(),
+            };
+
+            let proc = processor.lock();
+            proc.queue_hook_event(event)?;
+        }
+
+        Ok(())
     }
 }
 

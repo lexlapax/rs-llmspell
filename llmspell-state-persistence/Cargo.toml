@@ -42,6 +42,7 @@ sha2 = "0.10"
 rand = "0.8"
 
 # Performance optimizations
+crossbeam = "0.8"
 crossbeam-skiplist = "0.1"
 
 # Internal dependencies
