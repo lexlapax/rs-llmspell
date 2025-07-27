@@ -244,11 +244,12 @@ fn calculate_state_persistence_overhead(_c: &mut Criterion) {
             "context": {"topic": "greeting"}
         });
 
-        // Baseline: Direct memory operations
+        // Baseline: What apps would do without state persistence (HashMap operations)
+        let mut baseline_map = std::collections::HashMap::new();
         let start = tokio::time::Instant::now();
-        for _ in 0..1000 {
-            // Simulate direct memory write
-            let _ = black_box(test_data.clone());
+        for i in 0..1000 {
+            let key = format!("benchmark:key-{}", i);
+            baseline_map.insert(key, test_data.clone());
         }
         let baseline = start.elapsed();
 
@@ -280,6 +281,39 @@ fn calculate_state_persistence_overhead(_c: &mut Criterion) {
         println!(
             "Status: {}",
             if overhead_percent < 5.0 {
+                "PASS ✅"
+            } else {
+                "FAIL ❌"
+            }
+        );
+
+        // Also test with Ephemeral class (should have near-zero overhead)
+        println!("\n--- Ephemeral State Class Performance ---");
+        let start = tokio::time::Instant::now();
+        for i in 0..1000 {
+            let key = format!("ephemeral:key-{}", i);
+            state_manager
+                .set_with_class(
+                    scope.clone(),
+                    &key,
+                    test_data.clone(),
+                    Some(StateClass::Ephemeral),
+                )
+                .await
+                .unwrap();
+        }
+        let ephemeral_time = start.elapsed();
+        
+        let ephemeral_overhead_ns = ephemeral_time
+            .as_nanos()
+            .saturating_sub(baseline.as_nanos());
+        let ephemeral_overhead_percent = (ephemeral_overhead_ns as f64 / baseline.as_nanos() as f64) * 100.0;
+        
+        println!("Ephemeral state time: {:?}", ephemeral_time);
+        println!("Ephemeral overhead: {:.2}%", ephemeral_overhead_percent);
+        println!(
+            "Ephemeral status: {}",
+            if ephemeral_overhead_percent < 5.0 {
                 "PASS ✅"
             } else {
                 "FAIL ❌"

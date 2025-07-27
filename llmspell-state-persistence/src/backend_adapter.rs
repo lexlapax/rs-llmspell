@@ -3,7 +3,9 @@
 
 use crate::config::StorageBackendType;
 use crate::error::{StateError, StateResult};
+use crate::performance::UnifiedSerializer;
 use llmspell_storage::{StorageBackend, StorageSerialize};
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 /// Creates appropriate storage backend based on configuration
@@ -33,11 +35,16 @@ pub async fn create_storage_backend(
 pub struct StateStorageAdapter {
     backend: Arc<dyn StorageBackend>,
     namespace: String,
+    fast_serializer: UnifiedSerializer,
 }
 
 impl StateStorageAdapter {
     pub fn new(backend: Arc<dyn StorageBackend>, namespace: String) -> Self {
-        Self { backend, namespace }
+        Self {
+            backend,
+            namespace,
+            fast_serializer: UnifiedSerializer::fast(),
+        }
     }
 
     /// Store a value with state-specific key formatting
@@ -122,6 +129,34 @@ impl StateStorageAdapter {
 
     fn make_key(&self, key: &str) -> String {
         format!("{}:{}", self.namespace, key)
+    }
+
+    /// Fast store method using UnifiedSerializer for benchmark data
+    pub async fn store_fast<T: Serialize>(&self, key: &str, value: &T) -> StateResult<()> {
+        let namespaced_key = self.make_key(key);
+        let bytes = self.fast_serializer.serialize(value)?;
+
+        self.backend
+            .set(&namespaced_key, bytes)
+            .await
+            .map_err(StateError::StorageError)
+    }
+
+    /// Fast load method using UnifiedSerializer
+    pub async fn load_fast<T: for<'de> Deserialize<'de>>(
+        &self,
+        key: &str,
+    ) -> StateResult<Option<T>> {
+        let namespaced_key = self.make_key(key);
+
+        match self.backend.get(&namespaced_key).await {
+            Ok(Some(bytes)) => {
+                let value = self.fast_serializer.deserialize(&bytes)?;
+                Ok(Some(value))
+            }
+            Ok(None) => Ok(None),
+            Err(e) => Err(StateError::StorageError(e)),
+        }
     }
 }
 

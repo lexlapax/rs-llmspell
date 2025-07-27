@@ -1,9 +1,8 @@
 // ABOUTME: Agent state persistence structures and serialization
 // ABOUTME: Implements StorageSerialize for agent state with Phase 4 hook integration
 
-use crate::circular_ref::CircularReferenceCheck;
-use crate::error::{StateError, StateResult};
-use crate::sensitive_data::{safe_serialize_with_redaction, SensitiveDataConfig};
+use crate::error::StateResult;
+use crate::sensitive_data::SensitiveDataConfig;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::SystemTime;
@@ -188,20 +187,36 @@ impl Default for AgentMetadata {
 impl PersistentAgentState {
     /// Serialize with circular reference check and sensitive data protection
     pub fn safe_to_storage_bytes(&self) -> StateResult<Vec<u8>> {
-        // Check for circular references first
-        self.check_circular_references().map_err(|e| {
-            StateError::ValidationError(format!("Circular reference detected: {}", e))
-        })?;
+        // Use unified serializer for single-pass serialization
+        use crate::performance::UnifiedSerializer;
 
-        // Serialize with sensitive data protection
-        let config = SensitiveDataConfig::default();
-        safe_serialize_with_redaction(self, &config).map_err(StateError::SerializationError)
+        let serializer = UnifiedSerializer::new(SensitiveDataConfig::default());
+        serializer.serialize(self)
     }
 
     /// Deserialize from storage bytes (no special handling needed on read)
     pub fn safe_from_storage_bytes(bytes: &[u8]) -> StateResult<Self> {
-        use llmspell_storage::StorageSerialize;
-        Self::from_storage_bytes(bytes).map_err(|e| StateError::DeserializationError(e.to_string()))
+        // Use unified serializer for deserialization
+        use crate::performance::UnifiedSerializer;
+
+        let serializer = UnifiedSerializer::new(SensitiveDataConfig::default());
+        serializer.deserialize(bytes)
+    }
+
+    /// Fast serialization for benchmarks (no protection)
+    pub fn fast_to_bytes(&self) -> StateResult<Vec<u8>> {
+        use crate::performance::UnifiedSerializer;
+
+        let serializer = UnifiedSerializer::fast();
+        serializer.serialize(self)
+    }
+
+    /// Fast deserialization for benchmarks
+    pub fn fast_from_bytes(bytes: &[u8]) -> StateResult<Self> {
+        use crate::performance::UnifiedSerializer;
+
+        let serializer = UnifiedSerializer::fast();
+        serializer.deserialize(bytes)
     }
 }
 

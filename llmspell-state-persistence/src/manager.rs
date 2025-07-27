@@ -611,7 +611,7 @@ impl StateManager {
 
             // Use fast storage without validation
             self.storage_adapter
-                .store(&scoped_key, &serializable_state)
+                .store_fast(&scoped_key, &serializable_state)
                 .await?;
         }
 
@@ -697,7 +697,7 @@ impl StateManager {
         if self.persistence_config.enabled {
             if let Some(serialized) = self
                 .storage_adapter
-                .load::<SerializableState>(&scoped_key)
+                .load_fast::<SerializableState>(&scoped_key)
                 .await?
             {
                 // Update in-memory cache
@@ -1223,10 +1223,10 @@ impl StateManager {
         // Use lock-free store for fast agents
         self.fast_agent_ops.save_fast(agent_state)?;
 
-        // If persistence is enabled, also save to storage
+        // If persistence is enabled, also save to storage using fast serialization
         if self.persistence_config.enabled {
             let key = format!("agent_state:{}", agent_state.agent_id);
-            self.storage_adapter.store(&key, agent_state).await?;
+            self.storage_adapter.store_fast(&key, agent_state).await?;
         }
 
         Ok(())
@@ -1242,10 +1242,10 @@ impl StateManager {
             return Ok(Some(state));
         }
 
-        // Fall back to storage if not in memory
+        // Fall back to storage if not in memory - use fast load
         if self.persistence_config.enabled {
             let key = format!("agent_state:{}", agent_id);
-            self.storage_adapter.load(&key).await
+            self.storage_adapter.load_fast(&key).await
         } else {
             Ok(None)
         }

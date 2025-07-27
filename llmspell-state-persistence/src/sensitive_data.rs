@@ -81,6 +81,50 @@ impl Default for SensitiveDataConfig {
     }
 }
 
+impl SensitiveDataConfig {
+    /// Create a disabled configuration (no redaction)
+    pub fn disabled() -> Self {
+        Self {
+            redact_enabled: false,
+            redaction_text: "[REDACTED]".to_string(),
+            custom_patterns: Vec::new(),
+            custom_field_names: Vec::new(),
+            hash_redacted: false,
+        }
+    }
+
+    /// Check if this field name should be redacted
+    pub fn is_sensitive_field(&self, field_name: &str) -> bool {
+        if !self.redact_enabled {
+            return false;
+        }
+
+        let lower = field_name.to_lowercase();
+        SENSITIVE_FIELD_NAMES
+            .iter()
+            .any(|&name| lower.contains(name))
+            || self
+                .custom_field_names
+                .iter()
+                .any(|name| lower.contains(&name.to_lowercase()))
+    }
+
+    /// Check if this value contains sensitive patterns
+    pub fn contains_sensitive_pattern(&self, value: &str) -> bool {
+        if !self.redact_enabled {
+            return false;
+        }
+
+        API_KEY_PATTERNS
+            .iter()
+            .any(|pattern| pattern.is_match(value))
+            || self
+                .custom_patterns
+                .iter()
+                .any(|pattern| pattern.is_match(value))
+    }
+}
+
 /// Sensitive data protector
 pub struct SensitiveDataProtector {
     config: SensitiveDataConfig,
