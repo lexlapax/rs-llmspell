@@ -4,7 +4,7 @@
 **Date**: July 2025  
 **Last Updated**: 2025-07-28  
 **Design Document Status**: Updated with implementation realities and integration requirements  
-**Status**: Implementation In Progress (19/27 tasks completed)  
+**Status**: Implementation In Progress (19/33 tasks completed)  
 **Phase**: 5 (Persistent State Management with Hook Integration)  
 **Timeline**: Weeks 19-20 (10 working days)  
 **Priority**: MEDIUM (Production Important)  
@@ -21,7 +21,9 @@
 - **Phase 5.4**: 📋 TODO (0/5 tasks) - State migration framework
 - **Phase 5.5**: 🔄 IN PROGRESS (2/3 tasks) - Backup and recovery
 - **Phase 5.6**: 📋 IN PROGRESS (2/6 tasks) - System integration and validation
-- **Phase 5.7**: 📋 TODO (0/3 tasks) - Phase 6 preparation
+- **Phase 5.7**: 📋 TODO (0/3 tasks) - Script examples for state persistence
+- **Phase 5.8**: 📋 TODO (0/6 tasks) - Test infrastructure reorganization
+- **Phase 5.9**: 📋 TODO (0/3 tasks) - Phase 6 preparation
 
 ## ⚠️ CRITICAL MISSING COMPONENTS (Discovered During Implementation)
 
@@ -2651,9 +2653,327 @@ The new `llmspell-state-traits` crate was essential to break a **circular depend
 
 ---
 
-## Task 5.7: Script Examples for State Persistence
+## Phase 5.7: Test Infrastructure Reorganization (Days 7-8)
 
-### Task 5.7.1: Complete Lua/JavaScript Examples for Phase 5 Features
+### Task 5.7.1: Transform llmspell-testing into Comprehensive Test Suite
+**Priority**: HIGH  
+**Estimated Time**: 4 hours  
+**Assignee**: Test Infrastructure Team
+**Status**: TODO
+
+**Description**: Expand the existing llmspell-testing crate from just test utilities into a comprehensive test suite that consolidates all tests across the project for easier discovery and execution.
+
+**Files to Create/Update:**
+- **UPDATE**: `llmspell-testing/Cargo.toml` - Add test targets and dependencies
+- **CREATE**: `llmspell-testing/tests/unit/` - Unit test modules for all crates
+- **CREATE**: `llmspell-testing/tests/integration/` - Integration test modules
+- **CREATE**: `llmspell-testing/tests/agents/` - Agent-specific test modules
+- **CREATE**: `llmspell-testing/tests/scenarios/` - End-to-end scenario tests
+- **CREATE**: `llmspell-testing/tests/lua/` - Lua script test modules
+- **CREATE**: `llmspell-testing/tests/performance/` - Performance test harnesses
+- **UPDATE**: `llmspell-testing/src/lib.rs` - Export test utilities and helpers
+
+**Acceptance Criteria:**
+- [ ] All existing tests from tests/ directory migrated to llmspell-testing
+- [ ] Test organization follows clear categories (unit, integration, scenarios)
+- [ ] Tests can be run by category using cargo test features
+- [ ] Performance benchmarks integrated but kept separate
+- [ ] Test utilities remain accessible as library exports
+- [ ] Documentation explains test organization and running procedures
+- [ ] CI/CD scripts updated to use new test structure
+- [ ] Test discovery is straightforward for developers
+
+**Implementation Steps:**
+1. **Reorganize Cargo.toml** (1 hour):
+   - Add [[test]] targets for each category
+   - Configure features for selective test execution
+   - Add all necessary dev-dependencies
+   - Set up benchmark configurations
+
+2. **Migrate Existing Tests** (2 hours):
+   - Move tests/agents/* to llmspell-testing/tests/agents/
+   - Move tests/integration/* to llmspell-testing/tests/integration/
+   - Move tests/scenarios/* to llmspell-testing/tests/scenarios/
+   - Create mod.rs files for proper organization
+   - Update import paths and dependencies
+
+3. **Create Test Categories** (1 hour):
+   - Set up feature flags for test categories
+   - Create test runner utilities
+   - Add category-specific test helpers
+   - Document test categorization scheme
+
+**Definition of Done:**
+- [ ] All tests successfully migrated
+- [ ] Tests pass in new location
+- [ ] Test categories clearly defined
+- [ ] Documentation updated
+- [ ] CI/CD scripts work with new structure
+
+### Task 5.7.2: Consolidate Performance Benchmarks
+**Priority**: MEDIUM  
+**Estimated Time**: 3 hours  
+**Assignee**: Performance Team
+**Status**: TODO
+
+**Description**: Integrate the separate tests/performance crate into llmspell-testing as a benchmark module while maintaining Criterion benchmark capabilities.
+
+**Files to Create/Update:**
+- **CREATE**: `llmspell-testing/benches/` - Consolidated benchmark directory
+- **MOVE**: `tests/performance/benches/*` → `llmspell-testing/benches/`
+- **UPDATE**: `llmspell-testing/Cargo.toml` - Add [[bench]] targets
+- **CREATE**: `llmspell-testing/src/benchmarks.rs` - Benchmark utilities
+- **UPDATE**: `scripts/run-performance-benchmarks.sh` - Update paths
+- **CREATE**: `llmspell-testing/benches/README.md` - Benchmark documentation
+
+**Acceptance Criteria:**
+- [ ] All benchmarks moved to llmspell-testing/benches/
+- [ ] Benchmarks run correctly with cargo bench
+- [ ] Benchmark utilities available for creating new benchmarks
+- [ ] Performance regression detection maintained
+- [ ] Benchmark reports generated in consistent location
+- [ ] Scripts updated to work with new structure
+- [ ] Historical benchmark data migration handled
+- [ ] Documentation explains benchmark organization
+
+**Implementation Steps:**
+1. **Move Benchmark Files** (1 hour):
+   - Copy all benchmark files to new location
+   - Update import paths
+   - Verify benchmarks compile
+   - Remove old performance crate
+
+2. **Update Build Configuration** (1 hour):
+   - Add [[bench]] entries to Cargo.toml
+   - Configure Criterion settings
+   - Set up benchmark features
+   - Update workspace configuration
+
+3. **Create Benchmark Infrastructure** (1 hour):
+   - Add benchmark runner utilities
+   - Create common benchmark fixtures
+   - Set up performance tracking
+   - Document benchmark patterns
+
+**Definition of Done:**
+- [ ] All benchmarks migrated successfully
+- [ ] Benchmarks run without errors
+- [ ] Performance tracking maintained
+- [ ] Documentation complete
+- [ ] Scripts updated and tested
+
+### Task 5.7.3: Create Unified Test Runner and Discovery
+**Priority**: HIGH  
+**Estimated Time**: 4 hours  
+**Assignee**: Developer Experience Team
+**Status**: TODO
+
+**Description**: Create a unified test runner that makes it easy to discover and run specific categories of tests without needing to know script locations or cargo commands.
+
+**Files to Create/Update:**
+- **CREATE**: `llmspell-testing/src/bin/test-runner.rs` - CLI test runner
+- **CREATE**: `llmspell-testing/src/runner/` - Test runner modules
+- **UPDATE**: `llmspell-testing/src/lib.rs` - Export runner functionality
+- **CREATE**: `llmspell-testing/README.md` - Comprehensive test documentation
+- **UPDATE**: `scripts/test-by-tag.sh` - Delegate to new test runner
+- **CREATE**: `.cargo/config.toml` - Add test runner aliases
+
+**Acceptance Criteria:**
+- [ ] Test runner provides clear test discovery
+- [ ] Categories clearly listed with descriptions
+- [ ] Running tests by category is simple
+- [ ] Test filtering by name pattern works
+- [ ] Parallel test execution supported
+- [ ] Test output is clean and informative
+- [ ] Integration with existing scripts maintained
+- [ ] Developer documentation comprehensive
+
+**Implementation Steps:**
+1. **Create Test Runner CLI** (2 hours):
+   - Build CLI with clap or similar
+   - Implement test discovery
+   - Add category selection
+   - Support filtering options
+   - Add output formatting
+
+2. **Integrate with Existing Tests** (1 hour):
+   - Connect to test categories
+   - Handle test execution
+   - Capture and format output
+   - Support parallel execution
+
+3. **Update Documentation** (1 hour):
+   - Write comprehensive README
+   - Add usage examples
+   - Document test categories
+   - Create contribution guide
+
+**Definition of Done:**
+- [ ] Test runner CLI functional
+- [ ] All test categories accessible
+- [ ] Documentation comprehensive
+- [ ] Scripts updated to use runner
+- [ ] Developer experience improved
+
+### Task 5.7.4: Add Test Categorization and Attributes
+**Priority**: MEDIUM  
+**Estimated Time**: 3 hours  
+**Assignee**: Test Architecture Team
+**Status**: TODO
+
+**Description**: Implement test categorization using attributes and features to enable fine-grained test selection and better organization.
+
+**Files to Create/Update:**
+- **CREATE**: `llmspell-testing/src/attributes.rs` - Custom test attributes
+- **UPDATE**: All test files - Add category attributes
+- **CREATE**: `llmspell-testing/tests/categories.rs` - Category definitions
+- **UPDATE**: `llmspell-testing/Cargo.toml` - Add feature flags
+- **CREATE**: `docs/testing/categories.md` - Category documentation
+
+**Acceptance Criteria:**
+- [ ] Test categories defined and documented
+- [ ] Attributes/features enable category selection
+- [ ] Tests properly categorized
+- [ ] Category-based execution works
+- [ ] Performance impact minimal
+- [ ] Documentation explains categorization
+- [ ] Examples show proper usage
+- [ ] Migration guide for existing tests
+
+**Implementation Steps:**
+1. **Define Category System** (1 hour):
+   - Create category enum/constants
+   - Define attribute macros
+   - Set up feature flags
+   - Document categories
+
+2. **Apply Categories** (1.5 hours):
+   - Review all tests
+   - Apply appropriate categories
+   - Add multiple categories where needed
+   - Verify categorization
+
+3. **Test and Document** (0.5 hours):
+   - Test category selection
+   - Write usage documentation
+   - Create examples
+   - Update contribution guide
+
+**Definition of Done:**
+- [ ] Category system implemented
+- [ ] All tests categorized
+- [ ] Category selection works
+- [ ] Documentation complete
+- [ ] Examples provided
+
+### Task 5.7.5: Create Test Fixtures and Data Management
+**Priority**: MEDIUM  
+**Estimated Time**: 3 hours  
+**Assignee**: Test Data Team
+**Status**: TODO
+
+**Description**: Consolidate test fixtures and test data into a well-organized system within llmspell-testing for reuse across all test categories.
+
+**Files to Create/Update:**
+- **CREATE**: `llmspell-testing/fixtures/` - Test fixture directory
+- **MOVE**: `tests/data/*` → `llmspell-testing/fixtures/data/`
+- **CREATE**: `llmspell-testing/src/fixtures.rs` - Fixture management
+- **CREATE**: `llmspell-testing/src/data_generators.rs` - Test data generators
+- **UPDATE**: All tests using fixtures - Update paths
+
+**Acceptance Criteria:**
+- [ ] All test data consolidated in fixtures/
+- [ ] Fixture loading utilities provided
+- [ ] Data generators for common patterns
+- [ ] Fixtures versioned and documented
+- [ ] Path resolution works reliably
+- [ ] Performance of fixture loading acceptable
+- [ ] Fixtures shareable across test categories
+- [ ] Migration of existing test data complete
+
+**Implementation Steps:**
+1. **Consolidate Test Data** (1 hour):
+   - Move all test data files
+   - Organize by category/purpose
+   - Update references in tests
+   - Verify data accessibility
+
+2. **Create Fixture System** (1.5 hours):
+   - Build fixture loading utilities
+   - Add path resolution
+   - Create data generators
+   - Add fixture caching
+
+3. **Document and Test** (0.5 hours):
+   - Document fixture organization
+   - Create usage examples
+   - Test fixture loading
+   - Performance verification
+
+**Definition of Done:**
+- [ ] All fixtures consolidated
+- [ ] Loading utilities functional
+- [ ] Data generators created
+- [ ] Documentation complete
+- [ ] Tests updated and passing
+
+### Task 5.7.6: Update CI/CD and Scripts for New Structure
+**Priority**: HIGH  
+**Estimated Time**: 2 hours  
+**Assignee**: DevOps Team
+**Status**: TODO
+
+**Description**: Update all CI/CD configurations and development scripts to work with the new consolidated test structure in llmspell-testing.
+
+**Files to Create/Update:**
+- **UPDATE**: `.github/workflows/*.yml` - CI test commands
+- **UPDATE**: `scripts/quality-check*.sh` - Test execution paths
+- **UPDATE**: `scripts/test-by-tag.sh` - Use new test runner
+- **CREATE**: `scripts/test-coverage.sh` - Coverage with new structure
+- **UPDATE**: `Makefile` (if exists) - Test targets
+- **CREATE**: `llmspell-testing/scripts/` - Test-specific scripts
+
+**Acceptance Criteria:**
+- [ ] CI/CD runs all tests successfully
+- [ ] Quality check scripts updated
+- [ ] Test scripts use new structure
+- [ ] Coverage reporting works
+- [ ] Performance benchmarks integrated
+- [ ] No regression in CI/CD times
+- [ ] Local development workflow maintained
+- [ ] Documentation updated
+
+**Implementation Steps:**
+1. **Update CI/CD** (1 hour):
+   - Modify GitHub Actions workflows
+   - Update test commands
+   - Verify CI passes
+   - Check coverage reporting
+
+2. **Update Scripts** (0.5 hours):
+   - Modify quality check scripts
+   - Update test runner scripts
+   - Add new convenience scripts
+   - Test all scripts
+
+3. **Document Changes** (0.5 hours):
+   - Update development docs
+   - Document script changes
+   - Create migration notes
+   - Update README
+
+**Definition of Done:**
+- [ ] CI/CD fully functional
+- [ ] All scripts updated
+- [ ] Coverage reporting works
+- [ ] Documentation current
+- [ ] No workflow regressions
+
+---
+
+## Task 5.8: Script Examples for State Persistence
+
+### Task 5.8.1: Complete Lua/JavaScript Examples for Phase 5 Features
 **Priority**: MEDIUM  
 **Estimated Time**: 3 hours  
 **Assignee**: Documentation Team
@@ -2693,9 +3013,9 @@ The new `llmspell-state-traits` crate was essential to break a **circular depend
 
 ---
 
-## Phase 5.8: Phase 6 Session Boundary Preparation (Days 7-8)
+## Phase 5.9: Phase 6 Session Boundary Preparation (Days 9-10)
 
-### Task 5.8.1: Implement Session State Markers
+### Task 5.9.1: Implement Session State Markers
 **Priority**: MEDIUM  
 **Estimated Time**: 4 hours  
 **Assignee**: Session Preparation Team
@@ -2743,7 +3063,7 @@ The new `llmspell-state-traits` crate was essential to break a **circular depend
 - [ ] Security prevents cross-session leakage
 - [ ] Backward compatibility maintained
 
-### Task 5.8.2: Add Artifact State Correlation
+### Task 5.9.2: Add Artifact State Correlation
 **Priority**: MEDIUM  
 **Estimated Time**: 3 hours  
 **Assignee**: Artifact Correlation Team
@@ -2790,7 +3110,7 @@ The new `llmspell-state-traits` crate was essential to break a **circular depend
 - [ ] Security protects artifact data
 - [ ] Phase 6 integration points ready
 
-### Task 5.8.3: Create State System Documentation and Examples
+### Task 5.9.3: Create State System Documentation and Examples
 **Priority**: MEDIUM  
 **Estimated Time**: 3 hours  
 **Assignee**: Documentation Team
