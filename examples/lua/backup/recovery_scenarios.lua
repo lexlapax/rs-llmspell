@@ -1,6 +1,13 @@
 -- ABOUTME: Advanced recovery scenarios demonstrating point-in-time recovery
 -- ABOUTME: Shows incremental backups, selective restore, and recovery strategies
 
+-- CONFIG: Use examples/configs/backup-enabled.toml
+-- WHY: This example uses full backup API including incremental backups
+-- HOW TO RUN: ./target/debug/llmspell -c examples/configs/backup-enabled.toml run examples/lua/backup/recovery_scenarios.lua
+-- ALTERNATIVE: cargo run -- -c examples/configs/backup-enabled.toml run examples/lua/backup/recovery_scenarios.lua
+-- TODO: This file needs to be updated to use State.save/load instead of State.set/get/list
+-- NOTE: See recovery_scenarios_fixed.lua for a working version
+
 print("🔄 rs-llmspell Advanced Recovery Scenarios")
 print("==========================================")
 

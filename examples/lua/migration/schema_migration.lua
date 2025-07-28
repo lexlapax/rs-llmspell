@@ -1,6 +1,12 @@
 -- ABOUTME: Example demonstrating state schema migration from Lua scripts
 -- ABOUTME: Shows how scripts can trigger migrations and monitor progress
 
+-- CONFIG: Use examples/configs/migration-enabled.toml
+-- WHY: Migration API (State.migrate, State.schema_versions) requires migration_enabled=true
+-- HOW TO RUN: ./target/debug/llmspell -c examples/configs/migration-enabled.toml run examples/lua/migration/schema_migration.lua
+-- ALTERNATIVE: cargo run -- -c examples/configs/migration-enabled.toml run examples/lua/migration/schema_migration.lua
+-- TODO: This file needs to be updated to use State.save/load instead of State.set/get
+
 print("🚀 rs-llmspell Lua Migration Example")
 print("====================================")
 

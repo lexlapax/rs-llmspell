@@ -1,6 +1,12 @@
 -- ABOUTME: Disaster recovery procedure automation script
 -- ABOUTME: Provides step-by-step disaster recovery with validation and rollback
 
+-- CONFIG: Use examples/configs/backup-enabled.toml (or state-enabled.toml for manual recovery)
+-- WHY: Disaster recovery requires state persistence and optionally backup functionality
+-- HOW TO RUN: ./target/debug/llmspell -c examples/configs/backup-enabled.toml run examples/lua/operational_recovery/disaster_recovery_procedure.lua
+-- ALTERNATIVE: cargo run -- -c examples/configs/backup-enabled.toml run examples/lua/operational_recovery/disaster_recovery_procedure.lua
+-- NOTE: This demonstrates recovery procedures without requiring actual system failure
+
 -- Disaster Recovery Procedure
 -- This script automates the critical steps for recovering from a complete system failure
 

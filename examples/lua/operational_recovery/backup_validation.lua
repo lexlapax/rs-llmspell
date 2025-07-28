@@ -1,6 +1,12 @@
 -- ABOUTME: Backup validation and integrity checking automation
 -- ABOUTME: Provides comprehensive backup health monitoring and validation procedures
 
+-- CONFIG: Use examples/configs/backup-enabled.toml
+-- WHY: Backup validation requires backup manager with validate_backup functionality
+-- HOW TO RUN: ./target/debug/llmspell -c examples/configs/backup-enabled.toml run examples/lua/operational_recovery/backup_validation.lua
+-- ALTERNATIVE: cargo run -- -c examples/configs/backup-enabled.toml run examples/lua/operational_recovery/backup_validation.lua
+-- NOTE: Demonstrates backup health checks and validation procedures
+
 -- Backup Validation and Monitoring Script
 -- This script provides automated validation of backup integrity and operational readiness
 

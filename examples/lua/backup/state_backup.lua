@@ -1,6 +1,12 @@
 -- ABOUTME: Example demonstrating state backup and restore functionality
 -- ABOUTME: Shows how to create backups, list them, and restore from backups
 
+-- CONFIG: Use examples/configs/backup-enabled.toml
+-- WHY: This example uses backup API which requires backup_enabled=true in config
+-- HOW TO RUN: ./target/debug/llmspell -c examples/configs/backup-enabled.toml run examples/lua/backup/state_backup.lua
+-- ALTERNATIVE: cargo run -- -c examples/configs/backup-enabled.toml run examples/lua/backup/state_backup.lua
+-- TODO: This file needs to be updated to use State.save/load instead of State.set/get
+
 print("🗄️  rs-llmspell Lua Backup Example")
 print("=================================")
 

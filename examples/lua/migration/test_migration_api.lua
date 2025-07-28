@@ -1,6 +1,12 @@
 -- ABOUTME: Test script to verify migration API availability
 -- ABOUTME: Shows that migration APIs are properly exposed when configured
 
+-- CONFIG: Use examples/configs/migration-enabled.toml
+-- WHY: This tests if migration APIs are available (requires migration_enabled=true)
+-- HOW TO RUN: ./target/debug/llmspell -c examples/configs/migration-enabled.toml run examples/lua/migration/test_migration_api.lua
+-- ALTERNATIVE: cargo run -- -c examples/configs/migration-enabled.toml run examples/lua/migration/test_migration_api.lua
+-- NOTE: With state-enabled.toml, migration APIs will not be available
+
 print("🔍 Testing Migration API Availability")
 print("=====================================")
 

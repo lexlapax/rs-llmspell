@@ -1,5 +1,14 @@
 #!/usr/bin/env llmspell
 
+-- ABOUTME: Backup retention policy demonstration
+-- ABOUTME: Shows how to manage backup storage with retention policies
+
+-- CONFIG: Use examples/configs/backup-enabled.toml
+-- WHY: Retention policies require backup manager with cleanup_backups functionality
+-- HOW TO RUN: ./target/debug/llmspell -c examples/configs/backup-enabled.toml run examples/lua/backup/retention_policy.lua
+-- ALTERNATIVE: cargo run -- -c examples/configs/backup-enabled.toml run examples/lua/backup/retention_policy.lua
+-- TODO: This file needs to be updated to use State.save instead of State.set
+
 -- Backup Retention Policy Example
 -- Demonstrates backup storage management and retention policies
 
