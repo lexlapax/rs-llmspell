@@ -1,0 +1,80 @@
+// ABOUTME: Test migration schema for user data v1 to v2 transformation
+// ABOUTME: Demonstrates field restructuring and data enrichment
+
+{
+  "migration_id": "user_schema_v1_to_v2",
+  "description": "Migrate user data from flat structure to nested profile",
+  "from_version": "1.0.0",
+  "to_version": "2.0.0",
+  "transforms": [
+    {
+      "type": "move",
+      "from": "age",
+      "to": "profile.age"
+    },
+    {
+      "type": "move",
+      "from": "bio",
+      "to": "profile.bio"
+    },
+    {
+      "type": "rename",
+      "from": "is_verified",
+      "to": "profile.verified"
+    },
+    {
+      "type": "default",
+      "field": "profile.created_at",
+      "value": "{{now_iso8601}}"
+    },
+    {
+      "type": "computed",
+      "field": "profile.badge_level",
+      "expression": "calculate_badge_from_age"
+    }
+  ],
+  "validation": {
+    "pre_migration": [
+      {
+        "field": "username",
+        "validator": "required"
+      },
+      {
+        "field": "email",
+        "validator": "email_format"
+      }
+    ],
+    "post_migration": [
+      {
+        "field": "profile",
+        "validator": "required_object"
+      },
+      {
+        "field": "profile.age",
+        "validator": "min:0,max:150"
+      }
+    ]
+  },
+  "test_data": [
+    {
+      "input": {
+        "username": "john_doe",
+        "email": "john@example.com",
+        "age": 30,
+        "bio": "Software developer",
+        "is_verified": true
+      },
+      "expected": {
+        "username": "john_doe",
+        "email": "john@example.com",
+        "profile": {
+          "age": 30,
+          "bio": "Software developer",
+          "verified": true,
+          "created_at": "{{timestamp}}",
+          "badge_level": "silver"
+        }
+      }
+    }
+  ]
+}

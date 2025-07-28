@@ -40,6 +40,10 @@ harness = false
 name = "state_operations"
 harness = false
 
+[[bench]]
+name = "migration_performance"
+harness = false
+
 [dependencies]
 # Core crates
 llmspell-core = { path = "../../llmspell-core" }

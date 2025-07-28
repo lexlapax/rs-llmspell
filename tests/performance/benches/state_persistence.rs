@@ -303,12 +303,13 @@ fn calculate_state_persistence_overhead(_c: &mut Criterion) {
                 .unwrap();
         }
         let ephemeral_time = start.elapsed();
-        
+
         let ephemeral_overhead_ns = ephemeral_time
             .as_nanos()
             .saturating_sub(baseline.as_nanos());
-        let ephemeral_overhead_percent = (ephemeral_overhead_ns as f64 / baseline.as_nanos() as f64) * 100.0;
-        
+        let ephemeral_overhead_percent =
+            (ephemeral_overhead_ns as f64 / baseline.as_nanos() as f64) * 100.0;
+
         println!("Ephemeral state time: {:?}", ephemeral_time);
         println!("Ephemeral overhead: {:.2}%", ephemeral_overhead_percent);
         println!(

@@ -1,0 +1,153 @@
+// ABOUTME: Migration test cases that should trigger errors and rollbacks
+// ABOUTME: Tests validation failures, missing fields, and type mismatches
+
+{
+  "migration_id": "error_test_scenarios",
+  "description": "Test cases designed to fail and trigger rollback",
+  "from_version": "1.0.0",
+  "to_version": "2.0.0",
+  "error_cases": [
+    {
+      "name": "missing_required_field",
+      "input": {
+        "email": "test@example.com"
+      },
+      "transforms": [
+        {
+          "type": "rename",
+          "from": "username",
+          "to": "user_name"
+        }
+      ],
+      "expected_error": "Required field 'username' not found"
+    },
+    {
+      "name": "type_mismatch",
+      "input": {
+        "age": "twenty-five"
+      },
+      "transforms": [
+        {
+          "type": "computed",
+          "field": "age_in_months",
+          "expression": "age * 12"
+        }
+      ],
+      "expected_error": "Cannot perform numeric operation on string value"
+    },
+    {
+      "name": "validation_failure",
+      "input": {
+        "email": "invalid-email-format",
+        "username": "u"
+      },
+      "transforms": [
+        {
+          "type": "default",
+          "field": "verified",
+          "value": true
+        }
+      ],
+      "validation": {
+        "pre_migration": [
+          {
+            "field": "email",
+            "validator": "email_format"
+          },
+          {
+            "field": "username",
+            "validator": "min_length:3"
+          }
+        ]
+      },
+      "expected_error": "Validation failed: invalid email format, username too short"
+    },
+    {
+      "name": "circular_dependency",
+      "input": {
+        "field_a": 10,
+        "field_b": 20
+      },
+      "transforms": [
+        {
+          "type": "computed",
+          "field": "field_a",
+          "expression": "field_b + field_c"
+        },
+        {
+          "type": "computed",
+          "field": "field_b",
+          "expression": "field_a * 2"
+        },
+        {
+          "type": "computed",
+          "field": "field_c",
+          "expression": "field_a + field_b"
+        }
+      ],
+      "expected_error": "Circular dependency detected in transformations"
+    },
+    {
+      "name": "invalid_json_path",
+      "input": {
+        "data": {
+          "value": 100
+        }
+      },
+      "transforms": [
+        {
+          "type": "move",
+          "from": "data.value",
+          "to": "result[0].value"
+        }
+      ],
+      "expected_error": "Cannot create array at non-existent path"
+    },
+    {
+      "name": "overflow_error",
+      "input": {
+        "max_int": 9223372036854775807
+      },
+      "transforms": [
+        {
+          "type": "computed",
+          "field": "overflow",
+          "expression": "max_int * 2"
+        }
+      ],
+      "expected_error": "Integer overflow in computation"
+    }
+  ],
+  "rollback_scenarios": [
+    {
+      "name": "partial_batch_failure",
+      "description": "Third item in batch fails, should rollback all",
+      "batch": [
+        {
+          "id": "1",
+          "value": 100
+        },
+        {
+          "id": "2",
+          "value": 200
+        },
+        {
+          "id": "3",
+          "value": "invalid"
+        },
+        {
+          "id": "4",
+          "value": 400
+        }
+      ],
+      "transforms": [
+        {
+          "type": "computed",
+          "field": "doubled",
+          "expression": "value * 2"
+        }
+      ],
+      "expected_behavior": "All items should remain unchanged after rollback"
+    }
+  ]
+}

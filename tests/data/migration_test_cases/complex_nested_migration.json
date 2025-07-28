@@ -1,0 +1,110 @@
+// ABOUTME: Complex migration test case with deeply nested structures
+// ABOUTME: Tests array handling, object merging, and conditional transformations
+
+{
+  "migration_id": "complex_nested_v1_to_v2",
+  "description": "Complex migration with nested arrays and conditional logic",
+  "from_version": "1.0.0",
+  "to_version": "2.0.0",
+  "transforms": [
+    {
+      "type": "move",
+      "from": "items",
+      "to": "inventory.items"
+    },
+    {
+      "type": "computed",
+      "field": "inventory.total_value",
+      "expression": "sum(inventory.items[*].price)"
+    },
+    {
+      "type": "transform_array",
+      "field": "inventory.items",
+      "element_transforms": [
+        {
+          "type": "rename",
+          "from": "item_id",
+          "to": "id"
+        },
+        {
+          "type": "computed",
+          "field": "category",
+          "expression": "categorize_by_price(price)"
+        }
+      ]
+    },
+    {
+      "type": "conditional",
+      "condition": "user_type == 'premium'",
+      "transforms": [
+        {
+          "type": "default",
+          "field": "perks.discount",
+          "value": 0.15
+        },
+        {
+          "type": "default",
+          "field": "perks.free_shipping",
+          "value": true
+        }
+      ]
+    }
+  ],
+  "validation": {
+    "post_migration": [
+      {
+        "field": "inventory.items",
+        "validator": "array_min_length:1"
+      },
+      {
+        "field": "inventory.total_value",
+        "validator": "numeric_min:0"
+      }
+    ]
+  },
+  "test_data": [
+    {
+      "input": {
+        "user_id": "u123",
+        "user_type": "premium",
+        "items": [
+          {
+            "item_id": "i001",
+            "name": "Laptop",
+            "price": 1200
+          },
+          {
+            "item_id": "i002",
+            "name": "Mouse",
+            "price": 50
+          }
+        ]
+      },
+      "expected": {
+        "user_id": "u123",
+        "user_type": "premium",
+        "inventory": {
+          "items": [
+            {
+              "id": "i001",
+              "name": "Laptop",
+              "price": 1200,
+              "category": "high_value"
+            },
+            {
+              "id": "i002",
+              "name": "Mouse",
+              "price": 50,
+              "category": "low_value"
+            }
+          ],
+          "total_value": 1250
+        },
+        "perks": {
+          "discount": 0.15,
+          "free_shipping": true
+        }
+      }
+    }
+  ]
+}
