@@ -57,9 +57,11 @@
 //! ```
 
 // Test utilities modules
+pub mod attributes;
 pub mod benchmarks;
 pub mod fixtures;
 pub mod generators;
+pub mod macros;
 pub mod mocks;
 
 // Test runner support
@@ -67,8 +69,9 @@ pub mod mocks;
 pub mod runner;
 
 // Re-export commonly used test utilities when available
-#[cfg(feature = "test-utilities")]
-pub use fixtures::load_fixture;
+// TODO: Add load_fixture function in Task 5.7.5 (Test Fixtures and Data Management)
+// #[cfg(feature = "test-utilities")]
+// pub use fixtures::load_fixture;
 #[cfg(feature = "test-utilities")]
 pub use generators::component_id_strategy;
 

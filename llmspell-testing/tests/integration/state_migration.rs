@@ -1,6 +1,7 @@
 // ABOUTME: Integration tests for state migration functionality
 // ABOUTME: Validates complex migration scenarios and data integrity
 
+// Test categorization will be added later
 use llmspell_state_persistence::{
     config::{FieldSchema, PersistenceConfig, StorageBackendType},
     manager::{SerializableState, StateManager},
@@ -18,6 +19,7 @@ use std::time::SystemTime;
 
 /// Test complex schema migration with multiple transformations
 #[tokio::test]
+// TODO: Add test categorization attributes when macro support is improved
 async fn test_complex_schema_migration() {
     // Create state manager with persistence enabled
     let config = PersistenceConfig {
