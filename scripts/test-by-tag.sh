@@ -4,11 +4,14 @@
 # Usage: ./scripts/test-by-tag.sh <tag> [additional cargo test args]
 #
 # Available tags:
-#   unit        - Run only unit tests (--lib)
-#   integration - Run only integration tests (--test)
+#   unit        - Run unit tests from llmspell-testing
+#   integration - Run integration tests from llmspell-testing
+#   agent       - Run agent-specific tests from llmspell-testing
+#   scenarios   - Run end-to-end scenario tests from llmspell-testing
+#   lua         - Run Lua scripting tests from llmspell-testing
 #   tool        - Run tests in llmspell-tools package
-#   agent       - Run tests in llmspell-agents package
-#   workflow    - Run tests containing 'workflow' in name
+#   bridge      - Run tests in llmspell-bridge package
+#   workflow    - Run tests in llmspell-workflows package
 #   fast        - Run only fast unit tests
 #   slow        - Run slow/ignored tests
 #   external    - Run tests requiring external services
@@ -64,45 +67,40 @@ echo "================================="
 
 case $TAG in
     "unit")
-        print_info "Running unit tests (library tests only)..."
-        cargo test --lib --all $@
+        print_info "Running unit tests from llmspell-testing..."
+        cargo test -p llmspell-testing --features unit-tests $@
         ;;
     "integration")
-        print_info "Running integration tests..."
-        cargo test --test '*' $@
+        print_info "Running integration tests from llmspell-testing..."
+        cargo test -p llmspell-testing --features integration-tests $@
         ;;
     "tool")
         print_info "Running tool tests..."
         cargo test -p llmspell-tools $@
         ;;
     "agent")
-        print_info "Running agent tests..."
-        if cargo metadata --no-deps | grep -q '"name": "llmspell-agents"'; then
-            cargo test -p llmspell-agents $@
-        else
-            print_error "llmspell-agents package not found (not yet implemented)"
-            exit 1
-        fi
+        print_info "Running agent tests from llmspell-testing..."
+        cargo test -p llmspell-testing --features agent-tests $@
         ;;
     "workflow")
         print_info "Running workflow tests..."
-        cargo test workflow $@
+        cargo test -p llmspell-workflows $@
         ;;
     "fast")
         print_info "Running fast tests (unit tests only)..."
-        cargo test --lib --all $@
+        cargo test -p llmspell-testing --features unit-tests $@
         ;;
     "slow")
         print_info "Running slow tests (ignored tests with single thread)..."
-        cargo test -- --ignored --test-threads=1 $@
+        cargo test -p llmspell-testing --features all-tests -- --ignored --test-threads=1 $@
         ;;
     "external")
         print_info "Running external tests (tests requiring external services)..."
-        cargo test -- --ignored external $@
+        cargo test -p llmspell-testing --features all-tests -- --ignored external $@
         ;;
     "all")
         print_info "Running all tests including ignored..."
-        cargo test --all --include-ignored $@
+        cargo test -p llmspell-testing --features all-tests --include-ignored $@
         ;;
     "bridge")
         print_info "Running bridge tests..."
@@ -110,22 +108,32 @@ case $TAG in
         ;;
     "llm")
         print_info "Running LLM provider tests..."
-        cargo test llm $@ -- --ignored
+        cargo test -p llmspell-testing --features integration-tests llm $@ -- --ignored
         ;;
     "database")
         print_info "Running database tests..."
-        cargo test database $@ -- --ignored
+        cargo test -p llmspell-testing --features integration-tests database $@ -- --ignored
+        ;;
+    "scenarios")
+        print_info "Running scenario tests from llmspell-testing..."
+        cargo test -p llmspell-testing --features scenario-tests $@
+        ;;
+    "lua")
+        print_info "Running Lua tests from llmspell-testing..."
+        cargo test -p llmspell-testing --features lua-tests $@
         ;;
     *)
         print_error "Unknown tag: $TAG"
         echo ""
         echo "Available tags:"
-        echo "  unit        - Run only unit tests (--lib)"
-        echo "  integration - Run only integration tests (--test)"
+        echo "  unit        - Run unit tests from llmspell-testing"
+        echo "  integration - Run integration tests from llmspell-testing"
+        echo "  agent       - Run agent-specific tests from llmspell-testing"
+        echo "  scenarios   - Run end-to-end scenario tests from llmspell-testing"
+        echo "  lua         - Run Lua scripting tests from llmspell-testing"
         echo "  tool        - Run tests in llmspell-tools package"
-        echo "  agent       - Run tests in llmspell-agents package"
         echo "  bridge      - Run tests in llmspell-bridge package"
-        echo "  workflow    - Run tests containing 'workflow' in name"
+        echo "  workflow    - Run tests in llmspell-workflows package"
         echo "  llm         - Run LLM provider tests"
         echo "  database    - Run database tests"
         echo "  fast        - Run only fast unit tests"

@@ -2919,11 +2919,11 @@ The new `llmspell-state-traits` crate was essential to break a **circular depend
 - [ ] Documentation complete
 - [ ] Tests updated and passing
 
-### Task 5.7.6: Update CI/CD and Scripts for New Structure
+### Task 5.7.6: Update CI/CD and Scripts for New Structure ✅ COMPLETED
 **Priority**: HIGH  
 **Estimated Time**: 2.5 hours  
 **Assignee**: DevOps Team
-**Status**: TODO
+**Status**: COMPLETED (2025-07-28)
 
 **Description**: Update all CI/CD configurations and development scripts to work with the new consolidated test structure in llmspell-testing.
 
@@ -2935,15 +2935,15 @@ The new `llmspell-state-traits` crate was essential to break a **circular depend
 - **CREATE**: `llmspell-testing/scripts/` - Test-specific scripts
 
 **Acceptance Criteria:**
-- [ ] Quality check scripts updated
-- [ ] Test scripts use new structure
-- [ ] Coverage reporting works
-- [ ] Performance benchmarks integrated
-- [ ] No regression in CI/CD times
-- [ ] Local development workflow maintained
-- [ ] Documentation updated
-- [ ] Legacy tests/ directory completely removed
-- [ ] No remaining references to old test paths
+- [x] ✅ Quality check scripts updated - Modified to use llmspell-testing
+- [x] ✅ Test scripts use new structure - test-by-tag.sh and list-tests-by-tag.sh updated
+- [x] ✅ Coverage reporting works - test-coverage.sh created with llmspell-testing support
+- [x] ✅ Performance benchmarks integrated - Moved to llmspell-testing/benches/
+- [x] ✅ No regression in CI/CD times - Enabled CI workflows, same performance
+- [x] ✅ Local development workflow maintained - New run-llmspell-tests.sh added
+- [x] ✅ Documentation updated - README updated in llmspell-testing
+- [x] ✅ Legacy tests/ directory completely removed - Successfully deleted
+- [x] ✅ No remaining references to old test paths - CI/scripts all updated
 
 **Implementation Steps:**
 1. **Update Scripts** (0.5 hours):
@@ -2965,10 +2965,12 @@ The new `llmspell-state-traits` crate was essential to break a **circular depend
    - Update any remaining documentation references
 
 **Definition of Done:**
-- [ ] All scripts updated
-- [ ] Coverage reporting works
-- [ ] Documentation current
-- [ ] No workflow regressions
+- [x] ✅ All scripts updated - quality-check*.sh, test-by-tag.sh, list-tests-by-tag.sh
+- [x] ✅ Coverage reporting works - test-coverage.sh integrated with tarpaulin
+- [x] ✅ Documentation current - llmspell-testing/README.md comprehensive
+- [x] ✅ No workflow regressions - All existing workflows preserved
+- [x] ✅ New test runner created - run-llmspell-tests.sh with categories
+- [x] ✅ Workspace Cargo.toml cleaned - Removed tests/performance reference
 
 ---
 

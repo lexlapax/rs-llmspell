@@ -44,6 +44,9 @@ if [ $# -eq 0 ]; then
     echo "Available tags:"
     echo "  unit        - List unit tests"
     echo "  integration - List integration tests"
+    echo "  agent       - List agent tests"
+    echo "  scenario    - List scenario tests"
+    echo "  lua         - List Lua tests"
     echo "  tool        - List tool tests"
     echo "  ignored     - List ignored tests"
     echo "  all         - List all tests"
@@ -57,9 +60,19 @@ echo "================================"
 
 case $TAG in
     "unit")
-        print_info "Unit tests (in src/ directories):"
+        print_info "Unit tests from llmspell-testing:"
         echo ""
-        # Find all test modules in src directories
+        # List tests in llmspell-testing unit test directory
+        if [ -d "./llmspell-testing/tests/unit" ]; then
+            find ./llmspell-testing/tests/unit -name "*.rs" -type f | while read -r file; do
+                print_file "${file#./}"
+                grep -n "fn test_" "$file" 2>/dev/null | sed 's/^[[:space:]]*//' | while read -r line; do
+                    test_name=$(echo "$line" | sed -E 's/.*fn (test_[a-zA-Z0-9_]+).*/\1/')
+                    print_test "$test_name"
+                done
+            done
+        fi
+        # Also check crate unit tests
         find . -name "*.rs" -path "*/src/*" -type f | while read -r file; do
             if grep -q "#\[test\]" "$file" 2>/dev/null || grep -q "#\[cfg(test)\]" "$file" 2>/dev/null; then
                 print_file "${file#./}"
@@ -72,16 +85,18 @@ case $TAG in
         ;;
         
     "integration")
-        print_info "Integration tests (in tests/ directories):"
+        print_info "Integration tests from llmspell-testing:"
         echo ""
-        # Find all test files in tests directories
-        find . -name "*.rs" -path "*/tests/*" -type f | while read -r file; do
-            print_file "${file#./}"
-            grep -n "fn test_" "$file" 2>/dev/null | sed 's/^[[:space:]]*//' | while read -r line; do
-                test_name=$(echo "$line" | sed -E 's/.*fn (test_[a-zA-Z0-9_]+).*/\1/')
-                print_test "$test_name"
+        # List tests in llmspell-testing integration test directory
+        if [ -d "./llmspell-testing/tests/integration" ]; then
+            find ./llmspell-testing/tests/integration -name "*.rs" -type f | while read -r file; do
+                print_file "${file#./}"
+                grep -n "fn test_" "$file" 2>/dev/null | sed 's/^[[:space:]]*//' | while read -r line; do
+                    test_name=$(echo "$line" | sed -E 's/.*fn (test_[a-zA-Z0-9_]+).*/\1/')
+                    print_test "$test_name"
+                done
             done
-        done
+        fi
         ;;
         
     "tool")
@@ -143,10 +158,55 @@ case $TAG in
         echo "Available tags:"
         echo "  unit        - List unit tests"
         echo "  integration - List integration tests"
+        echo "  agent       - List agent tests"
+        echo "  scenario    - List scenario tests"
+        echo "  lua         - List Lua tests"
         echo "  tool        - List tool tests"
         echo "  ignored     - List ignored tests"
         echo "  all         - List all tests"
         exit 1
+        ;;
+    
+    "agent")
+        print_info "Agent tests from llmspell-testing:"
+        echo ""
+        if [ -d "./llmspell-testing/tests/agent" ]; then
+            find ./llmspell-testing/tests/agent -name "*.rs" -type f | while read -r file; do
+                print_file "${file#./}"
+                grep -n "fn test_" "$file" 2>/dev/null | sed 's/^[[:space:]]*//' | while read -r line; do
+                    test_name=$(echo "$line" | sed -E 's/.*fn (test_[a-zA-Z0-9_]+).*/\1/')
+                    print_test "$test_name"
+                done
+            done
+        fi
+        ;;
+        
+    "scenario")
+        print_info "Scenario tests from llmspell-testing:"
+        echo ""
+        if [ -d "./llmspell-testing/tests/scenario" ]; then
+            find ./llmspell-testing/tests/scenario -name "*.rs" -type f | while read -r file; do
+                print_file "${file#./}"
+                grep -n "fn test_" "$file" 2>/dev/null | sed 's/^[[:space:]]*//' | while read -r line; do
+                    test_name=$(echo "$line" | sed -E 's/.*fn (test_[a-zA-Z0-9_]+).*/\1/')
+                    print_test "$test_name"
+                done
+            done
+        fi
+        ;;
+        
+    "lua")
+        print_info "Lua tests from llmspell-testing:"
+        echo ""
+        if [ -d "./llmspell-testing/tests/lua" ]; then
+            find ./llmspell-testing/tests/lua -name "*.rs" -type f | while read -r file; do
+                print_file "${file#./}"
+                grep -n "fn test_" "$file" 2>/dev/null | sed 's/^[[:space:]]*//' | while read -r line; do
+                    test_name=$(echo "$line" | sed -E 's/.*fn (test_[a-zA-Z0-9_]+).*/\1/')
+                    print_test "$test_name"
+                done
+            done
+        fi
         ;;
 esac
 

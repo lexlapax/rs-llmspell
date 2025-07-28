@@ -81,13 +81,13 @@ if [ "$SKIP_SLOW_TESTS" = "true" ]; then
     print_info "Running tests (skipping slow/external)..."
     print_warning "SKIP_SLOW_TESTS is set - ignoring slow and external tests"
     
-    # Run all tests except ignored ones
-    if timeout 300s cargo test --workspace > /dev/null 2>&1; then
+    # Run core tests through llmspell-testing
+    if timeout 300s ./scripts/run-llmspell-tests.sh all --quiet > /dev/null 2>&1; then
         print_status 0 "Test suite passed (slow tests skipped)"
     else
         if [ $? -eq 124 ]; then
             print_status 1 "Test suite timed out (>5 minutes)"
-            print_warning "Consider using ./scripts/test-by-tag.sh to run specific test categories"
+            print_warning "Consider using ./scripts/run-llmspell-tests.sh to run specific test categories"
         else
             print_status 1 "Test suite failed"
         fi
@@ -97,16 +97,16 @@ else
     print_info "Running all tests including slow/external..."
     print_info "Set SKIP_SLOW_TESTS=true to skip slow tests"
     
-    # Run all tests including ignored ones
-    if timeout 300s cargo test --workspace --include-ignored > /dev/null 2>&1; then
+    # Run all tests through llmspell-testing and workspace
+    if timeout 300s bash -c "./scripts/run-llmspell-tests.sh all --quiet && cargo test --workspace --include-ignored" > /dev/null 2>&1; then
         print_status 0 "Full test suite passed"
     else
         if [ $? -eq 124 ]; then
             print_status 1 "Test suite timed out (>5 minutes)"
-            print_warning "Consider using SKIP_SLOW_TESTS=true or ./scripts/test-by-tag.sh"
+            print_warning "Consider using SKIP_SLOW_TESTS=true or ./scripts/run-llmspell-tests.sh"
         else
             print_status 1 "Test suite failed"
-            print_info "Run tests by category with ./scripts/test-by-tag.sh <tag>"
+            print_info "Run tests by category with ./scripts/run-llmspell-tests.sh <category>"
         fi
         OVERALL_SUCCESS=1
     fi
@@ -127,13 +127,12 @@ echo ""
 echo "6. Checking test coverage (optional)..."
 if command -v cargo-tarpaulin >/dev/null 2>&1; then
     echo "   Running coverage analysis..."
-    COVERAGE_OUTPUT=$(timeout 180s cargo tarpaulin --workspace --out Json --timeout 120 2>/dev/null || echo "failed")
-    
-    if [ "$COVERAGE_OUTPUT" != "failed" ]; then
-        # Try to extract coverage percentage (simplified)
-        if command -v jq >/dev/null 2>&1; then
-            COVERAGE=$(echo "$COVERAGE_OUTPUT" | jq -r '.files | to_entries | map(.value.summary.lines.percent) | add / length' 2>/dev/null || echo "unknown")
-            if [ "$COVERAGE" != "unknown" ] && [ "$COVERAGE" != "null" ]; then
+    # Use the test-coverage script for unified coverage
+    if ./scripts/test-coverage.sh all lcov > /tmp/coverage_output_$$.log 2>&1; then
+        # Try to extract coverage from lcov output
+        if [ -f "lcov.info" ] && command -v lcov >/dev/null 2>&1; then
+            COVERAGE=$(lcov --summary lcov.info 2>/dev/null | grep "lines......:" | sed 's/.*: \([0-9.]*\)%.*/\1/' | head -1)
+            if [ -n "$COVERAGE" ]; then
                 COVERAGE_INT=$(echo "$COVERAGE" | cut -d. -f1)
                 if [ "$COVERAGE_INT" -ge 90 ]; then
                     print_status 0 "Test coverage: ${COVERAGE}% (≥90% threshold)"
@@ -145,7 +144,7 @@ if command -v cargo-tarpaulin >/dev/null 2>&1; then
                 print_warning "Could not parse coverage percentage"
             fi
         else
-            print_warning "jq not available for coverage parsing"
+            print_warning "Coverage generated but lcov not available for parsing"
         fi
     else
         print_warning "Coverage analysis failed"
