@@ -27,20 +27,21 @@ Implement persistent state storage with sled/rocksdb backend, enabling state per
 - **3-Layer Bridge Architecture**: Script integration respects Native Bridge → Native Globals → Script Engine pattern
 
 ### Success Criteria
-- [ ] Agent state persists across application restarts
-- [ ] State can be serialized and restored correctly with full fidelity
-- [ ] Multiple agents have independent, isolated persistent state
-- [ ] State migrations work seamlessly for schema changes with rollback capability
-- [ ] Backup/restore operations functional with integrity verification
-- [ ] **Hook history is persisted and replayable** (Phase 4 integration)
-- [ ] **State changes trigger appropriate hooks** (Phase 4 integration)
-- [ ] **Event correlation IDs link state changes** (Phase 4 integration)
-- [ ] **Circular references in agent state handled correctly**
-- [ ] **Sensitive data (API keys) properly protected during serialization**
-- [ ] **Concurrent access to agent state properly synchronized**
-- [ ] **Agent-State persistence fully integrated with llmspell-agents**
-- [ ] **Script Bridge API exposes state persistence to Lua/JS/Python**
-- [ ] **Lifecycle hooks enable automatic state persistence**
+- [x] Agent state persists across application restarts
+- [x] State can be serialized and restored correctly with full fidelity
+- [x] Multiple agents have independent, isolated persistent state
+- [x] State migrations work seamlessly for schema changes with rollback capability (basic transformations)
+- [x] Backup/restore operations functional with integrity verification
+- [x] **Hook history is persisted and replayable** (Phase 4 integration)
+- [x] **State changes trigger appropriate hooks** (Phase 4 integration)
+- [x] **Event correlation IDs link state changes** (Phase 4 integration)
+- [x] **Circular references in agent state handled correctly**
+- [x] **Sensitive data (API keys) properly protected during serialization**
+- [x] **Concurrent access to agent state properly synchronized**
+- [x] **Agent-State persistence fully integrated with llmspell-agents**
+- [x] **Script Bridge API exposes state persistence to Lua/JS/Python**
+- [x] **Lifecycle hooks enable automatic state persistence**
+- [ ] **⚠️ DEFERRED: Complex custom transformations** (basic Copy, Default, Remove work; Custom transformers deferred)
 
 ---
 
@@ -430,6 +431,36 @@ pub trait StateMigration: Send + Sync {
     async fn rollback(&self, state: &mut StateManager) -> Result<()>;
     fn is_destructive(&self) -> bool;
 }
+```
+
+**⚠️ DEFERRED: Custom Transformer Implementation**
+
+The migration framework includes a `FieldTransform::Custom` variant for complex data transformations, but the actual custom transformer implementation is **DEFERRED** to a future phase. Current implementation returns empty results with a debug message.
+
+**Affected Functionality:**
+- Custom transformers like "now_iso8601", "normalize_score", "has_valid_email" 
+- 4 integration tests marked as `#[ignore]` pending implementation
+- Complex schema migrations requiring calculated fields or validations
+
+**Current Status:**
+```rust
+// Placeholder implementation in transforms.rs
+fn apply_custom_transform(
+    &self,
+    _source_values: &HashMap<String, &Value>,
+    transformer: &str,
+    _config: &HashMap<String, Value>,
+) -> Result<Vec<Value>, TransformationError> {
+    debug!("Custom transformer '{}' not implemented, returning empty", transformer);
+    Ok(vec![]) // Basic migrations work; complex ones deferred
+}
+```
+
+**Future Implementation Would Include:**
+- Transformer registry with pluggable transformer functions
+- Built-in transformers for common operations (timestamps, validations, calculations)
+- Configuration system for parameterized transformers
+- Error handling and rollback for failed transformations
 
 pub struct MigrationManager {
     current_schema: StateSchema,
