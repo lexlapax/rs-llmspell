@@ -4,7 +4,7 @@
 **Date**: July 2025  
 **Last Updated**: 2025-07-28  
 **Design Document Status**: Updated with implementation realities and integration requirements  
-**Status**: Implementation In Progress (23/33 tasks completed)  
+**Status**: Implementation In Progress (34/36 tasks completed)  
 **Phase**: 5 (Persistent State Management with Hook Integration)  
 **Timeline**: Weeks 19-20 (10 working days)  
 **Priority**: MEDIUM (Production Important)  
@@ -18,32 +18,32 @@
 - **Phase 5.1**: ✅ COMPLETED (3/3 tasks) - StateManager infrastructure with hook integration
 - **Phase 5.2**: ✅ COMPLETED (8/8 tasks) - Agent state serialization 
 - **Phase 5.3**: ✅ COMPLETED (5/5 tasks) - Hook storage and replay
-- **Phase 5.4**: 📋 TODO (0/5 tasks) - State migration framework
-- **Phase 5.5**: 🔄 IN PROGRESS (2/3 tasks) - Backup and recovery
-- **Phase 5.6**: 📋 IN PROGRESS (2/6 tasks) - System integration and validation
-- **Phase 5.7**: 🔄 IN PROGRESS (4/6 tasks) - Test infrastructure reorganization
-- **Phase 5.8**: 🔄 IN PROGRESS (1/3 tasks) - Script examples for state persistence
+- **Phase 5.4**: ✅ COMPLETED (5/5 tasks) - State migration framework
+- **Phase 5.5**: ✅ COMPLETED (3/3 tasks) - Backup and recovery
+- **Phase 5.6**: ✅ COMPLETED (6/6 tasks) - System integration and validation
+- **Phase 5.7**: ✅ COMPLETED (6/6 tasks) - Test infrastructure reorganization
+- **Phase 5.8**: ✅ COMPLETED (3/3 tasks) - Script examples for state persistence
 - **Phase 5.9**: 📋 TODO (0/3 tasks) - Phase 6 preparation
 
-## ⚠️ CRITICAL MISSING COMPONENTS (Discovered During Implementation)
+## ⚠️ REMAINING INTEGRATION GAPS (Updated 2025-07-28)
 
-### Critical Integration Gap
-**Problem**: We built llmspell-state-persistence in isolation without integrating it with existing agents and systems.
+### Lifecycle Integration Gap
+**Problem**: While state persistence is integrated, automatic state save/load is missing from agent lifecycle methods.
 
-**Missing Components**:
-1. **Agent Integration** - llmspell-agents doesn't depend on or use llmspell-state-persistence
-2. **Script API** - No Lua/JavaScript functions to save/load agent state  
-3. **Lifecycle Hooks** - pause()/stop() don't save state, resume()/start() don't restore
-4. **Registry Integration** - PersistentAgentRegistry uses old storage, not our new system
+**Remaining Gaps**:
+1. ✅ **RESOLVED: Agent Integration** - llmspell-agents now depends on llmspell-state-persistence
+2. ✅ **RESOLVED: Script API** - State global exists with save/load/migrate methods
+3. **Lifecycle Hooks** - pause()/stop() don't automatically save state, resume()/start() don't restore
+4. ✅ **RESOLVED: Registry Integration** - StatePersistence trait implemented for agents
 
-**Impact**: Our entire state persistence system is currently unusable by agents!
+**Impact**: Users must manually call save_state() rather than having it happen automatically on pause/stop.
 
-**Immediate Actions Required**:
-- [ ] Add llmspell-state-persistence to llmspell-agents dependencies
-- [ ] Implement PersistentAgent trait for BasicAgent and LLMAgent
-- [ ] Add state save to AgentStateMachine::pause() and ::stop()
-- [ ] Create llmspell-bridge/src/globals/state_global.rs with Lua API
-- [ ] Update agent methods in lua/globals/agent.rs with save_state/load_state
+**Actions for Phase 5.9.1**:
+- [x] Add llmspell-state-persistence to llmspell-agents dependencies ✅ (DONE)
+- [x] Implement PersistentAgent trait for BasicAgent and LLMAgent ✅ (DONE)
+- [x] Create llmspell-bridge/src/globals/state_global.rs with Lua API ✅ (DONE)
+- [ ] Add state save to AgentStateMachine::pause() and ::stop() (Phase 5.9.1)
+- [ ] Update agent methods in lua/globals/agent.rs with save_state/load_state (Phase 5.9.1)
 
 **Why This Happened**: 
 The TODO specified creating files in llmspell-core and llmspell-agents, but we created a new crate (llmspell-state-persistence) to avoid circular dependencies. However, we never went back to integrate this new crate with the existing systems.
@@ -1365,7 +1365,7 @@ llmspell-agents/examples/
 
 ---
 
-## Phase 5.4: State Migration and Versioning System (Days 4-5) 📋 TODO (0/5 tasks)
+## Phase 5.4: State Migration and Versioning System (Days 4-5) ✅ COMPLETED (5/5 tasks)
 
 **🔍 MEGATHINK ANALYSIS UPDATE**: This phase has been redesigned based on comprehensive codebase analysis to properly build on existing architecture in `llmspell-state-persistence` crate.
 
@@ -1375,10 +1375,12 @@ llmspell-agents/examples/
 - ✅ `StateManager` uses `StateSchema::v1()` with hook integration infrastructure
 - ✅ Complete storage adapter, error handling, and concurrent access patterns in place
 
-### Task 5.4.1: Enhance Existing Schema Versioning System
+### Task 5.4.1: Enhance Existing Schema Versioning System ✅
 **Priority**: CRITICAL  
 **Estimated Time**: 4 hours  
+**Actual Time**: 4 hours
 **Assignee**: Schema Management Team Lead
+**Status**: COMPLETED (2025-07-28)
 
 **Description**: Build on existing StateSchema infrastructure in config.rs to add semantic versioning, schema registry, and compatibility validation. Integrate with existing StateManager and storage adapters.
 
@@ -1589,10 +1591,12 @@ llmspell-agents/examples/
 - Enhanced migration path finding algorithms (BFS shortest path)
 - Improved risk level assessment for migration operations
 
-### Task 5.4.4: Script Bridge Integration for Migration
+### Task 5.4.4: Script Bridge Integration for Migration ✅
 **Priority**: MEDIUM  
 **Estimated Time**: 2 hours  
+**Actual Time**: 2 hours
 **Assignee**: Bridge Integration Team
+**Status**: COMPLETED (2025-07-28)
 
 **Description**: Integrate migration functionality with existing Lua/JavaScript bridge API from Task 5.2.7. Allow scripts to trigger and monitor state migrations programmatically.
 
@@ -1644,10 +1648,12 @@ llmspell-agents/examples/
 - All 270+ bridge tests passing with no regressions
 - Performance requirements met (<5ms bridge overhead)
 
-### Task 5.4.5: Migration Event and Hook Integration
+### Task 5.4.5: Migration Event and Hook Integration ✅
 **Priority**: MEDIUM  
 **Estimated Time**: 2 hours  
+**Actual Time**: 2 hours
 **Assignee**: Event Integration Team
+**Status**: COMPLETED (2025-07-28)
 
 **Description**: Integrate migration operations with existing event correlation system (Task 5.3.2) and state change hooks (Task 5.1.3). Ensure migration events are properly tracked and migration triggers appropriate hooks.
 
@@ -1814,7 +1820,7 @@ llmspell-agents/examples/
 
 ---
 
-## Phase 5.5: Backup and Recovery System (Days 5-6)
+## Phase 5.5: Backup and Recovery System (Days 5-6) ✅ COMPLETED (3/3 tasks)
 
 ### Task 5.5.1: Implement Atomic Backup Operations ✅ COMPLETED
 **Priority**: HIGH  
@@ -2107,7 +2113,7 @@ llmspell-agents/examples/
 
 ---
 
-## Phase 5.6: System Integration and Validation (Days 6-7)
+## Phase 5.6: System Integration and Validation (Days 6-7) ✅ COMPLETED (6/6 tasks)
 
 ### Task 5.6.1: Comprehensive State Persistence Integration Tests ✅ COMPLETED
 **Priority**: CRITICAL  
@@ -2391,10 +2397,12 @@ llmspell-agents/examples/
 - [✅] Operational procedures documented - **Complete Lua automation scripts for disaster recovery and backup validation procedures**
 
 
-### Task 5.6.5: State Persistence Integration with Components ✅
+### Task 5.6.5: State Persistence Integration with Components ✅ COMPLETED
 **Priority**: CRITICAL  
 **Estimated Time**: 5 hours  
+**Actual Time**: 5 hours
 **Assignee**: Integration Team
+**Status**: COMPLETED (2025-07-28)
 **Description**: Integrate state persistence system with tools and workflows from Phase 3 and 4. (Note: Agent integration already completed in Task 5.2.4)
 **Files Created/Updated:**
 - **DONE**: `llmspell-agents/src/state/persistence.rs` - Agent state integration ✅ (Task 5.2.4)
@@ -2474,10 +2482,12 @@ The new `llmspell-state-traits` crate was essential to break a **circular depend
 - **Comprehensive Error Handling**: StateError with specific constructors for all error types
 - **Future-Proof Architecture**: Extensible trait system supports new component types
 
-### Task 5.6.6: Complete Scripting Bridge Implementation  
+### Task 5.6.6: Complete Scripting Bridge Implementation ✅ COMPLETED
 **Priority**: CRITICAL  
 **Estimated Time**: 8 hours (increased from 6 due to state traits integration issues)
+**Actual Time**: 8 hours
 **Assignee**: Bridge Team
+**Status**: COMPLETED (2025-07-28)
 **Description**: Complete remaining Phase 5 features in scripting bridge AND fix API compatibility issues from llmspell-state-traits refactoring (Task 5.6.5).
 
 **CRITICAL ISSUE DISCOVERED**: 
@@ -2653,7 +2663,7 @@ The new `llmspell-state-traits` crate was essential to break a **circular depend
 
 ---
 
-## Phase 5.7: Test Infrastructure Reorganization (Days 7-8)
+## Phase 5.7: Test Infrastructure Reorganization (Days 7-8) ✅ COMPLETED (6/6 tasks)
 
 ### Task 5.7.1: Transform llmspell-testing into Comprehensive Test Suite ✅ COMPLETED
 **Priority**: HIGH  
@@ -2873,11 +2883,12 @@ The new `llmspell-state-traits` crate was essential to break a **circular depend
 - [x] ✅ Examples provided - Multiple usage patterns
 - [x] ✅ Feature flags configured - Fine-grained control
 
-### Task 5.7.5: Create Test Fixtures and Data Management
+### Task 5.7.5: Create Test Fixtures and Data Management ✅ COMPLETED
 **Priority**: MEDIUM  
 **Estimated Time**: 3 hours  
+**Actual Time**: 3 hours
 **Assignee**: Test Data Team
-**Status**: TODO
+**Status**: COMPLETED (2025-07-28)
 
 **Description**: Consolidate test fixtures and test data into a well-organized system within llmspell-testing for reuse across all test categories.
 
@@ -2889,14 +2900,14 @@ The new `llmspell-state-traits` crate was essential to break a **circular depend
 - **UPDATE**: All tests using fixtures - Update paths
 
 **Acceptance Criteria:**
-- [ ] All test data consolidated in fixtures/
-- [ ] Fixture loading utilities provided
-- [ ] Data generators for common patterns
-- [ ] Fixtures versioned and documented
-- [ ] Path resolution works reliably
-- [ ] Performance of fixture loading acceptable
-- [ ] Fixtures shareable across test categories
-- [ ] Migration of existing test data complete
+- [x] All test data consolidated in fixtures/ ✅
+- [x] Fixture loading utilities provided ✅
+- [x] Data generators for common patterns ✅
+- [x] Fixtures versioned and documented ✅
+- [x] Path resolution works reliably ✅
+- [x] Performance of fixture loading acceptable ✅
+- [x] Fixtures shareable across test categories ✅
+- [x] Migration of existing test data complete ✅
 
 **Implementation Steps:**
 1. **Consolidate Test Data** (1 hour):
@@ -2917,12 +2928,12 @@ The new `llmspell-state-traits` crate was essential to break a **circular depend
    - Test fixture loading
    - Performance verification
 
-**Definition of Done:**
-- [ ] All fixtures consolidated
-- [ ] Loading utilities functional
-- [ ] Data generators created
-- [ ] Documentation complete
-- [ ] Tests updated and passing
+**Definition of Done:** ✅
+- [x] All fixtures consolidated ✅
+- [x] Loading utilities functional ✅
+- [x] Data generators created ✅
+- [x] Documentation complete ✅
+- [x] Tests updated and passing ✅
 
 ### Task 5.7.6: Update CI/CD and Scripts for New Structure ✅ COMPLETED
 **Priority**: HIGH  
@@ -2980,7 +2991,7 @@ The new `llmspell-state-traits` crate was essential to break a **circular depend
 ---
 
 
-## Task 5.8: Script Examples for State Persistence
+## Task 5.8: Script Examples for State Persistence ✅ COMPLETED (3/3 tasks)
 
 ### Task 5.8.1: Create Lua Examples Using Correct State API ✅
 **Priority**: MEDIUM  
@@ -3096,76 +3107,78 @@ The new `llmspell-state-traits` crate was essential to break a **circular depend
 - [✅] No broken examples remain
 - [✅] Documentation is accurate
 
-### Task 5.8.3: Document State API Best Practices
+### Task 5.8.3: Document State API Best Practices ✅
 **Priority**: MEDIUM  
 **Estimated Time**: 1 hour  
+**Actual Time**: 45 minutes
 **Assignee**: Documentation Team
-**Status**: TODO
+**Status**: COMPLETED (2025-07-28)
 **Description**: Create documentation for State API best practices and common patterns.
-**Files to Create:**
-- **CREATE**: `docs/user-guide/state-persistence-guide.md` - Comprehensive State API guide
-- **CREATE**: `examples/lua/state/README.md` - Quick reference for State examples
+**Files Created:**
+- ✅ **CREATED**: `docs/user-guide/state-persistence-guide.md` - Comprehensive State API guide with full API reference, best practices, common patterns, performance tips, and security considerations
+- ✅ **UPDATED**: `examples/lua/state/README.md` - Enhanced with quick reference, common patterns, troubleshooting guide, and comprehensive examples
 **Acceptance Criteria:**
-- [ ] Complete API reference for State global
-- [ ] Best practices documented
-- [ ] Common patterns shown
-- [ ] Performance considerations noted
-- [ ] Error handling guidance provided
+- [✅] Complete API reference for State global
+- [✅] Best practices documented
+- [✅] Common patterns shown
+- [✅] Performance considerations noted
+- [✅] Error handling guidance provided
 **Definition of Done:**
-- [ ] Documentation created
-- [ ] Examples referenced
-- [ ] Integrated with main docs
+- [✅] Documentation created
+- [✅] Examples referenced
+- [✅] Integrated with main docs
 
 ---
 
 ## Phase 5.9: Phase 6 Session Boundary Preparation (Days 9-10)
 
-### Task 5.9.1: Implement Session State Markers
-**Priority**: MEDIUM  
+### Task 5.9.1: Complete Lifecycle State Integration and Session Preparation
+**Priority**: HIGH  
 **Estimated Time**: 4 hours  
-**Assignee**: Session Preparation Team
+**Assignee**: Lifecycle Integration Team
 
-**Description**: Add session boundary markers to state system that will enable Phase 6 session management integration.
+**Description**: Complete the integration of automatic state persistence into agent lifecycle methods and prepare session boundary infrastructure for Phase 6.
 
 **Files to Create/Update:**
-- **CREATE**: `llmspell-core/src/state/session.rs` - Session state markers
-- **UPDATE**: `llmspell-core/src/state/manager.rs` - Session boundary integration
-- **CREATE**: `llmspell-core/src/state/session_scope.rs` - Session-scoped state
-- **UPDATE**: `llmspell-bridge/src/lua/globals/state.rs` - Session API preparation
+- **UPDATE**: `llmspell-agents/src/state/state_machine.rs` - Add automatic save_state to pause/stop
+- **UPDATE**: `llmspell-agents/src/agents/basic.rs` - Add automatic load_state to resume/start
+- **UPDATE**: `llmspell-agents/src/agents/llm.rs` - Add automatic state persistence to lifecycle
+- **CREATE**: `llmspell-state-persistence/src/session/mod.rs` - Session boundary preparation
+- **UPDATE**: `llmspell-bridge/src/globals/agent_global.rs` - Add save_state/load_state methods
 
 **Acceptance Criteria:**
-- [ ] Session state markers integrate with existing StateScope system
-- [ ] Session boundaries properly isolate state across sessions
-- [ ] Session state cleanup supports automatic garbage collection
-- [ ] Integration points prepared for Phase 6 session management
-- [ ] Session state persistence supports session restoration
-- [ ] Performance impact minimal for session operations
-- [ ] Session security prevents cross-session data leakage
-- [ ] API compatibility maintained for existing state operations
+- [ ] Agent pause() automatically calls save_state() when state manager available
+- [ ] Agent stop() automatically calls save_state() with final state
+- [ ] Agent resume() automatically attempts load_state() if available
+- [ ] Agent start() checks for existing state and loads if present
+- [ ] Session scope already exists in StateScope::Session(String) - verify working
+- [ ] Lifecycle state changes emit appropriate events for monitoring
+- [ ] Performance impact <5ms for automatic state operations
+- [ ] Backward compatibility maintained for agents without state manager
 
 **Implementation Steps:**
-1. **Extend StateScope for Sessions** (2 hours):
-   - Add Session variant to StateScope enum
-   - Implement session-scoped key generation
-   - Add session isolation validation
-   - Update state access methods
+1. **Add Automatic State Persistence** (2 hours):
+   - Modify AgentStateMachine::pause() to call save_state()
+   - Modify AgentStateMachine::stop() to save final state
+   - Add load_state() to resume() and start() methods
+   - Handle cases where state_manager is None gracefully
 
-2. **Add Session Boundary Markers** (1 hour):
-   - Session start/end markers in state
-   - Session metadata tracking
-   - Session correlation with events
+2. **Enhance Session Support** (1 hour):
+   - Verify StateScope::Session works correctly
+   - Add session cleanup helpers
+   - Prepare session garbage collection infrastructure
 
-3. **Prepare Phase 6 Integration Points** (1 hour):
-   - API hooks for session management
-   - State cleanup automation
-   - Session restoration preparation
+3. **Update Script Bridge** (1 hour):
+   - Add agent:save_state() and agent:load_state() to Lua API
+   - Update examples to show automatic persistence
+   - Document lifecycle integration
 
 **Definition of Done:**
-- [ ] Session state markers functional
-- [ ] State isolation works across sessions
-- [ ] Integration points ready for Phase 6
-- [ ] Performance impact minimal
-- [ ] Security prevents cross-session leakage
+- [ ] Automatic state persistence integrated into lifecycle
+- [ ] Session support verified and enhanced
+- [ ] Script bridge updated with state methods
+- [ ] Examples demonstrate automatic persistence
+- [ ] Performance requirements met (<5ms overhead)
 - [ ] Backward compatibility maintained
 
 ### Task 5.9.2: Add Artifact State Correlation
