@@ -2,20 +2,14 @@
 // ABOUTME: Measures performance impact when state persistence is integrated with agents, workflows, tools
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
-use llmspell_agents::{
-    factory::{AgentFactory, DefaultAgentFactory},
-};
-use llmspell_core::{
-    BaseAgent, Tool,
-    types::AgentInput,
-    ExecutionContext,
-};
+use llmspell_agents::factory::{AgentFactory, DefaultAgentFactory};
+use llmspell_core::{types::AgentInput, BaseAgent, ExecutionContext, Tool};
 use llmspell_providers::ProviderManager;
 use llmspell_state_persistence::{StateClass, StateManager, StateScope};
 use llmspell_tools::util::calculator::CalculatorTool;
 use llmspell_workflows::{
-    ParallelWorkflowBuilder, SequentialWorkflowBuilder, StepType, WorkflowStep,
-    parallel::ParallelBranch,
+    parallel::ParallelBranch, ParallelWorkflowBuilder, SequentialWorkflowBuilder, StepType,
+    WorkflowStep,
 };
 use std::sync::Arc;
 use std::time::Instant;
@@ -85,7 +79,7 @@ fn bench_agent_system_overhead(c: &mut Criterion) {
                         // Create factory and agents without state persistence
                         let provider_manager = Arc::new(ProviderManager::new());
                         let factory = DefaultAgentFactory::new(provider_manager);
-                        
+
                         for _i in 0..test_data.agent_count {
                             let agent = factory.create_from_template("basic").await.unwrap();
 
@@ -114,7 +108,7 @@ fn bench_agent_system_overhead(c: &mut Criterion) {
                         // Create factory and agents (state persistence simulated separately)
                         let provider_manager = Arc::new(ProviderManager::new());
                         let factory = DefaultAgentFactory::new(provider_manager);
-                        
+
                         for i in 0..test_data.agent_count {
                             let agent_id = format!("benchmark:test_agent_{}", i);
                             let agent = factory.create_from_template("basic").await.unwrap();
@@ -177,7 +171,8 @@ fn bench_workflow_system_overhead(c: &mut Criterion) {
                         let start = Instant::now();
 
                         // Create and execute sequential workflow
-                        let mut builder = SequentialWorkflowBuilder::new("test_workflow".to_string());
+                        let mut builder =
+                            SequentialWorkflowBuilder::new("test_workflow".to_string());
                         for i in 0..test_data.workflow_steps {
                             let step = WorkflowStep::new(
                                 format!("step_{}", i),
@@ -465,7 +460,7 @@ fn bench_streaming_with_state(c: &mut Criterion) {
                 let start = Instant::now();
                 let state_manager = Arc::new(StateManager::new_benchmark().await.unwrap());
 
-                // Create agent using factory  
+                // Create agent using factory
                 let provider_manager = Arc::new(ProviderManager::new());
                 let factory = DefaultAgentFactory::new(provider_manager);
                 let agent = factory.create_from_template("basic").await.unwrap();
@@ -475,11 +470,14 @@ fn bench_streaming_with_state(c: &mut Criterion) {
                 // Basic agents don't support streaming, so simulate with execute
                 let ctx = ExecutionContext::default();
                 let result = agent.execute(input, ctx).await.unwrap();
-                
+
                 // Simulate streaming chunks
                 let text = result.text;
                 let chunk_size = 10;
-                let chunks: Vec<_> = text.chars().collect::<Vec<_>>().chunks(chunk_size)
+                let chunks: Vec<_> = text
+                    .chars()
+                    .collect::<Vec<_>>()
+                    .chunks(chunk_size)
                     .map(|chunk| chunk.iter().collect::<String>())
                     .collect();
                 let scope = StateScope::Agent("benchmark:streaming_agent".to_string());

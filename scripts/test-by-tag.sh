@@ -65,22 +65,25 @@ shift
 echo "🏷️  Running tests tagged as: $TAG"
 echo "================================="
 
+# Check if test runner is available
+if command -v llmspell-test >/dev/null 2>&1; then
+    TEST_RUNNER="llmspell-test"
+else
+    TEST_RUNNER="cargo run -p llmspell-testing --features test-runner --bin llmspell-test --"
+fi
+
 case $TAG in
-    "unit")
-        print_info "Running unit tests from llmspell-testing..."
-        cargo test -p llmspell-testing --features unit-tests $@
-        ;;
-    "integration")
-        print_info "Running integration tests from llmspell-testing..."
-        cargo test -p llmspell-testing --features integration-tests $@
+    "unit"|"integration"|"agent"|"scenario"|"scenarios"|"lua")
+        # Normalize scenarios -> scenario
+        if [ "$TAG" = "scenarios" ]; then
+            TAG="scenario"
+        fi
+        print_info "Delegating to llmspell-test runner..."
+        $TEST_RUNNER run $TAG $@
         ;;
     "tool")
         print_info "Running tool tests..."
         cargo test -p llmspell-tools $@
-        ;;
-    "agent")
-        print_info "Running agent tests from llmspell-testing..."
-        cargo test -p llmspell-testing --features agent-tests $@
         ;;
     "workflow")
         print_info "Running workflow tests..."
@@ -88,7 +91,7 @@ case $TAG in
         ;;
     "fast")
         print_info "Running fast tests (unit tests only)..."
-        cargo test -p llmspell-testing --features unit-tests $@
+        $TEST_RUNNER run unit $@
         ;;
     "slow")
         print_info "Running slow tests (ignored tests with single thread)..."
@@ -99,8 +102,8 @@ case $TAG in
         cargo test -p llmspell-testing --features all-tests -- --ignored external $@
         ;;
     "all")
-        print_info "Running all tests including ignored..."
-        cargo test -p llmspell-testing --features all-tests --include-ignored $@
+        print_info "Running all tests..."
+        $TEST_RUNNER run all $@
         ;;
     "bridge")
         print_info "Running bridge tests..."
@@ -113,14 +116,6 @@ case $TAG in
     "database")
         print_info "Running database tests..."
         cargo test -p llmspell-testing --features integration-tests database $@ -- --ignored
-        ;;
-    "scenarios")
-        print_info "Running scenario tests from llmspell-testing..."
-        cargo test -p llmspell-testing --features scenario-tests $@
-        ;;
-    "lua")
-        print_info "Running Lua tests from llmspell-testing..."
-        cargo test -p llmspell-testing --features lua-tests $@
         ;;
     *)
         print_error "Unknown tag: $TAG"

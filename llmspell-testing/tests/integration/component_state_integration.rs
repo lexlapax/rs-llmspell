@@ -19,11 +19,11 @@ async fn create_test_persistent_state_manager() -> Arc<PersistentStateManager> {
         enabled: true,
         ..Default::default()
     };
-    
+
     Arc::new(
         PersistentStateManager::with_backend(StorageBackendType::Memory, config)
             .await
-            .unwrap()
+            .unwrap(),
     )
 }
 
@@ -38,12 +38,18 @@ mod component_integration_tests {
         let mut registry = ToolStateRegistry::new(state_manager.clone());
 
         // Create multiple tool states
-        let tool_metadata = ComponentMetadata::new("test-tool".to_string(), "Test tool".to_string());
+        let tool_metadata =
+            ComponentMetadata::new("test-tool".to_string(), "Test tool".to_string());
         let tool_state = ToolState::new(tool_metadata.id.to_string(), tool_metadata.clone());
 
         // Store tool state directly
         let state_scope = StateScope::Custom(format!("tool_{}", tool_metadata.id));
-        state_manager.set(state_scope, "state", serde_json::to_value(&tool_state).unwrap())
+        state_manager
+            .set(
+                state_scope,
+                "state",
+                serde_json::to_value(&tool_state).unwrap(),
+            )
             .await
             .unwrap();
 
@@ -51,7 +57,8 @@ mod component_integration_tests {
         let loaded_state_value = state_manager.get(state_scope, "state").await.unwrap();
         assert!(loaded_state_value.is_some());
 
-        let loaded_tool_state: ToolState = serde_json::from_value(loaded_state_value.unwrap()).unwrap();
+        let loaded_tool_state: ToolState =
+            serde_json::from_value(loaded_state_value.unwrap()).unwrap();
         assert_eq!(loaded_tool_state.tool_id, tool_state.tool_id);
         assert_eq!(loaded_tool_state.metadata.id, tool_state.metadata.id);
 
@@ -87,17 +94,24 @@ mod component_integration_tests {
         let state_manager = create_test_persistent_state_manager().await;
 
         // Create tool state
-        let tool_metadata = ComponentMetadata::new("shared-tool".to_string(), "Shared tool".to_string());
+        let tool_metadata =
+            ComponentMetadata::new("shared-tool".to_string(), "Shared tool".to_string());
         let tool_state = ToolState::new(tool_metadata.id.to_string(), tool_metadata.clone());
 
         // Store tool state
         let tool_scope = StateScope::Custom(format!("tool_{}", tool_metadata.id));
-        state_manager.set(tool_scope, "state", serde_json::to_value(&tool_state).unwrap())
+        state_manager
+            .set(
+                tool_scope,
+                "state",
+                serde_json::to_value(&tool_state).unwrap(),
+            )
             .await
             .unwrap();
 
         // Create workflow state that references the tool
-        let workflow_metadata = ComponentMetadata::new("shared-workflow".to_string(), "Shared workflow".to_string());
+        let workflow_metadata =
+            ComponentMetadata::new("shared-workflow".to_string(), "Shared workflow".to_string());
         let workflow_state = PersistentWorkflowState::new(
             workflow_metadata.id.to_string(),
             WorkflowConfig::default(),
@@ -106,7 +120,12 @@ mod component_integration_tests {
 
         // Store workflow state
         let workflow_scope = StateScope::Custom(format!("workflow_{}", workflow_metadata.id));
-        state_manager.set(workflow_scope, "state", serde_json::to_value(&workflow_state).unwrap())
+        state_manager
+            .set(
+                workflow_scope,
+                "state",
+                serde_json::to_value(&workflow_state).unwrap(),
+            )
             .await
             .unwrap();
 
@@ -120,16 +139,23 @@ mod component_integration_tests {
                 workflow_metadata.id: [tool_metadata.id.clone()]
             }
         });
-        state_manager.set(references_scope, "component_references", references)
+        state_manager
+            .set(references_scope, "component_references", references)
             .await
             .unwrap();
 
         // Verify cross-references
-        let loaded_references = state_manager.get(references_scope, "component_references").await.unwrap();
+        let loaded_references = state_manager
+            .get(references_scope, "component_references")
+            .await
+            .unwrap();
         assert!(loaded_references.is_some());
 
         let refs_value = loaded_references.unwrap();
-        assert!(refs_value["tool_to_workflow"][&tool_metadata.id].as_array().unwrap().contains(&serde_json::Value::String(workflow_metadata.id.clone())));
+        assert!(refs_value["tool_to_workflow"][&tool_metadata.id]
+            .as_array()
+            .unwrap()
+            .contains(&serde_json::Value::String(workflow_metadata.id.clone())));
 
         println!("✅ Cross-component state sharing integration successful");
     }
@@ -138,7 +164,7 @@ mod component_integration_tests {
     #[cfg_attr(test_category = "integration", test_category = "integration")]
     async fn test_concurrent_state_operations() {
         let state_manager = create_test_persistent_state_manager().await;
-        
+
         // Create multiple concurrent operations
         let mut handles = vec![];
 
@@ -146,12 +172,18 @@ mod component_integration_tests {
             let state_manager = state_manager.clone();
             let handle = tokio::spawn(async move {
                 let component_id = format!("component_{}", i);
-                let metadata = ComponentMetadata::new(component_id.clone(), format!("Component {}", i));
-                
+                let metadata =
+                    ComponentMetadata::new(component_id.clone(), format!("Component {}", i));
+
                 // Tool state operation
                 let tool_state = ToolState::new(component_id.clone(), metadata.clone());
                 let tool_scope = StateScope::Custom(format!("tool_{}", component_id));
-                state_manager.set(tool_scope, "state", serde_json::to_value(&tool_state).unwrap())
+                state_manager
+                    .set(
+                        tool_scope,
+                        "state",
+                        serde_json::to_value(&tool_state).unwrap(),
+                    )
                     .await
                     .unwrap();
 
@@ -214,7 +246,10 @@ mod component_integration_tests {
 
         // Store the old format
         let scope = StateScope::Custom("tool_legacy-tool".to_string());
-        state_manager.set(scope, "state", old_tool_state).await.unwrap();
+        state_manager
+            .set(scope, "state", old_tool_state)
+            .await
+            .unwrap();
 
         // Try to load it as the new format
         let loaded_value = state_manager.get(scope, "state").await.unwrap();
@@ -222,7 +257,7 @@ mod component_integration_tests {
 
         // Attempt to deserialize - this tests backward compatibility
         let deserialization_result = serde_json::from_value::<ToolState>(loaded_value.unwrap());
-        
+
         // If this succeeds, we have backward compatibility
         // If it fails, we need migration logic
         match deserialization_result {
@@ -294,11 +329,17 @@ mod component_integration_tests {
         for (scope_suffix, _component_id, is_active) in &components {
             let scope = StateScope::Custom(scope_suffix.to_string());
             let state_value = state_manager.get(scope, "state").await.unwrap();
-            
+
             if *is_active {
-                assert!(state_value.is_some(), "Active component state should still exist");
+                assert!(
+                    state_value.is_some(),
+                    "Active component state should still exist"
+                );
             } else {
-                assert!(state_value.is_none(), "Inactive component state should be cleaned up");
+                assert!(
+                    state_value.is_none(),
+                    "Inactive component state should be cleaned up"
+                );
             }
         }
 
@@ -309,18 +350,22 @@ mod component_integration_tests {
     #[cfg_attr(test_category = "integration", test_category = "integration")]
     async fn test_state_performance_under_load() {
         let state_manager = create_test_persistent_state_manager().await;
-        
+
         let start_time = std::time::Instant::now();
         let num_operations = 100;
 
         // Perform many state operations
         for i in 0..num_operations {
             let component_id = format!("perf_test_{}", i);
-            let metadata = ComponentMetadata::new(component_id.clone(), format!("Performance test component {}", i));
+            let metadata = ComponentMetadata::new(
+                component_id.clone(),
+                format!("Performance test component {}", i),
+            );
             let tool_state = ToolState::new(component_id.clone(), metadata);
-            
+
             let scope = StateScope::Custom(format!("perf_tool_{}", i));
-            state_manager.set(scope, "state", serde_json::to_value(&tool_state).unwrap())
+            state_manager
+                .set(scope, "state", serde_json::to_value(&tool_state).unwrap())
                 .await
                 .unwrap();
         }
@@ -339,8 +384,16 @@ mod component_integration_tests {
         let avg_write_time = write_duration.as_millis() as f64 / num_operations as f64;
         let avg_read_time = read_duration.as_millis() as f64 / num_operations as f64;
 
-        assert!(avg_write_time < 50.0, "Average write time should be < 50ms, was {}ms", avg_write_time);
-        assert!(avg_read_time < 10.0, "Average read time should be < 10ms, was {}ms", avg_read_time);
+        assert!(
+            avg_write_time < 50.0,
+            "Average write time should be < 50ms, was {}ms",
+            avg_write_time
+        );
+        assert!(
+            avg_read_time < 10.0,
+            "Average read time should be < 10ms, was {}ms",
+            avg_read_time
+        );
 
         println!("✅ State performance under load test successful");
         println!("   Average write time: {:.2}ms", avg_write_time);

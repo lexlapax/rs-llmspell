@@ -1,13 +1,14 @@
 # llmspell-testing
 
-Comprehensive test suite and testing utilities for rs-llmspell.
+Comprehensive test suite and testing utilities for the rs-llmspell framework.
 
 ## Overview
 
-This crate serves two purposes:
-
-1. **Test Suite**: Consolidates all tests from across the llmspell workspace into a single, well-organized location
-2. **Test Utilities**: Provides mocks, fixtures, generators, and benchmarks for testing llmspell applications
+This crate provides:
+1. **Unified Test Suite**: All tests for the llmspell workspace organized by category
+2. **Test Runner CLI**: Simple command-line interface for test discovery and execution
+3. **Testing Utilities**: Mocks, generators, fixtures, and benchmarks for testing
+4. **Performance Benchmarks**: Criterion-based benchmarks for performance tracking
 
 ## Test Organization
 
@@ -15,62 +16,116 @@ Tests are organized into categories for easy discovery and selective execution:
 
 ### Test Categories
 
-- **`unit`** - Unit tests for individual components and functions
-- **`integration`** - Cross-crate integration tests verifying component interactions
-- **`agents`** - Agent-specific tests including isolation, lifecycle, and behavior
-- **`scenarios`** - End-to-end scenario tests simulating real-world usage
-- **`lua`** - Lua scripting tests for bridge functionality
-- **`performance`** - Performance benchmarks (kept separate from regular tests)
+- **unit** - Fast, isolated unit tests for individual components
+- **integration** - Cross-crate integration tests
+- **agent** - Agent-specific functionality tests
+- **scenario** - End-to-end scenario tests simulating real usage
+- **lua** - Lua scripting bridge tests
+- **performance** - Performance benchmarks (Criterion)
 
-## Running Tests
+## Installation
 
-### Run All Tests
+To use the test runner CLI:
+
 ```bash
-cargo test -p llmspell-testing --features all-tests
+# Install the test runner
+cargo install --path llmspell-testing --features test-runner
+
+# Or run directly from the workspace
+cargo run -p llmspell-testing --features test-runner --bin llmspell-test -- --help
 ```
 
-### Run Specific Category
+## Using the Test Runner
+
+### List Available Categories
+
 ```bash
-# Unit tests only
+# Show all test categories
+llmspell-test list
+
+# Show detailed information
+llmspell-test list --detailed
+```
+
+### Run Tests
+
+```bash
+# Run all tests
+llmspell-test run all
+
+# Run specific categories
+llmspell-test run unit integration
+
+# Run with filter
+llmspell-test run unit --filter test_state
+
+# Run in release mode
+llmspell-test run all --release
+
+# Generate coverage report
+llmspell-test run all --coverage
+
+# Don't capture test output
+llmspell-test run unit --nocapture
+```
+
+### Run Benchmarks
+
+```bash
+# Run all benchmarks
+llmspell-test bench
+
+# Run specific benchmark
+llmspell-test bench hook_overhead
+
+# Save baseline for comparison
+llmspell-test bench --save my-baseline
+
+# Compare with baseline
+llmspell-test bench --baseline my-baseline
+```
+
+### Get Category Information
+
+```bash
+# Show information about a specific category
+llmspell-test info unit
+```
+
+## Running Tests with Cargo
+
+You can also run tests directly with cargo:
+
+```bash
+# Run unit tests
 cargo test -p llmspell-testing --features unit-tests
 
-# Integration tests only
+# Run integration tests
 cargo test -p llmspell-testing --features integration-tests
 
-# Agent tests only
-cargo test -p llmspell-testing --features agent-tests
+# Run all tests
+cargo test -p llmspell-testing --features all-tests
 
-# Scenario tests only
-cargo test -p llmspell-testing --features scenario-tests
-
-# Lua tests only
-cargo test -p llmspell-testing --features lua-tests
-```
-
-### Run Multiple Categories
-```bash
-cargo test -p llmspell-testing --features "unit-tests,integration-tests"
-```
-
-### Run Tests with Output
-```bash
-cargo test -p llmspell-testing --features all-tests -- --nocapture
-```
-
-### Run Specific Test
-```bash
-cargo test -p llmspell-testing --features agent-tests test_strict_isolation
+# Run benchmarks
+cargo bench -p llmspell-testing
 ```
 
 ## Performance Benchmarks
 
-Performance benchmarks are managed separately and will be integrated in Task 5.7.2.
+Performance benchmarks have been integrated into llmspell-testing and use Criterion for statistical analysis:
 
-Currently, run benchmarks from the performance crate:
 ```bash
-cd tests/performance
-cargo bench
+# Run benchmarks with test runner
+llmspell-test bench
+
+# Or with cargo directly
+cargo bench -p llmspell-testing
+
+# View results
+open target/criterion/report/index.html
 ```
+
+Benchmark results are saved in `target/criterion` and can be compared across runs.
 
 ## Test Utilities
 
@@ -115,17 +170,25 @@ proptest! {
 
 ```
 llmspell-testing/
-├── src/              # Test utilities (mocks, generators, etc.)
-├── tests/            # Organized test suites
-│   ├── unit/         # Unit tests by crate
-│   ├── integration/  # Integration tests
-│   ├── agents/       # Agent-specific tests
-│   ├── scenarios/    # End-to-end scenarios
-│   └── lua/          # Lua scripting tests
-├── fixtures/         # Test data and fixtures
-│   ├── data/         # JSON/YAML test data
-│   └── lua/          # Lua test scripts
-└── benches/          # Performance benchmarks (Task 5.7.2)
+├── src/
+│   ├── lib.rs           # Main library exports
+│   ├── benchmarks.rs    # Benchmark utilities
+│   ├── fixtures.rs      # Test fixtures and data
+│   ├── generators.rs    # Property-based test generators
+│   ├── mocks.rs         # Mock implementations
+│   ├── runner/          # Test runner implementation
+│   └── bin/
+│       └── test-runner.rs  # CLI binary
+├── tests/
+│   ├── unit/            # Unit tests
+│   ├── integration/     # Integration tests
+│   ├── agents/          # Agent tests
+│   ├── scenarios/       # Scenario tests
+│   └── lua/             # Lua tests
+├── benches/             # Performance benchmarks
+└── fixtures/            # Test data files
+    ├── data/            # JSON/YAML test data
+    └── lua/             # Lua test scripts
 ```
 
 ## Adding New Tests
@@ -140,7 +203,28 @@ llmspell-testing/
 
 ## CI/CD Integration
 
-The test suite is designed to integrate seamlessly with CI/CD pipelines. See Task 5.7.6 for CI/CD updates.
+The test runner integrates seamlessly with CI/CD pipelines:
+
+```yaml
+# GitHub Actions example
+- name: Run tests
+  run: |
+    cargo install --path llmspell-testing --features test-runner
+    llmspell-test run all --format junit > test-results.xml
+
+# Or use scripts
+- name: Run tests
+  run: ./scripts/run-llmspell-tests.sh all
+```
+
+## Scripts Integration
+
+The following scripts use llmspell-testing:
+
+- `scripts/run-llmspell-tests.sh` - Convenience wrapper
+- `scripts/test-by-tag.sh` - Legacy script (delegates to test runner)
+- `scripts/quality-check.sh` - Includes test execution
+- `scripts/test-coverage.sh` - Coverage reporting
 
 ## Contributing
 
@@ -152,10 +236,33 @@ When contributing tests:
 5. Add fixtures to the `fixtures/` directory
 6. Update this README if adding new categories or utilities
 
+## Troubleshooting
+
+### Tests Not Found
+
+If tests aren't discovered:
+1. Ensure the correct feature is enabled
+2. Check that test files are in the expected location
+3. Verify test function names start with `test_`
+
+### Performance Issues
+
+For faster test execution:
+1. Run specific categories instead of `all`
+2. Use `--jobs` to control parallelism
+3. Skip slow tests with environment variables
+
+### Coverage Reports
+
+If coverage fails:
+1. Install `cargo-tarpaulin`: `cargo install cargo-tarpaulin`
+2. Ensure all crates are built with coverage flags
+3. Check available disk space for report generation
+
 ## Future Enhancements
 
-- [ ] Unified test runner CLI (Task 5.7.3)
+- [x] Unified test runner CLI (Task 5.7.3) ✅
 - [ ] Test categorization attributes (Task 5.7.4)
-- [ ] Performance benchmark integration (Task 5.7.2)
-- [ ] Coverage reporting integration
+- [x] Performance benchmark integration (Task 5.7.2) ✅
+- [x] Coverage reporting integration ✅
 - [ ] Test result visualization

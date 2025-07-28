@@ -6,13 +6,13 @@
 #[cfg(test)]
 mod tests {
     use llmspell_core::types::{AgentInput, AgentOutput};
-    
+
     #[test]
     fn test_agent_input_creation() {
         let input = AgentInput::text("test input");
         assert_eq!(input.text, "test input");
     }
-    
+
     #[test]
     fn test_agent_output_creation() {
         let output = AgentOutput::text("test output");

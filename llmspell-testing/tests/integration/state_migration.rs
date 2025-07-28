@@ -154,9 +154,11 @@ async fn test_complex_schema_migration() {
     // Execute transformation
     let transformer = DataTransformer::new();
     let mut migrated_states = Vec::new();
-    
+
     for mut state in test_states {
-        let result = transformer.transform_state(&mut state, &transformation).unwrap();
+        let result = transformer
+            .transform_state(&mut state, &transformation)
+            .unwrap();
         assert!(result.success, "Transformation failed: {:?}", result.errors);
         migrated_states.push(state);
     }
@@ -166,7 +168,7 @@ async fn test_complex_schema_migration() {
     let validation_result = validator
         .validate_post_migration(&migrated_states, &schema_v2)
         .unwrap();
-    
+
     assert!(
         validation_result.is_valid,
         "Validation failed: {:?}",
@@ -177,13 +179,19 @@ async fn test_complex_schema_migration() {
     for state in &migrated_states {
         let value = &state.value;
         assert!(value.get("profile").is_some(), "Profile field missing");
-        assert!(value.get("created_at").is_some(), "created_at field missing");
+        assert!(
+            value.get("created_at").is_some(),
+            "created_at field missing"
+        );
         assert!(value.get("age").is_none(), "Age should be moved to profile");
-        
+
         let profile = value.get("profile").unwrap();
         assert!(profile.get("age").is_some(), "Age missing from profile");
         assert!(profile.get("bio").is_some(), "Bio missing from profile");
-        assert!(profile.get("verified").is_some(), "Verified missing from profile");
+        assert!(
+            profile.get("verified").is_some(),
+            "Verified missing from profile"
+        );
     }
 }
 
@@ -191,7 +199,7 @@ async fn test_complex_schema_migration() {
 #[tokio::test]
 async fn test_large_dataset_migration_performance() {
     let start_time = std::time::Instant::now();
-    
+
     // Create large dataset (1000 items)
     let mut states = Vec::new();
     for i in 0..1000 {
@@ -236,7 +244,7 @@ async fn test_large_dataset_migration_performance() {
     let transformer = DataTransformer::new();
     let batch_size = 100;
     let mut total_transformed = 0;
-    
+
     for chunk in states.chunks_mut(batch_size) {
         for state in chunk {
             let result = transformer.transform_state(state, &transformation).unwrap();
@@ -247,14 +255,14 @@ async fn test_large_dataset_migration_performance() {
 
     let duration = start_time.elapsed();
     println!("Migrated {} items in {:?}", total_transformed, duration);
-    
+
     // Performance assertion: Should complete within 5 seconds
     assert!(
         duration.as_secs() < 5,
         "Migration took too long: {:?}",
         duration
     );
-    
+
     // Verify average time per item is reasonable
     let avg_time_per_item = duration.as_micros() as f64 / total_transformed as f64;
     println!("Average time per item: {:.2}μs", avg_time_per_item);
@@ -270,13 +278,13 @@ async fn test_large_dataset_migration_performance() {
 async fn test_multi_step_migration_chain() {
     // Create migration planner
     let mut planner = MigrationPlanner::new();
-    
+
     // Register multiple schema versions
     let v1_0_0 = SemanticVersion::new(1, 0, 0);
     let v1_1_0 = SemanticVersion::new(1, 1, 0);
     let v1_2_0 = SemanticVersion::new(1, 2, 0);
     let v2_0_0 = SemanticVersion::new(2, 0, 0);
-    
+
     // Schema v1.0.0: Basic data
     let mut schema_v1_0_0 = EnhancedStateSchema::new(v1_0_0.clone());
     schema_v1_0_0.add_field(
@@ -288,7 +296,7 @@ async fn test_multi_step_migration_chain() {
             validators: vec![],
         },
     );
-    
+
     // Schema v1.1.0: Add email
     let mut schema_v1_1_0 = EnhancedStateSchema::new(v1_1_0.clone());
     schema_v1_1_0.add_field(
@@ -309,7 +317,7 @@ async fn test_multi_step_migration_chain() {
             validators: vec![],
         },
     );
-    
+
     // Schema v1.2.0: Add phone
     let mut schema_v1_2_0 = EnhancedStateSchema::new(v1_2_0.clone());
     schema_v1_2_0.add_field(
@@ -339,7 +347,7 @@ async fn test_multi_step_migration_chain() {
             validators: vec![],
         },
     );
-    
+
     // Schema v2.0.0: Restructured contact info
     let mut schema_v2_0_0 = EnhancedStateSchema::new(v2_0_0.clone());
     schema_v2_0_0.add_field(
@@ -363,18 +371,18 @@ async fn test_multi_step_migration_chain() {
             validators: vec![],
         },
     );
-    
+
     // Register all schemas
     planner.register_schema(schema_v1_0_0);
     planner.register_schema(schema_v1_1_0);
     planner.register_schema(schema_v1_2_0);
     planner.register_schema(schema_v2_0_0);
-    
+
     // Plan migration from v1.0.0 to v2.0.0
     let plan = planner
         .create_migration_plan(&v1_0_0, &v2_0_0)
         .expect("Should create migration plan");
-    
+
     println!("Migration plan: {} steps", plan.steps.len());
     for (i, step) in plan.steps.iter().enumerate() {
         println!(
@@ -385,10 +393,13 @@ async fn test_multi_step_migration_chain() {
             step.description
         );
     }
-    
+
     // Verify plan has correct number of steps
-    assert!(plan.steps.len() >= 3, "Should have at least 3 migration steps");
-    
+    assert!(
+        plan.steps.len() >= 3,
+        "Should have at least 3 migration steps"
+    );
+
     // Test data
     let mut state = SerializableState {
         key: "test_user".to_string(),
@@ -398,42 +409,38 @@ async fn test_multi_step_migration_chain() {
         timestamp: SystemTime::now(),
         schema_version: 1,
     };
-    
+
     // Execute each migration step
     let transformer = DataTransformer::new();
-    
+
     // Step 1: v1.0.0 -> v1.1.0 (add email)
-    let mut transform1 = StateTransformation::new(
-        "add_email".to_string(),
-        "Add email field".to_string(),
-        1,
-        1,
-    );
+    let mut transform1 =
+        StateTransformation::new("add_email".to_string(), "Add email field".to_string(), 1, 1);
     transform1.add_transform(FieldTransform::Default {
         field: "email".to_string(),
         value: json!(""),
     });
-    
-    let result1 = transformer.transform_state(&mut state, &transform1).unwrap();
+
+    let result1 = transformer
+        .transform_state(&mut state, &transform1)
+        .unwrap();
     assert!(result1.success);
     assert!(state.value.get("email").is_some());
-    
+
     // Step 2: v1.1.0 -> v1.2.0 (add phone)
-    let mut transform2 = StateTransformation::new(
-        "add_phone".to_string(),
-        "Add phone field".to_string(),
-        1,
-        1,
-    );
+    let mut transform2 =
+        StateTransformation::new("add_phone".to_string(), "Add phone field".to_string(), 1, 1);
     transform2.add_transform(FieldTransform::Default {
         field: "phone".to_string(),
         value: json!(""),
     });
-    
-    let result2 = transformer.transform_state(&mut state, &transform2).unwrap();
+
+    let result2 = transformer
+        .transform_state(&mut state, &transform2)
+        .unwrap();
     assert!(result2.success);
     assert!(state.value.get("phone").is_some());
-    
+
     // Step 3: v1.2.0 -> v2.0.0 (restructure to contact object)
     let mut transform3 = StateTransformation::new(
         "restructure_contact".to_string(),
@@ -449,10 +456,12 @@ async fn test_multi_step_migration_chain() {
         from: "phone".to_string(),
         to: "contact.phone".to_string(),
     });
-    
-    let result3 = transformer.transform_state(&mut state, &transform3).unwrap();
+
+    let result3 = transformer
+        .transform_state(&mut state, &transform3)
+        .unwrap();
     assert!(result3.success);
-    
+
     // Verify final structure
     assert!(state.value.get("contact").is_some());
     let contact = state.value.get("contact").unwrap();
@@ -482,23 +491,23 @@ async fn test_migration_rollback_on_error() {
         create_backup: true,
         ..Default::default()
     };
-    
+
     let engine = MigrationEngine::new(state_manager.clone(), migration_config);
-    
+
     // Save some initial state
     let initial_states = vec![
         ("user_1", json!({"name": "Alice", "score": 100})),
         ("user_2", json!({"name": "Bob", "score": 200})),
         ("user_3", json!({"name": "Charlie", "score": 300})),
     ];
-    
+
     for (key, value) in &initial_states {
         state_manager
             .set(StateScope::Global, key, value.clone())
             .await
             .unwrap();
     }
-    
+
     // Create a transformation that will fail on certain data
     let mut failing_transform = StateTransformation::new(
         "failing_transform".to_string(),
@@ -506,17 +515,17 @@ async fn test_migration_rollback_on_error() {
         1,
         2,
     );
-    
+
     // This will fail if score > 250 (simulating validation error)
     failing_transform.add_transform(FieldTransform::Computed {
         field: "level".to_string(),
         expression: "score_to_level_with_validation".to_string(),
     });
-    
+
     // Attempt migration (should fail and rollback)
     // Note: In a real implementation, the engine would handle the rollback
     // For this test, we simulate the behavior
-    
+
     // Verify initial state is preserved after rollback
     for (key, expected_value) in &initial_states {
         let actual_value = state_manager
@@ -524,7 +533,7 @@ async fn test_migration_rollback_on_error() {
             .await
             .unwrap()
             .expect("State should exist");
-        
+
         assert_eq!(
             actual_value, *expected_value,
             "State should be rolled back to original"
@@ -591,7 +600,7 @@ async fn test_migration_data_integrity() {
             schema_version: 1,
         },
     ];
-    
+
     // Create transformation
     let mut transformation = StateTransformation::new(
         "integrity_test".to_string(),
@@ -599,32 +608,34 @@ async fn test_migration_data_integrity() {
         1,
         2,
     );
-    
+
     // Transform settings to preferences with defaults
     transformation.add_transform(FieldTransform::Rename {
         from: "settings".to_string(),
         to: "preferences".to_string(),
     });
-    
+
     // Add validation status
     transformation.add_transform(FieldTransform::Computed {
         field: "validated".to_string(),
         expression: "has_valid_email".to_string(),
     });
-    
+
     // Execute transformation
     let transformer = DataTransformer::new();
     let mut transformed_states = Vec::new();
-    
+
     for mut state in test_states.clone() {
-        let result = transformer.transform_state(&mut state, &transformation).unwrap();
+        let result = transformer
+            .transform_state(&mut state, &transformation)
+            .unwrap();
         assert!(result.success, "Transformation failed: {:?}", result.errors);
         transformed_states.push(state);
     }
-    
+
     // Validate data integrity
     let validator = MigrationValidator::new(ValidationRules::strict());
-    
+
     // Create a simple schema for validation
     let mut schema = EnhancedStateSchema::new(SemanticVersion::new(2, 0, 0));
     schema.add_field(
@@ -654,11 +665,11 @@ async fn test_migration_data_integrity() {
             validators: vec![],
         },
     );
-    
+
     let validation_result = validator
         .validate_post_migration(&transformed_states, &schema)
         .unwrap();
-    
+
     // Check specific integrity requirements
     for (original, transformed) in test_states.iter().zip(transformed_states.iter()) {
         // Name should be preserved exactly
@@ -667,28 +678,28 @@ async fn test_migration_data_integrity() {
             transformed.value.get("name"),
             "Name should be preserved"
         );
-        
+
         // Email should be preserved (including null)
         assert_eq!(
             original.value.get("email"),
             transformed.value.get("email"),
             "Email should be preserved"
         );
-        
+
         // Settings should be renamed to preferences
         assert_eq!(
             original.value.get("settings"),
             transformed.value.get("preferences"),
             "Settings should be renamed to preferences"
         );
-        
+
         // Original settings field should be removed
         assert!(
             transformed.value.get("settings").is_none(),
             "Original settings field should be removed"
         );
     }
-    
+
     println!(
         "Data integrity validation: {} errors, {} warnings",
         validation_result.errors.len(),
@@ -700,7 +711,7 @@ async fn test_migration_data_integrity() {
 #[tokio::test]
 async fn test_concurrent_migration_safety() {
     use tokio::sync::Mutex;
-    
+
     // Create shared state manager
     let config = PersistenceConfig {
         enabled: true,
@@ -711,7 +722,7 @@ async fn test_concurrent_migration_safety() {
             .await
             .unwrap(),
     );
-    
+
     // Create test data
     let num_items = 100;
     for i in 0..num_items {
@@ -728,18 +739,18 @@ async fn test_concurrent_migration_safety() {
             .await
             .unwrap();
     }
-    
+
     // Track migration results
     let results = Arc::new(Mutex::new(Vec::new()));
-    
+
     // Run concurrent migrations on different subsets
     let mut handles = vec![];
     let chunk_size = 25;
-    
+
     for chunk_start in (0..num_items).step_by(chunk_size) {
         let sm = state_manager.clone();
         let results_clone = results.clone();
-        
+
         let handle = tokio::spawn(async move {
             let mut transformation = StateTransformation::new(
                 format!("chunk_{}_migration", chunk_start),
@@ -747,23 +758,23 @@ async fn test_concurrent_migration_safety() {
                 1,
                 2,
             );
-            
+
             transformation.add_transform(FieldTransform::Rename {
                 from: "status".to_string(),
                 to: "state".to_string(),
             });
-            
+
             transformation.add_transform(FieldTransform::Computed {
                 field: "processed_at".to_string(),
                 expression: "now_iso8601".to_string(),
             });
-            
+
             let transformer = DataTransformer::new();
             let mut chunk_results = Vec::new();
-            
+
             for i in chunk_start..(chunk_start + chunk_size).min(num_items) {
                 let key = format!("item_{}", i);
-                
+
                 // Load state
                 if let Some(value) = sm.get(StateScope::Global, &key).await.unwrap() {
                     let mut state = SerializableState {
@@ -772,9 +783,11 @@ async fn test_concurrent_migration_safety() {
                         timestamp: SystemTime::now(),
                         schema_version: 1,
                     };
-                    
+
                     // Transform
-                    let result = transformer.transform_state(&mut state, &transformation).unwrap();
+                    let result = transformer
+                        .transform_state(&mut state, &transformation)
+                        .unwrap();
                     if result.success {
                         // Save back
                         sm.set(StateScope::Global, &key, state.value).await.unwrap();
@@ -784,18 +797,18 @@ async fn test_concurrent_migration_safety() {
                     }
                 }
             }
-            
+
             results_clone.lock().await.extend(chunk_results);
         });
-        
+
         handles.push(handle);
     }
-    
+
     // Wait for all migrations to complete
     for handle in handles {
         handle.await.unwrap();
     }
-    
+
     // Verify results
     let final_results = results.lock().await;
     assert_eq!(
@@ -803,12 +816,12 @@ async fn test_concurrent_migration_safety() {
         num_items as usize,
         "All items should be processed"
     );
-    
+
     // Verify all migrations succeeded
     for (key, success) in final_results.iter() {
         assert!(*success, "Migration failed for {}", key);
     }
-    
+
     // Verify final state
     for i in 0..num_items {
         let key = format!("item_{}", i);
@@ -817,10 +830,16 @@ async fn test_concurrent_migration_safety() {
             .await
             .unwrap()
             .expect("State should exist");
-        
+
         // Check transformation was applied
         assert!(value.get("state").is_some(), "state field should exist");
-        assert!(value.get("status").is_none(), "status field should be removed");
-        assert!(value.get("processed_at").is_some(), "processed_at should exist");
+        assert!(
+            value.get("status").is_none(),
+            "status field should be removed"
+        );
+        assert!(
+            value.get("processed_at").is_some(),
+            "processed_at should exist"
+        );
     }
 }

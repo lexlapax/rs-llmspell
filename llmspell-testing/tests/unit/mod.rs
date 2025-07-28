@@ -2,7 +2,7 @@
 // ABOUTME: Organizes unit tests by crate for easy navigation and execution
 
 //! Unit test suite for llmspell framework
-//! 
+//!
 //! This module consolidates unit tests from all llmspell crates.
 //! Tests are organized by crate and can be run selectively using features.
 

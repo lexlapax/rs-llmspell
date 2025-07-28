@@ -1,0 +1,20 @@
+[alias]
+# Test runner aliases
+test-all = "run -p llmspell-testing --features test-runner --bin llmspell-test -- run all"
+test-unit = "run -p llmspell-testing --features test-runner --bin llmspell-test -- run unit"
+test-integration = "run -p llmspell-testing --features test-runner --bin llmspell-test -- run integration"
+test-agent = "run -p llmspell-testing --features test-runner --bin llmspell-test -- run agent"
+test-scenario = "run -p llmspell-testing --features test-runner --bin llmspell-test -- run scenario"
+test-lua = "run -p llmspell-testing --features test-runner --bin llmspell-test -- run lua"
+test-list = "run -p llmspell-testing --features test-runner --bin llmspell-test -- list"
+test-info = "run -p llmspell-testing --features test-runner --bin llmspell-test -- info"
+bench-all = "run -p llmspell-testing --features test-runner --bin llmspell-test -- bench"
+
+# Quality check shortcuts
+fmt-check = "fmt --all -- --check"
+clippy-all = "clippy --workspace --all-features -- -D warnings"
+doc-all = "doc --workspace --no-deps --all-features --document-private-items"
+
+# Build shortcuts
+build-all = "build --workspace --all-features"
+build-release = "build --workspace --all-features --release"

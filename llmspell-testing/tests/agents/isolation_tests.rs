@@ -2,8 +2,8 @@
 // ABOUTME: Validates isolation boundaries and permission enforcement
 
 use llmspell_agents::state::{
-    IsolationBoundary, StateIsolationManager, SharedScopeConfig, StateOperation,
-    SharingPattern, StateSharingManager, StateMessage, StateScope, StatePermission,
+    IsolationBoundary, SharedScopeConfig, SharingPattern, StateIsolationManager, StateMessage,
+    StateOperation, StatePermission, StateScope, StateSharingManager,
 };
 use serde_json::json;
 use std::collections::HashMap;
@@ -36,12 +36,20 @@ async fn test_strict_isolation_prevents_cross_agent_access() {
 
     // Verify agent1 can access its own data
     assert!(isolation_manager
-        .check_access("agent1", &StateScope::Agent("agent1".to_string()), StateOperation::Read)
+        .check_access(
+            "agent1",
+            &StateScope::Agent("agent1".to_string()),
+            StateOperation::Read
+        )
         .unwrap());
 
     // Verify agent2 cannot access agent1's data
     assert!(!isolation_manager
-        .check_access("agent2", &StateScope::Agent("agent1".to_string()), StateOperation::Read)
+        .check_access(
+            "agent2",
+            &StateScope::Agent("agent1".to_string()),
+            StateOperation::Read
+        )
         .unwrap());
 
     // Verify neither agent can access global scope under strict isolation
@@ -61,17 +69,27 @@ async fn test_shared_scope_controlled_access() {
     // Create shared scope with specific permissions
     let mut permissions = HashMap::new();
     permissions.insert("reader".to_string(), vec![StatePermission::Read]);
-    permissions.insert("writer".to_string(), vec![StatePermission::Read, StatePermission::Write]);
-    permissions.insert("admin".to_string(), vec![
-        StatePermission::Read,
-        StatePermission::Write,
-        StatePermission::Delete,
-    ]);
+    permissions.insert(
+        "writer".to_string(),
+        vec![StatePermission::Read, StatePermission::Write],
+    );
+    permissions.insert(
+        "admin".to_string(),
+        vec![
+            StatePermission::Read,
+            StatePermission::Write,
+            StatePermission::Delete,
+        ],
+    );
 
     let shared_config = SharedScopeConfig {
         scope_id: "shared_data".to_string(),
         owner_agent_id: Some("admin".to_string()),
-        allowed_agents: vec!["reader".to_string(), "writer".to_string(), "admin".to_string()],
+        allowed_agents: vec![
+            "reader".to_string(),
+            "writer".to_string(),
+            "admin".to_string(),
+        ],
         permissions,
         created_at: SystemTime::now(),
         expires_at: None,
@@ -133,10 +151,10 @@ async fn test_audit_logging_tracks_access_attempts() {
 
     // Simulate access attempts
     let victim_scope = StateScope::Agent("victim".to_string());
-    
+
     // Denied access attempt
     let _ = isolation_manager.check_access("attacker", &victim_scope, StateOperation::Read);
-    
+
     // Allowed access attempt
     let _ = isolation_manager.check_access("victim", &victim_scope, StateOperation::Write);
 
@@ -161,10 +179,10 @@ async fn test_state_leakage_prevention() {
 
     // Create multiple agents with different data
     let agents = vec!["agent_a", "agent_b", "agent_c"];
-    
+
     for agent in &agents {
         isolation_manager.set_agent_boundary(agent, IsolationBoundary::Strict);
-        
+
         // Each agent stores sensitive data
         // TODO: When StateManager is properly integrated, uncomment this:
         // state_manager
@@ -218,14 +236,14 @@ async fn test_performance_isolation_overhead() {
 
     // Measure access check performance
     let start = std::time::Instant::now();
-    
+
     for _ in 0..1000 {
         let _ = isolation_manager.check_access("perf_test", &scope, StateOperation::Read);
     }
-    
+
     let duration = start.elapsed();
     let per_check = duration / 1000;
-    
+
     // Verify isolation checks are under 1ms
     assert!(
         per_check < Duration::from_millis(1),
@@ -243,7 +261,7 @@ async fn test_permission_revocation() {
 
     // Grant permission
     isolation_manager.grant_permission("contractor", scope.clone(), StatePermission::Write);
-    
+
     // Verify access
     assert!(isolation_manager
         .check_access("contractor", &scope, StateOperation::Write)
@@ -265,12 +283,21 @@ async fn test_broadcast_channel_isolation() {
 
     // Create broadcast channel
     sharing_manager
-        .create_channel("announcements", SharingPattern::Broadcast, "broadcaster", None)
+        .create_channel(
+            "announcements",
+            SharingPattern::Broadcast,
+            "broadcaster",
+            None,
+        )
         .unwrap();
 
     // Subscribe listeners
-    sharing_manager.subscribe_agent("listener1", "announcements").unwrap();
-    sharing_manager.subscribe_agent("listener2", "announcements").unwrap();
+    sharing_manager
+        .subscribe_agent("listener1", "announcements")
+        .unwrap();
+    sharing_manager
+        .subscribe_agent("listener2", "announcements")
+        .unwrap();
 
     // Only broadcaster can send
     let result = sharing_manager
@@ -303,8 +330,14 @@ async fn test_pipeline_ordered_access() {
     let sharing_manager = StateSharingManager::new(state_manager);
 
     // Create pipeline
-    let stages = vec!["validator".to_string(), "processor".to_string(), "outputter".to_string()];
-    sharing_manager.create_pipeline("data_pipeline", stages.clone()).unwrap();
+    let stages = vec![
+        "validator".to_string(),
+        "processor".to_string(),
+        "outputter".to_string(),
+    ];
+    sharing_manager
+        .create_pipeline("data_pipeline", stages.clone())
+        .unwrap();
 
     // Process through pipeline in order
     let next = sharing_manager
@@ -401,8 +434,12 @@ async fn test_custom_isolation_policy() {
     let isolation_manager = StateIsolationManager::new(state_manager.clone());
 
     // Set custom policies
-    isolation_manager.set_agent_boundary("reader", IsolationBoundary::Custom("read-all".to_string()));
-    isolation_manager.set_agent_boundary("writer", IsolationBoundary::Custom("write-shared".to_string()));
+    isolation_manager
+        .set_agent_boundary("reader", IsolationBoundary::Custom("read-all".to_string()));
+    isolation_manager.set_agent_boundary(
+        "writer",
+        IsolationBoundary::Custom("write-shared".to_string()),
+    );
 
     // Test read-all policy
     assert!(isolation_manager
@@ -421,7 +458,9 @@ async fn test_custom_isolation_policy() {
         created_at: SystemTime::now(),
         expires_at: None,
     };
-    isolation_manager.create_shared_scope("writable", None, config).unwrap();
+    isolation_manager
+        .create_shared_scope("writable", None, config)
+        .unwrap();
 
     // Test write-shared policy
     let shared_scope = StateScope::Custom("shared:writable".to_string());
@@ -429,6 +468,10 @@ async fn test_custom_isolation_policy() {
         .check_access("writer", &shared_scope, StateOperation::Write)
         .unwrap());
     assert!(!isolation_manager
-        .check_access("writer", &StateScope::Agent("other".to_string()), StateOperation::Write)
+        .check_access(
+            "writer",
+            &StateScope::Agent("other".to_string()),
+            StateOperation::Write
+        )
         .unwrap());
 }
