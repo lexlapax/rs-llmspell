@@ -2979,6 +2979,7 @@ The new `llmspell-state-traits` crate was essential to break a **circular depend
 
 ---
 
+
 ## Task 5.8: Script Examples for State Persistence
 
 ### Task 5.8.1: Complete Lua/JavaScript Examples for Phase 5 Features
@@ -3021,9 +3022,13 @@ The new `llmspell-state-traits` crate was essential to break a **circular depend
 
 ---
 
-## Phase 5.9: Phase 6 Session Boundary Preparation (Days 9-10)
+## Phase 5.9: Test Organization
 
-### Task 5.9.1: Implement Session State Markers
+---
+
+## Phase 5.10: Phase 6 Session Boundary Preparation (Days 9-10)
+
+### Task 5.10.1: Implement Session State Markers
 **Priority**: MEDIUM  
 **Estimated Time**: 4 hours  
 **Assignee**: Session Preparation Team
@@ -3071,7 +3076,7 @@ The new `llmspell-state-traits` crate was essential to break a **circular depend
 - [ ] Security prevents cross-session leakage
 - [ ] Backward compatibility maintained
 
-### Task 5.9.2: Add Artifact State Correlation
+### Task 5.10.2: Add Artifact State Correlation
 **Priority**: MEDIUM  
 **Estimated Time**: 3 hours  
 **Assignee**: Artifact Correlation Team
@@ -3118,7 +3123,7 @@ The new `llmspell-state-traits` crate was essential to break a **circular depend
 - [ ] Security protects artifact data
 - [ ] Phase 6 integration points ready
 
-### Task 5.9.3: Create State System Documentation and Examples
+### Task 5.10.3: Create State System Documentation and Examples
 **Priority**: MEDIUM  
 **Estimated Time**: 3 hours  
 **Assignee**: Documentation Team

@@ -48,7 +48,7 @@ max_state_size_bytes = 10000000  # 10MB per key
 backup_enabled = true  # Enable backup functionality
 
 [runtime.state_persistence.backup]
-backup_dir = "./example_backups"
+backup_dir = "./examples/backups"
 compression_enabled = true
 compression_type = "zstd"
 compression_level = 3
