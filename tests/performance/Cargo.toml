@@ -44,6 +44,10 @@ harness = false
 name = "migration_performance"
 harness = false
 
+[[bench]]
+name = "integrated_overhead"
+harness = false
+
 [dependencies]
 # Core crates
 llmspell-core = { path = "../../llmspell-core" }
@@ -56,11 +60,13 @@ llmspell-bridge = { path = "../../llmspell-bridge" }
 llmspell-state-persistence = { path = "../../llmspell-state-persistence" }
 llmspell-storage = { path = "../../llmspell-storage" }
 llmspell-utils = { path = "../../llmspell-utils" }
+llmspell-providers = { path = "../../llmspell-providers" }
 
 # Async runtime
 tokio = { version = "1.45", features = ["full"] }
 async-trait = "0.1"
 anyhow = "1.0"
+futures = "0.3"
 
 # Benchmarking
 criterion = { version = "0.5", features = ["async_tokio", "html_reports"] }
