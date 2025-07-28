@@ -457,8 +457,8 @@ macro_rules! impl_tool_state_persistence {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use llmspell_core::traits::base_tool::BaseTool;
-    use llmspell_core::types::{ToolInput, ToolOutput};
+    use llmspell_core::types::{AgentInput, AgentOutput};
+    use llmspell_core::{BaseAgent, ExecutionContext, LLMSpellError};
     use llmspell_state_persistence::config::PersistenceConfig;
     use llmspell_state_persistence::config::StorageBackendType;
     use std::sync::Mutex;
@@ -473,25 +473,25 @@ mod tests {
     }
 
     #[async_trait]
-    impl BaseTool for MockTool {
+    impl BaseAgent for MockTool {
         fn metadata(&self) -> &ComponentMetadata {
             &self.metadata
         }
 
         async fn execute(
             &self,
-            _input: ToolInput,
+            _input: AgentInput,
             _context: ExecutionContext,
-        ) -> llmspell_core::Result<ToolOutput> {
-            Ok(ToolOutput::text("Mock output"))
+        ) -> llmspell_core::Result<AgentOutput> {
+            Ok(AgentOutput::text("Mock output"))
         }
 
-        async fn validate_input(&self, _input: &ToolInput) -> llmspell_core::Result<()> {
+        async fn validate_input(&self, _input: &AgentInput) -> llmspell_core::Result<()> {
             Ok(())
         }
 
-        async fn handle_error(&self, error: LLMSpellError) -> llmspell_core::Result<ToolOutput> {
-            Ok(ToolOutput::text(format!("Error: {}", error)))
+        async fn handle_error(&self, error: LLMSpellError) -> llmspell_core::Result<AgentOutput> {
+            Ok(AgentOutput::text(format!("Error: {}", error)))
         }
     }
 
@@ -575,9 +575,12 @@ mod tests {
         };
 
         Arc::new(
-            StateManager::with_backend(StorageBackendType::Memory, config)
-                .await
-                .unwrap(),
+            llmspell_state_persistence::StateManager::with_backend(
+                StorageBackendType::Memory,
+                config,
+            )
+            .await
+            .unwrap(),
         )
     }
 
@@ -605,7 +608,7 @@ mod tests {
             custom_state: Arc::new(Mutex::new(HashMap::new())),
         };
 
-        tool.set_state_manager(state_manager);
+        ToolStateManagerHolder::set_state_manager(&mut tool, state_manager);
 
         // Should save and load successfully
         tool.save_state().await.unwrap();

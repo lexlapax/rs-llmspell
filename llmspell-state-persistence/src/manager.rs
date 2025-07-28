@@ -1740,3 +1740,56 @@ mod tests {
             .unwrap();
     }
 }
+
+// ==============================================================================
+// TRAIT IMPLEMENTATIONS FOR llmspell-state-traits
+// ==============================================================================
+
+use async_trait::async_trait;
+use llmspell_state_traits::{
+    StateManager as StateManagerTrait, StatePersistence, TypedStatePersistence,
+};
+
+#[async_trait]
+impl StateManagerTrait for StateManager {
+    async fn set(&self, scope: StateScope, key: &str, value: Value) -> StateResult<()> {
+        self.set(scope, key, value).await
+    }
+
+    async fn get(&self, scope: StateScope, key: &str) -> StateResult<Option<Value>> {
+        self.get(scope, key).await
+    }
+
+    async fn delete(&self, scope: StateScope, key: &str) -> StateResult<bool> {
+        self.delete(scope, key).await
+    }
+
+    async fn list_keys(&self, scope: StateScope) -> StateResult<Vec<String>> {
+        self.list_keys(scope).await
+    }
+
+    async fn exists(&self, scope: StateScope, key: &str) -> StateResult<bool> {
+        self.exists_in_scope(scope, key).await
+    }
+
+    async fn clear_scope(&self, scope: StateScope) -> StateResult<()> {
+        self.clear_scope(scope).await
+    }
+
+    async fn get_all_in_scope(&self, scope: StateScope) -> StateResult<HashMap<String, Value>> {
+        self.get_all_in_scope(scope).await
+    }
+
+    async fn copy_scope(&self, from_scope: StateScope, to_scope: StateScope) -> StateResult<usize> {
+        self.copy_scope(from_scope, to_scope).await
+    }
+
+    async fn move_scope(&self, from_scope: StateScope, to_scope: StateScope) -> StateResult<usize> {
+        self.move_scope(from_scope, to_scope).await
+    }
+}
+
+#[async_trait]
+impl StatePersistence for StateManager {}
+
+impl TypedStatePersistence for StateManager {}

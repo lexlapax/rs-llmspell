@@ -2517,54 +2517,98 @@ The new `llmspell-state-traits` crate was essential to break a **circular depend
 - [ ] Production readiness confirmed
 
 
-### Task 5.6.7: Complete Scripting Bridge Implementation
+### Task 5.6.7: Complete Scripting Bridge Implementation  
 **Priority**: CRITICAL  
-**Estimated Time**: 6 hours  
+**Estimated Time**: 8 hours (increased from 6 due to state traits integration issues)
 **Assignee**: Bridge Team
-**Description**: Complete remaining Phase 5 features in scripting bridge (basic state operations completed in Task 5.2.7).
+**Description**: Complete remaining Phase 5 features in scripting bridge AND fix API compatibility issues from llmspell-state-traits refactoring (Task 5.6.5).
+
+**CRITICAL ISSUE DISCOVERED**: 
+- ⚠️ **Ignored Test**: `test_lua_workflow_api` in `tests/streaming_test.rs` 
+- **Cause**: Workflow API format changed during state traits refactoring (Task 5.6.5)
+- **Impact**: Lua bridge layer expects old workflow API signatures
+- **Status**: Workflows work in examples but bridge API is misaligned
+
 **Files to Create/Update:**
 - **DONE**: Basic state operations (save/load/delete/list) ✅ (Task 5.2.7)
+- **🔥 FIX**: `llmspell-bridge/src/lua/globals/workflow.rs` - Update workflow API for new state traits
+- **🔥 FIX**: `llmspell-bridge/src/javascript/globals/workflow.rs` - Update workflow API signatures  
+- **🔥 FIX**: `llmspell-bridge/tests/streaming_test.rs` - Re-enable `test_lua_workflow_api` test
 - **UPDATE**: `llmspell-bridge/src/lua/globals/state.rs` - Add backup/restore/migration methods
 - **UPDATE**: `llmspell-bridge/src/javascript/globals/state.rs` - Add backup/restore/migration methods
+- **UPDATE**: `llmspell-bridge/src/globals/state_global.rs` - Align with new StateManager trait
+- **UPDATE**: `llmspell-bridge/src/globals/tool_global.rs` - Verify tool state persistence integration
 - **CREATE**: `llmspell-bridge/src/globals/migration_global.rs` - Migration bridge abstraction
 - **CREATE**: `llmspell-bridge/src/globals/backup_global.rs` - Backup/restore bridge abstraction
 - **UPDATE**: `llmspell-bridge/src/globals/replay_global.rs` - Hook replay integration
 - **CREATE**: `examples/lua/state/backup_demo.lua` - Backup/restore demo
 - **CREATE**: `examples/lua/state/migration_demo.lua` - Migration demo
+
+**State Traits Integration Fixes Required:**
+- [ ] **Workflow Bridge API**: Fix API format mismatch (test_lua_workflow_api ignored)
+- [ ] **State Manager Bridge**: Ensure Arc<dyn StateManager> trait objects work in scripts
+- [ ] **StateScope Integration**: Verify StateScope enum works across bridge layer
+- [ ] **Tool State Persistence**: Test tool state operations from Lua/JS
+- [ ] **Error Handling**: Ensure StateError propagates correctly to scripts
+
 **Acceptance Criteria:**
 - [x] Basic state operations accessible from Lua/JS ✅ (Task 5.2.7)
+- [ ] **🔥 CRITICAL**: `test_lua_workflow_api` test passes (currently ignored)
+- [ ] All workflow operations work from Lua/JavaScript with new state traits
+- [ ] StateManager trait objects accessible from scripts  
+- [ ] StateScope enum available in script environments
 - [ ] Backup/restore methods fully implemented (not TODO)
 - [ ] Migration operations exposed through scripts
 - [ ] Hook replay accessible from scripts
 - [ ] StateClass exposed for performance optimization from scripts
-- [ ] Error handling consistent across languages
+- [ ] Error handling consistent across languages (includes StateError)
 - [ ] Performance overhead minimal for bridges
 - [ ] Documentation complete for all bridges
+- [ ] All bridge tests pass (no ignored tests)
 **Implementation Steps:**
+0. **🔥 CRITICAL FIXES** (2 hours):
+   - Fix workflow API format mismatch in bridge layer
+   - Update workflow bridge to use new StateManager trait  
+   - Re-enable and fix `test_lua_workflow_api` test
+   - Verify StateScope enum compatibility across bridge layer
+   - Test StateError propagation to scripts
+
 1. **Complete Lua Bridge** (2 hours):
-   - Implement backup/restore methods
+   - Implement backup/restore methods with new state traits
    - Add retention policy configuration
-   - Complete storage usage reporting
-   - Test all state operations
+   - Complete storage usage reporting using StateManager trait
+   - Test all state operations with Arc<dyn StateManager>
+   - Verify tool state persistence operations
+
 2. **Complete JavaScript Bridge** (2 hours):
-   - Add backup/restore methods
-   - Add migration operations
-   - Add StateClass support
-   - Test cross-language compatibility
+   - Add backup/restore methods with new state traits
+   - Add migration operations using new interfaces
+   - Add StateClass support with trait integration
+   - Test cross-language compatibility with new state system
+   - Ensure StateScope enum works in JavaScript
+
 3. **Integration and Testing** (2 hours):
-   - Create comprehensive examples
-   - Test error scenarios
-   - Verify performance overhead
-   - Document bridge usage
+   - Create comprehensive examples using new state APIs
+   - Test error scenarios including StateError handling
+   - Verify performance overhead with trait objects
+   - Document bridge usage with new state management
+   - Ensure all bridge tests pass (no ignored tests)
 **Definition of Done:**
+- [ ] **🔥 CRITICAL**: `test_lua_workflow_api` test passes (currently ignored)
+- [ ] All workflow API calls work correctly from Lua/JavaScript with new state traits
+- [ ] StateManager trait objects function properly in script environments
+- [ ] StateScope enum accessible and functional in both Lua/JavaScript  
+- [ ] StateError handling works correctly across bridge layer
 - [ ] All TODO comments removed from state bridge code
-- [ ] Backup/restore operations work from Lua/JavaScript
-- [ ] Migration operations accessible from scripts
-- [ ] Hook replay functionality exposed
+- [ ] Backup/restore operations work from Lua/JavaScript with new state APIs
+- [ ] Migration operations accessible from scripts using new traits
+- [ ] Hook replay functionality exposed through updated bridges
 - [ ] StateClass performance hints available from scripts
-- [ ] Examples demonstrate all functionality
-- [ ] Cross-language compatibility verified
-- [ ] Bridge documentation complete
+- [ ] Tool state persistence operations work from Lua/JavaScript
+- [ ] Examples demonstrate all functionality with new state management
+- [ ] Cross-language compatibility verified with trait-based architecture
+- [ ] Bridge documentation complete and updated for new APIs
+- [ ] All bridge tests pass (zero ignored tests)
 
 ---
 
