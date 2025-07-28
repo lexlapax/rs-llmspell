@@ -203,9 +203,17 @@ impl GlobalObject for StateGlobal {
             })?;
 
         state_table
-            .set("get", get_fn)
+            .set("get", get_fn.clone())
             .map_err(|e| LLMSpellError::Component {
                 message: format!("Failed to set State.get: {}", e),
+                source: None,
+            })?;
+
+        // Also set as "load" for backward compatibility
+        state_table
+            .set("load", get_fn)
+            .map_err(|e| LLMSpellError::Component {
+                message: format!("Failed to set State.load: {}", e),
                 source: None,
             })?;
 
@@ -267,9 +275,17 @@ impl GlobalObject for StateGlobal {
             })?;
 
         state_table
-            .set("set", set_fn)
+            .set("set", set_fn.clone())
             .map_err(|e| LLMSpellError::Component {
                 message: format!("Failed to set State.set: {}", e),
+                source: None,
+            })?;
+
+        // Also set as "save" for backward compatibility
+        state_table
+            .set("save", set_fn)
+            .map_err(|e| LLMSpellError::Component {
+                message: format!("Failed to set State.save: {}", e),
                 source: None,
             })?;
 

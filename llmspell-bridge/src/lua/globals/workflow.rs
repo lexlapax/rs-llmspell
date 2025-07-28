@@ -226,6 +226,12 @@ struct WorkflowInstance {
 }
 
 impl UserData for WorkflowInstance {
+    fn add_fields<'lua, F: mlua::UserDataFields<'lua, Self>>(fields: &mut F) {
+        fields.add_field_method_get("type", |_, this| Ok(this.workflow_type.clone()));
+        fields.add_field_method_get("name", |_, this| Ok(this.name.clone()));
+        fields.add_field_method_get("id", |_, this| Ok(this.workflow_id.clone()));
+    }
+
     fn add_methods<'lua, M: UserDataMethods<'lua, Self>>(methods: &mut M) {
         // execute method
         methods.add_method("execute", |lua, this, input: Option<Table>| {
@@ -816,13 +822,21 @@ pub fn inject_workflow_global(
                     source: None,
                 })?;
                 let description: Option<String> = config.get("description").ok();
-                let branches: Table =
-                    config.get("branches").map_err(|e| LLMSpellError::Script {
-                        message: format!("Failed to get workflow branches: {}", e),
+
+                // Accept both "branches" and "steps" for API consistency
+                let branches: Table = if let Ok(branches) = config.get::<&str, Table>("branches") {
+                    branches
+                } else if let Ok(steps) = config.get::<&str, Table>("steps") {
+                    steps
+                } else {
+                    return Err(LLMSpellError::Script {
+                        message: "Parallel workflow requires either 'branches' or 'steps' field"
+                            .to_string(),
                         language: Some("lua".to_string()),
                         line: None,
                         source: None,
-                    })?;
+                    });
+                };
                 let max_concurrency: Option<usize> = config.get("max_concurrency").ok();
                 let error_strategy: Option<String> = config.get("error_strategy").ok();
                 let timeout_ms: Option<u64> = config.get("timeout_ms").ok();

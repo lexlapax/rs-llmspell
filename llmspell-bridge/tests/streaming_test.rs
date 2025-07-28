@@ -133,7 +133,6 @@ mod tests {
     }
 
     #[tokio::test(flavor = "multi_thread")]
-    #[ignore = "Workflow test needs API format fix - workflows work in examples"]
     async fn test_lua_workflow_api() {
         let config = LuaConfig::default();
         let mut engine = EngineFactory::create_lua_engine(&config).unwrap();
@@ -178,8 +177,8 @@ mod tests {
                 workflowExists = workflowExists,
                 seqType = seq and seq.type or nil,
                 parType = par and par.type or nil,
-                seqHasExecute = type(Workflow.execute) == "function",
-                parHasExecute = type(Workflow.execute) == "function"
+                seqHasExecute = seq and type(seq.execute) == "function" or false,
+                parHasExecute = par and type(par.execute) == "function" or false
             }
         "#;
 

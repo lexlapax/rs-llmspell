@@ -114,7 +114,7 @@ impl WorkflowDiscovery {
                     "fail_fast".to_string(),
                     "optional_branches".to_string(),
                 ],
-                required_params: vec!["branches".to_string()],
+                required_params: vec!["branches".to_string()], // Also accepts "steps" for compatibility
                 optional_params: vec![
                     "name".to_string(),
                     "max_concurrency".to_string(),
@@ -405,36 +405,45 @@ async fn create_parallel_workflow(params: serde_json::Value) -> Result<impl Work
 
     let mut builder = ParallelWorkflowBuilder::new(name.clone());
 
-    // Parse branches
-    if let Some(branches) = params.get("branches").and_then(|v| v.as_array()) {
-        for branch_json in branches {
-            let branch_name = branch_json
-                .get("name")
-                .and_then(|v| v.as_str())
-                .unwrap_or("branch")
-                .to_string();
+    // Parse branches - support both "branches" and "steps" for API compatibility
+    let branches = if let Some(branches) = params.get("branches").and_then(|v| v.as_array()) {
+        branches
+    } else if let Some(steps) = params.get("steps").and_then(|v| v.as_array()) {
+        steps
+    } else {
+        return Err(llmspell_core::LLMSpellError::Configuration {
+            message: "Parallel workflow requires either 'branches' or 'steps' field".to_string(),
+            source: None,
+        });
+    };
 
-            let mut branch = ParallelBranch::new(branch_name);
+    for branch_json in branches {
+        let branch_name = branch_json
+            .get("name")
+            .and_then(|v| v.as_str())
+            .unwrap_or("branch")
+            .to_string();
 
-            if let Some(desc) = branch_json.get("description").and_then(|v| v.as_str()) {
-                branch = branch.with_description(desc.to_string());
-            }
+        let mut branch = ParallelBranch::new(branch_name);
 
-            if let Some(optional) = branch_json.get("optional").and_then(|v| v.as_bool()) {
-                if optional {
-                    branch = branch.optional();
-                }
-            }
-
-            if let Some(steps) = branch_json.get("steps").and_then(|v| v.as_array()) {
-                for step_json in steps {
-                    let step = parse_workflow_step(step_json)?;
-                    branch = branch.add_step(step);
-                }
-            }
-
-            builder = builder.add_branch(branch);
+        if let Some(desc) = branch_json.get("description").and_then(|v| v.as_str()) {
+            branch = branch.with_description(desc.to_string());
         }
+
+        if let Some(optional) = branch_json.get("optional").and_then(|v| v.as_bool()) {
+            if optional {
+                branch = branch.optional();
+            }
+        }
+
+        if let Some(steps) = branch_json.get("steps").and_then(|v| v.as_array()) {
+            for step_json in steps {
+                let step = parse_workflow_step(step_json)?;
+                branch = branch.add_step(step);
+            }
+        }
+
+        builder = builder.add_branch(branch);
     }
 
     // Parse config options
