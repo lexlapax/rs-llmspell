@@ -16,8 +16,12 @@ local function run_test(test_name, test_func)
         print("  ✅ PASSED")
         table.insert(test_results, {name = test_name, status = "PASSED"})
     else
-        print("  ❌ FAILED: " .. (result or "Unknown error"))
-        table.insert(test_results, {name = test_name, status = "FAILED", error = result})
+        local error_msg = "Unknown error"
+        if result then
+            error_msg = tostring(result)
+        end
+        print("  ❌ FAILED: " .. error_msg)
+        table.insert(test_results, {name = test_name, status = "FAILED", error = error_msg})
     end
 end
 
@@ -34,7 +38,7 @@ run_test("Hook Registration Performance", function()
     local num_hooks = 50
     local handles = {}
     
-    local register_time = measure_time(function()
+    local _, register_time = measure_time(function()
         for i = 1, num_hooks do
             local handle = Hook.register("BeforeAgentExecution", function(ctx)
                 return "continue"
@@ -48,7 +52,7 @@ run_test("Hook Registration Performance", function()
     local performance_ok = register_time < 500
     
     -- Clean up
-    local cleanup_time = measure_time(function()
+    local _, cleanup_time = measure_time(function()
         for _, handle in ipairs(handles) do
             handle:unregister()
         end
@@ -76,12 +80,12 @@ run_test("Hook Listing Performance", function()
     end
     
     -- Test list all performance
-    local list_all_time = measure_time(function()
+    local _, list_all_time = measure_time(function()
         return Hook.list()
     end)
     
     -- Test filtered list performance
-    local list_filtered_time = measure_time(function()
+    local _, list_filtered_time = measure_time(function()
         return Hook.list({language = "lua", priority = "high"})
     end)
     
@@ -104,7 +108,7 @@ run_test("Event Publishing Performance", function()
     local num_events = 100
     local events_published = 0
     
-    local publish_time = measure_time(function()
+    local _, publish_time = measure_time(function()
         for i = 1, num_events do
             local published = Event.publish("performance.test." .. i, {
                 sequence = i,
@@ -132,7 +136,7 @@ run_test("Event Subscription Performance", function()
     local num_subscriptions = 25
     local subscription_ids = {}
     
-    local subscribe_time = measure_time(function()
+    local _, subscribe_time = measure_time(function()
         for i = 1, num_subscriptions do
             local sub_id = Event.subscribe("perf.test." .. i .. ".*")
             table.insert(subscription_ids, sub_id)
@@ -141,12 +145,12 @@ run_test("Event Subscription Performance", function()
     end)
     
     -- Test listing subscriptions performance
-    local list_subs_time = measure_time(function()
+    local _, list_subs_time = measure_time(function()
         return Event.list_subscriptions()
     end)
     
     -- Test unsubscribe performance
-    local unsubscribe_time = measure_time(function()
+    local _, unsubscribe_time = measure_time(function()
         for _, sub_id in ipairs(subscription_ids) do
             Event.unsubscribe(sub_id)
         end
@@ -330,7 +334,7 @@ run_test("Resource Cleanup Performance", function()
     local subscriptions = {}
     
     -- Create resources
-    local creation_time = measure_time(function()
+    local _, creation_time = measure_time(function()
         for i = 1, num_resources do
             local handle = Hook.register("BeforeAgentExecution", function(ctx)
                 return "continue"
@@ -344,7 +348,7 @@ run_test("Resource Cleanup Performance", function()
     end)
     
     -- Clean up all resources
-    local cleanup_time = measure_time(function()
+    local _, cleanup_time = measure_time(function()
         for _, handle in ipairs(handles) do
             handle:unregister()
         end
@@ -370,7 +374,7 @@ run_test("Stress Test - Rapid Operations", function()
     local operations = 0
     local errors = 0
     
-    local stress_time = measure_time(function()
+    local _, stress_time = measure_time(function()
         -- Rapid hook operations
         for i = 1, 30 do
             local success, handle = pcall(function()

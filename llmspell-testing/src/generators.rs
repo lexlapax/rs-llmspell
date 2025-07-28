@@ -234,7 +234,121 @@ pub fn workflow_status_strategy() -> impl Strategy<Value = WorkflowStatus> {
     ]
 }
 
-// Removed json_roundtrip_strategy as it's not needed with current implementation
+// Additional comprehensive generators for test data
+
+/// Strategy for generating test file paths
+pub fn test_file_path_strategy() -> impl Strategy<Value = String> {
+    prop_oneof![
+        Just("test.txt".to_string()),
+        Just("data/sample.json".to_string()),
+        Just("fixtures/test_data.csv".to_string()),
+        "[a-zA-Z0-9_-]+\\.(txt|json|csv|yaml|toml)".prop_map(|s| format!("fixtures/data/{}", s)),
+    ]
+}
+
+/// Strategy for generating sample JSON test data
+pub fn sample_json_data_strategy() -> impl Strategy<Value = serde_json::Value> {
+    prop_oneof![
+        // Simple object
+        json_value_strategy(),
+        // Array of values
+        prop::collection::vec(json_value_strategy(), 0..10).prop_map(serde_json::Value::Array),
+        // Object with multiple fields
+        prop::collection::hash_map("[a-zA-Z][a-zA-Z0-9_]*", json_value_strategy(), 1..5)
+            .prop_map(|map| serde_json::Value::Object(map.into_iter().collect())),
+    ]
+}
+
+/// Strategy for generating test error messages
+pub fn error_message_strategy() -> impl Strategy<Value = String> {
+    prop_oneof![
+        Just("File not found".to_string()),
+        Just("Permission denied".to_string()),
+        Just("Invalid input format".to_string()),
+        Just("Connection timeout".to_string()),
+        Just("Resource exhausted".to_string()),
+        "Error: .*".prop_map(|s| s),
+    ]
+}
+
+/// Strategy for generating mock API responses
+pub fn mock_api_response_strategy() -> impl Strategy<Value = serde_json::Value> {
+    (
+        prop::option::of(any::<bool>()),
+        prop::option::of(".*"),
+        prop::option::of(sample_json_data_strategy()),
+        prop::option::of(error_message_strategy()),
+    )
+        .prop_map(|(success, message, data, error)| {
+            let mut obj = serde_json::Map::new();
+            if let Some(s) = success {
+                obj.insert("success".to_string(), serde_json::Value::Bool(s));
+            }
+            if let Some(m) = message {
+                obj.insert("message".to_string(), serde_json::Value::String(m));
+            }
+            if let Some(d) = data {
+                obj.insert("data".to_string(), d);
+            }
+            if let Some(e) = error {
+                obj.insert("error".to_string(), serde_json::Value::String(e));
+            }
+            serde_json::Value::Object(obj)
+        })
+}
+
+/// Strategy for generating test command arguments
+pub fn command_args_strategy() -> impl Strategy<Value = Vec<String>> {
+    prop::collection::vec(
+        prop_oneof![
+            Just("--verbose".to_string()),
+            Just("--quiet".to_string()),
+            Just("--output".to_string()),
+            Just("json".to_string()),
+            Just("--file".to_string()),
+            "[a-zA-Z0-9_-]+".prop_map(|s| format!("--{}", s)),
+            "[a-zA-Z0-9_/.]+".prop_map(|s| s),
+        ],
+        0..10,
+    )
+}
+
+/// Strategy for generating test environment variables
+pub fn env_vars_strategy() -> impl Strategy<Value = std::collections::HashMap<String, String>> {
+    prop::collection::hash_map(
+        "[A-Z][A-Z0-9_]*",
+        prop_oneof![
+            Just("true".to_string()),
+            Just("false".to_string()),
+            Just("test".to_string()),
+            Just("production".to_string()),
+            "[a-zA-Z0-9_/.-]+".prop_map(|s| s),
+        ],
+        0..5,
+    )
+}
+
+/// Strategy for generating test timeout durations
+pub fn timeout_duration_strategy() -> impl Strategy<Value = Duration> {
+    prop_oneof![
+        Just(Duration::from_millis(100)),
+        Just(Duration::from_secs(1)),
+        Just(Duration::from_secs(5)),
+        Just(Duration::from_secs(30)),
+        (1u64..3600u64).prop_map(Duration::from_secs),
+    ]
+}
+
+/// Strategy for generating test file content
+pub fn file_content_strategy() -> impl Strategy<Value = String> {
+    prop_oneof![
+        Just("Hello, world!\n".to_string()),
+        Just("{\"key\": \"value\"}\n".to_string()),
+        Just("line1\nline2\nline3\n".to_string()),
+        ".*".prop_map(|s| format!("{}\n", s)),
+        prop::collection::vec(".*", 1..10).prop_map(|lines| lines.join("\n") + "\n"),
+    ]
+}
 
 #[cfg(test)]
 mod tests {
@@ -277,6 +391,46 @@ mod tests {
             // Just verify we have the expected fields
             let _ = step.component_id;
             let _ = step.dependencies;
+        }
+
+        #[test]
+        fn test_file_path_generation(path in test_file_path_strategy()) {
+            // Path should not be empty
+            assert!(!path.is_empty());
+            // Should have an extension or be a known test file
+            assert!(path.contains('.') || path == "test");
+        }
+
+        #[test]
+        fn test_json_data_generation(data in sample_json_data_strategy()) {
+            // Should be valid JSON that can round-trip
+            let json_str = serde_json::to_string(&data).unwrap();
+            let parsed: serde_json::Value = serde_json::from_str(&json_str).unwrap();
+            assert_eq!(data, parsed);
+        }
+
+        #[test]
+        fn test_mock_api_response_generation(response in mock_api_response_strategy()) {
+            // Should be an object
+            assert!(response.is_object());
+            // Should have at least one field
+            let obj = response.as_object().unwrap();
+            assert!(!obj.is_empty());
+        }
+
+        #[test]
+        fn test_env_vars_generation(vars in env_vars_strategy()) {
+            // All keys should be uppercase
+            for key in vars.keys() {
+                assert!(key.chars().all(|c| c.is_uppercase() || c == '_' || c.is_numeric()));
+            }
+        }
+
+        #[test]
+        fn test_timeout_duration_generation(duration in timeout_duration_strategy()) {
+            // Should be within reasonable bounds
+            assert!(duration.as_millis() >= 100);
+            assert!(duration.as_secs() <= 3600);
         }
     }
 }

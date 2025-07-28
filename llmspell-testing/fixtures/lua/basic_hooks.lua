@@ -16,8 +16,12 @@ local function run_test(test_name, test_func)
         print("  ✅ PASSED")
         table.insert(test_results, {name = test_name, status = "PASSED"})
     else
-        print("  ❌ FAILED: " .. (result or "Unknown error"))
-        table.insert(test_results, {name = test_name, status = "FAILED", error = result})
+        local error_msg = "Unknown error"
+        if result then
+            error_msg = tostring(result)
+        end
+        print("  ❌ FAILED: " .. error_msg)
+        table.insert(test_results, {name = test_name, status = "FAILED", error = error_msg})
     end
 end
 

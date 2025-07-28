@@ -37,7 +37,7 @@ fn run_lua_test_file(lua: &Lua, file_path: &str) -> mlua::Result<bool> {
 async fn test_lua_basic_hooks_integration() {
     let (lua, _context, _bridge) = create_full_test_environment().await;
 
-    let test_file = "tests/lua_hooks/basic_hooks.lua";
+    let test_file = "llmspell-testing/fixtures/lua/basic_hooks.lua";
     assert!(
         Path::new(test_file).exists(),
         "Test file {} does not exist",
@@ -59,7 +59,7 @@ async fn test_lua_basic_hooks_integration() {
 async fn test_lua_cross_language_integration() {
     let (lua, _context, _bridge) = create_full_test_environment().await;
 
-    let test_file = "tests/lua_hooks/cross_language.lua";
+    let test_file = "llmspell-testing/fixtures/lua/cross_language.lua";
     assert!(
         Path::new(test_file).exists(),
         "Test file {} does not exist",
@@ -81,7 +81,7 @@ async fn test_lua_cross_language_integration() {
 async fn test_lua_performance_integration() {
     let (lua, _context, _bridge) = create_full_test_environment().await;
 
-    let test_file = "tests/lua_hooks/performance.lua";
+    let test_file = "llmspell-testing/fixtures/lua/performance.lua";
     assert!(
         Path::new(test_file).exists(),
         "Test file {} does not exist",

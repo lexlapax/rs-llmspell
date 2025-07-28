@@ -135,7 +135,7 @@ mod conditional_tests {
 // Example 6: Creating categories programmatically
 #[cfg(test)]
 mod programmatic_category_tests {
-    use llmspell_testing::attributes::{TestCategory, Speed, Scope, Component};
+    use llmspell_testing::attributes::{Component, Scope, Speed, TestCategory};
 
     #[test]
     fn test_creating_category_programmatically() {
