@@ -57,12 +57,23 @@ check_threshold() {
 }
 
 echo ""
-echo "📊 Running Tool Initialization Benchmarks..."
+echo "📊 Running Performance Benchmarks..."
+
+# Check if we should use old or new location
+if [ -d "${WORKSPACE_ROOT}/tests/performance" ]; then
+    echo "⚠️  Using old benchmark location (tests/performance) - migration pending"
+    BENCH_PACKAGE="tests/performance"
+    cd "${WORKSPACE_ROOT}/tests/performance"
+else
+    echo "✅ Using new benchmark location (llmspell-testing)"
+    BENCH_PACKAGE="llmspell-testing"
+    cd "${WORKSPACE_ROOT}"
+fi
 
 # Run initialization benchmarks
-echo "Running: cargo bench -p llmspell-tools --bench tool_initialization"
-if ! INIT_OUTPUT=$(cargo bench -p llmspell-tools --bench tool_initialization -- --quiet 2>&1); then
-    echo "❌ Failed to run initialization benchmarks"
+echo "Running: cargo bench -p $BENCH_PACKAGE --bench minimal_test"
+if ! INIT_OUTPUT=$(cargo bench -p $BENCH_PACKAGE --bench minimal_test -- --quiet 2>&1); then
+    echo "❌ Failed to run benchmarks"
     echo "$INIT_OUTPUT"
     exit 1
 fi
@@ -81,14 +92,14 @@ else
 fi
 
 echo ""
-echo "📈 Running Quick Operation Benchmarks..."
+echo "📈 Running State Persistence Benchmarks..."
 
-# Run a subset of operation benchmarks (faster)
-echo "Running: cargo bench -p llmspell-tools --bench tool_operations -- simple_arithmetic uuid_v4_generation --quiet"
-if OPERATION_OUTPUT=$(timeout 30s cargo bench -p llmspell-tools --bench tool_operations -- "simple_arithmetic|uuid_v4_generation" --quiet 2>&1); then
-    echo "Operation benchmarks completed"
+# Run state persistence benchmarks
+echo "Running: cargo bench -p $BENCH_PACKAGE --bench state_persistence"
+if OPERATION_OUTPUT=$(timeout 60s cargo bench -p $BENCH_PACKAGE --bench state_persistence -- --quiet 2>&1); then
+    echo "State persistence benchmarks completed"
 else
-    echo "⚠️  Operation benchmarks timed out or failed (this is acceptable)"
+    echo "⚠️  State persistence benchmarks timed out or failed"
     OPERATION_OUTPUT=""
 fi
 

@@ -16,7 +16,6 @@ members = [
     "llmspell-events",
     "llmspell-testing",
     "llmspell-utils",
-    "tests/performance",
     "llmspell-state-persistence",
     "llmspell-state-traits"
 ]

@@ -1,18 +1,75 @@
 [package]
 name = "llmspell-testing"
-description = "Testing utilities and helpers for rs-llmspell"
+description = "Comprehensive test suite and testing utilities for rs-llmspell"
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
 repository.workspace = true
 license.workspace = true
 
+[features]
+default = []
+# Test categories for selective execution
+unit-tests = []
+integration-tests = []
+agent-tests = []
+scenario-tests = []
+lua-tests = []
+performance-tests = []
+all-tests = ["unit-tests", "integration-tests", "agent-tests", "scenario-tests", "lua-tests", "performance-tests"]
+# Optional features
+test-runner = []
+test-utilities = []
+
+# Test harness configurations
+[[test]]
+name = "unit"
+path = "tests/unit/mod.rs"
+required-features = ["unit-tests"]
+
+[[test]]
+name = "integration"
+path = "tests/integration/mod.rs"
+required-features = ["integration-tests"]
+
+[[test]]
+name = "agents"
+path = "tests/agents/mod.rs"
+required-features = ["agent-tests"]
+
+[[test]]
+name = "scenarios"
+path = "tests/scenarios/mod.rs"
+required-features = ["scenario-tests"]
+
+[[test]]
+name = "lua"
+path = "tests/lua/mod.rs"
+required-features = ["lua-tests"]
+
 [dependencies]
+# Core crates - add all workspace crates for comprehensive testing
 llmspell-core = { path = "../llmspell-core" }
+llmspell-agents = { path = "../llmspell-agents" }
+llmspell-tools = { path = "../llmspell-tools" }
+llmspell-workflows = { path = "../llmspell-workflows" }
+llmspell-bridge = { path = "../llmspell-bridge" }
+llmspell-providers = { path = "../llmspell-providers" }
+llmspell-storage = { path = "../llmspell-storage" }
+llmspell-config = { path = "../llmspell-config" }
+llmspell-security = { path = "../llmspell-security" }
+llmspell-hooks = { path = "../llmspell-hooks" }
+llmspell-events = { path = "../llmspell-events" }
+llmspell-utils = { path = "../llmspell-utils" }
+llmspell-state-persistence = { path = "../llmspell-state-persistence" }
+
+# Testing frameworks
 tokio.workspace = true
 mockall.workspace = true
 proptest.workspace = true
 criterion.workspace = true
+
+# Common dependencies
 serde.workspace = true
 serde_json.workspace = true
 anyhow.workspace = true
@@ -20,3 +77,60 @@ tracing.workspace = true
 async-trait.workspace = true
 chrono.workspace = true
 uuid.workspace = true
+
+# Additional test dependencies
+tempfile = "3.13"
+futures = "0.3"
+once_cell = "1.20"
+
+# Lua testing
+mlua = { version = "0.10", features = ["lua54", "vendored", "async", "send", "serialize"] }
+
+[dev-dependencies]
+# Additional dev dependencies if needed
+pretty_assertions = "1.4"
+
+# Benchmark configurations
+[[bench]]
+name = "minimal_test"
+harness = false
+
+[[bench]]
+name = "hook_overhead_simple"
+harness = false
+
+[[bench]]
+name = "hook_overhead"
+harness = false
+
+[[bench]]
+name = "event_throughput_simple"
+harness = false
+
+[[bench]]
+name = "event_throughput"
+harness = false
+
+[[bench]]
+name = "circuit_breaker"
+harness = false
+
+[[bench]]
+name = "cross_language"
+harness = false
+
+[[bench]]
+name = "state_persistence"
+harness = false
+
+[[bench]]
+name = "state_operations"
+harness = false
+
+[[bench]]
+name = "migration_performance"
+harness = false
+
+[[bench]]
+name = "integrated_overhead"
+harness = false
