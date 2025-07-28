@@ -5,7 +5,7 @@
 -- WHY: Migration API (State.migrate, State.schema_versions) requires migration_enabled=true
 -- HOW TO RUN: ./target/debug/llmspell -c examples/configs/migration-enabled.toml run examples/lua/migration/schema_migration.lua
 -- ALTERNATIVE: cargo run -- -c examples/configs/migration-enabled.toml run examples/lua/migration/schema_migration.lua
--- TODO: This file needs to be updated to use State.save/load instead of State.set/get
+-- NOTE: This file uses correct State API (save/load) and migration methods
 
 print("🚀 rs-llmspell Lua Migration Example")
 print("====================================")
@@ -18,14 +18,14 @@ print("====================================")
 print("\n1. Checking current migration status...")
 
 -- Check if migration methods exist
-if not State.get_migration_status then
+if not State.migration_status then
     print("❌ Migration API not available")
     print("   The State global was not initialized with migration support")
     print("   See examples/lua/migration/README.md for details")
     return
 end
 
-local status = State.get_migration_status()
+local status = State.migration_status()
 
 if status.error and status.error == "No current schema found" then
     print("⚠️  No schemas registered yet")
@@ -66,9 +66,17 @@ end
 
 -- List all available schema versions
 print("\n2. Available schema versions:")
-local versions = State.list_schema_versions()
-for i, version in ipairs(versions) do
-    print("   " .. i .. ". " .. version)
+if State.schema_versions then
+    local versions = State.schema_versions()
+    if versions and #versions > 0 then
+        for i, version in ipairs(versions) do
+            print("   " .. i .. ". " .. version)
+        end
+    else
+        print("   No schema versions available")
+    end
+else
+    print("   Schema versions API not available")
 end
 
 -- Example: Try to migrate to a specific version (if available)
@@ -82,7 +90,7 @@ if #targets > 0 then
     print("   Attempting migration to: " .. target_version)
     
     -- Trigger migration
-    local result = State.migrate_to_version(target_version)
+    local result = State.migrate(target_version)
     
     if result.success then
         print("✅ Migration successful!")
@@ -120,7 +128,7 @@ if #targets > 0 then
 else
     print("   No migration targets available - trying to migrate to same version")
     local current_version = State.migration_status().current_version
-    local result = State.migrate_to_version(current_version)
+    local result = State.migrate(current_version)
     
     if result.success and result.status == "already_current" then
         print("✅ Already at current version: " .. result.current_version)

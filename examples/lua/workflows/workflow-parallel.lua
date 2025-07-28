@@ -1,6 +1,11 @@
 -- ABOUTME: Parallel workflow example demonstrating concurrent execution
 -- ABOUTME: Shows how to use Workflow.parallel() for fork-join patterns
 
+-- CONFIG: Use examples/configs/state-enabled.toml (or minimal.toml if State not needed)
+-- WHY: This example uses State.save for storing intermediate results
+-- HOW TO RUN: ./target/debug/llmspell -c examples/configs/state-enabled.toml run examples/lua/workflows/workflow-parallel.lua
+-- ALTERNATIVE: cargo run -- -c examples/configs/state-enabled.toml run examples/lua/workflows/workflow-parallel.lua
+
 -- Parallel Workflow Example
 -- Demonstrates concurrent execution and result aggregation
 
@@ -120,8 +125,8 @@ local data_chunks = {
     { id = "chunk4", data = {18, 28, 38, 48, 58} }
 }
 
-State.set("data_chunks", data_chunks)
-State.set("chunk_results", {})
+State.save("global", "data_chunks", data_chunks)
+State.save("global", "chunk_results", {})
 
 local fork_join = Workflow.parallel({
     name = "fork_join_processor",
@@ -370,7 +375,7 @@ local documents = {
     "All that glitters is not gold"
 }
 
-State.set("word_counts", {})
+State.save("global", "word_counts", {})
 
 local map_reduce = Workflow.parallel({
     name = "word_count_mapreduce",

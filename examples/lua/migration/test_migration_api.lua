@@ -21,9 +21,9 @@ print("✅ State global exists")
 -- 2. Check migration methods
 print("\n2. Checking migration methods...")
 local migration_methods = {
-    "migrate_to_version",
-    "get_migration_status", 
-    "list_schema_versions"
+    "migrate",
+    "migration_status", 
+    "schema_versions"
 }
 
 local all_found = true
@@ -43,9 +43,9 @@ end
 
 print("\n✅ All migration APIs are available!")
 
--- 3. Test get_migration_status
-print("\n3. Testing State.get_migration_status()...")
-local status = State.get_migration_status()
+-- 3. Test migration_status
+print("\n3. Testing State.migration_status()...")
+local status = State.migration_status and State.migration_status() or nil
 print("   Returned type: " .. type(status))
 
 if type(status) == "table" then
@@ -55,9 +55,9 @@ if type(status) == "table" then
     end
 end
 
--- 4. Test list_schema_versions
-print("\n4. Testing State.list_schema_versions()...")
-local versions = State.list_schema_versions()
+-- 4. Test schema_versions
+print("\n4. Testing State.schema_versions()...")
+local versions = State.schema_versions and State.schema_versions() or {}
 print("   Returned type: " .. type(versions))
 print("   Number of schemas: " .. #versions)
 
