@@ -11,8 +11,9 @@ use super::{
     AtomicBackup, BackupCompression, BackupConfig, BackupId, BackupResult, BackupValidation,
     CompressionLevel, RestoreOptions,
 };
-use crate::{error::StateError, manager::StateManager};
+use crate::manager::StateManager;
 use anyhow::{Context, Result};
+use llmspell_state_traits::StateError;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -194,7 +195,8 @@ impl BackupManager {
             backup_id.clone(),
             self.state_manager.clone(),
             parent_id.clone(),
-        )?;
+        )
+        .map_err(|e| StateError::storage(e.to_string()))?;
 
         // Perform the backup
         let start_time = std::time::Instant::now();
@@ -204,7 +206,7 @@ impl BackupManager {
         // Extract entry count from snapshot metadata
         let snapshot: crate::backup::atomic::StateSnapshot = rmp_serde::from_slice(&backup_data)
             .map_err(|e| {
-                StateError::DeserializationError(format!(
+                StateError::serialization(format!(
                     "Failed to deserialize snapshot for metadata: {}",
                     e
                 ))
@@ -229,7 +231,7 @@ impl BackupManager {
         let backup_path = self.get_backup_path(&backup_id);
         tokio::fs::write(&backup_path, &data)
             .await
-            .context("Failed to write backup file")?;
+            .map_err(|e| StateError::storage(format!("Failed to write backup file: {}", e)))?;
 
         // Create metadata
         let metadata = BackupMetadata {
@@ -300,7 +302,7 @@ impl BackupManager {
         if options.verify_checksums {
             let validation = self.validate_backup(backup_id).await?;
             if !validation.is_valid {
-                return Err(StateError::ValidationError(format!(
+                return Err(StateError::validation_error(format!(
                     "Backup validation failed: {}",
                     validation.errors.join(", ")
                 )));
@@ -454,18 +456,20 @@ impl BackupManager {
 
     async fn get_backup_metadata(&self, backup_id: &str) -> BackupResult<BackupMetadata> {
         let index = self.backup_index.read().await;
-        index.get(backup_id).cloned().ok_or_else(|| {
-            StateError::StorageError(anyhow::anyhow!("Backup not found: {}", backup_id))
-        })
+        index
+            .get(backup_id)
+            .cloned()
+            .ok_or_else(|| StateError::storage(format!("Backup not found: {}", backup_id)))
     }
 
     async fn save_backup_metadata(&self, metadata: &BackupMetadata) -> BackupResult<()> {
         let metadata_path = self.config.backup_dir.join(format!("{}.meta", metadata.id));
-        let json =
-            serde_json::to_string_pretty(metadata).context("Failed to serialize metadata")?;
+        let json = serde_json::to_string_pretty(metadata).map_err(|e| {
+            StateError::serialization(format!("Failed to serialize metadata: {}", e))
+        })?;
         tokio::fs::write(metadata_path, json)
             .await
-            .context("Failed to write metadata file")?;
+            .map_err(|e| StateError::storage(format!("Failed to write metadata file: {}", e)))?;
         Ok(())
     }
 
@@ -554,9 +558,9 @@ impl BackupManager {
 
         // Load backup data from file
         let backup_path = self.get_backup_path(backup_id);
-        let compressed_data = tokio::fs::read(&backup_path).await.map_err(|e| {
-            StateError::StorageError(anyhow::anyhow!("Failed to read backup: {}", e))
-        })?;
+        let compressed_data = tokio::fs::read(&backup_path)
+            .await
+            .map_err(|e| StateError::storage(format!("Failed to read backup: {}", e)))?;
 
         // Decompress if needed
         let backup_data = if let Some(ref compression_info) = metadata.compression {
@@ -588,7 +592,8 @@ impl BackupManager {
             backup_id.to_string(),
             self.state_manager.clone(),
             metadata.parent_id.clone(),
-        )?;
+        )
+        .map_err(|e| StateError::storage(e.to_string()))?;
 
         // Perform the restoration
         atomic_backup.restore(&backup_data).await?;

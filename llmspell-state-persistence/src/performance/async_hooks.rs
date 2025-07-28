@@ -1,9 +1,9 @@
 // ABOUTME: Async hook processing to remove hooks from critical state operation path
 // ABOUTME: Uses lock-free queues and background processing for zero-overhead hook execution
 
-use crate::error::{StateError, StateResult};
 use crossbeam::queue::SegQueue;
 use llmspell_hooks::{Hook, HookContext, HookExecutor};
+use llmspell_state_traits::{StateError, StateResult};
 use parking_lot::RwLock;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
@@ -94,7 +94,7 @@ impl AsyncHookProcessor {
     /// Start background processing
     pub fn start(&mut self) -> StateResult<()> {
         if self.processor_handle.is_some() {
-            return Err(StateError::AlreadyExists(
+            return Err(StateError::already_exists(
                 "Hook processor already running".to_string(),
             ));
         }
@@ -161,7 +161,7 @@ impl AsyncHookProcessor {
         if let Some(handle) = self.processor_handle.take() {
             handle
                 .await
-                .map_err(|e| StateError::BackgroundTaskError(e.to_string()))?;
+                .map_err(|e| StateError::background_task_error(e.to_string()))?;
         }
 
         Ok(())
@@ -216,7 +216,7 @@ impl AsyncHookProcessor {
 
         while self.queue_depth() > 0 {
             if start.elapsed() > timeout {
-                return Err(StateError::Timeout("Hook queue drain timeout".to_string()));
+                return Err(StateError::timeout("Hook queue drain timeout".to_string()));
             }
             tokio::time::sleep(Duration::from_millis(10)).await;
         }

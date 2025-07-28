@@ -1,8 +1,9 @@
 // ABOUTME: Atomic backup operations ensuring consistent point-in-time snapshots
 // ABOUTME: Implements lock-free backup strategies with minimal performance impact
 
-use crate::{error::StateError, manager::StateManager, StateScope};
+use crate::manager::StateManager;
 use anyhow::Result;
+use llmspell_state_traits::{StateError, StateScope};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -233,7 +234,7 @@ impl AtomicBackup {
     /// Serialize snapshot to bytes
     fn serialize_snapshot(&self, snapshot: &StateSnapshot) -> Result<Vec<u8>, StateError> {
         // Use MessagePack for efficient binary serialization
-        rmp_serde::to_vec(snapshot).map_err(|e| StateError::SerializationError(e.to_string()))
+        rmp_serde::to_vec(snapshot).map_err(|e| StateError::serialization(e.to_string()))
     }
 
     /// Restore state from snapshot data
@@ -243,7 +244,7 @@ impl AtomicBackup {
 
         // Deserialize snapshot
         let snapshot: StateSnapshot = rmp_serde::from_slice(snapshot_data)
-            .map_err(|e| StateError::DeserializationError(e.to_string()))?;
+            .map_err(|e| StateError::serialization(e.to_string()))?;
 
         // Validate snapshot
         self.validate_snapshot(&snapshot)?;
@@ -291,7 +292,7 @@ impl AtomicBackup {
 
         // Deserialize snapshot
         let snapshot: StateSnapshot = rmp_serde::from_slice(snapshot_data)
-            .map_err(|e| StateError::DeserializationError(e.to_string()))?;
+            .map_err(|e| StateError::serialization(e.to_string()))?;
 
         // Validate snapshot
         self.validate_snapshot(&snapshot)?;
@@ -333,7 +334,7 @@ impl AtomicBackup {
     fn validate_snapshot(&self, snapshot: &StateSnapshot) -> Result<(), StateError> {
         // Basic validation
         if snapshot.metadata.backup_id != self.backup_id {
-            return Err(StateError::ValidationError(
+            return Err(StateError::validation_error(
                 "Backup validation failed: Backup ID mismatch".to_string(),
             ));
         }

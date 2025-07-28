@@ -2,8 +2,8 @@
 // ABOUTME: Targets >70% compression ratio for typical state data
 
 use crate::config::CompressionType;
-use crate::error::StateError;
 use anyhow::Result;
+use llmspell_state_traits::StateError;
 use serde::{Deserialize, Serialize};
 use std::io::{Read, Write};
 use tracing::debug;
@@ -18,7 +18,7 @@ impl CompressionLevel {
     /// Create new compression level (1-9)
     pub fn new(level: u32) -> Result<Self, StateError> {
         if !(1..=9).contains(&level) {
-            return Err(StateError::ValidationError(
+            return Err(StateError::validation_error(
                 "Compression level must be between 1 and 9".to_string(),
             ));
         }
@@ -126,10 +126,10 @@ impl BackupCompression {
         let mut encoder = GzEncoder::new(Vec::new(), Compression::new(self.compression_level.0));
         encoder
             .write_all(data)
-            .map_err(|e| StateError::StorageError(anyhow::anyhow!("Compression error: {}", e)))?;
+            .map_err(|e| StateError::storage(format!("Compression error: {}", e)))?;
         encoder
             .finish()
-            .map_err(|e| StateError::StorageError(anyhow::anyhow!("Compression error: {}", e)))
+            .map_err(|e| StateError::storage(format!("Compression error: {}", e)))
     }
 
     /// Decompress gzip
@@ -140,20 +140,20 @@ impl BackupCompression {
         let mut decompressed = Vec::new();
         decoder
             .read_to_end(&mut decompressed)
-            .map_err(|e| StateError::StorageError(anyhow::anyhow!("Decompression error: {}", e)))?;
+            .map_err(|e| StateError::storage(format!("Decompression error: {}", e)))?;
         Ok(decompressed)
     }
 
     /// Compress with zstd
     fn compress_zstd(&self, data: &[u8]) -> Result<Vec<u8>, StateError> {
         zstd::encode_all(data, self.compression_level.0 as i32)
-            .map_err(|e| StateError::StorageError(anyhow::anyhow!("Compression error: {}", e)))
+            .map_err(|e| StateError::storage(format!("Compression error: {}", e)))
     }
 
     /// Decompress zstd
     fn decompress_zstd(&self, data: &[u8]) -> Result<Vec<u8>, StateError> {
         zstd::decode_all(data)
-            .map_err(|e| StateError::StorageError(anyhow::anyhow!("Decompression error: {}", e)))
+            .map_err(|e| StateError::storage(format!("Decompression error: {}", e)))
     }
 
     /// Compress with lz4
@@ -171,13 +171,13 @@ impl BackupCompression {
             Some(lz4::block::CompressionMode::HIGHCOMPRESSION(acceleration)),
             true,
         )
-        .map_err(|e| StateError::StorageError(anyhow::anyhow!("Compression error: {}", e)))
+        .map_err(|e| StateError::storage(format!("Compression error: {}", e)))
     }
 
     /// Decompress lz4
     fn decompress_lz4(&self, data: &[u8]) -> Result<Vec<u8>, StateError> {
         lz4::block::decompress(data, None)
-            .map_err(|e| StateError::StorageError(anyhow::anyhow!("Decompression error: {}", e)))
+            .map_err(|e| StateError::storage(format!("Decompression error: {}", e)))
     }
 
     /// Compress with brotli
@@ -189,7 +189,7 @@ impl BackupCompression {
         };
 
         brotli::BrotliCompress(&mut std::io::Cursor::new(data), &mut output, &params)
-            .map_err(|e| StateError::StorageError(anyhow::anyhow!("Compression error: {}", e)))?;
+            .map_err(|e| StateError::storage(format!("Compression error: {}", e)))?;
 
         Ok(output)
     }
@@ -198,7 +198,7 @@ impl BackupCompression {
     fn decompress_brotli(&self, data: &[u8]) -> Result<Vec<u8>, StateError> {
         let mut output = Vec::new();
         brotli::BrotliDecompress(&mut std::io::Cursor::new(data), &mut output)
-            .map_err(|e| StateError::StorageError(anyhow::anyhow!("Decompression error: {}", e)))?;
+            .map_err(|e| StateError::storage(format!("Decompression error: {}", e)))?;
 
         Ok(output)
     }

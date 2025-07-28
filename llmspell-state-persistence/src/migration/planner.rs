@@ -2,12 +2,12 @@
 // ABOUTME: Provides high-level migration planning interface for StateManager integration
 
 use crate::config::MigrationStep as LegacyMigrationStep;
-use crate::error::{StateError, StateResult};
 use crate::schema::{
     CompatibilityChecker, CompatibilityResult, EnhancedStateSchema,
     MigrationPlan as SchemaMigrationPlan, MigrationPlanner as SchemaMigrationPlanner,
     SchemaRegistry, SemanticVersion,
 };
+use llmspell_state_traits::{StateError, StateResult};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::Duration;

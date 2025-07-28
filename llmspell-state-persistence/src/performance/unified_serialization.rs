@@ -1,8 +1,8 @@
 // ABOUTME: Unified serialization pipeline that performs all operations in a single pass
 // ABOUTME: Eliminates multiple serialization cycles for optimal performance
 
-use crate::error::{StateError, StateResult};
 use crate::sensitive_data::SensitiveDataConfig;
+use llmspell_state_traits::{StateError, StateResult};
 use rmp_serde as msgpack;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -45,9 +45,9 @@ impl UnifiedSerializer {
         if self.skip_validation {
             // Fast path - direct serialization
             if self.use_msgpack {
-                msgpack::to_vec(value).map_err(|e| StateError::SerializationError(e.to_string()))
+                msgpack::to_vec(value).map_err(|e| StateError::serialization(e.to_string()))
             } else {
-                serde_json::to_vec(value).map_err(|e| StateError::SerializationError(e.to_string()))
+                serde_json::to_vec(value).map_err(|e| StateError::serialization(e.to_string()))
             }
         } else {
             // Full validation path - but still single pass
@@ -58,29 +58,27 @@ impl UnifiedSerializer {
     /// Deserialize value
     pub fn deserialize<T: for<'de> Deserialize<'de>>(&self, data: &[u8]) -> StateResult<T> {
         if self.use_msgpack {
-            msgpack::from_slice(data).map_err(|e| StateError::DeserializationError(e.to_string()))
+            msgpack::from_slice(data).map_err(|e| StateError::serialization(e.to_string()))
         } else {
-            serde_json::from_slice(data)
-                .map_err(|e| StateError::DeserializationError(e.to_string()))
+            serde_json::from_slice(data).map_err(|e| StateError::serialization(e.to_string()))
         }
     }
 
     /// Serialize with full protection in a single pass
     fn serialize_with_protection<T: Serialize>(&self, value: &T) -> StateResult<Vec<u8>> {
         // First convert to JSON Value for validation
-        let json_value = serde_json::to_value(value)
-            .map_err(|e| StateError::SerializationError(e.to_string()))?;
+        let json_value =
+            serde_json::to_value(value).map_err(|e| StateError::serialization(e.to_string()))?;
 
         // Apply all transformations in-place
         let protected_value = self.apply_protections(json_value)?;
 
         // Final serialization
         if self.use_msgpack {
-            msgpack::to_vec(&protected_value)
-                .map_err(|e| StateError::SerializationError(e.to_string()))
+            msgpack::to_vec(&protected_value).map_err(|e| StateError::serialization(e.to_string()))
         } else {
             serde_json::to_vec(&protected_value)
-                .map_err(|e| StateError::SerializationError(e.to_string()))
+                .map_err(|e| StateError::serialization(e.to_string()))
         }
     }
 
@@ -107,7 +105,7 @@ impl UnifiedSerializer {
                 // Check for circular references using object identity
                 let obj_id = format!("{:p}", map as *const _);
                 if visited.contains(&obj_id) {
-                    return Err(StateError::ValidationError(format!(
+                    return Err(StateError::validation_error(format!(
                         "Circular reference detected at path: {}",
                         path.join(".")
                     )));
@@ -234,7 +232,7 @@ impl<W: Write> StreamingSerializer<W> {
         let data = self.serializer.serialize(value)?;
         self.writer
             .write_all(&data)
-            .map_err(|e| StateError::SerializationError(e.to_string()))?;
+            .map_err(|e| StateError::serialization(e.to_string()))?;
         Ok(())
     }
 }

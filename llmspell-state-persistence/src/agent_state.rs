@@ -1,8 +1,8 @@
 // ABOUTME: Agent state persistence structures and serialization
 // ABOUTME: Implements StorageSerialize for agent state with Phase 4 hook integration
 
-use crate::error::StateResult;
 use crate::sensitive_data::SensitiveDataConfig;
+use llmspell_state_traits::StateResult;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::SystemTime;

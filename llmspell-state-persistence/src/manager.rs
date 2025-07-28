@@ -3,17 +3,16 @@
 
 use crate::backend_adapter::{create_storage_backend, StateStorageAdapter};
 use crate::config::{PersistenceConfig, StateSchema};
-use crate::error::{StateError, StateResult};
 use crate::key_manager::KeyManager;
 use crate::performance::{
     AsyncHookProcessor, FastAgentStateOps, FastPathConfig, FastPathManager, HookEvent,
     HookEventType, StateClass,
 };
-use crate::scope::StateScope;
 use llmspell_events::{CorrelationContext, EventBus, EventCorrelationTracker, UniversalEvent};
 use llmspell_hooks::{
     ComponentType, Hook, HookContext, HookExecutor, HookPoint, HookResult, ReplayableHook,
 };
+use llmspell_state_traits::{StateError, StateResult, StateScope};
 use llmspell_storage::StorageBackend;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
@@ -69,9 +68,9 @@ impl HookReplayManager {
             correlation_id: context.correlation_id,
             hook_context: hook
                 .serialize_context(context)
-                .map_err(|e| StateError::SerializationError(e.to_string()))?,
+                .map_err(|e| StateError::serialization(e.to_string()))?,
             result: serde_json::to_string(result)
-                .map_err(|e| StateError::SerializationError(e.to_string()))?,
+                .map_err(|e| StateError::serialization(e.to_string()))?,
             timestamp: SystemTime::now(),
             duration,
             metadata: HashMap::new(),
@@ -332,7 +331,7 @@ impl StateManager {
             self.hook_executor
                 .execute_hooks(&before_hooks, &mut hook_context)
                 .await
-                .map_err(|e| StateError::HookError(e.to_string()))?
+                .map_err(|e| StateError::hook_error(e.to_string()))?
         } else {
             vec![]
         };
@@ -402,7 +401,7 @@ impl StateManager {
         self.event_bus
             .publish(state_event)
             .await
-            .map_err(|e| StateError::StorageError(e.into()))?;
+            .map_err(|e| StateError::storage(e.to_string()))?;
 
         Ok(())
     }
@@ -458,7 +457,7 @@ impl StateManager {
             self.hook_executor
                 .execute_hooks(&hooks_to_execute, &mut hook_context)
                 .await
-                .map_err(|e| StateError::HookError(e.to_string()))?
+                .map_err(|e| StateError::hook_error(e.to_string()))?
         } else {
             vec![]
         };
@@ -519,7 +518,7 @@ impl StateManager {
                 .hook_executor
                 .execute_hooks(&hooks_to_execute, &mut hook_context)
                 .await
-                .map_err(|e| StateError::HookError(e.to_string()))?;
+                .map_err(|e| StateError::hook_error(e.to_string()))?;
         }
 
         // Emit state change event
@@ -537,7 +536,7 @@ impl StateManager {
         self.event_bus
             .publish(state_event)
             .await
-            .map_err(|e| StateError::StorageError(e.into()))?;
+            .map_err(|e| StateError::storage(e.to_string()))?;
 
         Ok(())
     }
@@ -901,7 +900,7 @@ impl StateManager {
             self.hook_executor
                 .execute_hooks(&before_hooks, &mut hook_context)
                 .await
-                .map_err(|e| StateError::HookError(e.to_string()))?;
+                .map_err(|e| StateError::hook_error(e.to_string()))?;
         }
 
         // Store in persistent backend IMMEDIATELY
@@ -949,7 +948,7 @@ impl StateManager {
         self.event_bus
             .publish(state_event)
             .await
-            .map_err(|e| StateError::StorageError(e.into()))?;
+            .map_err(|e| StateError::storage(e.to_string()))?;
 
         Ok(())
     }
@@ -1008,7 +1007,7 @@ impl StateManager {
             self.hook_executor
                 .execute_hooks(&hooks_to_execute, &mut hook_context)
                 .await
-                .map_err(|e| StateError::HookError(e.to_string()))?;
+                .map_err(|e| StateError::hook_error(e.to_string()))?;
         }
 
         // Store in persistent backend
@@ -1044,7 +1043,7 @@ impl StateManager {
             self.hook_executor
                 .execute_hooks(&hooks_to_execute, &mut hook_context)
                 .await
-                .map_err(|e| StateError::HookError(e.to_string()))?;
+                .map_err(|e| StateError::hook_error(e.to_string()))?;
         }
 
         // Emit state save event
@@ -1064,7 +1063,7 @@ impl StateManager {
         self.event_bus
             .publish(state_event)
             .await
-            .map_err(|e| StateError::StorageError(e.into()))?;
+            .map_err(|e| StateError::storage(e.to_string()))?;
 
         Ok(())
     }
@@ -1133,7 +1132,7 @@ impl StateManager {
             self.hook_executor
                 .execute_hooks(&hooks_to_execute, &mut hook_context)
                 .await
-                .map_err(|e| StateError::HookError(e.to_string()))?;
+                .map_err(|e| StateError::hook_error(e.to_string()))?;
         }
 
         // Delete from storage within lock scope
@@ -1160,7 +1159,7 @@ impl StateManager {
             self.hook_executor
                 .execute_hooks(&hooks_to_execute, &mut hook_context)
                 .await
-                .map_err(|e| StateError::HookError(e.to_string()))?;
+                .map_err(|e| StateError::hook_error(e.to_string()))?;
         }
 
         // Emit state delete event
@@ -1178,7 +1177,7 @@ impl StateManager {
         self.event_bus
             .publish(state_event)
             .await
-            .map_err(|e| StateError::StorageError(e.into()))?;
+            .map_err(|e| StateError::storage(e.to_string()))?;
 
         Ok(true)
     }

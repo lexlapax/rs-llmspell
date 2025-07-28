@@ -33,7 +33,13 @@ pub use conditions::{Condition, ConditionEvaluationContext, ConditionEvaluator, 
 pub use error_handling::{
     ErrorAction, ErrorHandler, RecoveryAction, WorkflowErrorAnalysis, WorkflowErrorType,
 };
-pub use state::{ExecutionStats, StateManager};
+
+// Re-export state components (both memory and persistent)
+pub use state::{
+    ExecutionStats, PersistentWorkflowState, PersistentWorkflowStateManager, RetryStatistics,
+    StateManager, StepStatistics, WorkflowCheckpoint, WorkflowExecutionStats,
+    WorkflowStatePersistence,
+};
 pub use step_executor::StepExecutor;
 
 pub use r#loop::{

@@ -2,8 +2,8 @@
 // ABOUTME: Integrates with Phase 3.3 llmspell-storage infrastructure
 
 use crate::config::StorageBackendType;
-use crate::error::{StateError, StateResult};
 use crate::performance::UnifiedSerializer;
+use llmspell_state_traits::{StateError, StateResult};
 use llmspell_storage::{StorageBackend, StorageSerialize};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -19,14 +19,14 @@ pub async fn create_storage_backend(
         }
         StorageBackendType::Sled(config) => {
             let backend = llmspell_storage::SledBackend::new_with_path(&config.path)
-                .map_err(StateError::StorageError)?;
+                .map_err(|e| StateError::storage(e.to_string()))?;
             Ok(Arc::new(backend) as Arc<dyn StorageBackend>)
         }
         StorageBackendType::RocksDB(_config) => {
             // RocksDB backend to be implemented in future phase
-            Err(StateError::StorageError(anyhow::anyhow!(
-                "RocksDB backend not yet implemented"
-            )))
+            Err(StateError::storage(
+                "RocksDB backend not yet implemented".to_string(),
+            ))
         }
     }
 }
@@ -52,12 +52,12 @@ impl StateStorageAdapter {
         let namespaced_key = self.make_key(key);
         let bytes = value
             .to_storage_bytes()
-            .map_err(|e| StateError::SerializationError(e.to_string()))?;
+            .map_err(|e| StateError::serialization(e.to_string()))?;
 
         self.backend
             .set(&namespaced_key, bytes)
             .await
-            .map_err(StateError::StorageError)
+            .map_err(|e| StateError::storage(e.to_string()))
     }
 
     /// Load a value with state-specific key formatting
@@ -67,11 +67,11 @@ impl StateStorageAdapter {
         match self.backend.get(&namespaced_key).await {
             Ok(Some(bytes)) => {
                 let value = T::from_storage_bytes(&bytes)
-                    .map_err(|e| StateError::DeserializationError(e.to_string()))?;
+                    .map_err(|e| StateError::serialization(e.to_string()))?;
                 Ok(Some(value))
             }
             Ok(None) => Ok(None),
-            Err(e) => Err(StateError::StorageError(e)),
+            Err(e) => Err(StateError::storage(e.to_string())),
         }
     }
 
@@ -81,7 +81,7 @@ impl StateStorageAdapter {
         self.backend
             .delete(&namespaced_key)
             .await
-            .map_err(StateError::StorageError)
+            .map_err(|e| StateError::storage(e.to_string()))
     }
 
     /// Check if a key exists
@@ -90,7 +90,7 @@ impl StateStorageAdapter {
         self.backend
             .exists(&namespaced_key)
             .await
-            .map_err(StateError::StorageError)
+            .map_err(|e| StateError::storage(e.to_string()))
     }
 
     /// List all keys in the namespace
@@ -100,7 +100,7 @@ impl StateStorageAdapter {
             .backend
             .list_keys(&namespaced_prefix)
             .await
-            .map_err(StateError::StorageError)?;
+            .map_err(|e| StateError::storage(e.to_string()))?;
 
         // Remove namespace prefix from keys
         let prefix_len = self.namespace.len() + 1;
@@ -124,7 +124,7 @@ impl StateStorageAdapter {
         self.backend
             .delete_batch(&namespaced_keys)
             .await
-            .map_err(StateError::StorageError)
+            .map_err(|e| StateError::storage(e.to_string()))
     }
 
     fn make_key(&self, key: &str) -> String {
@@ -139,7 +139,7 @@ impl StateStorageAdapter {
         self.backend
             .set(&namespaced_key, bytes)
             .await
-            .map_err(StateError::StorageError)
+            .map_err(|e| StateError::storage(e.to_string()))
     }
 
     /// Fast load method using UnifiedSerializer
@@ -155,7 +155,7 @@ impl StateStorageAdapter {
                 Ok(Some(value))
             }
             Ok(None) => Ok(None),
-            Err(e) => Err(StateError::StorageError(e)),
+            Err(e) => Err(StateError::storage(e.to_string())),
         }
     }
 }

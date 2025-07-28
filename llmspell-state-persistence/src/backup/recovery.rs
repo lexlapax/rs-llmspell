@@ -2,8 +2,8 @@
 // ABOUTME: Provides rollback capabilities and recovery coordination
 
 use super::{BackupId, BackupManager, BackupValidation, RestoreOptions};
-use crate::error::StateError;
 use anyhow::Result;
+use llmspell_state_traits::StateError;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime};
@@ -240,7 +240,7 @@ impl RecoveryOrchestrator {
         let backup = backups
             .iter()
             .find(|b| b.id == target_backup)
-            .ok_or_else(|| StateError::ValidationError("Backup not found".to_string()))?;
+            .ok_or_else(|| StateError::validation_error("Backup not found".to_string()))?;
 
         Ok(backup.entry_count)
     }
@@ -291,7 +291,7 @@ impl RecoveryOrchestrator {
             info!("Rollback completed successfully");
             Ok(())
         } else {
-            Err(StateError::ValidationError(
+            Err(StateError::validation_error(
                 "No rollback point available".to_string(),
             ))
         }

@@ -41,14 +41,12 @@ pub mod backend_adapter;
 pub mod backup;
 pub mod circular_ref;
 pub mod config;
-pub mod error;
 pub mod hooks;
 pub mod key_manager;
 pub mod manager;
 pub mod migration;
 pub mod performance;
 pub mod schema;
-pub mod scope;
 pub mod sensitive_data;
 
 // Re-export main types
@@ -62,8 +60,11 @@ pub use config::{
     MigrationStep, PerformanceConfig, PersistenceConfig, RocksDBConfig, SledConfig, StateSchema,
     StorageBackendType,
 };
-pub use error::{StateError, StateResult};
+// Re-export from llmspell-state-traits
 pub use key_manager::{KeyManager, StateAccessControl, StatePermission};
+pub use llmspell_state_traits::{
+    StateError, StateManager as StateManagerTrait, StatePersistence, StateResult, StateScope,
+};
 pub use manager::{HookReplayManager, SerializableState, SerializedHookExecution, StateManager};
 pub use migration::{
     DataTransformer, MigrationConfig, MigrationEngine, MigrationResult, MigrationStatus,
@@ -74,7 +75,7 @@ pub use schema::{
     CompatibilityChecker, CompatibilityResult, EnhancedStateSchema, MigrationPlan,
     MigrationPlanner, SchemaRegistry, SchemaVersion, SemanticVersion,
 };
-pub use scope::StateScope;
+// StateScope now comes from llmspell-state-traits
 pub use sensitive_data::{RedactSensitiveData, SensitiveDataConfig, SensitiveDataProtector};
 
 pub use serde_json::{json, Value};
@@ -83,6 +84,6 @@ pub use serde_json::{json, Value};
 pub mod prelude {
     pub use crate::{
         config::{PersistenceConfig, StorageBackendType},
-        StateError, StateManager, StateResult, StateScope,
+        StateError, StateManager, StateManagerTrait, StatePersistence, StateResult, StateScope,
     };
 }

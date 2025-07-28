@@ -1,8 +1,7 @@
 // ABOUTME: Key validation and namespace management for state isolation
 // ABOUTME: Ensures key security and prevents traversal attacks
 
-use crate::error::{StateError, StateResult};
-use crate::scope::StateScope;
+use llmspell_state_traits::{StateError, StateResult, StateScope};
 use unicode_normalization::UnicodeNormalization;
 
 pub struct KeyManager;
@@ -12,34 +11,34 @@ impl KeyManager {
     pub fn validate_key(key: &str) -> StateResult<()> {
         // Check empty key
         if key.is_empty() {
-            return Err(StateError::InvalidKey("Key cannot be empty".to_string()));
+            return Err(StateError::invalid_format("Key cannot be empty"));
         }
 
         // Check key length
         if key.len() > 256 {
-            return Err(StateError::InvalidKey(
-                "Key cannot be longer than 256 characters".to_string(),
+            return Err(StateError::invalid_format(
+                "Key cannot be longer than 256 characters",
             ));
         }
 
         // Prevent path traversal
         if key.contains("..") || key.contains("\\") || key.contains("//") {
-            return Err(StateError::InvalidKey(
-                "Key contains invalid path traversal characters".to_string(),
+            return Err(StateError::invalid_format(
+                "Key contains invalid path traversal characters",
             ));
         }
 
         // Check for invalid characters
         if key.contains('\0') || key.contains('\n') || key.contains('\r') {
-            return Err(StateError::InvalidKey(
-                "Key contains invalid control characters".to_string(),
+            return Err(StateError::invalid_format(
+                "Key contains invalid control characters",
             ));
         }
 
         // Check for reserved prefixes
         if key.starts_with("__") || key.starts_with("$$") {
-            return Err(StateError::InvalidKey(
-                "Key cannot start with reserved prefixes __ or $$".to_string(),
+            return Err(StateError::invalid_format(
+                "Key cannot start with reserved prefixes __ or $$",
             ));
         }
 
@@ -55,7 +54,7 @@ impl KeyManager {
 
         // Ensure final key is still within limits
         if scoped_key.len() > 512 {
-            return Err(StateError::InvalidKey(
+            return Err(StateError::invalid_format(
                 "Scoped key exceeds maximum length".to_string(),
             ));
         }
@@ -217,12 +216,9 @@ mod tests {
         assert!(acl.has_permission(agent_id, &scope, &StatePermission::Write));
         assert!(!acl.has_permission(agent_id, &scope, &StatePermission::Delete));
 
-        // Check parent scope inheritance
-        let child_scope = StateScope::Step {
-            workflow_id: "workflow456".to_string(),
-            step_name: "step1".to_string(),
-        };
-        assert!(acl.has_permission(agent_id, &child_scope, &StatePermission::Read));
+        // Check that custom scopes don't inherit from workflow scopes (they only inherit from Global)
+        let child_scope = StateScope::Custom("workflow456:step1".to_string());
+        assert!(!acl.has_permission(agent_id, &child_scope, &StatePermission::Read));
     }
 
     #[test]

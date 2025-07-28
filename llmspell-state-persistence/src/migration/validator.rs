@@ -1,9 +1,9 @@
 // ABOUTME: Migration validation system for ensuring data integrity
 // ABOUTME: Provides pre and post-migration validation with existing StateManager integration
 
-use crate::error::{StateError, StateResult};
 use crate::manager::SerializableState;
 use crate::schema::{EnhancedStateSchema, SchemaRegistry};
+use llmspell_state_traits::{StateError, StateResult};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -37,7 +37,7 @@ pub enum ValidationError {
 
 impl From<ValidationError> for StateError {
     fn from(err: ValidationError) -> Self {
-        StateError::ValidationError(err.to_string())
+        StateError::validation_error(err.to_string())
     }
 }
 

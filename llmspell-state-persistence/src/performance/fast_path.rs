@@ -1,8 +1,8 @@
 // ABOUTME: Fast-path state operations that bypass expensive validation and processing
 // ABOUTME: Provides direct serialization paths for trusted and ephemeral data
 
-use crate::error::{StateError, StateResult};
 use crate::StateScope;
+use llmspell_state_traits::{StateError, StateResult};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -56,12 +56,11 @@ impl FastPathManager {
     pub fn serialize_trusted(&self, value: &Value) -> StateResult<Vec<u8>> {
         if self.config.use_messagepack {
             rmp_serde::to_vec(value).map_err(|e| {
-                StateError::SerializationError(format!("MessagePack serialization failed: {}", e))
+                StateError::serialization(format!("MessagePack serialization failed: {}", e))
             })
         } else {
-            serde_json::to_vec(value).map_err(|e| {
-                StateError::SerializationError(format!("JSON serialization failed: {}", e))
-            })
+            serde_json::to_vec(value)
+                .map_err(|e| StateError::serialization(format!("JSON serialization failed: {}", e)))
         }
     }
 
@@ -69,14 +68,11 @@ impl FastPathManager {
     pub fn deserialize_trusted(&self, bytes: &[u8]) -> StateResult<Value> {
         if self.config.use_messagepack {
             rmp_serde::from_slice(bytes).map_err(|e| {
-                StateError::DeserializationError(format!(
-                    "MessagePack deserialization failed: {}",
-                    e
-                ))
+                StateError::serialization(format!("MessagePack deserialization failed: {}", e))
             })
         } else {
             serde_json::from_slice(bytes).map_err(|e| {
-                StateError::DeserializationError(format!("JSON deserialization failed: {}", e))
+                StateError::serialization(format!("JSON deserialization failed: {}", e))
             })
         }
     }
@@ -170,11 +166,11 @@ impl FastPathManager {
         let mut encoder = GzEncoder::new(Vec::new(), Compression::fast());
         encoder
             .write_all(&data)
-            .map_err(|e| StateError::CompressionError(format!("Compression failed: {}", e)))?;
+            .map_err(|e| StateError::compression_error(format!("Compression failed: {}", e)))?;
 
         encoder
             .finish()
-            .map_err(|e| StateError::CompressionError(format!("Compression finish failed: {}", e)))
+            .map_err(|e| StateError::compression_error(format!("Compression finish failed: {}", e)))
     }
 
     /// Decompress data if needed
@@ -187,7 +183,7 @@ impl FastPathManager {
             let mut decoder = GzDecoder::new(data);
             let mut decompressed = Vec::new();
             decoder.read_to_end(&mut decompressed).map_err(|e| {
-                StateError::CompressionError(format!("Decompression failed: {}", e))
+                StateError::compression_error(format!("Decompression failed: {}", e))
             })?;
             Ok(decompressed)
         } else {

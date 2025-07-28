@@ -2,8 +2,8 @@
 // ABOUTME: Eliminates per-agent locks that cause massive overhead in state operations
 
 use crate::agent_state::PersistentAgentState;
-use crate::error::{StateError, StateResult};
 use crossbeam_skiplist::SkipMap;
+use llmspell_state_traits::{StateError, StateResult};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -88,7 +88,7 @@ impl LockFreeAgentStore {
             // Version mismatch, retry
             retries += 1;
             if retries >= max_retries {
-                return Err(StateError::LockError(format!(
+                return Err(StateError::lock_error(format!(
                     "Failed to update agent state after {} retries",
                     max_retries
                 )));
@@ -250,7 +250,7 @@ impl FastAgentStateOps {
     pub fn update_field(&self, agent_id: &str, field: &str, value: Value) -> StateResult<()> {
         self.store.update(agent_id, |current| {
             let mut state = current
-                .ok_or_else(|| StateError::NotFound(format!("Agent {} not found", agent_id)))?
+                .ok_or_else(|| StateError::not_found("agent", agent_id))?
                 .clone();
 
             // Update specific field
@@ -399,7 +399,7 @@ mod tests {
                 for j in 0..10 {
                     let _ = store_clone.update("concurrent-agent", |current| {
                         let mut state = current
-                            .ok_or_else(|| StateError::NotFound("Agent not found".to_string()))?
+                            .ok_or_else(|| StateError::not_found("agent", "concurrent-agent"))?
                             .clone();
                         let key = format!("thread_{}_update_{}", i, j);
                         state

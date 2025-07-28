@@ -11,7 +11,7 @@ use serde_json::Value;
 /// State change event for hooks
 #[derive(Debug, Clone)]
 pub struct StateChangeEvent {
-    pub scope: crate::scope::StateScope,
+    pub scope: llmspell_state_traits::StateScope,
     pub key: String,
     pub old_value: Option<Value>,
     pub new_value: Option<Value>,

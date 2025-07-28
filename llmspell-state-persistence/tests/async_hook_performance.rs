@@ -3,6 +3,7 @@
 
 use llmspell_hooks::{Hook, HookContext, HookResult};
 use llmspell_state_persistence::{performance::StateClass, StateManager};
+use llmspell_state_traits::StateScope;
 use serde_json::json;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -75,11 +76,7 @@ async fn test_async_hooks_dont_block_state_operations() {
 
         // Use regular set_with_hooks which will use async processing
         manager
-            .set_with_hooks(
-                llmspell_state_persistence::scope::StateScope::Global,
-                &key,
-                value,
-            )
+            .set_with_hooks(StateScope::Global, &key, value)
             .await
             .unwrap();
     }

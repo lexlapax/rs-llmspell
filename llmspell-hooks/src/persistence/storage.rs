@@ -10,6 +10,8 @@ use std::sync::Arc;
 use std::time::SystemTime;
 use uuid::Uuid;
 
+use llmspell_state_traits::{StateManager, StateScope};
+
 /// Hook-specific metadata for enhanced storage
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct HookMetadata {
@@ -80,6 +82,8 @@ pub struct HookStorageAdapter {
     metadata_cache: Arc<RwLock<HashMap<String, HookMetadata>>>,
     /// Statistics tracking
     storage_stats: Arc<RwLock<StorageStatistics>>,
+    /// Optional persistent state manager
+    persistent_state_manager: Option<Arc<dyn StateManager>>,
 }
 
 /// Storage statistics for monitoring
@@ -97,6 +101,7 @@ impl Default for HookStorageAdapter {
         Self {
             metadata_cache: Arc::new(RwLock::new(HashMap::new())),
             storage_stats: Arc::new(RwLock::new(StorageStatistics::default())),
+            persistent_state_manager: None,
         }
     }
 }
@@ -105,6 +110,17 @@ impl HookStorageAdapter {
     /// Create a new hook storage adapter
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// Configure with persistent state manager
+    pub fn with_persistent_state(mut self, state_manager: Arc<dyn StateManager>) -> Self {
+        self.persistent_state_manager = Some(state_manager);
+        self
+    }
+
+    /// Set persistent state manager
+    pub fn set_persistent_state_manager(&mut self, state_manager: Arc<dyn StateManager>) {
+        self.persistent_state_manager = Some(state_manager);
     }
 
     /// Store hook metadata
@@ -119,6 +135,15 @@ impl HookStorageAdapter {
         self.metadata_cache
             .write()
             .insert(key.clone(), metadata.clone());
+
+        // Store in persistent storage if available
+        if let Some(state_manager) = &self.persistent_state_manager {
+            let scope = StateScope::Custom(format!("hook_metadata_{}", metadata.hook_type));
+            state_manager
+                .set(scope, &key, serde_json::to_value(metadata)?)
+                .await
+                .context("Failed to store metadata in persistent storage")?;
+        }
 
         // Update statistics
         let mut stats = self.storage_stats.write();
@@ -149,12 +174,33 @@ impl HookStorageAdapter {
             return Ok(Some(metadata.clone()));
         }
 
-        // Cache miss
+        // Cache miss - try to load from persistent storage
+        if let Some(state_manager) = &self.persistent_state_manager {
+            // Try different hook types to find the metadata
+            let hook_types = [
+                "rate_limit",
+                "cost_tracking",
+                "security",
+                "logging",
+                "metrics",
+            ];
+            for hook_type in &hook_types {
+                let scope = StateScope::Custom(format!("hook_metadata_{}", hook_type));
+                if let Ok(Some(value)) = state_manager.get(scope, &key).await {
+                    if let Ok(metadata) = serde_json::from_value::<HookMetadata>(value) {
+                        // Cache the loaded metadata
+                        self.metadata_cache.write().insert(key, metadata.clone());
+                        self.storage_stats.write().cache_misses += 1;
+                        self.storage_stats.write().total_loaded += 1;
+                        return Ok(Some(metadata));
+                    }
+                }
+            }
+        }
+
+        // Not found anywhere
         self.storage_stats.write().cache_misses += 1;
         self.storage_stats.write().total_loaded += 1;
-
-        // In a real implementation, this would load from persistent storage
-        // For now, return None as we only have in-memory cache
         Ok(None)
     }
 

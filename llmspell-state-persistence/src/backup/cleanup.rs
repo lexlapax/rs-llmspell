@@ -2,7 +2,7 @@
 // ABOUTME: Implements atomic cleanup operations with rollback capability and audit logging
 
 use super::{retention::RetentionDecision, BackupId, BackupMetadata};
-use crate::error::StateError;
+use llmspell_state_traits::StateError;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -120,7 +120,7 @@ impl BackupCleanup {
         // Get backup metadata
         let metadata = backup_index
             .get(backup_id)
-            .ok_or_else(|| StateError::NotFound(format!("Backup {} not found", backup_id)))?;
+            .ok_or_else(|| StateError::not_found("backup", backup_id))?;
 
         let backup_path = self.backup_dir.join(format!("{}.backup", backup_id));
         let metadata_path = self.backup_dir.join(format!("{}.meta", backup_id));
@@ -135,21 +135,21 @@ impl BackupCleanup {
 
         // Verify backup is not in use (simple check - could be enhanced)
         if !backup_path.exists() {
-            return Err(StateError::NotFound(format!(
-                "Backup file not found: {:?}",
-                backup_path
-            )));
+            return Err(StateError::not_found(
+                "backup_file",
+                backup_path.to_string_lossy(),
+            ));
         }
 
         // Delete backup file
-        tokio::fs::remove_file(&backup_path).await.map_err(|e| {
-            StateError::StorageError(anyhow::anyhow!("Failed to delete backup file: {}", e))
-        })?;
+        tokio::fs::remove_file(&backup_path)
+            .await
+            .map_err(|e| StateError::storage(format!("Failed to delete backup file: {}", e)))?;
 
         // Delete metadata file
         if metadata_path.exists() {
             tokio::fs::remove_file(&metadata_path).await.map_err(|e| {
-                StateError::StorageError(anyhow::anyhow!("Failed to delete metadata file: {}", e))
+                StateError::storage(format!("Failed to delete metadata file: {}", e))
             })?;
         }
 
@@ -176,7 +176,7 @@ impl BackupCleanup {
         let operation = operations
             .iter()
             .find(|op| op.id == operation_id)
-            .ok_or_else(|| StateError::NotFound(format!("Operation {} not found", operation_id)))?;
+            .ok_or_else(|| StateError::not_found("cleanup_operation", operation_id))?;
 
         warn!(
             "Rollback requested for operation {} which deleted {} backups",
@@ -189,7 +189,7 @@ impl BackupCleanup {
         // 2. Restore from trash here
         // For now, we just log the request
 
-        Err(StateError::ValidationError(
+        Err(StateError::validation_error(
             "Rollback not implemented - consider implementing trash/recycle bin functionality"
                 .to_string(),
         ))

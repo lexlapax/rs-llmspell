@@ -4,7 +4,7 @@
 use super::compatibility::RiskLevel;
 use super::{CompatibilityChecker, CompatibilityResult, EnhancedStateSchema, SemanticVersion};
 use crate::config::MigrationStep;
-use crate::error::StateError;
+use llmspell_state_traits::StateError;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, VecDeque};
 use thiserror::Error;

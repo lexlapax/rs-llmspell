@@ -6,11 +6,11 @@ use super::{
     MigrationConfig, MigrationContext, MigrationResult, ValidationLevel,
 };
 use crate::backend_adapter::StateStorageAdapter;
-use crate::error::{StateError, StateResult};
 use crate::manager::SerializableState;
 use crate::schema::{MigrationPlan, MigrationPlanner, SchemaRegistry, SemanticVersion};
 use llmspell_events::{EventBus, EventCorrelationTracker, UniversalEvent};
 use llmspell_hooks::{ComponentId, ComponentType, HookContext, HookExecutor, HookPoint};
+use llmspell_state_traits::{StateError, StateResult};
 use parking_lot::RwLock;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -516,7 +516,7 @@ impl MigrationEngine {
         self.event_bus
             .publish(event)
             .await
-            .map_err(|e| StateError::StorageError(e.into()))?;
+            .map_err(|e| StateError::storage(e.to_string()))?;
 
         Ok(())
     }
@@ -541,7 +541,7 @@ impl MigrationEngine {
         self.event_bus
             .publish(universal_event)
             .await
-            .map_err(|e| StateError::StorageError(e.into()))?;
+            .map_err(|e| StateError::storage(e.to_string()))?;
 
         // Log event for debugging
         match migration_event {

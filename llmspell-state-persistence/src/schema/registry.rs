@@ -2,7 +2,7 @@
 // ABOUTME: Provides centralized schema storage, version resolution, and schema discovery
 
 use super::{EnhancedStateSchema, SchemaVersion, SemanticVersion};
-use crate::error::{StateError, StateResult};
+use llmspell_state_traits::{StateError, StateResult};
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap};

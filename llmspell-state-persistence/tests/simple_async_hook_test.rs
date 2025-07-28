@@ -8,6 +8,7 @@ use llmspell_state_persistence::{
     performance::{AsyncHookProcessor, HookEvent, HookEventType},
     StateManager,
 };
+use llmspell_state_traits::StateScope;
 use serde_json::json;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
@@ -127,7 +128,7 @@ async fn test_state_manager_with_only_after_hooks() {
     for i in 0..10 {
         manager
             .set(
-                llmspell_state_persistence::scope::StateScope::Global,
+                StateScope::Global,
                 &format!("key_{}", i),
                 json!({ "value": i }),
             )

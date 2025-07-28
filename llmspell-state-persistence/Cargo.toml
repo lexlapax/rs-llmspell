@@ -49,6 +49,7 @@ crossbeam-skiplist = "0.1"
 llmspell-storage = { path = "../llmspell-storage" }
 llmspell-hooks = { path = "../llmspell-hooks" }
 llmspell-events = { path = "../llmspell-events" }
+llmspell-state-traits = { path = "../llmspell-state-traits" }
 
 [dev-dependencies]
 tempfile.workspace = true
