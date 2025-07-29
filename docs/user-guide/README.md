@@ -1,12 +1,12 @@
 # rs-llmspell User Guide
 
-⚠️ **EVOLVING DOCUMENTATION**: This user guide reflects the current Phase 3.3 implementation and planned future features. Features are marked with implementation status:
-- ✅ **Fully Available**: Tested and production-ready (Phases 0-3.2)
-- 🚧 **In Development**: Currently being implemented (Phase 3.3)  
-- 📋 **Planned Feature**: Designed but not yet available (Phase 4+)
+⚠️ **EVOLVING DOCUMENTATION**: This user guide reflects the current v0.5.0 release with Phase 5 complete. Features are marked with implementation status:
+- ✅ **Fully Available**: Tested and production-ready (Phases 0-5)
+- 🚧 **In Development**: Currently being implemented (Phase 6)  
+- 📋 **Planned Feature**: Designed but not yet available (Phase 7+)
 - ❌ **Not Available**: Future or removed features
 
-**Current Project Status**: Phase 3.3 - Agent Infrastructure & Basic Multi-Agent Coordination
+**Current Project Status**: Phase 5 Complete (v0.5.0) - Persistent State Management
 
 **🔗 Navigation**: [← Documentation Hub](../README.md) | [Project Home](../../README.md) | [Developer Guide](../developer-guide/) | [Technical Docs](../technical/)
 
@@ -36,7 +36,7 @@ Welcome to the rs-llmspell user documentation! This guide will help you write po
   - Parallel execution for concurrent tasks
   - Advanced tool integration patterns
 
-- **[External Tools Guide](external-tools-guide.md)** - Phase 3.1 external integration tools
+- **[External Tools Guide](external-tools-guide.md)** - External integration tools
   - Web tools (scraper, API tester, webhook caller)
   - Communication tools (email, database)
   - Quick reference and examples
@@ -47,7 +47,9 @@ Welcome to the rs-llmspell user documentation! This guide will help you write po
   - Thread-safe in-memory storage
   - Workflow state sharing patterns
   - Common patterns (counters, caching, progress tracking)
-  - Future persistence features (Phase 5)
+  - State persistence with multiple backends (Memory, Sled, RocksDB)
+  - Schema migrations and backup/recovery
+  - See [State Management Guide](../state-management/) for full persistence features
 
 ### Configuration
 - **[Configuration Guide](configuration/configuration.md)** - Configure security, resources, and deployment
@@ -70,7 +72,7 @@ Welcome to the rs-llmspell user documentation! This guide will help you write po
   - API key management
   - Rate limiting configuration
 
-### Hooks and Events (Phase 4)
+### Hooks and Events
 - **[Hooks & Events Overview](hooks-events-overview.md)** - Introduction to extensibility systems
   - Understanding hooks vs events
   - Architecture and performance characteristics
@@ -241,10 +243,9 @@ rs-llmspell includes comprehensive security features:
 
 ## 🗺️ Roadmap
 
-- **Current**: Phase 3 - Enhanced tools and agent infrastructure
-- **Phase 4**: Hook system for lifecycle management
-- **Phase 5**: Persistent state storage
-- **Phase 6**: Session and artifact management
-- **Phase 7+**: Vector storage, advanced features
+- **✅ Completed**: Phases 0-5 including persistent state, hooks, events, and 34 tools
+- **🚀 Next**: Phase 6 - Session Management & Agent Upgrades
+- **📋 Future**: Phase 7+ - GUI, Python support, vector storage, enterprise features
+- **🎯 Target**: Version 1.0 with stable API (Q4 2025)
 
 Happy scripting with rs-llmspell! 🚀

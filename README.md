@@ -4,7 +4,7 @@ Scriptable LLM interactions via Lua and JavaScript - Cast scripting spells to an
 
 ## Overview
 
-Rs-LLMSpell provides script-driven workflows for LLM interactions with 34 built-in tools, agent coordination, state management, and a powerful hook/event system for extensibility. Currently v0.4.0 (Phase 4 complete), working toward 1.0 release.
+Rs-LLMSpell provides script-driven workflows for LLM interactions with 34 built-in tools, agent coordination, persistent state management, and a powerful hook/event system for extensibility. Currently v0.5.0 (Phase 5 complete), working toward 1.0 release.
 
 ## Quick Example
 
@@ -49,6 +49,28 @@ Event.emit({
 })
 ```
 
+### Persistent State Example (v0.5.0)
+
+```lua
+-- Save state with automatic persistence
+State.save("agent:gpt-4", "conversation_history", messages)
+
+-- Load state with fallback
+local config = State.load("global", "app_config") or {theme = "dark"}
+
+-- Backup state before critical operations
+local backup_id = State.backup({description = "Before update"})
+
+-- Perform migration
+State.migrate({
+    from_version = 1,
+    to_version = 2,
+    transformations = {
+        {field = "old_field", transform = "copy", to = "new_field"}
+    }
+})
+```
+
 ## Installation
 
 ```bash
@@ -66,22 +88,24 @@ cargo build --release
 - **34 Production Tools**: File operations, web scraping, data processing, system utilities
 - **Agent Coordination**: Create and orchestrate LLM agents with different models
 - **Workflow Patterns**: Sequential, parallel, conditional, and loop execution
-- **State Management**: Thread-safe state sharing between agents and workflows
+- **Persistent State Management**: Multi-backend persistence with migration and backup support
 - **Hook System**: 40+ extensibility points with <1% performance overhead
 - **Event Bus**: Cross-language event propagation at >90K events/sec
 - **Built-in Hooks**: Logging, metrics, caching, rate limiting, retry, cost tracking, and security
-- **Security**: Comprehensive sandboxing and resource limits
+- **State Persistence**: Sled/RocksDB backends, schema migrations, atomic backups
+- **Security**: Comprehensive sandboxing, resource limits, and sensitive data protection
 - **Multi-Provider**: Support for OpenAI, Anthropic, and local models
 
 ## Current Status
 
+- **v0.5.0 Released**: Persistent state management with enterprise features (2025-07-29)
 - **v0.4.0 Released**: Hook and event system with cross-language support (2025-07-25)
 - **v0.3.0 Released**: 34 tools, agent infrastructure, and workflows (2025-07-23)
-- **Phase 3.3 Complete**: Agent infrastructure and workflow integration done
+- **Phase 5 Complete**: Production-ready state persistence with 36/36 tasks done
 - **Pre-1.0 Software**: Breaking changes expected before stable release
-- **Not Production Ready**: Use for experimentation and development only
+- **Production-Ready Components**: State persistence, tools, hooks, and events are production quality
 - See [CHANGELOG.md](CHANGELOG.md) for detailed version history
-- See [RELEASE_NOTES_v0.3.0.md](RELEASE_NOTES_v0.3.0.md) for latest release
+- See [RELEASE_NOTES_v0.5.0.md](RELEASE_NOTES_v0.5.0.md) for latest release
 
 ## Documentation
 

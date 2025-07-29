@@ -1,8 +1,8 @@
 # Rs-LLMSpell Examples
 
-**Current Version**: Phase 4.8.1 Complete  
+**Current Version**: Phase 5 Complete (v0.5.0)  
 **Available Tools**: 34 production tools  
-**Features**: Agents, Workflows, Tools, State Management, Hooks, Events
+**Features**: Agents, Workflows, Tools, Persistent State Management, Hooks, Events
 
 **🔗 Navigation**: [← Project Home](../README.md) | [Documentation Hub](../docs/README.md) | [User Guide](../docs/user-guide/README.md)
 
@@ -10,7 +10,7 @@
 
 ## Overview
 
-This directory contains working examples demonstrating rs-llmspell capabilities. All examples are tested and work with the current Phase 4.8.1 implementation, including comprehensive hook and event system integration.
+This directory contains working examples demonstrating rs-llmspell capabilities. All examples are tested and work with the current v0.5.0 release (Phase 5), including persistent state management, comprehensive hook and event system integration.
 
 ## 📁 Directory Structure
 
@@ -21,15 +21,27 @@ examples/
 ├── provider-info.lua           # Provider configuration info
 ├── streaming-demo.lua          # Streaming responses
 ├── multimodal-stub.lua         # Multimodal capabilities
-├── llmspell.toml              # Example configuration
-├── minimal.toml               # Minimal configuration
+├── configs/                    # Configuration examples
+│   ├── llmspell.toml          # Full configuration
+│   ├── minimal.toml           # Minimal configuration
+│   ├── state-enabled.toml     # State persistence config
+│   ├── backup-enabled.toml    # Backup configuration
+│   └── migration-enabled.toml # Migration configuration
+├── state_persistence/          # State persistence examples (Phase 5)
+│   ├── basic_operations.lua   # Lua state operations
+│   ├── basic_operations.rs    # Rust state operations
+│   └── configs/               # State configs
 ├── lua/
 │   ├── agents/                 # Agent examples (10 files)
 │   ├── tools/                  # Tool examples (13 files)
 │   ├── workflows/              # Workflow examples (9 files)
-│   ├── hooks/                  # Hook system examples (10 files)
+│   ├── hooks/                  # Hook system examples (14 files)
 │   ├── events/                 # Event system examples (10 files)
-│   ├── integration/            # Real-world integration examples (3 files)
+│   ├── state/                  # State management examples (8 files)
+│   ├── backup/                 # Backup examples (3 files)
+│   ├── migration/              # Migration examples (3 files)
+│   ├── operational_recovery/   # Recovery procedures (3 files)
+│   ├── integration/            # Real-world integration examples (5 files)
 │   ├── run-all-examples.lua    # Master runner for all examples
 │   ├── run-integration-demos.lua  # Integration demo runner
 │   └── run-performance-benchmarks.lua  # Performance testing runner
@@ -100,6 +112,25 @@ llmspell run examples/lua/events/event-cross-language.lua
 
 # Run integration demos
 llmspell run examples/lua/run-integration-demos.lua
+```
+
+### State Persistence Examples (Phase 5)
+
+```bash
+# Run quick start example
+cd examples/state_persistence && ./run_quick_start.sh
+
+# Run specific state examples
+llmspell run examples/lua/state/basic_persistence.lua
+llmspell run examples/lua/state/agent_state_persistence.lua
+llmspell run examples/lua/state/scope_isolation.lua
+
+# Run backup examples
+llmspell run examples/lua/backup/state_backup.lua
+llmspell run examples/lua/backup/retention_policy.lua
+
+# Run migration examples
+llmspell run examples/lua/migration/schema_migration.lua
 
 # Run performance benchmarks
 llmspell run examples/lua/run-performance-benchmarks.lua
@@ -410,7 +441,7 @@ To add new examples:
 
 ## 🪝 Hook & Event System Overview
 
-Phase 4.8.1 introduces a comprehensive hook and event system enabling advanced automation, monitoring, and coordination patterns.
+Phase 5 (v0.5.0) includes persistent state management with multi-backend support, enabling enterprise-grade state persistence, migrations, and backup capabilities.
 
 ### Hook System Architecture
 
