@@ -50,11 +50,12 @@ pub enum HookPoint {
     ResourceLimitExceeded,
     SecurityViolation,
 
-    // Session hooks (4 states)
+    // Session hooks (5 states)
     SessionStart,
     SessionEnd,
     SessionCheckpoint,
     SessionRestore,
+    SessionSave,
 
     // Event hooks (3 states)
     BeforeEventEmit,

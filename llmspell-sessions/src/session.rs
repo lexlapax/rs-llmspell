@@ -197,6 +197,9 @@ impl Session {
     }
 }
 
+/// Current snapshot format version
+pub const SNAPSHOT_VERSION: u32 = 1;
+
 /// Serializable representation of a session for persistence
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionSnapshot {
@@ -210,6 +213,13 @@ pub struct SessionSnapshot {
     pub artifact_ids: Vec<String>,
     /// Snapshot timestamp
     pub snapshot_at: DateTime<Utc>,
+    /// Snapshot format version
+    #[serde(default = "default_version")]
+    pub version: u32,
+}
+
+fn default_version() -> u32 {
+    0 // For backward compatibility with snapshots that don't have a version
 }
 
 impl Session {
@@ -221,6 +231,7 @@ impl Session {
             state: self.state.read().await.clone(),
             artifact_ids: self.artifact_ids.read().await.clone(),
             snapshot_at: Utc::now(),
+            version: SNAPSHOT_VERSION,
         }
     }
 

@@ -15,12 +15,14 @@ use llmspell_events::{
     universal_event::{Language, UniversalEvent},
 };
 use llmspell_hooks::{
-    ComponentId, ComponentType, HookContext, HookExecutor, HookPoint, HookRegistry,
+    ComponentId, ComponentType, HookContext, HookExecutor, HookPoint, HookRegistry, LoggingHook,
+    MetricsHook,
 };
 use llmspell_state_persistence::StateManager;
 use llmspell_state_traits::StateScope;
 use llmspell_storage::StorageBackend;
 use std::collections::HashMap;
+use std::str::FromStr;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::time::{interval, Duration};
@@ -92,6 +94,11 @@ impl SessionManager {
                     format!("Failed to create storage directory: {e}"),
                 ))
             })?;
+        }
+
+        // Register built-in hooks for session lifecycle
+        if config.hook_config.enable_lifecycle_hooks {
+            Self::register_builtin_hooks(&hook_registry)?;
         }
 
         let manager = Self {
@@ -531,6 +538,30 @@ impl SessionManager {
         let snapshot = session.snapshot().await;
         let session_id = snapshot.metadata.id;
 
+        // Fire pre-save hooks
+        if self.config.hook_config.enable_lifecycle_hooks {
+            let hooks = self.hook_registry.get_hooks(&HookPoint::SessionSave);
+            let component_id = ComponentId::new(
+                ComponentType::Custom("SessionManager".to_string()),
+                "session-manager".to_string(),
+            );
+
+            for hook in hooks {
+                let mut context = HookContext::new(HookPoint::SessionSave, component_id.clone());
+                context.data.insert(
+                    "session_id".to_string(),
+                    serde_json::json!(session_id.to_string()),
+                );
+                context
+                    .data
+                    .insert("action".to_string(), serde_json::json!("save"));
+
+                if let Err(e) = hook.execute(&mut context).await {
+                    warn!("Session save hook failed: {e}");
+                }
+            }
+        }
+
         // Serialize snapshot
         let data = if self.config.enable_compression {
             let serialized = bincode::serialize(&snapshot)?;
@@ -577,6 +608,15 @@ impl SessionManager {
         } else {
             bincode::deserialize(&data)?
         };
+
+        // Check version compatibility
+        if snapshot.version > crate::session::SNAPSHOT_VERSION {
+            return Err(SessionError::Configuration(format!(
+                "Session snapshot version {} is newer than supported version {}",
+                snapshot.version,
+                crate::session::SNAPSHOT_VERSION
+            )));
+        }
 
         // Restore session
         let session = Session::from_snapshot(snapshot);
@@ -692,10 +732,118 @@ impl SessionManager {
         Ok(())
     }
 
+    /// Save all active sessions
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any session fails to save
+    pub async fn save_all_active_sessions(&self) -> Result<()> {
+        let sessions = self.active_sessions.read().await;
+        let mut errors = Vec::new();
+
+        for session in sessions.values() {
+            if let Err(e) = self.save_session(session).await {
+                errors.push(format!(
+                    "Failed to save session {}: {e}",
+                    session.id().await
+                ));
+            }
+        }
+
+        if !errors.is_empty() {
+            return Err(SessionError::Storage(errors.join("; ")));
+        }
+
+        info!("Saved {} active sessions", sessions.len());
+        Ok(())
+    }
+
+    /// Restore recent sessions
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if session listing or restoration fails
+    pub async fn restore_recent_sessions(&self, count: usize) -> Result<Vec<SessionId>> {
+        // List all stored sessions
+        let prefix = "session:";
+        let keys = self
+            .storage_backend
+            .list_keys(prefix)
+            .await
+            .map_err(|e| SessionError::Storage(e.to_string()))?;
+
+        // Sort by modification time (newest first)
+        let mut session_infos = Vec::new();
+        for key in keys {
+            if let Some(session_id_str) = key.strip_prefix("session:") {
+                if let Ok(session_id) = SessionId::from_str(session_id_str) {
+                    // Get metadata to check updated_at
+                    match self.load_session(&session_id).await {
+                        Ok(session) => {
+                            let metadata = session.metadata.read().await;
+                            session_infos.push((session_id, metadata.updated_at));
+                        }
+                        Err(e) => {
+                            warn!("Failed to load session metadata for {session_id}: {e}");
+                        }
+                    }
+                }
+            }
+        }
+
+        // Sort by updated_at (newest first)
+        session_infos.sort_by(|a, b| b.1.cmp(&a.1));
+
+        // Restore the most recent sessions
+        let mut restored = Vec::new();
+        for (session_id, _) in session_infos.into_iter().take(count) {
+            match self.load_session(&session_id).await {
+                Ok(_) => {
+                    restored.push(session_id);
+                }
+                Err(e) => {
+                    warn!("Failed to restore session {session_id}: {e}");
+                }
+            }
+        }
+
+        info!("Restored {} recent sessions", restored.len());
+        Ok(restored)
+    }
+
     /// Shutdown the manager
     pub async fn shutdown(&self) {
         *self.shutdown.write().await = true;
         info!("SessionManager shutdown initiated");
+    }
+
+    /// Register built-in hooks for session lifecycle events
+    fn register_builtin_hooks(registry: &Arc<HookRegistry>) -> Result<()> {
+        // Register hooks for all session lifecycle events
+        let session_points = vec![
+            HookPoint::SessionStart,
+            HookPoint::SessionEnd,
+            HookPoint::SessionCheckpoint,
+            HookPoint::SessionRestore,
+            HookPoint::SessionSave,
+        ];
+
+        for point in session_points {
+            // Register logging hook
+            registry
+                .register(point.clone(), LoggingHook::new())
+                .map_err(|e| {
+                    SessionError::Configuration(format!("Failed to register logging hook: {e}"))
+                })?;
+
+            // Register metrics hook
+            registry.register(point, MetricsHook::new()).map_err(|e| {
+                SessionError::Configuration(format!("Failed to register metrics hook: {e}"))
+            })?;
+        }
+
+        info!("Registered built-in hooks for session lifecycle events");
+        Ok(())
     }
 }
 
