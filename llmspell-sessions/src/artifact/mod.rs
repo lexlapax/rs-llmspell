@@ -5,6 +5,7 @@ pub mod metadata;
 pub mod session_artifact;
 pub mod storage;
 pub mod types;
+pub mod versioning;
 
 pub use session_artifact::SessionArtifact;
 pub use storage::{

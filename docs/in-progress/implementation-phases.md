@@ -444,7 +444,7 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 - HNSW indexing for performance
 - Document chunking and embedding strategies
 - Tree-sitter parser integration for code analysis
-- Integration with external vector databases (optional)
+- Integration with external vector databases 
 
 **Success Criteria**:
 - [ ] Vector storage backends operational (memory, disk-based)
@@ -521,47 +521,7 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 
 ## Advanced Integration Phases
 
-### **Phase 9: Multimodal Tools Implementation (Weeks 27-28)**
-
-**Goal**: Implement comprehensive multimodal processing tools  
-**Priority**: MEDIUM (Feature Enhancement)
-**Dependencies**: Requires Phase 8 Workflow Orchestration for multimodal workflows
-**Phase 4 Integration**: Media processing hooks enable dynamic parameter adjustment, progress tracking, and cost monitoring for expensive operations.
-
-**Components**:
-- Image processing tools (resize, crop, format conversion)
-- OCR tool with multiple language support
-- Video processing tools (frame extraction, thumbnail generation)
-- Audio transcription tool (stub with interface)
-- Media format conversion utilities
-- Integration with multimodal workflows
-- **Hook-based parameter optimization for large media files**
-- **Progress hooks for long-running operations**
-- **Cost tracking for AI-powered media analysis**
-
-**Success Criteria**:
-- [ ] Image processing tools handle common formats (PNG, JPEG, WebP)
-- [ ] OCR tool extracts text from images accurately
-- [ ] Video tools can extract frames and generate thumbnails
-- [ ] Audio transcription interface defined (implementation can be stub)
-- [ ] Tools integrate smoothly with streaming workflows
-- [ ] Media type validation works correctly
-- [ ] **Hooks automatically optimize processing for large files**
-- [ ] **Progress events emitted for operations >1 second**
-- [ ] **Cost tracking accurate for AI operations**
-
-**Testing Requirements**:
-- Individual tool functionality tests
-- Media format compatibility tests
-- Integration tests with workflows
-- Performance benchmarks for media processing
-- Error handling for invalid media
-- **Hook-based optimization tests**
-- **Progress tracking accuracy tests**
-
----
-
-### **Phase 10: REPL Interactive Mode (Weeks 29-30)**
+### **Phase 9: REPL Interactive Mode (Weeks 29-30)**
 
 **Goal**: Implement interactive REPL for development and debugging  
 **Priority**: MEDIUM (Developer Experience)
@@ -605,7 +565,7 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 
 ---
 
-### **Phase 11: Daemon and Service Mode (Weeks 31-32)**
+### **Phase 10: Daemon and Service Mode (Weeks 31-32)**
 
 **Goal**: Implement long-running daemon mode with scheduler  
 **Priority**: LOW (Advanced Feature)
@@ -652,7 +612,7 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 
 ---
 
-### **Phase 12: MCP Tool Integration (Weeks 33-34)**
+### **Phase 11: MCP Tool Integration (Weeks 33-34)**
 
 **Goal**: Support Model Control Protocol for external tools  
 **Priority**: LOW (Advanced Integration)
@@ -679,7 +639,7 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 
 ---
 
-### **Phase 13: MCP Server Mode (Weeks 35-36)**
+### **Phase 12: MCP Server Mode (Weeks 35-36)**
 
 **Goal**: Expose rs-llmspell tools and agents via MCP protocol  
 **Priority**: LOW (Advanced Integration)
@@ -706,41 +666,7 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 
 ---
 
-### **Phase 14: AI/ML Complex Tools (Weeks 37-38)**
-
-**Goal**: Implement AI and ML dependent complex tools  
-**Priority**: MEDIUM (Advanced AI Features)
-**Phase 4 Integration**: CostTrackingHook, RateLimitHook, and RetryHook from Phase 4 are essential for production AI/ML tool deployment.
-
-**Components**:
-- **AI/ML Tools** (6 tools): text_summarizer, sentiment_analyzer, language_detector, text_classifier, named_entity_recognizer, embedding_generator
-- **Advanced Multimodal** (8 tools): image_analyzer, ocr_extractor, audio_transcriber, image_generator, media_converter, face_detector, scene_analyzer
-- Model loading and inference infrastructure
-- Local model support and optimization
-- **AI/ML Tools with automatic cost tracking via Phase 4 hooks**
-- **Rate limiting with backoff for API quota management**
-- **Retry mechanisms for transient AI service failures**
-
-**Success Criteria**:
-- [ ] All AI/ML tools functional with local models
-- [ ] Advanced multimodal tools handle complex operations
-- [ ] Model loading and caching optimized
-- [ ] Performance acceptable for production use
-- [ ] Integration with vector storage (from Phase 7)
-- [ ] **Cost tracking accurate for all AI operations**
-- [ ] **Rate limiting prevents API quota exhaustion**
-- [ ] **Automatic retry handles transient failures**
-
-**Testing Requirements**:
-- AI/ML tool accuracy validation
-- Model loading performance tests
-- Advanced multimodal integration tests
-- Memory usage optimization tests
-- Production deployment validation
-
----
-
-### **Phase 15: JavaScript Engine Support (Weeks 39-40)**
+### **Phase 13: JavaScript Engine Support (Weeks 39-40)**
 
 **Goal**: Add JavaScript as second script engine using existing ScriptEngineBridge infrastructure  
 **Priority**: MEDIUM (Enhancement)
@@ -790,6 +716,81 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 - Cross-engine integration tests
 
 ---
+
+### **Phase 14: Multimodal Tools Implementation (Weeks 27-28)**
+
+**Goal**: Implement comprehensive multimodal processing tools  
+**Priority**: MEDIUM (Feature Enhancement)
+**Dependencies**: Requires Phase 8 Workflow Orchestration for multimodal workflows
+**Phase 4 Integration**: Media processing hooks enable dynamic parameter adjustment, progress tracking, and cost monitoring for expensive operations.
+
+**Components**:
+- Image processing tools (resize, crop, format conversion)
+- OCR tool with multiple language support
+- Video processing tools (frame extraction, thumbnail generation)
+- Audio transcription tool (stub with interface)
+- Media format conversion utilities
+- Integration with multimodal workflows
+- **Hook-based parameter optimization for large media files**
+- **Progress hooks for long-running operations**
+- **Cost tracking for AI-powered media analysis**
+
+**Success Criteria**:
+- [ ] Image processing tools handle common formats (PNG, JPEG, WebP)
+- [ ] OCR tool extracts text from images accurately
+- [ ] Video tools can extract frames and generate thumbnails
+- [ ] Audio transcription interface defined (implementation can be stub)
+- [ ] Tools integrate smoothly with streaming workflows
+- [ ] Media type validation works correctly
+- [ ] **Hooks automatically optimize processing for large files**
+- [ ] **Progress events emitted for operations >1 second**
+- [ ] **Cost tracking accurate for AI operations**
+
+**Testing Requirements**:
+- Individual tool functionality tests
+- Media format compatibility tests
+- Integration tests with workflows
+- Performance benchmarks for media processing
+- Error handling for invalid media
+- **Hook-based optimization tests**
+- **Progress tracking accuracy tests**
+
+---
+
+### **Phase 15: AI/ML Complex Tools (Weeks 37-38)**
+
+**Goal**: Implement AI and ML dependent complex tools  
+**Priority**: MEDIUM (Advanced AI Features)
+**Phase 4 Integration**: CostTrackingHook, RateLimitHook, and RetryHook from Phase 4 are essential for production AI/ML tool deployment.
+
+**Components**:
+- **AI/ML Tools** (6 tools): text_summarizer, sentiment_analyzer, language_detector, text_classifier, named_entity_recognizer, embedding_generator
+- **Advanced Multimodal** (8 tools): image_analyzer, ocr_extractor, audio_transcriber, image_generator, media_converter, face_detector, scene_analyzer
+- Model loading and inference infrastructure
+- Local model support and optimization
+- **AI/ML Tools with automatic cost tracking via Phase 4 hooks**
+- **Rate limiting with backoff for API quota management**
+- **Retry mechanisms for transient AI service failures**
+
+**Success Criteria**:
+- [ ] All AI/ML tools functional with local models
+- [ ] Advanced multimodal tools handle complex operations
+- [ ] Model loading and caching optimized
+- [ ] Performance acceptable for production use
+- [ ] Integration with vector storage (from Phase 7)
+- [ ] **Cost tracking accurate for all AI operations**
+- [ ] **Rate limiting prevents API quota exhaustion**
+- [ ] **Automatic retry handles transient failures**
+
+**Testing Requirements**:
+- AI/ML tool accuracy validation
+- Model loading performance tests
+- Advanced multimodal integration tests
+- Memory usage optimization tests
+- Production deployment validation
+
+---
+
 
 ## Platform Support Phases
 

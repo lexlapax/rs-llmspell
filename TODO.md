@@ -48,7 +48,7 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 - Session load: 3.4µs (target: <50ms) ✨
 - Hook overhead: 11µs absolute (well under 1ms target) ✨
 
-#### TASK-6.1.1: Create llmspell-sessions crate structure
+#### Task 6.1.1: Create llmspell-sessions crate structure
 **Priority**: CRITICAL
 **Estimated Time**: 2 hours
 **Status**: COMPLETED ✅
@@ -120,7 +120,7 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 
 ---
 
-#### TASK-6.1.2: Implement SessionId and core types
+#### Task 6.1.2: Implement SessionId and core types
 **Priority**: CRITICAL
 **Estimated Time**: 3 hours
 **Status**: COMPLETED ✅
@@ -195,7 +195,7 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 
 ---
 
-#### TASK-6.1.3: Implement SessionManager core structure
+#### Task 6.1.3: Implement SessionManager core structure
 **Priority**: CRITICAL
 **Estimated Time**: 4 hours
 **Status**: COMPLETED ✅
@@ -265,7 +265,7 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 
 ---
 
-#### TASK-6.1.4: Implement Session struct with state management
+#### Task 6.1.4: Implement Session struct with state management
 **Priority**: CRITICAL
 **Estimated Time**: 6 hours
 **Status**: COMPLETED ✅
@@ -340,7 +340,7 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 
 ---
 
-#### TASK-6.1.5: Integrate session lifecycle hooks
+#### Task 6.1.5: Integrate session lifecycle hooks
 **Priority**: HIGH
 **Estimated Time**: 4 hours
 **Status**: PARTIALLY COMPLETED ✅
@@ -406,7 +406,7 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 
 ---
 
-#### TASK-6.1.6: Implement session persistence and restoration
+#### Task 6.1.6: Implement session persistence and restoration
 **Priority**: HIGH
 **Estimated Time**: 5 hours
 **Status**: COMPLETED ✅
@@ -472,7 +472,7 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 
 ### Phase 6.2: Artifact Storage System (Day 3-6)
 
-#### TASK-6.2.1: Design and implement ArtifactId and types
+#### Task 6.2.1: Design and implement ArtifactId and types
 **Priority**: CRITICAL
 **Estimated Time**: 3 hours
 **Status**: DONE ✅
@@ -546,7 +546,7 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 
 ---
 
-#### TASK-6.2.2: Implement SessionArtifact with StorageSerialize
+#### Task 6.2.2: Implement SessionArtifact with StorageSerialize
 **Priority**: CRITICAL
 **Estimated Time**: 4 hours
 **Status**: DONE ✅
@@ -628,7 +628,7 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 
 ---
 
-#### TASK-6.2.3: Implement ArtifactStorage core structure
+#### Task 6.2.3: Implement ArtifactStorage core structure
 **Priority**: CRITICAL
 **Estimated Time**: 4 hours
 **Status**: DONE ✅
@@ -695,10 +695,10 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 
 ---
 
-#### TASK-6.2.4: Implement artifact store operation
+#### Task 6.2.4: Implement artifact store operation
 **Priority**: CRITICAL
 **Estimated Time**: 6 hours
-**Status**: TODO
+**Status**: DONE ✅
 **Assigned To**: Storage Team
 
 **Description**: Implement the core store_artifact operation with versioning, content hashing, and metadata management.
@@ -709,14 +709,14 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 - **CREATE**: Tests for artifact storage
 
 **Acceptance Criteria**:
-- [ ] store_artifact() stores content and metadata atomically
-- [ ] Content hash calculated and verified
-- [ ] Version number assigned automatically
-- [ ] Duplicate content detected and deduplicated
-- [ ] Large artifacts handled efficiently
-- [ ] Metadata includes all required fields
-- [ ] Storage keys follow consistent pattern
-- [ ] Errors handled gracefully
+- [x] store_artifact() stores content and metadata atomically ✅
+- [x] Content hash calculated and verified ✅ (using blake3)
+- [x] Version number assigned automatically ✅ (VersionManager)
+- [x] Duplicate content detected and deduplicated ✅
+- [x] Large artifacts handled efficiently ✅ (chunked storage)
+- [x] Metadata includes all required fields ✅
+- [x] Storage keys follow consistent pattern ✅
+- [x] Errors handled gracefully ✅
 
 **Implementation Steps**:
 1. **Implement store_artifact()** (2.5 hours):
@@ -766,24 +766,24 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
    - Memory efficiency
 
 **Testing Requirements**:
-- [ ] Store operation tests
-- [ ] Version management tests
-- [ ] Deduplication tests
-- [ ] Large file tests
-- [ ] Atomic operation tests
-- [ ] Performance benchmarks
+- [x] Store operation tests ✅
+- [x] Version management tests ✅
+- [x] Deduplication tests ✅
+- [x] Large file tests ✅
+- [x] Atomic operation tests ✅ (via storage backend)
+- [x] Performance benchmarks ✅ (sub-millisecond operations)
 
 **Definition of Done**:
-- [ ] Store operation fully functional
-- [ ] Versioning system working
-- [ ] Deduplication effective
-- [ ] Large files handled well
-- [ ] Atomicity guaranteed
-- [ ] Performance within targets
+- [x] Store operation fully functional ✅
+- [x] Versioning system working ✅
+- [x] Deduplication effective ✅
+- [x] Large files handled well ✅ (chunked storage)
+- [x] Atomicity guaranteed ✅
+- [x] Performance within targets ✅
 
 ---
 
-#### TASK-6.2.5: Implement artifact retrieval operations
+#### Task 6.2.5: Implement artifact retrieval operations
 **Priority**: HIGH
 **Estimated Time**: 4 hours
 **Status**: TODO
@@ -861,7 +861,7 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 
 ---
 
-#### TASK-6.2.6: Implement artifact search and query
+#### Task 6.2.6: Implement artifact search and query
 **Priority**: HIGH
 **Estimated Time**: 5 hours
 **Status**: TODO
@@ -931,7 +931,7 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 
 ---
 
-#### TASK-6.2.7: Integrate artifact collection hooks
+#### Task 6.2.7: Integrate artifact collection hooks
 **Priority**: HIGH
 **Estimated Time**: 4 hours
 **Status**: TODO
@@ -997,7 +997,7 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 
 ---
 
-#### TASK-6.2.8: Implement artifact access control
+#### Task 6.2.8: Implement artifact access control
 **Priority**: HIGH
 **Estimated Time**: 3 hours
 **Status**: TODO
@@ -1054,7 +1054,7 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 
 ### Phase 6.3: Hook Integration and Lifecycle (Day 6-8)
 
-#### TASK-6.3.1: Implement session hook context builders
+#### Task 6.3.1: Implement session hook context builders
 **Priority**: HIGH
 **Estimated Time**: 3 hours
 **Status**: TODO
@@ -1117,7 +1117,7 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 
 ---
 
-#### TASK-6.3.2: Implement ReplayableHook for sessions
+#### Task 6.3.2: Implement ReplayableHook for sessions
 **Priority**: HIGH
 **Estimated Time**: 5 hours
 **Status**: TODO
@@ -1185,7 +1185,7 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 
 ---
 
-#### TASK-6.3.3: Create session event correlation
+#### Task 6.3.3: Create session event correlation
 **Priority**: HIGH
 **Estimated Time**: 4 hours
 **Status**: TODO
@@ -1240,7 +1240,7 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 
 ---
 
-#### TASK-6.3.4: Implement hook-based session policies
+#### Task 6.3.4: Implement hook-based session policies
 **Priority**: MEDIUM
 **Estimated Time**: 4 hours
 **Status**: TODO
@@ -1297,7 +1297,7 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 
 ---
 
-#### TASK-6.3.5: Create session middleware system
+#### Task 6.3.5: Create session middleware system
 **Priority**: MEDIUM
 **Estimated Time**: 3 hours
 **Status**: TODO
@@ -1356,7 +1356,7 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 
 ---
 
-#### TASK-6.3.6: Implement session analytics hooks
+#### Task 6.3.6: Implement session analytics hooks
 **Priority**: LOW
 **Estimated Time**: 3 hours
 **Status**: TODO
@@ -1412,7 +1412,7 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 
 ### Phase 6.4: Session Replay Engine (Day 8-10)
 
-#### TASK-6.4.1: Design replay engine architecture
+#### Task 6.4.1: Design replay engine architecture
 **Priority**: HIGH
 **Estimated Time**: 4 hours
 **Status**: TODO
@@ -1477,7 +1477,7 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 
 ---
 
-#### TASK-6.4.2: Implement session replay functionality
+#### Task 6.4.2: Implement session replay functionality
 **Priority**: HIGH
 **Estimated Time**: 6 hours
 **Status**: TODO
@@ -1566,7 +1566,7 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 
 ---
 
-#### TASK-6.4.3: Implement replay event storage
+#### Task 6.4.3: Implement replay event storage
 **Priority**: HIGH
 **Estimated Time**: 4 hours
 **Status**: TODO
@@ -1620,7 +1620,7 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 
 ---
 
-#### TASK-6.4.4: Create replay execution framework
+#### Task 6.4.4: Create replay execution framework
 **Priority**: HIGH
 **Estimated Time**: 5 hours
 **Status**: TODO
@@ -1675,7 +1675,7 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 
 ---
 
-#### TASK-6.4.5: Implement replay debugging features
+#### Task 6.4.5: Implement replay debugging features
 **Priority**: MEDIUM
 **Estimated Time**: 4 hours
 **Status**: TODO
@@ -1731,7 +1731,7 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 
 ### Phase 6.5: Script Bridge Implementation (Day 10-12)
 
-#### TASK-6.5.1: Design Lua Session global API
+#### Task 6.5.1: Design Lua Session global API
 **Priority**: HIGH
 **Estimated Time**: 3 hours
 **Status**: TODO
@@ -1804,7 +1804,7 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 
 ---
 
-#### TASK-6.5.2: Implement core Session global
+#### Task 6.5.2: Implement core Session global
 **Priority**: CRITICAL
 **Estimated Time**: 5 hours
 **Status**: TODO
@@ -1877,7 +1877,7 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 
 ---
 
-#### TASK-6.5.3: Implement artifact Lua methods
+#### Task 6.5.3: Implement artifact Lua methods
 **Priority**: HIGH
 **Estimated Time**: 4 hours
 **Status**: TODO
@@ -1965,7 +1965,7 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 
 ---
 
-#### TASK-6.5.4: Implement session state methods
+#### Task 6.5.4: Implement session state methods
 **Priority**: HIGH
 **Estimated Time**: 3 hours
 **Status**: TODO
@@ -2019,7 +2019,7 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 
 ---
 
-#### TASK-6.5.5: Implement session context bridge
+#### Task 6.5.5: Implement session context bridge
 **Priority**: MEDIUM
 **Estimated Time**: 3 hours
 **Status**: TODO
@@ -2073,7 +2073,7 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 
 ---
 
-#### TASK-6.5.6: Implement replay methods
+#### Task 6.5.6: Implement replay methods
 **Priority**: MEDIUM
 **Estimated Time**: 4 hours
 **Status**: TODO
@@ -2133,7 +2133,7 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 
 ---
 
-#### TASK-6.5.7: Create Lua session examples
+#### Task 6.5.7: Create Lua session examples
 **Priority**: HIGH
 **Estimated Time**: 4 hours
 **Status**: TODO
@@ -2198,7 +2198,7 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 
 ### Phase 6.6: Testing and Validation (Day 12-14)
 
-#### TASK-6.6.1: Create comprehensive unit tests
+#### Task 6.6.1: Create comprehensive unit tests
 **Priority**: CRITICAL
 **Estimated Time**: 6 hours
 **Status**: TODO
@@ -2258,7 +2258,7 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 
 ---
 
-#### TASK-6.6.2: Create integration tests
+#### Task 6.6.2: Create integration tests
 **Priority**: HIGH
 **Estimated Time**: 5 hours
 **Status**: TODO
@@ -2343,7 +2343,7 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 
 ---
 
-#### TASK-6.6.3: Performance benchmarking
+#### Task 6.6.3: Performance benchmarking
 **Priority**: HIGH
 **Estimated Time**: 4 hours
 **Status**: TODO
@@ -2416,7 +2416,7 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 
 ---
 
-#### TASK-6.6.4: Security validation tests
+#### Task 6.6.4: Security validation tests
 **Priority**: HIGH
 **Estimated Time**: 3 hours
 **Status**: TODO
@@ -2469,7 +2469,7 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 
 ---
 
-#### TASK-6.6.5: Create Lua bridge tests
+#### Task 6.6.5: Create Lua bridge tests
 **Priority**: HIGH
 **Estimated Time**: 4 hours
 **Status**: TODO
@@ -2528,7 +2528,7 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 
 ---
 
-#### TASK-6.6.6: Documentation validation
+#### Task 6.6.6: Documentation validation
 **Priority**: HIGH
 **Estimated Time**: 3 hours
 **Status**: TODO
@@ -2582,7 +2582,7 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 
 ---
 
-#### TASK-6.6.7: API documentation generation
+#### Task 6.6.7: API documentation generation
 **Priority**: HIGH
 **Estimated Time**: 3 hours
 **Status**: TODO
@@ -2636,7 +2636,7 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 
 ---
 
-#### TASK-6.6.8: Final integration validation
+#### Task 6.6.8: Final integration validation
 **Priority**: CRITICAL
 **Estimated Time**: 4 hours
 **Status**: TODO

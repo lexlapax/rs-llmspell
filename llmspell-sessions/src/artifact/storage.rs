@@ -3,6 +3,7 @@
 
 use super::session_artifact::SessionArtifact;
 use super::types::{ArtifactId, ArtifactMetadata, ArtifactType, ContentHash};
+use super::versioning::VersionManager;
 use crate::{Result, SessionError, SessionId};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
@@ -88,6 +89,8 @@ pub struct ArtifactStorage {
     session_stats: Arc<RwLock<HashMap<SessionId, SessionStorageStats>>>,
     /// Content deduplication index (`content_hash` -> `reference_count`)
     dedup_index: Arc<RwLock<HashMap<ContentHash, usize>>>,
+    /// Version manager for tracking artifact versions
+    version_manager: Arc<VersionManager>,
 }
 
 impl ArtifactStorage {
@@ -100,12 +103,18 @@ impl ArtifactStorage {
         let cache_size = std::num::NonZeroUsize::new(config.cache_size)
             .unwrap_or(std::num::NonZeroUsize::new(100).unwrap());
 
+        let version_manager = Arc::new(VersionManager::new(
+            storage_backend.clone(),
+            config.key_prefix.clone(),
+        ));
+
         Self {
             storage_backend,
             config,
             metadata_cache: Arc::new(RwLock::new(lru::LruCache::new(cache_size))),
             session_stats: Arc::new(RwLock::new(HashMap::new())),
             dedup_index: Arc::new(RwLock::new(HashMap::new())),
+            version_manager,
         }
     }
 
@@ -309,6 +318,83 @@ impl ArtifactStorage {
         Ok(())
     }
 
+    /// Store content in chunks for large artifacts
+    #[allow(dead_code)]
+    async fn store_chunked_content(
+        &self,
+        content_hash: &ContentHash,
+        content: &[u8],
+    ) -> Result<()> {
+        let chunk_size = self.config.chunk_size;
+        let total_chunks = content.len().div_ceil(chunk_size);
+
+        // Store each chunk
+        for (i, chunk) in content.chunks(chunk_size).enumerate() {
+            #[allow(clippy::cast_possible_truncation)]
+            let chunk_key = self.chunk_key(content_hash, i as u32);
+            self.storage_backend
+                .set(&chunk_key, chunk.to_vec())
+                .await
+                .map_err(|e| SessionError::Storage(format!("Failed to store chunk {i}: {e}")))?;
+        }
+
+        // Store chunk metadata
+        let metadata_key = format!(
+            "{}/chunks/{}/metadata",
+            self.config.key_prefix, content_hash
+        );
+        let chunk_metadata = serde_json::json!({
+            "total_chunks": total_chunks,
+            "chunk_size": chunk_size,
+            "total_size": content.len(),
+        });
+
+        self.storage_backend
+            .set(&metadata_key, serde_json::to_vec(&chunk_metadata).unwrap())
+            .await
+            .map_err(|e| SessionError::Storage(format!("Failed to store chunk metadata: {e}")))?;
+
+        Ok(())
+    }
+
+    /// Add artifact to session's artifact list
+    #[allow(dead_code)]
+    async fn add_to_session_artifacts(
+        &self,
+        session_id: &SessionId,
+        artifact_id: &ArtifactId,
+    ) -> Result<()> {
+        let key = self.session_artifacts_key(session_id);
+
+        // Get existing list
+        let mut artifact_ids: Vec<ArtifactId> = match self.storage_backend.get(&key).await {
+            Ok(Some(data)) => bincode::deserialize(&data).map_err(|e| {
+                SessionError::Deserialization(format!("Failed to deserialize artifact list: {e}"))
+            })?,
+            Ok(None) => Vec::new(),
+            Err(e) => {
+                return Err(SessionError::Storage(format!(
+                    "Failed to get artifact list: {e}"
+                )))
+            }
+        };
+
+        // Add new artifact ID
+        artifact_ids.push(artifact_id.clone());
+
+        // Store updated list
+        let data = bincode::serialize(&artifact_ids).map_err(|e| {
+            SessionError::Serialization(format!("Failed to serialize artifact list: {e}"))
+        })?;
+
+        self.storage_backend
+            .set(&key, data)
+            .await
+            .map_err(|e| SessionError::Storage(format!("Failed to store artifact list: {e}")))?;
+
+        Ok(())
+    }
+
     /// Check if adding an artifact would exceed storage limits
     #[allow(dead_code)]
     async fn check_storage_limits(
@@ -395,9 +481,104 @@ pub struct ArtifactQuery {
 // We'll implement the actual storage operations in the next task (6.2.4)
 #[async_trait]
 impl ArtifactStorageOps for ArtifactStorage {
-    async fn store_artifact(&self, _artifact: &SessionArtifact) -> Result<ArtifactId> {
-        // Will be implemented in TASK-6.2.4
-        todo!("Implement in TASK-6.2.4")
+    async fn store_artifact(&self, artifact: &SessionArtifact) -> Result<ArtifactId> {
+        // Check storage limits first (use original size if compressed)
+        let actual_size = artifact
+            .metadata
+            .original_size
+            .unwrap_or(artifact.metadata.size);
+        self.check_storage_limits(&artifact.id.session_id, actual_size)
+            .await?;
+
+        let content_hash = artifact.id.content_hash.clone();
+        let session_id = artifact.id.session_id;
+
+        // Get the next version number for this artifact name
+        let version_info = self
+            .version_manager
+            .next_version(&session_id, &artifact.metadata.name)
+            .await?;
+
+        // Create a new artifact with updated version info
+        let mut updated_metadata = artifact.metadata.clone();
+        updated_metadata.version = version_info;
+
+        // Create new artifact ID with the version sequence
+        let versioned_id = ArtifactId::new(
+            content_hash.clone(),
+            session_id,
+            u64::from(updated_metadata.version.version),
+        );
+
+        // Check if content already exists (deduplication)
+        let content_exists = self.content_exists(&content_hash).await?;
+
+        // Store content if it doesn't exist
+        if !content_exists {
+            // Get the content from the artifact
+            let content = artifact.get_content()?;
+
+            // Store content based on size
+            if content.len() > self.config.chunk_size {
+                // Store in chunks for large artifacts
+                self.store_chunked_content(&content_hash, &content).await?;
+            } else {
+                // Store as single blob
+                let key = self.content_key(&content_hash);
+                self.storage_backend
+                    .set(&key, content.clone())
+                    .await
+                    .map_err(|e| SessionError::Storage(format!("Failed to store content: {e}")))?;
+            }
+        }
+
+        // Update deduplication index
+        self.update_dedup_index(&content_hash, true).await?;
+
+        // Record the version in version history
+        self.version_manager
+            .record_version(
+                &session_id,
+                &updated_metadata.name,
+                updated_metadata.version.version,
+                &versioned_id,
+                &content_hash,
+            )
+            .await?;
+
+        // Create metadata index entry
+        let index_entry = MetadataIndex {
+            artifact_id: versioned_id.clone(),
+            metadata: updated_metadata.clone(),
+            storage_key: self.content_key(&content_hash),
+            content_size: actual_size,
+            is_chunked: actual_size > self.config.chunk_size,
+            chunk_count: if actual_size > self.config.chunk_size {
+                #[allow(clippy::cast_possible_truncation)]
+                let count = actual_size.div_ceil(self.config.chunk_size) as u32;
+                count
+            } else {
+                0
+            },
+        };
+
+        // Store metadata
+        self.store_metadata(&versioned_id, &index_entry).await?;
+
+        // Update session artifacts list
+        self.add_to_session_artifacts(&session_id, &versioned_id)
+            .await?;
+
+        // Update session statistics (use original size if compressed)
+        let actual_size = updated_metadata
+            .original_size
+            .unwrap_or(updated_metadata.size);
+        let deduplicated = content_exists;
+        #[allow(clippy::cast_possible_wrap)]
+        self.update_session_stats(&session_id, actual_size as i64, 1, deduplicated)
+            .await?;
+
+        Ok(versioned_id)
     }
 
     async fn get_artifact(&self, _artifact_id: &ArtifactId) -> Result<Option<SessionArtifact>> {
@@ -432,6 +613,7 @@ impl ArtifactStorageOps for ArtifactStorage {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::artifact::SessionArtifact;
     use llmspell_storage::MemoryBackend;
 
     #[tokio::test]
@@ -481,5 +663,181 @@ mod tests {
         // Should succeed - within limit
         let result = storage.check_storage_limits(&session_id, 512).await;
         assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_store_artifact_basic() {
+        let backend = Arc::new(MemoryBackend::new());
+        let storage = Arc::new(ArtifactStorage::with_backend(backend));
+
+        let session_id = SessionId::new();
+        let content = b"test content".to_vec();
+        let artifact = SessionArtifact::new(
+            session_id,
+            1,
+            ArtifactType::UserInput,
+            "test.txt".to_string(),
+            content.clone(),
+        )
+        .unwrap();
+
+        // Store the artifact
+        let artifact_id = storage.store_artifact(&artifact).await.unwrap();
+
+        // Verify the artifact ID has version 1
+        assert_eq!(artifact_id.sequence, 1);
+
+        // Check that stats were updated
+        let stats = storage.get_storage_stats(&session_id).await.unwrap();
+        assert_eq!(stats.artifact_count, 1);
+        assert_eq!(stats.total_size, content.len());
+        assert_eq!(stats.deduplicated_count, 0);
+    }
+
+    #[tokio::test]
+    async fn test_store_artifact_versioning() {
+        let backend = Arc::new(MemoryBackend::new());
+        let storage = Arc::new(ArtifactStorage::with_backend(backend));
+
+        let session_id = SessionId::new();
+
+        // Store first version
+        let content1 = b"version 1 content".to_vec();
+        let artifact1 = SessionArtifact::new(
+            session_id,
+            1,
+            ArtifactType::UserInput,
+            "document.txt".to_string(),
+            content1.clone(),
+        )
+        .unwrap();
+
+        let id1 = storage.store_artifact(&artifact1).await.unwrap();
+        assert_eq!(id1.sequence, 1);
+
+        // Store second version with same name
+        let content2 = b"version 2 content - updated".to_vec();
+        let artifact2 = SessionArtifact::new(
+            session_id,
+            2,
+            ArtifactType::UserInput,
+            "document.txt".to_string(),
+            content2.clone(),
+        )
+        .unwrap();
+
+        let id2 = storage.store_artifact(&artifact2).await.unwrap();
+        assert_eq!(id2.sequence, 2);
+
+        // Different content should have different hashes
+        assert_ne!(id1.content_hash, id2.content_hash);
+
+        // Check stats - two artifacts stored
+        let stats = storage.get_storage_stats(&session_id).await.unwrap();
+        assert_eq!(stats.artifact_count, 2);
+        assert_eq!(stats.total_size, content1.len() + content2.len());
+    }
+
+    #[tokio::test]
+    async fn test_store_artifact_deduplication() {
+        let backend = Arc::new(MemoryBackend::new());
+        let storage = Arc::new(ArtifactStorage::with_backend(backend));
+
+        let session_id = SessionId::new();
+        let content = b"duplicate content".to_vec();
+
+        // Store first artifact
+        let artifact1 = SessionArtifact::new(
+            session_id,
+            1,
+            ArtifactType::UserInput,
+            "file1.txt".to_string(),
+            content.clone(),
+        )
+        .unwrap();
+
+        let id1 = storage.store_artifact(&artifact1).await.unwrap();
+
+        // Store second artifact with same content but different name
+        let artifact2 = SessionArtifact::new(
+            session_id,
+            2,
+            ArtifactType::UserInput,
+            "file2.txt".to_string(),
+            content.clone(),
+        )
+        .unwrap();
+
+        let id2 = storage.store_artifact(&artifact2).await.unwrap();
+
+        // Same content should have same hash
+        assert_eq!(id1.content_hash, id2.content_hash);
+
+        // Check that deduplication worked
+        let stats = storage.get_storage_stats(&session_id).await.unwrap();
+        assert_eq!(stats.artifact_count, 2);
+        assert_eq!(stats.deduplicated_count, 1);
+        // Total size counts both artifacts even if deduplicated
+        assert_eq!(stats.total_size, content.len() * 2);
+    }
+
+    #[tokio::test]
+    async fn test_store_large_artifact() {
+        let backend = Arc::new(MemoryBackend::new());
+        let mut config = ArtifactStorageConfig::default();
+        config.chunk_size = 1024; // 1KB chunks for testing
+
+        let storage = Arc::new(ArtifactStorage::new(backend, config));
+
+        let session_id = SessionId::new();
+        // Create content larger than chunk size
+        let content = vec![b'x'; 3000]; // 3KB
+
+        let artifact = SessionArtifact::new(
+            session_id,
+            1,
+            ArtifactType::SystemGenerated,
+            "large_file.bin".to_string(),
+            content.clone(),
+        )
+        .unwrap();
+
+        let artifact_id = storage.store_artifact(&artifact).await.unwrap();
+
+        // Verify storage
+        assert_eq!(artifact_id.sequence, 1);
+
+        let stats = storage.get_storage_stats(&session_id).await.unwrap();
+        assert_eq!(stats.artifact_count, 1);
+        assert_eq!(stats.total_size, content.len());
+    }
+
+    #[tokio::test]
+    async fn test_store_artifact_with_compression() {
+        let backend = Arc::new(MemoryBackend::new());
+        let storage = Arc::new(ArtifactStorage::with_backend(backend));
+
+        let session_id = SessionId::new();
+        // Create compressible content (repetitive pattern)
+        let content = "x".repeat(20 * 1024).into_bytes(); // 20KB of 'x'
+
+        let artifact = SessionArtifact::new(
+            session_id,
+            1,
+            ArtifactType::AgentOutput,
+            "compressed.txt".to_string(),
+            content.clone(),
+        )
+        .unwrap();
+
+        // Store artifact (should auto-compress)
+        let artifact_id = storage.store_artifact(&artifact).await.unwrap();
+
+        assert_eq!(artifact_id.sequence, 1);
+
+        let stats = storage.get_storage_stats(&session_id).await.unwrap();
+        assert_eq!(stats.artifact_count, 1);
+        // Size reported is original size, not compressed
+        assert_eq!(stats.total_size, content.len());
     }
 }
