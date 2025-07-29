@@ -11,15 +11,15 @@ use std::collections::{HashMap, HashSet};
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct MetadataIndex {
     /// Index by session ID
-    by_session: HashMap<SessionId, HashSet<ArtifactId>>,
+    pub by_session: HashMap<SessionId, HashSet<ArtifactId>>,
     /// Index by artifact type
-    by_type: HashMap<ArtifactType, HashSet<ArtifactId>>,
+    pub by_type: HashMap<ArtifactType, HashSet<ArtifactId>>,
     /// Index by tags
-    by_tag: HashMap<String, HashSet<ArtifactId>>,
+    pub by_tag: HashMap<String, HashSet<ArtifactId>>,
     /// Index by creation date (bucketed by day)
-    by_date: HashMap<String, HashSet<ArtifactId>>,
+    pub by_date: HashMap<String, HashSet<ArtifactId>>,
     /// Full metadata cache
-    metadata_cache: HashMap<ArtifactId, ArtifactMetadata>,
+    pub metadata_cache: HashMap<ArtifactId, ArtifactMetadata>,
 }
 
 impl MetadataIndex {

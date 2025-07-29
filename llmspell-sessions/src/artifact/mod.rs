@@ -2,11 +2,13 @@
 //! ABOUTME: Provides content-addressed storage with metadata and versioning
 
 pub mod metadata;
+pub mod search;
 pub mod session_artifact;
 pub mod storage;
 pub mod types;
 pub mod versioning;
 
+pub use search::{ArtifactSearch, ArtifactSearchQuery, SearchResult, SortOrder};
 pub use session_artifact::SessionArtifact;
 pub use storage::{
     ArtifactQuery, ArtifactStorage, ArtifactStorageConfig, ArtifactStorageOps, SessionStorageStats,

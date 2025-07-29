@@ -67,7 +67,7 @@ impl fmt::Display for ArtifactId {
 }
 
 /// Type of artifact stored
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
 pub enum ArtifactType {
     /// Output from an agent execution
     AgentOutput,
@@ -112,7 +112,7 @@ pub struct ArtifactVersion {
 }
 
 /// Metadata for an artifact
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ArtifactMetadata {
     /// Human-readable name
     pub name: String,

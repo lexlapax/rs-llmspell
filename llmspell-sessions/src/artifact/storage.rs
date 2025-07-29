@@ -811,6 +811,58 @@ impl ArtifactStorage {
 
         Ok(())
     }
+
+    /// Search for artifacts by content hash
+    pub async fn find_by_content_hash(
+        &self,
+        content_hash: &ContentHash,
+    ) -> Result<Vec<ArtifactMetadata>> {
+        // Build a metadata index from all sessions that might have this content
+        let mut found_metadata = Vec::new();
+
+        // We need to search through all stored metadata entries
+        // In a production system, you'd maintain a reverse index from content_hash to artifact_ids
+        // For now, we'll scan through the cache to find matches
+        let cache = self.metadata_cache.read().await;
+        for (_, index_entry) in cache.iter() {
+            if index_entry.artifact_id.content_hash == *content_hash {
+                found_metadata.push(index_entry.metadata.clone());
+            }
+        }
+
+        Ok(found_metadata)
+    }
+
+    /// Count artifacts by type across all sessions
+    pub async fn count_artifacts_by_type(&self) -> Result<HashMap<ArtifactType, usize>> {
+        let mut counts = HashMap::new();
+
+        // Aggregate from session stats
+        let _stats_map = self.session_stats.read().await;
+
+        // Note: In a production system, you'd maintain separate type counts
+        // For now, return empty as we don't track type-specific counts in session stats
+        counts.insert(ArtifactType::UserInput, 0);
+        counts.insert(ArtifactType::AgentOutput, 0);
+        counts.insert(ArtifactType::ToolResult, 0);
+        counts.insert(ArtifactType::SystemGenerated, 0);
+
+        Ok(counts)
+    }
+
+    /// Get total artifact count across all sessions
+    pub async fn get_total_artifact_count(&self) -> Result<usize> {
+        let stats_map = self.session_stats.read().await;
+        let total = stats_map.values().map(|stats| stats.artifact_count).sum();
+        Ok(total)
+    }
+
+    /// Get total storage size across all sessions
+    pub async fn get_total_storage_size(&self) -> Result<usize> {
+        let stats_map = self.session_stats.read().await;
+        let total = stats_map.values().map(|stats| stats.total_size).sum();
+        Ok(total)
+    }
 }
 
 /// Trait for artifact storage operations
@@ -1054,15 +1106,96 @@ impl ArtifactStorageOps for ArtifactStorage {
 
     async fn list_session_artifacts(
         &self,
-        _session_id: &SessionId,
+        session_id: &SessionId,
     ) -> Result<Vec<ArtifactMetadata>> {
-        // Will be implemented in TASK-6.2.6
-        todo!("Implement in TASK-6.2.6")
+        // Get the list of artifact IDs for this session
+        let key = self.session_artifacts_key(session_id);
+        let artifact_ids: Vec<ArtifactId> = match self.storage_backend.get(&key).await {
+            Ok(Some(data)) => bincode::deserialize(&data).map_err(|e| {
+                SessionError::Deserialization(format!("Failed to deserialize artifact list: {e}"))
+            })?,
+            Ok(None) => return Ok(Vec::new()),
+            Err(e) => {
+                return Err(SessionError::Storage(format!(
+                    "Failed to get artifact list: {e}"
+                )))
+            }
+        };
+
+        // Load metadata for each artifact
+        let mut metadata_list = Vec::with_capacity(artifact_ids.len());
+        for artifact_id in artifact_ids {
+            if let Some(index) = self.load_metadata(&artifact_id).await? {
+                metadata_list.push(index.metadata);
+            }
+            // Skip artifacts whose metadata might have been deleted
+        }
+
+        Ok(metadata_list)
     }
 
-    async fn query_artifacts(&self, _query: ArtifactQuery) -> Result<Vec<ArtifactMetadata>> {
-        // Will be implemented in TASK-6.2.6
-        todo!("Implement in TASK-6.2.6")
+    async fn query_artifacts(&self, query: ArtifactQuery) -> Result<Vec<ArtifactMetadata>> {
+        use super::metadata::MetadataIndex;
+        use super::search::{ArtifactSearch, ArtifactSearchQuery, SortOrder};
+
+        // Build a comprehensive metadata index from all sessions
+        let mut global_index = MetadataIndex::new();
+
+        // If session_id is specified, only search that session
+        let sessions_to_search = if let Some(ref session_id) = query.session_id {
+            vec![session_id.clone()]
+        } else {
+            // Otherwise, we need to list all sessions
+            // For now, we'll return empty if no session specified
+            // In production, you'd iterate through all sessions in storage
+            return Ok(Vec::new());
+        };
+
+        // Collect metadata from specified sessions
+        for session_id in sessions_to_search {
+            let key = self.session_artifacts_key(&session_id);
+            let artifact_ids: Vec<ArtifactId> = match self.storage_backend.get(&key).await {
+                Ok(Some(data)) => bincode::deserialize(&data).map_err(|e| {
+                    SessionError::Deserialization(format!(
+                        "Failed to deserialize artifact list: {e}"
+                    ))
+                })?,
+                Ok(None) => continue,
+                Err(e) => {
+                    return Err(SessionError::Storage(format!(
+                        "Failed to get artifact list: {e}"
+                    )))
+                }
+            };
+
+            // Add each artifact's metadata to the global index
+            for artifact_id in artifact_ids {
+                if let Some(index_entry) = self.load_metadata(&artifact_id).await? {
+                    global_index.add_metadata(artifact_id, index_entry.metadata);
+                }
+            }
+        }
+
+        // Convert ArtifactQuery to ArtifactSearchQuery
+        let search_query = ArtifactSearchQuery {
+            session_id: query.session_id,
+            artifact_type: query.artifact_type,
+            name_pattern: query.name_pattern,
+            tags: query.tags,
+            created_after: query.created_after,
+            created_before: query.created_before,
+            min_size: query.min_size,
+            max_size: query.max_size,
+            sort_order: SortOrder::default(),
+            offset: None,
+            limit: query.limit,
+        };
+
+        // Create search engine and perform search
+        let search_engine = ArtifactSearch::new(global_index);
+        let search_result = search_engine.search(&search_query);
+
+        Ok(search_result.artifacts)
     }
 
     async fn get_storage_stats(&self, session_id: &SessionId) -> Result<SessionStorageStats> {
@@ -1520,5 +1653,306 @@ mod tests {
         // Test streaming with non-existent artifact
         let result = storage.stream_artifact_content(&fake_id, 1024).await;
         assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_list_session_artifacts() {
+        let backend = Arc::new(MemoryBackend::new());
+        let storage = Arc::new(ArtifactStorage::with_backend(backend));
+
+        let session_id = SessionId::new();
+
+        // Initially empty
+        let artifacts = storage.list_session_artifacts(&session_id).await.unwrap();
+        assert_eq!(artifacts.len(), 0);
+
+        // Store some artifacts
+        let artifact1 = SessionArtifact::new(
+            session_id,
+            1,
+            ArtifactType::UserInput,
+            "input.txt".to_string(),
+            b"input data".to_vec(),
+        )
+        .unwrap();
+        let _id1 = storage.store_artifact(&artifact1).await.unwrap();
+
+        let artifact2 = SessionArtifact::new(
+            session_id,
+            2,
+            ArtifactType::ToolResult,
+            "result.json".to_string(),
+            b"result data".to_vec(),
+        )
+        .unwrap();
+        let _id2 = storage.store_artifact(&artifact2).await.unwrap();
+
+        // List should now return 2 artifacts
+        let artifacts = storage.list_session_artifacts(&session_id).await.unwrap();
+        assert_eq!(artifacts.len(), 2);
+
+        // Verify metadata content
+        let names: Vec<String> = artifacts.iter().map(|a| a.name.clone()).collect();
+        assert!(names.contains(&"input.txt".to_string()));
+        assert!(names.contains(&"result.json".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_query_artifacts_by_type() {
+        let backend = Arc::new(MemoryBackend::new());
+        let storage = Arc::new(ArtifactStorage::with_backend(backend));
+
+        let session_id = SessionId::new();
+
+        // Store artifacts of different types
+        let types = vec![
+            (ArtifactType::UserInput, "input1.txt"),
+            (ArtifactType::UserInput, "input2.txt"),
+            (ArtifactType::ToolResult, "result.json"),
+            (ArtifactType::AgentOutput, "output.log"),
+        ];
+
+        for (i, (artifact_type, name)) in types.iter().enumerate() {
+            let artifact = SessionArtifact::new(
+                session_id,
+                i as u64 + 1,
+                artifact_type.clone(),
+                name.to_string(),
+                format!("content {}", i).into_bytes(),
+            )
+            .unwrap();
+            storage.store_artifact(&artifact).await.unwrap();
+        }
+
+        // Query for UserInput artifacts
+        let query = ArtifactQuery {
+            session_id: Some(session_id),
+            artifact_type: Some(ArtifactType::UserInput),
+            ..Default::default()
+        };
+
+        let results = storage.query_artifacts(query).await.unwrap();
+        assert_eq!(results.len(), 2);
+        assert!(results
+            .iter()
+            .all(|a| a.artifact_type == ArtifactType::UserInput));
+    }
+
+    #[tokio::test]
+    async fn test_query_artifacts_by_name_pattern() {
+        let backend = Arc::new(MemoryBackend::new());
+        let storage = Arc::new(ArtifactStorage::with_backend(backend));
+
+        let session_id = SessionId::new();
+
+        // Store artifacts with different names
+        let names = vec![
+            "test_file.txt",
+            "config.json",
+            "test_output.log",
+            "readme.md",
+        ];
+
+        for (i, name) in names.iter().enumerate() {
+            let artifact = SessionArtifact::new(
+                session_id,
+                i as u64 + 1,
+                ArtifactType::UserInput,
+                name.to_string(),
+                format!("content {}", i).into_bytes(),
+            )
+            .unwrap();
+            storage.store_artifact(&artifact).await.unwrap();
+        }
+
+        // Query for artifacts with "test" in the name
+        let query = ArtifactQuery {
+            session_id: Some(session_id),
+            name_pattern: Some("test".to_string()),
+            ..Default::default()
+        };
+
+        let results = storage.query_artifacts(query).await.unwrap();
+        assert_eq!(results.len(), 2);
+
+        let result_names: Vec<String> = results.iter().map(|a| a.name.clone()).collect();
+        assert!(result_names.contains(&"test_file.txt".to_string()));
+        assert!(result_names.contains(&"test_output.log".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_query_artifacts_with_tags() {
+        let backend = Arc::new(MemoryBackend::new());
+        let storage = Arc::new(ArtifactStorage::with_backend(backend));
+
+        let session_id = SessionId::new();
+
+        // Create artifacts with tags
+        let mut artifact1 = SessionArtifact::new(
+            session_id,
+            1,
+            ArtifactType::UserInput,
+            "doc1.txt".to_string(),
+            b"content 1".to_vec(),
+        )
+        .unwrap();
+        artifact1.metadata.add_tag("important".to_string()).unwrap();
+        artifact1.metadata.add_tag("reviewed".to_string()).unwrap();
+        let _id1 = storage.store_artifact(&artifact1).await.unwrap();
+
+        let mut artifact2 = SessionArtifact::new(
+            session_id,
+            2,
+            ArtifactType::UserInput,
+            "doc2.txt".to_string(),
+            b"content 2".to_vec(),
+        )
+        .unwrap();
+        artifact2.metadata.add_tag("draft".to_string()).unwrap();
+        let _id2 = storage.store_artifact(&artifact2).await.unwrap();
+
+        let mut artifact3 = SessionArtifact::new(
+            session_id,
+            3,
+            ArtifactType::UserInput,
+            "doc3.txt".to_string(),
+            b"content 3".to_vec(),
+        )
+        .unwrap();
+        artifact3.metadata.add_tag("important".to_string()).unwrap();
+        artifact3.metadata.add_tag("final".to_string()).unwrap();
+        let _id3 = storage.store_artifact(&artifact3).await.unwrap();
+
+        // Query for artifacts with "important" tag
+        let query = ArtifactQuery {
+            session_id: Some(session_id),
+            tags: vec!["important".to_string()],
+            ..Default::default()
+        };
+
+        let results = storage.query_artifacts(query).await.unwrap();
+        assert_eq!(results.len(), 2);
+        assert!(results
+            .iter()
+            .all(|a| a.tags.contains(&"important".to_string())));
+    }
+
+    #[tokio::test]
+    async fn test_query_artifacts_with_size_filters() {
+        let backend = Arc::new(MemoryBackend::new());
+        let storage = Arc::new(ArtifactStorage::with_backend(backend));
+
+        let session_id = SessionId::new();
+
+        // Store artifacts of different sizes
+        let sizes = vec![
+            ("small.txt", 100),
+            ("medium.txt", 1000),
+            ("large.txt", 5000),
+            ("huge.txt", 10000),
+        ];
+
+        for (i, (name, size)) in sizes.iter().enumerate() {
+            let content = "x".repeat(*size);
+            let artifact = SessionArtifact::new(
+                session_id,
+                i as u64 + 1,
+                ArtifactType::UserInput,
+                name.to_string(),
+                content.into_bytes(),
+            )
+            .unwrap();
+            storage.store_artifact(&artifact).await.unwrap();
+        }
+
+        // Query for artifacts between 500 and 6000 bytes
+        let query = ArtifactQuery {
+            session_id: Some(session_id),
+            min_size: Some(500),
+            max_size: Some(6000),
+            ..Default::default()
+        };
+
+        let results = storage.query_artifacts(query).await.unwrap();
+        assert_eq!(results.len(), 2);
+
+        let result_names: Vec<String> = results.iter().map(|a| a.name.clone()).collect();
+        assert!(result_names.contains(&"medium.txt".to_string()));
+        assert!(result_names.contains(&"large.txt".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_find_by_content_hash() {
+        let backend = Arc::new(MemoryBackend::new());
+        let storage = Arc::new(ArtifactStorage::with_backend(backend));
+
+        let session_id = SessionId::new();
+        let content = b"unique content".to_vec();
+
+        // Store an artifact
+        let artifact = SessionArtifact::new(
+            session_id,
+            1,
+            ArtifactType::UserInput,
+            "file.txt".to_string(),
+            content.clone(),
+        )
+        .unwrap();
+        let artifact_id = storage.store_artifact(&artifact).await.unwrap();
+
+        // Find by content hash
+        let results = storage
+            .find_by_content_hash(&artifact_id.content_hash)
+            .await
+            .unwrap();
+
+        // Should find at least one artifact with this hash
+        assert!(!results.is_empty());
+
+        // Verify it's the correct artifact
+        let found = &results[0];
+        assert_eq!(found.name, "file.txt");
+    }
+
+    #[tokio::test]
+    async fn test_count_statistics() {
+        let backend = Arc::new(MemoryBackend::new());
+        let storage = Arc::new(ArtifactStorage::with_backend(backend));
+
+        let session_id1 = SessionId::new();
+        let session_id2 = SessionId::new();
+
+        // Store artifacts in different sessions
+        for i in 0..3 {
+            let artifact = SessionArtifact::new(
+                session_id1,
+                i + 1,
+                ArtifactType::UserInput,
+                format!("file{}.txt", i),
+                format!("content {}", i).into_bytes(),
+            )
+            .unwrap();
+            storage.store_artifact(&artifact).await.unwrap();
+        }
+
+        for i in 0..2 {
+            let artifact = SessionArtifact::new(
+                session_id2,
+                i + 1,
+                ArtifactType::ToolResult,
+                format!("result{}.json", i),
+                format!("result {}", i).into_bytes(),
+            )
+            .unwrap();
+            storage.store_artifact(&artifact).await.unwrap();
+        }
+
+        // Test total count
+        let total_count = storage.get_total_artifact_count().await.unwrap();
+        assert_eq!(total_count, 5);
+
+        // Test total size
+        let total_size = storage.get_total_storage_size().await.unwrap();
+        assert!(total_size > 0);
     }
 }

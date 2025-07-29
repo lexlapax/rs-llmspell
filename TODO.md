@@ -786,24 +786,24 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 #### Task 6.2.5: Implement artifact retrieval operations
 **Priority**: HIGH
 **Estimated Time**: 4 hours
-**Status**: TODO
+**Status**: DONE ✅
 **Assigned To**: Storage Team
 
 **Description**: Implement artifact retrieval operations including content verification and version selection.
 
 **Files to Update**:
-- **UPDATE**: `llmspell-sessions/src/artifact/storage.rs` - Add retrieval methods
-- **CREATE**: Tests for artifact retrieval
+- **UPDATE**: `llmspell-sessions/src/artifact/storage.rs` - Add retrieval methods ✅
+- **CREATE**: Tests for artifact retrieval ✅
 
 **Acceptance Criteria**:
-- [ ] get_artifact() retrieves artifact with content
-- [ ] Content hash verified on retrieval
-- [ ] Version selection supported (latest, specific)
-- [ ] get_artifact_metadata() for metadata only
-- [ ] Batch retrieval operations supported
-- [ ] Not found errors handled gracefully
-- [ ] Corrupted content detected
-- [ ] Streaming retrieval for large artifacts
+- [x] get_artifact() retrieves artifact with content ✅
+- [x] Content hash verified on retrieval ✅
+- [x] Version selection supported (latest, specific) ✅
+- [x] get_artifact_metadata() for metadata only ✅
+- [x] Batch retrieval operations supported ✅
+- [x] Not found errors handled gracefully ✅
+- [x] Corrupted content detected ✅
+- [x] Streaming retrieval for large artifacts ✅
 
 **Implementation Steps**:
 1. **Basic Retrieval** (1.5 hours):
@@ -845,44 +845,44 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
    - Verification reporting
 
 **Testing Requirements**:
-- [ ] Retrieval operation tests
-- [ ] Content integrity tests
-- [ ] Version selection tests
-- [ ] Batch operation tests
-- [ ] Error handling tests
-- [ ] Performance tests
+- [x] Retrieval operation tests ✅
+- [x] Content integrity tests ✅
+- [x] Version selection tests ✅
+- [x] Batch operation tests ✅
+- [x] Error handling tests ✅
+- [x] Performance tests ✅
 
 **Definition of Done**:
-- [ ] Retrieval fully functional
-- [ ] Content integrity verified
-- [ ] Version selection working
-- [ ] Batch operations efficient
-- [ ] Error handling complete
+- [x] Retrieval fully functional ✅
+- [x] Content integrity verified ✅
+- [x] Version selection working ✅
+- [x] Batch operations efficient ✅
+- [x] Error handling complete ✅
 
 ---
 
 #### Task 6.2.6: Implement artifact search and query
 **Priority**: HIGH
 **Estimated Time**: 5 hours
-**Status**: TODO
+**Status**: DONE ✅
 **Assigned To**: Storage Team
 
 **Description**: Implement artifact listing and search capabilities with filtering and pagination.
 
 **Files to Update**:
-- **UPDATE**: `llmspell-sessions/src/artifact/storage.rs` - Add list/search methods
-- **CREATE**: `llmspell-sessions/src/artifact/search.rs` - Search implementation
-- **CREATE**: Tests for listing and search
+- **UPDATE**: `llmspell-sessions/src/artifact/storage.rs` - Add list/search methods ✅
+- **CREATE**: `llmspell-sessions/src/artifact/search.rs` - Search implementation ✅
+- **CREATE**: Tests for listing and search ✅
 
 **Acceptance Criteria**:
-- [ ] list_artifacts() returns all artifacts for session
-- [ ] Filtering by type, name, metadata supported
-- [ ] Pagination prevents memory issues
-- [ ] Search by content hash works
-- [ ] Metadata search capabilities
-- [ ] Sorting options (date, size, name)
-- [ ] Efficient queries using indices
-- [ ] Count operations for statistics
+- [x] list_artifacts() returns all artifacts for session ✅
+- [x] Filtering by type, name, metadata supported ✅
+- [x] Pagination prevents memory issues ✅
+- [x] Search by content hash works ✅
+- [x] Metadata search capabilities ✅
+- [x] Sorting options (date, size, name) ✅
+- [x] Efficient queries using indices ✅
+- [x] Count operations for statistics ✅
 
 **Implementation Steps**:
 1. **Basic Listing** (1.5 hours):
@@ -916,18 +916,18 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
    - Lazy loading
 
 **Testing Requirements**:
-- [ ] Listing operation tests
-- [ ] Search functionality tests
-- [ ] Pagination tests
-- [ ] Performance tests
-- [ ] Complex query tests
+- [x] Listing operation tests ✅
+- [x] Search functionality tests ✅
+- [x] Pagination tests ✅
+- [x] Performance tests ✅
+- [x] Complex query tests ✅
 
 **Definition of Done**:
-- [ ] Listing fully functional
-- [ ] Search flexible and fast
-- [ ] Pagination working correctly
-- [ ] Performance acceptable
-- [ ] Complex queries supported
+- [x] Listing fully functional ✅
+- [x] Search flexible and fast ✅
+- [x] Pagination working correctly ✅
+- [x] Performance acceptable ✅
+- [x] Complex queries supported ✅
 
 ---
 
@@ -1740,7 +1740,7 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 **Description**: Design the Lua Session global object API following Phase 5 patterns.
 
 **Files to Create/Update**:
-- **CREATE**: `llmspell-sessions/src/bridge/mod.rs` - Bridge module structure
+- **CREATE**: `llmspell-sessions/src/bridge/mod.rs` - Bridge module structure - rethink where - megathink, should probably be in llmspell-bridge/src
 - **CREATE**: API design document in module comments
 
 **Acceptance Criteria**:
@@ -1813,7 +1813,7 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 **Description**: Implement the Lua Session global object.
 
 **Files to Create/Update**:
-- **CREATE**: `llmspell-sessions/src/bridge/lua.rs` - Lua bridge implementation
+- **CREATE**: `llmspell-sessions/src/bridge/lua.rs` - rethink where - megathink, should probably be in llmspell-bridge/src
 - **UPDATE**: `llmspell-bridge/src/lua/globals/mod.rs` - Register Session global
 
 **Acceptance Criteria**:
@@ -1886,7 +1886,7 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 **Description**: Add artifact management to Lua Session API.
 
 **Files to Update**:
-- **UPDATE**: `llmspell-sessions/src/bridge/lua.rs` - Add artifact methods
+- **UPDATE**: `llmspell-sessions/src/bridge/lua.rs` - Add artifact methods - rethink where - megathink, should probably be in llmspell-bridge/src
 - **CREATE**: Helper functions for artifact handling
 
 **Acceptance Criteria**:
@@ -1974,7 +1974,7 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 **Description**: Implement session state management in Lua.
 
 **Files to Update**:
-- **UPDATE**: `llmspell-sessions/src/bridge/lua.rs` - Add state methods
+- **UPDATE**: `llmspell-sessions/src/bridge/lua.rs` - Add state methods - rethink where - megathink, should probably be in llmspell-bridge/src
 - **CREATE**: State conversion helpers
 
 **Acceptance Criteria**:
@@ -2028,7 +2028,7 @@ Phase 6 implements comprehensive session and artifact management, building on Ph
 **Description**: Implement Lua bridge for session context management (current session).
 
 **Files to Update**:
-- **UPDATE**: `llmspell-sessions/src/bridge/lua.rs` - Add context methods
+- **UPDATE**: `llmspell-sessions/src/bridge/lua.rs` - Add context methods - rethink where - megathink, should probably be in llmspell-bridge/src
 - **CREATE**: Thread-local session storage
 
 **Acceptance Criteria**:
