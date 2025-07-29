@@ -345,14 +345,11 @@ async fn test_component_registration_integration() {
             Ok(vec![])
         }
 
-        async fn add_message(
-            &mut self,
-            _message: ConversationMessage,
-        ) -> Result<(), LLMSpellError> {
+        async fn add_message(&self, _message: ConversationMessage) -> Result<(), LLMSpellError> {
             Ok(())
         }
 
-        async fn clear_conversation(&mut self) -> Result<(), LLMSpellError> {
+        async fn clear_conversation(&self) -> Result<(), LLMSpellError> {
             Ok(())
         }
     }

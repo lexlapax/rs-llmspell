@@ -82,7 +82,7 @@ impl ProviderTestContext {
             .max_tokens(1000)
             .build()?;
 
-        let mut agent = LLMAgent::new(config, self.provider_manager.clone()).await?;
+        let agent = LLMAgent::new(config, self.provider_manager.clone()).await?;
         agent.set_state_manager(self.state_manager.clone());
 
         Ok(Some(agent))
@@ -102,7 +102,7 @@ impl ProviderTestContext {
             .max_tokens(1000)
             .build()?;
 
-        let mut agent = LLMAgent::new(config, self.provider_manager.clone()).await?;
+        let agent = LLMAgent::new(config, self.provider_manager.clone()).await?;
         agent.set_state_manager(self.state_manager.clone());
 
         Ok(Some(agent))
@@ -248,7 +248,7 @@ impl ProviderTestContext {
             .max_tokens(1000)
             .build()?;
 
-        let mut agent = LLMAgent::new(config, self.provider_manager.clone()).await?;
+        let agent = LLMAgent::new(config, self.provider_manager.clone()).await?;
         agent.set_state_manager(self.state_manager.clone());
 
         Ok(Some(agent))
@@ -289,7 +289,7 @@ impl ProviderTestContext {
             .max_tokens(1000)
             .build()?;
 
-        let mut agent = LLMAgent::new(config, self.provider_manager.clone()).await?;
+        let agent = LLMAgent::new(config, self.provider_manager.clone()).await?;
         agent.set_state_manager(self.state_manager.clone());
 
         // Initialize and restore state

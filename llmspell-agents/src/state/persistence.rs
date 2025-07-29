@@ -14,10 +14,10 @@ use tracing::{debug, info};
 #[async_trait]
 pub trait StatePersistence: Agent {
     /// Get the state manager for this agent
-    fn state_manager(&self) -> Option<&Arc<StateManager>>;
+    fn state_manager(&self) -> Option<Arc<StateManager>>;
 
     /// Set the state manager for this agent
-    fn set_state_manager(&mut self, state_manager: Arc<StateManager>);
+    fn set_state_manager(&self, state_manager: Arc<StateManager>);
 
     /// Save the agent's current state
     async fn save_state(&self) -> Result<()> {
@@ -35,12 +35,12 @@ pub trait StatePersistence: Agent {
     }
 
     /// Load the agent's state from storage
-    async fn load_state(&mut self) -> Result<bool> {
+    async fn load_state(&self) -> Result<bool> {
         if let Some(state_manager) = self.state_manager() {
             let agent_id = self.metadata().id.to_string();
             match state_manager.load_agent_state(&agent_id).await {
                 Ok(Some(state)) => {
-                    futures::executor::block_on(self.restore_from_persistent_state(state))?;
+                    self.restore_from_persistent_state(state).await?;
                     info!("Loaded state for agent {}", agent_id);
                     Ok(true)
                 }
@@ -92,7 +92,7 @@ pub trait StatePersistence: Agent {
     }
 
     /// Restore agent state from persistent state
-    async fn restore_from_persistent_state(&mut self, state: PersistentAgentState) -> Result<()> {
+    async fn restore_from_persistent_state(&self, state: PersistentAgentState) -> Result<()> {
         // Clear current conversation
         self.clear_conversation().await?;
 
@@ -133,8 +133,8 @@ pub struct ToolStats {
 
 /// State manager holder trait for concrete implementations
 pub trait StateManagerHolder {
-    fn state_manager(&self) -> Option<&Arc<StateManager>>;
-    fn set_state_manager(&mut self, state_manager: Arc<StateManager>);
+    fn state_manager(&self) -> Option<Arc<StateManager>>;
+    fn set_state_manager(&self, state_manager: Arc<StateManager>);
 }
 
 /// Macro to implement PersistentAgent trait for types that implement Agent + StatePersistence
@@ -160,7 +160,7 @@ macro_rules! impl_persistent_agent {
             }
 
             fn apply_persistent_state(
-                &mut self,
+                &self,
                 state: llmspell_state_persistence::PersistentAgentState,
             ) -> llmspell_state_persistence::StateResult<()> {
                 // Since we need async, we use block_on here
@@ -189,7 +189,7 @@ mod tests {
         agent_id_string: String,
         config: AgentConfig,
         conversation: Arc<Mutex<Vec<ConversationMessage>>>,
-        state_manager: Option<Arc<StateManager>>,
+        state_manager: Arc<parking_lot::RwLock<Option<Arc<StateManager>>>>,
     }
 
     #[async_trait]
@@ -234,7 +234,7 @@ mod tests {
                 })
         }
 
-        async fn add_message(&mut self, message: ConversationMessage) -> llmspell_core::Result<()> {
+        async fn add_message(&self, message: ConversationMessage) -> llmspell_core::Result<()> {
             self.conversation
                 .lock()
                 .map(|mut conv| conv.push(message))
@@ -244,7 +244,7 @@ mod tests {
                 })
         }
 
-        async fn clear_conversation(&mut self) -> llmspell_core::Result<()> {
+        async fn clear_conversation(&self) -> llmspell_core::Result<()> {
             self.conversation
                 .lock()
                 .map(|mut conv| conv.clear())
@@ -256,22 +256,22 @@ mod tests {
     }
 
     impl StateManagerHolder for MockAgent {
-        fn state_manager(&self) -> Option<&Arc<StateManager>> {
-            self.state_manager.as_ref()
+        fn state_manager(&self) -> Option<Arc<StateManager>> {
+            self.state_manager.read().clone()
         }
 
-        fn set_state_manager(&mut self, state_manager: Arc<StateManager>) {
-            self.state_manager = Some(state_manager);
+        fn set_state_manager(&self, state_manager: Arc<StateManager>) {
+            *self.state_manager.write() = Some(state_manager);
         }
     }
 
     #[async_trait]
     impl StatePersistence for MockAgent {
-        fn state_manager(&self) -> Option<&Arc<StateManager>> {
+        fn state_manager(&self) -> Option<Arc<StateManager>> {
             StateManagerHolder::state_manager(self)
         }
 
-        fn set_state_manager(&mut self, state_manager: Arc<StateManager>) {
+        fn set_state_manager(&self, state_manager: Arc<StateManager>) {
             StateManagerHolder::set_state_manager(self, state_manager)
         }
     }
@@ -283,12 +283,12 @@ mod tests {
     async fn test_state_persistence_trait() {
         let metadata = ComponentMetadata::new("test-agent".to_string(), "Test agent".to_string());
         let agent_id_string = metadata.id.to_string();
-        let mut agent = MockAgent {
+        let agent = MockAgent {
             metadata,
             agent_id_string,
             config: AgentConfig::default(),
             conversation: Arc::new(Mutex::new(vec![])),
-            state_manager: None,
+            state_manager: Arc::new(parking_lot::RwLock::new(None)),
         };
 
         // Add some conversation

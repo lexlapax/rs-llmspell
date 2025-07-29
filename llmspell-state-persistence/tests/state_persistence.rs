@@ -14,9 +14,10 @@ mod tests {
     use super::*;
 
     fn enabled_persistence_config() -> PersistenceConfig {
-        let mut config = PersistenceConfig::default();
-        config.enabled = true;
-        config
+        PersistenceConfig {
+            enabled: true,
+            ..Default::default()
+        }
     }
 
     #[tokio::test]
@@ -144,7 +145,7 @@ mod tests {
 
         // Set state in different scopes with same key
         let key = "shared_key";
-        let scopes = vec![
+        let scopes = [
             StateScope::Global,
             StateScope::Agent("agent-1".to_string()),
             StateScope::Agent("agent-2".to_string()),

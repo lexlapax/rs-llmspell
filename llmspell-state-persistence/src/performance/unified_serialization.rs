@@ -262,9 +262,11 @@ mod tests {
 
     #[test]
     fn test_unified_serializer_with_protection() {
-        let mut config = SensitiveDataConfig::default();
-        config.redact_enabled = true;
-        config.custom_field_names.push("password".to_string());
+        let config = SensitiveDataConfig {
+            redact_enabled: true,
+            custom_field_names: vec!["password".to_string()],
+            ..Default::default()
+        };
 
         let serializer = UnifiedSerializer::new(config);
 

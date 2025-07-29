@@ -89,7 +89,7 @@ async fn main() -> Result<()> {
         .max_tokens(500)
         .build()?;
 
-    let mut agent = LLMAgent::new(config, provider_manager.clone()).await?;
+    let agent = LLMAgent::new(config, provider_manager.clone()).await?;
     agent.set_state_manager(state_manager.clone());
 
     // Initialize and start agent
@@ -130,7 +130,7 @@ async fn main() -> Result<()> {
         .max_tokens(500)
         .build()?;
 
-    let mut agent2 = LLMAgent::new(config2, provider_manager.clone()).await?;
+    let agent2 = LLMAgent::new(config2, provider_manager.clone()).await?;
     agent2.set_state_manager(state_manager.clone());
 
     // Initialize and restore state

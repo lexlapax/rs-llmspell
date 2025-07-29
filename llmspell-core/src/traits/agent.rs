@@ -175,15 +175,17 @@ impl Default for AgentConfig {
 ///         Ok(self.conversation.clone())
 ///     }
 ///     
-///     async fn add_message(&mut self, message: ConversationMessage) -> Result<()> {
-///         self.conversation.push(message);
+///     async fn add_message(&self, message: ConversationMessage) -> Result<()> {
+///         // With interior mutability pattern
+///         self.conversation.lock().await.push(message);
 ///         // Trim if needed
 ///         self.trim_conversation().await?;
 ///         Ok(())
 ///     }
 ///     
-///     async fn clear_conversation(&mut self) -> Result<()> {
-///         self.conversation.clear();
+///     async fn clear_conversation(&self) -> Result<()> {
+///         // With interior mutability pattern
+///         self.conversation.lock().await.clear();
 ///         Ok(())
 ///     }
 /// }
@@ -208,10 +210,10 @@ pub trait Agent: BaseAgent {
     async fn get_conversation(&self) -> Result<Vec<ConversationMessage>>;
 
     /// Add message to conversation
-    async fn add_message(&mut self, message: ConversationMessage) -> Result<()>;
+    async fn add_message(&self, message: ConversationMessage) -> Result<()>;
 
     /// Clear conversation history
-    async fn clear_conversation(&mut self) -> Result<()>;
+    async fn clear_conversation(&self) -> Result<()>;
 
     /// Get the current conversation length
     async fn conversation_length(&self) -> Result<usize> {
@@ -219,7 +221,7 @@ pub trait Agent: BaseAgent {
     }
 
     /// Trim conversation to configured max length
-    async fn trim_conversation(&mut self) -> Result<()> {
+    async fn trim_conversation(&self) -> Result<()> {
         if let Some(max_len) = self.config().max_conversation_length {
             let current_len = self.conversation_length().await?;
             if current_len > max_len {
@@ -331,23 +333,25 @@ mod tests {
     struct MockLLMAgent {
         metadata: ComponentMetadata,
         config: AgentConfig,
-        conversation: VecDeque<ConversationMessage>,
+        conversation: std::sync::Arc<tokio::sync::Mutex<VecDeque<ConversationMessage>>>,
     }
 
     impl MockLLMAgent {
         fn new() -> Self {
-            let config = AgentConfig {
+            Self::with_config(AgentConfig {
                 system_prompt: Some("You are a test assistant".to_string()),
                 ..Default::default()
-            };
+            })
+        }
 
+        fn with_config(config: AgentConfig) -> Self {
             Self {
                 metadata: ComponentMetadata::new(
                     "mock-llm-agent".to_string(),
                     "A mock LLM agent for testing".to_string(),
                 ),
                 config,
-                conversation: VecDeque::new(),
+                conversation: std::sync::Arc::new(tokio::sync::Mutex::new(VecDeque::new())),
             }
         }
     }
@@ -389,23 +393,23 @@ mod tests {
         }
 
         async fn get_conversation(&self) -> Result<Vec<ConversationMessage>> {
-            Ok(self.conversation.iter().cloned().collect())
+            Ok(self.conversation.lock().await.iter().cloned().collect())
         }
 
-        async fn add_message(&mut self, message: ConversationMessage) -> Result<()> {
-            self.conversation.push_back(message);
+        async fn add_message(&self, message: ConversationMessage) -> Result<()> {
+            self.conversation.lock().await.push_back(message);
             Ok(())
         }
 
-        async fn clear_conversation(&mut self) -> Result<()> {
-            self.conversation.clear();
+        async fn clear_conversation(&self) -> Result<()> {
+            self.conversation.lock().await.clear();
             Ok(())
         }
     }
 
     #[tokio::test]
     async fn test_agent_conversation_management() {
-        let mut agent = MockLLMAgent::new();
+        let agent = MockLLMAgent::new();
 
         // Test empty conversation
         assert_eq!(agent.conversation_length().await.unwrap(), 0);
@@ -440,8 +444,12 @@ mod tests {
 
     #[tokio::test]
     async fn test_agent_conversation_trimming() {
-        let mut agent = MockLLMAgent::new();
-        agent.config.max_conversation_length = Some(5);
+        let config = AgentConfig {
+            system_prompt: Some("You are a test assistant".to_string()),
+            max_conversation_length: Some(5),
+            ..Default::default()
+        };
+        let agent = MockLLMAgent::with_config(config);
 
         // Add system message
         agent

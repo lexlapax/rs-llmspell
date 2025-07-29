@@ -64,11 +64,11 @@ impl Agent for TestAgent {
         Ok(vec![])
     }
 
-    async fn add_message(&mut self, _message: ConversationMessage) -> llmspell_core::Result<()> {
+    async fn add_message(&self, _message: ConversationMessage) -> llmspell_core::Result<()> {
         Ok(())
     }
 
-    async fn clear_conversation(&mut self) -> llmspell_core::Result<()> {
+    async fn clear_conversation(&self) -> llmspell_core::Result<()> {
         Ok(())
     }
 }

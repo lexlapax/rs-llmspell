@@ -54,7 +54,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("✅ Created schema v1.0.0 with fields: name (required), age (optional)");
 
     // 3. Store initial data using v1.0.0 schema
-    let initial_users = vec![
+    let initial_users = [
         serde_json::json!({
             "name": "Alice Johnson",
             "age": 28

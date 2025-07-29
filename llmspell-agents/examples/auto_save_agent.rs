@@ -107,7 +107,7 @@ async fn main() -> Result<()> {
         .build()?;
 
     // Create first agent instance
-    let mut agent1 = BasicAgent::new(config.clone())?;
+    let agent1 = BasicAgent::new(config.clone())?;
     agent1.set_state_manager(state_manager.clone());
     let agent1_id = agent1.metadata().id.to_string();
 
@@ -155,7 +155,7 @@ async fn main() -> Result<()> {
     sleep(Duration::from_secs(6)).await;
 
     // Add more conversation (using another agent instance since first is moved)
-    let mut agent1_cont = BasicAgent::new(config.clone())?;
+    let agent1_cont = BasicAgent::new(config.clone())?;
     agent1_cont.set_state_manager(state_manager.clone());
     agent1_cont.initialize().await?;
     agent1_cont.start().await?;
@@ -188,7 +188,7 @@ async fn main() -> Result<()> {
     let config2 = AgentBuilder::basic("auto-save-agent")
         .description("Agent with automatic state persistence")
         .build()?;
-    let mut agent2 = BasicAgent::new(config2)?;
+    let agent2 = BasicAgent::new(config2)?;
     agent2.set_state_manager(state_manager.clone());
     let agent2_id = agent2.metadata().id.to_string();
 
@@ -207,7 +207,7 @@ async fn main() -> Result<()> {
     let config3 = AgentBuilder::basic("auto-save-agent")
         .description("Agent with automatic state persistence")
         .build()?;
-    let mut agent3 = BasicAgent::new(config3)?;
+    let agent3 = BasicAgent::new(config3)?;
     agent3.set_state_manager(state_manager.clone());
     agent3.initialize().await?;
     agent3.resume().await?;

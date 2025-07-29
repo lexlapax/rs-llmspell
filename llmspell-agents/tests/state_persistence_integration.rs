@@ -29,8 +29,8 @@ async fn test_basic_agent_state_persistence() -> Result<()> {
         .build()?;
 
     // Create two agents with same ID to test save/load
-    let mut agent1 = BasicAgent::new(config.clone())?;
-    let mut agent2 = BasicAgent::new(config)?;
+    let agent1 = BasicAgent::new(config.clone())?;
+    let agent2 = BasicAgent::new(config)?;
 
     // Create state manager with persistent storage
     let state_manager = Arc::new(
@@ -190,8 +190,8 @@ async fn test_state_persistence_with_multiple_agents() -> Result<()> {
         .description("Second test agent")
         .build()?;
 
-    let mut agent1 = BasicAgent::new(config1)?;
-    let mut agent2 = BasicAgent::new(config2)?;
+    let agent1 = BasicAgent::new(config1)?;
+    let agent2 = BasicAgent::new(config2)?;
 
     // Set state manager on both
     agent1.set_state_manager(state_manager.clone());
@@ -219,12 +219,12 @@ async fn test_state_persistence_with_multiple_agents() -> Result<()> {
     agent2.save_state().await?;
 
     // Create new instances with same IDs
-    let mut new_agent1 = BasicAgent::new(
+    let new_agent1 = BasicAgent::new(
         AgentBuilder::basic("agent-1")
             .description("First test agent")
             .build()?,
     )?;
-    let mut new_agent2 = BasicAgent::new(
+    let new_agent2 = BasicAgent::new(
         AgentBuilder::basic("agent-2")
             .description("Second test agent")
             .build()?,
@@ -257,7 +257,7 @@ async fn test_state_persistence_error_handling() -> Result<()> {
     let config = AgentBuilder::basic("test-agent")
         .description("Test agent")
         .build()?;
-    let mut agent = BasicAgent::new(config)?;
+    let agent = BasicAgent::new(config)?;
 
     // Try to save state without state manager
     let save_result = agent.save_state().await;

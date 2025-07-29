@@ -61,7 +61,7 @@ async fn test_save_on_pause() -> Result<()> {
 
     // Create agent
     let config = AgentBuilder::basic("test-agent").build()?;
-    let mut agent = BasicAgent::new(config)?;
+    let agent = BasicAgent::new(config)?;
     let agent_id = agent.metadata().id.to_string();
     agent.set_state_manager(state_manager.clone());
 
@@ -146,7 +146,7 @@ async fn test_save_on_stop() -> Result<()> {
 
     // Create agent
     let config = AgentBuilder::basic("test-agent-stop").build()?;
-    let mut agent = BasicAgent::new(config)?;
+    let agent = BasicAgent::new(config)?;
     let agent_id = agent.metadata().id.to_string();
     agent.set_state_manager(state_manager.clone());
 
@@ -210,7 +210,7 @@ async fn test_auto_save() -> Result<()> {
 
     // Create agent
     let config = AgentBuilder::basic("test-agent-auto").build()?;
-    let mut agent = BasicAgent::new(config)?;
+    let agent = BasicAgent::new(config)?;
     let agent_id = agent.metadata().id.to_string();
     agent.set_state_manager(state_manager.clone());
 
@@ -352,7 +352,7 @@ async fn test_non_blocking_saves() -> Result<()> {
 
     // Create agent
     let config = AgentBuilder::basic("test-agent-async").build()?;
-    let mut agent = BasicAgent::new(config)?;
+    let agent = BasicAgent::new(config)?;
     let agent_id = agent.metadata().id.to_string();
     agent.set_state_manager(state_manager.clone());
 

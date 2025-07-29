@@ -281,7 +281,7 @@ pub fn mock_api_response_strategy() -> impl Strategy<Value = serde_json::Value> 
     )
         .prop_map(|(success, message, data, error)| {
             let mut obj = serde_json::Map::new();
-            
+
             // Ensure at least one field is present
             if success.is_none() && message.is_none() && data.is_none() && error.is_none() {
                 // Default to success: true if all fields are None
@@ -300,7 +300,7 @@ pub fn mock_api_response_strategy() -> impl Strategy<Value = serde_json::Value> 
                     obj.insert("error".to_string(), serde_json::Value::String(e));
                 }
             }
-            
+
             serde_json::Value::Object(obj)
         })
 }

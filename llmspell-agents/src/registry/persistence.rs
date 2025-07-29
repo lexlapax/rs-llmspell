@@ -361,13 +361,13 @@ mod tests {
             }
 
             async fn add_message(
-                &mut self,
+                &self,
                 _message: llmspell_core::traits::agent::ConversationMessage,
             ) -> llmspell_core::Result<()> {
                 panic!("Not implemented for test")
             }
 
-            async fn clear_conversation(&mut self) -> llmspell_core::Result<()> {
+            async fn clear_conversation(&self) -> llmspell_core::Result<()> {
                 panic!("Not implemented for test")
             }
         }
@@ -474,13 +474,13 @@ mod tests {
                 }
 
                 async fn add_message(
-                    &mut self,
+                    &self,
                     _message: llmspell_core::traits::agent::ConversationMessage,
                 ) -> llmspell_core::Result<()> {
                     panic!("Not implemented for test")
                 }
 
-                async fn clear_conversation(&mut self) -> llmspell_core::Result<()> {
+                async fn clear_conversation(&self) -> llmspell_core::Result<()> {
                     panic!("Not implemented for test")
                 }
             }

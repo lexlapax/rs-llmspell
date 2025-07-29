@@ -1381,21 +1381,22 @@ impl AgentBridge {
 
     /// Save an agent's state
     pub async fn save_agent_state(&self, agent_name: &str) -> Result<()> {
-        let state_manager = self.state_manager.as_ref().ok_or_else(|| {
-            LLMSpellError::Component {
-                message: "State manager not configured".to_string(),
-                source: None,
-            }
-        })?;
+        let state_manager =
+            self.state_manager
+                .as_ref()
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: "State manager not configured".to_string(),
+                    source: None,
+                })?;
 
         // Get the agent
         let agents = self.active_agents.read().await;
-        let agent = agents.get(agent_name).ok_or_else(|| {
-            LLMSpellError::Component {
+        let agent = agents
+            .get(agent_name)
+            .ok_or_else(|| LLMSpellError::Component {
                 message: format!("Agent '{}' not found", agent_name),
                 source: None,
-            }
-        })?;
+            })?;
 
         let agent_id = agent.metadata().id.to_string();
         let scope = StateScope::Agent(agent_id.clone());
@@ -1417,8 +1418,8 @@ impl AgentBridge {
 
         // 2. Save conversation history
         if let Ok(conversation) = agent.get_conversation().await {
-            let conv_json = serde_json::to_value(&conversation)
-                .map_err(|e| LLMSpellError::Component {
+            let conv_json =
+                serde_json::to_value(&conversation).map_err(|e| LLMSpellError::Component {
                     message: format!("Failed to serialize conversation: {}", e),
                     source: None,
                 })?;
@@ -1455,25 +1456,26 @@ impl AgentBridge {
 
     /// Load an agent's state
     pub async fn load_agent_state(&self, agent_name: &str) -> Result<bool> {
-        let state_manager = self.state_manager.as_ref().ok_or_else(|| {
-            LLMSpellError::Component {
-                message: "State manager not configured".to_string(),
-                source: None,
-            }
-        })?;
+        let state_manager =
+            self.state_manager
+                .as_ref()
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: "State manager not configured".to_string(),
+                    source: None,
+                })?;
 
         // Note: Loading state requires mutable access to agent, which we don't have
         // with Arc<dyn Agent>. This is a limitation of the current architecture.
         // For now, we can only verify if state exists.
-        
+
         // Get the agent to find its ID
         let agents = self.active_agents.read().await;
-        let agent = agents.get(agent_name).ok_or_else(|| {
-            LLMSpellError::Component {
+        let agent = agents
+            .get(agent_name)
+            .ok_or_else(|| LLMSpellError::Component {
                 message: format!("Agent '{}' not found", agent_name),
                 source: None,
-            }
-        })?;
+            })?;
 
         let agent_id = agent.metadata().id.to_string();
         let scope = StateScope::Agent(agent_id.clone());
@@ -1503,12 +1505,13 @@ impl AgentBridge {
 
     /// Delete an agent's state
     pub async fn delete_agent_state(&self, agent_name: &str) -> Result<()> {
-        let state_manager = self.state_manager.as_ref().ok_or_else(|| {
-            LLMSpellError::Component {
-                message: "State manager not configured".to_string(),
-                source: None,
-            }
-        })?;
+        let state_manager =
+            self.state_manager
+                .as_ref()
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: "State manager not configured".to_string(),
+                    source: None,
+                })?;
 
         // Get the agent to get its ID (or use agent_name as ID if agent not found)
         let agent_id = if let Some(agent) = self.get_agent(agent_name).await {
@@ -1535,12 +1538,13 @@ impl AgentBridge {
 
     /// List all saved agent states
     pub async fn list_saved_agents(&self) -> Result<Vec<String>> {
-        let state_manager = self.state_manager.as_ref().ok_or_else(|| {
-            LLMSpellError::Component {
-                message: "State manager not configured".to_string(),
-                source: None,
-            }
-        })?;
+        let state_manager =
+            self.state_manager
+                .as_ref()
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: "State manager not configured".to_string(),
+                    source: None,
+                })?;
 
         // Get the registry of saved agents from global scope
         let saved_agents = state_manager
@@ -1569,12 +1573,13 @@ impl AgentBridge {
 
     /// Register an agent as having saved state
     async fn register_saved_agent(&self, agent_name: &str) -> Result<()> {
-        let state_manager = self.state_manager.as_ref().ok_or_else(|| {
-            LLMSpellError::Component {
-                message: "State manager not configured".to_string(),
-                source: None,
-            }
-        })?;
+        let state_manager =
+            self.state_manager
+                .as_ref()
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: "State manager not configured".to_string(),
+                    source: None,
+                })?;
 
         // Get current registry
         let mut saved_agents = match state_manager
@@ -1617,12 +1622,13 @@ impl AgentBridge {
 
     /// Unregister an agent from saved state registry
     async fn unregister_saved_agent(&self, agent_name: &str) -> Result<()> {
-        let state_manager = self.state_manager.as_ref().ok_or_else(|| {
-            LLMSpellError::Component {
-                message: "State manager not configured".to_string(),
-                source: None,
-            }
-        })?;
+        let state_manager =
+            self.state_manager
+                .as_ref()
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: "State manager not configured".to_string(),
+                    source: None,
+                })?;
 
         // Get current registry
         let saved_agents = match state_manager

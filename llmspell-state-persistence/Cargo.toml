@@ -46,6 +46,7 @@ crossbeam = "0.8"
 crossbeam-skiplist = "0.1"
 
 # Internal dependencies
+llmspell-core = { path = "../llmspell-core" }
 llmspell-storage = { path = "../llmspell-storage" }
 llmspell-hooks = { path = "../llmspell-hooks" }
 llmspell-events = { path = "../llmspell-events" }

@@ -24,7 +24,7 @@ async fn main() -> Result<()> {
         .build()?;
 
     // Create the agent
-    let mut agent = BasicAgent::new(config)?;
+    let agent = BasicAgent::new(config)?;
     println!("Created agent: {}", agent.metadata().name);
 
     // Create state manager with persistent storage

@@ -230,7 +230,7 @@ pub trait PersistentAgent {
     fn get_persistent_state(&self) -> StateResult<PersistentAgentState>;
 
     /// Apply a persistent state to the agent
-    fn apply_persistent_state(&mut self, state: PersistentAgentState) -> StateResult<()>;
+    fn apply_persistent_state(&self, state: PersistentAgentState) -> StateResult<()>;
 
     /// Save the agent's state
     async fn save_state(&self, state_manager: &crate::manager::StateManager) -> StateResult<()> {

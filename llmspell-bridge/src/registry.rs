@@ -170,13 +170,13 @@ mod tests {
         }
 
         async fn add_message(
-            &mut self,
+            &self,
             _message: llmspell_core::traits::agent::ConversationMessage,
         ) -> Result<(), LLMSpellError> {
             Ok(())
         }
 
-        async fn clear_conversation(&mut self) -> Result<(), LLMSpellError> {
+        async fn clear_conversation(&self) -> Result<(), LLMSpellError> {
             Ok(())
         }
     }

@@ -489,6 +489,87 @@ impl HookExecutor {
     pub fn correlation_tracker(&self) -> Option<Arc<EventCorrelationTracker>> {
         self.correlation_tracker.clone()
     }
+
+    /// Execute hooks for artifact events
+    pub async fn execute_artifact_hooks(
+        &self,
+        artifact_event: &llmspell_core::events::ArtifactEvent,
+        hooks: &[Arc<dyn Hook>],
+    ) -> Result<Vec<HookResult>> {
+        use crate::artifact_hooks::{add_artifact_to_context, event_to_hook_point};
+
+        // Convert artifact event to hook point
+        let hook_point = event_to_hook_point(artifact_event);
+
+        // Create context for artifact hooks
+        let component_id = crate::types::ComponentId::new(
+            crate::types::ComponentType::Custom("artifact_manager".to_string()),
+            artifact_event.source.to_string(),
+        );
+
+        let mut context = HookContext::new(hook_point, component_id);
+        if let Some(correlation_id) = artifact_event.metadata.correlation_id() {
+            // Parse UUID from string
+            if let Ok(uuid) = uuid::Uuid::parse_str(correlation_id) {
+                context = context.with_correlation_id(uuid);
+            }
+        }
+
+        // Add artifact-specific metadata
+        match &artifact_event.event_type {
+            llmspell_core::events::ArtifactEventType::Created(e) => {
+                add_artifact_to_context(&mut context, &e.artifact.id, "created");
+                context.insert_metadata("artifact_name".to_string(), e.artifact.name.clone());
+                context.insert_metadata(
+                    "artifact_type".to_string(),
+                    e.artifact.artifact_type.clone(),
+                );
+            }
+            llmspell_core::events::ArtifactEventType::Modified(e) => {
+                add_artifact_to_context(&mut context, &e.artifact_id, "modified");
+                context.insert_metadata(
+                    "modifications".to_string(),
+                    format!("{:?}", e.modifications),
+                );
+            }
+            llmspell_core::events::ArtifactEventType::Deleted(e) => {
+                add_artifact_to_context(&mut context, &e.artifact_id, "deleted");
+                context.insert_metadata("permanent".to_string(), e.permanent.to_string());
+            }
+            llmspell_core::events::ArtifactEventType::Validated(e) => {
+                add_artifact_to_context(&mut context, &e.artifact_id, "validated");
+                context.insert_metadata(
+                    "validation_type".to_string(),
+                    format!("{:?}", e.validation_type),
+                );
+                context.insert_metadata("valid".to_string(), e.results.valid.to_string());
+            }
+            llmspell_core::events::ArtifactEventType::ValidationFailed(e) => {
+                add_artifact_to_context(&mut context, &e.artifact_id, "validation_failed");
+                context.insert_metadata(
+                    "validation_type".to_string(),
+                    format!("{:?}", e.validation_type),
+                );
+                context.insert_metadata("failures".to_string(), format!("{:?}", e.failures));
+            }
+            llmspell_core::events::ArtifactEventType::Derived(e) => {
+                add_artifact_to_context(&mut context, &e.derived_artifact.id, "derived");
+                context.insert_metadata("parent_artifact".to_string(), e.parent_id.to_string());
+                context.insert_metadata(
+                    "derivation_type".to_string(),
+                    format!("{:?}", e.derivation_type),
+                );
+            }
+            llmspell_core::events::ArtifactEventType::Accessed(e) => {
+                add_artifact_to_context(&mut context, &e.artifact_id, "accessed");
+                context.insert_metadata("access_type".to_string(), format!("{:?}", e.access_type));
+            }
+            _ => {}
+        }
+
+        // Execute all hooks for this artifact event
+        self.execute_hooks(hooks, &mut context).await
+    }
 }
 
 impl Default for HookExecutor {

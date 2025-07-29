@@ -252,7 +252,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   • settings (preferences + privacy + notifications)");
 
     // Store sample data in v1.0.0 format
-    let sample_users_v1 = vec![
+    let sample_users_v1 = [
         serde_json::json!({
             "user_id": "550e8400-e29b-41d4-a716-446655440001",
             "username": "alice_wonder",

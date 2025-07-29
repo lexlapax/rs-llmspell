@@ -29,7 +29,7 @@ pub struct LLMAgent {
     conversation: Arc<Mutex<Vec<ConversationMessage>>>,
     provider: Arc<Box<dyn ProviderInstance>>,
     state_machine: Arc<AgentStateMachine>,
-    state_manager: Option<Arc<StateManager>>,
+    state_manager: Arc<parking_lot::RwLock<Option<Arc<StateManager>>>>,
 }
 
 impl LLMAgent {
@@ -113,7 +113,7 @@ impl LLMAgent {
             conversation: Arc::new(Mutex::new(Vec::new())),
             provider,
             state_machine,
-            state_manager: None,
+            state_manager: Arc::new(parking_lot::RwLock::new(None)),
         })
     }
 
@@ -163,13 +163,13 @@ impl LLMAgent {
     /// Start the agent execution
     pub async fn start(&self) -> Result<()> {
         info!("Starting LLMAgent '{}'", self.metadata.name);
-        
+
         // Note: Automatic state loading requires mutable self reference
         // Users should call load_state() explicitly before start() if needed
-        if self.state_manager.is_some() {
+        if self.state_manager.read().is_some() {
             debug!("State manager available for LLMAgent '{}'. Call load_state() before start() to restore previous state.", self.metadata.name);
         }
-        
+
         self.state_machine.start().await?;
         debug!("LLMAgent '{}' started successfully", self.metadata.name);
         Ok(())
@@ -179,16 +179,22 @@ impl LLMAgent {
     pub async fn pause(&self) -> Result<()> {
         info!("Pausing LLMAgent '{}'", self.metadata.name);
         self.state_machine.pause().await?;
-        
+
         // Automatically save state when pausing if state manager is available
-        if self.state_manager.is_some() {
-            debug!("Saving state for LLMAgent '{}' on pause", self.metadata.name);
+        if self.state_manager.read().is_some() {
+            debug!(
+                "Saving state for LLMAgent '{}' on pause",
+                self.metadata.name
+            );
             if let Err(e) = self.save_state().await {
-                warn!("Failed to save state during pause for agent '{}': {}", self.metadata.name, e);
+                warn!(
+                    "Failed to save state during pause for agent '{}': {}",
+                    self.metadata.name, e
+                );
                 // Continue with pause even if state save fails
             }
         }
-        
+
         debug!("LLMAgent '{}' paused", self.metadata.name);
         Ok(())
     }
@@ -196,13 +202,13 @@ impl LLMAgent {
     /// Resume the agent execution
     pub async fn resume(&self) -> Result<()> {
         info!("Resuming LLMAgent '{}'", self.metadata.name);
-        
+
         // Note: Automatic state loading requires mutable self reference
         // Users should call load_state() explicitly before resume() if needed
-        if self.state_manager.is_some() {
+        if self.state_manager.read().is_some() {
             debug!("State manager available for LLMAgent '{}'. Call load_state() before resume() to restore saved state.", self.metadata.name);
         }
-        
+
         self.state_machine.resume().await?;
         debug!("LLMAgent '{}' resumed", self.metadata.name);
         Ok(())
@@ -211,16 +217,22 @@ impl LLMAgent {
     /// Stop the agent execution
     pub async fn stop(&self) -> Result<()> {
         info!("Stopping LLMAgent '{}'", self.metadata.name);
-        
+
         // Automatically save state before stopping if state manager is available
-        if self.state_manager.is_some() {
-            debug!("Saving final state for LLMAgent '{}' before stop", self.metadata.name);
+        if self.state_manager.read().is_some() {
+            debug!(
+                "Saving final state for LLMAgent '{}' before stop",
+                self.metadata.name
+            );
             if let Err(e) = self.save_state().await {
-                warn!("Failed to save state during stop for agent '{}': {}", self.metadata.name, e);
+                warn!(
+                    "Failed to save state during stop for agent '{}': {}",
+                    self.metadata.name, e
+                );
                 // Continue with stop even if state save fails
             }
         }
-        
+
         self.state_machine.stop().await?;
         debug!("LLMAgent '{}' stopped", self.metadata.name);
         Ok(())
@@ -431,7 +443,7 @@ impl Agent for LLMAgent {
             })
     }
 
-    async fn add_message(&mut self, message: ConversationMessage) -> Result<(), LLMSpellError> {
+    async fn add_message(&self, message: ConversationMessage) -> Result<(), LLMSpellError> {
         self.conversation
             .lock()
             .map(|mut conv| conv.push(message))
@@ -441,7 +453,7 @@ impl Agent for LLMAgent {
             })
     }
 
-    async fn clear_conversation(&mut self) -> Result<(), LLMSpellError> {
+    async fn clear_conversation(&self) -> Result<(), LLMSpellError> {
         self.conversation
             .lock()
             .map(|mut conv| conv.clear())
@@ -454,23 +466,23 @@ impl Agent for LLMAgent {
 
 // Implement StateManagerHolder
 impl StateManagerHolder for LLMAgent {
-    fn state_manager(&self) -> Option<&Arc<StateManager>> {
-        self.state_manager.as_ref()
+    fn state_manager(&self) -> Option<Arc<StateManager>> {
+        self.state_manager.read().clone()
     }
 
-    fn set_state_manager(&mut self, state_manager: Arc<StateManager>) {
-        self.state_manager = Some(state_manager);
+    fn set_state_manager(&self, state_manager: Arc<StateManager>) {
+        *self.state_manager.write() = Some(state_manager);
     }
 }
 
 // Implement StatePersistence
 #[async_trait]
 impl StatePersistence for LLMAgent {
-    fn state_manager(&self) -> Option<&Arc<StateManager>> {
+    fn state_manager(&self) -> Option<Arc<StateManager>> {
         StateManagerHolder::state_manager(self)
     }
 
-    fn set_state_manager(&mut self, state_manager: Arc<StateManager>) {
+    fn set_state_manager(&self, state_manager: Arc<StateManager>) {
         StateManagerHolder::set_state_manager(self, state_manager)
     }
 }

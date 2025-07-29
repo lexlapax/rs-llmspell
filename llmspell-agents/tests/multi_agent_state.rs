@@ -42,19 +42,19 @@ mod tests {
         let config1 = AgentBuilder::basic("agent-1")
             .description("First test agent")
             .build()?;
-        let mut agent1 = BasicAgent::new(config1)?;
+        let agent1 = BasicAgent::new(config1)?;
         agent1.set_state_manager(state_manager.clone());
 
         let config2 = AgentBuilder::basic("agent-2")
             .description("Second test agent")
             .build()?;
-        let mut agent2 = BasicAgent::new(config2)?;
+        let agent2 = BasicAgent::new(config2)?;
         agent2.set_state_manager(state_manager.clone());
 
         let config3 = AgentBuilder::basic("agent-3")
             .description("Third test agent")
             .build()?;
-        let mut agent3 = BasicAgent::new(config3)?;
+        let agent3 = BasicAgent::new(config3)?;
         agent3.set_state_manager(state_manager.clone());
 
         // Initialize all agents
@@ -165,7 +165,7 @@ mod tests {
             let config = AgentBuilder::basic(&format!("collaborator-{}", i))
                 .description(&format!("Collaborative agent {}", i))
                 .build()?;
-            let mut agent = BasicAgent::new(config)?;
+            let agent = BasicAgent::new(config)?;
             agent.set_state_manager(state_manager.clone());
             agent.initialize().await?;
             agents.push(agent);
@@ -230,7 +230,7 @@ mod tests {
             let config = AgentBuilder::basic(agent_id)
                 .description("Agent with persistent state")
                 .build()?;
-            let mut agent = BasicAgent::new(config)?;
+            let agent = BasicAgent::new(config)?;
             agent.set_state_manager(state_manager.clone());
             agent.initialize().await?;
             agent.start().await?;
@@ -277,7 +277,7 @@ mod tests {
             let config = AgentBuilder::basic(agent_id)
                 .description("Agent with persistent state")
                 .build()?;
-            let mut agent = BasicAgent::new(config)?;
+            let agent = BasicAgent::new(config)?;
             agent.set_state_manager(state_manager.clone());
             agent.initialize().await?;
 

@@ -820,7 +820,7 @@ async fn test_concurrent_migration_safety() {
     let final_results = results.lock().await;
     assert_eq!(
         final_results.len(),
-        num_items as usize,
+        num_items,
         "All items should be processed"
     );
 

@@ -223,7 +223,7 @@ async fn test_agent_error_handling() {
 async fn test_agent_state_persistence() {
     use mocks::MockAgentBuilder;
 
-    let mut agent = MockAgentBuilder::new("stateful_agent")
+    let agent = MockAgentBuilder::new("stateful_agent")
         .with_response(Some("hello".to_string()), "Hello response")
         .with_response(Some("goodbye".to_string()), "Goodbye response")
         .build();

@@ -26,7 +26,7 @@ pub struct BasicAgent {
     core_config: CoreAgentConfig,
     conversation: Arc<Mutex<Vec<ConversationMessage>>>,
     state_machine: Arc<AgentStateMachine>,
-    state_manager: Option<Arc<StateManager>>,
+    state_manager: Arc<parking_lot::RwLock<Option<Arc<StateManager>>>>,
 }
 
 impl BasicAgent {
@@ -62,7 +62,7 @@ impl BasicAgent {
             core_config,
             conversation: Arc::new(Mutex::new(Vec::new())),
             state_machine,
-            state_manager: None,
+            state_manager: Arc::new(parking_lot::RwLock::new(None)),
         })
     }
 
@@ -90,13 +90,13 @@ impl BasicAgent {
     /// Start the agent execution
     pub async fn start(&self) -> Result<()> {
         info!("Starting BasicAgent '{}'", self.metadata.name);
-        
+
         // Note: Automatic state loading requires mutable self reference
         // Users should call load_state() explicitly before start() if needed
-        if self.state_manager.is_some() {
+        if self.state_manager.read().is_some() {
             debug!("State manager available for BasicAgent '{}'. Call load_state() before start() to restore previous state.", self.metadata.name);
         }
-        
+
         self.state_machine.start().await?;
         debug!("BasicAgent '{}' started successfully", self.metadata.name);
         Ok(())
@@ -106,16 +106,22 @@ impl BasicAgent {
     pub async fn pause(&self) -> Result<()> {
         info!("Pausing BasicAgent '{}'", self.metadata.name);
         self.state_machine.pause().await?;
-        
+
         // Automatically save state when pausing if state manager is available
-        if self.state_manager.is_some() {
-            debug!("Saving state for BasicAgent '{}' on pause", self.metadata.name);
+        if self.state_manager.read().is_some() {
+            debug!(
+                "Saving state for BasicAgent '{}' on pause",
+                self.metadata.name
+            );
             if let Err(e) = self.save_state().await {
-                warn!("Failed to save state during pause for agent '{}': {}", self.metadata.name, e);
+                warn!(
+                    "Failed to save state during pause for agent '{}': {}",
+                    self.metadata.name, e
+                );
                 // Continue with pause even if state save fails
             }
         }
-        
+
         debug!("BasicAgent '{}' paused", self.metadata.name);
         Ok(())
     }
@@ -123,13 +129,13 @@ impl BasicAgent {
     /// Resume the agent execution
     pub async fn resume(&self) -> Result<()> {
         info!("Resuming BasicAgent '{}'", self.metadata.name);
-        
+
         // Note: Automatic state loading requires mutable self reference
         // Users should call load_state() explicitly before resume() if needed
-        if self.state_manager.is_some() {
+        if self.state_manager.read().is_some() {
             debug!("State manager available for BasicAgent '{}'. Call load_state() before resume() to restore saved state.", self.metadata.name);
         }
-        
+
         self.state_machine.resume().await?;
         debug!("BasicAgent '{}' resumed", self.metadata.name);
         Ok(())
@@ -138,16 +144,22 @@ impl BasicAgent {
     /// Stop the agent execution
     pub async fn stop(&self) -> Result<()> {
         info!("Stopping BasicAgent '{}'", self.metadata.name);
-        
+
         // Automatically save state before stopping if state manager is available
-        if self.state_manager.is_some() {
-            debug!("Saving final state for BasicAgent '{}' before stop", self.metadata.name);
+        if self.state_manager.read().is_some() {
+            debug!(
+                "Saving final state for BasicAgent '{}' before stop",
+                self.metadata.name
+            );
             if let Err(e) = self.save_state().await {
-                warn!("Failed to save state during stop for agent '{}': {}", self.metadata.name, e);
+                warn!(
+                    "Failed to save state during stop for agent '{}': {}",
+                    self.metadata.name, e
+                );
                 // Continue with stop even if state save fails
             }
         }
-        
+
         self.state_machine.stop().await?;
         debug!("BasicAgent '{}' stopped", self.metadata.name);
         Ok(())
@@ -327,7 +339,7 @@ impl Agent for BasicAgent {
             })
     }
 
-    async fn add_message(&mut self, message: ConversationMessage) -> Result<(), LLMSpellError> {
+    async fn add_message(&self, message: ConversationMessage) -> Result<(), LLMSpellError> {
         self.conversation
             .lock()
             .map(|mut conv| conv.push(message))
@@ -337,7 +349,7 @@ impl Agent for BasicAgent {
             })
     }
 
-    async fn clear_conversation(&mut self) -> Result<(), LLMSpellError> {
+    async fn clear_conversation(&self) -> Result<(), LLMSpellError> {
         self.conversation
             .lock()
             .map(|mut conv| conv.clear())
@@ -350,23 +362,23 @@ impl Agent for BasicAgent {
 
 // Implement StateManagerHolder
 impl StateManagerHolder for BasicAgent {
-    fn state_manager(&self) -> Option<&Arc<StateManager>> {
-        self.state_manager.as_ref()
+    fn state_manager(&self) -> Option<Arc<StateManager>> {
+        self.state_manager.read().clone()
     }
 
-    fn set_state_manager(&mut self, state_manager: Arc<StateManager>) {
-        self.state_manager = Some(state_manager);
+    fn set_state_manager(&self, state_manager: Arc<StateManager>) {
+        *self.state_manager.write() = Some(state_manager);
     }
 }
 
 // Implement StatePersistence
 #[async_trait]
 impl StatePersistence for BasicAgent {
-    fn state_manager(&self) -> Option<&Arc<StateManager>> {
+    fn state_manager(&self) -> Option<Arc<StateManager>> {
         StateManagerHolder::state_manager(self)
     }
 
-    fn set_state_manager(&mut self, state_manager: Arc<StateManager>) {
+    fn set_state_manager(&self, state_manager: Arc<StateManager>) {
         StateManagerHolder::set_state_manager(self, state_manager)
     }
 }
@@ -410,7 +422,7 @@ mod tests {
     #[tokio::test]
     async fn test_basic_agent_conversation() {
         let config = AgentBuilder::basic("test-agent").build().unwrap();
-        let mut agent = BasicAgent::new(config).unwrap();
+        let agent = BasicAgent::new(config).unwrap();
 
         // Add messages
         agent

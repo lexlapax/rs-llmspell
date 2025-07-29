@@ -8,6 +8,8 @@ use crate::performance::{
     AsyncHookProcessor, FastAgentStateOps, FastPathConfig, FastPathManager, HookEvent,
     HookEventType, StateClass,
 };
+use llmspell_core::state::{ArtifactCorrelationManager, ArtifactId, StateOperation};
+use llmspell_core::types::ComponentId as CoreComponentId;
 use llmspell_events::{CorrelationContext, EventBus, EventCorrelationTracker, UniversalEvent};
 use llmspell_hooks::{
     ComponentType, Hook, HookContext, HookExecutor, HookPoint, HookResult, ReplayableHook,
@@ -16,7 +18,7 @@ use llmspell_state_traits::{StateError, StateResult, StateScope};
 use llmspell_storage::StorageBackend;
 use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{json, Value};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
@@ -138,6 +140,9 @@ pub struct StateManager {
     fast_path_manager: FastPathManager,
     fast_agent_ops: FastAgentStateOps,
     async_hook_processor: Option<Arc<parking_lot::Mutex<AsyncHookProcessor>>>,
+
+    // Artifact correlation tracking
+    artifact_correlation_manager: Arc<ArtifactCorrelationManager>,
 }
 
 impl StateManager {
@@ -186,6 +191,7 @@ impl StateManager {
             fast_path_manager: FastPathManager::new(FastPathConfig::default()),
             fast_agent_ops: FastAgentStateOps::new(),
             async_hook_processor: None,
+            artifact_correlation_manager: Arc::new(ArtifactCorrelationManager::new()),
         })
     }
 
@@ -260,6 +266,7 @@ impl StateManager {
             fast_path_manager: FastPathManager::new(FastPathConfig::default()),
             fast_agent_ops: FastAgentStateOps::new(),
             async_hook_processor,
+            artifact_correlation_manager: Arc::new(ArtifactCorrelationManager::new()),
         })
     }
 
@@ -1567,7 +1574,143 @@ impl StateManager {
 
         Ok(())
     }
+
+    /// Get the artifact correlation manager
+    pub fn artifact_correlation_manager(&self) -> &Arc<ArtifactCorrelationManager> {
+        &self.artifact_correlation_manager
+    }
+
+    /// Correlate an artifact with the current state operation
+    pub async fn correlate_artifact_creation(
+        &self,
+        artifact_id: ArtifactId,
+        component_id: CoreComponentId,
+        parent_artifact: Option<ArtifactId>,
+    ) -> String {
+        self.artifact_correlation_manager
+            .correlate_creation(artifact_id, component_id, parent_artifact)
+            .await
+    }
+
+    /// Track that a state operation created an artifact
+    pub async fn track_artifact_in_state(
+        &self,
+        scope: StateScope,
+        key: &str,
+        artifact_id: ArtifactId,
+        operation: StateOperation,
+    ) -> StateResult<()> {
+        // Create a correlation between state and artifact
+        let component_id = match &scope {
+            StateScope::Agent(id) => CoreComponentId::from_name(&format!("agent:{}", id)),
+            StateScope::Tool(id) => CoreComponentId::from_name(&format!("tool:{}", id)),
+            StateScope::Workflow(id) => CoreComponentId::from_name(&format!("workflow:{}", id)),
+            StateScope::Custom(id) => CoreComponentId::from_name(&format!("custom:{}", id)),
+            StateScope::Global => CoreComponentId::from_name("global"),
+            StateScope::Session(id) => CoreComponentId::from_name(&format!("session:{}", id)),
+            StateScope::User(id) => CoreComponentId::from_name(&format!("user:{}", id)),
+            StateScope::Hook(id) => CoreComponentId::from_name(&format!("hook:{}", id)),
+        };
+
+        let correlation_id = Uuid::new_v4().to_string();
+        let artifact_id_str = artifact_id.to_string();
+
+        let correlation = llmspell_core::state::ArtifactCorrelation {
+            correlation_id: correlation_id.clone(),
+            artifact_id,
+            component_id,
+            operation,
+            timestamp: SystemTime::now(),
+            parent_artifact: None,
+            relationship: None,
+        };
+
+        self.artifact_correlation_manager
+            .add_correlation(correlation)
+            .await;
+
+        // Store artifact reference in state
+        let artifact_key = format!("artifact:{}:{}", key, artifact_id_str);
+        let artifact_metadata = json!({
+            "artifact_id": artifact_id_str,
+            "correlation_id": correlation_id,
+            "timestamp": SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+        });
+
+        self.set_state_internal(scope, &artifact_key, artifact_metadata)
+            .await
+    }
+
+    /// Get artifacts associated with a component's state
+    pub async fn get_component_artifacts(&self, component_id: &CoreComponentId) -> Vec<ArtifactId> {
+        self.artifact_correlation_manager
+            .get_artifacts_by_component(component_id)
+            .await
+    }
+
+    /// Get artifact lineage (parent chain)
+    pub async fn get_artifact_lineage(&self, artifact_id: &ArtifactId) -> Vec<ArtifactId> {
+        self.artifact_correlation_manager
+            .get_lineage(artifact_id)
+            .await
+    }
 }
+
+// ==============================================================================
+// TRAIT IMPLEMENTATIONS FOR llmspell-state-traits
+// ==============================================================================
+
+use async_trait::async_trait;
+use llmspell_state_traits::{
+    StateManager as StateManagerTrait, StatePersistence, TypedStatePersistence,
+};
+
+#[async_trait]
+impl StateManagerTrait for StateManager {
+    async fn set(&self, scope: StateScope, key: &str, value: Value) -> StateResult<()> {
+        self.set(scope, key, value).await
+    }
+
+    async fn get(&self, scope: StateScope, key: &str) -> StateResult<Option<Value>> {
+        self.get(scope, key).await
+    }
+
+    async fn delete(&self, scope: StateScope, key: &str) -> StateResult<bool> {
+        self.delete(scope, key).await
+    }
+
+    async fn list_keys(&self, scope: StateScope) -> StateResult<Vec<String>> {
+        self.list_keys(scope).await
+    }
+
+    async fn exists(&self, scope: StateScope, key: &str) -> StateResult<bool> {
+        self.exists_in_scope(scope, key).await
+    }
+
+    async fn clear_scope(&self, scope: StateScope) -> StateResult<()> {
+        self.clear_scope(scope).await
+    }
+
+    async fn get_all_in_scope(&self, scope: StateScope) -> StateResult<HashMap<String, Value>> {
+        self.get_all_in_scope(scope).await
+    }
+
+    async fn copy_scope(&self, from_scope: StateScope, to_scope: StateScope) -> StateResult<usize> {
+        self.copy_scope(from_scope, to_scope).await
+    }
+
+    async fn move_scope(&self, from_scope: StateScope, to_scope: StateScope) -> StateResult<usize> {
+        self.move_scope(from_scope, to_scope).await
+    }
+}
+
+#[async_trait]
+impl StatePersistence for StateManager {}
+
+impl TypedStatePersistence for StateManager {}
 
 #[cfg(test)]
 mod tests {
@@ -1740,56 +1883,3 @@ mod tests {
             .unwrap();
     }
 }
-
-// ==============================================================================
-// TRAIT IMPLEMENTATIONS FOR llmspell-state-traits
-// ==============================================================================
-
-use async_trait::async_trait;
-use llmspell_state_traits::{
-    StateManager as StateManagerTrait, StatePersistence, TypedStatePersistence,
-};
-
-#[async_trait]
-impl StateManagerTrait for StateManager {
-    async fn set(&self, scope: StateScope, key: &str, value: Value) -> StateResult<()> {
-        self.set(scope, key, value).await
-    }
-
-    async fn get(&self, scope: StateScope, key: &str) -> StateResult<Option<Value>> {
-        self.get(scope, key).await
-    }
-
-    async fn delete(&self, scope: StateScope, key: &str) -> StateResult<bool> {
-        self.delete(scope, key).await
-    }
-
-    async fn list_keys(&self, scope: StateScope) -> StateResult<Vec<String>> {
-        self.list_keys(scope).await
-    }
-
-    async fn exists(&self, scope: StateScope, key: &str) -> StateResult<bool> {
-        self.exists_in_scope(scope, key).await
-    }
-
-    async fn clear_scope(&self, scope: StateScope) -> StateResult<()> {
-        self.clear_scope(scope).await
-    }
-
-    async fn get_all_in_scope(&self, scope: StateScope) -> StateResult<HashMap<String, Value>> {
-        self.get_all_in_scope(scope).await
-    }
-
-    async fn copy_scope(&self, from_scope: StateScope, to_scope: StateScope) -> StateResult<usize> {
-        self.copy_scope(from_scope, to_scope).await
-    }
-
-    async fn move_scope(&self, from_scope: StateScope, to_scope: StateScope) -> StateResult<usize> {
-        self.move_scope(from_scope, to_scope).await
-    }
-}
-
-#[async_trait]
-impl StatePersistence for StateManager {}
-
-impl TypedStatePersistence for StateManager {}

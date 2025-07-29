@@ -199,10 +199,10 @@ impl ToolState {
 #[async_trait]
 pub trait ToolStatePersistence: Tool {
     /// Get the state manager for this tool
-    fn state_manager(&self) -> Option<&Arc<dyn StateManager>>;
+    fn state_manager(&self) -> Option<Arc<dyn StateManager>>;
 
     /// Set the state manager for this tool
-    fn set_state_manager(&mut self, state_manager: Arc<dyn StateManager>);
+    fn set_state_manager(&self, state_manager: Arc<dyn StateManager>);
 
     /// Save the tool's current state
     async fn save_state(&self) -> Result<()> {
@@ -223,7 +223,7 @@ pub trait ToolStatePersistence: Tool {
     }
 
     /// Load the tool's state from storage
-    async fn load_state(&mut self) -> Result<bool> {
+    async fn load_state(&self) -> Result<bool> {
         if let Some(state_manager) = self.state_manager() {
             let tool_id = self.metadata().id.to_string();
             let state_scope = StateScope::Custom(format!("tool_{}", tool_id));
@@ -271,7 +271,7 @@ pub trait ToolStatePersistence: Tool {
     }
 
     /// Restore tool state from saved state
-    async fn restore_from_tool_state(&mut self, state: ToolState) -> Result<()> {
+    async fn restore_from_tool_state(&self, state: ToolState) -> Result<()> {
         let cache_count = state.result_cache.len();
         let tool_id = state.tool_id.clone();
 
@@ -308,25 +308,25 @@ pub trait ToolStatePersistence: Tool {
     }
 
     /// Restore execution statistics (optional override)
-    fn restore_execution_statistics(&mut self, _stats: ToolExecutionStats) -> Result<()> {
+    fn restore_execution_statistics(&self, _stats: ToolExecutionStats) -> Result<()> {
         Ok(())
     }
 
     /// Restore result cache (optional override)
-    fn restore_result_cache(&mut self, _cache: HashMap<String, CachedResult>) -> Result<()> {
+    fn restore_result_cache(&self, _cache: HashMap<String, CachedResult>) -> Result<()> {
         Ok(())
     }
 
     /// Restore custom state (optional override)
-    fn restore_custom_state(&mut self, _state: HashMap<String, Value>) -> Result<()> {
+    fn restore_custom_state(&self, _state: HashMap<String, Value>) -> Result<()> {
         Ok(())
     }
 }
 
 /// State manager holder trait for concrete implementations
 pub trait ToolStateManagerHolder {
-    fn state_manager(&self) -> Option<&Arc<dyn StateManager>>;
-    fn set_state_manager(&mut self, state_manager: Arc<dyn StateManager>);
+    fn state_manager(&self) -> Option<Arc<dyn StateManager>>;
+    fn set_state_manager(&self, state_manager: Arc<dyn StateManager>);
 }
 
 /// Tool state registry for managing multiple tool states
@@ -345,7 +345,7 @@ impl ToolStateRegistry {
     }
 
     /// Register a tool for state management
-    pub async fn register_tool<T: ToolStatePersistence>(&mut self, mut tool: T) -> Result<T> {
+    pub async fn register_tool<T: ToolStatePersistence>(&mut self, tool: T) -> Result<T> {
         tool.set_state_manager(self.state_manager.clone());
 
         // Try to load existing state
@@ -466,7 +466,7 @@ mod tests {
     // Mock tool for testing
     struct MockTool {
         metadata: ComponentMetadata,
-        state_manager: Option<Arc<dyn StateManager>>,
+        state_manager: Arc<parking_lot::RwLock<Option<Arc<dyn StateManager>>>>,
         execution_stats: Arc<Mutex<ToolExecutionStats>>,
         result_cache: Arc<Mutex<HashMap<String, CachedResult>>>,
         custom_state: Arc<Mutex<HashMap<String, Value>>>,
@@ -515,22 +515,22 @@ mod tests {
     }
 
     impl ToolStateManagerHolder for MockTool {
-        fn state_manager(&self) -> Option<&Arc<dyn StateManager>> {
-            self.state_manager.as_ref()
+        fn state_manager(&self) -> Option<Arc<dyn StateManager>> {
+            self.state_manager.read().clone()
         }
 
-        fn set_state_manager(&mut self, state_manager: Arc<dyn StateManager>) {
-            self.state_manager = Some(state_manager);
+        fn set_state_manager(&self, state_manager: Arc<dyn StateManager>) {
+            *self.state_manager.write() = Some(state_manager);
         }
     }
 
     #[async_trait]
     impl ToolStatePersistence for MockTool {
-        fn state_manager(&self) -> Option<&Arc<dyn StateManager>> {
+        fn state_manager(&self) -> Option<Arc<dyn StateManager>> {
             ToolStateManagerHolder::state_manager(self)
         }
 
-        fn set_state_manager(&mut self, state_manager: Arc<dyn StateManager>) {
+        fn set_state_manager(&self, state_manager: Arc<dyn StateManager>) {
             ToolStateManagerHolder::set_state_manager(self, state_manager)
         }
 
@@ -546,21 +546,21 @@ mod tests {
             self.custom_state.lock().ok().map(|state| state.clone())
         }
 
-        fn restore_execution_statistics(&mut self, stats: ToolExecutionStats) -> Result<()> {
+        fn restore_execution_statistics(&self, stats: ToolExecutionStats) -> Result<()> {
             if let Ok(mut current_stats) = self.execution_stats.lock() {
                 *current_stats = stats;
             }
             Ok(())
         }
 
-        fn restore_result_cache(&mut self, cache: HashMap<String, CachedResult>) -> Result<()> {
+        fn restore_result_cache(&self, cache: HashMap<String, CachedResult>) -> Result<()> {
             if let Ok(mut current_cache) = self.result_cache.lock() {
                 *current_cache = cache;
             }
             Ok(())
         }
 
-        fn restore_custom_state(&mut self, state: HashMap<String, Value>) -> Result<()> {
+        fn restore_custom_state(&self, state: HashMap<String, Value>) -> Result<()> {
             if let Ok(mut current_state) = self.custom_state.lock() {
                 *current_state = state;
             }
@@ -600,15 +600,15 @@ mod tests {
         let state_manager = create_test_state_manager().await;
 
         let metadata = ComponentMetadata::new("test-tool".to_string(), "Test tool".to_string());
-        let mut tool = MockTool {
+        let tool = MockTool {
             metadata,
-            state_manager: None,
+            state_manager: Arc::new(parking_lot::RwLock::new(None)),
             execution_stats: Arc::new(Mutex::new(ToolExecutionStats::default())),
             result_cache: Arc::new(Mutex::new(HashMap::new())),
             custom_state: Arc::new(Mutex::new(HashMap::new())),
         };
 
-        ToolStateManagerHolder::set_state_manager(&mut tool, state_manager);
+        ToolStateManagerHolder::set_state_manager(&tool, state_manager);
 
         // Should save and load successfully
         tool.save_state().await.unwrap();
@@ -624,7 +624,7 @@ mod tests {
         let metadata = ComponentMetadata::new("test-tool".to_string(), "Test tool".to_string());
         let tool = MockTool {
             metadata,
-            state_manager: None,
+            state_manager: Arc::new(parking_lot::RwLock::new(None)),
             execution_stats: Arc::new(Mutex::new(ToolExecutionStats::default())),
             result_cache: Arc::new(Mutex::new(HashMap::new())),
             custom_state: Arc::new(Mutex::new(HashMap::new())),

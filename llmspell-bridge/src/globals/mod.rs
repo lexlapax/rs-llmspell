@@ -84,12 +84,15 @@ pub async fn create_standard_registry(context: Arc<GlobalContext>) -> Result<Glo
     )));
 
     // Create agent global with state manager if available
-    let agent_global = if let Some(state_manager) = context.get_bridge::<llmspell_state_persistence::StateManager>("state_manager") {
+    let agent_global = if let Some(state_manager) =
+        context.get_bridge::<llmspell_state_persistence::StateManager>("state_manager")
+    {
         agent_global::AgentGlobal::with_state_manager(
-            context.registry.clone(), 
+            context.registry.clone(),
             context.providers.clone(),
-            state_manager
-        ).await?
+            state_manager,
+        )
+        .await?
     } else {
         agent_global::AgentGlobal::new(context.registry.clone(), context.providers.clone()).await?
     };
