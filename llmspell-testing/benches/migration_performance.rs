@@ -121,7 +121,7 @@ fn benchmark_simple_transformation(c: &mut Criterion) {
 
     // Single item transformation
     group.bench_function("single_item", |b| {
-        let mut state = create_test_state(1);
+        let state = create_test_state(1);
         b.iter(|| {
             let mut state_copy = state.clone();
             let result = transformer
@@ -158,7 +158,7 @@ fn benchmark_complex_transformation(c: &mut Criterion) {
 
     // Single item transformation
     group.bench_function("single_item", |b| {
-        let mut state = create_test_state(1);
+        let state = create_test_state(1);
         b.iter(|| {
             let mut state_copy = state.clone();
             let result = transformer
@@ -194,7 +194,7 @@ fn benchmark_transformation_types(c: &mut Criterion) {
 
     // Copy transformation
     group.bench_function("copy", |b| {
-        let mut state = create_test_state(1);
+        let state = create_test_state(1);
         let mut transformation = StateTransformation::new("copy".to_string(), "".to_string(), 1, 2);
         transformation.add_transform(FieldTransform::Copy {
             from_field: "name".to_string(),
@@ -212,7 +212,7 @@ fn benchmark_transformation_types(c: &mut Criterion) {
 
     // Remove transformation
     group.bench_function("remove", |b| {
-        let mut state = create_test_state(1);
+        let state = create_test_state(1);
         let mut transformation =
             StateTransformation::new("remove".to_string(), "".to_string(), 1, 2);
         transformation.add_transform(FieldTransform::Remove {
@@ -230,7 +230,7 @@ fn benchmark_transformation_types(c: &mut Criterion) {
 
     // Default transformation
     group.bench_function("default", |b| {
-        let mut state = create_test_state(1);
+        let state = create_test_state(1);
         let mut transformation =
             StateTransformation::new("default".to_string(), "".to_string(), 1, 2);
         transformation.add_transform(FieldTransform::Default {
@@ -249,7 +249,7 @@ fn benchmark_transformation_types(c: &mut Criterion) {
 
     // Custom transformation
     group.bench_function("custom", |b| {
-        let mut state = create_test_state(1);
+        let state = create_test_state(1);
         let mut transformation =
             StateTransformation::new("custom".to_string(), "".to_string(), 1, 2);
         transformation.add_transform(FieldTransform::Custom {
@@ -326,7 +326,7 @@ fn benchmark_nested_data_depth(c: &mut Criterion) {
 
     for depth in [1, 5, 10, 20] {
         group.bench_function(format!("depth_{}", depth), |b| {
-            let mut state = create_nested_state(depth);
+            let state = create_nested_state(depth);
             let mut transformation =
                 StateTransformation::new("nested".to_string(), "".to_string(), 1, 2);
 

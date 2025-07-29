@@ -15,7 +15,7 @@ use tokio::runtime::Runtime;
 /// Benchmark state save operations with various payload sizes
 fn bench_state_save_by_size(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
-    let temp_dir = TempDir::new().unwrap();
+    let _temp_dir = TempDir::new().unwrap();
 
     let mut group = c.benchmark_group("state_save_operations");
 
@@ -226,7 +226,7 @@ fn bench_agent_state_overhead(c: &mut Criterion) {
                     .description("Test agent")
                     .build()
                     .unwrap();
-                let mut agent = BasicAgent::new(config).unwrap();
+                let agent = BasicAgent::new(config).unwrap();
 
                 agent.initialize().await.unwrap();
 
@@ -249,7 +249,7 @@ fn bench_agent_state_overhead(c: &mut Criterion) {
                     .description("Test agent")
                     .build()
                     .unwrap();
-                let mut agent = BasicAgent::new(config).unwrap();
+                let agent = BasicAgent::new(config).unwrap();
                 agent.set_state_manager(state_manager);
 
                 agent.initialize().await.unwrap();
