@@ -395,6 +395,387 @@ impl ArtifactStorage {
         Ok(())
     }
 
+    /// Load content from storage (handling chunked content)
+    #[allow(dead_code, clippy::cast_possible_truncation)]
+    async fn load_content(&self, content_hash: &ContentHash) -> Result<Vec<u8>> {
+        // Check if content is chunked
+        let metadata_key = format!(
+            "{}/chunks/{}/metadata",
+            self.config.key_prefix, content_hash
+        );
+
+        if let Some(chunk_metadata_data) =
+            self.storage_backend.get(&metadata_key).await.map_err(|e| {
+                SessionError::Storage(format!("Failed to check chunk metadata: {e}"))
+            })?
+        {
+            // Load chunked content
+            let chunk_metadata: serde_json::Value = serde_json::from_slice(&chunk_metadata_data)
+                .map_err(|e| {
+                    SessionError::Deserialization(format!("Failed to parse chunk metadata: {e}"))
+                })?;
+
+            let total_chunks = chunk_metadata["total_chunks"]
+                .as_u64()
+                .ok_or_else(|| SessionError::Deserialization("Missing total_chunks".to_string()))?
+                as u32;
+
+            let mut content = Vec::new();
+            for i in 0..total_chunks {
+                let chunk_key = self.chunk_key(content_hash, i);
+                let chunk = self
+                    .storage_backend
+                    .get(&chunk_key)
+                    .await
+                    .map_err(|e| SessionError::Storage(format!("Failed to load chunk {i}: {e}")))?
+                    .ok_or_else(|| SessionError::Storage(format!("Chunk {i} not found")))?;
+                content.extend_from_slice(&chunk);
+            }
+
+            Ok(content)
+        } else {
+            // Load single blob
+            let content_key = self.content_key(content_hash);
+            self.storage_backend
+                .get(&content_key)
+                .await
+                .map_err(|e| SessionError::Storage(format!("Failed to load content: {e}")))?
+                .ok_or_else(|| SessionError::Storage("Content not found".to_string()))
+        }
+    }
+
+    /// Delete chunked content
+    #[allow(dead_code, clippy::cast_possible_truncation)]
+    async fn delete_chunked_content(&self, content_hash: &ContentHash) -> Result<()> {
+        // Get chunk metadata
+        let metadata_key = format!(
+            "{}/chunks/{}/metadata",
+            self.config.key_prefix, content_hash
+        );
+
+        let chunk_metadata_data = self
+            .storage_backend
+            .get(&metadata_key)
+            .await
+            .map_err(|e| SessionError::Storage(format!("Failed to get chunk metadata: {e}")))?
+            .ok_or_else(|| SessionError::Storage("Chunk metadata not found".to_string()))?;
+
+        let chunk_metadata: serde_json::Value = serde_json::from_slice(&chunk_metadata_data)
+            .map_err(|e| {
+                SessionError::Deserialization(format!("Failed to parse chunk metadata: {e}"))
+            })?;
+
+        let total_chunks = chunk_metadata["total_chunks"]
+            .as_u64()
+            .ok_or_else(|| SessionError::Deserialization("Missing total_chunks".to_string()))?
+            as u32;
+
+        // Delete all chunks
+        for i in 0..total_chunks {
+            let chunk_key = self.chunk_key(content_hash, i);
+            self.storage_backend
+                .delete(&chunk_key)
+                .await
+                .map_err(|e| SessionError::Storage(format!("Failed to delete chunk {i}: {e}")))?;
+        }
+
+        // Delete chunk metadata
+        self.storage_backend
+            .delete(&metadata_key)
+            .await
+            .map_err(|e| SessionError::Storage(format!("Failed to delete chunk metadata: {e}")))?;
+
+        Ok(())
+    }
+
+    /// Remove artifact from session's artifact list
+    #[allow(dead_code)]
+    async fn remove_from_session_artifacts(
+        &self,
+        session_id: &SessionId,
+        artifact_id: &ArtifactId,
+    ) -> Result<()> {
+        let key = self.session_artifacts_key(session_id);
+
+        // Get existing list
+        let mut artifact_ids: Vec<ArtifactId> = match self.storage_backend.get(&key).await {
+            Ok(Some(data)) => bincode::deserialize(&data).map_err(|e| {
+                SessionError::Deserialization(format!("Failed to deserialize artifact list: {e}"))
+            })?,
+            Ok(None) => return Ok(()), // No list, nothing to remove
+            Err(e) => {
+                return Err(SessionError::Storage(format!(
+                    "Failed to get artifact list: {e}"
+                )))
+            }
+        };
+
+        // Remove the artifact ID
+        artifact_ids.retain(|id| id != artifact_id);
+
+        // Store updated list
+        let data = bincode::serialize(&artifact_ids).map_err(|e| {
+            SessionError::Serialization(format!("Failed to serialize artifact list: {e}"))
+        })?;
+
+        self.storage_backend
+            .set(&key, data)
+            .await
+            .map_err(|e| SessionError::Storage(format!("Failed to update artifact list: {e}")))?;
+
+        Ok(())
+    }
+
+    /// Get the latest version of an artifact by name
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if artifact is not found or retrieval fails
+    pub async fn get_latest_version(
+        &self,
+        session_id: &SessionId,
+        name: &str,
+    ) -> Result<SessionArtifact> {
+        let history = self
+            .version_manager
+            .get_version_history(session_id, name)
+            .await?;
+
+        if history.current_version == 0 {
+            return Err(SessionError::ArtifactNotFound {
+                id: name.to_string(),
+                session_id: session_id.to_string(),
+            });
+        }
+
+        let latest_id = history
+            .versions
+            .get(&history.current_version)
+            .ok_or_else(|| SessionError::ArtifactNotFound {
+                id: format!("{name}:v{}", history.current_version),
+                session_id: session_id.to_string(),
+            })?;
+
+        match self.get_artifact(latest_id).await? {
+            Some(artifact) => Ok(artifact),
+            None => Err(SessionError::ArtifactNotFound {
+                id: format!("{name}:v{}", history.current_version),
+                session_id: session_id.to_string(),
+            }),
+        }
+    }
+
+    /// Get a specific version of an artifact by name and version number
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if artifact version is not found or retrieval fails
+    pub async fn get_specific_version(
+        &self,
+        session_id: &SessionId,
+        name: &str,
+        version: u32,
+    ) -> Result<SessionArtifact> {
+        let history = self
+            .version_manager
+            .get_version_history(session_id, name)
+            .await?;
+
+        let artifact_id =
+            history
+                .versions
+                .get(&version)
+                .ok_or_else(|| SessionError::ArtifactNotFound {
+                    id: format!("{name}:v{version}"),
+                    session_id: session_id.to_string(),
+                })?;
+
+        match self.get_artifact(artifact_id).await? {
+            Some(artifact) => Ok(artifact),
+            None => Err(SessionError::ArtifactNotFound {
+                id: format!("{name}:v{version}"),
+                session_id: session_id.to_string(),
+            }),
+        }
+    }
+
+    /// Get all versions of an artifact by name
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if version history cannot be loaded or artifacts cannot be retrieved
+    pub async fn get_all_versions(
+        &self,
+        session_id: &SessionId,
+        name: &str,
+    ) -> Result<Vec<SessionArtifact>> {
+        let history = self
+            .version_manager
+            .get_version_history(session_id, name)
+            .await?;
+
+        let mut artifacts = Vec::new();
+
+        // Get artifacts in version order
+        for version in 1..=history.current_version {
+            if let Some(artifact_id) = history.versions.get(&version) {
+                match self.get_artifact(artifact_id).await {
+                    Ok(Some(artifact)) => artifacts.push(artifact),
+                    Ok(None) => {
+                        eprintln!("Warning: Artifact version {version} of {name} not found");
+                    }
+                    Err(e) => {
+                        // Log error but continue with other versions
+                        eprintln!("Warning: Could not retrieve version {version} of {name}: {e}");
+                    }
+                }
+            }
+        }
+
+        Ok(artifacts)
+    }
+
+    /// Batch retrieve multiple artifacts by their IDs
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if storage operations fail. Individual artifact failures are returned as None in the result vector.
+    pub async fn get_artifacts_batch(
+        &self,
+        artifact_ids: &[ArtifactId],
+    ) -> Result<Vec<Option<SessionArtifact>>> {
+        let mut results = Vec::with_capacity(artifact_ids.len());
+
+        for artifact_id in artifact_ids {
+            match self.get_artifact(artifact_id).await {
+                Ok(Some(artifact)) => results.push(Some(artifact)),
+                Ok(None) | Err(_) => results.push(None), // Not found or failed to retrieve
+            }
+        }
+
+        Ok(results)
+    }
+
+    /// Get artifacts from a session with pagination
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if session artifacts cannot be loaded or deserialized
+    pub async fn get_session_artifacts_paginated(
+        &self,
+        session_id: &SessionId,
+        offset: usize,
+        limit: usize,
+    ) -> Result<Vec<SessionArtifact>> {
+        let key = self.session_artifacts_key(session_id);
+
+        let artifact_ids: Vec<ArtifactId> = match self.storage_backend.get(&key).await {
+            Ok(Some(data)) => bincode::deserialize(&data).map_err(|e| {
+                SessionError::Deserialization(format!("Failed to deserialize artifact list: {e}"))
+            })?,
+            Ok(None) => return Ok(vec![]), // No artifacts
+            Err(e) => {
+                return Err(SessionError::Storage(format!(
+                    "Failed to get artifact list: {e}"
+                )))
+            }
+        };
+
+        // Apply pagination
+        let paginated_ids: Vec<&ArtifactId> =
+            artifact_ids.iter().skip(offset).take(limit).collect();
+
+        // Batch retrieve the paginated artifacts
+        let batch_results = self
+            .get_artifacts_batch(&paginated_ids.into_iter().cloned().collect::<Vec<_>>())
+            .await?;
+
+        // Filter out failed retrievals
+        Ok(batch_results.into_iter().flatten().collect())
+    }
+
+    /// Stream artifact content in chunks (useful for large artifacts)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if artifact is not found or chunks cannot be streamed
+    pub async fn stream_artifact_content(
+        &self,
+        artifact_id: &ArtifactId,
+        chunk_size: usize,
+    ) -> Result<Vec<Vec<u8>>> {
+        // Get the artifact metadata
+        let metadata_key = self.metadata_key(artifact_id);
+        let metadata_data = self
+            .storage_backend
+            .get(&metadata_key)
+            .await
+            .map_err(|e| SessionError::Storage(format!("Failed to get metadata: {e}")))?;
+
+        let metadata_data = metadata_data.ok_or_else(|| SessionError::ArtifactNotFound {
+            id: artifact_id.to_string(),
+            session_id: artifact_id.session_id.to_string(),
+        })?;
+
+        let metadata_index: MetadataIndex = bincode::deserialize(&metadata_data)
+            .map_err(|e| SessionError::Deserialization(format!("Failed to parse metadata: {e}")))?;
+
+        // Get content
+        let content = self.load_content(&artifact_id.content_hash).await?;
+
+        // Decompress if needed
+        let final_content = if metadata_index.metadata.is_compressed {
+            lz4_flex::decompress_size_prepended(&content).map_err(|e| SessionError::General {
+                message: format!("Decompression failed: {e}"),
+                source: None,
+            })?
+        } else {
+            content
+        };
+
+        // Split into chunks
+        let mut chunks = Vec::new();
+        for chunk in final_content.chunks(chunk_size) {
+            chunks.push(chunk.to_vec());
+        }
+
+        Ok(chunks)
+    }
+
+    /// Get artifact content as a stream of bytes
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if artifact cannot be found or content cannot be loaded
+    #[allow(clippy::manual_let_else)]
+    pub async fn get_artifact_content_stream(&self, artifact_id: &ArtifactId) -> Result<Vec<u8>> {
+        // Get the artifact metadata
+        let metadata = match self.load_metadata(artifact_id).await? {
+            Some(metadata) => metadata,
+            None => {
+                return Err(SessionError::ArtifactNotFound {
+                    id: artifact_id.to_string(),
+                    session_id: artifact_id.session_id.to_string(),
+                })
+            }
+        };
+
+        // Get content
+        let content = self.load_content(&artifact_id.content_hash).await?;
+
+        // Decompress if needed
+        let final_content = if metadata.metadata.is_compressed {
+            lz4_flex::decompress_size_prepended(&content).map_err(|e| SessionError::General {
+                message: format!("Decompression failed: {e}"),
+                source: None,
+            })?
+        } else {
+            content
+        };
+
+        Ok(final_content)
+    }
+
     /// Check if adding an artifact would exceed storage limits
     #[allow(dead_code)]
     async fn check_storage_limits(
@@ -581,14 +962,94 @@ impl ArtifactStorageOps for ArtifactStorage {
         Ok(versioned_id)
     }
 
-    async fn get_artifact(&self, _artifact_id: &ArtifactId) -> Result<Option<SessionArtifact>> {
-        // Will be implemented in TASK-6.2.5
-        todo!("Implement in TASK-6.2.5")
+    #[allow(clippy::manual_let_else)]
+    async fn get_artifact(&self, artifact_id: &ArtifactId) -> Result<Option<SessionArtifact>> {
+        // Load metadata first
+        let metadata = match self.load_metadata(artifact_id).await? {
+            Some(metadata) => metadata,
+            None => return Ok(None),
+        };
+
+        // Get the content
+        let content = self
+            .load_content(&metadata.artifact_id.content_hash)
+            .await?;
+
+        // Verify content integrity
+        let calculated_hash = blake3::hash(&content).to_string();
+        if calculated_hash != metadata.artifact_id.content_hash {
+            return Err(SessionError::IntegrityError {
+                message: format!(
+                    "Content hash mismatch: expected {}, got {}",
+                    metadata.artifact_id.content_hash, calculated_hash
+                ),
+            });
+        }
+
+        // Reconstruct the SessionArtifact
+        let artifact = SessionArtifact::from_parts(
+            metadata.artifact_id.clone(),
+            metadata.metadata.clone(),
+            content,
+            metadata.metadata.created_at,
+        )?;
+
+        Ok(Some(artifact))
     }
 
-    async fn delete_artifact(&self, _artifact_id: &ArtifactId) -> Result<bool> {
-        // Will be implemented in TASK-6.2.5
-        todo!("Implement in TASK-6.2.5")
+    #[allow(clippy::manual_let_else)]
+    async fn delete_artifact(&self, artifact_id: &ArtifactId) -> Result<bool> {
+        // Load metadata to get content hash and session info
+        let metadata = match self.load_metadata(artifact_id).await? {
+            Some(metadata) => metadata,
+            None => return Ok(false), // Not found
+        };
+
+        let content_hash = &metadata.artifact_id.content_hash;
+        let session_id = &artifact_id.session_id;
+
+        // Delete metadata
+        let metadata_key = self.metadata_key(artifact_id);
+        self.storage_backend
+            .delete(&metadata_key)
+            .await
+            .map_err(|e| SessionError::Storage(format!("Failed to delete metadata: {e}")))?;
+
+        // Update deduplication index
+        self.update_dedup_index(content_hash, false).await?;
+
+        // Check if content should be deleted (no more references)
+        let dedup_index = self.dedup_index.read().await;
+        let should_delete_content = !dedup_index.contains_key(content_hash);
+        drop(dedup_index);
+
+        if should_delete_content {
+            // Delete content
+            if metadata.is_chunked {
+                self.delete_chunked_content(content_hash).await?;
+            } else {
+                let content_key = self.content_key(content_hash);
+                self.storage_backend
+                    .delete(&content_key)
+                    .await
+                    .map_err(|e| SessionError::Storage(format!("Failed to delete content: {e}")))?;
+            }
+        }
+
+        // Remove from session artifacts list
+        self.remove_from_session_artifacts(session_id, artifact_id)
+            .await?;
+
+        // Update session statistics
+        let actual_size = metadata
+            .metadata
+            .original_size
+            .unwrap_or(metadata.metadata.size);
+        #[allow(clippy::cast_possible_wrap)]
+        self.update_session_stats(session_id, -(actual_size as i64), -1, false)
+            .await?;
+
+        Ok(true)
     }
 
     async fn list_session_artifacts(
@@ -839,5 +1300,225 @@ mod tests {
         assert_eq!(stats.artifact_count, 1);
         // Size reported is original size, not compressed
         assert_eq!(stats.total_size, content.len());
+    }
+
+    #[tokio::test]
+    async fn test_version_retrieval() {
+        let backend = Arc::new(MemoryBackend::new());
+        let storage = Arc::new(ArtifactStorage::with_backend(backend));
+
+        let session_id = SessionId::new();
+        let artifact_name = "test_file.txt";
+
+        // Store version 1
+        let content_v1 = b"Version 1 content".to_vec();
+        let artifact_v1 = SessionArtifact::new(
+            session_id,
+            1,
+            ArtifactType::UserInput,
+            artifact_name.to_string(),
+            content_v1.clone(),
+        )
+        .unwrap();
+        storage.store_artifact(&artifact_v1).await.unwrap();
+
+        // Store version 2
+        let content_v2 = b"Version 2 content".to_vec();
+        let artifact_v2 = SessionArtifact::new(
+            session_id,
+            2,
+            ArtifactType::UserInput,
+            artifact_name.to_string(),
+            content_v2.clone(),
+        )
+        .unwrap();
+        storage.store_artifact(&artifact_v2).await.unwrap();
+
+        // Test get_latest_version
+        let latest = storage
+            .get_latest_version(&session_id, artifact_name)
+            .await
+            .unwrap();
+        assert_eq!(latest.get_content().unwrap(), content_v2);
+
+        // Test get_specific_version
+        let v1 = storage
+            .get_specific_version(&session_id, artifact_name, 1)
+            .await
+            .unwrap();
+        assert_eq!(v1.get_content().unwrap(), content_v1);
+
+        // Test get_all_versions
+        let all_versions = storage
+            .get_all_versions(&session_id, artifact_name)
+            .await
+            .unwrap();
+        assert_eq!(all_versions.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_batch_retrieval() {
+        let backend = Arc::new(MemoryBackend::new());
+        let storage = Arc::new(ArtifactStorage::with_backend(backend));
+
+        let session_id = SessionId::new();
+
+        // Store multiple artifacts
+        let mut artifact_ids = Vec::new();
+        for i in 1..=3 {
+            let content = format!("Content {}", i).into_bytes();
+            let artifact = SessionArtifact::new(
+                session_id,
+                i,
+                ArtifactType::SystemGenerated,
+                format!("file_{}.txt", i),
+                content,
+            )
+            .unwrap();
+            let id = storage.store_artifact(&artifact).await.unwrap();
+            artifact_ids.push(id);
+        }
+
+        // Test batch retrieval
+        let results = storage.get_artifacts_batch(&artifact_ids).await.unwrap();
+        assert_eq!(results.len(), 3);
+        assert!(results.iter().all(|r| r.is_some()));
+
+        // Test batch retrieval with non-existent ID
+        let mut mixed_ids = artifact_ids.clone();
+        let fake_id = ArtifactId::new("fake_hash".to_string(), session_id, 999);
+        mixed_ids.push(fake_id);
+
+        let mixed_results = storage.get_artifacts_batch(&mixed_ids).await.unwrap();
+        assert_eq!(mixed_results.len(), 4);
+        assert!(mixed_results[0].is_some());
+        assert!(mixed_results[1].is_some());
+        assert!(mixed_results[2].is_some());
+        assert!(mixed_results[3].is_none()); // Fake ID should be None
+    }
+
+    #[tokio::test]
+    async fn test_paginated_retrieval() {
+        let backend = Arc::new(MemoryBackend::new());
+        let storage = Arc::new(ArtifactStorage::with_backend(backend));
+
+        let session_id = SessionId::new();
+
+        // Store 5 artifacts
+        for i in 1..=5 {
+            let content = format!("Content {}", i).into_bytes();
+            let artifact = SessionArtifact::new(
+                session_id,
+                i,
+                ArtifactType::ToolResult,
+                format!("result_{}.json", i),
+                content,
+            )
+            .unwrap();
+            storage.store_artifact(&artifact).await.unwrap();
+        }
+
+        // Test pagination - first page
+        let page1 = storage
+            .get_session_artifacts_paginated(&session_id, 0, 2)
+            .await
+            .unwrap();
+        assert_eq!(page1.len(), 2);
+
+        // Test pagination - second page
+        let page2 = storage
+            .get_session_artifacts_paginated(&session_id, 2, 2)
+            .await
+            .unwrap();
+        assert_eq!(page2.len(), 2);
+
+        // Test pagination - last page
+        let page3 = storage
+            .get_session_artifacts_paginated(&session_id, 4, 2)
+            .await
+            .unwrap();
+        assert_eq!(page3.len(), 1);
+
+        // Test pagination - beyond available items
+        let empty_page = storage
+            .get_session_artifacts_paginated(&session_id, 10, 2)
+            .await
+            .unwrap();
+        assert_eq!(empty_page.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_streaming_retrieval() {
+        let backend = Arc::new(MemoryBackend::new());
+        let storage = Arc::new(ArtifactStorage::with_backend(backend));
+
+        let session_id = SessionId::new();
+
+        // Create a large artifact (2KB)
+        let content = "x".repeat(2048).into_bytes();
+        let artifact = SessionArtifact::new(
+            session_id,
+            1,
+            ArtifactType::AgentOutput,
+            "large_file.txt".to_string(),
+            content.clone(),
+        )
+        .unwrap();
+
+        let artifact_id = storage.store_artifact(&artifact).await.unwrap();
+
+        // Test streaming with 512-byte chunks
+        let chunks = storage
+            .stream_artifact_content(&artifact_id, 512)
+            .await
+            .unwrap();
+        assert_eq!(chunks.len(), 4); // 2048 / 512 = 4 chunks
+        assert_eq!(chunks[0].len(), 512);
+
+        // Reconstruct content from streams
+        let reconstructed: Vec<u8> = chunks.into_iter().flatten().collect();
+        assert_eq!(reconstructed, content);
+
+        // Test content stream
+        let streamed_content = storage
+            .get_artifact_content_stream(&artifact_id)
+            .await
+            .unwrap();
+        assert_eq!(streamed_content, content);
+    }
+
+    #[tokio::test]
+    async fn test_retrieval_error_cases() {
+        let backend = Arc::new(MemoryBackend::new());
+        let storage = Arc::new(ArtifactStorage::with_backend(backend));
+
+        let session_id = SessionId::new();
+        let fake_id = ArtifactId::new("fake_hash".to_string(), session_id, 1);
+
+        // Test get_artifact with non-existent ID
+        let result = storage.get_artifact(&fake_id).await.unwrap();
+        assert!(result.is_none());
+
+        // Test get_latest_version with non-existent name
+        let result = storage
+            .get_latest_version(&session_id, "non_existent.txt")
+            .await;
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            SessionError::ArtifactNotFound { id, .. } => {
+                assert_eq!(id, "non_existent.txt");
+            }
+            _ => panic!("Expected ArtifactNotFound error"),
+        }
+
+        // Test get_specific_version with non-existent version
+        let result = storage
+            .get_specific_version(&session_id, "test.txt", 99)
+            .await;
+        assert!(result.is_err());
+
+        // Test streaming with non-existent artifact
+        let result = storage.stream_artifact_content(&fake_id, 1024).await;
+        assert!(result.is_err());
     }
 }

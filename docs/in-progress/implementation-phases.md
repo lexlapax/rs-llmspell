@@ -717,7 +717,183 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 
 ---
 
-### **Phase 14: Multimodal Tools Implementation (Weeks 27-28)**
+## Production Optimization Phase
+
+### **Phase 14: Library Mode Support (Weeks 45-46)**
+
+**Goal**: Support usage as native module in external runtimes  
+**Priority**: MEDIUM (Alternative Usage Mode)
+
+**Components**:
+- C API layer for FFI
+- `RuntimeMode::Library` implementation
+- `SelectiveInitStrategy` for partial initialization
+- Native module packaging (LuaRock, NPM)
+
+**Success Criteria**:
+- [ ] Can be compiled as shared library
+- [ ] C API allows external lua_State injection
+- [ ] Selective initialization works (tools-only, agents-only)
+- [ ] Native modules can be required in external scripts
+- [ ] Memory management safe in external runtimes
+
+**Testing Requirements**:
+- C API functionality tests
+- External runtime integration tests
+- Memory safety validation
+- Selective initialization tests
+- Native module packaging tests
+
+---
+
+## Additional Enhancement Phases
+
+### **Phase 15: Cross-Platform Support (Weeks 47-48)**
+
+**Goal**: Full Windows support and cross-platform compatibility  
+**Priority**: MEDIUM (Platform Coverage)
+
+**Components**:
+- Windows-specific implementations
+- Cross-platform build system
+- Platform-specific service integration
+- Cross-platform testing matrix
+
+**Success Criteria**:
+- [ ] All features work on Windows
+- [ ] Windows Service integration functional
+- [ ] Build system supports all target platforms
+- [ ] Cross-platform CI pipeline validates all platforms
+- [ ] Path handling works correctly on all platforms
+
+**Testing Requirements**:
+- Windows-specific functionality tests
+- Cross-platform build validation
+- Service integration tests per platform
+- Path handling compatibility tests
+- Full platform matrix testing
+
+---
+## Platform Support Phases
+
+### **Phase 16: Production Optimization (Weeks 49-50)**
+
+**Goal**: Performance optimization and production hardening  
+**Priority**: HIGH (Production Readiness)
+**Phase 4 Benefit**: CircuitBreaker, PerformanceMonitor, and SecurityHook from Phase 4 provide built-in protection, reducing this phase's scope by ~1 week.
+
+**Components**:
+- Performance profiling and optimization **(building on Phase 4 monitoring)**
+- Memory usage optimization
+- Comprehensive observability **(extending Phase 4 metrics)**
+- Security audit and hardening **(leveraging SecurityHook patterns)**
+- **Fine-tuning of existing CircuitBreaker thresholds**
+- **Optimization of hook execution paths**
+
+**Success Criteria**:
+- [ ] Performance benchmarks meet targets
+- [ ] Memory usage optimized and bounded
+- [ ] Full observability stack functional
+- [ ] Security audit passes
+- [ ] Production deployment validated
+- [ ] **CircuitBreaker thresholds optimized for production**
+- [ ] **Hook execution overhead remains <5%**
+- [ ] **Security patterns from Phase 4 validated**
+
+**Testing Requirements**:
+- Performance benchmark validation
+- Memory usage profiling
+- Observability stack integration tests
+- Security penetration testing
+- Production deployment simulation
+- **Hook performance regression tests**
+- **Circuit breaker threshold optimization tests**
+
+---
+
+## Enhanced Capabilities
+
+### **Phase 17: Additional Optional Enhancements (Extended Tools, Other Enhancements) (Weeks 51-52)**
+
+**Goal**: Implement additional data processing and integration tools  
+**Priority**: LOW (Post-Production Enhancement)
+
+**Components**:
+- **Data Processing Tools** (5 tools): `xml_processor`, `yaml_processor`, `data_transformer`, `statistical_analyzer`, `text_analyzer`
+- **System Integration Tools** (3 tools): `slack_integration`, `github_integration`, `cron_scheduler`
+- Integration with existing tool ecosystem
+- Comprehensive documentation and examples
+
+**Success Criteria**:
+- [ ] All 8 tools functional and tested
+- [ ] Tools follow established Phase 3.0 standards
+- [ ] Integration with workflow patterns verified
+- [ ] Documentation and examples complete
+- [ ] Performance meets established benchmarks
+
+**Testing Requirements**:
+- Individual tool unit tests
+- Integration tests with existing tools
+- Workflow compatibility validation
+- Performance benchmarking
+- Security review
+
+---
+### **Phase 18: A2A Client Support (Weeks 41-42)**
+
+**Goal**: Agent-to-Agent communication as client  
+**Priority**: LOW (Advanced Networking)
+
+**Components**:
+- A2A protocol client implementation
+- Agent discovery and delegation
+- Network communication and retries
+- Task distribution patterns
+
+**Success Criteria**:
+- [ ] Can discover remote agents via A2A protocol
+- [ ] Task delegation to remote agents works
+- [ ] Network failures handled with retries
+- [ ] Agent capabilities properly negotiated
+- [ ] Distributed task execution functional
+
+**Testing Requirements**:
+- A2A protocol client tests
+- Agent discovery validation
+- Network failure simulation tests
+- Task delegation integration tests
+- Distributed execution tests
+
+---
+
+### **Phase 19: A2A Server Support (Weeks 43-44)**
+
+**Goal**: Expose local agents via A2A protocol  
+**Priority**: LOW (Advanced Networking)
+
+**Components**:
+- A2A protocol server implementation
+- Agent exposure and capability advertisement
+- Multi-agent coordination
+- Load balancing and failover
+
+**Success Criteria**:
+- [ ] A2A server accepts agent connections
+- [ ] Local agents discoverable by remote clients
+- [ ] Multi-agent coordination works
+- [ ] Load is distributed across available agents
+- [ ] Failover mechanisms handle agent failures
+
+**Testing Requirements**:
+- A2A server implementation tests
+- Agent exposure validation
+- Multi-agent coordination tests
+- Load balancing functionality tests
+- Failover mechanism tests
+
+---
+
+### **Phase 20: Multimodal Tools Implementation (Weeks 27-28)**
 
 **Goal**: Implement comprehensive multimodal processing tools  
 **Priority**: MEDIUM (Feature Enhancement)
@@ -757,7 +933,7 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 
 ---
 
-### **Phase 15: AI/ML Complex Tools (Weeks 37-38)**
+### **Phase 21: AI/ML Complex Tools (Weeks 37-38)**
 
 **Goal**: Implement AI and ML dependent complex tools  
 **Priority**: MEDIUM (Advanced AI Features)
@@ -788,183 +964,6 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 - Advanced multimodal integration tests
 - Memory usage optimization tests
 - Production deployment validation
-
----
-
-
-## Platform Support Phases
-
-### **Phase 16: A2A Client Support (Weeks 41-42)**
-
-**Goal**: Agent-to-Agent communication as client  
-**Priority**: LOW (Advanced Networking)
-
-**Components**:
-- A2A protocol client implementation
-- Agent discovery and delegation
-- Network communication and retries
-- Task distribution patterns
-
-**Success Criteria**:
-- [ ] Can discover remote agents via A2A protocol
-- [ ] Task delegation to remote agents works
-- [ ] Network failures handled with retries
-- [ ] Agent capabilities properly negotiated
-- [ ] Distributed task execution functional
-
-**Testing Requirements**:
-- A2A protocol client tests
-- Agent discovery validation
-- Network failure simulation tests
-- Task delegation integration tests
-- Distributed execution tests
-
----
-
-### **Phase 17: A2A Server Support (Weeks 43-44)**
-
-**Goal**: Expose local agents via A2A protocol  
-**Priority**: LOW (Advanced Networking)
-
-**Components**:
-- A2A protocol server implementation
-- Agent exposure and capability advertisement
-- Multi-agent coordination
-- Load balancing and failover
-
-**Success Criteria**:
-- [ ] A2A server accepts agent connections
-- [ ] Local agents discoverable by remote clients
-- [ ] Multi-agent coordination works
-- [ ] Load is distributed across available agents
-- [ ] Failover mechanisms handle agent failures
-
-**Testing Requirements**:
-- A2A server implementation tests
-- Agent exposure validation
-- Multi-agent coordination tests
-- Load balancing functionality tests
-- Failover mechanism tests
-
----
-
-## Production Optimization Phase
-
-### **Phase 18: Library Mode Support (Weeks 45-46)**
-
-**Goal**: Support usage as native module in external runtimes  
-**Priority**: MEDIUM (Alternative Usage Mode)
-
-**Components**:
-- C API layer for FFI
-- `RuntimeMode::Library` implementation
-- `SelectiveInitStrategy` for partial initialization
-- Native module packaging (LuaRock, NPM)
-
-**Success Criteria**:
-- [ ] Can be compiled as shared library
-- [ ] C API allows external lua_State injection
-- [ ] Selective initialization works (tools-only, agents-only)
-- [ ] Native modules can be required in external scripts
-- [ ] Memory management safe in external runtimes
-
-**Testing Requirements**:
-- C API functionality tests
-- External runtime integration tests
-- Memory safety validation
-- Selective initialization tests
-- Native module packaging tests
-
----
-
-## Additional Enhancement Phases
-
-### **Phase 19: Cross-Platform Support (Weeks 47-48)**
-
-**Goal**: Full Windows support and cross-platform compatibility  
-**Priority**: MEDIUM (Platform Coverage)
-
-**Components**:
-- Windows-specific implementations
-- Cross-platform build system
-- Platform-specific service integration
-- Cross-platform testing matrix
-
-**Success Criteria**:
-- [ ] All features work on Windows
-- [ ] Windows Service integration functional
-- [ ] Build system supports all target platforms
-- [ ] Cross-platform CI pipeline validates all platforms
-- [ ] Path handling works correctly on all platforms
-
-**Testing Requirements**:
-- Windows-specific functionality tests
-- Cross-platform build validation
-- Service integration tests per platform
-- Path handling compatibility tests
-- Full platform matrix testing
-
----
-
-### **Phase 20: Production Optimization (Weeks 49-50)**
-
-**Goal**: Performance optimization and production hardening  
-**Priority**: HIGH (Production Readiness)
-**Phase 4 Benefit**: CircuitBreaker, PerformanceMonitor, and SecurityHook from Phase 4 provide built-in protection, reducing this phase's scope by ~1 week.
-
-**Components**:
-- Performance profiling and optimization **(building on Phase 4 monitoring)**
-- Memory usage optimization
-- Comprehensive observability **(extending Phase 4 metrics)**
-- Security audit and hardening **(leveraging SecurityHook patterns)**
-- **Fine-tuning of existing CircuitBreaker thresholds**
-- **Optimization of hook execution paths**
-
-**Success Criteria**:
-- [ ] Performance benchmarks meet targets
-- [ ] Memory usage optimized and bounded
-- [ ] Full observability stack functional
-- [ ] Security audit passes
-- [ ] Production deployment validated
-- [ ] **CircuitBreaker thresholds optimized for production**
-- [ ] **Hook execution overhead remains <5%**
-- [ ] **Security patterns from Phase 4 validated**
-
-**Testing Requirements**:
-- Performance benchmark validation
-- Memory usage profiling
-- Observability stack integration tests
-- Security penetration testing
-- Production deployment simulation
-- **Hook performance regression tests**
-- **Circuit breaker threshold optimization tests**
-
----
-
-### **Phase 21: Additional Optional Enhancements (Extended Tools, Other Enhancements) (Weeks 51-52)**
-
-**Goal**: Implement additional data processing and integration tools  
-**Priority**: LOW (Post-Production Enhancement)
-
-**Components**:
-- **Data Processing Tools** (5 tools): `xml_processor`, `yaml_processor`, `data_transformer`, `statistical_analyzer`, `text_analyzer`
-- **System Integration Tools** (3 tools): `slack_integration`, `github_integration`, `cron_scheduler`
-- Integration with existing tool ecosystem
-- Comprehensive documentation and examples
-
-**Success Criteria**:
-- [ ] All 8 tools functional and tested
-- [ ] Tools follow established Phase 3.0 standards
-- [ ] Integration with workflow patterns verified
-- [ ] Documentation and examples complete
-- [ ] Performance meets established benchmarks
-
-**Testing Requirements**:
-- Individual tool unit tests
-- Integration tests with existing tools
-- Workflow compatibility validation
-- Performance benchmarking
-- Security review
 
 ---
 

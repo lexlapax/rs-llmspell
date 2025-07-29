@@ -131,6 +131,13 @@ pub enum SessionError {
         operation: String,
     },
 
+    /// Data integrity error
+    #[error("Data integrity error: {message}")]
+    IntegrityError {
+        /// Error message
+        message: String,
+    },
+
     /// General error with context
     #[error("{message}")]
     General {

@@ -96,6 +96,31 @@ impl SessionArtifact {
         hash.to_hex().to_string()
     }
 
+    /// Create from parts (used during retrieval)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if metadata validation fails
+    pub fn from_parts(
+        id: ArtifactId,
+        metadata: ArtifactMetadata,
+        content: Vec<u8>,
+        stored_at: DateTime<Utc>,
+    ) -> Result<Self> {
+        // Validate metadata
+        metadata
+            .validate()
+            .map_err(|e| SessionError::Validation(format!("Invalid artifact metadata: {e}")))?;
+
+        Ok(Self {
+            id,
+            metadata,
+            content,
+            stored_at,
+            storage_version: Self::STORAGE_VERSION,
+        })
+    }
+
     /// Get the raw content (decompressing if necessary)
     ///
     /// # Errors
