@@ -275,6 +275,46 @@ impl LifecycleEventSystem {
         }
     }
 
+    /// Subscribe to specific event types with a closure
+    pub async fn subscribe_filtered<F>(
+        &self,
+        _name: &str,
+        handler: F,
+        event_types: Vec<LifecycleEventType>,
+    ) -> String
+    where
+        F: Fn(&LifecycleEvent) + Send + Sync + 'static,
+    {
+        struct ClosureListener<F> {
+            handler: F,
+            event_types: Vec<LifecycleEventType>,
+        }
+
+        #[async_trait]
+        impl<F> LifecycleEventListener for ClosureListener<F>
+        where
+            F: Fn(&LifecycleEvent) + Send + Sync,
+        {
+            async fn handle_event(&self, event: &LifecycleEvent) -> Result<()> {
+                (self.handler)(event);
+                Ok(())
+            }
+
+            fn interested_in(&self, event_type: &LifecycleEventType) -> bool {
+                self.event_types.is_empty() || self.event_types.contains(event_type)
+            }
+        }
+
+        let listener = Arc::new(ClosureListener {
+            handler,
+            event_types: event_types.clone(),
+        });
+
+        let subscription = EventSubscription::new(listener).for_event_types(event_types);
+
+        self.subscribe(subscription).await
+    }
+
     /// Subscribe to events
     pub async fn subscribe(&self, subscription: EventSubscription) -> String {
         let subscription_id = subscription.id.clone();

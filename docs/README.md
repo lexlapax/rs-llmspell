@@ -4,7 +4,7 @@
 
 > **📖 Documentation Hub**: Complete documentation for rs-llmspell, a Rust library that enables scriptable LLM interactions through embedded scripting engines. This documentation covers everything from quick start guides to deep architectural analysis.
 
-**🔗 Back to Project**: [← Main README](../README.md) | **Current Status**: Phase 4 Complete | **Target**: Version 1.0
+**🔗 Back to Project**: [← Main README](../README.md) | **Current Status**: Phase 5 Complete (v0.5.0) | **Target**: Version 1.0
 
 ---
 
@@ -114,25 +114,31 @@ Rs-LLMSpell is a **focused scripting framework** for LLM interactions. It provid
 2. **[Phase Status](in-progress/)** - Current completion status  
 3. **[Known Limitations](user-guide/README.md#current-limitations--workarounds)** - What's not yet available
 4. **[Hook & Event Architecture](technical/hook-event-architecture.md)** - Phase 4 extensibility system
+5. **[State Management Guide](state-management/)** - Phase 5 persistent state system
 
 ---
 
 ## Current Project Status
 
-### ✅ **Phase 4 Complete** (July 2025)
-- **Agent Infrastructure**: Factory, registry, lifecycle management
-- **34 Production Tools**: File, network, data processing, system utilities
-- **Hook System**: 40+ hook points with CircuitBreaker protection
-- **Event System**: High-throughput pub/sub (90K+ events/sec)
-- **Cross-Language Support**: Hooks and events across Lua/JS/Rust
-- **Bridge Architecture**: Lua/JavaScript APIs with async execution
-- **Security Hardening**: Defense-in-depth with comprehensive testing
-- **Workflow Patterns**: 4 orchestration patterns implemented
-- **State Management**: Thread-safe workflow coordination
+### ✅ **Phase 5 Complete** (July 2025 - v0.5.0)
+- **Persistent State Management**: Multi-backend support (Memory, Sled, RocksDB)
+- **State Scoping**: 6 levels (Global, Agent, Workflow, Step, Session, Custom)
+- **Enterprise Features**: Schema migrations, atomic backups, retention policies
+- **Performance Achievements**: <5ms state operations, 2.07μs/item migrations
+- **Security Enhancements**: Circular reference detection, sensitive data protection
+- **Testing Revolution**: 7 test categories with quality check scripts
+- **Hook Integration**: All state changes trigger hooks with <2% overhead
+
+### ✅ **Previous Phases Complete**
+- **Phase 4**: Hook & Event System (40+ hooks, 90K events/sec)
+- **Phase 3**: 34 Production Tools & Workflow Patterns
+- **Phase 2**: Agent Infrastructure & Bridge Architecture
+- **Phase 1**: Core Foundation & Script Execution
 
 ### 📋 **Working Toward 1.0** (Target: Q4 2025)
-- **Phase 5**: Persistent State Management (Q3 2025)
-- **Phase 6+**: Session Management, GUI, Advanced Features (Q4 2025)
+- **Phase 6**: Session Management & Agent Upgrades (Next)
+- **Phase 7-9**: GUI, Testing Tools, Python Support
+- **Phase 10-16**: Advanced Features & Enterprise Capabilities
 - **Version 1.0**: Stable API with backward compatibility guarantees
 
 ### 🎯 **What 1.0 Means For You**
@@ -191,4 +197,4 @@ This documentation follows strict quality standards:
 - **🔧 Source Code**: [Library Source](../llmspell-*)
 - **🧪 Tests**: [Integration Tests](../tests/)
 
-**Last Updated**: July 2025 | **Documentation Version**: Phase 4 Complete | **Next Update**: Phase 5 Features (Q3 2025)
+**Last Updated**: July 29, 2025 | **Documentation Version**: Phase 5 Complete (v0.5.0) | **Next Update**: Phase 6 Features

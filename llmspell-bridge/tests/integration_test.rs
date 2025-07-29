@@ -246,12 +246,14 @@ async fn test_execution_context_integration() {
     engine.inject_apis(&registry, &providers).unwrap();
 
     // Set custom execution context
-    let mut context = llmspell_bridge::engine::bridge::ExecutionContext::default();
-    context.working_directory = "/test/dir".to_string();
+    let mut context = llmspell_bridge::engine::bridge::ExecutionContext {
+        working_directory: "/test/dir".to_string(),
+        state: serde_json::json!({"custom": "state"}),
+        ..Default::default()
+    };
     context
         .environment
         .insert("TEST_VAR".to_string(), "test_value".to_string());
-    context.state = serde_json::json!({"custom": "state"});
 
     engine.set_execution_context(context.clone()).unwrap();
 
@@ -343,14 +345,11 @@ async fn test_component_registration_integration() {
             Ok(vec![])
         }
 
-        async fn add_message(
-            &mut self,
-            _message: ConversationMessage,
-        ) -> Result<(), LLMSpellError> {
+        async fn add_message(&self, _message: ConversationMessage) -> Result<(), LLMSpellError> {
             Ok(())
         }
 
-        async fn clear_conversation(&mut self) -> Result<(), LLMSpellError> {
+        async fn clear_conversation(&self) -> Result<(), LLMSpellError> {
             Ok(())
         }
     }

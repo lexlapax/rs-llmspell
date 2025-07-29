@@ -5,8 +5,10 @@ use llmspell_bridge::{RuntimeConfig, ScriptRuntime};
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_agent_discovery_from_lua() {
-    let mut config = RuntimeConfig::default();
-    config.default_engine = "lua".to_string();
+    let config = RuntimeConfig {
+        default_engine: "lua".to_string(),
+        ..Default::default()
+    };
 
     let runtime = ScriptRuntime::new_with_lua(config)
         .await
@@ -30,8 +32,10 @@ async fn test_agent_discovery_from_lua() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_agent_templates_from_lua() {
-    let mut config = RuntimeConfig::default();
-    config.default_engine = "lua".to_string();
+    let config = RuntimeConfig {
+        default_engine: "lua".to_string(),
+        ..Default::default()
+    };
 
     let runtime = ScriptRuntime::new_with_lua(config)
         .await
@@ -55,8 +59,10 @@ async fn test_agent_templates_from_lua() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_agent_creation_and_execution() {
-    let mut config = RuntimeConfig::default();
-    config.default_engine = "lua".to_string();
+    let config = RuntimeConfig {
+        default_engine: "lua".to_string(),
+        ..Default::default()
+    };
 
     let runtime = ScriptRuntime::new_with_lua(config)
         .await
@@ -91,8 +97,10 @@ async fn test_agent_creation_and_execution() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_agent_parameter_conversion() {
-    let mut config = RuntimeConfig::default();
-    config.default_engine = "lua".to_string();
+    let config = RuntimeConfig {
+        default_engine: "lua".to_string(),
+        ..Default::default()
+    };
 
     let runtime = ScriptRuntime::new_with_lua(config)
         .await
@@ -134,8 +142,10 @@ async fn test_agent_parameter_conversion() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_agent_tool_integration() {
-    let mut config = RuntimeConfig::default();
-    config.default_engine = "lua".to_string();
+    let config = RuntimeConfig {
+        default_engine: "lua".to_string(),
+        ..Default::default()
+    };
 
     let runtime = ScriptRuntime::new_with_lua(config)
         .await

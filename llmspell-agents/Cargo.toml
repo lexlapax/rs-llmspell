@@ -13,6 +13,7 @@ llmspell-providers = { path = "../llmspell-providers" }
 llmspell-storage = { path = "../llmspell-storage" }
 llmspell-tools = { path = "../llmspell-tools" }
 llmspell-hooks = { path = "../llmspell-hooks" }
+llmspell-state-persistence = { path = "../llmspell-state-persistence" }
 tokio.workspace = true
 tokio-util.workspace = true
 async-trait.workspace = true
@@ -25,8 +26,16 @@ once_cell.workspace = true
 chrono.workspace = true
 uuid.workspace = true
 futures.workspace = true
+parking_lot.workspace = true
 regex = "1.11"
 rand = "0.8"
 
 [dev-dependencies]
 tracing-subscriber.workspace = true
+tempfile = "3.8"
+
+# Integration test configuration for provider state tests
+[[test]]
+name = "provider_state_integration"
+path = "tests/provider_state_integration/mod.rs"
+required-features = []

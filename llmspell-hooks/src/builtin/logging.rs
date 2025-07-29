@@ -3,7 +3,7 @@
 
 use crate::context::HookContext;
 use crate::result::HookResult;
-use crate::traits::{Hook, MetricHook};
+use crate::traits::{Hook, MetricHook, ReplayableHook};
 use crate::types::{HookMetadata, Language, Priority};
 use anyhow::Result;
 use async_trait::async_trait;
@@ -225,6 +225,10 @@ impl Hook for LoggingHook {
         // Always execute logging hook unless explicitly disabled
         true
     }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 #[async_trait]
@@ -251,6 +255,44 @@ impl MetricHook for LoggingHook {
             );
         }
         Ok(())
+    }
+}
+
+#[async_trait]
+impl ReplayableHook for LoggingHook {
+    fn is_replayable(&self) -> bool {
+        true
+    }
+
+    fn serialize_context(&self, ctx: &HookContext) -> Result<Vec<u8>> {
+        // Create a serializable version of the context with logging config
+        let mut context_data = ctx.data.clone();
+
+        // Add logging configuration to the context for replay
+        context_data.insert(
+            "_logging_config".to_string(),
+            serde_json::to_value(&self.config)?,
+        );
+
+        // Create a modified context with the config data
+        let mut replay_context = ctx.clone();
+        replay_context.data = context_data;
+
+        Ok(serde_json::to_vec(&replay_context)?)
+    }
+
+    fn deserialize_context(&self, data: &[u8]) -> Result<HookContext> {
+        let mut context: HookContext = serde_json::from_slice(data)?;
+
+        // Remove the logging config from the context data
+        // (it was only needed for serialization)
+        context.data.remove("_logging_config");
+
+        Ok(context)
+    }
+
+    fn replay_id(&self) -> String {
+        format!("{}:{}", self.metadata.name, self.metadata.version)
     }
 }
 
@@ -363,5 +405,42 @@ mod tests {
         let context = HookContext::new(HookPoint::SystemStartup, component_id);
 
         assert!(hook.should_execute(&context));
+    }
+
+    #[tokio::test]
+    async fn test_replayable_hook_implementation() {
+        let hook = LoggingHook::new()
+            .with_level(LogLevel::Debug)
+            .with_max_data_size(512);
+        let component_id = ComponentId::new(ComponentType::Agent, "test-agent".to_string());
+        let mut context = HookContext::new(HookPoint::BeforeAgentExecution, component_id);
+
+        // Add test data
+        context.insert_data("test_key".to_string(), json!("test_value"));
+        context.insert_metadata("test_meta".to_string(), "meta_value".to_string());
+
+        // Test serialization
+        let serialized = hook.serialize_context(&context).unwrap();
+        assert!(!serialized.is_empty());
+
+        // Test deserialization
+        let deserialized = hook.deserialize_context(&serialized).unwrap();
+        assert_eq!(deserialized.point, context.point);
+        assert_eq!(deserialized.component_id, context.component_id);
+        assert_eq!(
+            deserialized.data.get("test_key"),
+            context.data.get("test_key")
+        );
+        assert_eq!(
+            deserialized.get_metadata("test_meta"),
+            context.get_metadata("test_meta")
+        );
+
+        // Ensure _logging_config was removed
+        assert!(deserialized.data.get("_logging_config").is_none());
+
+        // Test replay ID
+        assert_eq!(hook.replay_id(), "logging_hook:1.0.0");
+        assert!(hook.is_replayable());
     }
 }

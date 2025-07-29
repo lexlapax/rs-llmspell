@@ -10,6 +10,8 @@ license.workspace = true
 [dependencies]
 llmspell-core = { path = "../llmspell-core" }
 llmspell-hooks = { path = "../llmspell-hooks" }
+llmspell-state-persistence = { path = "../llmspell-state-persistence" }
+llmspell-state-traits = { path = "../llmspell-state-traits" }
 tokio.workspace = true
 async-trait.workspace = true
 serde.workspace = true

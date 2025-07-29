@@ -371,8 +371,10 @@ async fn test_context_switching_overhead() {
     // Create different contexts
     let mut contexts = vec![];
     for i in 0..5 {
-        let mut ctx = llmspell_bridge::engine::bridge::ExecutionContext::default();
-        ctx.working_directory = format!("/test/dir/{}", i);
+        let mut ctx = llmspell_bridge::engine::bridge::ExecutionContext {
+            working_directory: format!("/test/dir/{}", i),
+            ..Default::default()
+        };
         ctx.environment.insert("CTX_ID".to_string(), i.to_string());
         contexts.push(ctx);
     }

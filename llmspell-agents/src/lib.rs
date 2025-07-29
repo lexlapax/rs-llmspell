@@ -11,9 +11,11 @@ pub mod di;
 pub mod factory;
 pub mod factory_registry;
 pub mod health;
+pub mod hooks;
 pub mod lifecycle;
 pub mod monitoring;
 pub mod registry;
+pub mod state;
 pub mod templates;
 pub mod tool_context;
 pub mod tool_discovery;
@@ -29,7 +31,7 @@ pub use agent_wrapped_tool::{
 };
 pub use builder::AgentBuilder;
 pub use composition::{CompositionStep, DataFlow, DataTransform, ToolComposition, ToolProvider};
-pub use config::{ConfigLoader, DefaultTemplates};
+pub use config::{presets, PersistenceConfigBuilder};
 pub use di::{DIContainer, DIContainerBuilder, ScopedDIContainer};
 pub use factory::{
     AgentConfig, AgentFactory, CreationHook, DefaultAgentFactory, ModelConfig, ResourceLimits,
@@ -39,6 +41,7 @@ pub use health::{
     AgentHealthMonitor, HealthCheckResult, HealthIssue, HealthMonitorConfig, HealthStatus,
     ResourceHealthCheck, ResponsivenessHealthCheck, StateMachineHealthCheck,
 };
+pub use hooks::StatePersistenceHook;
 pub use lifecycle::{
     events::{
         EventSubscription, LifecycleEvent, LifecycleEventData, LifecycleEventSystem,
@@ -67,6 +70,9 @@ pub use tool_errors::{
 };
 pub use tool_invocation::{InvocationConfig, InvocationMetrics, InvocationResult, ToolInvoker};
 pub use tool_manager::{ToolManager, ToolManagerConfig};
+
+// Re-export state types
+pub use state::{StateManagerHolder, StatePersistence, ToolStats};
 
 // Re-export monitoring types
 pub use monitoring::{
@@ -98,6 +104,6 @@ pub use monitoring::{
 pub mod prelude {
     pub use crate::{
         global_registry, AgentBuilder, AgentConfig, AgentFactory, CreationHook, DIContainer,
-        DefaultAgentFactory, DefaultTemplates,
+        DefaultAgentFactory,
     };
 }

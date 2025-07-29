@@ -22,6 +22,21 @@ jsonschema.workspace = true
 futures.workspace = true
 mockall = { workspace = true, optional = true }
 
+# Serialization
+rmp-serde = "1.3"
+
+# Compression libraries
+flate2 = "1.0"
+zstd = "0.13"
+lz4 = "1.24"
+brotli = "3.5"
+
+# Crypto for checksums
+sha2 = "0.10"
+
+# Random for backup IDs
+rand = "0.8"
+
 [dev-dependencies]
 mockall.workspace = true
 proptest.workspace = true

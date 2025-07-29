@@ -490,7 +490,7 @@ async fn test_tool_execution_phases() {
     // This test verifies that all 8 hook phases are represented in ToolExecutionPhase
     use llmspell_tools::lifecycle::hook_integration::ToolExecutionPhase;
 
-    let phases = vec![
+    let phases = [
         ToolExecutionPhase::ParameterValidation,
         ToolExecutionPhase::SecurityCheck,
         ToolExecutionPhase::ResourceAllocation,

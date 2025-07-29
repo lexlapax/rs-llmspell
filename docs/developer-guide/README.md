@@ -48,14 +48,15 @@ cargo test -p llmspell-core --lib
 - **[Quality Check Scripts](quality-check-scripts.md)** ✅ *Current & Accurate* - Running quality checks
 
 ### **Development Areas**
-- **[Tool Development Guide](tool-development-guide.md)** 📋 *Missing - Phase 3 Priority*
-- **[Agent Development Guide](agent-development-guide.md)** 📋 *Missing - Phase 3 Priority*
-- **[Bridge Development Guide](bridge-development-guide.md)** 📋 *Missing - Phase 3 Priority*
-- **[Hook Development Guide](hook-development-guide.md)** ✅ *Phase 4* - Creating custom hooks in Rust
+- **[Tool Development Guide](tool-development-guide.md)** ✅ *Complete* - Developing new tools
+- **[Agent Development Guide](agent-development-guide.md)** ✅ *Complete* - Agent infrastructure guide
+- **[Bridge Development Guide](bridge-development-guide.md)** ✅ *Complete* - Script language integration
+- **[Hook Development Guide](hook-development-guide.md)** ✅ *Complete* - Creating custom hooks in Rust
+- **[State Development Guide](../state-management/)** ✅ *Phase 5* - State persistence development
 
 ---
 
-## 🏗️ Current Architecture (Phase 3.3)
+## 🏗️ Current Architecture (v0.5.0 - Phase 5 Complete)
 
 ### **Core Components**
 ```
@@ -65,7 +66,7 @@ rs-llmspell/
 ├── llmspell-tools/         # 34 built-in tools
 ├── llmspell-utils/         # Shared utilities (resource limits, etc.)
 ├── llmspell-security/      # Security framework
-└── llmspell-agents/        # Agent infrastructure (Phase 3.3)
+└── llmspell-agents/        # Agent infrastructure with state persistence
 ```
 
 ### **Development Status by Component**
@@ -74,7 +75,10 @@ rs-llmspell/
 - **✅ llmspell-tools**: 34 production-ready tools with security
 - **✅ llmspell-utils**: Resource limits and shared functionality  
 - **✅ llmspell-security**: Security levels, sandboxing, validation
-- **🚧 llmspell-agents**: Agent infrastructure in active development
+- **✅ llmspell-agents**: Production-ready agent infrastructure
+- **✅ llmspell-hooks**: Hook system with 40+ hook points
+- **✅ llmspell-events**: High-performance event bus (90K+ events/sec)
+- **✅ llmspell-state-persistence**: Multi-backend state management
 
 ---
 
@@ -91,7 +95,7 @@ cargo test -p llmspell-tools --test test_your_tool
 cargo test --test integration_test_tools
 ```
 
-### **Working on Agents (Phase 3.3)**
+### **Working on Agents**
 ```bash
 # 1. Implement Agent trait in llmspell-agents/
 # 2. Add to agent registry
@@ -139,11 +143,13 @@ cargo test --test lua_integration_tests
 - **Sandboxing** provides file/network access control
 - **See**: [Security Development Guide](security-guide.md)
 
-### **3. Phase 3.3 Development Focus**
-- **Agent Infrastructure**: Multi-agent coordination and composition
-- **Tool Integration**: Agents discovering and invoking tools
-- **Workflow Enhancement**: Advanced workflow patterns with agent support
-- **Bridge Completion**: Full Lua API coverage for agents and workflows
+### **3. Phase 5 Development Achievements**
+- **Persistent State Management**: Multi-backend support (Memory, Sled, RocksDB)
+- **Enterprise Features**: Schema migrations, atomic backups, retention policies
+- **Performance Excellence**: <5ms state operations, 2.07μs/item migrations
+- **Hook Integration**: All state changes trigger hooks with <2% overhead
+- **Security Enhancements**: Circular reference detection, sensitive data protection
+- **Testing Revolution**: 7 test categories with quality check scripts
 
 ---
 
@@ -176,7 +182,7 @@ cargo test --test lua_integration_tests
 - **Unit Tests**: `cargo test --lib` - Individual component testing
 - **Integration Tests**: `./scripts/test-by-tag.sh integration` - Component interaction
 - **Tool Tests**: `./scripts/test-by-tag.sh tool` - Tool-specific functionality
-- **Agent Tests**: `./scripts/test-by-tag.sh agent` - Agent infrastructure (Phase 3.3)
+- **Agent Tests**: `./scripts/test-by-tag.sh agent` - Agent infrastructure
 - **External Tests**: `./scripts/test-by-tag.sh external` - Network-dependent tests
 
 ### **Performance Benchmarks**
@@ -184,7 +190,10 @@ cargo test --test lua_integration_tests
 # Benchmark tool performance
 cargo bench -p llmspell-tools
 
-# Benchmark agent operations (Phase 3.3)
+# Benchmark state operations
+cargo bench -p llmspell-state-persistence
+
+# Benchmark agent operations
 cargo bench -p llmspell-agents
 
 # Benchmark bridge overhead
@@ -215,7 +224,7 @@ cargo test --test tool_registry_test
 cargo test -p llmspell-bridge --lib -- tool_discovery
 ```
 
-#### **Agent Infrastructure Issues (Phase 3.3)**
+#### **Common Development Issues**
 ```bash
 # Test agent creation and registry
 cargo test -p llmspell-agents --lib
@@ -243,7 +252,10 @@ cargo test --test agent_tool_integration
 
 ### **Performance Requirements**
 - **Tool Initialization**: <10ms (measured in benchmarks)
-- **Agent Operations**: <50ms overhead (Phase 3.3 target)
+- **Agent Operations**: <50ms overhead (achieved)
+- **State Operations**: <5ms read/write (achieved)
+- **Hook Overhead**: <2% performance impact (achieved)
+- **Migration Performance**: 2.07μs per item (achieved)
 - **Bridge Overhead**: <5ms for global method calls
 - **Memory Usage**: Tools must use ResourceTracker for memory >1MB
 
@@ -276,46 +288,49 @@ cargo test --test agent_tool_integration
 
 ## 🗺️ Phase Roadmap for Contributors
 
-### **Current: Phase 3.3 - Agent Infrastructure (Weeks 15-16)**
+### **Completed: Phases 0-5 (v0.5.0 Released)**
+**Achievements**:
+- ✅ Foundation infrastructure with 12-crate workspace
+- ✅ 34 production-ready tools across 9 categories
+- ✅ Agent infrastructure with multi-agent coordination
+- ✅ Hook system with 40+ hook points (<1% overhead)
+- ✅ Event bus with 90K+ events/sec throughput
+- ✅ Persistent state with multi-backend support
+- ✅ Enterprise features: migrations, backups, retention
+
+### **Next: Phase 6 - Session Management (Q3 2025)**
 **Focus Areas**:
-- Agent factory and registry completion
-- Multi-agent coordination patterns  
-- Agent-tool integration
-- Workflow-agent composition
+- Session lifecycle and persistence
+- Session-scoped state management
+- Agent session upgrades
+- Multi-session coordination
 
 **Contribution Opportunities**:
-- Agent implementation patterns
-- Tool integration with agent discovery
-- Advanced workflow patterns
-- Lua API completion for agents
+- Session manager implementation
+- Session persistence strategies
+- Session migration utilities
+- Cross-session communication
 
-### **Next: Phase 4 - Hooks & Events (Weeks 17-18)**
-**Focus Areas**:
-- Hook system implementation (20+ lifecycle points)
-- Event bus with async subscriptions
-- Performance monitoring hooks
-- Integration with existing workflows
-
-### **Future: Phase 5 - Persistent State (Weeks 19-20)**
-**Focus Areas**:
-- State backed by sled/rocksdb
-- Automatic persistence and recovery
-- State migrations and versioning
-- Cross-session state management
+### **Future: Phase 7+ - Advanced Features**
+**Planned Features**:
+- GUI interface (Phase 7)
+- Python support (Phase 9)
+- Vector storage integration (Phase 10)
+- Enterprise deployment tools (Phase 11+)
 
 ---
 
 ## 🎯 Current Development Priorities
 
-### **High Priority (Phase 3.3)**
-1. **Agent Infrastructure Completion**: Factory, registry, lifecycle management
-2. **Tool-Agent Integration**: Agents discovering and invoking tools
-3. **Workflow Enhancement**: Agent-aware workflow patterns
-4. **Bridge API Completion**: Full Lua coverage for agents
+### **High Priority (Phase 6 Preparation)**
+1. **Session Management Design**: Architecture for session lifecycle
+2. **Session Persistence**: Storage strategies for sessions
+3. **Agent Session Upgrades**: Enhance agents with session awareness
+4. **Documentation**: Update guides for session features
 
 ### **Medium Priority**
-1. **Documentation Updates**: Keep development guides current with implementation
-2. **Performance Optimization**: Meet Phase 3.3 performance targets
+1. **Performance Monitoring**: Maintain achieved performance targets
+2. **Bug Fixes**: Address any v0.5.0 issues reported
 3. **Test Coverage**: Increase coverage in agent infrastructure
 4. **Security Hardening**: Complete security review of agent components
 

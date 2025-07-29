@@ -1,11 +1,11 @@
 [package]
 name = "llmspell-events"
-version = "0.4.0"
-edition = "2021"
-authors = ["LLMSpell Contributors"]
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
 description = "Event bus and cross-language event system for rs-llmspell"
-repository = "https://github.com/lexlapax/rs-llmspell"
-license = "MIT OR Apache-2.0"
+repository.workspace = true
+license.workspace = true
 keywords = ["llm", "events", "async", "cross-language"]
 categories = ["asynchronous", "api-bindings"]
 

@@ -6,6 +6,7 @@ use crate::lifecycle::{
     events::{LifecycleEvent, LifecycleEventData, LifecycleEventType},
     state_machine::{AgentState, AgentStateMachine},
 };
+use crate::state::{StateManagerHolder, StatePersistence};
 use anyhow::Result;
 use async_trait::async_trait;
 use llmspell_core::{
@@ -20,6 +21,7 @@ use llmspell_core::{
     },
     BaseAgent, ExecutionContext, LLMSpellError,
 };
+use llmspell_state_persistence::{PersistentAgentState, StateManager};
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
@@ -95,6 +97,8 @@ pub struct MockAgent {
     state_machine: Arc<AgentStateMachine>,
     event_sender: Option<broadcast::Sender<LifecycleEvent>>,
     conversation: Arc<Mutex<Vec<ConversationMessage>>>,
+    state_manager: Arc<parking_lot::RwLock<Option<Arc<StateManager>>>>,
+    agent_id_string: String,
 }
 
 impl MockAgent {
@@ -119,6 +123,8 @@ impl MockAgent {
             max_tokens: Some(2000),
         };
 
+        let agent_id_string = metadata.id.to_string();
+
         Self {
             metadata,
             core_config,
@@ -129,6 +135,8 @@ impl MockAgent {
             state_machine: Arc::new(state_machine),
             event_sender: None,
             conversation: Arc::new(Mutex::new(Vec::new())),
+            state_manager: Arc::new(parking_lot::RwLock::new(None)),
+            agent_id_string,
         }
     }
 
@@ -174,6 +182,38 @@ impl MockAgent {
         if let Some(sender) = &self.event_sender {
             let _ = sender.send(event);
         }
+    }
+
+    /// Initialize the agent
+    pub async fn initialize(&mut self) -> Result<()> {
+        self.state_machine
+            .initialize()
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to initialize agent: {}", e))
+    }
+
+    /// Start the agent
+    pub async fn start(&mut self) -> Result<()> {
+        self.state_machine
+            .start()
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to start agent: {}", e))
+    }
+
+    /// Stop the agent
+    pub async fn stop(&mut self) -> Result<()> {
+        self.state_machine
+            .stop()
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to stop agent: {}", e))
+    }
+
+    /// Terminate the agent
+    pub async fn terminate(&mut self) -> Result<()> {
+        self.state_machine
+            .terminate()
+            .await
+            .map_err(|e| anyhow::anyhow!("Failed to terminate agent: {}", e))
     }
 }
 
@@ -283,6 +323,23 @@ impl BaseAgent for MockAgent {
             }
         };
 
+        // Add messages to conversation history
+        {
+            let mut conversation = self.conversation.lock().unwrap();
+            // Add user message
+            conversation.push(ConversationMessage {
+                role: llmspell_core::traits::agent::MessageRole::User,
+                content: input.text.clone(),
+                timestamp: chrono::Utc::now(),
+            });
+            // Add assistant response
+            conversation.push(ConversationMessage {
+                role: llmspell_core::traits::agent::MessageRole::Assistant,
+                content: output.text.clone(),
+                timestamp: chrono::Utc::now(),
+            });
+        }
+
         Ok(output)
     }
 
@@ -311,12 +368,12 @@ impl Agent for MockAgent {
         Ok(self.conversation.lock().unwrap().clone())
     }
 
-    async fn add_message(&mut self, message: ConversationMessage) -> Result<(), LLMSpellError> {
+    async fn add_message(&self, message: ConversationMessage) -> Result<(), LLMSpellError> {
         self.conversation.lock().unwrap().push(message);
         Ok(())
     }
 
-    async fn clear_conversation(&mut self) -> Result<(), LLMSpellError> {
+    async fn clear_conversation(&self) -> Result<(), LLMSpellError> {
         self.conversation.lock().unwrap().clear();
         Ok(())
     }
@@ -342,6 +399,145 @@ impl ToolCapable for MockAgent {
             .contains(&tool_name.to_string())
     }
 }
+
+impl StateManagerHolder for MockAgent {
+    fn state_manager(&self) -> Option<Arc<StateManager>> {
+        self.state_manager.read().clone()
+    }
+
+    fn set_state_manager(&self, state_manager: Arc<StateManager>) {
+        *self.state_manager.write() = Some(state_manager);
+    }
+}
+
+#[async_trait]
+impl StatePersistence for MockAgent {
+    fn state_manager(&self) -> Option<Arc<StateManager>> {
+        StateManagerHolder::state_manager(self)
+    }
+
+    fn set_state_manager(&self, state_manager: Arc<StateManager>) {
+        StateManagerHolder::set_state_manager(self, state_manager)
+    }
+
+    async fn save_state(&self) -> Result<()> {
+        if let Some(state_manager) = StateManagerHolder::state_manager(self) {
+            let state = self.create_persistent_state().await?;
+            state_manager
+                .save_agent_state(&state)
+                .await
+                .map_err(|e| anyhow::anyhow!("Failed to save state: {}", e))?;
+            Ok(())
+        } else {
+            Err(anyhow::anyhow!("No state manager configured"))
+        }
+    }
+
+    async fn load_state(&self) -> Result<bool> {
+        if let Some(state_manager) = StateManagerHolder::state_manager(self) {
+            if let Some(state) = state_manager
+                .load_agent_state(&self.agent_id_string)
+                .await
+                .map_err(|e| anyhow::anyhow!("Failed to load state: {}", e))?
+            {
+                self.restore_from_persistent_state(state).await?;
+                Ok(true)
+            } else {
+                Ok(false)
+            }
+        } else {
+            Err(anyhow::anyhow!("No state manager configured"))
+        }
+    }
+
+    async fn create_persistent_state(&self) -> Result<PersistentAgentState> {
+        let conversation = self.conversation.lock().unwrap().clone();
+        let conversation_history = conversation
+            .into_iter()
+            .map(
+                |msg| llmspell_state_persistence::agent_state::ConversationMessage {
+                    role: match msg.role {
+                        llmspell_core::traits::agent::MessageRole::System => {
+                            llmspell_state_persistence::agent_state::MessageRole::System
+                        }
+                        llmspell_core::traits::agent::MessageRole::User => {
+                            llmspell_state_persistence::agent_state::MessageRole::User
+                        }
+                        llmspell_core::traits::agent::MessageRole::Assistant => {
+                            llmspell_state_persistence::agent_state::MessageRole::Assistant
+                        }
+                    },
+                    content: msg.content,
+                    timestamp: std::time::SystemTime::from(msg.timestamp),
+                    metadata: None,
+                },
+            )
+            .collect();
+
+        let state_data = llmspell_state_persistence::agent_state::AgentStateData {
+            conversation_history,
+            context_variables: HashMap::new(),
+            tool_usage_stats: Default::default(),
+            execution_state: llmspell_state_persistence::agent_state::ExecutionState::Idle,
+            custom_data: HashMap::new(),
+        };
+
+        let metadata = llmspell_state_persistence::agent_state::AgentMetadata {
+            name: self.metadata.name.clone(),
+            description: Some(self.metadata.description.clone()),
+            version: self.metadata.version.to_string(),
+            capabilities: vec![],
+            provider_config: Some(serde_json::to_value(&self.core_config).unwrap_or_default()),
+            tags: vec![],
+        };
+
+        Ok(PersistentAgentState {
+            agent_id: self.agent_id_string.clone(),
+            agent_type: "mock".to_string(),
+            state: state_data,
+            metadata,
+            creation_time: std::time::SystemTime::now(),
+            last_modified: std::time::SystemTime::now(),
+            schema_version: 1,
+            hook_registrations: vec![],
+            last_hook_execution: None,
+            correlation_context: None,
+        })
+    }
+
+    async fn restore_from_persistent_state(&self, state: PersistentAgentState) -> Result<()> {
+        let mut conversation = self.conversation.lock().unwrap();
+        conversation.clear();
+
+        for entry in state.state.conversation_history {
+            let role = match entry.role {
+                llmspell_state_persistence::agent_state::MessageRole::System => {
+                    llmspell_core::traits::agent::MessageRole::System
+                }
+                llmspell_state_persistence::agent_state::MessageRole::User => {
+                    llmspell_core::traits::agent::MessageRole::User
+                }
+                llmspell_state_persistence::agent_state::MessageRole::Assistant => {
+                    llmspell_core::traits::agent::MessageRole::Assistant
+                }
+                llmspell_state_persistence::agent_state::MessageRole::Tool => {
+                    llmspell_core::traits::agent::MessageRole::Assistant
+                } // Map Tool to Assistant
+            };
+
+            conversation.push(ConversationMessage {
+                role,
+                content: entry.content,
+                timestamp: chrono::DateTime::<chrono::Utc>::from(entry.timestamp),
+            });
+        }
+
+        Ok(())
+    }
+}
+
+// Implement the PersistentAgent trait using our macro
+crate::impl_persistent_agent!(MockAgent);
 
 /// Mock tool implementation for testing
 pub struct MockTool {

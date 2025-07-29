@@ -3,7 +3,7 @@
 
 use crate::context::HookContext;
 use crate::result::HookResult;
-use crate::traits::{Hook, MetricHook};
+use crate::traits::{Hook, MetricHook, ReplayableHook};
 use crate::types::{HookMetadata, HookPoint, Language, Priority};
 use anyhow::Result;
 use async_trait::async_trait;
@@ -418,6 +418,10 @@ impl Hook for DebuggingHook {
         // Execute for all contexts unless specifically disabled
         true
     }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 #[async_trait]
@@ -675,5 +679,84 @@ mod tests {
         assert_eq!(metadata.language, Language::Native);
         assert!(metadata.tags.contains(&"builtin".to_string()));
         assert!(metadata.tags.contains(&"debugging".to_string()));
+    }
+}
+
+#[async_trait]
+impl ReplayableHook for DebuggingHook {
+    fn is_replayable(&self) -> bool {
+        true
+    }
+
+    fn serialize_context(&self, ctx: &HookContext) -> Result<Vec<u8>> {
+        // Create a serializable version of the context with debugging config
+        let mut context_data = ctx.data.clone();
+
+        // Add debugging configuration for replay
+        context_data.insert(
+            "_debugging_config".to_string(),
+            serde_json::to_value(&self.storage.config)?,
+        );
+
+        // Add current traces snapshot for debugging
+        let traces = self.storage.get_traces();
+        let trace_summary = serde_json::json!({
+            "total_traces": traces.len(),
+            "hook_points": traces.iter().map(|t| format!("{:?}", t.hook_point)).collect::<Vec<_>>(),
+            "average_duration": if traces.is_empty() {
+                0.0
+            } else {
+                traces.iter()
+                    .filter_map(|t| t.execution_duration)
+                    .sum::<f64>() / traces.len() as f64
+            },
+            "component_types": traces.iter().map(|t| &t.component_type).collect::<std::collections::HashSet<_>>(),
+            "languages": traces.iter().map(|t| &t.language).collect::<std::collections::HashSet<_>>(),
+        });
+        context_data.insert("_debug_trace_summary".to_string(), trace_summary);
+
+        // Add the current trace entry if debugging info should be included
+        if self.storage.config.include_context_data {
+            let current_trace = DebugTrace {
+                timestamp: Utc::now(),
+                hook_point: ctx.point.clone(),
+                component_name: ctx.component_id.name.clone(),
+                component_type: format!("{:?}", ctx.component_id.component_type),
+                language: format!("{:?}", ctx.language),
+                correlation_id: ctx.correlation_id.to_string(),
+                context_data: serde_json::to_value(&ctx.data)?,
+                metadata: ctx.metadata.clone(),
+                stack_trace: if self.storage.config.capture_stack_traces {
+                    self.capture_stack_trace()
+                } else {
+                    None
+                },
+                execution_duration: None,
+            };
+            context_data.insert(
+                "_current_debug_trace".to_string(),
+                serde_json::to_value(&current_trace)?,
+            );
+        }
+
+        let mut replay_context = ctx.clone();
+        replay_context.data = context_data;
+
+        Ok(serde_json::to_vec(&replay_context)?)
+    }
+
+    fn deserialize_context(&self, data: &[u8]) -> Result<HookContext> {
+        let mut context: HookContext = serde_json::from_slice(data)?;
+
+        // Remove the debugging-specific data from context
+        context.data.remove("_debugging_config");
+        context.data.remove("_debug_trace_summary");
+        context.data.remove("_current_debug_trace");
+
+        Ok(context)
+    }
+
+    fn replay_id(&self) -> String {
+        format!("{}:{}", self.metadata.name, self.metadata.version)
     }
 }

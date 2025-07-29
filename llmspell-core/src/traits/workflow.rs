@@ -246,15 +246,17 @@ pub struct WorkflowConfig {
 ///         &self.config
 ///     }
 ///     
-///     async fn add_step(&mut self, step: WorkflowStep) -> Result<()> {
+///     async fn add_step(&self, step: WorkflowStep) -> Result<()> {
 ///         // Validate no circular dependencies
-///         self.steps.push(step);
+///         // With interior mutability pattern
+///         self.steps.lock().await.push(step);
 ///         self.validate().await?;
 ///         Ok(())
 ///     }
 ///     
-///     async fn remove_step(&mut self, step_id: ComponentId) -> Result<()> {
-///         self.steps.retain(|s| s.id != step_id);
+///     async fn remove_step(&self, step_id: ComponentId) -> Result<()> {
+///         // With interior mutability pattern
+///         self.steps.lock().await.retain(|s| s.id != step_id);
 ///         Ok(())
 ///     }
 ///     
@@ -288,10 +290,10 @@ pub trait Workflow: BaseAgent {
     fn config(&self) -> &WorkflowConfig;
 
     /// Add step to workflow
-    async fn add_step(&mut self, step: WorkflowStep) -> Result<()>;
+    async fn add_step(&self, step: WorkflowStep) -> Result<()>;
 
     /// Remove step from workflow
-    async fn remove_step(&mut self, step_id: ComponentId) -> Result<()>;
+    async fn remove_step(&self, step_id: ComponentId) -> Result<()>;
 
     /// Get all steps
     async fn get_steps(&self) -> Result<Vec<WorkflowStep>>;
@@ -526,12 +528,12 @@ mod tests {
             &self.config
         }
 
-        async fn add_step(&mut self, step: WorkflowStep) -> Result<()> {
+        async fn add_step(&self, step: WorkflowStep) -> Result<()> {
             self.steps.lock().await.push(step);
             Ok(())
         }
 
-        async fn remove_step(&mut self, step_id: ComponentId) -> Result<()> {
+        async fn remove_step(&self, step_id: ComponentId) -> Result<()> {
             let mut steps = self.steps.lock().await;
             steps.retain(|s| s.id != step_id);
             Ok(())
@@ -552,7 +554,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_workflow_step_management() {
-        let mut workflow = MockWorkflow::new();
+        let workflow = MockWorkflow::new();
 
         // Add steps
         let step1 = WorkflowStep::new("step1".to_string(), ComponentId::new());
@@ -574,7 +576,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_workflow_execution_planning() {
-        let mut workflow = MockWorkflow::new();
+        let workflow = MockWorkflow::new();
 
         // Create steps with dependencies: step1 -> step2 -> step3
         let step1 = WorkflowStep::new("step1".to_string(), ComponentId::new());
@@ -597,7 +599,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_workflow_circular_dependency_detection() {
-        let mut workflow = MockWorkflow::new();
+        let workflow = MockWorkflow::new();
 
         // Create circular dependency: step1 -> step2 -> step1
         let step1 = WorkflowStep::new("step1".to_string(), ComponentId::new());
@@ -619,7 +621,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_workflow_validation() {
-        let mut workflow = MockWorkflow::new();
+        let workflow = MockWorkflow::new();
 
         // Valid workflow
         let step1 = WorkflowStep::new("step1".to_string(), ComponentId::new());
@@ -654,9 +656,7 @@ mod tests {
 
         // Add steps
         let step1 = WorkflowStep::new("step1".to_string(), ComponentId::new());
-        let mut workflow_mut = workflow;
-        workflow_mut.add_step(step1.clone()).await.unwrap();
-        let workflow = workflow_mut;
+        workflow.add_step(step1.clone()).await.unwrap();
 
         // Execute workflow
         let input = AgentInput::text("Execute workflow");

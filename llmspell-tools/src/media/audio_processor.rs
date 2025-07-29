@@ -792,8 +792,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_file_size_limit() {
-        let mut config = AudioProcessorConfig::default();
-        config.max_file_size = 10; // Very small limit
+        let config = AudioProcessorConfig {
+            max_file_size: 10, // Very small limit
+            ..Default::default()
+        };
         let tool = AudioProcessorTool::new(config);
 
         let temp_dir = TempDir::new().unwrap();

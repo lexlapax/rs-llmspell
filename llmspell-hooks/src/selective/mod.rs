@@ -29,6 +29,10 @@
 //!
 //! #[async_trait]
 //! impl Hook for MyHook {
+//!     fn as_any(&self) -> &dyn std::any::Any {
+//!         self
+//!     }
+//!     
 //!     async fn execute(&self, context: &mut HookContext) -> Result<HookResult> {
 //!         Ok(HookResult::Continue)
 //!     }

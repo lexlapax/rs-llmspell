@@ -589,6 +589,10 @@ mod tests {
                 ..Default::default()
             }
         }
+
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
+        }
     }
 
     #[test]
@@ -707,8 +711,10 @@ mod tests {
     #[test]
     fn test_memory_management() {
         let features = HookFeatures::with_features(vec!["test"]);
-        let mut config = SelectiveRegistryConfig::default();
-        config.max_instantiated_hooks = 2;
+        let config = SelectiveRegistryConfig {
+            max_instantiated_hooks: 2,
+            ..Default::default()
+        };
 
         let registry = SelectiveHookRegistry::with_config(features, config);
 

@@ -1,6 +1,7 @@
 //! ABOUTME: Command handler implementations
 //! ABOUTME: Executes CLI commands with multi-engine support
 
+pub mod backup;
 pub mod exec;
 pub mod info;
 pub mod init;
@@ -41,6 +42,9 @@ pub async fn execute_command(
         Commands::Info { all } => info::show_engine_info(engine, all, output_format).await,
         Commands::Init { output, force } => init::init_config(output, force).await,
         Commands::Keys(keys_cmd) => keys::KeysCommand { command: keys_cmd }.execute().await,
+        Commands::Backup(backup_cmd) => {
+            backup::execute_backup(backup_cmd, &runtime_config, output_format).await
+        }
     }
 }
 

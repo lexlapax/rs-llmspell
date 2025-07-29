@@ -117,7 +117,9 @@ impl ScriptRuntime {
     /// ```
     pub async fn new_with_lua(config: RuntimeConfig) -> Result<Self, LLMSpellError> {
         let lua_config = config.engines.lua.clone();
-        let engine = EngineFactory::create_lua_engine(&lua_config)?;
+        let config_arc = Arc::new(config.clone());
+        let engine =
+            EngineFactory::create_lua_engine_with_runtime(&lua_config, Some(config_arc.clone()))?;
         Self::new_with_engine(engine, config).await
     }
 
@@ -320,6 +322,8 @@ pub struct GlobalRuntimeConfig {
     pub enable_streaming: bool,
     /// Security settings
     pub security: SecurityConfig,
+    /// State persistence settings
+    pub state_persistence: StatePersistenceConfig,
 }
 
 impl Default for GlobalRuntimeConfig {
@@ -329,6 +333,7 @@ impl Default for GlobalRuntimeConfig {
             script_timeout_seconds: 300,
             enable_streaming: true,
             security: SecurityConfig::default(),
+            state_persistence: StatePersistenceConfig::default(),
         }
     }
 }
@@ -357,6 +362,76 @@ impl Default for SecurityConfig {
             allow_process_spawn: false,
             max_memory_bytes: Some(50_000_000),   // 50MB
             max_execution_time_ms: Some(300_000), // 5 minutes
+        }
+    }
+}
+
+/// State persistence configuration
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(default)]
+pub struct StatePersistenceConfig {
+    /// Enable state persistence
+    pub enabled: bool,
+    /// Backend type for storage (memory, file, redis, etc.)
+    pub backend_type: String,
+    /// Enable migration functionality
+    pub migration_enabled: bool,
+    /// Directory for schema definitions
+    pub schema_directory: Option<String>,
+    /// Automatic backup on migration
+    pub backup_on_migration: bool,
+    /// Maximum state size per key in bytes
+    pub max_state_size_bytes: Option<usize>,
+    /// Enable backup functionality
+    pub backup_enabled: bool,
+    /// Backup configuration
+    pub backup: Option<BackupConfig>,
+}
+
+/// Backup configuration for state persistence
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct BackupConfig {
+    /// Directory for backup storage
+    pub backup_dir: Option<String>,
+    /// Enable compression for backups
+    pub compression_enabled: bool,
+    /// Compression type to use
+    pub compression_type: String,
+    /// Compression level (1-9)
+    pub compression_level: u8,
+    /// Enable incremental backups
+    pub incremental_enabled: bool,
+    /// Maximum number of backups to keep
+    pub max_backups: Option<usize>,
+    /// Maximum age of backups in seconds
+    pub max_backup_age: Option<u64>,
+}
+
+impl Default for StatePersistenceConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            backend_type: "memory".to_string(),
+            migration_enabled: false,
+            schema_directory: None,
+            backup_on_migration: true,
+            max_state_size_bytes: Some(10_000_000), // 10MB per key
+            backup_enabled: false,
+            backup: None,
+        }
+    }
+}
+
+impl Default for BackupConfig {
+    fn default() -> Self {
+        Self {
+            backup_dir: Some("./backups".to_string()),
+            compression_enabled: true,
+            compression_type: "zstd".to_string(),
+            compression_level: 3,
+            incremental_enabled: true,
+            max_backups: Some(10),
+            max_backup_age: Some(2592000), // 30 days
         }
     }
 }

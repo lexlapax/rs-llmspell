@@ -25,6 +25,10 @@
 //!
 //! #[async_trait]
 //! impl Hook for MyHook {
+//!     fn as_any(&self) -> &dyn std::any::Any {
+//!         self
+//!     }
+//!     
 //!     async fn execute(&self, context: &mut HookContext) -> Result<HookResult> {
 //!         println!("Hook executed at {:?}", context.point);
 //!         Ok(HookResult::Continue)
@@ -33,6 +37,7 @@
 //! ```
 
 // Re-export core types
+pub mod artifact_hooks;
 pub mod builtin;
 pub mod cache;
 pub mod circuit_breaker;
@@ -41,15 +46,18 @@ pub mod coordination;
 pub mod distributed;
 pub mod executor;
 pub mod performance;
+pub mod persistence;
 pub mod priority;
 pub mod rate_limiter;
 pub mod registry;
+pub mod replay;
 pub mod result;
 pub mod selective;
 pub mod traits;
 pub mod types;
 
 // Re-export commonly used items at crate root
+pub use artifact_hooks::{event_to_hook_point, is_artifact_hook_point, ArtifactHookPoints};
 pub use circuit_breaker::{BreakerState, CircuitBreaker};
 pub use context::{HookContext, HookContextBuilder, OperationContext};
 pub use coordination::{
@@ -62,6 +70,10 @@ pub use distributed::{
 };
 pub use executor::{HookExecutor, HookExecutorBuilder};
 pub use performance::{PerformanceMetrics, PerformanceMonitor};
+pub use persistence::{
+    HookMetadata as PersistenceHookMetadata, HookPersistenceManager, RetentionManager,
+    RetentionPolicy,
+};
 pub use priority::{PriorityBucket, PriorityComparator};
 pub use registry::{HookRegistry, RegistryError};
 pub use result::{ForkBuilder, HookResult, Operation, RetryBuilder};
@@ -115,7 +127,8 @@ mod tests {
     }
 
     #[test]
+    #[allow(clippy::len_zero)]
     fn test_version() {
-        assert!(!VERSION.is_empty());
+        assert!(VERSION.len() > 0);
     }
 }

@@ -8,8 +8,8 @@ use llmspell_core::{ComponentId, ComponentMetadata, LLMSpellError, Result};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
-use std::time::{Duration, Instant};
-use tracing::{debug, warn};
+use std::time::{Duration, Instant, SystemTime};
+use tracing::{debug, info, warn};
 
 /// Memory-based state manager for workflows
 #[derive(Clone)]
@@ -678,4 +678,235 @@ mod tests {
         assert!(manager.get_all_shared_data().await.unwrap().is_empty());
         assert!(manager.get_execution_history().await.unwrap().is_empty());
     }
+}
+
+// ==============================================================================
+// PERSISTENT WORKFLOW STATE MANAGEMENT
+// ==============================================================================
+
+use async_trait::async_trait;
+use llmspell_state_traits::{StateManager as PersistentStateManager, StateScope};
+use serde::{Deserialize, Serialize};
+
+/// Persistent workflow state for storage
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PersistentWorkflowState {
+    /// Workflow identifier
+    pub workflow_id: String,
+    /// Workflow configuration
+    pub config: WorkflowConfig,
+    /// Current workflow state
+    pub workflow_state: WorkflowState,
+    /// Current workflow status
+    pub status: WorkflowStatus,
+    /// Execution history
+    pub execution_history: Vec<StepResult>,
+    /// Workflow metadata
+    pub metadata: ComponentMetadata,
+    /// Execution statistics
+    pub execution_stats: WorkflowExecutionStats,
+    /// Checkpoint states for resumption
+    pub checkpoints: HashMap<usize, WorkflowCheckpoint>,
+    /// State timestamp
+    pub last_updated: SystemTime,
+    /// Custom workflow properties
+    pub custom_properties: HashMap<String, Value>,
+}
+
+/// Workflow execution statistics
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct WorkflowExecutionStats {
+    /// Total number of workflow executions
+    pub total_executions: u64,
+    /// Number of successful executions
+    pub successful_executions: u64,
+    /// Number of failed executions
+    pub failed_executions: u64,
+    /// Number of cancelled executions
+    pub cancelled_executions: u64,
+    /// Total execution time across all runs
+    pub total_execution_time_ms: u64,
+    /// Average execution time per run
+    pub average_execution_time_ms: f64,
+    /// Last execution timestamp
+    pub last_execution: Option<SystemTime>,
+    /// Steps execution statistics
+    pub step_stats: HashMap<String, StepStatistics>,
+    /// Retry statistics
+    pub retry_stats: RetryStatistics,
+}
+
+/// Step execution statistics
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct StepStatistics {
+    /// Step name
+    pub step_name: String,
+    /// Total executions of this step
+    pub executions: u64,
+    /// Successful executions
+    pub successes: u64,
+    /// Failed executions
+    pub failures: u64,
+    /// Total execution time for this step
+    pub total_time_ms: u64,
+    /// Average execution time for this step
+    pub average_time_ms: f64,
+    /// Retry count for this step
+    pub retries: u64,
+}
+
+/// Retry statistics
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct RetryStatistics {
+    /// Total retry attempts across all steps
+    pub total_retries: u64,
+    /// Retries that eventually succeeded
+    pub successful_retries: u64,
+    /// Retries that ultimately failed
+    pub failed_retries: u64,
+    /// Average retries per failed step
+    pub average_retries_per_failure: f64,
+}
+
+/// Workflow checkpoint for resumption
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkflowCheckpoint {
+    /// Step index when checkpoint was created
+    pub step_index: usize,
+    /// Workflow state at checkpoint
+    pub state_snapshot: WorkflowState,
+    /// Execution history up to checkpoint
+    pub execution_history: Vec<StepResult>,
+    /// Timestamp of checkpoint
+    pub created_at: SystemTime,
+    /// Checkpoint description
+    pub description: String,
+    /// Whether this is an automatic or manual checkpoint
+    pub is_automatic: bool,
+}
+
+impl PersistentWorkflowState {
+    /// Create new persistent workflow state
+    pub fn new(workflow_id: String, config: WorkflowConfig, metadata: ComponentMetadata) -> Self {
+        Self {
+            workflow_id,
+            config,
+            workflow_state: WorkflowState::new(),
+            status: WorkflowStatus::Pending,
+            execution_history: Vec::new(),
+            metadata,
+            execution_stats: WorkflowExecutionStats::default(),
+            checkpoints: HashMap::new(),
+            last_updated: SystemTime::now(),
+            custom_properties: HashMap::new(),
+        }
+    }
+}
+
+/// Extended state manager with persistence capabilities
+pub struct PersistentWorkflowStateManager {
+    /// In-memory state manager for current execution
+    memory_state_manager: StateManager,
+    /// Persistent state manager for long-term storage
+    persistent_state_manager: Arc<dyn PersistentStateManager>,
+    /// Current persistent state
+    persistent_state: Option<PersistentWorkflowState>,
+    /// Workflow identifier
+    workflow_id: String,
+    /// Whether to auto-save state changes
+    #[allow(dead_code)]
+    auto_save: bool,
+}
+
+impl PersistentWorkflowStateManager {
+    /// Create new persistent workflow state manager
+    pub fn new(
+        config: WorkflowConfig,
+        persistent_state_manager: Arc<dyn PersistentStateManager>,
+        workflow_id: String,
+    ) -> Self {
+        Self {
+            memory_state_manager: StateManager::new(config),
+            persistent_state_manager,
+            persistent_state: None,
+            workflow_id,
+            auto_save: true,
+        }
+    }
+
+    /// Load existing workflow state from persistent storage
+    pub async fn load_state(&mut self) -> Result<bool> {
+        let state_scope = StateScope::Custom(format!("workflow_{}", self.workflow_id));
+
+        match self
+            .persistent_state_manager
+            .get(state_scope, "state")
+            .await
+        {
+            Ok(Some(state_value)) => {
+                let persistent_state: PersistentWorkflowState =
+                    serde_json::from_value(state_value)?;
+
+                self.persistent_state = Some(persistent_state);
+                info!("Loaded persistent state for workflow {}", self.workflow_id);
+                Ok(true)
+            }
+            Ok(None) => {
+                debug!("No saved state found for workflow {}", self.workflow_id);
+                Ok(false)
+            }
+            Err(e) => Err(LLMSpellError::Internal {
+                message: format!("Failed to load workflow state: {}", e),
+                source: None,
+            }),
+        }
+    }
+
+    /// Save current state to persistent storage
+    pub async fn save_state(&mut self) -> Result<()> {
+        let metadata =
+            ComponentMetadata::new(self.workflow_id.clone(), "Persistent workflow".to_string());
+
+        let persistent_state = PersistentWorkflowState::new(
+            self.workflow_id.clone(),
+            self.memory_state_manager.config.clone(),
+            metadata,
+        );
+
+        let state_scope = StateScope::Custom(format!("workflow_{}", self.workflow_id));
+
+        self.persistent_state_manager
+            .set(
+                state_scope,
+                "state",
+                serde_json::to_value(&persistent_state)?,
+            )
+            .await
+            .map_err(|e| LLMSpellError::Internal {
+                message: format!("Failed to save workflow state: {}", e),
+                source: None,
+            })?;
+
+        self.persistent_state = Some(persistent_state);
+        info!("Saved persistent state for workflow {}", self.workflow_id);
+        Ok(())
+    }
+
+    /// Get in-memory state manager
+    pub fn memory_state_manager(&self) -> &StateManager {
+        &self.memory_state_manager
+    }
+}
+
+/// Extension trait for workflow components to add persistence capabilities
+#[async_trait]
+pub trait WorkflowStatePersistence {
+    /// Get the persistent state manager
+    fn persistent_state_manager(&self) -> Option<&PersistentWorkflowStateManager>;
+
+    /// Set the persistent state manager
+    fn set_persistent_state_manager(&mut self, manager: PersistentWorkflowStateManager);
+
+    /// Load workflow state
+    async fn load_workflow_state(&mut self) -> Result<bool>;
 }

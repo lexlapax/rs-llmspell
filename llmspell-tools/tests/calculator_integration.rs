@@ -83,7 +83,7 @@ async fn test_variable_substitution() {
     // Variables in complex expressions
     let vars = json!({
         "radius": 5,
-        "pi": 3.14159
+        "pi": std::f64::consts::PI
     });
     let result = evaluate_expression("pi * radius^2", Some(vars))
         .await

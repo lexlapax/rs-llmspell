@@ -22,6 +22,7 @@ pub struct LuaEngine {
     lua: Arc<parking_lot::Mutex<mlua::Lua>>,
     _config: LuaConfig,
     execution_context: ExecutionContext,
+    runtime_config: Option<Arc<crate::runtime::RuntimeConfig>>,
 }
 
 // SAFETY: We ensure thread safety by using Mutex for all Lua access
@@ -46,6 +47,7 @@ impl LuaEngine {
                 lua: Arc::new(parking_lot::Mutex::new(lua)),
                 _config: config.clone(),
                 execution_context: ExecutionContext::default(),
+                runtime_config: None,
             })
         }
 
@@ -69,6 +71,11 @@ impl LuaEngine {
             max_script_size: Some(10_000_000),    // 10MB
             max_execution_time_ms: Some(300_000), // 5 minutes
         }
+    }
+
+    /// Set the runtime configuration
+    pub fn set_runtime_config(&mut self, config: Arc<crate::runtime::RuntimeConfig>) {
+        self.runtime_config = Some(config);
     }
 }
 
@@ -202,6 +209,12 @@ impl ScriptEngineBridge for LuaEngine {
             // Inject globals using the new system
             use crate::globals::{create_standard_registry, GlobalContext, GlobalInjector};
             let global_context = Arc::new(GlobalContext::new(registry.clone(), providers.clone()));
+
+            // Pass runtime config through global context if available
+            if let Some(runtime_config) = &self.runtime_config {
+                global_context.set_bridge("runtime_config", runtime_config.clone());
+            }
+
             let global_registry =
                 futures::executor::block_on(create_standard_registry(global_context.clone()))
                     .map_err(|e| LLMSpellError::Component {

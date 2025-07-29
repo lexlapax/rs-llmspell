@@ -8,7 +8,7 @@ use llmspell_bridge::lua::globals::hook::inject_hook_global;
 use llmspell_bridge::{ComponentRegistry, ProviderManager};
 use mlua::Lua;
 use std::fs;
-use std::path::Path;
+use std::path::PathBuf;
 use std::sync::Arc;
 
 async fn create_full_test_environment() -> (Lua, GlobalContext, Arc<HookBridge>) {
@@ -37,14 +37,17 @@ fn run_lua_test_file(lua: &Lua, file_path: &str) -> mlua::Result<bool> {
 async fn test_lua_basic_hooks_integration() {
     let (lua, _context, _bridge) = create_full_test_environment().await;
 
-    let test_file = "tests/lua_hooks/basic_hooks.lua";
+    let test_file = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .join("llmspell-testing/fixtures/lua/basic_hooks.lua");
     assert!(
-        Path::new(test_file).exists(),
+        test_file.exists(),
         "Test file {} does not exist",
-        test_file
+        test_file.display()
     );
 
-    let result = run_lua_test_file(&lua, test_file);
+    let result = run_lua_test_file(&lua, test_file.to_str().unwrap());
     match result {
         Ok(success) => {
             assert!(success, "Basic hooks integration test failed");
@@ -59,14 +62,17 @@ async fn test_lua_basic_hooks_integration() {
 async fn test_lua_cross_language_integration() {
     let (lua, _context, _bridge) = create_full_test_environment().await;
 
-    let test_file = "tests/lua_hooks/cross_language.lua";
+    let test_file = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .join("llmspell-testing/fixtures/lua/cross_language.lua");
     assert!(
-        Path::new(test_file).exists(),
+        test_file.exists(),
         "Test file {} does not exist",
-        test_file
+        test_file.display()
     );
 
-    let result = run_lua_test_file(&lua, test_file);
+    let result = run_lua_test_file(&lua, test_file.to_str().unwrap());
     match result {
         Ok(success) => {
             assert!(success, "Cross-language integration test failed");
@@ -81,14 +87,17 @@ async fn test_lua_cross_language_integration() {
 async fn test_lua_performance_integration() {
     let (lua, _context, _bridge) = create_full_test_environment().await;
 
-    let test_file = "tests/lua_hooks/performance.lua";
+    let test_file = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .unwrap()
+        .join("llmspell-testing/fixtures/lua/performance.lua");
     assert!(
-        Path::new(test_file).exists(),
+        test_file.exists(),
         "Test file {} does not exist",
-        test_file
+        test_file.display()
     );
 
-    let result = run_lua_test_file(&lua, test_file);
+    let result = run_lua_test_file(&lua, test_file.to_str().unwrap());
     match result {
         Ok(success) => {
             assert!(success, "Performance integration test failed");

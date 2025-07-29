@@ -15,10 +15,22 @@ impl EngineFactory {
     pub fn create_lua_engine(
         config: &LuaConfig,
     ) -> Result<Box<dyn ScriptEngineBridge>, LLMSpellError> {
+        Self::create_lua_engine_with_runtime(config, None)
+    }
+
+    /// Create a Lua engine with the given configuration and runtime config
+    pub fn create_lua_engine_with_runtime(
+        config: &LuaConfig,
+        runtime_config: Option<Arc<crate::runtime::RuntimeConfig>>,
+    ) -> Result<Box<dyn ScriptEngineBridge>, LLMSpellError> {
         #[cfg(feature = "lua")]
         {
             use crate::lua::LuaEngine;
-            Ok(Box::new(LuaEngine::new(config)?))
+            let mut engine = LuaEngine::new(config)?;
+            if let Some(rc) = runtime_config {
+                engine.set_runtime_config(rc);
+            }
+            Ok(Box::new(engine))
         }
         #[cfg(not(feature = "lua"))]
         {

@@ -37,6 +37,7 @@ use llmspell_core::{
 #[cfg(test)]
 use llmspell_core::traits::agent::MessageRole;
 use serde_json::json;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 /// Sample ComponentMetadata for testing
@@ -250,6 +251,136 @@ pub fn setup_test_environment() -> std::collections::HashMap<String, String> {
     env
 }
 
+// Fixture loading utilities
+
+/// Get the path to the fixtures directory
+pub fn fixtures_dir() -> PathBuf {
+    // Try multiple strategies to find the fixtures directory
+    let possible_paths = vec![
+        // Use CARGO_MANIFEST_DIR if available (most reliable)
+        std::env::var("CARGO_MANIFEST_DIR")
+            .ok()
+            .map(|dir| {
+                let manifest_path = PathBuf::from(dir);
+                // Check if we're in llmspell-testing crate
+                if manifest_path.ends_with("llmspell-testing") {
+                    manifest_path.join("fixtures")
+                } else {
+                    // We're in another crate, go up to workspace root
+                    manifest_path
+                        .parent()
+                        .map(|p| p.join("llmspell-testing/fixtures"))
+                        .unwrap_or_else(|| manifest_path.join("fixtures"))
+                }
+            })
+            .unwrap_or_default(),
+        // When running from the crate root
+        PathBuf::from("fixtures"),
+        // When running from workspace root
+        PathBuf::from("llmspell-testing/fixtures"),
+        // When running tests from within the crate
+        PathBuf::from("../fixtures"),
+        // Look for workspace root marker
+        std::env::current_dir()
+            .ok()
+            .and_then(|mut dir| {
+                // Look for Cargo.toml with workspace marker
+                loop {
+                    let cargo_path = dir.join("Cargo.toml");
+                    if cargo_path.exists() {
+                        // Check if this is the workspace root
+                        if let Ok(content) = std::fs::read_to_string(&cargo_path) {
+                            if content.contains("[workspace]") {
+                                return Some(dir.join("llmspell-testing/fixtures"));
+                            }
+                        }
+                    }
+                    if !dir.pop() {
+                        break;
+                    }
+                }
+                None
+            })
+            .unwrap_or_default(),
+    ];
+
+    for path in possible_paths {
+        if path.exists() && path.is_dir() {
+            return path;
+        }
+    }
+
+    // Fallback: assume we're in the crate directory
+    PathBuf::from("fixtures")
+}
+
+/// Get the path to a fixture file
+pub fn fixture_path(relative_path: impl AsRef<Path>) -> PathBuf {
+    fixtures_dir().join(relative_path)
+}
+
+/// Load a text fixture file
+pub fn load_fixture_text(relative_path: impl AsRef<Path>) -> Result<String, std::io::Error> {
+    let path = fixture_path(relative_path);
+    std::fs::read_to_string(path)
+}
+
+/// Load a JSON fixture file
+pub fn load_fixture_json(
+    relative_path: impl AsRef<Path>,
+) -> Result<serde_json::Value, Box<dyn std::error::Error>> {
+    let content = load_fixture_text(relative_path)?;
+    let value = serde_json::from_str(&content)?;
+    Ok(value)
+}
+
+/// Load a Lua fixture file
+pub fn load_fixture_lua(filename: impl AsRef<Path>) -> Result<String, std::io::Error> {
+    load_fixture_text(Path::new("lua").join(filename))
+}
+
+/// Load test data from the data directory
+pub fn load_test_data(filename: impl AsRef<Path>) -> Result<Vec<u8>, std::io::Error> {
+    let path = fixture_path(Path::new("data").join(filename));
+    std::fs::read(path)
+}
+
+/// Create a temporary test file in the fixtures directory
+pub fn create_temp_fixture(filename: &str, content: &str) -> Result<PathBuf, std::io::Error> {
+    let temp_dir = fixtures_dir().join("temp");
+    std::fs::create_dir_all(&temp_dir)?;
+    let path = temp_dir.join(filename);
+    std::fs::write(&path, content)?;
+    Ok(path)
+}
+
+/// Clean up temporary test files
+pub fn cleanup_temp_fixtures() -> Result<(), std::io::Error> {
+    let temp_dir = fixtures_dir().join("temp");
+    if temp_dir.exists() {
+        std::fs::remove_dir_all(temp_dir)?;
+    }
+    Ok(())
+}
+
+/// List all files in a fixture subdirectory
+pub fn list_fixture_files(subdir: impl AsRef<Path>) -> Result<Vec<PathBuf>, std::io::Error> {
+    let dir = fixtures_dir().join(subdir);
+    let mut files = Vec::new();
+
+    if dir.exists() {
+        for entry in std::fs::read_dir(dir)? {
+            let entry = entry?;
+            let path = entry.path();
+            if path.is_file() {
+                files.push(path);
+            }
+        }
+    }
+
+    Ok(files)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -287,5 +418,90 @@ mod tests {
 
         let errors = error_scenarios();
         assert!(errors.len() >= 4);
+    }
+
+    #[test]
+    fn test_fixtures_dir() {
+        let dir = fixtures_dir();
+        // Should return a path (even if it doesn't exist yet)
+        assert!(!dir.as_os_str().is_empty());
+
+        // The directory should exist in our test environment
+        assert!(
+            dir.exists(),
+            "Fixtures directory should exist at: {:?}",
+            dir
+        );
+        assert!(
+            dir.is_dir(),
+            "Fixtures path should be a directory: {:?}",
+            dir
+        );
+
+        // Should contain expected subdirectories
+        let lua_dir = dir.join("lua");
+        let data_dir = dir.join("data");
+        assert!(
+            lua_dir.exists(),
+            "Expected lua subdirectory at: {:?}",
+            lua_dir
+        );
+        assert!(
+            data_dir.exists(),
+            "Expected data subdirectory at: {:?}",
+            data_dir
+        );
+    }
+
+    #[test]
+    fn test_fixture_path() {
+        let path = fixture_path("test.txt");
+        assert!(path.ends_with("test.txt"));
+        assert!(path.to_string_lossy().contains("fixtures"));
+    }
+
+    #[test]
+    fn test_load_fixture_json() {
+        // Test with existing migration test data
+        let result = load_fixture_json("data/migration_test_cases/v1_to_v2_user_schema.json");
+        if result.is_ok() {
+            let json = result.unwrap();
+            assert!(json.is_object());
+        }
+    }
+
+    #[test]
+    fn test_temp_fixtures() {
+        // Create a temp fixture
+        let content = "test content";
+        let result = create_temp_fixture("test_temp.txt", content);
+
+        if let Ok(path) = result {
+            // Verify it was created
+            assert!(path.exists());
+
+            // Read it back
+            let read_content = std::fs::read_to_string(&path).unwrap();
+            assert_eq!(read_content, content);
+
+            // Clean up
+            let _ = cleanup_temp_fixtures();
+
+            // Verify cleanup worked
+            assert!(!path.exists());
+        }
+    }
+
+    #[test]
+    fn test_list_fixture_files() {
+        let lua_files = list_fixture_files("lua");
+        if let Ok(files) = lua_files {
+            // We know we have lua fixtures
+            if !files.is_empty() {
+                assert!(files
+                    .iter()
+                    .any(|p| p.extension().and_then(|s| s.to_str()) == Some("lua")));
+            }
+        }
     }
 }

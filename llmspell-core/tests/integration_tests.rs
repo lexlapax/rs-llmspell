@@ -85,12 +85,12 @@ impl Agent for TestAgent {
         Ok(self.conversation.lock().unwrap().clone())
     }
 
-    async fn add_message(&mut self, message: ConversationMessage) -> Result<()> {
+    async fn add_message(&self, message: ConversationMessage) -> Result<()> {
         self.conversation.lock().unwrap().push(message);
         Ok(())
     }
 
-    async fn clear_conversation(&mut self) -> Result<()> {
+    async fn clear_conversation(&self) -> Result<()> {
         self.conversation.lock().unwrap().clear();
         Ok(())
     }
@@ -212,7 +212,7 @@ impl Tool for TestTool {
 
 #[tokio::test]
 async fn test_agent_conversation_flow() {
-    let mut agent = TestAgent::new("conversational-agent");
+    let agent = TestAgent::new("conversational-agent");
 
     // Test empty conversation
     let conv = agent.get_conversation().await.unwrap();

@@ -95,13 +95,13 @@ impl Agent for ConcurrentAgent {
         Ok(conv.clone())
     }
 
-    async fn add_message(&mut self, message: ConversationMessage) -> Result<()> {
+    async fn add_message(&self, message: ConversationMessage) -> Result<()> {
         let mut conv = self.conversation.write().await;
         conv.push(message);
         Ok(())
     }
 
-    async fn clear_conversation(&mut self) -> Result<()> {
+    async fn clear_conversation(&self) -> Result<()> {
         let mut conv = self.conversation.write().await;
         conv.clear();
         Ok(())
@@ -197,7 +197,7 @@ async fn test_concurrent_conversation_modifications() {
     let write_handle = tokio::spawn(async move {
         for i in 0..20 {
             tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
-            let mut agent = agent_clone.write().await;
+            let agent = agent_clone.read().await;
             agent
                 .add_message(ConversationMessage::user(format!("Message {}", i)))
                 .await

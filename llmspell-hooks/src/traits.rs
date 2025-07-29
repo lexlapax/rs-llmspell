@@ -23,6 +23,9 @@ pub trait Hook: Send + Sync {
     fn should_execute(&self, _context: &HookContext) -> bool {
         true
     }
+
+    /// Get self as Any for downcasting
+    fn as_any(&self) -> &dyn std::any::Any;
 }
 
 /// Language adapter for cross-language hook support
@@ -109,7 +112,7 @@ pub struct FnHook<F> {
 
 impl<F> FnHook<F>
 where
-    F: Fn(&mut HookContext) -> Result<HookResult> + Send + Sync,
+    F: Fn(&mut HookContext) -> Result<HookResult> + Send + Sync + 'static,
 {
     pub fn new(name: &str, func: F) -> Self {
         Self {
@@ -130,7 +133,7 @@ where
 #[async_trait]
 impl<F> Hook for FnHook<F>
 where
-    F: Fn(&mut HookContext) -> Result<HookResult> + Send + Sync,
+    F: Fn(&mut HookContext) -> Result<HookResult> + Send + Sync + 'static,
 {
     async fn execute(&self, context: &mut HookContext) -> Result<HookResult> {
         (self.func)(context)
@@ -138,6 +141,10 @@ where
 
     fn metadata(&self) -> HookMetadata {
         self.metadata.clone()
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }
 
@@ -188,6 +195,10 @@ mod tests {
                 name: self.name.clone(),
                 ..Default::default()
             }
+        }
+
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
         }
     }
 
@@ -261,6 +272,10 @@ mod tests {
     impl Hook for TestReplayableHook {
         async fn execute(&self, _context: &mut HookContext) -> Result<HookResult> {
             Ok(HookResult::Continue)
+        }
+
+        fn as_any(&self) -> &dyn std::any::Any {
+            self
         }
     }
 

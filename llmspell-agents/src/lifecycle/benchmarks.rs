@@ -52,6 +52,10 @@ impl Hook for ProductionLoggingHook {
             ..Default::default()
         }
     }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
 }
 
 /// Production-style metrics hook - tracks timing
@@ -102,6 +106,10 @@ impl Hook for ProductionMetricsHook {
             name: self.name.clone(),
             ..Default::default()
         }
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
     }
 }
 

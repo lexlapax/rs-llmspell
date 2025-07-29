@@ -15,6 +15,7 @@ use llmspell_core::execution_context::{
 };
 use llmspell_core::types::{AgentInput, AgentOutput, ComponentId};
 use llmspell_core::{Agent, ExecutionContext, LLMSpellError, Result, Tool};
+use llmspell_state_persistence::{StateManager, StateScope};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
@@ -44,6 +45,8 @@ pub struct AgentBridge {
     contexts: Arc<tokio::sync::RwLock<HashMap<String, Arc<ExecutionContext>>>>,
     /// Active streaming channels
     streaming_channels: Arc<tokio::sync::RwLock<HashMap<String, mpsc::Sender<AgentOutput>>>>,
+    /// State manager for agent state persistence
+    state_manager: Option<Arc<StateManager>>,
 }
 
 impl AgentBridge {
@@ -70,6 +73,7 @@ impl AgentBridge {
             shared_memory: Arc::new(SharedMemory::new()),
             contexts: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
             streaming_channels: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
+            state_manager: None,
         }
     }
 
@@ -93,6 +97,7 @@ impl AgentBridge {
             shared_memory: Arc::new(SharedMemory::new()),
             contexts: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
             streaming_channels: Arc::new(tokio::sync::RwLock::new(HashMap::new())),
+            state_manager: None,
         }
     }
 
@@ -1367,6 +1372,297 @@ impl AgentBridge {
         });
 
         Ok(hierarchy)
+    }
+
+    /// Set the state manager for agent state persistence
+    pub fn set_state_manager(&mut self, state_manager: Arc<StateManager>) {
+        self.state_manager = Some(state_manager);
+    }
+
+    /// Save an agent's state
+    pub async fn save_agent_state(&self, agent_name: &str) -> Result<()> {
+        let state_manager =
+            self.state_manager
+                .as_ref()
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: "State manager not configured".to_string(),
+                    source: None,
+                })?;
+
+        // Get the agent
+        let agents = self.active_agents.read().await;
+        let agent = agents
+            .get(agent_name)
+            .ok_or_else(|| LLMSpellError::Component {
+                message: format!("Agent '{}' not found", agent_name),
+                source: None,
+            })?;
+
+        let agent_id = agent.metadata().id.to_string();
+        let scope = StateScope::Agent(agent_id.clone());
+
+        // Save complete agent state
+        // 1. Save metadata
+        let agent_meta = serde_json::json!({
+            "name": agent.metadata().name,
+            "description": agent.metadata().description,
+            "id": agent_id,
+        });
+        state_manager
+            .set(scope.clone(), "metadata", agent_meta)
+            .await
+            .map_err(|e| LLMSpellError::Component {
+                message: format!("Failed to save agent metadata: {}", e),
+                source: None,
+            })?;
+
+        // 2. Save conversation history
+        if let Ok(conversation) = agent.get_conversation().await {
+            let conv_json =
+                serde_json::to_value(&conversation).map_err(|e| LLMSpellError::Component {
+                    message: format!("Failed to serialize conversation: {}", e),
+                    source: None,
+                })?;
+            state_manager
+                .set(scope.clone(), "conversation", conv_json)
+                .await
+                .map_err(|e| LLMSpellError::Component {
+                    message: format!("Failed to save conversation: {}", e),
+                    source: None,
+                })?;
+        }
+
+        // 3. Save agent configuration
+        let config = agent.config();
+        let config_json = serde_json::json!({
+            "max_conversation_length": config.max_conversation_length,
+            "system_prompt": config.system_prompt,
+            "temperature": config.temperature,
+            "max_tokens": config.max_tokens,
+        });
+        state_manager
+            .set(scope.clone(), "config", config_json)
+            .await
+            .map_err(|e| LLMSpellError::Component {
+                message: format!("Failed to save config: {}", e),
+                source: None,
+            })?;
+
+        // 4. Register this agent as having saved state
+        self.register_saved_agent(agent_name).await?;
+
+        Ok(())
+    }
+
+    /// Load an agent's state
+    pub async fn load_agent_state(&self, agent_name: &str) -> Result<bool> {
+        let state_manager =
+            self.state_manager
+                .as_ref()
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: "State manager not configured".to_string(),
+                    source: None,
+                })?;
+
+        // Note: Loading state requires mutable access to agent, which we don't have
+        // with Arc<dyn Agent>. This is a limitation of the current architecture.
+        // For now, we can only verify if state exists.
+
+        // Get the agent to find its ID
+        let agents = self.active_agents.read().await;
+        let agent = agents
+            .get(agent_name)
+            .ok_or_else(|| LLMSpellError::Component {
+                message: format!("Agent '{}' not found", agent_name),
+                source: None,
+            })?;
+
+        let agent_id = agent.metadata().id.to_string();
+        let scope = StateScope::Agent(agent_id.clone());
+
+        // Check if state exists
+        let metadata = state_manager
+            .get(scope.clone(), "metadata")
+            .await
+            .map_err(|e| LLMSpellError::Component {
+                message: format!("Failed to check agent state: {}", e),
+                source: None,
+            })?;
+
+        if metadata.is_some() {
+            // State exists but we cannot load it into the agent due to Arc<dyn Agent> limitation
+            // This would require refactoring to store agents differently or using interior mutability
+            tracing::warn!(
+                "Agent state exists for '{}' but cannot be loaded due to immutable agent reference. \
+                 Consider using agent-specific state loading methods.",
+                agent_name
+            );
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    /// Delete an agent's state
+    pub async fn delete_agent_state(&self, agent_name: &str) -> Result<()> {
+        let state_manager =
+            self.state_manager
+                .as_ref()
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: "State manager not configured".to_string(),
+                    source: None,
+                })?;
+
+        // Get the agent to get its ID (or use agent_name as ID if agent not found)
+        let agent_id = if let Some(agent) = self.get_agent(agent_name).await {
+            agent.metadata().id.to_string()
+        } else {
+            // If agent not found, still try to delete using name as ID
+            agent_name.to_string()
+        };
+
+        // Clear all state for this agent
+        state_manager
+            .clear_scope(StateScope::Agent(agent_id))
+            .await
+            .map_err(|e| LLMSpellError::Component {
+                message: format!("Failed to delete agent state: {}", e),
+                source: None,
+            })?;
+
+        // Unregister from saved agents
+        self.unregister_saved_agent(agent_name).await?;
+
+        Ok(())
+    }
+
+    /// List all saved agent states
+    pub async fn list_saved_agents(&self) -> Result<Vec<String>> {
+        let state_manager =
+            self.state_manager
+                .as_ref()
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: "State manager not configured".to_string(),
+                    source: None,
+                })?;
+
+        // Get the registry of saved agents from global scope
+        let saved_agents = state_manager
+            .get(StateScope::Global, "saved_agents_registry")
+            .await
+            .map_err(|e| LLMSpellError::Component {
+                message: format!("Failed to get saved agents registry: {}", e),
+                source: None,
+            })?;
+
+        match saved_agents {
+            Some(registry) => {
+                // Parse the registry
+                if let Some(agents) = registry.as_array() {
+                    Ok(agents
+                        .iter()
+                        .filter_map(|v| v.as_str().map(String::from))
+                        .collect())
+                } else {
+                    Ok(vec![])
+                }
+            }
+            None => Ok(vec![]),
+        }
+    }
+
+    /// Register an agent as having saved state
+    async fn register_saved_agent(&self, agent_name: &str) -> Result<()> {
+        let state_manager =
+            self.state_manager
+                .as_ref()
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: "State manager not configured".to_string(),
+                    source: None,
+                })?;
+
+        // Get current registry
+        let mut saved_agents = match state_manager
+            .get(StateScope::Global, "saved_agents_registry")
+            .await
+        {
+            Ok(Some(registry)) => {
+                if let Some(agents) = registry.as_array() {
+                    agents
+                        .iter()
+                        .filter_map(|v| v.as_str().map(String::from))
+                        .collect::<Vec<_>>()
+                } else {
+                    vec![]
+                }
+            }
+            _ => vec![],
+        };
+
+        // Add agent if not already present
+        if !saved_agents.contains(&agent_name.to_string()) {
+            saved_agents.push(agent_name.to_string());
+        }
+
+        // Save updated registry
+        state_manager
+            .set(
+                StateScope::Global,
+                "saved_agents_registry",
+                serde_json::json!(saved_agents),
+            )
+            .await
+            .map_err(|e| LLMSpellError::Component {
+                message: format!("Failed to update saved agents registry: {}", e),
+                source: None,
+            })?;
+
+        Ok(())
+    }
+
+    /// Unregister an agent from saved state registry
+    async fn unregister_saved_agent(&self, agent_name: &str) -> Result<()> {
+        let state_manager =
+            self.state_manager
+                .as_ref()
+                .ok_or_else(|| LLMSpellError::Component {
+                    message: "State manager not configured".to_string(),
+                    source: None,
+                })?;
+
+        // Get current registry
+        let saved_agents = match state_manager
+            .get(StateScope::Global, "saved_agents_registry")
+            .await
+        {
+            Ok(Some(registry)) => {
+                if let Some(agents) = registry.as_array() {
+                    agents
+                        .iter()
+                        .filter_map(|v| v.as_str().map(String::from))
+                        .filter(|name| name != agent_name)
+                        .collect::<Vec<_>>()
+                } else {
+                    vec![]
+                }
+            }
+            _ => vec![],
+        };
+
+        // Save updated registry
+        state_manager
+            .set(
+                StateScope::Global,
+                "saved_agents_registry",
+                serde_json::json!(saved_agents),
+            )
+            .await
+            .map_err(|e| LLMSpellError::Component {
+                message: format!("Failed to update saved agents registry: {}", e),
+                source: None,
+            })?;
+
+        Ok(())
     }
 }
 

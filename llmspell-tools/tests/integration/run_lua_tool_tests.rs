@@ -21,9 +21,7 @@ async fn test_lua_tool_integration() {
     let test_script_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .unwrap()
-        .parent()
-        .unwrap()
-        .join("tests/integration/lua_tool_integration.lua");
+        .join("llmspell-testing/fixtures/lua/lua_tool_integration.lua");
     
     let script_content = std::fs::read_to_string(&test_script_path)
         .expect("Failed to read test script");

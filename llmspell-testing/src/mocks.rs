@@ -83,10 +83,10 @@ mock! {
     impl Agent for Agent {
         fn config(&self) -> &AgentConfig;
         async fn get_conversation(&self) -> Result<Vec<ConversationMessage>>;
-        async fn add_message(&mut self, message: ConversationMessage) -> Result<()>;
-        async fn clear_conversation(&mut self) -> Result<()>;
+        async fn add_message(&self, message: ConversationMessage) -> Result<()>;
+        async fn clear_conversation(&self) -> Result<()>;
         async fn conversation_length(&self) -> Result<usize>;
-        async fn trim_conversation(&mut self) -> Result<()>;
+        async fn trim_conversation(&self) -> Result<()>;
     }
 }
 
@@ -134,8 +134,8 @@ mock! {
     #[async_trait]
     impl Workflow for Workflow {
         fn config(&self) -> &WorkflowConfig;
-        async fn add_step(&mut self, step: WorkflowStep) -> Result<()>;
-        async fn remove_step(&mut self, step_id: ComponentId) -> Result<()>;
+        async fn add_step(&self, step: WorkflowStep) -> Result<()>;
+        async fn remove_step(&self, step_id: ComponentId) -> Result<()>;
         async fn get_steps(&self) -> Result<Vec<WorkflowStep>>;
         async fn plan_execution(&self) -> Result<Vec<WorkflowStep>>;
         async fn status(&self) -> Result<WorkflowStatus>;
