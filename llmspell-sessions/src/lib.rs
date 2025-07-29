@@ -55,7 +55,10 @@ pub mod replay;
 pub mod bridge;
 
 // Re-export commonly used types
-pub use artifact::{ArtifactId, ArtifactStorage, ArtifactType, SessionArtifact};
+pub use artifact::{
+    ArtifactId, ArtifactQuery, ArtifactStorage, ArtifactStorageConfig, ArtifactStorageOps,
+    ArtifactType, SessionArtifact,
+};
 pub use config::{SessionManagerConfig, SessionManagerConfigBuilder};
 pub use error::{Result, SessionError};
 pub use manager::SessionManager;

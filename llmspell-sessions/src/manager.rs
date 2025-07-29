@@ -101,6 +101,8 @@ impl SessionManager {
             Self::register_builtin_hooks(&hook_registry)?;
         }
 
+        let artifact_storage = Arc::new(ArtifactStorage::with_backend(storage_backend.clone()));
+
         let manager = Self {
             state_manager,
             storage_backend,
@@ -111,7 +113,7 @@ impl SessionManager {
                 llmspell_events::correlation::CorrelationConfig::default(),
             )),
             active_sessions: Arc::new(RwLock::new(HashMap::new())),
-            artifact_storage: Arc::new(ArtifactStorage::new()),
+            artifact_storage,
             replay_engine: Arc::new(ReplayEngine::new()),
             config,
             shutdown: Arc::new(RwLock::new(false)),

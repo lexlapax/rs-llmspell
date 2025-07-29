@@ -67,7 +67,7 @@ impl fmt::Display for ArtifactId {
 }
 
 /// Type of artifact stored
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ArtifactType {
     /// Output from an agent execution
     AgentOutput,

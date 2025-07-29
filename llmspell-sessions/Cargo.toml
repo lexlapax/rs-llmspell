@@ -47,6 +47,9 @@ lz4_flex = { workspace = true }
 # Hashing for artifact deduplication
 blake3 = { workspace = true }
 
+# LRU cache for metadata
+lru = "0.12"
+
 [dev-dependencies]
 llmspell-testing = { path = "../llmspell-testing" }
 criterion = { workspace = true }
