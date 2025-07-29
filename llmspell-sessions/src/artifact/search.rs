@@ -93,7 +93,6 @@ impl ArtifactSearch {
             .metadata_cache
             .iter()
             .filter(|(id, metadata)| self.matches_query(id, metadata, query))
-            .map(|(id, metadata)| (id, metadata))
             .collect();
 
         let total_count = matches.len();
@@ -166,8 +165,7 @@ impl ArtifactSearch {
         self.index
             .by_session
             .get(session_id)
-            .map(|ids| ids.len())
-            .unwrap_or(0)
+            .map_or(0, std::collections::HashSet::len)
     }
 
     /// Count artifacts by type
@@ -175,8 +173,7 @@ impl ArtifactSearch {
         self.index
             .by_type
             .get(artifact_type)
-            .map(|ids| ids.len())
-            .unwrap_or(0)
+            .map_or(0, std::collections::HashSet::len)
     }
 
     /// Get all unique tags

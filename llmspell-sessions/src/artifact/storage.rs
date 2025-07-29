@@ -1143,7 +1143,7 @@ impl ArtifactStorageOps for ArtifactStorage {
 
         // If session_id is specified, only search that session
         let sessions_to_search = if let Some(ref session_id) = query.session_id {
-            vec![session_id.clone()]
+            vec![*session_id]
         } else {
             // Otherwise, we need to list all sessions
             // For now, we'll return empty if no session specified

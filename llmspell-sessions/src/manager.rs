@@ -4,6 +4,7 @@
 use crate::{
     artifact::ArtifactStorage,
     config::SessionManagerConfig,
+    hooks::{register_artifact_collectors, ArtifactCollectionProcessor, CollectorConfig},
     replay::ReplayEngine,
     session::{Session, SessionSnapshot},
     types::{CreateSessionOptions, SessionQuery, SessionSortBy},
@@ -53,6 +54,9 @@ pub struct SessionManager {
     /// Session replay engine (Phase 6.4)
     #[allow(dead_code)]
     replay_engine: Arc<ReplayEngine>,
+    /// Artifact collection processor
+    #[allow(dead_code)]
+    artifact_collector: Option<Arc<ArtifactCollectionProcessor>>,
     /// Manager configuration
     config: SessionManagerConfig,
     /// Shutdown signal
@@ -103,6 +107,18 @@ impl SessionManager {
 
         let artifact_storage = Arc::new(ArtifactStorage::with_backend(storage_backend.clone()));
 
+        // Create artifact collection processor if configured
+        let artifact_collector = if config.hook_config.enable_artifact_collection {
+            let collector_config = CollectorConfig::default();
+            register_artifact_collectors(&hook_registry, &collector_config)?;
+            Some(Arc::new(ArtifactCollectionProcessor::new(
+                artifact_storage.clone(),
+                collector_config,
+            )))
+        } else {
+            None
+        };
+
         let manager = Self {
             state_manager,
             storage_backend,
@@ -115,6 +131,7 @@ impl SessionManager {
             active_sessions: Arc::new(RwLock::new(HashMap::new())),
             artifact_storage,
             replay_engine: Arc::new(ReplayEngine::new()),
+            artifact_collector,
             config,
             shutdown: Arc::new(RwLock::new(false)),
         };
@@ -180,6 +197,13 @@ impl SessionManager {
 
                 if let Err(e) = hook.execute(&mut context).await {
                     warn!("Session start hook failed: {e}");
+                }
+
+                // Process any collected artifacts
+                if let Some(ref collector) = self.artifact_collector {
+                    if ArtifactCollectionProcessor::should_process_hook_point(&context.point) {
+                        let _ = collector.process_hook_context(&context, &session_id).await;
+                    }
                 }
             }
         }

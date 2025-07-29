@@ -54,6 +54,9 @@ pub mod replay;
 /// Script bridge implementations
 pub mod bridge;
 
+/// Hook integration
+pub mod hooks;
+
 // Re-export commonly used types
 pub use artifact::{
     ArtifactId, ArtifactQuery, ArtifactStorage, ArtifactStorageConfig, ArtifactStorageOps,

@@ -93,6 +93,8 @@ pub struct HookExecutionConfig {
     pub enable_lifecycle_hooks: bool,
     /// Enable artifact hooks
     pub enable_artifact_hooks: bool,
+    /// Enable automatic artifact collection
+    pub enable_artifact_collection: bool,
     /// Hook timeout in milliseconds
     pub hook_timeout_ms: u64,
     /// Maximum concurrent hook executions
@@ -108,6 +110,7 @@ impl Default for HookExecutionConfig {
         Self {
             enable_lifecycle_hooks: true,
             enable_artifact_hooks: true,
+            enable_artifact_collection: true,
             hook_timeout_ms: 5000,
             max_concurrent_hooks: 10,
             retry_failed_hooks: true,
