@@ -83,9 +83,16 @@ pub async fn create_standard_registry(context: Arc<GlobalContext>) -> Result<Glo
         context.registry.clone(),
     )));
 
-    // Create agent global asynchronously
-    let agent_global =
-        agent_global::AgentGlobal::new(context.registry.clone(), context.providers.clone()).await?;
+    // Create agent global with state manager if available
+    let agent_global = if let Some(state_manager) = context.get_bridge::<llmspell_state_persistence::StateManager>("state_manager") {
+        agent_global::AgentGlobal::with_state_manager(
+            context.registry.clone(), 
+            context.providers.clone(),
+            state_manager
+        ).await?
+    } else {
+        agent_global::AgentGlobal::new(context.registry.clone(), context.providers.clone()).await?
+    };
     builder.register(Arc::new(agent_global));
 
     builder.register(Arc::new(workflow_global::WorkflowGlobal::new(

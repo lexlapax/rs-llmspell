@@ -163,6 +163,13 @@ impl LLMAgent {
     /// Start the agent execution
     pub async fn start(&self) -> Result<()> {
         info!("Starting LLMAgent '{}'", self.metadata.name);
+        
+        // Note: Automatic state loading requires mutable self reference
+        // Users should call load_state() explicitly before start() if needed
+        if self.state_manager.is_some() {
+            debug!("State manager available for LLMAgent '{}'. Call load_state() before start() to restore previous state.", self.metadata.name);
+        }
+        
         self.state_machine.start().await?;
         debug!("LLMAgent '{}' started successfully", self.metadata.name);
         Ok(())
@@ -172,6 +179,16 @@ impl LLMAgent {
     pub async fn pause(&self) -> Result<()> {
         info!("Pausing LLMAgent '{}'", self.metadata.name);
         self.state_machine.pause().await?;
+        
+        // Automatically save state when pausing if state manager is available
+        if self.state_manager.is_some() {
+            debug!("Saving state for LLMAgent '{}' on pause", self.metadata.name);
+            if let Err(e) = self.save_state().await {
+                warn!("Failed to save state during pause for agent '{}': {}", self.metadata.name, e);
+                // Continue with pause even if state save fails
+            }
+        }
+        
         debug!("LLMAgent '{}' paused", self.metadata.name);
         Ok(())
     }
@@ -179,6 +196,13 @@ impl LLMAgent {
     /// Resume the agent execution
     pub async fn resume(&self) -> Result<()> {
         info!("Resuming LLMAgent '{}'", self.metadata.name);
+        
+        // Note: Automatic state loading requires mutable self reference
+        // Users should call load_state() explicitly before resume() if needed
+        if self.state_manager.is_some() {
+            debug!("State manager available for LLMAgent '{}'. Call load_state() before resume() to restore saved state.", self.metadata.name);
+        }
+        
         self.state_machine.resume().await?;
         debug!("LLMAgent '{}' resumed", self.metadata.name);
         Ok(())
@@ -187,6 +211,16 @@ impl LLMAgent {
     /// Stop the agent execution
     pub async fn stop(&self) -> Result<()> {
         info!("Stopping LLMAgent '{}'", self.metadata.name);
+        
+        // Automatically save state before stopping if state manager is available
+        if self.state_manager.is_some() {
+            debug!("Saving final state for LLMAgent '{}' before stop", self.metadata.name);
+            if let Err(e) = self.save_state().await {
+                warn!("Failed to save state during stop for agent '{}': {}", self.metadata.name, e);
+                // Continue with stop even if state save fails
+            }
+        }
+        
         self.state_machine.stop().await?;
         debug!("LLMAgent '{}' stopped", self.metadata.name);
         Ok(())

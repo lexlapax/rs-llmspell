@@ -90,6 +90,13 @@ impl BasicAgent {
     /// Start the agent execution
     pub async fn start(&self) -> Result<()> {
         info!("Starting BasicAgent '{}'", self.metadata.name);
+        
+        // Note: Automatic state loading requires mutable self reference
+        // Users should call load_state() explicitly before start() if needed
+        if self.state_manager.is_some() {
+            debug!("State manager available for BasicAgent '{}'. Call load_state() before start() to restore previous state.", self.metadata.name);
+        }
+        
         self.state_machine.start().await?;
         debug!("BasicAgent '{}' started successfully", self.metadata.name);
         Ok(())
@@ -99,6 +106,16 @@ impl BasicAgent {
     pub async fn pause(&self) -> Result<()> {
         info!("Pausing BasicAgent '{}'", self.metadata.name);
         self.state_machine.pause().await?;
+        
+        // Automatically save state when pausing if state manager is available
+        if self.state_manager.is_some() {
+            debug!("Saving state for BasicAgent '{}' on pause", self.metadata.name);
+            if let Err(e) = self.save_state().await {
+                warn!("Failed to save state during pause for agent '{}': {}", self.metadata.name, e);
+                // Continue with pause even if state save fails
+            }
+        }
+        
         debug!("BasicAgent '{}' paused", self.metadata.name);
         Ok(())
     }
@@ -106,6 +123,13 @@ impl BasicAgent {
     /// Resume the agent execution
     pub async fn resume(&self) -> Result<()> {
         info!("Resuming BasicAgent '{}'", self.metadata.name);
+        
+        // Note: Automatic state loading requires mutable self reference
+        // Users should call load_state() explicitly before resume() if needed
+        if self.state_manager.is_some() {
+            debug!("State manager available for BasicAgent '{}'. Call load_state() before resume() to restore saved state.", self.metadata.name);
+        }
+        
         self.state_machine.resume().await?;
         debug!("BasicAgent '{}' resumed", self.metadata.name);
         Ok(())
@@ -114,6 +138,16 @@ impl BasicAgent {
     /// Stop the agent execution
     pub async fn stop(&self) -> Result<()> {
         info!("Stopping BasicAgent '{}'", self.metadata.name);
+        
+        // Automatically save state before stopping if state manager is available
+        if self.state_manager.is_some() {
+            debug!("Saving final state for BasicAgent '{}' before stop", self.metadata.name);
+            if let Err(e) = self.save_state().await {
+                warn!("Failed to save state during stop for agent '{}': {}", self.metadata.name, e);
+                // Continue with stop even if state save fails
+            }
+        }
+        
         self.state_machine.stop().await?;
         debug!("BasicAgent '{}' stopped", self.metadata.name);
         Ok(())

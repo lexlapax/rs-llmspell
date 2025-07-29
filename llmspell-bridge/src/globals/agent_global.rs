@@ -33,6 +33,23 @@ impl AgentGlobal {
         })
     }
 
+    /// Create with state manager support
+    pub async fn with_state_manager(
+        registry: Arc<ComponentRegistry>,
+        providers: Arc<ProviderManager>,
+        state_manager: Arc<llmspell_state_persistence::StateManager>,
+    ) -> Result<Self> {
+        // Create a core provider manager for the agent bridge
+        let core_providers = providers.create_core_manager_arc().await?;
+        let mut bridge = AgentBridge::new(registry.clone(), core_providers);
+        bridge.set_state_manager(state_manager);
+        Ok(Self {
+            registry,
+            providers,
+            bridge: Arc::new(bridge),
+        })
+    }
+
     /// Get the agent bridge
     pub fn bridge(&self) -> &Arc<AgentBridge> {
         &self.bridge

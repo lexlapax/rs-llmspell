@@ -113,6 +113,45 @@ impl UserData for LuaAgentInstance {
             Ok(())
         });
 
+        // saveState method - synchronous wrapper
+        methods.add_method("saveState", |_, this, ()| {
+            let bridge = this.bridge.clone();
+            let agent_name = this.agent_instance_name.clone();
+
+            block_on_async(
+                "agent_saveState",
+                async move { bridge.save_agent_state(&agent_name).await },
+                None,
+            )?;
+            Ok(())
+        });
+
+        // loadState method - synchronous wrapper
+        methods.add_method("loadState", |_, this, ()| {
+            let bridge = this.bridge.clone();
+            let agent_name = this.agent_instance_name.clone();
+
+            let loaded = block_on_async(
+                "agent_loadState",
+                async move { bridge.load_agent_state(&agent_name).await },
+                None,
+            )?;
+            Ok(loaded)
+        });
+
+        // deleteState method - synchronous wrapper
+        methods.add_method("deleteState", |_, this, ()| {
+            let bridge = this.bridge.clone();
+            let agent_name = this.agent_instance_name.clone();
+
+            block_on_async(
+                "agent_deleteState",
+                async move { bridge.delete_agent_state(&agent_name).await },
+                None,
+            )?;
+            Ok(())
+        });
+
         // Tool Integration Methods
 
         // discoverTools method
