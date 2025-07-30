@@ -1,8 +1,17 @@
 //! ABOUTME: Script bridge implementations for session management in Lua and other languages
 //! ABOUTME: Provides Session global object for script access to session functionality
 
-// use crate::{SessionId, SessionError, Result};
-// Full imports will be added in Phase 6.5
+// Re-export submodules
+pub mod conversions;
+pub mod errors;
+pub mod operations;
+
+// Re-export key types
+pub use conversions::*;
+pub use errors::*;
+pub use operations::*;
+
+// Types will be used when implementing full bridge functionality
 
 /// Script bridge stub - to be implemented in Phase 6.5
 pub struct SessionBridge {
