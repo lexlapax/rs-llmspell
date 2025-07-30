@@ -7,7 +7,7 @@ pub mod session_adapter;
 #[cfg(test)]
 mod tests;
 
-use hook_replay_bridge::HookReplayBridge;
+pub use hook_replay_bridge::HookReplayBridge;
 
 use crate::{Result, SessionId};
 use llmspell_events::EventBus;
@@ -105,6 +105,32 @@ impl ReplayEngine {
     /// Get all active replays
     pub fn get_all_active_replays(&self) -> Vec<session_adapter::SessionReplayStatus> {
         self.session_adapter.get_all_active_replays()
+    }
+
+    /// Query hook executions for a specific session
+    pub async fn query_session_hooks(
+        &self,
+        session_id: &SessionId,
+        filter: session_adapter::SessionHookFilter,
+    ) -> Result<Vec<llmspell_state_persistence::manager::SerializedHookExecution>> {
+        self.session_adapter
+            .query_session_hooks(session_id, filter)
+            .await
+    }
+
+    /// Get session replay metadata
+    pub async fn get_session_replay_metadata(
+        &self,
+        session_id: &SessionId,
+    ) -> Result<session_adapter::SessionReplayMetadata> {
+        self.session_adapter
+            .get_session_replay_metadata(session_id)
+            .await
+    }
+
+    /// List all sessions that can be replayed
+    pub async fn list_replayable_sessions(&self) -> Result<Vec<SessionId>> {
+        self.session_adapter.list_replayable_sessions().await
     }
 }
 

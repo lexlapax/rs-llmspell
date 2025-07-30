@@ -16,6 +16,7 @@ pub struct HookReplayBridge {
 }
 
 impl HookReplayBridge {
+    /// Create a new hook replay bridge
     pub fn new(state_replay_manager: Arc<StateHookReplayManager>) -> Self {
         Self {
             state_replay_manager,

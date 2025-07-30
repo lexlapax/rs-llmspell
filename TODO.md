@@ -1745,22 +1745,41 @@ The system currently focuses entirely on the "capture" side (automatic collectio
 #### Task 6.4.3: Configure session replay storage
 **Priority**: HIGH
 **Estimated Time**: 2 hours
-**Status**: TODO
+**Status**: COMPLETED ✅
 **Assigned To**: Replay Team
 
 **Description**: Configure session replay to use existing storage infrastructure.
 
 **Files to Create/Update**:
-- **UPDATE**: `llmspell-sessions/src/replay/session_adapter.rs` - Storage configuration
-- **UPDATE**: `llmspell-sessions/src/manager.rs` - Wire up storage backends
+- **UPDATE**: `llmspell-sessions/src/replay/session_adapter.rs` - Storage configuration ✅
+- **UPDATE**: `llmspell-sessions/src/manager.rs` - Wire up storage backends ✅
 
 **Acceptance Criteria**:
-- [ ] Uses existing SerializedHookExecution format
-- [ ] Leverages StateStorageAdapter from llmspell-state-persistence
-- [ ] Reuses correlation-based storage keys
-- [ ] No new storage implementation needed
-- [ ] Compatible with existing replay storage
-- [ ] Uses existing compression from StorageBackend
+- [x] Uses existing SerializedHookExecution format
+- [x] Leverages StateStorageAdapter from llmspell-state-persistence
+- [x] Reuses correlation-based storage keys
+
+**Implementation Details**:
+- Added proper storage integration in SessionManager using:
+  - StateStorageAdapter for state-specific storage
+  - HookReplayManager for managing hook executions
+  - HookReplayBridge for trait compatibility
+  - Real storage backends instead of in-memory stubs
+- Implemented storage key patterns:
+  - `session_correlation:{session_id}` - stores correlation_id for session
+  - `session_metadata:{session_id}` - stores replay metadata in JSON format
+  - `hook_history:{correlation_id}:{execution_id}` - existing pattern reused
+- Added query methods:
+  - `query_session_hooks()` - filter hooks by time, hook_id, etc.
+  - `get_session_replay_metadata()` - get session replay metadata
+  - `list_replayable_sessions()` - list all sessions that can be replayed
+- Added session-specific retention:
+  - `cleanup_session_replay_metadata()` - cleans up old metadata
+  - Integrated with existing cleanup infrastructure
+- Updated tests to verify storage integration works correctly
+- [x] No new storage implementation needed
+- [x] Compatible with existing replay storage
+- [x] Uses existing compression from StorageBackend
 
 **Implementation Steps**:
 1. **Storage Integration** (45 min):

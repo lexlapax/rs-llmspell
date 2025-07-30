@@ -245,17 +245,28 @@ mod tests {
         // Create a mock session with correlation_id
         let session_id = SessionId::new();
         let correlation_id = uuid::Uuid::new_v4();
-        let session_key = format!("session:{}", session_id);
-        let session_data = serde_json::json!({
+
+        // Store session metadata with correlation_id (as per our implementation)
+        let metadata_key = format!("session_metadata:{}", session_id);
+        let metadata = serde_json::json!({
             "id": session_id.to_string(),
             "name": "test_session",
             "status": "Active",
-            "correlation_id": correlation_id.to_string()
+            "correlation_id": correlation_id.to_string(),
+            "created_at": chrono::Utc::now(),
+            "updated_at": chrono::Utc::now(),
         });
 
-        let session_data_bytes = serde_json::to_vec(&session_data).unwrap();
+        let metadata_bytes = serde_json::to_vec(&metadata).unwrap();
         storage_backend
-            .set(&session_key, session_data_bytes)
+            .set(&metadata_key, metadata_bytes)
+            .await
+            .unwrap();
+
+        // Also create a dummy session entry to indicate the session exists
+        let session_key = format!("session:{}", session_id);
+        storage_backend
+            .set(&session_key, vec![1, 2, 3]) // Dummy data to indicate session exists
             .await
             .unwrap();
 
@@ -467,5 +478,149 @@ mod tests {
         assert!(adapter.get_replay_status(&session2).is_some());
         assert!(adapter.get_replay_status(&session3).is_none());
         assert!(adapter.get_replay_status(&session4).is_none());
+    }
+
+    #[tokio::test]
+    async fn test_session_storage_with_metadata() {
+        let manager = create_test_session_manager().await;
+
+        // Create a session
+        let session_id = manager
+            .create_session(CreateSessionOptions::default())
+            .await
+            .unwrap();
+
+        // Save the session (this should save metadata with correlation_id)
+        let session = manager.get_session(&session_id).await.unwrap();
+        manager.save_session(&session).await.unwrap();
+
+        // Try to load correlation ID through replay adapter
+        let replay_engine = manager.replay_engine();
+        let can_replay = replay_engine.can_replay_session(&session_id).await.unwrap();
+
+        // Should be false since no hooks have been executed yet
+        assert!(!can_replay);
+    }
+
+    #[tokio::test]
+    async fn test_query_session_hooks() {
+        let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
+            create_test_replay_components().await;
+
+        let adapter = SessionReplayAdapter::new(
+            replay_manager,
+            hook_replay_manager,
+            storage_backend.clone(),
+            event_bus,
+        );
+
+        // Create session with metadata including correlation_id
+        let session_id = SessionId::new();
+        let correlation_id = uuid::Uuid::new_v4();
+        let metadata_key = format!("session_metadata:{}", session_id);
+        let metadata = serde_json::json!({
+            "id": session_id.to_string(),
+            "name": "test_session",
+            "status": "Active",
+            "correlation_id": correlation_id.to_string(),
+            "created_at": chrono::Utc::now(),
+            "updated_at": chrono::Utc::now(),
+        });
+
+        let metadata_bytes = serde_json::to_vec(&metadata).unwrap();
+        storage_backend
+            .set(&metadata_key, metadata_bytes)
+            .await
+            .unwrap();
+
+        // Query with empty filter should return empty results
+        let filter = super::super::session_adapter::SessionHookFilter::default();
+        let results = adapter
+            .query_session_hooks(&session_id, filter)
+            .await
+            .unwrap();
+        assert!(results.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_get_session_replay_metadata() {
+        let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
+            create_test_replay_components().await;
+
+        let adapter = SessionReplayAdapter::new(
+            replay_manager,
+            hook_replay_manager,
+            storage_backend.clone(),
+            event_bus,
+        );
+
+        // Create session with metadata
+        let session_id = SessionId::new();
+        let correlation_id = uuid::Uuid::new_v4();
+        let metadata_key = format!("session_metadata:{}", session_id);
+        let metadata = serde_json::json!({
+            "id": session_id.to_string(),
+            "name": "test_session",
+            "status": "Active",
+            "correlation_id": correlation_id.to_string(),
+            "created_at": chrono::Utc::now(),
+            "updated_at": chrono::Utc::now(),
+        });
+
+        let metadata_bytes = serde_json::to_vec(&metadata).unwrap();
+        storage_backend
+            .set(&metadata_key, metadata_bytes)
+            .await
+            .unwrap();
+
+        // Get replay metadata
+        let replay_metadata = adapter
+            .get_session_replay_metadata(&session_id)
+            .await
+            .unwrap();
+        assert_eq!(replay_metadata.session_id, session_id);
+        assert_eq!(replay_metadata.correlation_id, correlation_id);
+        assert_eq!(replay_metadata.total_hooks, 0);
+        assert!(!replay_metadata.can_replay);
+    }
+
+    #[tokio::test]
+    async fn test_list_replayable_sessions() {
+        let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
+            create_test_replay_components().await;
+
+        let adapter = SessionReplayAdapter::new(
+            replay_manager,
+            hook_replay_manager,
+            storage_backend.clone(),
+            event_bus,
+        );
+
+        // Create multiple sessions with metadata
+        let session1 = SessionId::new();
+        let session2 = SessionId::new();
+
+        for (session_id, name) in [(session1, "session1"), (session2, "session2")] {
+            let correlation_id = uuid::Uuid::new_v4();
+            let metadata_key = format!("session_metadata:{}", session_id);
+            let metadata = serde_json::json!({
+                "id": session_id.to_string(),
+                "name": name,
+                "status": "Active",
+                "correlation_id": correlation_id.to_string(),
+                "created_at": chrono::Utc::now(),
+                "updated_at": chrono::Utc::now(),
+            });
+
+            let metadata_bytes = serde_json::to_vec(&metadata).unwrap();
+            storage_backend
+                .set(&metadata_key, metadata_bytes)
+                .await
+                .unwrap();
+        }
+
+        // List replayable sessions (should be empty since no hooks)
+        let replayable = adapter.list_replayable_sessions().await.unwrap();
+        assert!(replayable.is_empty());
     }
 }

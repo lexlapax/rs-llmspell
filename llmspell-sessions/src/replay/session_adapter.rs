@@ -11,6 +11,7 @@ use llmspell_state_persistence::manager::{HookReplayManager, SerializedHookExecu
 use llmspell_storage::StorageBackend;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::str::FromStr;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant, SystemTime};
 use tracing::{debug, info};
@@ -150,6 +151,21 @@ impl SessionReplayAdapter {
 
     /// Load session correlation ID from storage
     async fn load_session_correlation_id(&self, session_id: &SessionId) -> Result<Uuid> {
+        // Try to load from session_metadata first (new format)
+        let metadata_key = format!("session_metadata:{}", session_id);
+        if let Ok(Some(metadata_bytes)) = self.storage_backend.get(&metadata_key).await {
+            if let Ok(metadata) = serde_json::from_slice::<serde_json::Value>(&metadata_bytes) {
+                if let Some(correlation_id_str) =
+                    metadata.get("correlation_id").and_then(|v| v.as_str())
+                {
+                    return Uuid::parse_str(correlation_id_str).map_err(|e| {
+                        SessionError::general(format!("Invalid correlation_id: {}", e))
+                    });
+                }
+            }
+        }
+
+        // Fallback to try loading from the main session key (for backward compatibility)
         let session_key = format!("session:{}", session_id);
         let session_bytes = self
             .storage_backend
@@ -157,25 +173,19 @@ impl SessionReplayAdapter {
             .await
             .map_err(|e| SessionError::Storage(e.to_string()))?;
 
-        let session_data = if let Some(bytes) = session_bytes {
-            Some(
-                serde_json::from_slice::<serde_json::Value>(&bytes)
-                    .map_err(|e| SessionError::Storage(e.to_string()))?,
-            )
+        // The session data is stored in bincode format, not JSON
+        // So we can't extract correlation_id from it directly
+        // Return an error indicating the session needs to be saved in the new format
+        if session_bytes.is_some() {
+            Err(SessionError::general(
+                "Session exists but correlation_id not found. Session needs to be saved in new format.",
+            ))
         } else {
-            None
-        };
-
-        let session = session_data
-            .ok_or_else(|| SessionError::general(format!("Session {} not found", session_id)))?;
-
-        let correlation_id = session
-            .get("correlation_id")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| SessionError::general("Session missing correlation_id"))?;
-
-        Uuid::parse_str(correlation_id)
-            .map_err(|e| SessionError::general(format!("Invalid correlation_id: {}", e)))
+            Err(SessionError::general(format!(
+                "Session {} not found",
+                session_id
+            )))
+        }
     }
 
     /// Convert state-persistence executions to hooks format
@@ -422,6 +432,138 @@ impl SessionReplayAdapter {
             status.current_hook = current_hook;
         }
     }
+
+    /// Query hook executions for a specific session
+    pub async fn query_session_hooks(
+        &self,
+        session_id: &SessionId,
+        filter: SessionHookFilter,
+    ) -> Result<Vec<SerializedHookExecution>> {
+        // Load session correlation ID
+        let correlation_uuid = self.load_session_correlation_id(session_id).await?;
+
+        // Get all hook executions for this correlation
+        let mut executions = self
+            .hook_replay_manager
+            .get_hook_executions_by_correlation(correlation_uuid)
+            .await
+            .map_err(|e| SessionError::replay(e.to_string()))?;
+
+        // Apply filters
+        if let Some(start_time) = filter.start_time {
+            executions.retain(|e| e.timestamp >= start_time);
+        }
+
+        if let Some(end_time) = filter.end_time {
+            executions.retain(|e| e.timestamp <= end_time);
+        }
+
+        if let Some(hook_id) = filter.hook_id {
+            executions.retain(|e| e.hook_id == hook_id);
+        }
+
+        if let Some(max_results) = filter.max_results {
+            executions.truncate(max_results);
+        }
+
+        // Sort by timestamp
+        executions.sort_by_key(|e| e.timestamp);
+
+        Ok(executions)
+    }
+
+    /// Get session replay metadata
+    pub async fn get_session_replay_metadata(
+        &self,
+        session_id: &SessionId,
+    ) -> Result<SessionReplayMetadata> {
+        // Load correlation ID
+        let correlation_uuid = self.load_session_correlation_id(session_id).await?;
+
+        // Get hook executions count
+        let executions = self
+            .hook_replay_manager
+            .get_hook_executions_by_correlation(correlation_uuid)
+            .await
+            .map_err(|e| SessionError::replay(e.to_string()))?;
+
+        let total_hooks = executions.len();
+        let first_timestamp = executions.iter().map(|e| e.timestamp).min();
+        let last_timestamp = executions.iter().map(|e| e.timestamp).max();
+        let total_duration = match (first_timestamp, last_timestamp) {
+            (Some(start), Some(end)) => end.duration_since(start).ok(),
+            _ => None,
+        };
+
+        Ok(SessionReplayMetadata {
+            session_id: *session_id,
+            correlation_id: correlation_uuid,
+            total_hooks,
+            first_hook_timestamp: first_timestamp,
+            last_hook_timestamp: last_timestamp,
+            total_duration,
+            can_replay: total_hooks > 0,
+        })
+    }
+
+    /// List all sessions that can be replayed
+    pub async fn list_replayable_sessions(&self) -> Result<Vec<SessionId>> {
+        // List all session_metadata keys
+        let prefix = "session_metadata:";
+        let keys = self
+            .storage_backend
+            .list_keys(prefix)
+            .await
+            .map_err(|e| SessionError::Storage(e.to_string()))?;
+
+        let mut replayable_sessions = Vec::new();
+
+        for key in keys {
+            // Extract session ID from key
+            if let Some(session_id_str) = key.strip_prefix(prefix) {
+                if let Ok(session_id) = SessionId::from_str(session_id_str) {
+                    // Check if session has hook executions
+                    if self.can_replay_session(&session_id).await.unwrap_or(false) {
+                        replayable_sessions.push(session_id);
+                    }
+                }
+            }
+        }
+
+        Ok(replayable_sessions)
+    }
+}
+
+/// Filter for querying session hooks
+#[derive(Debug, Clone, Default)]
+pub struct SessionHookFilter {
+    /// Start time filter
+    pub start_time: Option<SystemTime>,
+    /// End time filter
+    pub end_time: Option<SystemTime>,
+    /// Specific hook ID filter
+    pub hook_id: Option<String>,
+    /// Maximum number of results
+    pub max_results: Option<usize>,
+}
+
+/// Session replay metadata
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SessionReplayMetadata {
+    /// Session ID
+    pub session_id: SessionId,
+    /// Correlation ID
+    pub correlation_id: Uuid,
+    /// Total number of hooks
+    pub total_hooks: usize,
+    /// First hook timestamp
+    pub first_hook_timestamp: Option<SystemTime>,
+    /// Last hook timestamp
+    pub last_hook_timestamp: Option<SystemTime>,
+    /// Total duration
+    pub total_duration: Option<Duration>,
+    /// Whether the session can be replayed
+    pub can_replay: bool,
 }
 
 #[cfg(test)]

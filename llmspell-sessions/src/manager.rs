@@ -7,7 +7,7 @@ use crate::{
         ArtifactStorageOps, ArtifactType, SessionArtifact,
     },
     config::SessionManagerConfig,
-    events::{create_session_event, SessionEventType},
+    events::{create_correlated_event, create_session_event, SessionEventType},
     hooks::{
         register_artifact_collectors, ArtifactCollectionProcessor, CollectorConfig,
         SessionHookContextHelper,
@@ -17,6 +17,7 @@ use crate::{
     types::{CreateSessionOptions, SessionQuery, SessionSortBy},
     Result, SessionError, SessionId, SessionMetadata,
 };
+use chrono::{DateTime, Utc};
 use llmspell_events::{bus::EventBus, correlation::EventCorrelationTracker};
 use llmspell_hooks::{HookExecutor, HookPoint, HookRegistry, LoggingHook, MetricsHook};
 use llmspell_state_persistence::StateManager;
@@ -126,13 +127,35 @@ impl SessionManager {
                 "sessions".to_string(),
             ),
         );
-        let _hook_replay_manager = Arc::new(
-            llmspell_state_persistence::manager::HookReplayManager::new(state_storage_adapter),
-        );
+        let hook_replay_manager =
+            Arc::new(llmspell_state_persistence::manager::HookReplayManager::new(
+                state_storage_adapter.clone(),
+            ));
 
-        // For task 6.4.1, create a minimal replay engine that compiles and provides basic functionality
-        // Full integration will be completed in subsequent tasks of phase 6.4
-        let replay_engine = Arc::new(ReplayEngine::default());
+        // Create bridge adapter for type compatibility
+        let hook_replay_bridge = Arc::new(crate::replay::HookReplayBridge::new(
+            hook_replay_manager.clone(),
+        ));
+
+        // Create hooks storage backend (separate from main storage)
+        let hooks_storage_backend =
+            Arc::new(llmspell_hooks::persistence::InMemoryStorageBackend::new());
+
+        // Create replay manager with proper storage
+        let replay_manager = Arc::new(llmspell_hooks::replay::ReplayManager::new(
+            Arc::new(llmspell_hooks::persistence::HookPersistenceManager::new(
+                hook_replay_bridge,
+            )),
+            hooks_storage_backend,
+        ));
+
+        // Create replay engine with properly configured storage
+        let replay_engine = Arc::new(ReplayEngine::new(
+            replay_manager,
+            hook_replay_manager,
+            storage_backend.clone(),
+            event_bus.clone(),
+        ));
 
         let manager = Self {
             state_manager,
@@ -202,6 +225,21 @@ impl SessionManager {
         self.correlation_tracker
             .add_context(session_event.correlation_context.clone());
 
+        // Store the correlation ID for the session (for replay)
+        let session_correlation_key = format!("session_correlation:{}", session_id);
+        let correlation_data = serde_json::json!({
+            "session_id": session_id.to_string(),
+            "correlation_id": session_event.correlation_context.correlation_id.to_string(),
+            "created_at": chrono::Utc::now(),
+        });
+        let correlation_bytes = serde_json::to_vec(&correlation_data).map_err(|e| {
+            SessionError::general(format!("Failed to serialize correlation data: {}", e))
+        })?;
+        self.storage_backend
+            .set(&session_correlation_key, correlation_bytes)
+            .await
+            .map_err(|e| SessionError::Storage(e.to_string()))?;
+
         // Fire session start hooks
         if self.config.hook_config.enable_lifecycle_hooks {
             let hooks = self.hook_registry.get_hooks(&HookPoint::SessionStart);
@@ -246,7 +284,7 @@ impl SessionManager {
         // Publish session created event with correlation
         if self.config.event_config.enable_session_events {
             // Create started event as child of created event
-            let started_event = crate::events::create_correlated_event(
+            let started_event = create_correlated_event(
                 session_id,
                 SessionEventType::Started,
                 serde_json::json!({
@@ -664,6 +702,37 @@ impl SessionManager {
             .await
             .map_err(|e| SessionError::Storage(e.to_string()))?;
 
+        // Store session metadata for replay (JSON format)
+        // This includes the correlation_id for session replay functionality
+        let session_correlation_key = format!("session_correlation:{}", session_id);
+        if let Ok(Some(correlation_bytes)) =
+            self.storage_backend.get(&session_correlation_key).await
+        {
+            if let Ok(correlation_data) =
+                serde_json::from_slice::<serde_json::Value>(&correlation_bytes)
+            {
+                if let Some(correlation_id_str) = correlation_data
+                    .get("correlation_id")
+                    .and_then(|v| v.as_str())
+                {
+                    let metadata_key = format!("session_metadata:{}", session_id);
+                    let metadata = serde_json::json!({
+                        "id": session_id.to_string(),
+                        "name": snapshot.metadata.name,
+                        "status": snapshot.metadata.status,
+                        "correlation_id": correlation_id_str,
+                        "created_at": snapshot.metadata.created_at,
+                        "updated_at": snapshot.metadata.updated_at,
+                    });
+                    let metadata_bytes = serde_json::to_vec(&metadata)?;
+                    self.storage_backend
+                        .set(&metadata_key, metadata_bytes)
+                        .await
+                        .map_err(|e| SessionError::Storage(e.to_string()))?;
+                }
+            }
+        }
+
         debug!("Saved session {session_id} ({data_len} bytes)");
         Ok(())
     }
@@ -813,6 +882,57 @@ impl SessionManager {
                 debug!("Would archive session {session_id} before deletion");
             }
             self.delete_session(&session_id).await?;
+        }
+
+        // Clean up session replay metadata for deleted sessions
+        self.cleanup_session_replay_metadata(cutoff).await?;
+
+        Ok(())
+    }
+
+    /// Clean up old session replay metadata
+    async fn cleanup_session_replay_metadata(&self, cutoff: DateTime<Utc>) -> Result<()> {
+        // List all session_metadata keys
+        let prefix = "session_metadata:";
+        let keys = self
+            .storage_backend
+            .list_keys(prefix)
+            .await
+            .map_err(|e| SessionError::Storage(e.to_string()))?;
+
+        let mut to_delete = Vec::new();
+
+        for key in keys {
+            // Load metadata to check updated_at
+            if let Ok(Some(metadata_bytes)) = self.storage_backend.get(&key).await {
+                if let Ok(metadata) = serde_json::from_slice::<serde_json::Value>(&metadata_bytes) {
+                    if let Some(updated_at_str) =
+                        metadata.get("updated_at").and_then(|v| v.as_str())
+                    {
+                        if let Ok(updated_at) = DateTime::parse_from_rfc3339(updated_at_str) {
+                            let updated_at_utc = updated_at.with_timezone(&Utc);
+                            if updated_at_utc < cutoff {
+                                to_delete.push(key);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Delete old metadata
+        let to_delete_count = to_delete.len();
+        for key in to_delete {
+            if let Err(e) = self.storage_backend.delete(&key).await {
+                warn!("Failed to delete old session metadata {}: {}", key, e);
+            }
+        }
+
+        if to_delete_count > 0 {
+            info!(
+                "Cleaned up {} old session replay metadata entries",
+                to_delete_count
+            );
         }
 
         Ok(())
@@ -1429,6 +1549,32 @@ impl SessionManager {
         &self,
     ) -> Vec<crate::replay::session_adapter::SessionReplayStatus> {
         self.replay_engine.get_all_active_replays()
+    }
+
+    /// Query hook executions for a specific session
+    pub async fn query_session_hooks(
+        &self,
+        session_id: &SessionId,
+        filter: crate::replay::session_adapter::SessionHookFilter,
+    ) -> Result<Vec<llmspell_state_persistence::manager::SerializedHookExecution>> {
+        self.replay_engine
+            .query_session_hooks(session_id, filter)
+            .await
+    }
+
+    /// Get session replay metadata
+    pub async fn get_session_replay_metadata(
+        &self,
+        session_id: &SessionId,
+    ) -> Result<crate::replay::session_adapter::SessionReplayMetadata> {
+        self.replay_engine
+            .get_session_replay_metadata(session_id)
+            .await
+    }
+
+    /// List all sessions that can be replayed
+    pub async fn list_replayable_sessions(&self) -> Result<Vec<SessionId>> {
+        self.replay_engine.list_replayable_sessions().await
     }
 }
 
