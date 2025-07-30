@@ -1559,322 +1559,374 @@ The system currently focuses entirely on the "capture" side (automatic collectio
 
 ---
 
-### Phase 6.4: Session Replay Engine (Day 8-10)
+### Phase 6.4: Session Replay Engine (Day 8-10) - LEVERAGING EXISTING INFRASTRUCTURE
 
-#### Task 6.4.1: Design replay engine architecture
+#### Task 6.4.1: Integrate existing replay infrastructure
 **Priority**: HIGH
-**Estimated Time**: 4 hours
+**Estimated Time**: 3 hours
 **Status**: TODO
 **Assigned To**: Replay Team Lead
 
-**Description**: Design and implement core replay engine architecture.
+**Description**: Integrate session replay with existing replay infrastructure from llmspell-hooks and llmspell-state-persistence.
 
 **Files to Create/Update**:
-- **CREATE**: `llmspell-sessions/src/replay/mod.rs` - Replay module exports
-- **CREATE**: `llmspell-sessions/src/replay/engine.rs` - ReplayEngine implementation
+- **UPDATE**: `llmspell-sessions/src/replay.rs` - Implement ReplayEngine using existing infrastructure
+- **CREATE**: `llmspell-sessions/src/replay/session_adapter.rs` - Adapt existing replay to sessions
 - **UPDATE**: `llmspell-sessions/src/manager.rs` - Integrate replay engine
 
 **Acceptance Criteria**:
-- [ ] ReplayEngine struct design complete
-- [ ] Event sourcing pattern implemented
-- [ ] State reconstruction logic
-- [ ] Deterministic execution guaranteed
-- [ ] Performance optimization
-- [ ] Error handling comprehensive
-- [ ] Progress tracking support
+- [ ] ReplayEngine leverages existing llmspell_hooks::replay::ReplayManager
+- [ ] Uses existing ReplayableHook trait from llmspell-hooks
+- [ ] Integrates with HookReplayManager from llmspell-state-persistence
+- [ ] Session-specific replay configuration
+- [ ] Correlation-based event retrieval
+- [ ] Progress tracking via existing ReplayState
 
 **Implementation Steps**:
-1. **Engine Structure** (1.5 hours):
+1. **Adapt Existing Infrastructure** (1 hour):
    ```rust
+   use llmspell_hooks::replay::{ReplayManager, ReplayMode, ReplayConfig};
+   use llmspell_hooks::traits::ReplayableHook;
+   use llmspell_state_persistence::manager::HookReplayManager;
+   
    pub struct ReplayEngine {
-       state_manager: Arc<StateManager>,
-       hook_executor: Arc<HookExecutor>,
-       replay_config: ReplayConfig,
-       progress_tracker: Arc<RwLock<ReplayProgress>>,
+       replay_manager: Arc<ReplayManager>,
+       hook_replay_manager: Arc<HookReplayManager>,
+       session_storage: Arc<SessionStorage>,
+       event_bus: Arc<EventBus>,
    }
    ```
 
-2. **Event Sourcing** (1 hour):
-   - Event store design
-   - Event ordering
-   - Snapshot support
-   - Incremental replay
+2. **Session-Specific Adapter** (1 hour):
+   - Map session replay requests to existing ReplayRequest
+   - Convert session context to HookContext
+   - Handle session-specific metadata
+   - Maintain backward compatibility
 
-3. **State Reconstruction** (1 hour):
-   - Load initial state
-   - Apply events in order
-   - Validate consistency
-   - Handle conflicts
+3. **Integration Points** (45 min):
+   - Use existing SerializedHookExecution format
+   - Leverage existing ReplayResult structure
+   - Reuse ParameterModification for session variables
+   - Integrate with existing comparator
 
-4. **Configuration** (30 min):
-   - Replay speed
-   - Error handling mode
-   - Validation levels
-   - Resource limits
+4. **Session Extensions** (15 min):
+   - Add session-specific replay modes
+   - Session timeline navigation
+   - Multi-session replay support
 
 **Testing Requirements**:
-- [ ] Architecture validation tests
-- [ ] Event sourcing tests
-- [ ] State reconstruction tests
+- [ ] Integration with existing replay tests
+- [ ] Session-specific replay scenarios
+- [ ] Compatibility with existing infrastructure
 - [ ] Performance benchmarks
 
 **Definition of Done**:
-- [ ] Architecture implemented
-- [ ] Event sourcing working
-- [ ] State reconstruction accurate
-- [ ] Performance acceptable
+- [ ] Successfully reuses existing replay infrastructure
+- [ ] No duplicate code with llmspell-hooks replay
+- [ ] Session replay works with existing tools
+- [ ] All existing replay features available
 
 ---
 
-#### Task 6.4.2: Implement session replay functionality
+#### Task 6.4.2: Implement session-specific replay methods
 **Priority**: HIGH
-**Estimated Time**: 6 hours
+**Estimated Time**: 4 hours  
 **Status**: TODO
 **Assigned To**: Replay Team
 
-**Description**: Implement the core replay_session functionality that recreates session state by replaying hooks.
+**Description**: Implement session-specific replay methods using existing replay infrastructure.
 
 **Files to Update**:
-- **UPDATE**: `llmspell-sessions/src/replay/engine.rs` - Add replay methods
-- **CREATE**: `llmspell-sessions/src/replay/executor.rs` - Replay execution
-- **CREATE**: Tests for replay functionality
+- **UPDATE**: `llmspell-sessions/src/replay.rs` - Add session replay methods
+- **UPDATE**: `llmspell-sessions/src/replay/session_adapter.rs` - Session replay logic
+- **CREATE**: Tests for session replay functionality
 
 **Acceptance Criteria**:
-- [ ] replay_session() recreates session state accurately
-- [ ] Target timestamp support (replay to point)
-- [ ] Hook replay in correct order
-- [ ] State consistency maintained
-- [ ] Error handling for failed replays
-- [ ] Progress reporting during replay
-- [ ] Replay results comprehensive
-- [ ] Performance acceptable
+- [ ] replay_session() uses existing ReplayManager::replay()
+- [ ] Leverages HookReplayManager::get_hook_executions_by_correlation()
+- [ ] Uses existing ReplayConfig and ReplayMode
+- [ ] Integrates with existing BatchReplayRequest for multi-hook replay
+- [ ] Session state reconstruction via existing mechanisms
+- [ ] Reuses existing ReplayResult and ComparisonResult
 
 **Implementation Steps**:
-1. **Core Replay Method** (2.5 hours):
+1. **Session Replay Adapter** (1.5 hours):
    ```rust
    pub async fn replay_session(
        &self,
        session_id: &SessionId,
-       target_state: Option<DateTime<Utc>>,
-   ) -> Result<ReplayResult> {
-       // Load session metadata
-       let session = self.load_session_metadata(session_id).await?;
+       config: SessionReplayConfig,
+   ) -> Result<SessionReplayResult> {
+       // Get session correlation_id
+       let session = self.session_storage.load(session_id).await?;
        
-       // Load hook history
-       let hook_history = self.load_hook_history(&session.correlation_id).await?;
+       // Use existing HookReplayManager to get executions
+       let executions = self.hook_replay_manager
+           .get_hook_executions_by_correlation(session.correlation_id)
+           .await?;
        
-       // Create replay session
-       let replay_session_id = SessionId::new();
+       // Convert to BatchReplayRequest
+       let batch_request = BatchReplayRequest {
+           executions,
+           config: config.into_replay_config(),
+           parallel: false,
+           max_concurrent: 1,
+       };
        
-       // Replay hooks in order
-       for hook_execution in hook_history {
-           if let Some(target) = target_state {
-               if hook_execution.timestamp > target {
-                   break;
-               }
-           }
-           
-           self.replay_hook_execution(&hook_execution).await?;
-       }
+       // Use existing replay infrastructure
+       let batch_result = self.replay_manager
+           .replay_batch(batch_request)
+           .await?;
        
-       Ok(ReplayResult { /* ... */ })
+       // Convert to session-specific result
+       Ok(SessionReplayResult::from(batch_result))
    }
    ```
 
-2. **Hook Replay Logic** (2 hours):
-   - Deserialize hook context
-   - Execute with replay flag
-   - Handle side effects
-   - Verify state changes
+2. **Configuration Mapping** (1 hour):
+   - Map SessionReplayConfig to ReplayConfig
+   - Support existing ReplayMode enum
+   - Handle ParameterModification for session variables
+   - Integrate timeline controls
 
-3. **Error Recovery** (1 hour):
-   - Continue on error option
-   - Rollback capability
-   - Error collection
-   - Partial replay
+3. **Result Adaptation** (1 hour):
+   - Convert BatchReplayResponse to SessionReplayResult
+   - Preserve existing ComparisonResult
+   - Map metadata appropriately
+   - Session-specific error context
 
-4. **Validation** (30 min):
-   - State consistency checks
-   - Checksum verification
-   - Invariant validation
-   - Divergence detection
+4. **Progress Integration** (30 min):
+   - Use existing ReplayState tracking
+   - Subscribe to progress updates
+   - Session-specific progress events
 
 **Testing Requirements**:
-- [ ] Full replay tests
-- [ ] Partial replay tests
-- [ ] Error handling tests
-- [ ] State consistency tests
-- [ ] Performance tests
+- [ ] Test with existing replay test infrastructure
+- [ ] Session correlation retrieval tests
+- [ ] Configuration mapping tests
+- [ ] Result conversion tests
 
 **Definition of Done**:
-- [ ] Replay recreates state
-- [ ] Target time works
-- [ ] Errors handled gracefully
-- [ ] Progress reported
-- [ ] Performance acceptable
+- [ ] Fully leverages existing replay code
+- [ ] No reimplementation of replay logic
+- [ ] Session replay works seamlessly
+- [ ] All replay features accessible
 
 ---
 
-#### Task 6.4.3: Implement replay event storage
+#### Task 6.4.3: Configure session replay storage
 **Priority**: HIGH
-**Estimated Time**: 4 hours
+**Estimated Time**: 2 hours
 **Status**: TODO
 **Assigned To**: Replay Team
 
-**Description**: Create storage system for replay events.
+**Description**: Configure session replay to use existing storage infrastructure.
 
 **Files to Create/Update**:
-- **CREATE**: `llmspell-sessions/src/replay/storage.rs` - Event storage
-- **UPDATE**: `llmspell-sessions/src/replay/engine.rs` - Use event storage
+- **UPDATE**: `llmspell-sessions/src/replay/session_adapter.rs` - Storage configuration
+- **UPDATE**: `llmspell-sessions/src/manager.rs` - Wire up storage backends
 
 **Acceptance Criteria**:
-- [ ] Event storage format defined
-- [ ] Efficient retrieval by correlation ID
-- [ ] Event ordering guarantees
-- [ ] Compression support
-- [ ] Retention policies
-- [ ] Query capabilities
-- [ ] Streaming support
+- [ ] Uses existing SerializedHookExecution format
+- [ ] Leverages StateStorageAdapter from llmspell-state-persistence
+- [ ] Reuses correlation-based storage keys
+- [ ] No new storage implementation needed
+- [ ] Compatible with existing replay storage
+- [ ] Uses existing compression from StorageBackend
 
 **Implementation Steps**:
-1. **Storage Schema** (1.5 hours):
-   - Event structure design
-   - Index strategy
-   - Partitioning scheme
-   - Compression format
+1. **Storage Integration** (45 min):
+   ```rust
+   impl SessionReplayAdapter {
+       pub fn new(
+           storage_backend: Arc<dyn StorageBackend>,
+           state_storage: Arc<StateStorageAdapter>,
+       ) -> Self {
+           // Reuse existing storage infrastructure
+           let hook_replay_manager = HookReplayManager::new(state_storage.clone());
+           let replay_manager = ReplayManager::new(
+               persistence_manager,
+               storage_backend.clone(),
+           );
+           
+           Self {
+               replay_manager: Arc::new(replay_manager),
+               hook_replay_manager: Arc::new(hook_replay_manager),
+               storage_backend,
+           }
+       }
+   }
+   ```
 
-2. **Storage Operations** (1.5 hours):
-   - Store events atomically
-   - Retrieve by correlation
-   - Range queries
-   - Batch operations
+2. **Key Management** (30 min):
+   - Use existing key patterns: `hook_history:{correlation_id}:{execution_id}`
+   - Session metadata keys: `session:{session_id}`
+   - No new key schemes needed
 
-3. **Optimization** (1 hour):
-   - Event compression
-   - Batch writes
-   - Read caching
-   - Parallel retrieval
+3. **Query Methods** (30 min):
+   - Wrap existing list_keys() for session queries
+   - Use existing load/store methods
+   - Leverage existing batch operations
+
+4. **Configuration** (15 min):
+   - Session-specific retention policies
+   - Use existing compression settings
+   - Storage limits per session
 
 **Testing Requirements**:
-- [ ] Storage efficiency tests
-- [ ] Ordering guarantee tests
-- [ ] Query performance tests
-- [ ] Compression tests
+- [ ] Storage integration tests
+- [ ] Key pattern compatibility tests
+- [ ] Query functionality tests
 
 **Definition of Done**:
-- [ ] Event storage working
-- [ ] Queries efficient
-- [ ] Ordering maintained
-- [ ] Performance good
+- [ ] Uses existing storage completely
+- [ ] No new storage code written
+- [ ] Compatible with existing data
+- [ ] Performance maintained
 
 ---
 
-#### Task 6.4.4: Create replay execution framework
+#### Task 6.4.4: Adapt replay controls for sessions
 **Priority**: HIGH
-**Estimated Time**: 5 hours
+**Estimated Time**: 3 hours
 **Status**: TODO
 **Assigned To**: Replay Team
 
-**Description**: Implement the replay execution system with controls.
+**Description**: Adapt existing replay execution controls for session context.
 
 **Files to Create/Update**:
-- **UPDATE**: `llmspell-sessions/src/replay/executor.rs` - Execution framework
-- **CREATE**: `llmspell-sessions/src/replay/controls.rs` - Replay controls
-- **CREATE**: Tests for execution framework
+- **UPDATE**: `llmspell-sessions/src/replay/session_adapter.rs` - Session replay controls
+- **CREATE**: `llmspell-sessions/src/replay/session_controls.rs` - Session-specific controls
+- **CREATE**: Tests for session replay controls
 
 **Acceptance Criteria**:
-- [ ] Step-by-step replay support
-- [ ] Fast-forward capability
-- [ ] Pause/resume support
-- [ ] Breakpoint system
-- [ ] State validation at each step
-- [ ] Progress tracking
-- [ ] Speed control
+- [ ] Uses existing ReplayScheduler for scheduling
+- [ ] Leverages existing ReplaySessionConfig patterns
+- [ ] Integrates with existing breakpoint system
+- [ ] Reuses existing progress tracking
+- [ ] Adapts existing replay modes
+- [ ] Session-specific UI controls
 
 **Implementation Steps**:
-1. **Execution Controller** (2 hours):
-   - Play/pause/stop controls
-   - Speed adjustment
-   - Step execution
-   - Breakpoint handling
+1. **Control Adapter** (1 hour):
+   ```rust
+   pub struct SessionReplayControls {
+       scheduler: Arc<ReplayScheduler>,
+       active_replays: Arc<RwLock<HashMap<SessionId, ReplayStatus>>>,
+   }
+   
+   impl SessionReplayControls {
+       pub async fn schedule_replay(
+           &self,
+           session_id: SessionId,
+           schedule: ReplaySchedule,
+       ) -> Result<ScheduledReplay> {
+           // Use existing scheduler
+           let replay_request = self.create_replay_request(session_id)?;
+           self.scheduler.schedule(replay_request, schedule).await
+       }
+   }
+   ```
 
-2. **Progress Tracking** (1.5 hours):
-   - Current position
-   - Total events
-   - Time estimation
-   - Progress callbacks
+2. **Session Progress** (1 hour):
+   - Map ReplayState to session progress
+   - Use existing progress callbacks
+   - Session-specific progress events
+   - Timeline position tracking
 
-3. **Validation Framework** (1.5 hours):
-   - State checks
-   - Invariant validation
-   - Divergence detection
-   - Error collection
+3. **Breakpoint Integration** (45 min):
+   - Use existing BreakpointCondition
+   - Add session-specific conditions
+   - Integrate with ReplaySession
+   - Session state inspection
+
+4. **Speed Control** (15 min):
+   - Use existing speed_multiplier
+   - Session playback controls
+   - Real-time adjustments
 
 **Testing Requirements**:
-- [ ] Control flow tests
-- [ ] Breakpoint tests
+- [ ] Control integration tests
 - [ ] Progress tracking tests
-- [ ] Validation tests
+- [ ] Breakpoint tests
+- [ ] Scheduler tests
 
 **Definition of Done**:
-- [ ] All controls working
-- [ ] Progress accurate
-- [ ] Validation comprehensive
-- [ ] Performance good
+- [ ] Fully uses existing controls
+- [ ] No control logic reimplemented
+- [ ] Session controls intuitive
+- [ ] Performance maintained
 
 ---
 
-#### Task 6.4.5: Implement replay debugging features
+#### Task 6.4.5: Integrate replay debugging features
 **Priority**: MEDIUM
-**Estimated Time**: 4 hours
+**Estimated Time**: 2 hours
 **Status**: TODO
 **Assigned To**: Replay Team
 
-**Description**: Add debugging capabilities to replay system.
+**Description**: Integrate existing replay debugging features for sessions.
 
 **Files to Create/Update**:
-- **CREATE**: `llmspell-sessions/src/replay/debug.rs` - Debug features
-- **UPDATE**: `llmspell-sessions/src/replay/engine.rs` - Add debug support
+- **UPDATE**: `llmspell-sessions/src/replay/session_adapter.rs` - Debug integration
+- **CREATE**: `llmspell-sessions/src/replay/session_debug.rs` - Session debug helpers
 
 **Acceptance Criteria**:
-- [ ] State inspection at any point
-- [ ] Event timeline visualization
-- [ ] Diff between states
-- [ ] Performance profiling
-- [ ] Error analysis
-- [ ] Export capabilities
-- [ ] Watch expressions
+- [ ] Uses existing CapturedState from persistence module
+- [ ] Leverages existing ReplayError types
+- [ ] Integrates with existing timeline features
+- [ ] Reuses existing state inspection
+- [ ] Uses existing HookResultComparator
+- [ ] Session-specific debug views
 
 **Implementation Steps**:
-1. **State Inspector** (1.5 hours):
-   - Inspect at any point
-   - Compare states
-   - Watch variables
-   - Export state
+1. **Debug Integration** (45 min):
+   ```rust
+   pub struct SessionDebugger {
+       comparator: HookResultComparator,
+       captured_states: VecDeque<CapturedState>,
+   }
+   
+   impl SessionDebugger {
+       pub fn inspect_state_at(
+           &self,
+           session_id: &SessionId,
+           timestamp: SystemTime,
+       ) -> Result<SessionState> {
+           // Use existing captured states
+           let state = self.find_state_at_time(timestamp)?;
+           Ok(SessionState::from_captured(state))
+       }
+   }
+   ```
 
-2. **Timeline Visualization** (1.5 hours):
-   - Event sequence
-   - Time gaps
-   - Dependencies
-   - Critical path
+2. **Timeline Adapter** (30 min):
+   - Use existing timeline from ReplaySession
+   - Map to session events
+   - Preserve metadata
+   - Session navigation
 
-3. **Profiling Support** (1 hour):
-   - Event timing
-   - Resource usage
-   - Bottleneck detection
-   - Performance report
+3. **Comparison Tools** (30 min):
+   - Use existing HookResultComparator
+   - Session state diffs
+   - Change detection
+   - Export differences
+
+4. **Error Analysis** (15 min):
+   - Use existing ReplayErrorType
+   - Session error context
+   - Error aggregation
 
 **Testing Requirements**:
-- [ ] Inspector accuracy tests
-- [ ] Timeline tests
-- [ ] Profiling tests
-- [ ] Export tests
+- [ ] Debug integration tests
+- [ ] State inspection tests
+- [ ] Comparison tests
 
 **Definition of Done**:
-- [ ] Debugging functional
-- [ ] Visualization working
-- [ ] Profiling accurate
-- [ ] Export complete
+- [ ] Uses all existing debug features
+- [ ] No debug code duplicated
+- [ ] Session debugging intuitive
+- [ ] Performance acceptable
 
 ---
 
@@ -2879,7 +2931,7 @@ The system currently focuses entirely on the "capture" side (automatic collectio
 - Phase 6.1 (Core Infrastructure): 6 tasks, 24 hours ✅ COMPLETED
 - Phase 6.2 (Artifact Storage): 8 tasks, 31 hours ✅ COMPLETED  
 - Phase 6.3 (Hook Integration): 6 tasks, 14 hours (REDUCED from 21 - leveraging existing hook/event infrastructure)
-- Phase 6.4 (Replay Engine): 5 tasks, 21 hours
+- Phase 6.4 (Replay Engine): 5 tasks, 14 hours (REDUCED from 21 - leveraging existing replay infrastructure)
 - Phase 6.5 (Script Bridge): 7 tasks, 26 hours
 - Phase 6.6 (Testing): 8 tasks, 29 hours
 
