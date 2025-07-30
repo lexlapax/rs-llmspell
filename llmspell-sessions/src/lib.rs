@@ -69,6 +69,9 @@ pub mod events;
 /// Session policies using hook patterns
 pub mod policies;
 
+/// Session middleware using pattern hooks
+pub mod middleware;
+
 // Re-export commonly used types
 pub use artifact::{
     ArtifactId, ArtifactQuery, ArtifactStorage, ArtifactStorageConfig, ArtifactStorageOps,
