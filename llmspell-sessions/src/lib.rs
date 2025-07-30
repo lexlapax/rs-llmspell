@@ -59,6 +59,9 @@ pub mod bridge;
 /// Hook integration
 pub mod hooks;
 
+/// Event system integration
+pub mod events;
+
 // Re-export commonly used types
 pub use artifact::{
     ArtifactId, ArtifactQuery, ArtifactStorage, ArtifactStorageConfig, ArtifactStorageOps,

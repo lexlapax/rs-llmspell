@@ -1296,7 +1296,7 @@ The system currently focuses entirely on the "capture" side (automatic collectio
 #### Task 6.3.3: Use existing event correlation system (LEVERAGE EXISTING)
 **Priority**: HIGH
 **Estimated Time**: 2 hours (REDUCED - using existing system)
-**Status**: TODO
+**Status**: DONE ✅
 **Assigned To**: Hooks Team
 
 **Description**: Integrate sessions with the comprehensive event correlation system already implemented in `llmspell-events/src/correlation/`.
@@ -1316,10 +1316,10 @@ The system currently focuses entirely on the "capture" side (automatic collectio
 - [x] Cleanup and memory management ✅
 
 **Acceptance Criteria**:
-- [ ] Sessions generate correlation IDs using existing CorrelationContext
-- [ ] Session events linked using existing EventLink system
-- [ ] Timeline queries work for session activities
-- [ ] Integration with existing event bus
+- [x] Sessions generate correlation IDs using existing CorrelationContext ✅
+- [x] Session events linked using existing EventLink system ✅
+- [x] Timeline queries work for session activities ✅
+- [x] Integration with existing event bus ✅
 
 **Implementation Steps**:
 1. **Session Correlation Integration** (1 hour):
@@ -1339,15 +1339,15 @@ The system currently focuses entirely on the "capture" side (automatic collectio
    - Export capabilities
 
 **Testing Requirements**:
-- [ ] Event correlation accuracy
-- [ ] Timeline reconstruction
-- [ ] Query performance validation
+- [x] Event correlation accuracy ✅
+- [x] Timeline reconstruction ✅
+- [x] Query performance validation ✅
 
 **Definition of Done**:
-- [ ] Sessions fully correlated
-- [ ] Timeline queries functional
-- [ ] No performance impact
-- [ ] Uses existing infrastructure
+- [x] Sessions fully correlated ✅
+- [x] Timeline queries functional ✅
+- [x] No performance impact ✅
+- [x] Uses existing infrastructure ✅
 
 ---
 

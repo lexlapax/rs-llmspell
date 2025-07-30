@@ -7,6 +7,7 @@ use crate::{
         ArtifactStorageOps, ArtifactType, SessionArtifact,
     },
     config::SessionManagerConfig,
+    events::{create_session_event, SessionEventType},
     hooks::{
         register_artifact_collectors, ArtifactCollectionProcessor, CollectorConfig,
         SessionHookContextHelper,
@@ -16,11 +17,7 @@ use crate::{
     types::{CreateSessionOptions, SessionQuery, SessionSortBy},
     Result, SessionError, SessionId, SessionMetadata,
 };
-use llmspell_events::{
-    bus::EventBus,
-    correlation::EventCorrelationTracker,
-    universal_event::{Language, UniversalEvent},
-};
+use llmspell_events::{bus::EventBus, correlation::EventCorrelationTracker};
 use llmspell_hooks::{HookExecutor, HookPoint, HookRegistry, LoggingHook, MetricsHook};
 use llmspell_state_persistence::StateManager;
 use llmspell_state_traits::StateScope;
@@ -173,6 +170,23 @@ impl SessionManager {
         let session = Session::new(options.clone());
         let session_id = session.id().await;
 
+        // Create session created event with correlation
+        let session_event = create_session_event(
+            session_id,
+            SessionEventType::Created,
+            serde_json::json!({
+                "name": options.name.clone(),
+                "created_by": options.created_by.clone(),
+                "tags": options.tags.clone(),
+            }),
+        );
+
+        // Track the event and add correlation context
+        self.correlation_tracker
+            .track_event(session_event.event.clone());
+        self.correlation_tracker
+            .add_context(session_event.correlation_context.clone());
+
         // Fire session start hooks
         if self.config.hook_config.enable_lifecycle_hooks {
             let hooks = self.hook_registry.get_hooks(&HookPoint::SessionStart);
@@ -214,18 +228,30 @@ impl SessionManager {
             .await
             .map_err(SessionError::State)?;
 
-        // Publish session created event
+        // Publish session created event with correlation
         if self.config.event_config.enable_session_events {
-            let event = UniversalEvent::new(
-                "session.created",
+            // Create started event as child of created event
+            let started_event = crate::events::create_correlated_event(
+                session_id,
+                SessionEventType::Started,
                 serde_json::json!({
-                    "session_id": session_id.to_string(),
+                    "hook_count": self.hook_registry.get_hooks(&HookPoint::SessionStart).len(),
                 }),
-                Language::Rust,
+                &session_event,
             );
 
-            if let Err(e) = self.event_bus.publish(event).await {
-                warn!("Failed to publish session created event: {e}");
+            self.correlation_tracker
+                .track_event(started_event.event.clone());
+
+            // Add link between created and started events
+            let link = session_event.link_to(
+                &started_event,
+                llmspell_events::correlation::EventRelationship::CausedBy,
+            );
+            self.correlation_tracker.add_link(link);
+
+            if let Err(e) = self.event_bus.publish(started_event.event).await {
+                warn!("Failed to publish session started event: {e}");
             }
         }
 
@@ -406,17 +432,30 @@ impl SessionManager {
             self.save_session(&session).await?;
         }
 
-        // Publish event
+        // Publish event with correlation
         if self.config.event_config.enable_session_events {
-            let event = UniversalEvent::new(
-                "session.suspended",
+            // Get the session's correlation context
+            let context = self
+                .correlation_tracker
+                .get_context(session_id.as_uuid())
+                .unwrap_or_else(|| {
+                    llmspell_events::correlation::CorrelationContext::new_root()
+                        .with_metadata("session_id", session_id.to_string())
+                });
+
+            let suspend_event = crate::events::SessionEvent::new(
+                *session_id,
+                SessionEventType::Suspended,
                 serde_json::json!({
-                    "session_id": session_id.to_string(),
+                    "status": session.status().await.to_string(),
                 }),
-                Language::Rust,
+                context,
             );
 
-            if let Err(e) = self.event_bus.publish(event).await {
+            self.correlation_tracker
+                .track_event(suspend_event.event.clone());
+
+            if let Err(e) = self.event_bus.publish(suspend_event.event).await {
                 warn!("Failed to publish session suspended event: {e}");
             }
         }
@@ -457,17 +496,30 @@ impl SessionManager {
         // Resume the session
         session.resume().await?;
 
-        // Publish event
+        // Publish event with correlation
         if self.config.event_config.enable_session_events {
-            let event = UniversalEvent::new(
-                "session.resumed",
+            // Get the session's correlation context
+            let context = self
+                .correlation_tracker
+                .get_context(session_id.as_uuid())
+                .unwrap_or_else(|| {
+                    llmspell_events::correlation::CorrelationContext::new_root()
+                        .with_metadata("session_id", session_id.to_string())
+                });
+
+            let resume_event = crate::events::SessionEvent::new(
+                *session_id,
+                SessionEventType::Resumed,
                 serde_json::json!({
-                    "session_id": session_id.to_string(),
+                    "status": session.status().await.to_string(),
                 }),
-                Language::Rust,
+                context,
             );
 
-            if let Err(e) = self.event_bus.publish(event).await {
+            self.correlation_tracker
+                .track_event(resume_event.event.clone());
+
+            if let Err(e) = self.event_bus.publish(resume_event.event).await {
                 warn!("Failed to publish session resumed event: {e}");
             }
         }
@@ -516,17 +568,33 @@ impl SessionManager {
         // Remove from active sessions
         self.active_sessions.write().await.remove(session_id);
 
-        // Publish event
+        // Publish event with correlation
         if self.config.event_config.enable_session_events {
-            let event = UniversalEvent::new(
-                "session.completed",
+            // Get the session's correlation context
+            let context = self
+                .correlation_tracker
+                .get_context(session_id.as_uuid())
+                .unwrap_or_else(|| {
+                    llmspell_events::correlation::CorrelationContext::new_root()
+                        .with_metadata("session_id", session_id.to_string())
+                });
+
+            let complete_event = crate::events::SessionEvent::new(
+                *session_id,
+                SessionEventType::Completed,
                 serde_json::json!({
-                    "session_id": session_id.to_string(),
+                    "duration_ms": session.metadata.read().await.duration()
+                        .map_or(0, |d| d.num_milliseconds()),
+                    "artifact_count": session.metadata.read().await.artifact_count,
+                    "operation_count": session.metadata.read().await.operation_count,
                 }),
-                Language::Rust,
+                context,
             );
 
-            if let Err(e) = self.event_bus.publish(event).await {
+            self.correlation_tracker
+                .track_event(complete_event.event.clone());
+
+            if let Err(e) = self.event_bus.publish(complete_event.event).await {
                 warn!("Failed to publish session completed event: {e}");
             }
         }
@@ -933,21 +1001,34 @@ impl SessionManager {
             }
         }
 
-        // Publish event
+        // Publish event with correlation
         if self.config.event_config.enable_session_events {
-            let event = UniversalEvent::new(
-                "artifact.stored",
+            // Get the session's correlation context
+            let correlation_ctx = self
+                .correlation_tracker
+                .get_context(session_id.as_uuid())
+                .unwrap_or_else(|| {
+                    llmspell_events::correlation::CorrelationContext::new_root()
+                        .with_metadata("session_id", session_id.to_string())
+                        .with_tag("artifact_operation")
+                });
+
+            let artifact_event = crate::events::SessionEvent::new(
+                *session_id,
+                SessionEventType::ArtifactStored,
                 serde_json::json!({
-                    "session_id": session_id.to_string(),
                     "artifact_id": artifact_id.to_string(),
                     "artifact_type": artifact_type.to_string(),
                     "name": name,
                     "size": artifact.metadata.size,
                 }),
-                Language::Rust,
+                correlation_ctx,
             );
 
-            if let Err(e) = self.event_bus.publish(event).await {
+            self.correlation_tracker
+                .track_event(artifact_event.event.clone());
+
+            if let Err(e) = self.event_bus.publish(artifact_event.event).await {
                 warn!("Failed to publish artifact stored event: {e}");
             }
         }
@@ -1072,18 +1153,31 @@ impl SessionManager {
         // Update session metadata
         session.decrement_artifact_count().await?;
 
-        // Publish event
+        // Publish event with correlation
         if self.config.event_config.enable_session_events {
-            let event = UniversalEvent::new(
-                "artifact.deleted",
+            // Get the session's correlation context
+            let artifact_context = self
+                .correlation_tracker
+                .get_context(artifact_id.session_id.as_uuid())
+                .unwrap_or_else(|| {
+                    llmspell_events::correlation::CorrelationContext::new_root()
+                        .with_metadata("session_id", artifact_id.session_id.to_string())
+                        .with_tag("artifact_operation")
+                });
+
+            let delete_event = crate::events::SessionEvent::new(
+                artifact_id.session_id,
+                SessionEventType::ArtifactDeleted,
                 serde_json::json!({
-                    "session_id": artifact_id.session_id.to_string(),
                     "artifact_id": artifact_id.to_string(),
                 }),
-                Language::Rust,
+                artifact_context,
             );
 
-            if let Err(e) = self.event_bus.publish(event).await {
+            self.correlation_tracker
+                .track_event(delete_event.event.clone());
+
+            if let Err(e) = self.event_bus.publish(delete_event.event).await {
                 warn!("Failed to publish artifact deleted event: {e}");
             }
         }
