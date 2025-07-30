@@ -3,14 +3,17 @@
 
 use crate::{Result, SessionError, SessionId};
 use llmspell_events::EventBus;
-use llmspell_hooks::replay::{BatchReplayResponse, ReplayConfig, ReplayManager, ReplayMode};
+use llmspell_hooks::persistence::SerializedHookExecution as HooksSerializedHookExecution;
+use llmspell_hooks::replay::{
+    BatchReplayRequest, BatchReplayResponse, ReplayConfig, ReplayManager, ReplayMode, ReplayState,
+};
 use llmspell_state_persistence::manager::{HookReplayManager, SerializedHookExecution};
 use llmspell_storage::StorageBackend;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::Arc;
-use std::time::{Duration, SystemTime};
-use tracing::{debug, info, warn};
+use std::sync::{Arc, RwLock};
+use std::time::{Duration, Instant, SystemTime};
+use tracing::{debug, info};
 use uuid::Uuid;
 
 /// Session-specific replay configuration
@@ -96,10 +99,26 @@ impl From<BatchReplayResponse> for SessionReplayResult {
     }
 }
 
+/// Active session replay tracking
+#[derive(Debug, Clone)]
+pub struct SessionReplayStatus {
+    /// Session being replayed
+    pub session_id: SessionId,
+    /// Current replay state
+    pub state: ReplayState,
+    /// Start time of replay
+    pub start_time: Instant,
+    /// Number of hooks processed
+    pub hooks_processed: usize,
+    /// Total hooks to process
+    pub total_hooks: usize,
+    /// Current hook being replayed
+    pub current_hook: Option<String>,
+}
+
 /// Session replay adapter that bridges session operations to existing replay infrastructure
 pub struct SessionReplayAdapter {
     /// Core replay manager from llmspell-hooks
-    #[allow(dead_code)]
     replay_manager: Arc<ReplayManager>,
     /// Hook replay manager from llmspell-state-persistence
     hook_replay_manager: Arc<HookReplayManager>,
@@ -108,6 +127,8 @@ pub struct SessionReplayAdapter {
     /// Event bus for publishing replay events
     #[allow(dead_code)]
     event_bus: Arc<EventBus>,
+    /// Active session replays
+    pub(crate) active_replays: Arc<RwLock<HashMap<SessionId, SessionReplayStatus>>>,
 }
 
 impl SessionReplayAdapter {
@@ -123,64 +144,12 @@ impl SessionReplayAdapter {
             hook_replay_manager,
             storage_backend,
             event_bus,
+            active_replays: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
-    /// Check if a session can be replayed
-    pub async fn can_replay_session(&self, session_id: &SessionId) -> Result<bool> {
-        // Load session metadata to get correlation_id
-        let session_key = format!("session:{}", session_id);
-        let session_bytes = self
-            .storage_backend
-            .get(&session_key)
-            .await
-            .map_err(|e| SessionError::Storage(e.to_string()))?;
-
-        let session_data = if let Some(bytes) = session_bytes {
-            Some(
-                serde_json::from_slice::<serde_json::Value>(&bytes)
-                    .map_err(|e| SessionError::Storage(e.to_string()))?,
-            )
-        } else {
-            None
-        };
-
-        if let Some(session) = session_data {
-            if let Some(correlation_id) = session.get("correlation_id").and_then(|v| v.as_str()) {
-                let correlation_uuid = Uuid::parse_str(correlation_id)
-                    .map_err(|e| SessionError::general(format!("Invalid correlation_id: {}", e)))?;
-
-                // Check if we have hook executions for this correlation_id
-                let executions = self
-                    .hook_replay_manager
-                    .get_hook_executions_by_correlation(correlation_uuid)
-                    .await
-                    .map_err(|e| SessionError::replay(e.to_string()))?;
-
-                Ok(!executions.is_empty())
-            } else {
-                warn!(
-                    "Session {} has no correlation_id, cannot replay",
-                    session_id
-                );
-                Ok(false)
-            }
-        } else {
-            debug!("Session {} not found in storage", session_id);
-            Ok(false)
-        }
-    }
-
-    /// Replay a session using the existing replay infrastructure
-    pub async fn replay_session(
-        &self,
-        session_id: &SessionId,
-        config: SessionReplayConfig,
-    ) -> Result<SessionReplayResult> {
-        info!("Starting replay for session {}", session_id);
-        let start_time = SystemTime::now();
-
-        // Load session metadata to get correlation_id
+    /// Load session correlation ID from storage
+    async fn load_session_correlation_id(&self, session_id: &SessionId) -> Result<Uuid> {
         let session_key = format!("session:{}", session_id);
         let session_bytes = self
             .storage_backend
@@ -205,58 +174,160 @@ impl SessionReplayAdapter {
             .and_then(|v| v.as_str())
             .ok_or_else(|| SessionError::general("Session missing correlation_id"))?;
 
-        let correlation_uuid = Uuid::parse_str(correlation_id)
-            .map_err(|e| SessionError::general(format!("Invalid correlation_id: {}", e)))?;
+        Uuid::parse_str(correlation_id)
+            .map_err(|e| SessionError::general(format!("Invalid correlation_id: {}", e)))
+    }
 
-        // Get hook executions for this session
-        let mut executions = self
+    /// Convert state-persistence executions to hooks format
+    fn convert_executions_to_hooks_format(
+        executions: Vec<SerializedHookExecution>,
+    ) -> Vec<HooksSerializedHookExecution> {
+        executions
+            .into_iter()
+            .map(|exec| HooksSerializedHookExecution {
+                hook_id: exec.hook_id,
+                execution_id: exec.execution_id,
+                correlation_id: exec.correlation_id,
+                hook_context: exec.hook_context,
+                result: exec.result,
+                timestamp: exec.timestamp,
+                duration: exec.duration,
+                metadata: exec.metadata,
+            })
+            .collect()
+    }
+
+    /// Check if a session can be replayed
+    pub async fn can_replay_session(&self, session_id: &SessionId) -> Result<bool> {
+        match self.load_session_correlation_id(session_id).await {
+            Ok(correlation_uuid) => {
+                // Check if we have hook executions for this correlation_id
+                let executions = self
+                    .hook_replay_manager
+                    .get_hook_executions_by_correlation(correlation_uuid)
+                    .await
+                    .map_err(|e| SessionError::replay(e.to_string()))?;
+
+                Ok(!executions.is_empty())
+            }
+            Err(e) => {
+                debug!("Cannot replay session {}: {}", session_id, e);
+                Ok(false)
+            }
+        }
+    }
+
+    /// Replay a session using the existing replay infrastructure
+    ///
+    /// # Panics
+    ///
+    /// Panics if the active replays mutex is poisoned
+    pub async fn replay_session(
+        &self,
+        session_id: &SessionId,
+        config: SessionReplayConfig,
+    ) -> Result<SessionReplayResult> {
+        info!("Starting replay for session {}", session_id);
+        let start_time = SystemTime::now();
+
+        // Load session correlation ID
+        let correlation_uuid = self.load_session_correlation_id(session_id).await?;
+
+        // Get hook executions for this session (in state-persistence format)
+        let mut state_executions = self
             .hook_replay_manager
             .get_hook_executions_by_correlation(correlation_uuid)
             .await
-            .map_err(|e| SessionError::replay(e.to_string()))?;
+            .map_err(|e| SessionError::replay(format!("Failed to get hook executions: {}", e)))?;
 
-        if executions.is_empty() {
+        if state_executions.is_empty() {
             return Err(SessionError::replay("No hook executions found for session"));
         }
 
         // Sort executions by timestamp for correct replay order
-        executions.sort_by_key(|e| e.timestamp);
+        state_executions.sort_by_key(|e| e.timestamp);
 
         // Filter executions by target timestamp if specified
         if let Some(target) = config.target_timestamp {
-            executions.retain(|e| e.timestamp <= target);
+            let before_count = state_executions.len();
+            state_executions.retain(|e| e.timestamp <= target);
             info!(
-                "Filtered to {} executions up to target timestamp",
-                executions.len()
+                "Filtered from {} to {} executions up to target timestamp",
+                before_count,
+                state_executions.len()
             );
         }
 
-        // For now, create a simplified result without using the replay manager
-        // This avoids the type mismatch issue between different SerializedHookExecution types
-        let duration = start_time.elapsed().unwrap_or_default();
+        info!(
+            "Found {} hook executions to replay for session {}",
+            state_executions.len(),
+            session_id
+        );
 
+        // Track active replay
+        {
+            let mut active = self.active_replays.write().unwrap();
+            active.insert(
+                *session_id,
+                SessionReplayStatus {
+                    session_id: *session_id,
+                    state: ReplayState::Running,
+                    start_time: Instant::now(),
+                    hooks_processed: 0,
+                    total_hooks: state_executions.len(),
+                    current_hook: None,
+                },
+            );
+        }
+
+        // Convert state-persistence executions to hooks format
+        let hook_executions = Self::convert_executions_to_hooks_format(state_executions);
+
+        // Create batch replay request
+        let batch_request = BatchReplayRequest {
+            executions: hook_executions,
+            config: config.clone().into_replay_config(),
+            parallel: false, // Session replay should maintain order
+            max_concurrent: 1,
+        };
+
+        // Execute batch replay using the actual replay infrastructure
+        let batch_response = self
+            .replay_manager
+            .batch_replay(batch_request)
+            .await
+            .map_err(|e| SessionError::replay(format!("Batch replay failed: {}", e)))?;
+
+        // Create session-specific result
         let result = SessionReplayResult {
             session_id: *session_id,
             correlation_id: correlation_uuid,
             start_time,
-            total_duration: duration,
-            hooks_replayed: executions.len(),
-            successful_replays: executions.len(), // Assume all would succeed for now
-            failed_replays: 0,
-            batch_response: BatchReplayResponse {
-                results: Vec::new(), // Empty for now
-                total_duration: duration,
-                success_count: executions.len(),
-                failure_count: 0,
-                metadata: HashMap::new(),
-            },
-            metadata: HashMap::new(),
+            total_duration: start_time.elapsed().unwrap_or_default(),
+            hooks_replayed: batch_response.results.len(),
+            successful_replays: batch_response.success_count,
+            failed_replays: batch_response.failure_count,
+            batch_response: batch_response.clone(),
+            metadata: config.metadata,
         };
 
         info!(
-            "Session replay analysis completed: {} hook executions found in {:?}",
-            result.hooks_replayed, result.total_duration
+            "Session replay completed: {}/{} hooks replayed successfully in {:?}",
+            result.successful_replays, result.hooks_replayed, result.total_duration
         );
+
+        // Update replay status
+        {
+            let mut active = self.active_replays.write().unwrap();
+            if let Some(status) = active.get_mut(session_id) {
+                status.state = if result.failed_replays > 0 {
+                    ReplayState::Failed(format!("{} hooks failed", result.failed_replays))
+                } else {
+                    ReplayState::Completed
+                };
+                status.hooks_processed = result.hooks_replayed;
+            }
+        }
 
         Ok(result)
     }
@@ -266,33 +337,8 @@ impl SessionReplayAdapter {
         &self,
         session_id: &SessionId,
     ) -> Result<Vec<SerializedHookExecution>> {
-        // Load session metadata to get correlation_id
-        let session_key = format!("session:{}", session_id);
-        let session_bytes = self
-            .storage_backend
-            .get(&session_key)
-            .await
-            .map_err(|e| SessionError::Storage(e.to_string()))?;
-
-        let session_data = if let Some(bytes) = session_bytes {
-            Some(
-                serde_json::from_slice::<serde_json::Value>(&bytes)
-                    .map_err(|e| SessionError::Storage(e.to_string()))?,
-            )
-        } else {
-            None
-        };
-
-        let session = session_data
-            .ok_or_else(|| SessionError::general(format!("Session {} not found", session_id)))?;
-
-        let correlation_id = session
-            .get("correlation_id")
-            .and_then(|v| v.as_str())
-            .ok_or_else(|| SessionError::general("Session missing correlation_id"))?;
-
-        let correlation_uuid = Uuid::parse_str(correlation_id)
-            .map_err(|e| SessionError::general(format!("Invalid correlation_id: {}", e)))?;
+        // Load session correlation ID
+        let correlation_uuid = self.load_session_correlation_id(session_id).await?;
 
         // Get and sort hook executions
         let mut executions = self
@@ -303,6 +349,78 @@ impl SessionReplayAdapter {
 
         executions.sort_by_key(|e| e.timestamp);
         Ok(executions)
+    }
+
+    /// Get current replay status for a session
+    ///
+    /// # Panics
+    ///
+    /// Panics if the active replays mutex is poisoned
+    pub fn get_replay_status(&self, session_id: &SessionId) -> Option<SessionReplayStatus> {
+        self.active_replays.read().unwrap().get(session_id).cloned()
+    }
+
+    /// Get all active replay statuses
+    ///
+    /// # Panics
+    ///
+    /// Panics if the active replays mutex is poisoned
+    pub fn get_all_active_replays(&self) -> Vec<SessionReplayStatus> {
+        self.active_replays
+            .read()
+            .unwrap()
+            .values()
+            .cloned()
+            .collect()
+    }
+
+    /// Stop/cancel session replay
+    ///
+    /// # Panics
+    ///
+    /// Panics if the active replays mutex is poisoned
+    pub fn stop_replay(&self, session_id: &SessionId) -> Result<()> {
+        let mut active = self.active_replays.write().unwrap();
+        if let Some(status) = active.get_mut(session_id) {
+            status.state = ReplayState::Cancelled;
+            info!("Stopped replay for session {}", session_id);
+            Ok(())
+        } else {
+            Err(SessionError::replay("No active replay found for session"))
+        }
+    }
+
+    /// Clear completed replays
+    ///
+    /// # Panics
+    ///
+    /// Panics if the active replays mutex is poisoned
+    pub fn clear_completed_replays(&self) {
+        let mut active = self.active_replays.write().unwrap();
+        active.retain(|_, status| {
+            !matches!(
+                status.state,
+                ReplayState::Completed | ReplayState::Failed(_) | ReplayState::Cancelled
+            )
+        });
+    }
+
+    /// Update replay progress (called during replay execution)
+    ///
+    /// # Panics
+    ///
+    /// Panics if the active replays mutex is poisoned
+    pub fn update_replay_progress(
+        &self,
+        session_id: &SessionId,
+        hooks_processed: usize,
+        current_hook: Option<String>,
+    ) {
+        let mut active = self.active_replays.write().unwrap();
+        if let Some(status) = active.get_mut(session_id) {
+            status.hooks_processed = hooks_processed;
+            status.current_hook = current_hook;
+        }
     }
 }
 

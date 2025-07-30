@@ -69,6 +69,43 @@ impl ReplayEngine {
     pub async fn can_replay_session(&self, session_id: &SessionId) -> Result<bool> {
         self.session_adapter.can_replay_session(session_id).await
     }
+
+    /// Replay a session
+    pub async fn replay_session(
+        &self,
+        session_id: &SessionId,
+        config: session_adapter::SessionReplayConfig,
+    ) -> Result<session_adapter::SessionReplayResult> {
+        self.session_adapter
+            .replay_session(session_id, config)
+            .await
+    }
+
+    /// Get session timeline
+    pub async fn get_session_timeline(
+        &self,
+        session_id: &SessionId,
+    ) -> Result<Vec<llmspell_state_persistence::manager::SerializedHookExecution>> {
+        self.session_adapter.get_session_timeline(session_id).await
+    }
+
+    /// Get replay status for a session
+    pub fn get_replay_status(
+        &self,
+        session_id: &SessionId,
+    ) -> Option<session_adapter::SessionReplayStatus> {
+        self.session_adapter.get_replay_status(session_id)
+    }
+
+    /// Stop session replay
+    pub fn stop_replay(&self, session_id: &SessionId) -> Result<()> {
+        self.session_adapter.stop_replay(session_id)
+    }
+
+    /// Get all active replays
+    pub fn get_all_active_replays(&self) -> Vec<session_adapter::SessionReplayStatus> {
+        self.session_adapter.get_all_active_replays()
+    }
 }
 
 impl Default for ReplayEngine {

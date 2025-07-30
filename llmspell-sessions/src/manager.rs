@@ -1400,10 +1400,7 @@ impl SessionManager {
         session_id: &SessionId,
         config: crate::replay::session_adapter::SessionReplayConfig,
     ) -> Result<crate::replay::session_adapter::SessionReplayResult> {
-        self.replay_engine
-            .session_adapter()
-            .replay_session(session_id, config)
-            .await
+        self.replay_engine.replay_session(session_id, config).await
     }
 
     /// Get the timeline of events for a session
@@ -1411,10 +1408,27 @@ impl SessionManager {
         &self,
         session_id: &SessionId,
     ) -> Result<Vec<llmspell_state_persistence::manager::SerializedHookExecution>> {
-        self.replay_engine
-            .session_adapter()
-            .get_session_timeline(session_id)
-            .await
+        self.replay_engine.get_session_timeline(session_id).await
+    }
+
+    /// Get replay status for a session
+    pub fn get_replay_status(
+        &self,
+        session_id: &SessionId,
+    ) -> Option<crate::replay::session_adapter::SessionReplayStatus> {
+        self.replay_engine.get_replay_status(session_id)
+    }
+
+    /// Stop session replay
+    pub fn stop_replay(&self, session_id: &SessionId) -> Result<()> {
+        self.replay_engine.stop_replay(session_id)
+    }
+
+    /// Get all active replays
+    pub fn get_all_active_replays(
+        &self,
+    ) -> Vec<crate::replay::session_adapter::SessionReplayStatus> {
+        self.replay_engine.get_all_active_replays()
     }
 }
 

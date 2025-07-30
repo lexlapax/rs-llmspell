@@ -1640,23 +1640,27 @@ The system currently focuses entirely on the "capture" side (automatic collectio
 #### Task 6.4.2: Implement session-specific replay methods
 **Priority**: HIGH
 **Estimated Time**: 4 hours  
-**Status**: TODO
+**Status**: COMPLETED ✅
+**Actual Time**: 3.5 hours
 **Assigned To**: Replay Team
 
 **Description**: Implement session-specific replay methods using existing replay infrastructure.
 
-**Files to Update**:
-- **UPDATE**: `llmspell-sessions/src/replay.rs` - Add session replay methods
-- **UPDATE**: `llmspell-sessions/src/replay/session_adapter.rs` - Session replay logic
-- **CREATE**: Tests for session replay functionality
+**Files Updated**:
+- **UPDATED**: `llmspell-sessions/src/replay.rs` - Added replay_session, get_session_timeline, stop_replay, get_replay_status methods
+- **UPDATED**: `llmspell-sessions/src/replay/session_adapter.rs` - Full replay logic with progress tracking
+- **UPDATED**: `llmspell-sessions/src/manager.rs` - Added replay control methods 
+- **UPDATED**: `llmspell-sessions/src/replay/tests.rs` - Comprehensive test coverage
 
 **Acceptance Criteria**:
-- [ ] replay_session() uses existing ReplayManager::replay()
-- [ ] Leverages HookReplayManager::get_hook_executions_by_correlation()
-- [ ] Uses existing ReplayConfig and ReplayMode
-- [ ] Integrates with existing BatchReplayRequest for multi-hook replay
-- [ ] Session state reconstruction via existing mechanisms
-- [ ] Reuses existing ReplayResult and ComparisonResult
+- [x] replay_session() uses existing ReplayManager::batch_replay() ✅
+- [x] Leverages HookReplayManager::get_hook_executions_by_correlation() ✅
+- [x] Uses existing ReplayConfig and ReplayMode ✅
+- [x] Integrates with existing BatchReplayRequest for multi-hook replay ✅
+- [x] Session state reconstruction via existing mechanisms ✅
+- [x] Reuses existing ReplayResult and ComparisonResult ✅
+- [x] Added progress tracking with SessionReplayStatus ✅
+- [x] Implemented stop/cancel operations ✅
 
 **Implementation Steps**:
 1. **Session Replay Adapter** (1.5 hours):
@@ -1710,16 +1714,31 @@ The system currently focuses entirely on the "capture" side (automatic collectio
    - Session-specific progress events
 
 **Testing Requirements**:
-- [ ] Test with existing replay test infrastructure
-- [ ] Session correlation retrieval tests
-- [ ] Configuration mapping tests
-- [ ] Result conversion tests
+- [x] Test with existing replay test infrastructure ✅
+- [x] Session correlation retrieval tests ✅
+- [x] Configuration mapping tests ✅
+- [x] Result conversion tests ✅
+- [x] Progress tracking tests ✅
+- [x] Stop/cancel operation tests ✅
+- [x] Active replay management tests ✅
 
 **Definition of Done**:
-- [ ] Fully leverages existing replay code
-- [ ] No reimplementation of replay logic
-- [ ] Session replay works seamlessly
-- [ ] All replay features accessible
+- [x] Fully leverages existing replay code ✅
+- [x] No reimplementation of replay logic ✅
+- [x] Session replay works seamlessly ✅
+- [x] All replay features accessible ✅
+- [x] All tests passing (12 replay tests) ✅
+- [x] Quality checks passing ✅
+- [x] Documentation complete ✅
+
+**Implementation Notes**:
+- Implemented full replay functionality using existing ReplayManager::batch_replay()
+- Added SessionReplayStatus for tracking active replays with progress
+- Created helper methods to reduce code duplication (load_session_correlation_id, convert_executions_to_hooks_format)
+- Converted between state-persistence and hooks SerializedHookExecution types
+- Removed pause/resume functionality as underlying ReplayState doesn't support it
+- Implemented stop functionality using ReplayState::Cancelled
+- Added comprehensive test coverage for all replay operations
 
 ---
 

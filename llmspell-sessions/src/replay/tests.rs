@@ -4,7 +4,7 @@
 #[cfg(test)]
 mod tests {
     use super::super::{
-        session_adapter::{SessionReplayAdapter, SessionReplayConfig},
+        session_adapter::{SessionReplayAdapter, SessionReplayConfig, SessionReplayStatus},
         HookReplayBridge, ReplayEngine,
     };
     use crate::{types::CreateSessionOptions, SessionId, SessionManager};
@@ -266,5 +266,206 @@ mod tests {
         // Timeline should be empty but successful
         let timeline = adapter.get_session_timeline(&session_id).await.unwrap();
         assert!(timeline.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_replay_status_tracking() {
+        let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
+            create_test_replay_components().await;
+
+        let adapter = SessionReplayAdapter::new(
+            replay_manager,
+            hook_replay_manager,
+            storage_backend,
+            event_bus,
+        );
+
+        let session_id = SessionId::new();
+
+        // Initially no status
+        assert!(adapter.get_replay_status(&session_id).is_none());
+
+        // Manually insert a status
+        {
+            let mut active = adapter.active_replays.write().unwrap();
+            active.insert(
+                session_id,
+                SessionReplayStatus {
+                    session_id,
+                    state: llmspell_hooks::replay::ReplayState::Running,
+                    start_time: std::time::Instant::now(),
+                    hooks_processed: 0,
+                    total_hooks: 10,
+                    current_hook: None,
+                },
+            );
+        }
+
+        // Now should have status
+        let status = adapter.get_replay_status(&session_id).unwrap();
+        assert!(matches!(
+            status.state,
+            llmspell_hooks::replay::ReplayState::Running
+        ));
+        assert_eq!(status.total_hooks, 10);
+    }
+
+    #[tokio::test]
+    async fn test_replay_stop() {
+        let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
+            create_test_replay_components().await;
+
+        let adapter = SessionReplayAdapter::new(
+            replay_manager,
+            hook_replay_manager,
+            storage_backend,
+            event_bus,
+        );
+
+        let session_id = SessionId::new();
+
+        // Can't stop non-existent replay
+        assert!(adapter.stop_replay(&session_id).is_err());
+
+        // Insert running status
+        {
+            let mut active = adapter.active_replays.write().unwrap();
+            active.insert(
+                session_id,
+                SessionReplayStatus {
+                    session_id,
+                    state: llmspell_hooks::replay::ReplayState::Running,
+                    start_time: std::time::Instant::now(),
+                    hooks_processed: 0,
+                    total_hooks: 10,
+                    current_hook: None,
+                },
+            );
+        }
+
+        // Should be able to stop
+        adapter.stop_replay(&session_id).unwrap();
+
+        // Status should be cancelled
+        let status = adapter.get_replay_status(&session_id).unwrap();
+        assert!(matches!(
+            status.state,
+            llmspell_hooks::replay::ReplayState::Cancelled
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_replay_progress_update() {
+        let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
+            create_test_replay_components().await;
+
+        let adapter = SessionReplayAdapter::new(
+            replay_manager,
+            hook_replay_manager,
+            storage_backend,
+            event_bus,
+        );
+
+        let session_id = SessionId::new();
+
+        // Insert initial status
+        {
+            let mut active = adapter.active_replays.write().unwrap();
+            active.insert(
+                session_id,
+                SessionReplayStatus {
+                    session_id,
+                    state: llmspell_hooks::replay::ReplayState::Running,
+                    start_time: std::time::Instant::now(),
+                    hooks_processed: 0,
+                    total_hooks: 10,
+                    current_hook: None,
+                },
+            );
+        }
+
+        // Update progress
+        adapter.update_replay_progress(&session_id, 5, Some("hook_five".to_string()));
+
+        // Check updated values
+        let status = adapter.get_replay_status(&session_id).unwrap();
+        assert_eq!(status.hooks_processed, 5);
+        assert_eq!(status.current_hook, Some("hook_five".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_clear_completed_replays() {
+        let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
+            create_test_replay_components().await;
+
+        let adapter = SessionReplayAdapter::new(
+            replay_manager,
+            hook_replay_manager,
+            storage_backend,
+            event_bus,
+        );
+
+        let session1 = SessionId::new();
+        let session2 = SessionId::new();
+        let session3 = SessionId::new();
+        let session4 = SessionId::new();
+
+        // Insert various statuses
+        {
+            let mut active = adapter.active_replays.write().unwrap();
+            active.insert(
+                session1,
+                SessionReplayStatus {
+                    session_id: session1,
+                    state: llmspell_hooks::replay::ReplayState::Completed,
+                    start_time: std::time::Instant::now(),
+                    hooks_processed: 10,
+                    total_hooks: 10,
+                    current_hook: None,
+                },
+            );
+            active.insert(
+                session2,
+                SessionReplayStatus {
+                    session_id: session2,
+                    state: llmspell_hooks::replay::ReplayState::Running,
+                    start_time: std::time::Instant::now(),
+                    hooks_processed: 5,
+                    total_hooks: 10,
+                    current_hook: None,
+                },
+            );
+            active.insert(
+                session3,
+                SessionReplayStatus {
+                    session_id: session3,
+                    state: llmspell_hooks::replay::ReplayState::Failed("test error".to_string()),
+                    start_time: std::time::Instant::now(),
+                    hooks_processed: 3,
+                    total_hooks: 10,
+                    current_hook: None,
+                },
+            );
+            active.insert(
+                session4,
+                SessionReplayStatus {
+                    session_id: session4,
+                    state: llmspell_hooks::replay::ReplayState::Cancelled,
+                    start_time: std::time::Instant::now(),
+                    hooks_processed: 7,
+                    total_hooks: 10,
+                    current_hook: None,
+                },
+            );
+        }
+
+        // Clear completed
+        adapter.clear_completed_replays();
+
+        // Only running replay should remain
+        assert!(adapter.get_replay_status(&session1).is_none());
+        assert!(adapter.get_replay_status(&session2).is_some());
+        assert!(adapter.get_replay_status(&session3).is_none());
+        assert!(adapter.get_replay_status(&session4).is_none());
     }
 }
