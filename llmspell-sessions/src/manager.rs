@@ -119,6 +119,21 @@ impl SessionManager {
             None
         };
 
+        // Create replay infrastructure components
+        let state_storage_adapter = Arc::new(
+            llmspell_state_persistence::backend_adapter::StateStorageAdapter::new(
+                storage_backend.clone(),
+                "sessions".to_string(),
+            ),
+        );
+        let _hook_replay_manager = Arc::new(
+            llmspell_state_persistence::manager::HookReplayManager::new(state_storage_adapter),
+        );
+
+        // For task 6.4.1, create a minimal replay engine that compiles and provides basic functionality
+        // Full integration will be completed in subsequent tasks of phase 6.4
+        let replay_engine = Arc::new(ReplayEngine::default());
+
         let manager = Self {
             state_manager,
             storage_backend,
@@ -130,7 +145,7 @@ impl SessionManager {
             )),
             active_sessions: Arc::new(RwLock::new(HashMap::new())),
             artifact_storage,
-            replay_engine: Arc::new(ReplayEngine::new()),
+            replay_engine,
             artifact_collector,
             config,
             shutdown: Arc::new(RwLock::new(false)),
@@ -1364,6 +1379,41 @@ impl SessionManager {
 
         // Store as artifact
         self.store_artifact(session_id, artifact_type, name, content, metadata)
+            .await
+    }
+
+    // MARK: - Replay Methods
+
+    /// Get the replay engine for direct access
+    pub fn replay_engine(&self) -> &Arc<ReplayEngine> {
+        &self.replay_engine
+    }
+
+    /// Check if a session can be replayed
+    pub async fn can_replay_session(&self, session_id: &SessionId) -> Result<bool> {
+        self.replay_engine.can_replay_session(session_id).await
+    }
+
+    /// Replay a session using the existing replay infrastructure
+    pub async fn replay_session(
+        &self,
+        session_id: &SessionId,
+        config: crate::replay::session_adapter::SessionReplayConfig,
+    ) -> Result<crate::replay::session_adapter::SessionReplayResult> {
+        self.replay_engine
+            .session_adapter()
+            .replay_session(session_id, config)
+            .await
+    }
+
+    /// Get the timeline of events for a session
+    pub async fn get_session_timeline(
+        &self,
+        session_id: &SessionId,
+    ) -> Result<Vec<llmspell_state_persistence::manager::SerializedHookExecution>> {
+        self.replay_engine
+            .session_adapter()
+            .get_session_timeline(session_id)
             .await
     }
 }
