@@ -21,6 +21,7 @@ use uuid::Uuid;
 use super::session_controls::{
     SessionBreakpoint, SessionReplayControlConfig, SessionReplayControls, SessionReplayProgress,
 };
+use super::session_debug::{ErrorAnalysis, SessionDebugger, SessionState, StateComparison};
 
 /// Session-specific replay configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -137,6 +138,8 @@ pub struct SessionReplayAdapter {
     pub(crate) active_replays: Arc<RwLock<HashMap<SessionId, SessionReplayStatus>>>,
     /// Session replay controls
     controls: Arc<SessionReplayControls>,
+    /// Session debugger
+    debugger: Arc<SessionDebugger>,
 }
 
 impl SessionReplayAdapter {
@@ -149,6 +152,7 @@ impl SessionReplayAdapter {
     ) -> Self {
         let control_config = SessionReplayControlConfig::default();
         let controls = Arc::new(SessionReplayControls::new(control_config));
+        let debugger = Arc::new(SessionDebugger::new());
 
         Self {
             replay_manager,
@@ -157,6 +161,7 @@ impl SessionReplayAdapter {
             event_bus,
             active_replays: Arc::new(RwLock::new(HashMap::new())),
             controls,
+            debugger,
         }
     }
 
@@ -641,6 +646,85 @@ impl SessionReplayAdapter {
     /// Clear session controls
     pub fn clear_session_controls(&self, session_id: &SessionId) {
         self.controls.clear_session_controls(session_id);
+    }
+
+    /// Get the debugger
+    pub fn debugger(&self) -> &Arc<SessionDebugger> {
+        &self.debugger
+    }
+
+    /// Inspect session state at a point in time
+    pub fn inspect_state_at(
+        &self,
+        session_id: &SessionId,
+        timestamp: SystemTime,
+    ) -> Result<Option<SessionState>> {
+        self.debugger.inspect_state_at(session_id, timestamp)
+    }
+
+    /// Compare states at two different points in time
+    pub fn compare_states(
+        &self,
+        session_id: &SessionId,
+        timestamp1: SystemTime,
+        timestamp2: SystemTime,
+    ) -> Result<StateComparison> {
+        self.debugger
+            .compare_states(session_id, timestamp1, timestamp2)
+    }
+
+    /// Get error analysis for a session
+    pub fn analyze_session_errors(&self, session_id: &SessionId) -> ErrorAnalysis {
+        self.debugger.analyze_errors(session_id)
+    }
+
+    /// Import debug data from replay session
+    pub async fn import_debug_data(&self, session_id: &SessionId) -> Result<()> {
+        // Get the replay session from the replay manager if available
+        // For now, we'll update the timeline with hook executions
+        let correlation_uuid = self.load_session_correlation_id(session_id).await?;
+
+        let executions = self
+            .hook_replay_manager
+            .get_hook_executions_by_correlation(correlation_uuid)
+            .await
+            .map_err(|e| SessionError::replay(format!("Failed to get hook executions: {}", e)))?;
+
+        // Update the debugger's timeline
+        self.debugger.update_timeline(*session_id, executions);
+
+        info!("Imported debug data for session {}", session_id);
+        Ok(())
+    }
+
+    /// Export debug data for a session
+    pub async fn export_debug_data(
+        &self,
+        session_id: &SessionId,
+    ) -> Result<super::session_debug::SessionDebugData> {
+        // Ensure we have the latest timeline data
+        self.import_debug_data(session_id).await?;
+
+        self.debugger.export_debug_data(session_id)
+    }
+
+    /// Get timeline navigation
+    pub fn navigate_to_timeline_point(
+        &self,
+        session_id: &SessionId,
+        entry_index: usize,
+    ) -> Result<SessionState> {
+        self.debugger
+            .navigate_to_timeline_point(session_id, entry_index)
+    }
+
+    /// Compare hook results
+    pub fn compare_hook_results(
+        &self,
+        original: &llmspell_hooks::result::HookResult,
+        replayed: &llmspell_hooks::result::HookResult,
+    ) -> llmspell_hooks::replay::ComparisonResult {
+        self.debugger.compare_hook_results(original, replayed)
     }
 }
 

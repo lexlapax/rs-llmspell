@@ -1893,23 +1893,23 @@ The system currently focuses entirely on the "capture" side (automatic collectio
    - Real-time adjustments
 
 **Testing Requirements**:
-- [ ] Control integration tests
-- [ ] Progress tracking tests
-- [ ] Breakpoint tests
-- [ ] Scheduler tests
+- [x] Control integration tests
+- [x] Progress tracking tests
+- [x] Breakpoint tests
+- [x] Scheduler tests
 
 **Definition of Done**:
-- [ ] Fully uses existing controls
-- [ ] No control logic reimplemented
-- [ ] Session controls intuitive
-- [ ] Performance maintained
+- [x] Fully uses existing controls
+- [x] No control logic reimplemented
+- [x] Session controls intuitive
+- [x] Performance maintained
 
 ---
 
 #### Task 6.4.5: Integrate replay debugging features
 **Priority**: MEDIUM
 **Estimated Time**: 2 hours
-**Status**: TODO
+**Status**: DONE ✅
 **Assigned To**: Replay Team
 
 **Description**: Integrate existing replay debugging features for sessions.
@@ -1919,12 +1919,12 @@ The system currently focuses entirely on the "capture" side (automatic collectio
 - **CREATE**: `llmspell-sessions/src/replay/session_debug.rs` - Session debug helpers
 
 **Acceptance Criteria**:
-- [ ] Uses existing CapturedState from persistence module
-- [ ] Leverages existing ReplayError types
-- [ ] Integrates with existing timeline features
-- [ ] Reuses existing state inspection
-- [ ] Uses existing HookResultComparator
-- [ ] Session-specific debug views
+- [x] Uses existing CapturedState from persistence module
+- [x] Leverages existing ReplayError types
+- [x] Integrates with existing timeline features
+- [x] Reuses existing state inspection
+- [x] Uses existing HookResultComparator
+- [x] Session-specific debug views
 
 **Implementation Steps**:
 1. **Debug Integration** (45 min):
@@ -1965,15 +1965,15 @@ The system currently focuses entirely on the "capture" side (automatic collectio
    - Error aggregation
 
 **Testing Requirements**:
-- [ ] Debug integration tests
-- [ ] State inspection tests
-- [ ] Comparison tests
+- [x] Debug integration tests
+- [x] State inspection tests
+- [x] Comparison tests
 
 **Definition of Done**:
-- [ ] Uses all existing debug features
-- [ ] No debug code duplicated
-- [ ] Session debugging intuitive
-- [ ] Performance acceptable
+- [x] Uses all existing debug features
+- [x] No debug code duplicated
+- [x] Session debugging intuitive
+- [x] Performance acceptable
 
 ---
 

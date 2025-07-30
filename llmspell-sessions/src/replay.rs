@@ -4,6 +4,7 @@
 mod hook_replay_bridge;
 pub mod session_adapter;
 pub mod session_controls;
+pub mod session_debug;
 
 #[cfg(test)]
 mod tests;
@@ -203,6 +204,64 @@ impl ReplayEngine {
     /// Clear session controls
     pub fn clear_session_controls(&self, session_id: &SessionId) {
         self.session_adapter.clear_session_controls(session_id);
+    }
+
+    /// Inspect session state at a point in time
+    pub fn inspect_state_at(
+        &self,
+        session_id: &SessionId,
+        timestamp: std::time::SystemTime,
+    ) -> Result<Option<session_debug::SessionState>> {
+        self.session_adapter.inspect_state_at(session_id, timestamp)
+    }
+
+    /// Compare states at two different points in time
+    pub fn compare_states(
+        &self,
+        session_id: &SessionId,
+        timestamp1: std::time::SystemTime,
+        timestamp2: std::time::SystemTime,
+    ) -> Result<session_debug::StateComparison> {
+        self.session_adapter
+            .compare_states(session_id, timestamp1, timestamp2)
+    }
+
+    /// Get error analysis for a session
+    pub fn analyze_session_errors(&self, session_id: &SessionId) -> session_debug::ErrorAnalysis {
+        self.session_adapter.analyze_session_errors(session_id)
+    }
+
+    /// Import debug data for a session
+    pub async fn import_debug_data(&self, session_id: &SessionId) -> Result<()> {
+        self.session_adapter.import_debug_data(session_id).await
+    }
+
+    /// Export debug data for a session
+    pub async fn export_debug_data(
+        &self,
+        session_id: &SessionId,
+    ) -> Result<session_debug::SessionDebugData> {
+        self.session_adapter.export_debug_data(session_id).await
+    }
+
+    /// Navigate to a specific point in the timeline
+    pub fn navigate_to_timeline_point(
+        &self,
+        session_id: &SessionId,
+        entry_index: usize,
+    ) -> Result<session_debug::SessionState> {
+        self.session_adapter
+            .navigate_to_timeline_point(session_id, entry_index)
+    }
+
+    /// Compare hook results
+    pub fn compare_hook_results(
+        &self,
+        original: &llmspell_hooks::result::HookResult,
+        replayed: &llmspell_hooks::result::HookResult,
+    ) -> llmspell_hooks::replay::ComparisonResult {
+        self.session_adapter
+            .compare_hook_results(original, replayed)
     }
 }
 
