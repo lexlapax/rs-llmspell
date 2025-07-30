@@ -1836,23 +1836,23 @@ The system currently focuses entirely on the "capture" side (automatic collectio
 #### Task 6.4.4: Adapt replay controls for sessions
 **Priority**: HIGH
 **Estimated Time**: 3 hours
-**Status**: TODO
+**Status**: COMPLETE ✅
 **Assigned To**: Replay Team
 
 **Description**: Adapt existing replay execution controls for session context.
 
 **Files to Create/Update**:
-- **UPDATE**: `llmspell-sessions/src/replay/session_adapter.rs` - Session replay controls
-- **CREATE**: `llmspell-sessions/src/replay/session_controls.rs` - Session-specific controls
-- **CREATE**: Tests for session replay controls
+- **UPDATE**: `llmspell-sessions/src/replay/session_adapter.rs` - Session replay controls ✅
+- **CREATE**: `llmspell-sessions/src/replay/session_controls.rs` - Session-specific controls ✅
+- **CREATE**: Tests for session replay controls ✅
 
 **Acceptance Criteria**:
-- [ ] Uses existing ReplayScheduler for scheduling
-- [ ] Leverages existing ReplaySessionConfig patterns
-- [ ] Integrates with existing breakpoint system
-- [ ] Reuses existing progress tracking
-- [ ] Adapts existing replay modes
-- [ ] Session-specific UI controls
+- [x] Uses existing ReplayScheduler for scheduling
+- [x] Leverages existing ReplaySessionConfig patterns
+- [x] Integrates with existing breakpoint system
+- [x] Reuses existing progress tracking
+- [x] Adapts existing replay modes
+- [x] Session-specific UI controls
 
 **Implementation Steps**:
 1. **Control Adapter** (1 hour):

@@ -3,6 +3,7 @@
 
 mod hook_replay_bridge;
 pub mod session_adapter;
+pub mod session_controls;
 
 #[cfg(test)]
 mod tests;
@@ -131,6 +132,77 @@ impl ReplayEngine {
     /// List all sessions that can be replayed
     pub async fn list_replayable_sessions(&self) -> Result<Vec<SessionId>> {
         self.session_adapter.list_replayable_sessions().await
+    }
+
+    /// Schedule a session replay
+    pub async fn schedule_replay(
+        &self,
+        session_id: &SessionId,
+        config: session_adapter::SessionReplayConfig,
+        schedule: llmspell_hooks::replay::ReplaySchedule,
+    ) -> Result<llmspell_hooks::replay::ScheduledReplay> {
+        self.session_adapter
+            .schedule_replay(session_id, config, schedule)
+            .await
+    }
+
+    /// Pause session replay
+    pub async fn pause_replay(&self, session_id: &SessionId) -> Result<()> {
+        self.session_adapter.pause_replay(session_id).await
+    }
+
+    /// Resume session replay
+    pub async fn resume_replay(&self, session_id: &SessionId) -> Result<()> {
+        self.session_adapter.resume_replay(session_id).await
+    }
+
+    /// Set replay speed
+    pub async fn set_replay_speed(&self, session_id: &SessionId, multiplier: f64) -> Result<()> {
+        self.session_adapter
+            .set_replay_speed(session_id, multiplier)
+            .await
+    }
+
+    /// Add a breakpoint
+    pub async fn add_breakpoint(
+        &self,
+        breakpoint: session_controls::SessionBreakpoint,
+    ) -> Result<()> {
+        self.session_adapter.add_breakpoint(breakpoint).await
+    }
+
+    /// Remove a breakpoint
+    pub async fn remove_breakpoint(
+        &self,
+        session_id: &SessionId,
+        breakpoint_id: uuid::Uuid,
+    ) -> Result<()> {
+        self.session_adapter
+            .remove_breakpoint(session_id, breakpoint_id)
+            .await
+    }
+
+    /// Step to next hook (when paused)
+    pub async fn step_next(&self, session_id: &SessionId) -> Result<()> {
+        self.session_adapter.step_next(session_id).await
+    }
+
+    /// Get session replay progress
+    pub fn get_replay_progress(
+        &self,
+        session_id: &SessionId,
+    ) -> Option<session_controls::SessionReplayProgress> {
+        self.session_adapter.get_replay_progress(session_id)
+    }
+
+    /// Get all active replay progresses
+    pub fn get_active_replay_progresses(&self) -> Vec<session_controls::SessionReplayProgress> {
+        self.session_adapter.get_active_replay_progresses()
+    }
+
+    /// Clear session controls
+    pub fn clear_session_controls(&self, session_id: &SessionId) {
+        self.session_adapter.clear_session_controls(session_id);
     }
 }
 

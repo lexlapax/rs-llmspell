@@ -768,4 +768,248 @@ mod tests {
         let can_replay = replay_engine.can_replay_session(&session_id).await.unwrap();
         assert!(!can_replay); // No hooks yet
     }
+
+    #[tokio::test]
+    async fn test_session_replay_controls_creation() {
+        use super::super::session_controls::{SessionReplayControlConfig, SessionReplayControls};
+
+        let config = SessionReplayControlConfig::default();
+        let controls = SessionReplayControls::new(config);
+
+        // Test that controls are created successfully
+        let active_replays = controls.get_active_replays();
+        assert!(active_replays.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_session_replay_scheduling() {
+        let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
+            create_test_replay_components().await;
+
+        let adapter = SessionReplayAdapter::new(
+            replay_manager,
+            hook_replay_manager,
+            storage_backend.clone(),
+            event_bus,
+        );
+
+        // Create a session with hook executions
+        let session_id = SessionId::new();
+        let correlation_id = uuid::Uuid::new_v4();
+
+        // Store session metadata
+        let metadata_key = format!("session_metadata:{}", session_id);
+        let metadata = serde_json::json!({
+            "id": session_id.to_string(),
+            "correlation_id": correlation_id.to_string(),
+            "created_at": chrono::Utc::now(),
+            "updated_at": chrono::Utc::now(),
+        });
+        storage_backend
+            .set(&metadata_key, serde_json::to_vec(&metadata).unwrap())
+            .await
+            .unwrap();
+
+        // Try to schedule (should fail with no executions)
+        let config = super::super::session_adapter::SessionReplayConfig::default();
+        let schedule = llmspell_hooks::replay::ReplaySchedule::Once {
+            delay: Duration::from_secs(5),
+        };
+
+        let result = adapter.schedule_replay(&session_id, config, schedule).await;
+        assert!(result.is_err()); // No executions to replay
+    }
+
+    #[tokio::test]
+    async fn test_replay_pause_resume() {
+        let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
+            create_test_replay_components().await;
+
+        let adapter = SessionReplayAdapter::new(
+            replay_manager,
+            hook_replay_manager,
+            storage_backend,
+            event_bus,
+        );
+
+        let session_id = SessionId::new();
+
+        // Cannot pause non-existent replay
+        assert!(adapter.pause_replay(&session_id).await.is_err());
+
+        // Cannot resume non-existent replay
+        assert!(adapter.resume_replay(&session_id).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_replay_speed_control() {
+        use super::super::session_controls::SessionReplaySpeed;
+
+        // Test speed control directly
+        let mut speed = SessionReplaySpeed::default();
+        assert_eq!(speed.multiplier(), 1.0);
+
+        speed.set_speed(2.0);
+        assert_eq!(speed.multiplier(), 2.0);
+
+        // Test extreme speeds with clamping
+        speed.set_speed(0.05);
+        assert_eq!(speed.multiplier(), 0.1); // Clamped to min
+
+        speed.set_speed(20.0);
+        assert_eq!(speed.multiplier(), 10.0); // Clamped to max
+
+        // Test duration application
+        let duration = Duration::from_secs(10);
+        speed.set_speed(2.0);
+        let adjusted = speed.apply_to_duration(duration);
+        assert_eq!(adjusted, Duration::from_secs(5)); // 10s / 2x = 5s
+    }
+
+    #[tokio::test]
+    async fn test_breakpoint_management() {
+        use super::super::session_controls::{SessionBreakpoint, SessionBreakpointCondition};
+
+        let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
+            create_test_replay_components().await;
+
+        let adapter = SessionReplayAdapter::new(
+            replay_manager,
+            hook_replay_manager,
+            storage_backend,
+            event_bus,
+        );
+
+        let session_id = SessionId::new();
+        let breakpoint_id = uuid::Uuid::new_v4();
+
+        // Create a breakpoint
+        let breakpoint = SessionBreakpoint {
+            id: breakpoint_id,
+            session_id,
+            condition: SessionBreakpointCondition::HookCount { count: 5 },
+            enabled: true,
+            one_shot: false,
+            callback_data: None,
+        };
+
+        // Add breakpoint
+        assert!(adapter.add_breakpoint(breakpoint).await.is_ok());
+
+        // Remove breakpoint
+        assert!(adapter
+            .remove_breakpoint(&session_id, breakpoint_id)
+            .await
+            .is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_step_debugging() {
+        let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
+            create_test_replay_components().await;
+
+        let adapter = SessionReplayAdapter::new(
+            replay_manager,
+            hook_replay_manager,
+            storage_backend,
+            event_bus,
+        );
+
+        let session_id = SessionId::new();
+
+        // Step should work even without active replay
+        let result = adapter.step_next(&session_id).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_replay_progress_tracking() {
+        let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
+            create_test_replay_components().await;
+
+        let adapter = SessionReplayAdapter::new(
+            replay_manager,
+            hook_replay_manager,
+            storage_backend,
+            event_bus,
+        );
+
+        let session_id = SessionId::new();
+
+        // No progress initially
+        assert!(adapter.get_replay_progress(&session_id).is_none());
+
+        // Get all active progresses
+        let progresses = adapter.get_active_replay_progresses();
+        assert!(progresses.is_empty());
+
+        // Clear controls (should not error)
+        adapter.clear_session_controls(&session_id);
+    }
+
+    #[tokio::test]
+    async fn test_session_replay_state_conversions() {
+        use super::super::session_controls::SessionReplayState;
+        use llmspell_hooks::replay::ReplayState;
+
+        // Test conversions from ReplayState to SessionReplayState
+        let running = SessionReplayState::from(ReplayState::Running);
+        assert_eq!(running, SessionReplayState::Running);
+
+        let completed = SessionReplayState::from(ReplayState::Completed);
+        assert_eq!(completed, SessionReplayState::Completed);
+
+        let failed = SessionReplayState::from(ReplayState::Failed("error".to_string()));
+        assert!(matches!(failed, SessionReplayState::Failed(_)));
+
+        let cancelled = SessionReplayState::from(ReplayState::Cancelled);
+        assert_eq!(cancelled, SessionReplayState::Cancelled);
+
+        // Test conversion back to ReplayState
+        assert!(SessionReplayState::Running.to_replay_state().is_some());
+        assert!(SessionReplayState::Scheduled.to_replay_state().is_none());
+        assert!(SessionReplayState::Paused.to_replay_state().is_none());
+    }
+
+    #[tokio::test]
+    async fn test_controls_with_session_manager() {
+        let manager = create_test_session_manager().await;
+
+        // Create a session
+        let session_id = manager
+            .create_session(CreateSessionOptions::default())
+            .await
+            .unwrap();
+
+        let replay_engine = manager.replay_engine();
+
+        // Test scheduling through replay engine
+        let config = super::super::session_adapter::SessionReplayConfig::default();
+        let schedule = llmspell_hooks::replay::ReplaySchedule::Once {
+            delay: Duration::from_secs(10),
+        };
+
+        // Should fail (no hook executions)
+        let result = replay_engine
+            .schedule_replay(&session_id, config, schedule)
+            .await;
+        assert!(result.is_err());
+
+        // Test control methods
+        assert!(replay_engine.pause_replay(&session_id).await.is_err());
+        assert!(replay_engine.resume_replay(&session_id).await.is_err());
+        // set_replay_speed requires an active replay with progress tracking
+        assert!(replay_engine
+            .set_replay_speed(&session_id, 2.0)
+            .await
+            .is_err());
+        assert!(replay_engine.step_next(&session_id).await.is_ok());
+
+        // Test progress
+        assert!(replay_engine.get_replay_progress(&session_id).is_none());
+        assert!(replay_engine.get_active_replay_progresses().is_empty());
+
+        // Clear controls
+        replay_engine.clear_session_controls(&session_id);
+    }
 }

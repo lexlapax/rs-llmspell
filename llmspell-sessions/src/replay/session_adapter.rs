@@ -5,7 +5,8 @@ use crate::{Result, SessionError, SessionId};
 use llmspell_events::EventBus;
 use llmspell_hooks::persistence::SerializedHookExecution as HooksSerializedHookExecution;
 use llmspell_hooks::replay::{
-    BatchReplayRequest, BatchReplayResponse, ReplayConfig, ReplayManager, ReplayMode, ReplayState,
+    BatchReplayRequest, BatchReplayResponse, ReplayConfig, ReplayManager, ReplayMode,
+    ReplaySchedule, ReplayState,
 };
 use llmspell_state_persistence::manager::{HookReplayManager, SerializedHookExecution};
 use llmspell_storage::StorageBackend;
@@ -16,6 +17,10 @@ use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant, SystemTime};
 use tracing::{debug, info};
 use uuid::Uuid;
+
+use super::session_controls::{
+    SessionBreakpoint, SessionReplayControlConfig, SessionReplayControls, SessionReplayProgress,
+};
 
 /// Session-specific replay configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -130,6 +135,8 @@ pub struct SessionReplayAdapter {
     event_bus: Arc<EventBus>,
     /// Active session replays
     pub(crate) active_replays: Arc<RwLock<HashMap<SessionId, SessionReplayStatus>>>,
+    /// Session replay controls
+    controls: Arc<SessionReplayControls>,
 }
 
 impl SessionReplayAdapter {
@@ -140,12 +147,16 @@ impl SessionReplayAdapter {
         storage_backend: Arc<dyn StorageBackend>,
         event_bus: Arc<EventBus>,
     ) -> Self {
+        let control_config = SessionReplayControlConfig::default();
+        let controls = Arc::new(SessionReplayControls::new(control_config));
+
         Self {
             replay_manager,
             hook_replay_manager,
             storage_backend,
             event_bus,
             active_replays: Arc::new(RwLock::new(HashMap::new())),
+            controls,
         }
     }
 
@@ -274,7 +285,14 @@ impl SessionReplayAdapter {
             session_id
         );
 
-        // Track active replay
+        // Track active replay using controls
+        self.controls
+            .update_progress(session_id, 0, None)
+            .unwrap_or_else(|e| {
+                debug!("Failed to update initial progress: {}", e);
+            });
+
+        // Also track in legacy format for backward compatibility
         {
             let mut active = self.active_replays.write().unwrap();
             active.insert(
@@ -531,6 +549,98 @@ impl SessionReplayAdapter {
         }
 
         Ok(replayable_sessions)
+    }
+
+    /// Get the replay controls
+    pub fn controls(&self) -> &Arc<SessionReplayControls> {
+        &self.controls
+    }
+
+    /// Schedule a session replay
+    pub async fn schedule_replay(
+        &self,
+        session_id: &SessionId,
+        config: SessionReplayConfig,
+        schedule: ReplaySchedule,
+    ) -> Result<llmspell_hooks::replay::ScheduledReplay> {
+        // Load correlation ID
+        let correlation_uuid = self.load_session_correlation_id(session_id).await?;
+
+        // Get hook executions
+        let executions = self
+            .hook_replay_manager
+            .get_hook_executions_by_correlation(correlation_uuid)
+            .await
+            .map_err(|e| SessionError::replay(format!("Failed to get hook executions: {}", e)))?;
+
+        if executions.is_empty() {
+            return Err(SessionError::replay("No hook executions found for session"));
+        }
+
+        // Convert to batch replay request
+        let hook_executions = Self::convert_executions_to_hooks_format(executions);
+        let batch_request = BatchReplayRequest {
+            executions: hook_executions,
+            config: config.into_replay_config(),
+            parallel: false,
+            max_concurrent: 1,
+        };
+
+        // Schedule using controls
+        self.controls
+            .schedule_replay(*session_id, batch_request, schedule)
+            .await
+    }
+
+    /// Pause session replay
+    pub async fn pause_replay(&self, session_id: &SessionId) -> Result<()> {
+        self.controls.pause_replay(session_id).await
+    }
+
+    /// Resume session replay
+    pub async fn resume_replay(&self, session_id: &SessionId) -> Result<()> {
+        self.controls.resume_replay(session_id).await
+    }
+
+    /// Set replay speed
+    pub async fn set_replay_speed(&self, session_id: &SessionId, multiplier: f64) -> Result<()> {
+        self.controls.set_replay_speed(session_id, multiplier).await
+    }
+
+    /// Add a breakpoint
+    pub async fn add_breakpoint(&self, breakpoint: SessionBreakpoint) -> Result<()> {
+        self.controls.add_breakpoint(breakpoint).await
+    }
+
+    /// Remove a breakpoint
+    pub async fn remove_breakpoint(
+        &self,
+        session_id: &SessionId,
+        breakpoint_id: Uuid,
+    ) -> Result<()> {
+        self.controls
+            .remove_breakpoint(session_id, breakpoint_id)
+            .await
+    }
+
+    /// Step to next hook (when paused)
+    pub async fn step_next(&self, session_id: &SessionId) -> Result<()> {
+        self.controls.step_next(session_id).await
+    }
+
+    /// Get session replay progress
+    pub fn get_replay_progress(&self, session_id: &SessionId) -> Option<SessionReplayProgress> {
+        self.controls.get_progress(session_id)
+    }
+
+    /// Get all active replay progresses
+    pub fn get_active_replay_progresses(&self) -> Vec<SessionReplayProgress> {
+        self.controls.get_active_replays()
+    }
+
+    /// Clear session controls
+    pub fn clear_session_controls(&self, session_id: &SessionId) {
+        self.controls.clear_session_controls(session_id);
     }
 }
 
