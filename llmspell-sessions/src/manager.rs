@@ -2,7 +2,10 @@
 //! ABOUTME: Coordinates with state persistence, storage backends, hooks, and events
 
 use crate::{
-    artifact::ArtifactStorage,
+    artifact::{
+        ArtifactId, ArtifactMetadata, ArtifactQuery, ArtifactStorage, ArtifactStorageOps,
+        ArtifactType, SessionArtifact,
+    },
     config::SessionManagerConfig,
     hooks::{register_artifact_collectors, ArtifactCollectionProcessor, CollectorConfig},
     replay::ReplayEngine,
@@ -871,6 +874,248 @@ impl SessionManager {
         info!("Registered built-in hooks for session lifecycle events");
         Ok(())
     }
+
+    // ===== Public Artifact API =====
+
+    /// Store a user-provided artifact in a session
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Session not found
+    /// - Artifact exceeds size limits
+    /// - Storage backend fails
+    /// - Artifact validation fails
+    pub async fn store_artifact(
+        &self,
+        session_id: &SessionId,
+        artifact_type: ArtifactType,
+        name: String,
+        content: Vec<u8>,
+        metadata: Option<HashMap<String, serde_json::Value>>,
+    ) -> Result<ArtifactId> {
+        // Verify session exists and is active
+        let session = self.get_session(session_id).await?;
+        let status = session.status().await;
+        if !status.is_active() {
+            return Err(SessionError::InvalidOperation {
+                reason: format!("Cannot store artifacts in {status:?} session"),
+            });
+        }
+
+        // Get next sequence number for this session
+        let sequence = session.increment_operation_count().await?;
+
+        // Create the artifact with metadata
+        let mut artifact = SessionArtifact::create_with_metadata(
+            *session_id,
+            sequence,
+            artifact_type.clone(),
+            name.clone(),
+            content,
+            None, // created_by will be set by session metadata if available
+        )?;
+
+        // Add custom metadata if provided
+        if let Some(custom_metadata) = metadata {
+            for (key, value) in custom_metadata {
+                artifact.metadata.custom.insert(key, value);
+            }
+        }
+
+        // Store the artifact
+        let artifact_id = self.artifact_storage.store_artifact(&artifact).await?;
+
+        // Update session metadata
+        session.increment_artifact_count().await?;
+
+        // Fire artifact creation hooks if enabled
+        if self.config.hook_config.enable_artifact_collection {
+            let hooks = self.hook_registry.get_hooks(&HookPoint::AfterToolExecution);
+            let component_id = ComponentId::new(
+                ComponentType::Custom("SessionManager".to_string()),
+                "session-manager".to_string(),
+            );
+
+            for hook in hooks {
+                let mut context =
+                    HookContext::new(HookPoint::AfterToolExecution, component_id.clone());
+                context.data.insert(
+                    "session_id".to_string(),
+                    serde_json::json!(session_id.to_string()),
+                );
+                context.data.insert(
+                    "artifact_id".to_string(),
+                    serde_json::json!(artifact_id.to_string()),
+                );
+                context.data.insert(
+                    "artifact_type".to_string(),
+                    serde_json::json!(artifact_type.to_string()),
+                );
+                context
+                    .data
+                    .insert("name".to_string(), serde_json::json!(name));
+                context.data.insert(
+                    "size".to_string(),
+                    serde_json::json!(artifact.metadata.size),
+                );
+
+                if let Err(e) = hook.execute(&mut context).await {
+                    warn!("Artifact storage hook failed: {e}");
+                }
+            }
+        }
+
+        // Publish event
+        if self.config.event_config.enable_session_events {
+            let event = UniversalEvent::new(
+                "artifact.stored",
+                serde_json::json!({
+                    "session_id": session_id.to_string(),
+                    "artifact_id": artifact_id.to_string(),
+                    "artifact_type": artifact_type.to_string(),
+                    "name": name,
+                    "size": artifact.metadata.size,
+                }),
+                Language::Rust,
+            );
+
+            if let Err(e) = self.event_bus.publish(event).await {
+                warn!("Failed to publish artifact stored event: {e}");
+            }
+        }
+
+        info!("Stored user artifact {artifact_id} in session {session_id}");
+        Ok(artifact_id)
+    }
+
+    /// Retrieve an artifact by ID
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the artifact is not found or retrieval fails
+    pub async fn get_artifact(&self, artifact_id: &ArtifactId) -> Result<SessionArtifact> {
+        self.artifact_storage
+            .get_artifact(artifact_id)
+            .await?
+            .ok_or_else(|| SessionError::ArtifactNotFound {
+                id: artifact_id.to_string(),
+            })
+    }
+
+    /// Retrieve artifact content only (without metadata)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the artifact is not found or content retrieval fails
+    pub async fn get_artifact_content(&self, artifact_id: &ArtifactId) -> Result<Vec<u8>> {
+        let artifact = self.get_artifact(artifact_id).await?;
+        artifact.get_content()
+    }
+
+    /// List all artifacts for a session
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the session is not found or listing fails
+    pub async fn list_artifacts(&self, session_id: &SessionId) -> Result<Vec<ArtifactMetadata>> {
+        // Verify session exists
+        self.get_session(session_id).await?;
+
+        self.artifact_storage
+            .list_session_artifacts(session_id)
+            .await
+    }
+
+    /// Delete an artifact
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Artifact not found
+    /// - Session is not active
+    /// - Deletion fails
+    pub async fn delete_artifact(&self, artifact_id: &ArtifactId) -> Result<()> {
+        // Verify session exists and is active
+        let session = self.get_session(&artifact_id.session_id).await?;
+        let status = session.status().await;
+        if !status.is_active() {
+            return Err(SessionError::InvalidOperation {
+                reason: format!("Cannot delete artifacts from {status:?} session"),
+            });
+        }
+
+        // Delete the artifact
+        let deleted = self.artifact_storage.delete_artifact(artifact_id).await?;
+        if !deleted {
+            return Err(SessionError::ArtifactNotFound {
+                id: artifact_id.to_string(),
+            });
+        }
+
+        // Update session metadata
+        session.decrement_artifact_count().await?;
+
+        // Publish event
+        if self.config.event_config.enable_session_events {
+            let event = UniversalEvent::new(
+                "artifact.deleted",
+                serde_json::json!({
+                    "session_id": artifact_id.session_id.to_string(),
+                    "artifact_id": artifact_id.to_string(),
+                }),
+                Language::Rust,
+            );
+
+            if let Err(e) = self.event_bus.publish(event).await {
+                warn!("Failed to publish artifact deleted event: {e}");
+            }
+        }
+
+        info!("Deleted artifact {artifact_id}");
+        Ok(())
+    }
+
+    /// Query artifacts with filtering and pagination
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the query fails
+    pub async fn query_artifacts(&self, query: ArtifactQuery) -> Result<Vec<ArtifactMetadata>> {
+        self.artifact_storage.query_artifacts(query).await
+    }
+
+    /// Store a file as an artifact
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if file reading or storage fails
+    pub async fn store_file_artifact(
+        &self,
+        session_id: &SessionId,
+        file_path: &std::path::Path,
+        artifact_type: ArtifactType,
+        metadata: Option<HashMap<String, serde_json::Value>>,
+    ) -> Result<ArtifactId> {
+        // Read file content
+        let content = tokio::fs::read(file_path).await.map_err(|e| {
+            SessionError::Io(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                format!("Failed to read file: {e}"),
+            ))
+        })?;
+
+        // Use file name as artifact name
+        let name = file_path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("unnamed")
+            .to_string();
+
+        // Store as artifact
+        self.store_artifact(session_id, artifact_type, name, content, metadata)
+            .await
+    }
 }
 
 #[cfg(test)]
@@ -982,5 +1227,195 @@ mod tests {
         };
         let sessions = manager.list_sessions(query).await.unwrap();
         assert_eq!(sessions.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn test_user_artifact_storage() {
+        let manager = create_test_manager().await;
+
+        // Create a session
+        let session_id = manager
+            .create_session(CreateSessionOptions::default())
+            .await
+            .unwrap();
+
+        // Store a user artifact
+        let content = b"Hello, this is my data!".to_vec();
+        let artifact_id = manager
+            .store_artifact(
+                &session_id,
+                ArtifactType::UserInput,
+                "my_data.txt".to_string(),
+                content.clone(),
+                None,
+            )
+            .await
+            .unwrap();
+
+        // Retrieve the artifact
+        let artifact = manager.get_artifact(&artifact_id).await.unwrap();
+        assert_eq!(artifact.metadata.name, "my_data.txt");
+        assert_eq!(artifact.metadata.artifact_type, ArtifactType::UserInput);
+        assert_eq!(artifact.get_content().unwrap(), content);
+
+        // List artifacts
+        let artifacts = manager.list_artifacts(&session_id).await.unwrap();
+        assert_eq!(artifacts.len(), 1);
+        assert_eq!(artifacts[0].name, "my_data.txt");
+
+        // Delete the artifact
+        manager.delete_artifact(&artifact_id).await.unwrap();
+
+        // Verify it's deleted
+        let result = manager.get_artifact(&artifact_id).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_artifact_with_metadata() {
+        let manager = create_test_manager().await;
+
+        // Create a session
+        let session_id = manager
+            .create_session(CreateSessionOptions::default())
+            .await
+            .unwrap();
+
+        // Create custom metadata
+        let mut metadata = HashMap::new();
+        metadata.insert("author".to_string(), serde_json::json!("John Doe"));
+        metadata.insert("version".to_string(), serde_json::json!("1.0.0"));
+        metadata.insert(
+            "tags".to_string(),
+            serde_json::json!(["important", "dataset"]),
+        );
+
+        // Store artifact with metadata
+        let content = b"Dataset content".to_vec();
+        let artifact_id = manager
+            .store_artifact(
+                &session_id,
+                ArtifactType::UserInput,
+                "dataset.csv".to_string(),
+                content,
+                Some(metadata.clone()),
+            )
+            .await
+            .unwrap();
+
+        // Retrieve and verify metadata
+        let artifact = manager.get_artifact(&artifact_id).await.unwrap();
+        assert_eq!(
+            artifact.metadata.custom.get("author").unwrap(),
+            &serde_json::json!("John Doe")
+        );
+        assert_eq!(
+            artifact.metadata.custom.get("version").unwrap(),
+            &serde_json::json!("1.0.0")
+        );
+    }
+
+    #[tokio::test]
+    async fn test_store_file_artifact() {
+        let manager = create_test_manager().await;
+
+        // Create a temporary file
+        let temp_dir = tempfile::tempdir().unwrap();
+        let file_path = temp_dir.path().join("test_file.json");
+        let content = r#"{"key": "value", "number": 42}"#;
+        std::fs::write(&file_path, content).unwrap();
+
+        // Create a session
+        let session_id = manager
+            .create_session(CreateSessionOptions::default())
+            .await
+            .unwrap();
+
+        // Store file as artifact
+        let artifact_id = manager
+            .store_file_artifact(&session_id, &file_path, ArtifactType::UserInput, None)
+            .await
+            .unwrap();
+
+        // Retrieve and verify
+        let artifact = manager.get_artifact(&artifact_id).await.unwrap();
+        assert_eq!(artifact.metadata.name, "test_file.json");
+        assert_eq!(artifact.get_content().unwrap(), content.as_bytes());
+    }
+
+    #[tokio::test]
+    async fn test_artifact_operations_on_inactive_session() {
+        let manager = create_test_manager().await;
+
+        // Create and suspend a session
+        let session_id = manager
+            .create_session(CreateSessionOptions::default())
+            .await
+            .unwrap();
+        manager.suspend_session(&session_id).await.unwrap();
+
+        // Try to store artifact - should fail
+        let result = manager
+            .store_artifact(
+                &session_id,
+                ArtifactType::UserInput,
+                "test.txt".to_string(),
+                b"content".to_vec(),
+                None,
+            )
+            .await;
+        assert!(result.is_err());
+
+        // Resume session and try again
+        manager.resume_session(&session_id).await.unwrap();
+        let artifact_id = manager
+            .store_artifact(
+                &session_id,
+                ArtifactType::UserInput,
+                "test.txt".to_string(),
+                b"content".to_vec(),
+                None,
+            )
+            .await
+            .unwrap();
+
+        // Suspend again and try to delete - should fail
+        manager.suspend_session(&session_id).await.unwrap();
+        let result = manager.delete_artifact(&artifact_id).await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_query_artifacts() {
+        let manager = create_test_manager().await;
+
+        // Create a session
+        let session_id = manager
+            .create_session(CreateSessionOptions::default())
+            .await
+            .unwrap();
+
+        // Store multiple artifacts
+        for i in 0..3 {
+            manager
+                .store_artifact(
+                    &session_id,
+                    ArtifactType::UserInput,
+                    format!("file_{}.txt", i),
+                    format!("content {}", i).into_bytes(),
+                    None,
+                )
+                .await
+                .unwrap();
+        }
+
+        // Query artifacts
+        let query = ArtifactQuery {
+            session_id: Some(session_id),
+            artifact_type: Some(ArtifactType::UserInput),
+            ..Default::default()
+        };
+        let artifacts = manager.query_artifacts(query).await.unwrap();
+        assert_eq!(artifacts.len(), 3);
     }
 }

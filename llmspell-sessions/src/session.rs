@@ -195,6 +195,32 @@ impl Session {
 
         Ok(())
     }
+
+    /// Increment operation count and return the new sequence number
+    pub async fn increment_operation_count(&self) -> Result<u64> {
+        let mut metadata = self.metadata.write().await;
+        metadata.operation_count += 1;
+        metadata.updated_at = Utc::now();
+        Ok(metadata.operation_count)
+    }
+
+    /// Increment artifact count
+    pub async fn increment_artifact_count(&self) -> Result<()> {
+        let mut metadata = self.metadata.write().await;
+        metadata.artifact_count += 1;
+        metadata.updated_at = Utc::now();
+        Ok(())
+    }
+
+    /// Decrement artifact count
+    pub async fn decrement_artifact_count(&self) -> Result<()> {
+        let mut metadata = self.metadata.write().await;
+        if metadata.artifact_count > 0 {
+            metadata.artifact_count -= 1;
+            metadata.updated_at = Utc::now();
+        }
+        Ok(())
+    }
 }
 
 /// Current snapshot format version

@@ -33,6 +33,13 @@ pub enum SessionError {
         to: crate::SessionStatus,
     },
 
+    /// Invalid operation
+    #[error("Invalid operation: {reason}")]
+    InvalidOperation {
+        /// Reason for the invalid operation
+        reason: String,
+    },
+
     /// Session is in invalid state for operation
     #[error("Session {id} is in invalid state {state:?} for operation {operation}")]
     InvalidSessionState {
@@ -45,12 +52,10 @@ pub enum SessionError {
     },
 
     /// Artifact not found
-    #[error("Artifact not found: {id} in session {session_id}")]
+    #[error("Artifact not found: {id}")]
     ArtifactNotFound {
         /// Artifact ID
         id: String,
-        /// Session ID
-        session_id: String,
     },
 
     /// Artifact already exists
@@ -86,6 +91,10 @@ pub enum SessionError {
     #[error("Deserialization error: {0}")]
     Deserialization(String),
 
+    /// Validation error
+    #[error("Validation error: {0}")]
+    Validation(String),
+
     /// I/O error
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
@@ -103,10 +112,6 @@ pub enum SessionError {
     /// Configuration error
     #[error("Configuration error: {0}")]
     Configuration(String),
-
-    /// Validation error
-    #[error("Validation error: {0}")]
-    Validation(String),
 
     /// Access denied error
     #[error("Access denied: {message}")]

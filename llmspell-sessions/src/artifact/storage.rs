@@ -544,7 +544,6 @@ impl ArtifactStorage {
         if history.current_version == 0 {
             return Err(SessionError::ArtifactNotFound {
                 id: name.to_string(),
-                session_id: session_id.to_string(),
             });
         }
 
@@ -553,14 +552,12 @@ impl ArtifactStorage {
             .get(&history.current_version)
             .ok_or_else(|| SessionError::ArtifactNotFound {
                 id: format!("{name}:v{}", history.current_version),
-                session_id: session_id.to_string(),
             })?;
 
         match self.get_artifact(latest_id).await? {
             Some(artifact) => Ok(artifact),
             None => Err(SessionError::ArtifactNotFound {
                 id: format!("{name}:v{}", history.current_version),
-                session_id: session_id.to_string(),
             }),
         }
     }
@@ -587,14 +584,12 @@ impl ArtifactStorage {
                 .get(&version)
                 .ok_or_else(|| SessionError::ArtifactNotFound {
                     id: format!("{name}:v{version}"),
-                    session_id: session_id.to_string(),
                 })?;
 
         match self.get_artifact(artifact_id).await? {
             Some(artifact) => Ok(artifact),
             None => Err(SessionError::ArtifactNotFound {
                 id: format!("{name}:v{version}"),
-                session_id: session_id.to_string(),
             }),
         }
     }
@@ -714,7 +709,6 @@ impl ArtifactStorage {
 
         let metadata_data = metadata_data.ok_or_else(|| SessionError::ArtifactNotFound {
             id: artifact_id.to_string(),
-            session_id: artifact_id.session_id.to_string(),
         })?;
 
         let metadata_index: MetadataIndex = bincode::deserialize(&metadata_data)
@@ -755,7 +749,6 @@ impl ArtifactStorage {
             None => {
                 return Err(SessionError::ArtifactNotFound {
                     id: artifact_id.to_string(),
-                    session_id: artifact_id.session_id.to_string(),
                 })
             }
         };
