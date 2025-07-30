@@ -1978,34 +1978,35 @@ The system currently focuses entirely on the "capture" side (automatic collectio
 ---
 
 ### Phase 6.5: Script Bridge Implementation (Day 10-12)
+<!-- UPDATED: Reordered tasks to leverage existing GlobalObject infrastructure, combined Session/Artifact design, 
+     emphasized reuse of existing patterns from StateGlobal and HookGlobal -->
 
-#### Task 6.5.1: Design Lua Session global API
+#### Task 6.5.1: Design Session and Artifact global APIs
 **Priority**: HIGH
 **Estimated Time**: 3 hours
-**Status**: TODO
+**Status**: DONE ✅
 **Assigned To**: Bridge Team Lead
 
-**Description**: Design the Lua Session global object API following Phase 5 patterns.
+**Description**: Design the Session and Artifact global object APIs following Phase 5 patterns and leveraging existing infrastructure.
 
-**Files to Create/Update**:
-- **CREATE**: `llmspell-bridge/src/session_bridge.rs` - Core session bridge (language-agnostic)
-- **CREATE**: `llmspell-bridge/src/artifact_bridge.rs` - Core artifact bridge (language-agnostic)
+**Files to Reference/Update**:
+- **LEVERAGE**: `llmspell-bridge/src/globals/types.rs` - Existing GlobalObject trait and GlobalContext ✅
+- **LEVERAGE**: `llmspell-bridge/src/globals/state_global.rs` - Pattern for GlobalObject implementation ✅
+- **UPDATE**: `llmspell-sessions/src/bridge.rs` - Existing SessionBridge stub
+- **CREATE**: `llmspell-bridge/src/session_bridge.rs` - Core session bridge (language-agnostic) ✅
+- **CREATE**: `llmspell-bridge/src/artifact_bridge.rs` - Core artifact bridge (language-agnostic) ✅
 - **CREATE**: `llmspell-bridge/src/globals/session_global.rs` - SessionGlobal wrapper
 - **CREATE**: `llmspell-bridge/src/globals/artifact_global.rs` - ArtifactGlobal wrapper
-- **CREATE**: `llmspell-bridge/src/lua/globals/session.rs` - Lua bindings for Session
-- **CREATE**: `llmspell-bridge/src/lua/globals/artifact.rs` - Lua bindings for Artifact
-- **UPDATE**: `llmspell-bridge/src/globals/mod.rs` - Export new globals
-- **UPDATE**: `llmspell-bridge/src/lib.rs` - Export bridges
-- **CREATE**: API design document in module comments
+- **CREATE**: `docs/technical/session-artifact-api-design.md` - API design document ✅
 
 **Acceptance Criteria**:
-- [ ] API follows Phase 5 patterns
-- [ ] All session operations exposed
-- [ ] Artifact operations included
-- [ ] Replay functionality accessible
-- [ ] Consistent naming conventions
-- [ ] Error handling patterns defined
-- [ ] Async operations handled properly
+- [x] API follows Phase 5 patterns
+- [x] All session operations exposed
+- [x] Artifact operations included
+- [x] Replay functionality accessible
+- [x] Consistent naming conventions
+- [x] Error handling patterns defined
+- [x] Async operations handled properly
 
 **Implementation Steps**:
 1. **API Surface Design** (1 hour):
@@ -2046,40 +2047,42 @@ The system currently focuses entirely on the "capture" side (automatic collectio
    - Migration guide
 
 **Testing Requirements**:
-- [ ] API completeness review
-- [ ] Naming consistency check
-- [ ] Error handling review
-- [ ] Documentation review
+- [x] API completeness review ✅
+- [x] Naming consistency check ✅
+- [x] Error handling review ✅
+- [x] Documentation review ✅
 
 **Definition of Done**:
-- [ ] API design complete
-- [ ] Patterns consistent
-- [ ] Documentation clear
-- [ ] Review completed
+- [x] API design complete ✅
+- [x] Patterns consistent ✅
+- [x] Documentation clear ✅
+- [x] Review completed ✅
 
 ---
 
-#### Task 6.5.2: Implement core Session global
+#### Task 6.5.2: Implement SessionBridge core operations
 **Priority**: CRITICAL
 **Estimated Time**: 5 hours
 **Status**: TODO
 **Assigned To**: Bridge Team
 
-**Description**: Implement the Session global object following the three-layer architecture.
+**Description**: Implement the SessionBridge that wraps SessionManager for script access. This follows the pattern established by HookBridge.
 
-**Files to Create/Update**:
-- **UPDATE**: `llmspell-bridge/src/session_bridge.rs` - Implement core session bridge methods
-- **UPDATE**: `llmspell-bridge/src/globals/session_global.rs` - Implement SessionGlobal with GlobalObject trait
-- **UPDATE**: `llmspell-bridge/src/lua/globals/session.rs` - Implement Lua-specific bindings
-- **UPDATE**: `llmspell-bridge/src/lua/globals/mod.rs` - Register Session global
-- **UPDATE**: `llmspell-bridge/src/globals/mod.rs` - Export SessionGlobal
+**Files to Reference/Update**:
+- **LEVERAGE**: `llmspell-bridge/src/hook_bridge.rs` - Pattern for async bridge wrapper
+- **LEVERAGE**: `llmspell-sessions/src/manager.rs` - Existing SessionManager to wrap
+- **UPDATE**: `llmspell-sessions/src/bridge.rs` - Expand existing SessionBridge stub
+- **CREATE**: `llmspell-sessions/src/bridge/operations.rs` - Core session operations
+- **CREATE**: `llmspell-sessions/src/bridge/conversions.rs` - Type conversions
+- **CREATE**: `llmspell-sessions/src/bridge/errors.rs` - Error handling
 
 **Acceptance Criteria**:
-- [ ] Core bridge provides language-agnostic session operations
-- [ ] SessionGlobal implements GlobalObject trait
-- [ ] Session global registered in Lua
-- [ ] Basic session operations working
-- [ ] State management methods functional
+- [ ] SessionBridge wraps SessionManager operations
+- [ ] Async operations handled with block_on pattern (like HookBridge)
+- [ ] Type conversions for script boundaries
+- [ ] Error handling and translation
+- [ ] Thread-safe operations
+- [ ] Integration with GlobalContext for state access
 - [ ] Error propagation correct
 - [ ] Thread safety guaranteed
 - [ ] Performance optimized
@@ -2137,27 +2140,28 @@ The system currently focuses entirely on the "capture" side (automatic collectio
 
 ---
 
-#### Task 6.5.3: Implement artifact methods
+#### Task 6.5.3: Implement SessionGlobal and ArtifactGlobal
 **Priority**: HIGH
 **Estimated Time**: 4 hours
 **Status**: TODO
 **Assigned To**: Bridge Team
 
-**Description**: Add artifact management to Session API across all layers.
+**Description**: Implement the GlobalObject wrappers for Session and Artifact functionality.
 
-**Files to Update**:
-- **UPDATE**: `llmspell-bridge/src/session_bridge.rs` - Add artifact management methods to core bridge
-- **UPDATE**: `llmspell-bridge/src/artifact_bridge.rs` - Implement core artifact bridge functionality
-- **UPDATE**: `llmspell-bridge/src/globals/artifact_global.rs` - Implement ArtifactGlobal with GlobalObject trait
-- **UPDATE**: `llmspell-bridge/src/lua/globals/session.rs` - Add Lua artifact methods
-- **UPDATE**: `llmspell-bridge/src/lua/globals/artifact.rs` - Implement Lua artifact bindings
-- **CREATE**: Helper functions for artifact handling
+**Files to Reference/Update**:
+- **LEVERAGE**: `llmspell-bridge/src/globals/state_global.rs` - Pattern for GlobalObject implementation
+- **LEVERAGE**: `llmspell-bridge/src/globals/hook_global.rs` - Pattern for wrapping async bridge
+- **CREATE**: `llmspell-bridge/src/globals/session_global.rs` - SessionGlobal with GlobalObject trait
+- **CREATE**: `llmspell-bridge/src/globals/artifact_global.rs` - ArtifactGlobal with GlobalObject trait
+- **UPDATE**: `llmspell-bridge/src/globals/mod.rs` - Export new globals
 
 **Acceptance Criteria**:
-- [ ] Core bridge provides artifact operations
-- [ ] ArtifactGlobal properly wraps artifact functionality
-- [ ] saveArtifact() stores artifacts from Lua (using public API)
-- [ ] loadArtifact() retrieves content
+- [ ] SessionGlobal implements GlobalObject trait
+- [ ] ArtifactGlobal implements GlobalObject trait
+- [ ] Both follow established patterns from StateGlobal
+- [ ] Proper metadata() implementation
+- [ ] inject_lua() creates appropriate tables and functions
+- [ ] Async operations use block_on_async pattern
 - [ ] listArtifacts() returns artifact list
 - [ ] deleteArtifact() removes artifacts
 - [ ] Binary data handled correctly
@@ -2231,27 +2235,27 @@ The system currently focuses entirely on the "capture" side (automatic collectio
 
 ---
 
-#### Task 6.5.4: Implement session state methods
+#### Task 6.5.4: Update GlobalRegistry for Session/Artifact globals
 **Priority**: HIGH
 **Estimated Time**: 3 hours
 **Status**: TODO
 **Assigned To**: Bridge Team
 
-**Description**: Implement session state management across all bridge layers.
+**Description**: Update the global registry to include SessionGlobal and ArtifactGlobal, ensuring proper initialization order.
 
-**Files to Update**:
-- **UPDATE**: `llmspell-bridge/src/session_bridge.rs` - Add state management methods to core bridge
-- **UPDATE**: `llmspell-bridge/src/lua/globals/session.rs` - Add Lua state methods
-- **CREATE**: State conversion helpers for Lua<->Rust type conversion
+**Files to Reference/Update**:
+- **UPDATE**: `llmspell-bridge/src/globals/mod.rs` - Update create_standard_registry()
+- **LEVERAGE**: Existing pattern for StateGlobal initialization
+- **ENSURE**: SessionGlobal initialized after StateGlobal (dependency)
+- **ENSURE**: ArtifactGlobal initialized after SessionGlobal (dependency)
 
 **Acceptance Criteria**:
-- [ ] Core bridge provides state operations
-- [ ] get()/set() for session variables
-- [ ] has() for existence check
-- [ ] delete() for removal
-- [ ] list_keys() method
-- [ ] Type preservation across Lua/Rust
-- [ ] Nested data support
+- [ ] SessionGlobal registered in correct order
+- [ ] ArtifactGlobal registered after SessionGlobal
+- [ ] Dependencies properly declared in metadata()
+- [ ] GlobalContext bridges available to both globals
+- [ ] Integration tests verify registration
+- [ ] Script examples work end-to-end
 - [ ] Performance optimized
 
 **Implementation Steps**:
@@ -2287,27 +2291,28 @@ The system currently focuses entirely on the "capture" side (automatic collectio
 
 ---
 
-#### Task 6.5.5: Implement session context bridge
+#### Task 6.5.5: Implement comprehensive script examples
 **Priority**: MEDIUM
 **Estimated Time**: 3 hours
 **Status**: TODO
 **Assigned To**: Bridge Team
 
-**Description**: Implement session context management (current session) across bridge layers.
+**Description**: Create comprehensive examples demonstrating Session and Artifact usage from scripts.
 
-**Files to Update**:
-- **UPDATE**: `llmspell-bridge/src/session_bridge.rs` - Add context management in core bridge
-- **UPDATE**: `llmspell-bridge/src/lua/globals/session.rs` - Add Lua context methods
-- **CREATE**: Thread-local session storage in core bridge
+**Files to Create**:
+- **CREATE**: `examples/session_basic.lua` - Basic session operations
+- **CREATE**: `examples/session_artifacts.lua` - Artifact management
+- **CREATE**: `examples/session_replay.lua` - Replay functionality
+- **CREATE**: `examples/session_advanced.lua` - Advanced patterns
+- **CREATE**: `examples/session_integration.lua` - Integration with other globals
 
 **Acceptance Criteria**:
-- [ ] Core bridge manages current session context
-- [ ] getCurrent() returns current session
-- [ ] setCurrent() sets active session
-- [ ] Context persists across calls
-- [ ] Thread-safe implementation
-- [ ] Works with coroutines
-- [ ] Clear error messages
+- [ ] Examples cover all major APIs
+- [ ] Examples are self-documenting
+- [ ] Examples run without errors
+- [ ] Examples show best practices
+- [ ] Examples include error handling
+- [ ] Examples demonstrate integration with State, Hook, Event globals
 - [ ] Automatic context in artifacts
 
 **Implementation Steps**:
@@ -2343,27 +2348,28 @@ The system currently focuses entirely on the "capture" side (automatic collectio
 
 ---
 
-#### Task 6.5.6: Implement replay methods
+#### Task 6.5.6: Integration tests for Session/Artifact globals
 **Priority**: MEDIUM
 **Estimated Time**: 4 hours
 **Status**: TODO
-**Assigned To**: Bridge Team
+**Assigned To**: Testing Team
 
-**Description**: Add replay functionality across bridge layers.
+**Description**: Create comprehensive integration tests for Session and Artifact globals.
 
-**Files to Update**:
-- **UPDATE**: `llmspell-bridge/src/session_bridge.rs` - Add replay methods to core bridge
-- **UPDATE**: `llmspell-bridge/src/lua/globals/session.rs` - Add Lua replay methods
-- **CREATE**: Replay result converters for Lua types
+**Files to Reference/Create**:
+- **LEVERAGE**: `llmspell-bridge/tests/globals/state_global_tests.rs` - Testing patterns
+- **CREATE**: `llmspell-bridge/tests/globals/session_global_tests.rs` - Session tests
+- **CREATE**: `llmspell-bridge/tests/globals/artifact_global_tests.rs` - Artifact tests
+- **CREATE**: `llmspell-bridge/tests/integration/session_workflow.rs` - End-to-end tests
 
 **Acceptance Criteria**:
-- [ ] Core bridge provides replay operations
-- [ ] start_replay() triggers session replay
-- [ ] timeline() returns event timeline
-- [ ] Progress callbacks supported
-- [ ] Results properly formatted
-- [ ] Async operations handled
-- [ ] Large timelines paginated
+- [ ] All SessionGlobal methods tested
+- [ ] All ArtifactGlobal methods tested
+- [ ] Integration with StateGlobal tested
+- [ ] Integration with HookGlobal tested
+- [ ] Error conditions tested
+- [ ] Performance benchmarks included
+- [ ] Memory leak tests
 - [ ] Export formats available
 
 **Implementation Steps**:
@@ -2405,17 +2411,20 @@ The system currently focuses entirely on the "capture" side (automatic collectio
 
 ---
 
-#### Task 6.5.7: Create Lua session examples
+#### Task 6.5.7: Documentation and API finalization
 **Priority**: HIGH
 **Estimated Time**: 4 hours
 **Status**: TODO
-**Assigned To**: Bridge Team
+**Assigned To**: Documentation Team
 
-**Description**: Create comprehensive Lua examples for session management.
+**Description**: Document the Session and Artifact APIs and ensure consistency.
 
-**Files to Create**:
-- **CREATE**: `examples/lua/sessions/basic_session.lua` - Basic usage
-- **CREATE**: `examples/lua/sessions/artifact_management.lua` - Artifacts (including user uploads)
+**Files to Create/Update**:
+- **CREATE**: `llmspell-sessions/README.md` - Crate documentation
+- **CREATE**: `docs/user-guide/session-management.md` - User guide
+- **UPDATE**: All public APIs with comprehensive doc comments
+- **UPDATE**: `llmspell-bridge/src/globals/session_global.rs` - API docs
+- **UPDATE**: `llmspell-bridge/src/globals/artifact_global.rs` - API docs
 - **CREATE**: `examples/lua/sessions/user_artifacts.lua` - User file/dataset storage
 - **CREATE**: `examples/lua/sessions/knowledge_base.lua` - Building knowledge base with artifacts
 - **CREATE**: `examples/lua/sessions/session_replay.lua` - Replay

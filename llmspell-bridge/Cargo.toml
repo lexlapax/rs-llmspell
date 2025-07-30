@@ -19,6 +19,7 @@ llmspell-events = { path = "../llmspell-events" }
 llmspell-hooks = { path = "../llmspell-hooks" }
 llmspell-state-persistence = { path = "../llmspell-state-persistence" }
 llmspell-storage = { path = "../llmspell-storage" }
+llmspell-sessions = { path = "../llmspell-sessions" }
 tokio.workspace = true
 tokio-stream.workspace = true
 async-trait.workspace = true
