@@ -72,6 +72,9 @@ pub mod policies;
 /// Session middleware using pattern hooks
 pub mod middleware;
 
+/// Session analytics using MetricsHook
+pub mod analytics;
+
 // Re-export commonly used types
 pub use artifact::{
     ArtifactId, ArtifactQuery, ArtifactStorage, ArtifactStorageConfig, ArtifactStorageOps,

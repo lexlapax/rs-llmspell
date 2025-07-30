@@ -1489,14 +1489,15 @@ The system currently focuses entirely on the "capture" side (automatic collectio
 #### Task 6.3.6: Create session analytics using existing MetricsHook (LEVERAGE EXISTING)
 **Priority**: LOW
 **Estimated Time**: 2 hours (REDUCED - extending existing)
-**Status**: TODO
+**Status**: COMPLETE ✅
 **Assigned To**: Hooks Team
 
 **Description**: Extend existing MetricsHook for session-specific analytics rather than creating new analytics system.
 
 **Files to Create/Update**:
-- **CREATE**: `llmspell-sessions/src/analytics/session_metrics.rs` - Session-specific metrics
-- **LEVERAGE**: `llmspell-hooks/src/builtin/metrics.rs` - Complete MetricsHook already exists ✅
+- **CREATED**: `llmspell-sessions/src/analytics/mod.rs` - Session analytics module ✅
+- **CREATED**: `llmspell-sessions/src/analytics/session_metrics.rs` - Session-specific metrics collector ✅
+- **LEVERAGED**: `llmspell-hooks/src/builtin/metrics.rs` - Complete MetricsHook with MetricsStorage ✅
 
 **What Already Exists** ✅:
 - [x] MetricsHook with comprehensive metrics collection ✅
@@ -1505,32 +1506,56 @@ The system currently focuses entirely on the "capture" side (automatic collectio
 - [x] Configurable metrics collection ✅
 
 **Acceptance Criteria**:
-- [ ] Session metrics using existing MetricsHook infrastructure
-- [ ] Session-specific metric types
-- [ ] Integration with existing privacy controls
+- [x] Session metrics using existing MetricsHook infrastructure ✅
+- [x] Session-specific metric types ✅
+- [x] Integration with existing privacy controls ✅
 
-**Implementation Steps**:
-1. **Session Metrics Extension** (1 hour):
+**Implementation Steps** (ACTUAL):
+1. **Session Metrics Collector** ✅:
    ```rust
-   pub struct SessionMetrics {
-       base_metrics: MetricsHook,
-       session_specific: HashMap<String, f64>,
+   pub struct SessionMetricsCollector {
+       metrics_hook: Arc<MetricsHook>,  // Reuses existing MetricsHook
+       config: SessionAnalyticsConfig,
+       session_start_times: Arc<RwLock<HashMap<String, Instant>>>,
+       operation_counts: Arc<RwLock<HashMap<String, HashMap<String, u64>>>>,
    }
    ```
 
-2. **Integration** (1 hour):
-   - Extend existing MetricsHook
-   - Session-specific aggregation
-   - Privacy compliance
+2. **MetricsHook Integration** ✅:
+   - Created SessionMetricsCollector that wraps MetricsHook with shared MetricsStorage
+   - Implements Hook trait to integrate with HookRegistry/HookExecutor
+   - Records session-specific metrics: duration, operations, resource usage
+   - Uses MetricsStorage.record_custom_metric() for session lifecycle tracking
+
+3. **Session Analytics Facade** ✅:
+   ```rust
+   pub struct SessionAnalytics {
+       collector: Arc<SessionMetricsCollector>,
+       storage: Arc<MetricsStorage>,  // Shared storage from MetricsHook
+       config: SessionAnalyticsConfig,
+   }
+   ```
+
+4. **Privacy Controls** ✅:
+   - SessionAnalyticsConfig includes privacy_mode flag
+   - anonymize_if_needed() hashes session IDs when privacy mode enabled
+   - Leverages existing MetricsHook privacy features
+
+**Key Implementation Details**:
+- SessionMetricType enum: SessionDuration, OperationCount, ResourceUsage, SuccessRate, etc.
+- Hooks into SessionStart/End/Checkpoint/Restore/Save events
+- get_session_summary() provides per-session metrics
+- get_aggregated_metrics() extends MetricsStorage.get_summary()
+- cleanup_old_metrics() based on retention_period configuration
 
 **Testing Requirements**:
-- [ ] Metrics accuracy using existing tests
-- [ ] Privacy compliance validation
+- [x] Metrics accuracy using existing tests ✅ (4 tests in session_metrics.rs)
+- [x] Privacy compliance validation ✅ (test_privacy_mode validates anonymization)
 
 **Definition of Done**:
-- [ ] Analytics use existing infrastructure
-- [ ] Session-specific extensions
-- [ ] Privacy maintained
+- [x] Analytics use existing infrastructure ✅ (MetricsHook and MetricsStorage)
+- [x] Session-specific extensions ✅ (SessionMetricsCollector with custom metrics)
+- [x] Privacy maintained ✅ (privacy_mode with session ID anonymization)
 
 ---
 
