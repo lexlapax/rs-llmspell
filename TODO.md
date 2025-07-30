@@ -1354,7 +1354,7 @@ The system currently focuses entirely on the "capture" side (automatic collectio
 #### Task 6.3.4: Implement session policies using existing hook patterns (LEVERAGE EXISTING)
 **Priority**: MEDIUM
 **Estimated Time**: 3 hours (REDUCED - using existing patterns)
-**Status**: TODO
+**Status**: COMPLETE ✅
 **Assigned To**: Hooks Team
 
 **Description**: Create session policy system using existing hook patterns from `llmspell-hooks/src/builtin/` and pattern hooks.
@@ -1373,10 +1373,10 @@ The system currently focuses entirely on the "capture" side (automatic collectio
 - [x] HookRegistry for organization ✅
 
 **Acceptance Criteria**:
-- [ ] Timeout policies using existing hook patterns
-- [ ] Resource limit policies using CostTrackingHook
-- [ ] Rate limiting using existing RateLimitHook
-- [ ] Policy composition using pattern hooks
+- [x] Timeout policies using existing hook patterns ✅
+- [x] Resource limit policies using CostTrackingHook ✅
+- [x] Rate limiting using existing RateLimitHook ✅
+- [x] Policy composition using pattern hooks ✅
 
 **Implementation Steps**:
 1. **Policy Framework** (1.5 hours):

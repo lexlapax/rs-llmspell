@@ -8,6 +8,10 @@
 #![allow(clippy::must_use_candidate)]
 #![allow(clippy::missing_errors_doc)]
 #![allow(clippy::unused_self)]
+#![allow(clippy::redundant_closure_for_method_calls)]
+#![allow(clippy::uninlined_format_args)]
+#![allow(clippy::map_unwrap_or)]
+#![allow(clippy::unnecessary_wraps)]
 
 //! # Session and Artifact Management
 //!
@@ -61,6 +65,9 @@ pub mod hooks;
 
 /// Event system integration
 pub mod events;
+
+/// Session policies using hook patterns
+pub mod policies;
 
 // Re-export commonly used types
 pub use artifact::{
