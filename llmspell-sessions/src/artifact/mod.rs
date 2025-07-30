@@ -1,6 +1,7 @@
 //! ABOUTME: Artifact storage system for managing session outputs and data
 //! ABOUTME: Provides content-addressed storage with metadata and versioning
 
+pub mod access;
 pub mod metadata;
 pub mod search;
 pub mod session_artifact;

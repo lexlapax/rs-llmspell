@@ -1,6 +1,7 @@
 //! ABOUTME: Artifact storage system that provides content-addressed storage with any backend
 //! ABOUTME: Abstracts over `StorageBackend` to support local, S3, cloud storage, etc.
 
+use super::access::{AccessControlConfig, AccessControlManager};
 use super::session_artifact::SessionArtifact;
 use super::types::{ArtifactId, ArtifactMetadata, ArtifactType, ContentHash};
 use super::versioning::VersionManager;
@@ -30,6 +31,8 @@ pub struct ArtifactStorageConfig {
     pub chunk_size: usize,
     /// Storage key prefix (useful for multi-tenant scenarios)
     pub key_prefix: String,
+    /// Access control configuration
+    pub access_control: AccessControlConfig,
 }
 
 impl Default for ArtifactStorageConfig {
@@ -42,6 +45,7 @@ impl Default for ArtifactStorageConfig {
             cache_size: 100,
             chunk_size: 1024 * 1024, // 1MB chunks
             key_prefix: "artifacts".to_string(),
+            access_control: AccessControlConfig::default(),
         }
     }
 }
@@ -91,6 +95,8 @@ pub struct ArtifactStorage {
     dedup_index: Arc<RwLock<HashMap<ContentHash, usize>>>,
     /// Version manager for tracking artifact versions
     version_manager: Arc<VersionManager>,
+    /// Access control manager
+    access_control_manager: Arc<AccessControlManager>,
 }
 
 impl ArtifactStorage {
@@ -108,6 +114,9 @@ impl ArtifactStorage {
             config.key_prefix.clone(),
         ));
 
+        let access_control_manager =
+            Arc::new(AccessControlManager::new(config.access_control.clone()));
+
         Self {
             storage_backend,
             config,
@@ -115,12 +124,18 @@ impl ArtifactStorage {
             session_stats: Arc::new(RwLock::new(HashMap::new())),
             dedup_index: Arc::new(RwLock::new(HashMap::new())),
             version_manager,
+            access_control_manager,
         }
     }
 
     /// Create with default configuration
     pub fn with_backend(storage_backend: Arc<dyn StorageBackend>) -> Self {
         Self::new(storage_backend, ArtifactStorageConfig::default())
+    }
+
+    /// Get access to the access control manager
+    pub fn access_control_manager(&self) -> &Arc<AccessControlManager> {
+        &self.access_control_manager
     }
 
     /// Generate a storage key for metadata
@@ -935,6 +950,11 @@ impl ArtifactStorageOps for ArtifactStorage {
             session_id,
             u64::from(updated_metadata.version.version),
         );
+
+        // Initialize access control for the versioned artifact (owner is the session that created it)
+        self.access_control_manager
+            .initialize_acl(versioned_id.clone(), session_id)
+            .await?;
 
         // Check if content already exists (deduplication)
         let content_exists = self.content_exists(&content_hash).await?;

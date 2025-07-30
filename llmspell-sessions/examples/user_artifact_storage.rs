@@ -64,7 +64,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Stored text artifact: {}", text_artifact_id);
 
     // Retrieve and display the text artifact
-    let retrieved_artifact = session_manager.get_artifact(&text_artifact_id).await?;
+    let retrieved_artifact = session_manager
+        .get_artifact(&session_id, &text_artifact_id)
+        .await?;
     println!("Retrieved artifact: {}", retrieved_artifact.metadata.name);
     println!(
         "Content: {}",
@@ -176,11 +178,16 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Example 7: Clean up - delete an artifact
     println!("\n--- Example 7: Delete Artifact ---");
-    session_manager.delete_artifact(&text_artifact_id).await?;
+    session_manager
+        .delete_artifact(&session_id, &text_artifact_id)
+        .await?;
     println!("Deleted artifact: {}", text_artifact_id);
 
     // Verify deletion
-    match session_manager.get_artifact(&text_artifact_id).await {
+    match session_manager
+        .get_artifact(&session_id, &text_artifact_id)
+        .await
+    {
         Ok(_) => println!("ERROR: Artifact still exists!"),
         Err(_) => println!("Confirmed: Artifact was deleted"),
     }

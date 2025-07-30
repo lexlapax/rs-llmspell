@@ -3,8 +3,8 @@
 
 use crate::{
     artifact::{
-        ArtifactId, ArtifactMetadata, ArtifactQuery, ArtifactStorage, ArtifactStorageOps,
-        ArtifactType, SessionArtifact,
+        access::AccessType, ArtifactId, ArtifactMetadata, ArtifactQuery, ArtifactStorage,
+        ArtifactStorageOps, ArtifactType, SessionArtifact,
     },
     config::SessionManagerConfig,
     hooks::{register_artifact_collectors, ArtifactCollectionProcessor, CollectorConfig},
@@ -182,30 +182,30 @@ impl SessionManager {
             );
 
             for hook in hooks {
-                let mut context = HookContext::new(HookPoint::SessionStart, component_id.clone());
-                context.data.insert(
+                let mut hook_ctx = HookContext::new(HookPoint::SessionStart, component_id.clone());
+                hook_ctx.data.insert(
                     "session_id".to_string(),
                     serde_json::json!(session_id.to_string()),
                 );
                 if let Some(ref name) = options.name {
-                    context
+                    hook_ctx
                         .data
                         .insert("name".to_string(), serde_json::json!(name));
                 }
                 if let Some(ref created_by) = options.created_by {
-                    context
+                    hook_ctx
                         .data
                         .insert("created_by".to_string(), serde_json::json!(created_by));
                 }
 
-                if let Err(e) = hook.execute(&mut context).await {
+                if let Err(e) = hook.execute(&mut hook_ctx).await {
                     warn!("Session start hook failed: {e}");
                 }
 
                 // Process any collected artifacts
                 if let Some(ref collector) = self.artifact_collector {
-                    if ArtifactCollectionProcessor::should_process_hook_point(&context.point) {
-                        let _ = collector.process_hook_context(&context, &session_id).await;
+                    if ArtifactCollectionProcessor::should_process_hook_point(&hook_ctx.point) {
+                        let _ = collector.process_hook_context(&hook_ctx, &session_id).await;
                     }
                 }
             }
@@ -399,17 +399,17 @@ impl SessionManager {
             );
 
             for hook in hooks {
-                let mut context =
+                let mut hook_ctx =
                     HookContext::new(HookPoint::SessionCheckpoint, component_id.clone());
-                context.data.insert(
+                hook_ctx.data.insert(
                     "session_id".to_string(),
                     serde_json::json!(session_id.to_string()),
                 );
-                context
+                hook_ctx
                     .data
                     .insert("action".to_string(), serde_json::json!("suspend"));
 
-                if let Err(e) = hook.execute(&mut context).await {
+                if let Err(e) = hook.execute(&mut hook_ctx).await {
                     warn!("Session suspend hook failed: {e}");
                 }
             }
@@ -459,16 +459,17 @@ impl SessionManager {
             );
 
             for hook in hooks {
-                let mut context = HookContext::new(HookPoint::SessionRestore, component_id.clone());
-                context.data.insert(
+                let mut hook_ctx =
+                    HookContext::new(HookPoint::SessionRestore, component_id.clone());
+                hook_ctx.data.insert(
                     "session_id".to_string(),
                     serde_json::json!(session_id.to_string()),
                 );
-                context
+                hook_ctx
                     .data
                     .insert("action".to_string(), serde_json::json!("resume"));
 
-                if let Err(e) = hook.execute(&mut context).await {
+                if let Err(e) = hook.execute(&mut hook_ctx).await {
                     warn!("Session resume hook failed: {e}");
                 }
             }
@@ -513,16 +514,16 @@ impl SessionManager {
             );
 
             for hook in hooks {
-                let mut context = HookContext::new(HookPoint::SessionEnd, component_id.clone());
-                context.data.insert(
+                let mut hook_ctx = HookContext::new(HookPoint::SessionEnd, component_id.clone());
+                hook_ctx.data.insert(
                     "session_id".to_string(),
                     serde_json::json!(session_id.to_string()),
                 );
-                context
+                hook_ctx
                     .data
                     .insert("action".to_string(), serde_json::json!("complete"));
 
-                if let Err(e) = hook.execute(&mut context).await {
+                if let Err(e) = hook.execute(&mut hook_ctx).await {
                     warn!("Session end hook failed: {e}");
                 }
             }
@@ -576,16 +577,16 @@ impl SessionManager {
             );
 
             for hook in hooks {
-                let mut context = HookContext::new(HookPoint::SessionSave, component_id.clone());
-                context.data.insert(
+                let mut hook_ctx = HookContext::new(HookPoint::SessionSave, component_id.clone());
+                hook_ctx.data.insert(
                     "session_id".to_string(),
                     serde_json::json!(session_id.to_string()),
                 );
-                context
+                hook_ctx
                     .data
                     .insert("action".to_string(), serde_json::json!("save"));
 
-                if let Err(e) = hook.execute(&mut context).await {
+                if let Err(e) = hook.execute(&mut hook_ctx).await {
                     warn!("Session save hook failed: {e}");
                 }
             }
@@ -938,29 +939,29 @@ impl SessionManager {
             );
 
             for hook in hooks {
-                let mut context =
+                let mut hook_ctx =
                     HookContext::new(HookPoint::AfterToolExecution, component_id.clone());
-                context.data.insert(
+                hook_ctx.data.insert(
                     "session_id".to_string(),
                     serde_json::json!(session_id.to_string()),
                 );
-                context.data.insert(
+                hook_ctx.data.insert(
                     "artifact_id".to_string(),
                     serde_json::json!(artifact_id.to_string()),
                 );
-                context.data.insert(
+                hook_ctx.data.insert(
                     "artifact_type".to_string(),
                     serde_json::json!(artifact_type.to_string()),
                 );
-                context
+                hook_ctx
                     .data
                     .insert("name".to_string(), serde_json::json!(name));
-                context.data.insert(
+                hook_ctx.data.insert(
                     "size".to_string(),
                     serde_json::json!(artifact.metadata.size),
                 );
 
-                if let Err(e) = hook.execute(&mut context).await {
+                if let Err(e) = hook.execute(&mut hook_ctx).await {
                     warn!("Artifact storage hook failed: {e}");
                 }
             }
@@ -994,7 +995,29 @@ impl SessionManager {
     /// # Errors
     ///
     /// Returns an error if the artifact is not found or retrieval fails
-    pub async fn get_artifact(&self, artifact_id: &ArtifactId) -> Result<SessionArtifact> {
+    pub async fn get_artifact(
+        &self,
+        session_id: &SessionId,
+        artifact_id: &ArtifactId,
+    ) -> Result<SessionArtifact> {
+        // Check access permission
+        let has_permission = self
+            .artifact_storage
+            .access_control_manager()
+            .check_permission(artifact_id, session_id, AccessType::Read)
+            .await?;
+
+        if !has_permission {
+            return Err(SessionError::AccessDenied {
+                message: format!(
+                    "Session {} does not have read permission for artifact {}",
+                    session_id,
+                    artifact_id.storage_key()
+                ),
+            });
+        }
+
+        // Retrieve the artifact
         self.artifact_storage
             .get_artifact(artifact_id)
             .await?
@@ -1008,8 +1031,12 @@ impl SessionManager {
     /// # Errors
     ///
     /// Returns an error if the artifact is not found or content retrieval fails
-    pub async fn get_artifact_content(&self, artifact_id: &ArtifactId) -> Result<Vec<u8>> {
-        let artifact = self.get_artifact(artifact_id).await?;
+    pub async fn get_artifact_content(
+        &self,
+        session_id: &SessionId,
+        artifact_id: &ArtifactId,
+    ) -> Result<Vec<u8>> {
+        let artifact = self.get_artifact(session_id, artifact_id).await?;
         artifact.get_content()
     }
 
@@ -1022,6 +1049,8 @@ impl SessionManager {
         // Verify session exists
         self.get_session(session_id).await?;
 
+        // For now, only allow sessions to list their own artifacts
+        // Cross-session access control for listing will be implemented in a future enhancement
         self.artifact_storage
             .list_session_artifacts(session_id)
             .await
@@ -1035,7 +1064,28 @@ impl SessionManager {
     /// - Artifact not found
     /// - Session is not active
     /// - Deletion fails
-    pub async fn delete_artifact(&self, artifact_id: &ArtifactId) -> Result<()> {
+    pub async fn delete_artifact(
+        &self,
+        requesting_session_id: &SessionId,
+        artifact_id: &ArtifactId,
+    ) -> Result<()> {
+        // Check access permission for deletion (requires admin access)
+        let has_permission = self
+            .artifact_storage
+            .access_control_manager()
+            .check_permission(artifact_id, requesting_session_id, AccessType::Delete)
+            .await?;
+
+        if !has_permission {
+            return Err(SessionError::AccessDenied {
+                message: format!(
+                    "Session {} does not have delete permission for artifact {}",
+                    requesting_session_id,
+                    artifact_id.storage_key()
+                ),
+            });
+        }
+
         // Verify session exists and is active
         let session = self.get_session(&artifact_id.session_id).await?;
         let status = session.status().await;
@@ -1082,7 +1132,147 @@ impl SessionManager {
     ///
     /// Returns an error if the query fails
     pub async fn query_artifacts(&self, query: ArtifactQuery) -> Result<Vec<ArtifactMetadata>> {
+        // For now, querying is limited to the session specified in the query
+        // Cross-session access control for querying will be implemented in a future enhancement
         self.artifact_storage.query_artifacts(query).await
+    }
+
+    /// Grant permission for another session to access an artifact
+    ///
+    /// # Arguments
+    ///
+    /// * `granting_session_id` - The session granting the permission (must have admin access)
+    /// * `artifact_id` - The artifact to grant access to
+    /// * `target_session_id` - The session to grant access to
+    /// * `permission` - The level of permission to grant
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the granting session doesn't have admin access or the operation fails
+    pub async fn grant_artifact_permission(
+        &self,
+        granting_session_id: &SessionId,
+        artifact_id: &ArtifactId,
+        target_session_id: SessionId,
+        permission: crate::artifact::access::Permission,
+    ) -> Result<()> {
+        self.artifact_storage
+            .access_control_manager()
+            .grant_permission(
+                artifact_id,
+                target_session_id,
+                permission,
+                *granting_session_id,
+            )
+            .await
+    }
+
+    /// Revoke permission for another session to access an artifact
+    ///
+    /// # Arguments
+    ///
+    /// * `revoking_session_id` - The session revoking the permission (must have admin access)
+    /// * `artifact_id` - The artifact to revoke access from
+    /// * `target_session_id` - The session to revoke access from
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the revoking session doesn't have admin access or the operation fails
+    pub async fn revoke_artifact_permission(
+        &self,
+        revoking_session_id: &SessionId,
+        artifact_id: &ArtifactId,
+        target_session_id: &SessionId,
+    ) -> Result<()> {
+        self.artifact_storage
+            .access_control_manager()
+            .revoke_permission(artifact_id, target_session_id, *revoking_session_id)
+            .await
+    }
+
+    /// Get access control list for an artifact
+    ///
+    /// # Arguments
+    ///
+    /// * `requesting_session_id` - The session requesting the ACL (must have admin access)
+    /// * `artifact_id` - The artifact to get the ACL for
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the requesting session doesn't have admin access
+    pub async fn get_artifact_acl(
+        &self,
+        requesting_session_id: &SessionId,
+        artifact_id: &ArtifactId,
+    ) -> Result<crate::artifact::access::AccessControlList> {
+        // Check if the requesting session has admin access to view the ACL
+        let has_permission = self
+            .artifact_storage
+            .access_control_manager()
+            .check_permission(
+                artifact_id,
+                requesting_session_id,
+                AccessType::ChangePermissions,
+            )
+            .await?;
+
+        if !has_permission {
+            return Err(SessionError::AccessDenied {
+                message: format!(
+                    "Session {} does not have permission to view ACL for artifact {}",
+                    requesting_session_id,
+                    artifact_id.storage_key()
+                ),
+            });
+        }
+
+        self.artifact_storage
+            .access_control_manager()
+            .get_acl(artifact_id)
+            .await
+    }
+
+    /// Get audit log for an artifact
+    ///
+    /// # Arguments
+    ///
+    /// * `requesting_session_id` - The session requesting the audit log (must have admin access)
+    /// * `artifact_id` - The artifact to get the audit log for
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the requesting session doesn't have admin access
+    pub async fn get_artifact_audit_log(
+        &self,
+        requesting_session_id: &SessionId,
+        artifact_id: &ArtifactId,
+    ) -> Result<Vec<crate::artifact::access::AccessAuditEntry>> {
+        // Check if the requesting session has admin access to view the audit log
+        let has_permission = self
+            .artifact_storage
+            .access_control_manager()
+            .check_permission(
+                artifact_id,
+                requesting_session_id,
+                AccessType::ChangePermissions,
+            )
+            .await?;
+
+        if !has_permission {
+            return Err(SessionError::AccessDenied {
+                message: format!(
+                    "Session {} does not have permission to view audit log for artifact {}",
+                    requesting_session_id,
+                    artifact_id.storage_key()
+                ),
+            });
+        }
+
+        Ok(self
+            .artifact_storage
+            .access_control_manager()
+            .get_audit_log(artifact_id)
+            .await)
     }
 
     /// Store a file as an artifact
@@ -1253,7 +1443,10 @@ mod tests {
             .unwrap();
 
         // Retrieve the artifact
-        let artifact = manager.get_artifact(&artifact_id).await.unwrap();
+        let artifact = manager
+            .get_artifact(&session_id, &artifact_id)
+            .await
+            .unwrap();
         assert_eq!(artifact.metadata.name, "my_data.txt");
         assert_eq!(artifact.metadata.artifact_type, ArtifactType::UserInput);
         assert_eq!(artifact.get_content().unwrap(), content);
@@ -1264,10 +1457,13 @@ mod tests {
         assert_eq!(artifacts[0].name, "my_data.txt");
 
         // Delete the artifact
-        manager.delete_artifact(&artifact_id).await.unwrap();
+        manager
+            .delete_artifact(&session_id, &artifact_id)
+            .await
+            .unwrap();
 
         // Verify it's deleted
-        let result = manager.get_artifact(&artifact_id).await;
+        let result = manager.get_artifact(&session_id, &artifact_id).await;
         assert!(result.is_err());
     }
 
@@ -1304,7 +1500,10 @@ mod tests {
             .unwrap();
 
         // Retrieve and verify metadata
-        let artifact = manager.get_artifact(&artifact_id).await.unwrap();
+        let artifact = manager
+            .get_artifact(&session_id, &artifact_id)
+            .await
+            .unwrap();
         assert_eq!(
             artifact.metadata.custom.get("author").unwrap(),
             &serde_json::json!("John Doe")
@@ -1338,7 +1537,10 @@ mod tests {
             .unwrap();
 
         // Retrieve and verify
-        let artifact = manager.get_artifact(&artifact_id).await.unwrap();
+        let artifact = manager
+            .get_artifact(&session_id, &artifact_id)
+            .await
+            .unwrap();
         assert_eq!(artifact.metadata.name, "test_file.json");
         assert_eq!(artifact.get_content().unwrap(), content.as_bytes());
     }
@@ -1381,7 +1583,7 @@ mod tests {
 
         // Suspend again and try to delete - should fail
         manager.suspend_session(&session_id).await.unwrap();
-        let result = manager.delete_artifact(&artifact_id).await;
+        let result = manager.delete_artifact(&session_id, &artifact_id).await;
         assert!(result.is_err());
     }
 
