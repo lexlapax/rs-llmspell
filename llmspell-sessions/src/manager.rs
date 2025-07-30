@@ -7,7 +7,10 @@ use crate::{
         ArtifactStorageOps, ArtifactType, SessionArtifact,
     },
     config::SessionManagerConfig,
-    hooks::{register_artifact_collectors, ArtifactCollectionProcessor, CollectorConfig},
+    hooks::{
+        register_artifact_collectors, ArtifactCollectionProcessor, CollectorConfig,
+        SessionHookContextHelper,
+    },
     replay::ReplayEngine,
     session::{Session, SessionSnapshot},
     types::{CreateSessionOptions, SessionQuery, SessionSortBy},
@@ -18,10 +21,7 @@ use llmspell_events::{
     correlation::EventCorrelationTracker,
     universal_event::{Language, UniversalEvent},
 };
-use llmspell_hooks::{
-    ComponentId, ComponentType, HookContext, HookExecutor, HookPoint, HookRegistry, LoggingHook,
-    MetricsHook,
-};
+use llmspell_hooks::{HookExecutor, HookPoint, HookRegistry, LoggingHook, MetricsHook};
 use llmspell_state_persistence::StateManager;
 use llmspell_state_traits::StateScope;
 use llmspell_storage::StorageBackend;
@@ -176,27 +176,14 @@ impl SessionManager {
         // Fire session start hooks
         if self.config.hook_config.enable_lifecycle_hooks {
             let hooks = self.hook_registry.get_hooks(&HookPoint::SessionStart);
-            let component_id = ComponentId::new(
-                ComponentType::Custom("SessionManager".to_string()),
-                "session-manager".to_string(),
-            );
 
             for hook in hooks {
-                let mut hook_ctx = HookContext::new(HookPoint::SessionStart, component_id.clone());
-                hook_ctx.data.insert(
-                    "session_id".to_string(),
-                    serde_json::json!(session_id.to_string()),
-                );
-                if let Some(ref name) = options.name {
-                    hook_ctx
-                        .data
-                        .insert("name".to_string(), serde_json::json!(name));
-                }
-                if let Some(ref created_by) = options.created_by {
-                    hook_ctx
-                        .data
-                        .insert("created_by".to_string(), serde_json::json!(created_by));
-                }
+                let mut hook_ctx = SessionHookContextHelper::create_lifecycle_context(
+                    HookPoint::SessionStart,
+                    &session,
+                    "session-manager",
+                )
+                .await;
 
                 if let Err(e) = hook.execute(&mut hook_ctx).await {
                     warn!("Session start hook failed: {e}");
@@ -393,18 +380,14 @@ impl SessionManager {
         // Fire pre-suspend hooks
         if self.config.hook_config.enable_lifecycle_hooks {
             let hooks = self.hook_registry.get_hooks(&HookPoint::SessionCheckpoint);
-            let component_id = ComponentId::new(
-                ComponentType::Custom("SessionManager".to_string()),
-                "session-manager".to_string(),
-            );
 
             for hook in hooks {
-                let mut hook_ctx =
-                    HookContext::new(HookPoint::SessionCheckpoint, component_id.clone());
-                hook_ctx.data.insert(
-                    "session_id".to_string(),
-                    serde_json::json!(session_id.to_string()),
-                );
+                let mut hook_ctx = SessionHookContextHelper::create_lifecycle_context(
+                    HookPoint::SessionCheckpoint,
+                    &session,
+                    "session-manager",
+                )
+                .await;
                 hook_ctx
                     .data
                     .insert("action".to_string(), serde_json::json!("suspend"));
@@ -453,18 +436,14 @@ impl SessionManager {
         // Fire pre-resume hooks
         if self.config.hook_config.enable_lifecycle_hooks {
             let hooks = self.hook_registry.get_hooks(&HookPoint::SessionRestore);
-            let component_id = ComponentId::new(
-                ComponentType::Custom("SessionManager".to_string()),
-                "session-manager".to_string(),
-            );
 
             for hook in hooks {
-                let mut hook_ctx =
-                    HookContext::new(HookPoint::SessionRestore, component_id.clone());
-                hook_ctx.data.insert(
-                    "session_id".to_string(),
-                    serde_json::json!(session_id.to_string()),
-                );
+                let mut hook_ctx = SessionHookContextHelper::create_lifecycle_context(
+                    HookPoint::SessionRestore,
+                    &session,
+                    "session-manager",
+                )
+                .await;
                 hook_ctx
                     .data
                     .insert("action".to_string(), serde_json::json!("resume"));
@@ -508,17 +487,14 @@ impl SessionManager {
         // Fire pre-complete hooks
         if self.config.hook_config.enable_lifecycle_hooks {
             let hooks = self.hook_registry.get_hooks(&HookPoint::SessionEnd);
-            let component_id = ComponentId::new(
-                ComponentType::Custom("SessionManager".to_string()),
-                "session-manager".to_string(),
-            );
 
             for hook in hooks {
-                let mut hook_ctx = HookContext::new(HookPoint::SessionEnd, component_id.clone());
-                hook_ctx.data.insert(
-                    "session_id".to_string(),
-                    serde_json::json!(session_id.to_string()),
-                );
+                let mut hook_ctx = SessionHookContextHelper::create_lifecycle_context(
+                    HookPoint::SessionEnd,
+                    &session,
+                    "session-manager",
+                )
+                .await;
                 hook_ctx
                     .data
                     .insert("action".to_string(), serde_json::json!("complete"));
@@ -571,17 +547,14 @@ impl SessionManager {
         // Fire pre-save hooks
         if self.config.hook_config.enable_lifecycle_hooks {
             let hooks = self.hook_registry.get_hooks(&HookPoint::SessionSave);
-            let component_id = ComponentId::new(
-                ComponentType::Custom("SessionManager".to_string()),
-                "session-manager".to_string(),
-            );
 
             for hook in hooks {
-                let mut hook_ctx = HookContext::new(HookPoint::SessionSave, component_id.clone());
-                hook_ctx.data.insert(
-                    "session_id".to_string(),
-                    serde_json::json!(session_id.to_string()),
-                );
+                let mut hook_ctx = SessionHookContextHelper::create_lifecycle_context(
+                    HookPoint::SessionSave,
+                    session,
+                    "session-manager",
+                )
+                .await;
                 hook_ctx
                     .data
                     .insert("action".to_string(), serde_json::json!("save"));
@@ -933,22 +906,15 @@ impl SessionManager {
         // Fire artifact creation hooks if enabled
         if self.config.hook_config.enable_artifact_collection {
             let hooks = self.hook_registry.get_hooks(&HookPoint::AfterToolExecution);
-            let component_id = ComponentId::new(
-                ComponentType::Custom("SessionManager".to_string()),
-                "session-manager".to_string(),
-            );
 
             for hook in hooks {
-                let mut hook_ctx =
-                    HookContext::new(HookPoint::AfterToolExecution, component_id.clone());
-                hook_ctx.data.insert(
-                    "session_id".to_string(),
-                    serde_json::json!(session_id.to_string()),
-                );
-                hook_ctx.data.insert(
-                    "artifact_id".to_string(),
-                    serde_json::json!(artifact_id.to_string()),
-                );
+                let mut hook_ctx = SessionHookContextHelper::create_artifact_context(
+                    &session,
+                    "store_artifact",
+                    &artifact_id.to_string(),
+                    "session-manager",
+                )
+                .await;
                 hook_ctx.data.insert(
                     "artifact_type".to_string(),
                     serde_json::json!(artifact_type.to_string()),

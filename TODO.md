@@ -1170,359 +1170,347 @@ The system currently focuses entirely on the "capture" side (automatic collectio
 
 ### Phase 6.3: Hook Integration and Lifecycle (Day 6-8)
 
-#### Task 6.3.1: Implement session hook context builders
+#### Task 6.3.1: Extend session hook context builders (LEVERAGE EXISTING)
 **Priority**: HIGH
-**Estimated Time**: 3 hours
-**Status**: TODO
+**Estimated Time**: 2 hours (REDUCED - leveraging existing HookContext & HookContextBuilder)
+**Status**: DONE ✅
 **Assigned To**: Hooks Team Lead
 
-**Description**: Create specialized HookContext builders for session events.
+**Description**: Extend existing HookContext and HookContextBuilder for session-specific metadata using the comprehensive infrastructure already in `llmspell-hooks/src/context.rs`.
 
 **Files to Create/Update**:
-- **CREATE**: `llmspell-sessions/src/hooks/context.rs` - Context builders
-- **UPDATE**: `llmspell-sessions/src/hooks/lifecycle.rs` - Use contexts
+- **UPDATE**: `llmspell-sessions/src/manager.rs` - Use HookContextBuilder for session lifecycle hooks
+- **CREATE**: `llmspell-sessions/src/hooks/context_extensions.rs` - Session-specific helper methods
+- **LEVERAGE**: `llmspell-hooks/src/context.rs` - Complete HookContext & HookContextBuilder already exists ✅
+
+**What Already Exists** ✅:
+- [x] Full HookContext with data, metadata, correlation_id, timestamp, operation context ✅
+- [x] HookContextBuilder with fluent API (language, correlation_id, data, metadata, operation, parent) ✅
+- [x] OperationContext for operation-specific data ✅
+- [x] Child context creation with correlation propagation ✅
+- [x] Serialization/deserialization support ✅
 
 **Acceptance Criteria**:
-- [ ] SessionStartContext builder with rich metadata
-- [ ] SessionEndContext builder
-- [ ] SessionSuspendContext builder
-- [ ] SessionResumeContext builder
-- [ ] Rich metadata included automatically
-- [ ] Type-safe API
-- [ ] Extensible for custom metadata
+- [x] SessionManager uses HookContextBuilder for all lifecycle hooks ✅
+- [x] Session metadata automatically added to hook contexts ✅
+- [x] Artifact operations included in hook contexts ✅
+- [x] Performance metrics enriched in contexts ✅
+- [x] Helper methods for common session context patterns ✅
 
 **Implementation Steps**:
-1. **Base Context Builder** (1 hour):
+1. **Update SessionManager Hook Usage** (1 hour):
    ```rust
-   pub struct SessionContextBuilder {
-       session_id: SessionId,
-       correlation_id: Uuid,
-       metadata: HashMap<String, Value>,
-   }
-   
-   impl SessionContextBuilder {
-       pub fn with_session(session: &Session) -> Self {
-           // Extract all session data
-       }
-   }
+   let context = HookContextBuilder::new(
+       HookPoint::SessionStart,
+       ComponentId::new(ComponentType::Session, session_id.to_string())
+   )
+   .correlation_id(session.correlation_id())
+   .data("session_id".to_string(), json!(session_id.to_string()))
+   .data("session_config".to_string(), json!(session.config()))
+   .metadata("operation_count".to_string(), session.operation_count().to_string())
+   .build();
    ```
 
-2. **Specific Builders** (1 hour):
-   - StartContext with config
-   - EndContext with summary
-   - SuspendContext with state
-   - ResumeContext with duration
-
-3. **Metadata Helpers** (1 hour):
-   - Auto-include timestamps
-   - Add performance metrics
-   - Include resource usage
-   - Correlation tracking
+2. **Session-specific Extensions** (1 hour):
+   - Helper methods for session data injection
+   - Artifact metadata inclusion
+   - Performance timing data
+   - Context enrichment utilities
 
 **Testing Requirements**:
-- [ ] Context building tests
-- [ ] Metadata completeness tests
-- [ ] Type safety tests
-- [ ] Serialization tests
+- [x] Context building tests with session data ✅
+- [x] Metadata completeness validation ✅
+- [x] Integration with existing hook system ✅
 
 **Definition of Done**:
-- [ ] All builders implemented
-- [ ] Metadata comprehensive
-- [ ] Type-safe API
-- [ ] Well documented
+- [x] SessionManager uses rich contexts ✅
+- [x] Session metadata automatically included ✅
+- [x] Helper methods implemented ✅
+- [x] No performance degradation ✅
 
 ---
 
-#### Task 6.3.2: Implement ReplayableHook for sessions
+#### Task 6.3.2: Use existing ReplayableHook trait for sessions (LEVERAGE EXISTING)
 **Priority**: HIGH
-**Estimated Time**: 5 hours
+**Estimated Time**: 3 hours (REDUCED - leveraging existing trait)
 **Status**: TODO
 **Assigned To**: Hooks Team
 
-**Description**: Implement ReplayableHook trait for session replay functionality.
+**Description**: Implement existing ReplayableHook trait for session hooks using the comprehensive replay infrastructure already in `llmspell-hooks/src/replay/`.
 
 **Files to Create/Update**:
-- **CREATE**: `llmspell-sessions/src/replay/hook.rs` - ReplayableHook impl
-- **UPDATE**: `llmspell-sessions/src/hooks/lifecycle.rs` - Make hooks replayable
+- **CREATE**: `llmspell-sessions/src/hooks/session_hooks.rs` - Session hooks implementing ReplayableHook
+- **LEVERAGE**: `llmspell-hooks/src/traits.rs` - Complete ReplayableHook trait already exists ✅
+- **LEVERAGE**: `llmspell-hooks/src/replay/` - Full replay system (manager, scheduler, comparator) ✅
+
+**What Already Exists** ✅:
+- [x] ReplayableHook trait with serialize/deserialize context methods ✅
+- [x] ReplayManager with advanced replay capabilities ✅
+- [x] ReplayScheduler for scheduled replays ✅  
+- [x] HookResultComparator for result validation ✅
+- [x] Parameter modification support ✅
+- [x] Batch replay functionality ✅
+- [x] ReplayConfig with multiple modes (Exact, Modified, Simulate, Debug) ✅
 
 **Acceptance Criteria**:
-- [ ] ReplayableHook trait implementation for all session hooks
-- [ ] Hook execution recording with full context
-- [ ] Deterministic replay guaranteed
-- [ ] State snapshot support
-- [ ] Replay validation mechanisms
-- [ ] Performance optimization
-- [ ] Side effect handling
+- [ ] Session lifecycle hooks implement ReplayableHook trait
+- [ ] Hook execution recording with session context
+- [ ] Integration with existing ReplayManager
+- [ ] State snapshot support for sessions
+- [ ] Replay validation using existing comparator
 
 **Implementation Steps**:
-1. **Implement ReplayableHook** (2 hours):
+1. **Session Hook Implementations** (2 hours):
    ```rust
+   pub struct SessionStartHook;
+   
+   #[async_trait]
    impl ReplayableHook for SessionStartHook {
-       fn record_execution(&self, context: &HookContext) -> ReplayRecord {
-           ReplayRecord {
-               hook_id: self.id(),
-               context: context.clone(),
-               timestamp: Utc::now(),
-               state_snapshot: self.capture_state(),
-           }
+       fn replay_id(&self) -> String {
+           format!("session_start:{}", self.metadata().version)
        }
        
-       async fn replay(&self, record: &ReplayRecord) -> Result<()> {
-           // Restore state and re-execute
-       }
+       // Use default serialize/deserialize context methods
    }
    ```
 
-2. **State Snapshot System** (1.5 hours):
-   - Capture relevant state
-   - Efficient serialization
-   - Compression support
-   - Incremental snapshots
-
-3. **Determinism Guarantees** (1.5 hours):
-   - Remove non-deterministic elements
-   - Mock time/random values
-   - Ensure same results
-   - Validation checks
+2. **Integration with Existing Replay System** (1 hour):
+   - Register session hooks with ReplayManager
+   - Use existing replay scheduling
+   - Leverage result comparison
+   - State snapshot integration
 
 **Testing Requirements**:
-- [ ] Record/replay round-trip tests
-- [ ] Determinism verification tests
-- [ ] State consistency tests
-- [ ] Performance impact tests
-- [ ] Edge case tests
+- [ ] Replay round-trip tests using existing infrastructure
+- [ ] Integration with ReplayManager
+- [ ] State consistency validation
 
 **Definition of Done**:
-- [ ] All hooks replayable
-- [ ] Determinism guaranteed
-- [ ] State snapshots working
-- [ ] Performance acceptable
-- [ ] Documentation complete
+- [ ] Session hooks are replayable
+- [ ] Integration with existing replay system
+- [ ] No duplicate implementation
+- [ ] Performance maintained
 
 ---
 
-#### Task 6.3.3: Create session event correlation
+#### Task 6.3.3: Use existing event correlation system (LEVERAGE EXISTING)
 **Priority**: HIGH
-**Estimated Time**: 4 hours
+**Estimated Time**: 2 hours (REDUCED - using existing system)
 **Status**: TODO
 **Assigned To**: Hooks Team
 
-**Description**: Integrate event correlation for all session activities.
+**Description**: Integrate sessions with the comprehensive event correlation system already implemented in `llmspell-events/src/correlation/`.
 
 **Files to Create/Update**:
-- **UPDATE**: `llmspell-sessions/src/manager.rs` - Add correlation
-- **CREATE**: `llmspell-sessions/src/events.rs` - Session events
-- **CREATE**: Tests for event correlation
+- **UPDATE**: `llmspell-sessions/src/manager.rs` - Use existing EventCorrelationTracker
+- **CREATE**: `llmspell-sessions/src/events/session_events.rs` - Session-specific event types
+- **LEVERAGE**: `llmspell-events/src/correlation/` - Complete correlation system already exists ✅
+
+**What Already Exists** ✅:
+- [x] EventCorrelationTracker with full correlation functionality ✅
+- [x] CorrelationContext with parent/root relationships ✅
+- [x] EventRelationship types (CausedBy, PartOf, RelatedTo, ResponseTo, FollowsFrom, ConcurrentWith) ✅
+- [x] EventLink for linking related events ✅
+- [x] Timeline reconstruction with query capabilities ✅
+- [x] Auto-detection of event relationships ✅
+- [x] Cleanup and memory management ✅
 
 **Acceptance Criteria**:
-- [ ] Correlation ID generation for sessions
-- [ ] Event linking implementation
-- [ ] Activity timeline creation
-- [ ] Cross-component correlation
-- [ ] Query capabilities
-- [ ] Visualization support
-- [ ] Performance impact minimal
+- [ ] Sessions generate correlation IDs using existing CorrelationContext
+- [ ] Session events linked using existing EventLink system
+- [ ] Timeline queries work for session activities
+- [ ] Integration with existing event bus
 
 **Implementation Steps**:
-1. **Correlation Integration** (1.5 hours):
-   - Generate correlation ID on session start
-   - Propagate through all operations
-   - Include in all events
-   - Link related activities
+1. **Session Correlation Integration** (1 hour):
+   ```rust
+   // Use existing CorrelationContext in SessionManager
+   let correlation_context = CorrelationContext::new_root()
+       .with_metadata("session_id", session_id.to_string())
+       .with_tag("session_lifecycle");
+   
+   self.correlation_tracker.add_context(correlation_context);
+   ```
 
-2. **Timeline Building** (1.5 hours):
-   - Collect all correlated events
-   - Sort chronologically
-   - Build activity graph
-   - Calculate durations
-
-3. **Query Implementation** (1 hour):
-   - Query by correlation ID
-   - Filter by event type
-   - Time range queries
+2. **Session Event Types** (1 hour):
+   - Define session-specific UniversalEvent types
+   - Use existing event correlation
+   - Timeline query integration
    - Export capabilities
 
 **Testing Requirements**:
-- [ ] Correlation accuracy tests
-- [ ] Timeline construction tests
-- [ ] Query performance tests
-- [ ] Cross-component tests
+- [ ] Event correlation accuracy
+- [ ] Timeline reconstruction
+- [ ] Query performance validation
 
 **Definition of Done**:
-- [ ] Correlation working
-- [ ] Timeline accurate
-- [ ] Queries efficient
-- [ ] Documentation complete
+- [ ] Sessions fully correlated
+- [ ] Timeline queries functional
+- [ ] No performance impact
+- [ ] Uses existing infrastructure
 
 ---
 
-#### Task 6.3.4: Implement hook-based session policies
+#### Task 6.3.4: Implement session policies using existing hook patterns (LEVERAGE EXISTING)
 **Priority**: MEDIUM
-**Estimated Time**: 4 hours
+**Estimated Time**: 3 hours (REDUCED - using existing patterns)
 **Status**: TODO
 **Assigned To**: Hooks Team
 
-**Description**: Create policy system using hooks for session management.
+**Description**: Create session policy system using existing hook patterns from `llmspell-hooks/src/builtin/` and pattern hooks.
 
 **Files to Create/Update**:
-- **CREATE**: `llmspell-sessions/src/hooks/policies.rs` - Policy hooks
-- **UPDATE**: `llmspell-sessions/src/config.rs` - Policy configuration
+- **CREATE**: `llmspell-sessions/src/policies/mod.rs` - Session policies using existing Hook trait
+- **LEVERAGE**: `llmspell-hooks/src/builtin/` - Rich set of built-in hooks for patterns ✅
+- **LEVERAGE**: `llmspell-hooks/src/patterns/` - Pattern hooks (Sequential, Parallel, Voting) ✅
+
+**What Already Exists** ✅:
+- [x] LoggingHook, MetricsHook, SecurityHook ✅
+- [x] CachingHook, RateLimitHook, RetryHook ✅
+- [x] CostTrackingHook for resource monitoring ✅
+- [x] SequentialHook, ParallelHook, VotingHook for composition ✅
+- [x] Hook trait with should_execute() method ✅
+- [x] HookRegistry for organization ✅
 
 **Acceptance Criteria**:
-- [ ] Timeout policies via hooks
-- [ ] Resource limit policies
-- [ ] Activity monitoring policies
-- [ ] Custom policy support
-- [ ] Policy configuration
-- [ ] Enforcement mechanisms
-- [ ] Override capabilities
+- [ ] Timeout policies using existing hook patterns
+- [ ] Resource limit policies using CostTrackingHook
+- [ ] Rate limiting using existing RateLimitHook
+- [ ] Policy composition using pattern hooks
 
 **Implementation Steps**:
 1. **Policy Framework** (1.5 hours):
    ```rust
+   pub struct SessionTimeoutPolicy {
+       timeout_duration: Duration,
+   }
+   
    #[async_trait]
-   trait SessionPolicy: Hook {
-       async fn evaluate(&self, session: &Session) -> PolicyResult;
-       fn enforcement_action(&self) -> PolicyAction;
+   impl Hook for SessionTimeoutPolicy {
+       async fn execute(&self, context: &mut HookContext) -> Result<HookResult> {
+           // Use existing patterns
+       }
+       
+       fn should_execute(&self, context: &HookContext) -> bool {
+           // Policy evaluation logic
+       }
    }
    ```
 
-2. **Built-in Policies** (1.5 hours):
-   - Idle timeout policy
-   - Resource quota policy
-   - Rate limiting policy
-   - Security policies
-
-3. **Enforcement** (1 hour):
-   - Policy evaluation engine
-   - Action execution
-   - Override mechanisms
-   - Audit logging
+2. **Policy Integration** (1.5 hours):
+   - Use existing built-in hooks
+   - Compose with pattern hooks
+   - Register with existing HookRegistry
+   - Configuration integration
 
 **Testing Requirements**:
-- [ ] Policy evaluation tests
-- [ ] Enforcement tests
-- [ ] Override tests
-- [ ] Custom policy tests
+- [ ] Policy evaluation using existing hook tests
+- [ ] Integration with existing hook system
+- [ ] Performance validation
 
 **Definition of Done**:
-- [ ] Policies implemented
-- [ ] Enforcement working
-- [ ] Configuration flexible
-- [ ] Well documented
+- [ ] Policies implemented using existing patterns
+- [ ] No duplicate implementation
+- [ ] Full integration with hook system
+- [ ] Configurable and extensible
 
 ---
 
-#### Task 6.3.5: Create session middleware system
+#### Task 6.3.5: Use existing pattern hooks for session middleware (LEVERAGE EXISTING)
 **Priority**: MEDIUM
-**Estimated Time**: 3 hours
+**Estimated Time**: 2 hours (REDUCED - using existing patterns)
 **Status**: TODO
 **Assigned To**: Hooks Team
 
-**Description**: Implement middleware pattern for session operations.
+**Description**: Use existing pattern hooks (SequentialHook, ParallelHook, VotingHook) to implement session middleware.
 
 **Files to Create/Update**:
-- **CREATE**: `llmspell-sessions/src/middleware/mod.rs` - Middleware system
-- **UPDATE**: `llmspell-sessions/src/manager.rs` - Add middleware
+- **CREATE**: `llmspell-sessions/src/middleware/session_middleware.rs` - Session middleware using pattern hooks
+- **LEVERAGE**: `llmspell-hooks/src/patterns/` - Pattern hooks already implemented ✅
+
+**What Already Exists** ✅:
+- [x] SequentialHook for ordered execution ✅
+- [x] ParallelHook for concurrent execution ✅
+- [x] VotingHook for consensus-based execution ✅
+- [x] Hook composition patterns ✅
+- [x] Error propagation handling ✅
 
 **Acceptance Criteria**:
-- [ ] Middleware trait definition
-- [ ] Logging middleware
-- [ ] Metrics middleware
-- [ ] Authentication middleware
-- [ ] Middleware chaining
-- [ ] Error propagation
-- [ ] Async support
+- [ ] Session operations use SequentialHook for middleware chains
+- [ ] Error handling using existing patterns
+- [ ] Async support via existing hook system
 
 **Implementation Steps**:
-1. **Middleware Trait** (1 hour):
+1. **Middleware Implementation** (1 hour):
    ```rust
-   #[async_trait]
-   trait SessionMiddleware {
-       async fn process(&self, 
-           operation: SessionOperation,
-           next: Box<dyn SessionMiddleware>
-       ) -> Result<OperationResult>;
-   }
+   let middleware_chain = SequentialHook::new(vec![
+       Box::new(LoggingHook::default()),
+       Box::new(MetricsHook::default()),
+       Box::new(session_operation_hook),
+   ]);
    ```
 
-2. **Core Middleware** (1 hour):
-   - Request logging
-   - Performance metrics
-   - Error handling
-   - Context enrichment
-
-3. **Chaining Logic** (1 hour):
-   - Build middleware chain
-   - Execute in order
-   - Handle errors
-   - Short-circuit support
+2. **Integration** (1 hour):
+   - Use existing pattern composition
+   - Error propagation
+   - Performance monitoring
 
 **Testing Requirements**:
-- [ ] Middleware execution tests
-- [ ] Chaining tests
-- [ ] Error propagation tests
-- [ ] Performance tests
+- [ ] Middleware chaining using existing tests
+- [ ] Performance validation
 
 **Definition of Done**:
-- [ ] Middleware system working
-- [ ] Core middleware implemented
-- [ ] Chaining functional
-- [ ] Documentation complete
+- [ ] Middleware uses existing patterns
+- [ ] No reimplementation
+- [ ] Full integration
 
 ---
 
-#### Task 6.3.6: Implement session analytics hooks
+#### Task 6.3.6: Create session analytics using existing MetricsHook (LEVERAGE EXISTING)
 **Priority**: LOW
-**Estimated Time**: 3 hours
+**Estimated Time**: 2 hours (REDUCED - extending existing)
 **Status**: TODO
 **Assigned To**: Hooks Team
 
-**Description**: Add analytics collection through session hooks.
+**Description**: Extend existing MetricsHook for session-specific analytics rather than creating new analytics system.
 
 **Files to Create/Update**:
-- **CREATE**: `llmspell-sessions/src/hooks/analytics.rs` - Analytics hooks
-- **UPDATE**: `llmspell-sessions/src/manager.rs` - Register analytics
+- **CREATE**: `llmspell-sessions/src/analytics/session_metrics.rs` - Session-specific metrics
+- **LEVERAGE**: `llmspell-hooks/src/builtin/metrics.rs` - Complete MetricsHook already exists ✅
+
+**What Already Exists** ✅:
+- [x] MetricsHook with comprehensive metrics collection ✅
+- [x] Performance timing and resource tracking ✅
+- [x] Error tracking and analysis ✅
+- [x] Configurable metrics collection ✅
 
 **Acceptance Criteria**:
-- [ ] Usage metrics collection
-- [ ] Performance metrics
-- [ ] Error tracking
-- [ ] Aggregation support
-- [ ] Export capabilities
-- [ ] Privacy controls
-- [ ] Minimal overhead
+- [ ] Session metrics using existing MetricsHook infrastructure
+- [ ] Session-specific metric types
+- [ ] Integration with existing privacy controls
 
 **Implementation Steps**:
-1. **Metrics Model** (1 hour):
-   - Define metric types
-   - Collection strategies
-   - Aggregation rules
-   - Retention policies
+1. **Session Metrics Extension** (1 hour):
+   ```rust
+   pub struct SessionMetrics {
+       base_metrics: MetricsHook,
+       session_specific: HashMap<String, f64>,
+   }
+   ```
 
-2. **Collection Hooks** (1 hour):
-   - Session duration
-   - Artifact counts
-   - Resource usage
-   - Error rates
-
-3. **Privacy Controls** (1 hour):
-   - Opt-in/opt-out
-   - Data anonymization
-   - Selective collection
-   - GDPR compliance
+2. **Integration** (1 hour):
+   - Extend existing MetricsHook
+   - Session-specific aggregation
+   - Privacy compliance
 
 **Testing Requirements**:
-- [ ] Metrics accuracy tests
-- [ ] Aggregation tests
-- [ ] Privacy compliance tests
-- [ ] Performance tests
+- [ ] Metrics accuracy using existing tests
+- [ ] Privacy compliance validation
 
 **Definition of Done**:
-- [ ] Analytics working
-- [ ] Privacy respected
-- [ ] Performance minimal
-- [ ] Export functional
+- [ ] Analytics use existing infrastructure
+- [ ] Session-specific extensions
+- [ ] Privacy maintained
 
 ---
 
@@ -2839,13 +2827,13 @@ The system currently focuses entirely on the "capture" side (automatic collectio
 ## Summary
 
 **Total Tasks**: 40
-**Estimated Total Time**: 152 hours
+**Estimated Total Time**: 139 hours (REDUCED by 13 hours due to leveraging existing infrastructure)
 **Target Duration**: 14 days
 
 ### Task Distribution by Phase:
 - Phase 6.1 (Core Infrastructure): 6 tasks, 24 hours ✅ COMPLETED
-- Phase 6.2 (Artifact Storage): 8 tasks, 31 hours  
-- Phase 6.3 (Hook Integration): 6 tasks, 21 hours
+- Phase 6.2 (Artifact Storage): 8 tasks, 31 hours ✅ COMPLETED  
+- Phase 6.3 (Hook Integration): 6 tasks, 14 hours (REDUCED from 21 - leveraging existing hook/event infrastructure)
 - Phase 6.4 (Replay Engine): 5 tasks, 21 hours
 - Phase 6.5 (Script Bridge): 7 tasks, 26 hours
 - Phase 6.6 (Testing): 8 tasks, 29 hours
