@@ -1233,7 +1233,7 @@ The system currently focuses entirely on the "capture" side (automatic collectio
 #### Task 6.3.2: Use existing ReplayableHook trait for sessions (LEVERAGE EXISTING)
 **Priority**: HIGH
 **Estimated Time**: 3 hours (REDUCED - leveraging existing trait)
-**Status**: TODO
+**Status**: DONE ✅
 **Assigned To**: Hooks Team
 
 **Description**: Implement existing ReplayableHook trait for session hooks using the comprehensive replay infrastructure already in `llmspell-hooks/src/replay/`.
@@ -1253,11 +1253,11 @@ The system currently focuses entirely on the "capture" side (automatic collectio
 - [x] ReplayConfig with multiple modes (Exact, Modified, Simulate, Debug) ✅
 
 **Acceptance Criteria**:
-- [ ] Session lifecycle hooks implement ReplayableHook trait
-- [ ] Hook execution recording with session context
-- [ ] Integration with existing ReplayManager
-- [ ] State snapshot support for sessions
-- [ ] Replay validation using existing comparator
+- [x] Session lifecycle hooks implement ReplayableHook trait ✅
+- [x] Hook execution recording with session context ✅
+- [x] Integration with existing ReplayManager ✅
+- [x] State snapshot support for sessions ✅
+- [x] Replay validation using existing comparator ✅
 
 **Implementation Steps**:
 1. **Session Hook Implementations** (2 hours):
@@ -1281,15 +1281,15 @@ The system currently focuses entirely on the "capture" side (automatic collectio
    - State snapshot integration
 
 **Testing Requirements**:
-- [ ] Replay round-trip tests using existing infrastructure
-- [ ] Integration with ReplayManager
-- [ ] State consistency validation
+- [x] Replay round-trip tests using existing infrastructure ✅
+- [x] Integration with ReplayManager ✅
+- [x] State consistency validation ✅
 
 **Definition of Done**:
-- [ ] Session hooks are replayable
-- [ ] Integration with existing replay system
-- [ ] No duplicate implementation
-- [ ] Performance maintained
+- [x] Session hooks are replayable ✅
+- [x] Integration with existing replay system ✅
+- [x] No duplicate implementation ✅
+- [x] Performance maintained ✅
 
 ---
 
