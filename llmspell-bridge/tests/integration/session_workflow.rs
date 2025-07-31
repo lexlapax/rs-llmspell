@@ -54,21 +54,41 @@ async fn test_api_availability_for_workflows() {
     "#;
 
     let result = engine.execute_script(lua_code).await;
-    assert!(result.is_ok(), "API availability test should succeed: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "API availability test should succeed: {:?}",
+        result.err()
+    );
 
     // Verify at least core APIs are available
     let output = result.unwrap();
     let workflow_result = output.output.as_object().unwrap();
-    
+
     // Should have at least Agent, Tool, and Workflow APIs
-    assert_eq!(workflow_result.get("agent_available").unwrap().as_bool(), Some(true));
-    assert_eq!(workflow_result.get("tool_available").unwrap().as_bool(), Some(true));
-    assert_eq!(workflow_result.get("workflow_available").unwrap().as_bool(), Some(true));
-    
+    assert_eq!(
+        workflow_result.get("agent_available").unwrap().as_bool(),
+        Some(true)
+    );
+    assert_eq!(
+        workflow_result.get("tool_available").unwrap().as_bool(),
+        Some(true)
+    );
+    assert_eq!(
+        workflow_result.get("workflow_available").unwrap().as_bool(),
+        Some(true)
+    );
+
     // Check how many APIs are available total
-    let available_count = workflow_result.get("total_available").unwrap().as_i64().unwrap();
-    assert!(available_count >= 3, "Should have at least 3 APIs available (Agent, Tool, Workflow)");
-    
+    let available_count = workflow_result
+        .get("total_available")
+        .unwrap()
+        .as_i64()
+        .unwrap();
+    assert!(
+        available_count >= 3,
+        "Should have at least 3 APIs available (Agent, Tool, Workflow)"
+    );
+
     println!("Available APIs: {}/7", available_count);
 }
 
@@ -121,18 +141,37 @@ async fn test_state_management_integration() {
     "#;
 
     let result = engine.execute_script(lua_code).await;
-    assert!(result.is_ok(), "State integration test should succeed: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "State integration test should succeed: {:?}",
+        result.err()
+    );
 
     let output = result.unwrap();
     let integration_result = output.output.as_object().unwrap();
-    
+
     // Lua state should always work
-    assert_eq!(integration_result.get("lua_state_works").unwrap().as_bool(), Some(true));
-    assert_eq!(integration_result.get("lua_complex_state").unwrap().as_bool(), Some(true));
-    
+    assert_eq!(
+        integration_result.get("lua_state_works").unwrap().as_bool(),
+        Some(true)
+    );
+    assert_eq!(
+        integration_result
+            .get("lua_complex_state")
+            .unwrap()
+            .as_bool(),
+        Some(true)
+    );
+
     // Global state might not be available depending on implementation
-    println!("Global state works: {:?}", integration_result.get("global_state_works"));
-    println!("Global state unavailable: {:?}", integration_result.get("global_state_unavailable"));
+    println!(
+        "Global state works: {:?}",
+        integration_result.get("global_state_works")
+    );
+    println!(
+        "Global state unavailable: {:?}",
+        integration_result.get("global_state_unavailable")
+    );
 }
 
 /// Test memory leak prevention through multiple executions
@@ -184,17 +223,35 @@ async fn test_memory_leak_prevention() {
     // Run the test multiple times to check for memory leaks
     for i in 0..5 {
         let result = engine.execute_script(lua_code).await;
-        assert!(result.is_ok(), "Memory leak test iteration {} should succeed: {:?}", i, result.err());
+        assert!(
+            result.is_ok(),
+            "Memory leak test iteration {} should succeed: {:?}",
+            i,
+            result.err()
+        );
 
         let output = result.unwrap();
         let memory_test = output.output.as_object().unwrap();
-        
-        assert_eq!(memory_test.get("large_data_created").unwrap().as_i64(), Some(100));
-        assert_eq!(memory_test.get("cleanup_attempted").unwrap().as_bool(), Some(true));
-        
-        let memory_usage = memory_test.get("memory_after_gc").unwrap().as_f64().unwrap();
-        println!("Memory usage after GC (iteration {}): {:.2} KB", i, memory_usage);
-        
+
+        assert_eq!(
+            memory_test.get("large_data_created").unwrap().as_i64(),
+            Some(100)
+        );
+        assert_eq!(
+            memory_test.get("cleanup_attempted").unwrap().as_bool(),
+            Some(true)
+        );
+
+        let memory_usage = memory_test
+            .get("memory_after_gc")
+            .unwrap()
+            .as_f64()
+            .unwrap();
+        println!(
+            "Memory usage after GC (iteration {}): {:.2} KB",
+            i, memory_usage
+        );
+
         // Memory should be reasonable (less than 50MB for this test)
         assert!(memory_usage < 50000.0, "Memory usage should be reasonable");
     }
@@ -214,7 +271,7 @@ async fn test_performance_requirements() {
 
     // Test script execution performance
     let start_time = Instant::now();
-    
+
     let lua_code = r#"
         -- Performance test
         local perf_result = {}
@@ -250,28 +307,38 @@ async fn test_performance_requirements() {
     "#;
 
     let result = engine.execute_script(lua_code).await;
-    assert!(result.is_ok(), "Performance test should succeed: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "Performance test should succeed: {:?}",
+        result.err()
+    );
 
     let total_time = start_time.elapsed();
-    
+
     let output = result.unwrap();
     let perf_result = output.output.as_object().unwrap();
-    
-    assert_eq!(perf_result.get("operations_count").unwrap().as_i64(), Some(1000));
+
+    assert_eq!(
+        perf_result.get("operations_count").unwrap().as_i64(),
+        Some(1000)
+    );
     assert!(perf_result.get("string_length").unwrap().as_i64().unwrap() > 0);
-    
+
     // Performance assertions
     let operation_time = perf_result.get("operation_time").unwrap().as_f64().unwrap();
     let string_time = perf_result.get("string_time").unwrap().as_f64().unwrap();
-    
+
     println!("Operation time: {:.4}s", operation_time);
     println!("String operation time: {:.4}s", string_time);
     println!("Total test execution time: {:?}", total_time);
-    
+
     // Performance targets (generous for script operations)
     assert!(operation_time < 2.0, "1000 operations should be < 2s");
     assert!(string_time < 0.5, "String operations should be < 0.5s");
-    assert!(total_time.as_secs() < 5, "Total test should complete in < 5s");
+    assert!(
+        total_time.as_secs() < 5,
+        "Total test should complete in < 5s"
+    );
 }
 
 /// Test error conditions and recovery
@@ -320,15 +387,31 @@ async fn test_error_conditions_and_recovery() {
     "#;
 
     let result = engine.execute_script(lua_code).await;
-    assert!(result.is_ok(), "Error condition test should succeed: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "Error condition test should succeed: {:?}",
+        result.err()
+    );
 
     let output = result.unwrap();
     let error_test = output.output.as_object().unwrap();
-    
-    assert_eq!(error_test.get("syntax_error_handled").unwrap().as_bool(), Some(true));
-    assert_eq!(error_test.get("runtime_error_handled").unwrap().as_bool(), Some(true));
-    assert_eq!(error_test.get("type_error_handled").unwrap().as_bool(), Some(true));
-    assert_eq!(error_test.get("recovery_successful").unwrap().as_bool(), Some(true));
+
+    assert_eq!(
+        error_test.get("syntax_error_handled").unwrap().as_bool(),
+        Some(true)
+    );
+    assert_eq!(
+        error_test.get("runtime_error_handled").unwrap().as_bool(),
+        Some(true)
+    );
+    assert_eq!(
+        error_test.get("type_error_handled").unwrap().as_bool(),
+        Some(true)
+    );
+    assert_eq!(
+        error_test.get("recovery_successful").unwrap().as_bool(),
+        Some(true)
+    );
 }
 
 /// Test concurrent script operations for thread safety
@@ -336,19 +419,20 @@ async fn test_error_conditions_and_recovery() {
 async fn test_concurrent_operations() {
     // Create multiple engines to simulate concurrent access
     let mut handles = vec![];
-    
+
     for i in 0..3 {
         let handle = tokio::spawn(async move {
             let lua_config = LuaConfig::default();
             let mut engine = EngineFactory::create_lua_engine(&lua_config).unwrap();
-            
+
             let registry = Arc::new(ComponentRegistry::new());
             let provider_config = ProviderManagerConfig::default();
             let providers = Arc::new(ProviderManager::new(provider_config).await.unwrap());
 
             let _ = engine.inject_apis(&registry, &providers);
-            
-            let lua_code = format!(r#"
+
+            let lua_code = format!(
+                r#"
                 -- Concurrent operations test {}
                 local thread_id = {}
                 
@@ -371,14 +455,16 @@ async fn test_concurrent_operations() {
                     success = true,
                     last_computed = results[#results].computed
                 }}
-            "#, i, i);
-            
+            "#,
+                i, i
+            );
+
             engine.execute_script(&lua_code).await
         });
-        
+
         handles.push(handle);
     }
-    
+
     // Wait for all concurrent operations to complete
     let mut results = vec![];
     for handle in handles {
@@ -386,19 +472,22 @@ async fn test_concurrent_operations() {
         assert!(result.is_ok(), "Concurrent operation should succeed");
         results.push(result.unwrap());
     }
-    
+
     // Verify all operations completed successfully
     assert_eq!(results.len(), 3);
-    
+
     for (i, result) in results.iter().enumerate() {
         let output = result.output.as_object().unwrap();
         assert_eq!(output.get("thread_id").unwrap().as_i64(), Some(i as i64));
         assert_eq!(output.get("results_count").unwrap().as_i64(), Some(10));
         assert_eq!(output.get("success").unwrap().as_bool(), Some(true));
-        
+
         // Verify thread-specific computations
         let expected_last_computed = i * 100 + 10;
-        assert_eq!(output.get("last_computed").unwrap().as_i64(), Some(expected_last_computed as i64));
+        assert_eq!(
+            output.get("last_computed").unwrap().as_i64(),
+            Some(expected_last_computed as i64)
+        );
     }
 }
 
@@ -500,29 +589,65 @@ async fn test_comprehensive_api_methods() {
     "#;
 
     let result = engine.execute_script(lua_code).await;
-    assert!(result.is_ok(), "API method availability test should succeed: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "API method availability test should succeed: {:?}",
+        result.err()
+    );
 
     let output = result.unwrap();
     let api_test = output.output.as_object().unwrap();
-    
+
     // Log all API method availability for debugging
     println!("API Method Availability:");
     for (key, value) in api_test.iter() {
         println!("  {}: {:?}", key, value);
     }
-    
+
     // Core APIs should be available - Agent.create should be available
-    assert_eq!(api_test.get("agent_create_available").unwrap().as_bool(), Some(true));
-    
+    assert_eq!(
+        api_test.get("agent_create_available").unwrap().as_bool(),
+        Some(true)
+    );
+
     // Tool and Workflow APIs exist but may not have create methods exposed
     // They still have multiple methods available
-    let tool_create = api_test.get("tool_create_available").unwrap().as_bool().unwrap_or(false);
-    let workflow_create = api_test.get("workflow_create_available").unwrap().as_bool().unwrap_or(false);
+    let tool_create = api_test
+        .get("tool_create_available")
+        .unwrap()
+        .as_bool()
+        .unwrap_or(false);
+    let workflow_create = api_test
+        .get("workflow_create_available")
+        .unwrap()
+        .as_bool()
+        .unwrap_or(false);
     println!("Tool.create available: {}", tool_create);
     println!("Workflow.create available: {}", workflow_create);
-    
+
     // Each API should have multiple methods regardless of create availability
-    assert!(api_test.get("agent_methods_count").unwrap().as_i64().unwrap() > 0);
-    assert!(api_test.get("tool_methods_count").unwrap().as_i64().unwrap() > 0);
-    assert!(api_test.get("workflow_methods_count").unwrap().as_i64().unwrap() > 0);
+    assert!(
+        api_test
+            .get("agent_methods_count")
+            .unwrap()
+            .as_i64()
+            .unwrap()
+            > 0
+    );
+    assert!(
+        api_test
+            .get("tool_methods_count")
+            .unwrap()
+            .as_i64()
+            .unwrap()
+            > 0
+    );
+    assert!(
+        api_test
+            .get("workflow_methods_count")
+            .unwrap()
+            .as_i64()
+            .unwrap()
+            > 0
+    );
 }
