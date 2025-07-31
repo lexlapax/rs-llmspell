@@ -55,4 +55,9 @@ llmspell-testing = { path = "../llmspell-testing" }
 criterion = { workspace = true }
 tempfile = { workspace = true }
 test-log = { workspace = true }
+rand = "0.8"
+
+[[bench]]
+name = "session_benchmarks"
+harness = false
 
