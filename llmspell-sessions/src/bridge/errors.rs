@@ -228,3 +228,296 @@ impl ErrorBuilder {
         }))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{SessionId, SessionStatus};
+    use serde_json::json;
+
+    #[test]
+    fn test_script_error_new() {
+        let error = ScriptError::new("TEST_ERROR", "Test message");
+        assert_eq!(error.code, "TEST_ERROR");
+        assert_eq!(error.message, "Test message");
+        assert!(error.details.is_none());
+    }
+
+    #[test]
+    fn test_script_error_with_details() {
+        let error =
+            ScriptError::new("TEST_ERROR", "Test message").with_details(json!({ "key": "value" }));
+
+        assert_eq!(error.code, "TEST_ERROR");
+        assert_eq!(error.message, "Test message");
+        assert_eq!(error.details, Some(json!({ "key": "value" })));
+    }
+
+    #[test]
+    fn test_script_error_display() {
+        let error = ScriptError::new("TEST_ERROR", "Test message");
+        assert_eq!(error.to_string(), "[TEST_ERROR] Test message");
+    }
+
+    #[test]
+    fn test_session_error_to_script_error() {
+        // Test SessionNotFound
+        let session_id = SessionId::new();
+        let error = SessionError::SessionNotFound {
+            id: session_id.to_string(),
+        };
+        let script_error: ScriptError = error.into();
+        assert_eq!(script_error.code, "SESSION_NOT_FOUND");
+        assert!(script_error.message.contains(&session_id.to_string()));
+
+        // Test SessionAlreadyExists
+        let error = SessionError::SessionAlreadyExists {
+            id: session_id.to_string(),
+        };
+        let script_error: ScriptError = error.into();
+        assert_eq!(script_error.code, "SESSION_ALREADY_EXISTS");
+        assert!(script_error.message.contains(&session_id.to_string()));
+
+        // Test InvalidStateTransition
+        let error = SessionError::InvalidStateTransition {
+            from: SessionStatus::Active,
+            to: SessionStatus::Completed,
+        };
+        let script_error: ScriptError = error.into();
+        assert_eq!(script_error.code, "INVALID_STATE_TRANSITION");
+        assert!(script_error.details.is_some());
+        let details = script_error.details.unwrap();
+        assert_eq!(details["from_state"], "Active");
+        assert_eq!(details["to_state"], "Completed");
+
+        // Test InvalidOperation
+        let error = SessionError::InvalidOperation {
+            reason: "Test reason".to_string(),
+        };
+        let script_error: ScriptError = error.into();
+        assert_eq!(script_error.code, "INVALID_OPERATION");
+        assert_eq!(script_error.message, "Test reason");
+
+        // Test Storage error
+        let error = SessionError::Storage("Storage failure".to_string());
+        let script_error: ScriptError = error.into();
+        assert_eq!(script_error.code, "STORAGE_ERROR");
+        assert_eq!(script_error.message, "Storage failure");
+
+        // Test Hook error
+        let error = SessionError::Hook("Hook failed".to_string());
+        let script_error: ScriptError = error.into();
+        assert_eq!(script_error.code, "HOOK_EXECUTION_ERROR");
+        assert_eq!(script_error.message, "Hook failed");
+
+        // Test Event error
+        let error = SessionError::Event("Event dispatch failed".to_string());
+        let script_error: ScriptError = error.into();
+        assert_eq!(script_error.code, "EVENT_DISPATCH_ERROR");
+        assert_eq!(script_error.message, "Event dispatch failed");
+
+        // Test Serialization error
+        let error = SessionError::Serialization("JSON error".to_string());
+        let script_error: ScriptError = error.into();
+        assert_eq!(script_error.code, "SERIALIZATION_ERROR");
+        assert_eq!(script_error.message, "JSON error");
+
+        // Test Validation error
+        let error = SessionError::Validation("Invalid input".to_string());
+        let script_error: ScriptError = error.into();
+        assert_eq!(script_error.code, "VALIDATION_ERROR");
+        assert_eq!(script_error.message, "Invalid input");
+
+        // Test AccessDenied
+        let error = SessionError::AccessDenied {
+            message: "No permission".to_string(),
+        };
+        let script_error: ScriptError = error.into();
+        assert_eq!(script_error.code, "ACCESS_DENIED");
+        assert_eq!(script_error.message, "No permission");
+
+        // Test ResourceLimitExceeded
+        let error = SessionError::ResourceLimitExceeded {
+            resource: "memory".to_string(),
+            message: "Out of memory".to_string(),
+        };
+        let script_error: ScriptError = error.into();
+        assert_eq!(script_error.code, "RESOURCE_LIMIT_EXCEEDED");
+        assert!(script_error.message.contains("memory"));
+        assert!(script_error.message.contains("Out of memory"));
+        assert!(script_error.details.is_some());
+
+        // Test Timeout
+        let error = SessionError::Timeout {
+            operation: "save".to_string(),
+        };
+        let script_error: ScriptError = error.into();
+        assert_eq!(script_error.code, "TIMEOUT");
+        assert!(script_error.message.contains("save"));
+
+        // Test IntegrityError
+        let error = SessionError::IntegrityError {
+            message: "Checksum mismatch".to_string(),
+        };
+        let script_error: ScriptError = error.into();
+        assert_eq!(script_error.code, "INTEGRITY_ERROR");
+        assert_eq!(script_error.message, "Checksum mismatch");
+    }
+
+    #[test]
+    fn test_invalid_session_state_error() {
+        let session_id = SessionId::new();
+        let error = SessionError::InvalidSessionState {
+            id: session_id.to_string(),
+            state: SessionStatus::Failed,
+            operation: "save".to_string(),
+        };
+        let script_error: ScriptError = error.into();
+        assert_eq!(script_error.code, "INVALID_SESSION_STATE");
+        assert!(script_error.message.contains(&session_id.to_string()));
+        assert!(script_error.message.contains("Failed"));
+        assert!(script_error.message.contains("save"));
+
+        let details = script_error.details.unwrap();
+        assert_eq!(details["session_id"], session_id.to_string());
+        assert_eq!(details["state"], "Failed");
+        assert_eq!(details["operation"], "save");
+    }
+
+    #[test]
+    fn test_artifact_errors() {
+        // Test ArtifactNotFound
+        let artifact_id = crate::ArtifactId::new("test_hash".to_string(), SessionId::new(), 1);
+        let error = SessionError::ArtifactNotFound {
+            id: artifact_id.to_string(),
+        };
+        let script_error: ScriptError = error.into();
+        assert_eq!(script_error.code, "ARTIFACT_NOT_FOUND");
+        assert!(script_error.message.contains(&artifact_id.to_string()));
+
+        // Test ArtifactAlreadyExists
+        let session_id = SessionId::new();
+        let error = SessionError::ArtifactAlreadyExists {
+            id: artifact_id.to_string(),
+            session_id: session_id.to_string(),
+        };
+        let script_error: ScriptError = error.into();
+        assert_eq!(script_error.code, "ARTIFACT_ALREADY_EXISTS");
+        assert!(script_error.message.contains(&artifact_id.to_string()));
+        assert!(script_error.message.contains(&session_id.to_string()));
+    }
+
+    #[test]
+    fn test_io_error_conversion() {
+        use std::io;
+        let io_error = io::Error::new(io::ErrorKind::NotFound, "File not found");
+        let error = SessionError::Io(io_error);
+        let script_error: ScriptError = error.into();
+        assert_eq!(script_error.code, "IO_ERROR");
+        assert!(script_error.message.contains("File not found"));
+    }
+
+    #[test]
+    fn test_error_builder_not_found() {
+        let error = ErrorBuilder::not_found("Session", "12345");
+        assert_eq!(error.code, error_codes::SESSION_NOT_FOUND);
+        assert!(error.message.contains("Session"));
+        assert!(error.message.contains("12345"));
+    }
+
+    #[test]
+    fn test_error_builder_invalid_input() {
+        let error = ErrorBuilder::invalid_input("session_id", "not a valid UUID");
+        assert_eq!(error.code, error_codes::INVALID_INPUT);
+        assert!(error.message.contains("session_id"));
+        assert!(error.message.contains("not a valid UUID"));
+
+        let details = error.details.unwrap();
+        assert_eq!(details["field"], "session_id");
+        assert_eq!(details["reason"], "not a valid UUID");
+    }
+
+    #[test]
+    fn test_error_builder_permission_denied() {
+        let error = ErrorBuilder::permission_denied("write", "session_123");
+        assert_eq!(error.code, error_codes::PERMISSION_DENIED);
+        assert!(error.message.contains("write"));
+        assert!(error.message.contains("session_123"));
+
+        let details = error.details.unwrap();
+        assert_eq!(details["action"], "write");
+        assert_eq!(details["resource"], "session_123");
+    }
+
+    #[test]
+    fn test_error_builder_conversion_error() {
+        let error =
+            ErrorBuilder::conversion_error("Lua table", "SessionConfig", "missing field 'name'");
+        assert_eq!(error.code, error_codes::SCRIPT_CONVERSION_ERROR);
+        assert!(error.message.contains("Lua table"));
+        assert!(error.message.contains("SessionConfig"));
+        assert!(error.message.contains("missing field 'name'"));
+
+        let details = error.details.unwrap();
+        assert_eq!(details["from_type"], "Lua table");
+        assert_eq!(details["to_type"], "SessionConfig");
+        assert_eq!(details["reason"], "missing field 'name'");
+    }
+
+    #[test]
+    fn test_error_codes_constants() {
+        // Verify error code constants are correctly defined
+        assert_eq!(error_codes::SESSION_NOT_FOUND, "SESSION_NOT_FOUND");
+        assert_eq!(
+            error_codes::SESSION_ALREADY_EXISTS,
+            "SESSION_ALREADY_EXISTS"
+        );
+        assert_eq!(error_codes::INVALID_OPERATION, "INVALID_OPERATION");
+        assert_eq!(error_codes::CONFIGURATION_ERROR, "CONFIGURATION_ERROR");
+        assert_eq!(error_codes::STORAGE_ERROR, "STORAGE_ERROR");
+        assert_eq!(error_codes::SERIALIZATION_ERROR, "SERIALIZATION_ERROR");
+        assert_eq!(error_codes::IO_ERROR, "IO_ERROR");
+        assert_eq!(error_codes::PERMISSION_DENIED, "PERMISSION_DENIED");
+        assert_eq!(
+            error_codes::RESOURCE_LIMIT_EXCEEDED,
+            "RESOURCE_LIMIT_EXCEEDED"
+        );
+        assert_eq!(error_codes::INVALID_INPUT, "INVALID_INPUT");
+        assert_eq!(
+            error_codes::INVALID_STATE_TRANSITION,
+            "INVALID_STATE_TRANSITION"
+        );
+        assert_eq!(error_codes::HOOK_EXECUTION_ERROR, "HOOK_EXECUTION_ERROR");
+        assert_eq!(error_codes::EVENT_DISPATCH_ERROR, "EVENT_DISPATCH_ERROR");
+        assert_eq!(error_codes::ARTIFACT_ERROR, "ARTIFACT_ERROR");
+        assert_eq!(error_codes::INTERNAL_ERROR, "INTERNAL_ERROR");
+        assert_eq!(
+            error_codes::SCRIPT_CONVERSION_ERROR,
+            "SCRIPT_CONVERSION_ERROR"
+        );
+    }
+
+    #[test]
+    fn test_general_error_with_source() {
+        let source_error = std::io::Error::new(std::io::ErrorKind::Other, "source error");
+        let error = SessionError::General {
+            message: "General failure".to_string(),
+            source: Some(anyhow::Error::new(source_error)),
+        };
+        let script_error: ScriptError = error.into();
+        assert_eq!(script_error.code, "GENERAL_ERROR");
+        assert_eq!(script_error.message, "General failure");
+    }
+
+    #[test]
+    fn test_replay_error_with_source() {
+        let source_error = std::io::Error::new(std::io::ErrorKind::Other, "replay source");
+        let error = SessionError::ReplayError {
+            message: "Replay failed".to_string(),
+            source: Some(Box::new(source_error)),
+        };
+        let script_error: ScriptError = error.into();
+        assert_eq!(script_error.code, "REPLAY_ERROR");
+        assert_eq!(script_error.message, "Replay failed");
+    }
+}
