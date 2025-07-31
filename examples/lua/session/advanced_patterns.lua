@@ -1,9 +1,50 @@
-#!/usr/bin/env llmspell
+-- ABOUTME: Example demonstrating advanced session and artifact patterns
+-- ABOUTME: Shows hierarchies, bulk operations, caching, and enterprise patterns
 
--- advanced_patterns.lua - Advanced session and artifact patterns
--- This example demonstrates sophisticated usage patterns and best practices
+-- CONFIG: Requires session-enabled configuration (see examples/configs/session-enabled.toml)
+-- WHY: Enterprise applications need advanced patterns for scalability and management
+-- STATUS: Session/Artifact globals fully integrated and functional
 
 print("=== Advanced Session Patterns Example ===\n")
+
+-- This example demonstrates:
+-- 1. Session hierarchies and templates
+-- 2. Cross-session artifact sharing
+-- 3. Bulk operations and batch processing
+-- 4. Advanced querying and analytics
+-- 5. State synchronization between sessions
+-- 6. Performance optimization (caching)
+-- 7. Resource management and cleanup
+-- 8. Session hierarchy export
+
+-- Simple JSON encoding function
+local function encode_json(data)
+    local function encode_value(v)
+        if type(v) == "string" then
+            return '"' .. v:gsub('"', '\\"') .. '"'
+        elseif type(v) == "number" then
+            return tostring(v)
+        elseif type(v) == "boolean" then
+            return tostring(v)
+        elseif type(v) == "table" then
+            local is_array = #v > 0
+            local parts = {}
+            if is_array then
+                for i, item in ipairs(v) do
+                    table.insert(parts, encode_value(item))
+                end
+                return "[" .. table.concat(parts, ",") .. "]"
+            else
+                for k, item in pairs(v) do
+                    table.insert(parts, '"' .. k .. '":' .. encode_value(item))
+                end
+                return "{" .. table.concat(parts, ",") .. "}"
+            end
+        end
+        return "null"
+    end
+    return encode_value(data)
+end
 
 -- 1. Session Hierarchies and Templates
 print("1. Creating session hierarchies:")
@@ -81,24 +122,21 @@ local shared_config = Artifact.store(
     parent_project,
     "system_generated",
     "shared_config.json",
-    Tool.execute("json-processor", {
-        operation = "stringify",
-        input = {
-            database = {
-                host = "analytics.db.internal",
-                port = 5432,
-                name = "analytics_prod"
-            },
-            api = {
-                endpoint = "https://api.analytics.internal",
-                version = "v2"
-            },
-            features = {
-                real_time = true,
-                batch_size = 1000
-            }
+    encode_json({
+        database = {
+            host = "analytics.db.internal",
+            port = 5432,
+            name = "analytics_prod"
+        },
+        api = {
+            endpoint = "https://api.analytics.internal",
+            version = "v2"
+        },
+        features = {
+            real_time = true,
+            batch_size = 1000
         }
-    }).result,
+    }),
     {
         scope = "shared",
         access = "read-only",
@@ -115,15 +153,12 @@ for name, session_id in pairs(sessions) do
         session_id,
         "system_generated",
         "config_reference.json",
-        Tool.execute("json-processor", {
-            operation = "stringify",
-            input = {
-                reference_type = "parent_artifact",
-                parent_session = parent_project,
-                artifact_id = shared_config,
-                purpose = "shared_configuration"
-            }
-        }).result,
+        encode_json({
+            reference_type = "parent_artifact",
+            parent_session = parent_project,
+            artifact_id = shared_config,
+            purpose = "shared_configuration"
+        }),
         {
             reference = true,
             parent_artifact = shared_config.content_hash
@@ -197,8 +232,8 @@ local artifact_stats = {
 
 local all_artifacts = Artifact.list(sessions.etl)
 for _, artifact in ipairs(all_artifacts) do
-    -- Group by hour
-    local hour = os.date("%H", artifact.created_at)
+    -- Group by hour (extract from ISO string)
+    local hour = artifact.created_at:match("T(%d%d):") or "00"
     artifact_stats.by_hour[hour] = (artifact_stats.by_hour[hour] or 0) + 1
     
     -- Categorize by size
@@ -244,16 +279,13 @@ local function syncSessionState(from_session, to_session, keys)
         to_session,
         "system_generated",
         "state_sync.json",
-        Tool.execute("json-processor", {
-            operation = "stringify",
-            input = {
-                sync_time = os.time(),
-                from_session = from_session,
-                to_session = to_session,
-                keys_synced = keys,
-                data = sync_data
-            }
-        }).result,
+        encode_json({
+            sync_time = os.time(),
+            from_session = from_session,
+            to_session = to_session,
+            keys_synced = keys,
+            data = sync_data
+        }),
         {
             operation = "state_sync",
             tags = {"sync", "state"}
@@ -371,11 +403,7 @@ Artifact.store(
     parent_project,
     "system_generated",
     "session_hierarchy.json",
-    Tool.execute("json-processor", {
-        operation = "stringify",
-        input = hierarchy,
-        pretty = true
-    }).result,
+    encode_json(hierarchy),
     {
         export_type = "hierarchy",
         timestamp = os.time(),

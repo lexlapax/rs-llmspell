@@ -2612,10 +2612,10 @@ Task 6.5.6 completion means **Phase 6 is now 100% complete** with all major sess
 - **UPDATE**: All public APIs with comprehensive doc comments
 - **UPDATE**: `llmspell-bridge/src/globals/session_global.rs` - API docs
 - **UPDATE**: `llmspell-bridge/src/globals/artifact_global.rs` - API docs
-- **CREATE**: `examples/lua/sessions/user_artifacts.lua` - User file/dataset storage
-- **CREATE**: `examples/lua/sessions/knowledge_base.lua` - Building knowledge base with artifacts
-- **CREATE**: `examples/lua/sessions/session_replay.lua` - Replay
-- **CREATE**: `examples/lua/sessions/advanced_patterns.lua` - Advanced
+- **CREATE**: `examples/lua/session/user_artifacts.lua` - User file/dataset storage
+- **CREATE**: `examples/lua/session/knowledge_base.lua` - Building knowledge base with artifacts
+- **CREATE**: `examples/lua/session/session_replay.lua` - Replay
+- **CREATE**: `examples/lua/session/advanced_patterns.lua` - Advanced
 - **CREATE**: Integration tests for Lua API
 
 **Acceptance Criteria**:

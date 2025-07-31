@@ -1,9 +1,48 @@
-#!/usr/bin/env llmspell
+-- ABOUTME: Example demonstrating how to build a searchable knowledge base
+-- ABOUTME: Shows structured document storage, search, and categorization with artifacts
 
--- knowledge_base.lua - Building a knowledge base with artifacts
--- This example shows how to create a searchable knowledge base using sessions and artifacts
+-- CONFIG: Requires session-enabled configuration (see examples/configs/session-enabled.toml)
+-- WHY: Knowledge bases need structured storage with metadata, search, and categorization
+-- STATUS: Session/Artifact globals fully integrated and functional
 
 print("=== Knowledge Base Example ===\n")
+
+-- This example demonstrates:
+-- 1. Structured document storage with rich metadata
+-- 2. Multiple content categories (technical, process, FAQ)
+-- 3. Simple search functionality
+-- 4. Tag-based organization
+-- 5. Statistical analysis
+-- 6. Export capabilities
+
+-- Simple JSON encoding function
+local function encode_json(data)
+    local function encode_value(v)
+        if type(v) == "string" then
+            return '"' .. v:gsub('"', '\\"') .. '"'
+        elseif type(v) == "number" then
+            return tostring(v)
+        elseif type(v) == "boolean" then
+            return tostring(v)
+        elseif type(v) == "table" then
+            local is_array = #v > 0
+            local parts = {}
+            if is_array then
+                for i, item in ipairs(v) do
+                    table.insert(parts, encode_value(item))
+                end
+                return "[" .. table.concat(parts, ",") .. "]"
+            else
+                for k, item in pairs(v) do
+                    table.insert(parts, '"' .. k .. '":' .. encode_value(item))
+                end
+                return "{" .. table.concat(parts, ",") .. "}"
+            end
+        end
+        return "null"
+    end
+    return encode_value(data)
+end
 
 -- Create a knowledge base session
 local kb_session = Session.create({
@@ -261,14 +300,17 @@ local function searchKnowledgeBase(query)
     for _, doc in ipairs(all_docs) do
         local score = 0
         
+        -- For listed artifacts, metadata is in custom field
+        local metadata = doc.custom or {}
+        
         -- Search in title
-        if doc.metadata.title and doc.metadata.title:lower():find(query_lower) then
+        if metadata.title and metadata.title:lower():find(query_lower) then
             score = score + 10
         end
         
         -- Search in tags
-        if doc.metadata.tags then
-            for _, tag in ipairs(doc.metadata.tags) do
+        if metadata.tags then
+            for _, tag in ipairs(metadata.tags) do
                 if tag:lower():find(query_lower) then
                     score = score + 5
                 end
@@ -276,19 +318,20 @@ local function searchKnowledgeBase(query)
         end
         
         -- Search in category
-        if doc.metadata.category and doc.metadata.category:lower():find(query_lower) then
+        if metadata.category and metadata.category:lower():find(query_lower) then
             score = score + 3
         end
         
-        -- If we need to search content, retrieve it
+        -- Search in name
+        if doc.name and doc.name:lower():find(query_lower) then
+            score = score + 2
+        end
+        
+        -- Add to results if matched
         if score > 0 then
-            local full_doc = Artifact.get(kb_session, doc.id)
-            if full_doc and full_doc.content:lower():find(query_lower) then
-                score = score + 1
-            end
-            
             table.insert(results, {
                 doc = doc,
+                metadata = metadata,
                 score = score
             })
         end
@@ -308,7 +351,7 @@ for _, query in ipairs(search_queries) do
     print(string.format("  Search '%s': found %d results", query, #results))
     if #results > 0 then
         print(string.format("    Top result: %s (score: %d)", 
-            results[1].doc.metadata.title or results[1].doc.name, 
+            (results[1].metadata and results[1].metadata.title) or results[1].doc.name, 
             results[1].score))
     end
 end
@@ -330,19 +373,22 @@ for _, artifact in ipairs(all_artifacts) do
     stats.total_documents = stats.total_documents + 1
     stats.total_size = stats.total_size + artifact.size
     
+    -- Metadata is in custom field for listed artifacts
+    local metadata = artifact.custom or {}
+    
     -- Count by category
-    local category = artifact.metadata.category or "uncategorized"
+    local category = metadata.category or "uncategorized"
     stats.by_category[category] = (stats.by_category[category] or 0) + 1
     
-    -- Count by type
-    stats.by_type[artifact.artifact_type] = (stats.by_type[artifact.artifact_type] or 0) + 1
-    
     -- Collect tags
-    if artifact.metadata.tags then
-        for _, tag in ipairs(artifact.metadata.tags) do
+    if metadata.tags then
+        for _, tag in ipairs(metadata.tags) do
             stats.tags[tag] = (stats.tags[tag] or 0) + 1
         end
     end
+    
+    -- Count by type
+    stats.by_type[artifact.artifact_type] = (stats.by_type[artifact.artifact_type] or 0) + 1
 end
 
 print("  Total documents: " .. stats.total_documents)
@@ -374,25 +420,22 @@ local summary = {
 
 -- Group documents by category
 for _, artifact in ipairs(all_artifacts) do
-    local category = artifact.metadata.category or "uncategorized"
+    local metadata = artifact.custom or {}
+    local category = metadata.category or "uncategorized"
     if not summary.categories[category] then
         summary.categories[category] = {}
     end
     table.insert(summary.categories[category], {
-        id = artifact.id,
         name = artifact.name,
-        title = artifact.metadata.title,
-        tags = artifact.metadata.tags,
-        updated = artifact.metadata.last_updated
+        title = metadata.title,
+        tags = metadata.tags,
+        updated = metadata.last_updated,
+        size = artifact.size
     })
 end
 
 -- Save summary as artifact
-local summary_json = Tool.execute("json-processor", {
-    operation = "stringify",
-    input = summary,
-    pretty = true
-})
+local summary_json = {result = encode_json(summary)}
 
 Artifact.store(
     kb_session,

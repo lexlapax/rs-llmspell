@@ -1,9 +1,19 @@
-#!/usr/bin/env llmspell
+-- ABOUTME: Example demonstrating storing user files and datasets as artifacts
+-- ABOUTME: Shows how to use the Artifact API for managing user-provided content
 
--- user_artifacts.lua - Demonstrates storing user files and datasets as artifacts
--- This example shows how to use the Artifact API for managing user-provided content
+-- CONFIG: Requires session-enabled configuration (see examples/configs/session-enabled.toml)
+-- WHY: Artifacts provide content-addressed storage for user data with rich metadata
+-- STATUS: Session/Artifact globals fully integrated and functional
 
 print("=== User Artifacts Example ===\n")
+
+-- This example demonstrates:
+-- 1. Storing various types of user content (documents, datasets, configs)
+-- 2. Adding rich metadata for organization and search
+-- 3. Storing files from disk using storeFile()
+-- 4. Querying artifacts by type, tags, and time
+-- 5. Building searchable indexes
+-- 6. Managing binary/media content metadata
 
 -- Create a session for our knowledge base
 local session_id = Session.create({
@@ -101,11 +111,36 @@ local config_data = {
     }
 }
 
-local config_json = Tool.execute("json-processor", {
-    operation = "stringify",
-    input = config_data,
-    pretty = true
-})
+-- Simple JSON encoding
+local function encode_json(data)
+    local function encode_value(v)
+        if type(v) == "string" then
+            return '"' .. v .. '"'
+        elseif type(v) == "number" then
+            return tostring(v)
+        elseif type(v) == "boolean" then
+            return tostring(v)
+        elseif type(v) == "table" then
+            local is_array = #v > 0
+            local parts = {}
+            if is_array then
+                for i, item in ipairs(v) do
+                    table.insert(parts, encode_value(item))
+                end
+                return "[" .. table.concat(parts, ",") .. "]"
+            else
+                for k, item in pairs(v) do
+                    table.insert(parts, '"' .. k .. '":' .. encode_value(item))
+                end
+                return "{" .. table.concat(parts, ",") .. "}"
+            end
+        end
+        return "null"
+    end
+    return encode_value(data)
+end
+
+local config_json = {result = encode_json(config_data)}
 
 local config_id = Artifact.store(
     session_id,
@@ -127,10 +162,10 @@ print("\n4. Storing files from disk:")
 
 -- Create a test file
 local test_file_path = "/tmp/llmspell_test_upload.txt"
-local file_op = Tool.execute("file-operations", {
+local file_op = Tool.invoke("file_operations", {
     operation = "write",
     path = test_file_path,
-    content = "This is a test file that simulates user upload.\nIt contains multiple lines of text.\nThis would typically be uploaded through a UI."
+    input = "This is a test file that simulates user upload.\nIt contains multiple lines of text.\nThis would typically be uploaded through a UI."
 })
 
 if file_op.success then
@@ -148,7 +183,7 @@ if file_op.success then
     print("  Stored file from disk: " .. file_artifact_id.content_hash:sub(1, 16) .. "...")
     
     -- Clean up
-    Tool.execute("file-operations", {
+    Tool.invoke("file_operations", {
         operation = "delete",
         path = test_file_path
     })
@@ -171,10 +206,7 @@ local image_metadata = {
     thumbnail = "base64_encoded_thumbnail_here"
 }
 
-local metadata_json = Tool.execute("json-processor", {
-    operation = "stringify",
-    input = image_metadata
-})
+local metadata_json = {result = encode_json(image_metadata)}
 
 local image_id = Artifact.store(
     session_id,
