@@ -2,6 +2,7 @@
 //! ABOUTME: Provides centralized management of all script-accessible globals
 
 pub mod agent_global;
+pub mod artifact_global;
 pub mod core;
 pub mod event_global;
 pub mod hook_global;
@@ -9,6 +10,7 @@ pub mod injection;
 pub mod json_global;
 pub mod registry;
 pub mod replay_global;
+pub mod session_global;
 pub mod state_global;
 pub mod state_infrastructure;
 pub mod streaming_global;
@@ -71,6 +73,23 @@ pub async fn create_standard_registry(context: Arc<GlobalContext>) -> Result<Glo
     builder.register(Arc::new(core::UtilsGlobal::new()));
     // TODO: Add Security global when implemented
     builder.register(Arc::new(event_global::EventGlobal::new()));
+
+    // Register Session and Artifact globals if SessionManager is available
+    if let Some(session_manager) =
+        context.get_bridge::<llmspell_sessions::manager::SessionManager>("session_manager")
+    {
+        // Create bridges externally for consistency with HookBridge pattern
+        let session_bridge = Arc::new(crate::session_bridge::SessionBridge::new(
+            session_manager.clone(),
+        ));
+        let artifact_bridge =
+            Arc::new(crate::artifact_bridge::ArtifactBridge::new(session_manager));
+
+        builder.register(Arc::new(session_global::SessionGlobal::new(session_bridge)));
+        builder.register(Arc::new(artifact_global::ArtifactGlobal::new(
+            artifact_bridge,
+        )));
+    }
 
     // Create HookBridge for hook system integration
     let hook_bridge = Arc::new(crate::hook_bridge::HookBridge::new(context.clone()).await?);

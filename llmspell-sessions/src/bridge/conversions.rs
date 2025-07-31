@@ -119,6 +119,7 @@ pub fn session_metadata_to_json(metadata: &SessionMetadata) -> serde_json::Value
         "name": metadata.name,
         "description": metadata.description,
         "tags": metadata.tags,
+        "status": metadata.status.to_string(),
         "created_at": metadata.created_at.to_rfc3339(),
         "updated_at": metadata.updated_at.to_rfc3339(),
         "parent_session_id": metadata.parent_session_id.as_ref().map(|id| id.to_string()),

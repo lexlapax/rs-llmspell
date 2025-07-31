@@ -221,6 +221,80 @@ return {
 }
 ```
 
+## Session Global 🚧
+
+| Method | Parameters | Returns | Description |
+|--------|------------|---------|-------------|
+| `Session.create(options)` | `options`: {name, description, tags, metadata, parent_session_id} | string (session_id) | Create new session |
+| `Session.get(session_id)` | `session_id`: string | table (metadata) | Get session metadata |
+| `Session.suspend(session_id)` | `session_id`: string | nil | Suspend active session |
+| `Session.resume(session_id)` | `session_id`: string | nil | Resume suspended session |
+| `Session.complete(session_id)` | `session_id`: string | nil | Complete session (removes from active) |
+| `Session.delete(session_id)` | `session_id`: string | nil | Delete session entirely |
+| `Session.list(filters)` | `filters`: {status, tags, limit, sort_by} (optional) | {sessions} | List sessions |
+| `Session.save(session_id)` | `session_id`: string | nil | Save to persistent storage |
+| `Session.load(session_id)` | `session_id`: string | string (session_id) | Load from storage |
+| `Session.getCurrent()` | none | string or nil | Get current thread-local session |
+| `Session.setCurrent(session_id)` | `session_id`: string or nil | nil | Set current thread-local session |
+
+### Session Config Example
+```lua
+{
+    name = "Customer Support",          -- Required
+    description = "Support ticket #123", -- Optional
+    tags = {"support", "priority-high"}, -- Optional
+    metadata = {custom = "data"},        -- Optional custom data
+    parent_session_id = "parent-123"     -- Optional parent session
+}
+```
+
+## Artifact Global 🚧
+
+| Method | Parameters | Returns | Description |
+|--------|------------|---------|-------------|
+| `Artifact.store(session_id, type, name, content, metadata)` | See below | {content_hash, session_id, sequence} | Store artifact |
+| `Artifact.get(session_id, artifact_id)` | `session_id`: string, `artifact_id`: table | {content, metadata} | Retrieve artifact |
+| `Artifact.list(session_id)` | `session_id`: string or "" (uses current) | {artifacts} | List session artifacts |
+| `Artifact.delete(session_id, artifact_id)` | `session_id`: string, `artifact_id`: table | nil | Delete artifact |
+| `Artifact.storeFile(session_id, path, type, metadata)` | See below | {content_hash, session_id, sequence} | Store file as artifact |
+
+### Artifact Parameters
+- `session_id`: Session to store in
+- `type`: "tool_result", "agent_output", "user_input", "system_generated", or custom
+- `name`: Artifact name (e.g., "analysis.txt")
+- `content`: String content (can be binary)
+- `metadata`: Optional table with:
+  - `mime_type`: Content MIME type
+  - `tags`: Array of tags
+  - Custom fields
+
+### Artifact Usage
+```lua
+-- Store text artifact
+local id = Artifact.store(
+    session_id,
+    "tool_result",
+    "output.txt",
+    "Results here...",
+    {mime_type = "text/plain", tags = {"important"}}
+)
+
+-- Store binary data
+local image_data = io.open("chart.png", "rb"):read("*a")
+local img_id = Artifact.store(
+    session_id,
+    "agent_output",
+    "chart.png",
+    image_data,
+    {mime_type = "image/png"}
+)
+
+-- Retrieve artifact
+local artifact = Artifact.get(session_id, id)
+print(artifact.content)
+print(artifact.metadata.name)
+```
+
 ## Event Global
 
 | Method | Parameters | Returns | Description |

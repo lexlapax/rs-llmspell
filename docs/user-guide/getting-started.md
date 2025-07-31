@@ -199,6 +199,46 @@ local now = Utils.timestamp()
 local hash = Utils.hash("my data")
 ```
 
+#### 11. Session Global 🚧 **In Development**
+Manage conversation sessions and execution contexts.
+
+```lua
+-- Create a session
+local session_id = Session.create({
+    name = "Customer Support Chat",
+    tags = {"support", "priority-high"}
+})
+
+-- Get session metadata
+local metadata = Session.get(session_id)
+
+-- Manage session lifecycle
+Session.suspend(session_id)
+Session.resume(session_id)
+Session.complete(session_id)
+```
+
+#### 12. Artifact Global 🚧 **In Development**
+Store and retrieve content within sessions.
+
+```lua
+-- Store text artifact
+local artifact_id = Artifact.store(
+    session_id,
+    "tool_result",
+    "analysis.txt",
+    "Analysis results...",
+    {mime_type = "text/plain"}
+)
+
+-- Retrieve artifact
+local artifact = Artifact.get(session_id, artifact_id)
+print(artifact.content)
+
+-- List session artifacts
+local artifacts = Artifact.list(session_id)
+```
+
 ---
 
 ## Architecture

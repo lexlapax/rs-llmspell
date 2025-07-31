@@ -2,7 +2,7 @@
 
 **Phase**: 6
 **Title**: Session and Artifact Management
-**Status**: IN PROGRESS (Phase 6.1 COMPLETED ✅)
+**Status**: IN PROGRESS (Phases 6.1, 6.2, 6.3, 6.4, 6.5 COMPLETED ✅)
 **Start Date**: TBD
 **Target End Date**: TBD (14 days from start)
 **Dependencies**: Phase 5 (Persistent State Management) ✅
@@ -1977,9 +1977,10 @@ The system currently focuses entirely on the "capture" side (automatic collectio
 
 ---
 
-### Phase 6.5: Script Bridge Implementation (Day 10-12)
+### Phase 6.5: Script Bridge Implementation (Day 10-12) - COMPLETED ✅
 <!-- UPDATED: Reordered tasks to leverage existing GlobalObject infrastructure, combined Session/Artifact design, 
      emphasized reuse of existing patterns from StateGlobal and HookGlobal -->
+<!-- COMPLETED: All 3 tasks completed successfully with full test coverage -->
 
 #### Task 6.5.1: Design Session and Artifact global APIs
 **Priority**: HIGH
@@ -2155,30 +2156,54 @@ The system currently focuses entirely on the "capture" side (automatic collectio
 #### Task 6.5.3: Implement SessionGlobal and ArtifactGlobal
 **Priority**: HIGH
 **Estimated Time**: 4 hours
-**Status**: TODO
+**Status**: COMPLETED ✅
 **Assigned To**: Bridge Team
+**Actual Time**: 5 hours
 
 **Description**: Implement the GlobalObject wrappers for Session and Artifact functionality.
 
-**Files to Reference/Update**:
-- **LEVERAGE**: `llmspell-bridge/src/globals/state_global.rs` - Pattern for GlobalObject implementation
-- **LEVERAGE**: `llmspell-bridge/src/globals/hook_global.rs` - Pattern for wrapping async bridge
-- **CREATE**: `llmspell-bridge/src/globals/session_global.rs` - SessionGlobal with GlobalObject trait
-- **CREATE**: `llmspell-bridge/src/globals/artifact_global.rs` - ArtifactGlobal with GlobalObject trait
-- **UPDATE**: `llmspell-bridge/src/globals/mod.rs` - Export new globals
+**ACCOMPLISHMENTS**:
+- ✅ **SessionGlobal fully functional**: All session operations working (create, get, list, suspend, resume, complete, delete, save, load)
+- ✅ **Architecture properly separated**: Three-layer pattern implemented (async bridge → sync GlobalObject → Lua bindings)
+- ✅ **Consistent with HookBridge pattern**: Refactored to create bridges externally for consistency
+- ✅ **Status field fix**: Added missing status field to session metadata JSON conversion
+- ✅ **Error conversion**: Proper error handling between Rust and Lua layers with tostring for pcall errors
+- ✅ **Thread-local context**: getCurrent/setCurrent session context management working
+- ✅ **All session tests passing**: 6/6 tests verified including save/load persistence
+- ✅ **ArtifactGlobal fully functional**: All artifact operations working (store, get, list, delete, storeFile)
+- ✅ **All artifact tests passing**: 8/8 tests verified including binary data and metadata preservation
+- ✅ **MIME type handling**: Fixed to check metadata table for mime_type field
+- ✅ **Binary data handling**: Fixed to always return content as Lua strings
+- ✅ **Custom metadata preservation**: Special handling for mime_type and tags fields
+
+**Files Created/Updated**:
+- **CREATED**: `llmspell-bridge/src/globals/session_global.rs` - SessionGlobal with GlobalObject trait ✅
+- **CREATED**: `llmspell-bridge/src/globals/artifact_global.rs` - ArtifactGlobal with GlobalObject trait ✅  
+- **CREATED**: `llmspell-bridge/src/lua/globals/session.rs` - Lua-specific Session implementation ✅
+- **CREATED**: `llmspell-bridge/src/lua/globals/artifact.rs` - Lua-specific Artifact implementation ✅
+- **UPDATED**: `llmspell-bridge/src/globals/mod.rs` - Create bridges externally (HookBridge pattern) ✅
+- **UPDATED**: `llmspell-sessions/src/bridge/conversions.rs` - Fixed missing status field ✅
+- **UPDATED**: `llmspell-sessions/src/manager.rs` - Fixed MIME type and tags handling ✅
+- **CREATED**: `llmspell-bridge/tests/session_global_test.rs` - Comprehensive session tests ✅
+- **CREATED**: `llmspell-bridge/tests/artifact_global_test.rs` - Comprehensive artifact tests ✅
+- **CREATED**: `docs/user-guide/session-artifact-api.md` - Comprehensive user guide with examples ✅
+- **CREATED**: `docs/developer-guide/session-artifact-implementation.md` - Developer implementation guide ✅
+- **UPDATED**: `docs/user-guide/api-reference.md` - Added Session and Artifact API tables ✅
+- **UPDATED**: `docs/user-guide/getting-started.md` - Added Session and Artifact globals to list ✅
+- **UPDATED**: `docs/user-guide/README.md` - Added reference to Session and Artifact API guide ✅
 
 **Acceptance Criteria**:
-- [ ] SessionGlobal implements GlobalObject trait
-- [ ] ArtifactGlobal implements GlobalObject trait
-- [ ] Both follow established patterns from StateGlobal
-- [ ] Proper metadata() implementation
-- [ ] inject_lua() creates appropriate tables and functions
-- [ ] Async operations use block_on_async pattern
-- [ ] listArtifacts() returns artifact list
-- [ ] deleteArtifact() removes artifacts
-- [ ] Binary data handled correctly
-- [ ] Metadata preserved
-- [ ] Large artifacts supported
+- [x] SessionGlobal implements GlobalObject trait ✅
+- [x] ArtifactGlobal implements GlobalObject trait ✅
+- [x] Both follow established patterns from StateGlobal ✅
+- [x] Proper metadata() implementation ✅
+- [x] inject_lua() creates appropriate tables and functions ✅
+- [x] Async operations use block_on_async pattern ✅
+- [x] listArtifacts() returns artifact list ✅ (via list method)
+- [x] deleteArtifact() removes artifacts ✅ (via delete method)
+- [x] Binary data handled correctly ✅ (get_content() used)
+- [x] Metadata preserved ✅ (via conversions)
+- [x] Large artifacts supported ✅ (compression handled by SessionArtifact)
 
 **Implementation Steps**:
 1. **Save Artifact** (1.5 hours):
@@ -2232,18 +2257,28 @@ The system currently focuses entirely on the "capture" side (automatic collectio
    - Error conversion
 
 **Testing Requirements**:
-- [ ] CRUD operation tests
-- [ ] Binary data tests
-- [ ] Metadata tests
-- [ ] Large artifact tests
-- [ ] Error handling tests
+- [x] CRUD operation tests - ✅ All session operations tested (6/6 tests pass)
+- [x] GlobalObject implementations - ✅ SessionGlobal and ArtifactGlobal fully functional
+- [x] Architecture separation - ✅ Three-layer pattern with proper separation
+- [x] Session lifecycle tests - ✅ All lifecycle operations working
+- [x] Artifact operations - ✅ All artifact tests passing (8/8 tests)
+- [x] Binary data handling - ✅ Proper binary data support verified
+- [x] Metadata preservation - ✅ Custom metadata and special fields handled
+- [x] Error handling - ✅ Proper error conversion and propagation
+- [x] Thread-local context - ✅ getCurrent/setCurrent working
+- [x] Async bridge pattern - ✅ All async operations properly bridged to sync Lua
 
 **Definition of Done**:
-- [ ] All artifact ops work
-- [ ] Binary data handled
-- [ ] Metadata preserved
-- [ ] Performance good
-- [ ] Documentation complete
+- [x] Session ops work - ✅ All operations functional (create, get, list, suspend, resume, complete, delete, save, load)
+- [x] SessionGlobal implemented - ✅ Full GlobalObject implementation with proper delegation
+- [x] ArtifactGlobal implemented - ✅ All operations functional (store, get, list, delete, storeFile)
+- [x] Architecture clean - ✅ Three-layer pattern: Bridge (async) → GlobalObject (sync) → Lua bindings
+- [x] All tests passing - ✅ Session: 6/6, Artifact: 8/8 (including large artifact handling)
+- [x] Bridge pattern consistent - ✅ Follows HookBridge pattern (bridges created externally)
+- [x] Integration complete - ✅ Session and Artifact functionality fully accessible from scripts
+- [x] Metadata preserved - ✅ Artifact metadata preservation test passing
+- [x] Performance good - ✅ Artifact performance test passing (100 artifacts in <5s)
+- [x] Documentation complete - ✅ Added comprehensive user and developer guides, updated API reference
 
 ---
 
@@ -2312,11 +2347,11 @@ The system currently focuses entirely on the "capture" side (automatic collectio
 **Description**: Create comprehensive examples demonstrating Session and Artifact usage from scripts.
 
 **Files to Create**:
-- **CREATE**: `examples/session_basic.lua` - Basic session operations
-- **CREATE**: `examples/session_artifacts.lua` - Artifact management
-- **CREATE**: `examples/session_replay.lua` - Replay functionality
-- **CREATE**: `examples/session_advanced.lua` - Advanced patterns
-- **CREATE**: `examples/session_integration.lua` - Integration with other globals
+- **CREATE**: `examples/lua/session/basic.lua` - Basic session operations
+- **CREATE**: `examples/lua/session/artifacts.lua` - Artifact management
+- **CREATE**: `examples/lua/session/replay.lua` - Replay functionality
+- **CREATE**: `examples/lua/session/advanced.lua` - Advanced patterns
+- **CREATE**: `examples/lua/session/integration.lua` - Integration with other globals
 
 **Acceptance Criteria**:
 - [ ] Examples cover all major APIs
@@ -2333,6 +2368,7 @@ The system currently focuses entirely on the "capture" side (automatic collectio
    - Thread-safe access
    - Coroutine support
    - Cleanup on exit
+   - uses `config`.toml (create one if needed in `examples/configs/`)
 
 2. **Context Methods** (1 hour):
    - getCurrent() implementation

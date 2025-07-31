@@ -1096,7 +1096,27 @@ impl SessionManager {
         // Add custom metadata if provided
         if let Some(custom_metadata) = metadata {
             for (key, value) in custom_metadata {
-                artifact.metadata.custom.insert(key, value);
+                match key.as_str() {
+                    // Special handling for mime_type - set it on the artifact metadata directly
+                    "mime_type" => {
+                        if let Some(mime_type_str) = value.as_str() {
+                            artifact.metadata.mime_type = mime_type_str.to_string();
+                        }
+                    }
+                    // Special handling for tags - set them on the artifact metadata directly
+                    "tags" => {
+                        if let Some(tags_array) = value.as_array() {
+                            artifact.metadata.tags = tags_array
+                                .iter()
+                                .filter_map(|v| v.as_str().map(String::from))
+                                .collect();
+                        }
+                    }
+                    // Everything else goes to custom metadata
+                    _ => {
+                        artifact.metadata.custom.insert(key, value);
+                    }
+                }
             }
         }
 
