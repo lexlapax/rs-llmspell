@@ -87,7 +87,7 @@ pub use config::{SessionManagerConfig, SessionManagerConfigBuilder};
 pub use error::{Result, SessionError};
 pub use manager::SessionManager;
 pub use session::Session;
-pub use types::{SessionConfig, SessionId, SessionMetadata, SessionStatus};
+pub use types::{CreateSessionOptions, SessionConfig, SessionId, SessionMetadata, SessionStatus};
 
 /// Prelude module for convenient imports
 pub mod prelude {
