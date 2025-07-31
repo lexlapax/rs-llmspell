@@ -324,6 +324,8 @@ pub struct GlobalRuntimeConfig {
     pub security: SecurityConfig,
     /// State persistence settings
     pub state_persistence: StatePersistenceConfig,
+    /// Session management settings
+    pub sessions: SessionConfig,
 }
 
 impl Default for GlobalRuntimeConfig {
@@ -334,6 +336,7 @@ impl Default for GlobalRuntimeConfig {
             enable_streaming: true,
             security: SecurityConfig::default(),
             state_persistence: StatePersistenceConfig::default(),
+            sessions: SessionConfig::default(),
         }
     }
 }
@@ -432,6 +435,37 @@ impl Default for BackupConfig {
             incremental_enabled: true,
             max_backups: Some(10),
             max_backup_age: Some(2592000), // 30 days
+        }
+    }
+}
+
+/// Session management configuration
+#[derive(Debug, Clone, Deserialize, Serialize)]
+#[serde(default)]
+pub struct SessionConfig {
+    /// Enable session management
+    pub enabled: bool,
+    /// Maximum number of concurrent sessions
+    pub max_sessions: usize,
+    /// Maximum artifacts per session
+    pub max_artifacts_per_session: usize,
+    /// Artifact compression threshold in bytes
+    pub artifact_compression_threshold: usize,
+    /// Session timeout in seconds
+    pub session_timeout_seconds: u64,
+    /// Storage backend type (memory, sled)
+    pub storage_backend: String,
+}
+
+impl Default for SessionConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            max_sessions: 100,
+            max_artifacts_per_session: 1000,
+            artifact_compression_threshold: 10240, // 10KB
+            session_timeout_seconds: 3600,         // 1 hour
+            storage_backend: "memory".to_string(),
         }
     }
 }

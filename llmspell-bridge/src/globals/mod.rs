@@ -11,6 +11,7 @@ pub mod json_global;
 pub mod registry;
 pub mod replay_global;
 pub mod session_global;
+pub mod session_infrastructure;
 pub mod state_global;
 pub mod state_infrastructure;
 pub mod streaming_global;
