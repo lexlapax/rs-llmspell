@@ -251,6 +251,92 @@ pub fn inject_artifact_global(
         })?;
     artifact_table.set("storeFile", store_file_fn)?;
 
+    // query method - query artifacts with filters
+    let query_bridge = artifact_bridge.clone();
+    let query_fn = lua.create_function(move |lua, query_table: Option<Table>| {
+        // Convert Lua table to ArtifactQuery
+        let query = if let Some(table) = query_table {
+            let mut artifact_query = llmspell_sessions::artifact::ArtifactQuery::default();
+
+            // Parse session_id
+            if let Ok(Some(session_id_str)) = table.get::<_, Option<String>>("session_id") {
+                artifact_query.session_id =
+                    Some(SessionId::from_str(&session_id_str).map_err(|e| {
+                        LuaError::RuntimeError(format!("Invalid session ID: {}", e))
+                    })?);
+            }
+
+            // Parse artifact_type
+            if let Ok(Some(type_str)) = table.get::<_, Option<String>>("type") {
+                artifact_query.artifact_type = Some(
+                    llmspell_sessions::bridge::conversions::parse_artifact_type(&type_str)
+                        .map_err(mlua::Error::RuntimeError)?,
+                );
+            }
+
+            // Parse name_pattern
+            if let Ok(Some(pattern)) = table.get::<_, Option<String>>("name_pattern") {
+                artifact_query.name_pattern = Some(pattern);
+            }
+
+            // Parse tags
+            if let Ok(Some(tags)) = table.get::<_, Option<Vec<String>>>("tags") {
+                artifact_query.tags = tags;
+            }
+
+            // Parse created_after
+            if let Ok(Some(after_str)) = table.get::<_, Option<String>>("created_after") {
+                if let Ok(datetime) = chrono::DateTime::parse_from_rfc3339(&after_str) {
+                    artifact_query.created_after = Some(datetime.with_timezone(&chrono::Utc));
+                }
+            }
+
+            // Parse created_before
+            if let Ok(Some(before_str)) = table.get::<_, Option<String>>("created_before") {
+                if let Ok(datetime) = chrono::DateTime::parse_from_rfc3339(&before_str) {
+                    artifact_query.created_before = Some(datetime.with_timezone(&chrono::Utc));
+                }
+            }
+
+            // Parse min_size
+            if let Ok(Some(min)) = table.get::<_, Option<usize>>("min_size") {
+                artifact_query.min_size = Some(min);
+            }
+
+            // Parse max_size
+            if let Ok(Some(max)) = table.get::<_, Option<usize>>("max_size") {
+                artifact_query.max_size = Some(max);
+            }
+
+            // Parse limit
+            if let Ok(Some(limit)) = table.get::<_, Option<usize>>("limit") {
+                artifact_query.limit = Some(limit);
+            }
+
+            artifact_query
+        } else {
+            llmspell_sessions::artifact::ArtifactQuery::default()
+        };
+
+        let bridge = query_bridge.clone();
+        let result = block_on_async(
+            "artifact_query",
+            async move { bridge.query_artifacts(query).await },
+            None,
+        )?;
+
+        // Convert Vec<ArtifactMetadata> to Lua table
+        let lua_table = lua.create_table()?;
+        for (i, metadata) in result.iter().enumerate() {
+            let json_value =
+                llmspell_sessions::bridge::conversions::artifact_metadata_to_json(metadata);
+            let lua_value = json_to_lua_value(lua, &json_value)?;
+            lua_table.set(i + 1, lua_value)?;
+        }
+        Ok(lua_table)
+    })?;
+    artifact_table.set("query", query_fn)?;
+
     // Set the Artifact table as a global
     lua.globals().set("Artifact", artifact_table)?;
 

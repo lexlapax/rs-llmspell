@@ -213,7 +213,7 @@ impl ScriptEngineBridge for LuaEngine {
             // Pass runtime config through global context if available
             if let Some(runtime_config) = &self.runtime_config {
                 global_context.set_bridge("runtime_config", runtime_config.clone());
-                
+
                 // Initialize session infrastructure if enabled
                 if runtime_config.runtime.sessions.enabled {
                     use crate::globals::session_infrastructure::get_or_create_session_infrastructure;

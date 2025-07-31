@@ -244,6 +244,93 @@ pub fn inject_session_global(
     })?;
     session_table.set("setCurrent", set_current_fn)?;
 
+    // Replay methods - session replay functionality
+
+    // canReplay method - check if a session can be replayed
+    let can_replay_bridge = session_bridge.clone();
+    let can_replay_fn = lua.create_function(move |_lua, session_id: String| {
+        let session_id = SessionId::from_str(&session_id)
+            .map_err(|e| LuaError::RuntimeError(format!("Invalid session ID: {}", e)))?;
+
+        let bridge = can_replay_bridge.clone();
+        block_on_async(
+            "session_can_replay",
+            async move { bridge.can_replay_session(&session_id).await },
+            None,
+        )
+    })?;
+    session_table.set("canReplay", can_replay_fn)?;
+
+    // replay method - replay a session
+    let replay_bridge = session_bridge.clone();
+    let replay_fn = lua.create_function(move |lua, args: (String, Option<Table>)| {
+        let (session_id_str, config_table) = args;
+        let session_id = SessionId::from_str(&session_id_str)
+            .map_err(|e| LuaError::RuntimeError(format!("Invalid session ID: {}", e)))?;
+
+        // Convert config table to JSON (SessionBridge handles the conversion)
+        let config_json = if let Some(config) = config_table {
+            serde_json::json!({
+                "start_from": config.get::<_, Option<String>>("start_from")?,
+                "end_at": config.get::<_, Option<String>>("end_at")?,
+                "hook_filter": config.get::<_, Option<String>>("hook_filter")?,
+                "max_duration_seconds": config.get::<_, Option<u64>>("max_duration_seconds")?,
+                "include_failed": config.get::<_, Option<bool>>("include_failed")?.unwrap_or(false),
+                "progress_callback": config.get::<_, Option<bool>>("progress_callback")?.unwrap_or(false)
+            })
+        } else {
+            serde_json::json!({})
+        };
+
+        let bridge = replay_bridge.clone();
+        let result = block_on_async(
+            "session_replay",
+            async move { bridge.replay_session(&session_id, config_json).await },
+            None,
+        )?;
+
+        // Convert JSON result back to Lua
+        json_to_lua_value(lua, &result)
+    })?;
+    session_table.set("replay", replay_fn)?;
+
+    // getReplayMetadata method - get replay metadata for a session
+    let metadata_bridge = session_bridge.clone();
+    let metadata_fn = lua.create_function(move |lua, session_id: String| {
+        let session_id = SessionId::from_str(&session_id)
+            .map_err(|e| LuaError::RuntimeError(format!("Invalid session ID: {}", e)))?;
+
+        let bridge = metadata_bridge.clone();
+        let result = block_on_async(
+            "session_replay_metadata",
+            async move { bridge.get_session_replay_metadata(&session_id).await },
+            None,
+        )?;
+
+        // Convert JSON to Lua value
+        json_to_lua_value(lua, &result)
+    })?;
+    session_table.set("getReplayMetadata", metadata_fn)?;
+
+    // listReplayable method - list all sessions that can be replayed
+    let list_replayable_bridge = session_bridge.clone();
+    let list_replayable_fn = lua.create_function(move |lua, ()| {
+        let bridge = list_replayable_bridge.clone();
+        let result = block_on_async(
+            "session_list_replayable",
+            async move { bridge.list_replayable_sessions().await },
+            None,
+        )?;
+
+        // Convert Vec<SessionId> to Lua table
+        let lua_table = lua.create_table()?;
+        for (i, session_id) in result.iter().enumerate() {
+            lua_table.set(i + 1, session_id.to_string())?;
+        }
+        Ok(lua_table)
+    })?;
+    session_table.set("listReplayable", list_replayable_fn)?;
+
     // Set the Session table as a global
     lua.globals().set("Session", session_table)?;
 

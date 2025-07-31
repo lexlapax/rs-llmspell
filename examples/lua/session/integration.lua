@@ -122,25 +122,55 @@ if has_hooks then
     print("\n3. Session + Hook Integration")
     print(string.rep("-", 40))
     
-    -- NOTE: Hook integration example temporarily disabled
-    -- The Hook global uses register(hook_point, callback, priority) API
-    -- Example hook points: AfterToolExecution, SessionStart, SessionEnd
-    print("⚠️  Hook integration example needs update for new Hook API")
+    -- Register a hook to capture tool executions within this session
+    local handle = Hook.register("AfterToolExecution", function(context)
+        -- Process hook context - store tool results as artifacts
+        if context and context.data and context.data.result then
+            local current_session = Session.getCurrent()
+            if current_session then
+                Artifact.store(
+                    current_session,
+                    "tool_result",
+                    "hook_captured_" .. os.time() .. ".json",
+                    JSON.stringify(context.data),
+                    {
+                        hook_point = "AfterToolExecution",
+                        captured_at = os.date("!%Y-%m-%dT%H:%M:%SZ"),
+                        correlation_id = context.correlation_id or "unknown"
+                    }
+                )
+                print("📥 Hook captured tool result and stored as artifact")
+            end
+        end
+        return "continue"
+    end, "normal")
     
-    -- Future example would be:
-    -- local handle = Hook.register("AfterToolExecution", function(context)
-    --     -- Process hook context
-    --     return "continue"
-    -- end, "normal")
+    print("🔗 Registered AfterToolExecution hook for session")
     
-    -- For now, just demonstrate artifact storage
+    -- Demonstrate hook triggering by executing a tool
+    local calc = Tool.get("calculator")
+    if calc then
+        -- This will trigger our hook
+        local result = calc:execute({
+            operation = "evaluate",
+            expression = "42 + 8"
+        })
+        print("🧮 Executed calculator (should trigger hook):", result)
+        update_metric("operations")
+    end
+    
+    -- Also store a direct artifact to show the difference
     Artifact.store(
         session_id,
         "system_generated", 
-        "hook_test.txt",
-        "This would trigger hooks if properly configured"
+        "hook_demo.txt",
+        "This demonstrates hook integration with session artifacts"
     )
     update_metric("artifacts_stored")
+    
+    -- Unregister the hook when done
+    handle:unregister()
+    print("✅ Hook integration demonstrated and cleaned up")
 else
     print("\n3. Session + Hook Integration")
     print(string.rep("-", 40))

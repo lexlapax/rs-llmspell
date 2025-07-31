@@ -50,3 +50,7 @@ javascript = ["dep:boa_engine"]
 [[bench]]
 name = "workflow_bridge_bench"
 harness = false
+
+[[bench]]
+name = "session_bench"
+harness = false

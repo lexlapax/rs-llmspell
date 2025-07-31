@@ -31,7 +31,7 @@ pub async fn get_or_create_session_infrastructure(
     let hook_registry = get_or_create_hook_registry(context)?;
     let hook_executor = get_or_create_hook_executor(context)?;
     let event_bus = get_or_create_event_bus(context).await?;
-    
+
     // Create storage backend based on configuration
     let storage_backend = create_storage_backend(&config.storage_backend).await?;
 
@@ -82,13 +82,16 @@ async fn get_or_create_state_manager(context: &GlobalContext) -> Result<Arc<Stat
 
     // Create basic in-memory StateManager if not available
     warn!("StateManager not found, creating in-memory instance for SessionManager");
-    let state_manager = Arc::new(StateManager::new().await.map_err(|e| {
-        LLMSpellError::Component {
-            message: format!("Failed to create StateManager: {}", e),
-            source: None,
-        }
-    })?);
-    
+    let state_manager =
+        Arc::new(
+            StateManager::new()
+                .await
+                .map_err(|e| LLMSpellError::Component {
+                    message: format!("Failed to create StateManager: {}", e),
+                    source: None,
+                })?,
+        );
+
     context.set_bridge("state_manager", state_manager.clone());
     Ok(state_manager)
 }
@@ -138,13 +141,11 @@ async fn create_storage_backend(backend_type: &str) -> Result<Arc<dyn StorageBac
         }
         "sled" => {
             debug!("Creating sled storage backend for sessions");
-            let path = std::env::var("LLMSPELL_SESSION_PATH")
+            let _path = std::env::var("LLMSPELL_SESSION_PATH")
                 .unwrap_or_else(|_| "./llmspell_sessions".to_string());
-            let backend = SledBackend::new().map_err(|e| {
-                LLMSpellError::Component {
-                    message: format!("Failed to create sled backend: {}", e),
-                    source: None,
-                }
+            let backend = SledBackend::new().map_err(|e| LLMSpellError::Component {
+                message: format!("Failed to create sled backend: {}", e),
+                source: None,
             })?;
             Ok(Arc::new(backend))
         }

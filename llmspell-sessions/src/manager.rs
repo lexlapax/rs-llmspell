@@ -13,6 +13,7 @@ use crate::{
         SessionHookContextHelper,
     },
     replay::ReplayEngine,
+    security::SessionSecurityManager,
     session::{Session, SessionSnapshot},
     types::{CreateSessionOptions, SessionQuery, SessionSortBy},
     Result, SessionError, SessionId, SessionMetadata,
@@ -60,6 +61,8 @@ pub struct SessionManager {
     artifact_collector: Option<Arc<ArtifactCollectionProcessor>>,
     /// Manager configuration
     config: SessionManagerConfig,
+    /// Session security and isolation manager
+    security_manager: Arc<RwLock<SessionSecurityManager>>,
     /// Shutdown signal
     shutdown: Arc<RwLock<bool>>,
 }
@@ -170,6 +173,7 @@ impl SessionManager {
             artifact_storage,
             replay_engine,
             artifact_collector,
+            security_manager: Arc::new(RwLock::new(SessionSecurityManager::new(true))), // Strict isolation by default
             config,
             shutdown: Arc::new(RwLock::new(false)),
         };
@@ -270,6 +274,12 @@ impl SessionManager {
             .write()
             .await
             .insert(session_id, session.clone());
+
+        // Register session with security manager
+        self.security_manager
+            .write()
+            .await
+            .register_session(&session_id);
 
         // Initialize state scope
         self.state_manager
@@ -795,6 +805,12 @@ impl SessionManager {
     pub async fn delete_session(&self, session_id: &SessionId) -> Result<()> {
         // Remove from active sessions
         self.active_sessions.write().await.remove(session_id);
+
+        // Unregister from security manager
+        self.security_manager
+            .write()
+            .await
+            .unregister_session(session_id);
 
         // Delete from storage
         let key = format!("session:{session_id}");
