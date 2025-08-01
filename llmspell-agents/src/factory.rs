@@ -35,6 +35,13 @@ pub struct AgentConfig {
     pub resource_limits: ResourceLimits,
 }
 
+impl AgentConfig {
+    /// Create a new builder for AgentConfig
+    pub fn builder(name: impl Into<String>) -> AgentConfigBuilder {
+        AgentConfigBuilder::new(name)
+    }
+}
+
 /// Model configuration for LLM-based agents
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ModelConfig {
@@ -77,6 +84,112 @@ impl Default for ResourceLimits {
             max_memory_mb: 512,
             max_tool_calls: 100,
             max_recursion_depth: 10,
+        }
+    }
+}
+
+/// Builder for AgentConfig
+#[derive(Debug, Clone)]
+pub struct AgentConfigBuilder {
+    name: String,
+    description: String,
+    agent_type: String,
+    model: Option<ModelConfig>,
+    allowed_tools: Vec<String>,
+    custom_config: serde_json::Map<String, serde_json::Value>,
+    resource_limits: ResourceLimits,
+}
+
+impl AgentConfigBuilder {
+    /// Create a new builder with required name
+    pub fn new(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            description: String::new(),
+            agent_type: String::from("basic"),
+            model: None,
+            allowed_tools: Vec::new(),
+            custom_config: serde_json::Map::new(),
+            resource_limits: ResourceLimits::default(),
+        }
+    }
+
+    /// Set the agent's description
+    pub fn description(mut self, description: impl Into<String>) -> Self {
+        self.description = description.into();
+        self
+    }
+
+    /// Set the agent type
+    pub fn agent_type(mut self, agent_type: impl Into<String>) -> Self {
+        self.agent_type = agent_type.into();
+        self
+    }
+
+    /// Set the model configuration
+    pub fn model(mut self, model: ModelConfig) -> Self {
+        self.model = Some(model);
+        self
+    }
+
+    /// Add an allowed tool
+    pub fn allow_tool(mut self, tool_id: impl Into<String>) -> Self {
+        self.allowed_tools.push(tool_id.into());
+        self
+    }
+
+    /// Set allowed tools
+    pub fn allowed_tools(mut self, tools: Vec<String>) -> Self {
+        self.allowed_tools = tools;
+        self
+    }
+
+    /// Add a custom configuration parameter
+    pub fn custom_param(mut self, key: impl Into<String>, value: serde_json::Value) -> Self {
+        self.custom_config.insert(key.into(), value);
+        self
+    }
+
+    /// Set custom configuration
+    pub fn custom_config(mut self, config: serde_json::Map<String, serde_json::Value>) -> Self {
+        self.custom_config = config;
+        self
+    }
+
+    /// Set resource limits
+    pub fn resource_limits(mut self, limits: ResourceLimits) -> Self {
+        self.resource_limits = limits;
+        self
+    }
+
+    /// Set maximum execution time
+    pub fn max_execution_time_secs(mut self, secs: u64) -> Self {
+        self.resource_limits.max_execution_time_secs = secs;
+        self
+    }
+
+    /// Set maximum memory usage
+    pub fn max_memory_mb(mut self, mb: u64) -> Self {
+        self.resource_limits.max_memory_mb = mb;
+        self
+    }
+
+    /// Set maximum tool calls
+    pub fn max_tool_calls(mut self, calls: u32) -> Self {
+        self.resource_limits.max_tool_calls = calls;
+        self
+    }
+
+    /// Build the final AgentConfig
+    pub fn build(self) -> AgentConfig {
+        AgentConfig {
+            name: self.name,
+            description: self.description,
+            agent_type: self.agent_type,
+            model: self.model,
+            allowed_tools: self.allowed_tools,
+            custom_config: self.custom_config,
+            resource_limits: self.resource_limits,
         }
     }
 }

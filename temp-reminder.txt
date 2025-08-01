@@ -1,4 +1,1 @@
-reminders for me
-- testing extract and centralize - integration between crates, integration with external within crate, and functional
-- examples - separate between real world examples and testing lua 
-- why are different workflow patterns not leveraging the workflow traits?
+

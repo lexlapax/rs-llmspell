@@ -86,11 +86,11 @@ pub trait ApiKeyStorage: Send + Sync {
     /// Store a key
     fn store(&mut self, key_id: &str, key: &str, metadata: &ApiKeyMetadata) -> Result<(), String>;
 
-    /// Retrieve a key
-    fn retrieve(&self, key_id: &str) -> Result<Option<String>, String>;
+    /// Get a key
+    fn get(&self, key_id: &str) -> Result<Option<String>, String>;
 
-    /// Retrieve metadata
-    fn retrieve_metadata(&self, key_id: &str) -> Result<Option<ApiKeyMetadata>, String>;
+    /// Get metadata
+    fn get_metadata(&self, key_id: &str) -> Result<Option<ApiKeyMetadata>, String>;
 
     /// Update key metadata
     fn update_metadata(&mut self, key_id: &str, metadata: &ApiKeyMetadata) -> Result<(), String>;
@@ -119,11 +119,11 @@ impl ApiKeyStorage for InMemoryStorage {
         Ok(())
     }
 
-    fn retrieve(&self, key_id: &str) -> Result<Option<String>, String> {
+    fn get(&self, key_id: &str) -> Result<Option<String>, String> {
         Ok(self.keys.get(key_id).map(|entry| entry.key.clone()))
     }
 
-    fn retrieve_metadata(&self, key_id: &str) -> Result<Option<ApiKeyMetadata>, String> {
+    fn get_metadata(&self, key_id: &str) -> Result<Option<ApiKeyMetadata>, String> {
         Ok(self.keys.get(key_id).map(|entry| entry.metadata.clone()))
     }
 
@@ -262,9 +262,9 @@ impl ApiKeyManager {
 
             let mut found_key_id = None;
             for key_id in key_ids {
-                if let Some(_key) = storage.retrieve(&key_id)? {
+                if let Some(_key) = storage.get(&key_id)? {
                     // Get metadata to check service directly from storage to avoid nested locks
-                    if let Some(metadata) = storage.retrieve_metadata(&key_id)? {
+                    if let Some(metadata) = storage.get_metadata(&key_id)? {
                         if metadata.service == service && metadata.is_active {
                             // Check expiration
                             if let Some(expires_at) = metadata.expires_at {
@@ -289,9 +289,9 @@ impl ApiKeyManager {
         if let Some(key_id) = key_id_to_use {
             let mut storage = self.storage.write();
 
-            if let Some(key) = storage.retrieve(&key_id)? {
+            if let Some(key) = storage.get(&key_id)? {
                 // Get metadata directly from storage to avoid nested locks
-                if let Some(mut metadata) = storage.retrieve_metadata(&key_id)? {
+                if let Some(mut metadata) = storage.get_metadata(&key_id)? {
                     metadata.last_used = Some(Utc::now());
                     metadata.usage_count += 1;
                     storage.update_metadata(&key_id, &metadata)?;
@@ -315,7 +315,7 @@ impl ApiKeyManager {
     /// Get metadata for a key
     pub fn get_metadata(&self, key_id: &str) -> Result<Option<ApiKeyMetadata>, String> {
         let storage = self.storage.read();
-        storage.retrieve_metadata(key_id)
+        storage.get_metadata(key_id)
     }
 
     /// Rotate an API key
@@ -367,7 +367,7 @@ impl ApiKeyManager {
         let mut storage = self.storage.write();
 
         // Get metadata directly from storage to avoid nested locks
-        if let Some(mut metadata) = storage.retrieve_metadata(key_id)? {
+        if let Some(mut metadata) = storage.get_metadata(key_id)? {
             metadata.is_active = false;
             storage.update_metadata(key_id, &metadata)?;
 

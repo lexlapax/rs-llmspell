@@ -41,6 +41,7 @@ pub mod artifact_hooks;
 pub mod builtin;
 pub mod cache;
 pub mod circuit_breaker;
+pub mod collectors;
 pub mod context;
 pub mod coordination;
 pub mod distributed;
@@ -59,6 +60,9 @@ pub mod types;
 // Re-export commonly used items at crate root
 pub use artifact_hooks::{event_to_hook_point, is_artifact_hook_point, ArtifactHookPoints};
 pub use circuit_breaker::{BreakerState, CircuitBreaker};
+pub use collectors::{
+    AgentOutputCollector, ArtifactCollector, ArtifactData, CollectionConfig, ToolResultCollector,
+};
 pub use context::{HookContext, HookContextBuilder, OperationContext};
 pub use coordination::{
     CorrelationId, CrossComponentContext, CrossComponentCoordinator, DependencyGraph,

@@ -213,6 +213,25 @@ impl ScriptEngineBridge for LuaEngine {
             // Pass runtime config through global context if available
             if let Some(runtime_config) = &self.runtime_config {
                 global_context.set_bridge("runtime_config", runtime_config.clone());
+
+                // Initialize session infrastructure if enabled
+                if runtime_config.runtime.sessions.enabled {
+                    use crate::globals::session_infrastructure::get_or_create_session_infrastructure;
+                    match futures::executor::block_on(get_or_create_session_infrastructure(
+                        &global_context,
+                        &runtime_config.runtime.sessions,
+                    )) {
+                        Ok(_) => {
+                            tracing::debug!("Session infrastructure initialized successfully");
+                        }
+                        Err(e) => {
+                            tracing::warn!(
+                                "Failed to initialize session infrastructure: {}, Session/Artifact globals will not be available",
+                                e
+                            );
+                        }
+                    }
+                }
             }
 
             let global_registry =

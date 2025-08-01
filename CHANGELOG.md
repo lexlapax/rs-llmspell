@@ -7,6 +7,109 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] - 2025-08-01
+
+### Added
+
+#### Complete Session and Artifact Management System
+- **Session Lifecycle Management**: Create, suspend, resume, and complete long-running sessions
+- **Artifact Storage**: Content-addressed storage for session outputs with blake3 hashing
+- **Session Persistence**: Save and restore full session context across restarts
+- **Session Replay**: Comprehensive replay capability using existing hook infrastructure
+- **Automatic Artifact Collection**: Tool outputs and agent responses automatically captured
+- **User Artifact Storage**: Public API for users to store their own files and data
+
+#### Session Infrastructure (39/39 tasks completed)
+- **New llmspell-sessions crate**: Core session management with 24.5µs creation time
+- **Session States**: Active, Suspended, Completed, Failed, Archived with transitions
+- **Session Metadata**: Tags, parent references, operation counts, timestamps
+- **Session Configuration**: Retention policies, auto-save intervals, resource limits
+- **Artifact Versioning**: Automatic version management for same-named artifacts
+- **Compression Support**: LZ4 compression for artifacts >10KB (50%+ ratio)
+
+#### Artifact Management Features
+- **Content Hashing**: Blake3 for 10x faster hashing than SHA2
+- **Deduplication**: Content-based addressing prevents duplicate storage
+- **Metadata System**: Rich metadata with tags, MIME types, custom fields
+- **Query System**: Advanced search with filtering, pagination, and sorting
+- **Binary Support**: Handles text, JSON, and binary data efficiently
+- **Size Limits**: Configurable limits (default 100MB per artifact)
+
+#### Hook and Event Integration
+- **Session Lifecycle Hooks**: session:start, session:end, session:suspend, session:resume
+- **Artifact Hooks**: artifact:created, artifact:accessed via collectors
+- **Replayable Hooks**: All session hooks implement ReplayableHook trait
+- **Event Correlation**: Sessions generate correlated events with timeline support
+- **Built-in Collectors**: ToolResultCollector and AgentOutputCollector
+- **Performance**: Hook overhead maintained at 11µs (well under 1ms target)
+
+#### Session Policies and Middleware
+- **Timeout Policies**: Configurable session duration and idle timeouts
+- **Resource Policies**: Memory, token, operation, and cost limits
+- **Rate Limiting**: Global, per-session, and per-operation limits
+- **Middleware Patterns**: Sequential, Parallel, and Voting execution
+- **Policy Composition**: Combine multiple policies with different strategies
+- **Performance**: <10µs overhead per policy evaluation
+
+#### Script Bridge Implementation
+- **Session Global**: Complete Lua API for session management
+- **Artifact Global**: Store, retrieve, list, and delete artifacts from scripts
+- **Thread-Local Context**: getCurrent/setCurrent for active session
+- **Example Suite**: 5 comprehensive examples demonstrating all features
+- **Integration Examples**: Sessions work with State, Events, Hooks, Agents
+
+#### Performance Achievements
+- **Session Creation**: 24.5µs (target: <50ms) - 2000x better
+- **Session Save**: 15.3µs (target: <50ms) - 3200x better
+- **Session Load**: 3.4µs (target: <50ms) - 14700x better
+- **Artifact Store**: <1ms for text/JSON artifacts
+- **Query Performance**: List 100 artifacts in <5ms
+- **Memory Efficiency**: Chunked storage for large artifacts
+
+### Changed
+
+#### Architecture Enhancements
+- **Three-Layer Pattern**: SessionBridge (async) → SessionGlobal (sync) → Lua bindings
+- **Foundation-First Approach**: Test categorization moved before API work
+- **Bridge Consistency**: All bridges now created externally (follows HookBridge pattern)
+- **Manager Pattern**: All services follow Manager suffix convention
+
+#### API Improvements
+- **Public Artifact API**: Added store_artifact, get_artifact, list_artifacts to SessionManager
+- **Query Interface**: ArtifactQuery builder for complex searches
+- **File Support**: store_file_artifact for direct file uploads
+- **Metadata Handling**: Consistent metadata preservation across operations
+
+### Fixed
+- Session isolation between different session contexts
+- Artifact content integrity with hash verification
+- Replay functionality integration with existing infrastructure
+- Binary data handling in script bridge
+- MIME type detection and preservation
+
+### Performance
+
+| Component | Target | Achieved | Status |
+|-----------|--------|----------|---------|
+| Session Creation | <50ms | 24.5µs | ✅ 2000x better |
+| Session Save | <50ms | 15.3µs | ✅ 3200x better |
+| Session Load | <50ms | 3.4µs | ✅ 14700x better |
+| Hook Overhead | <1ms | 11µs | ✅ 90x better |
+| Artifact Store | <5ms | <1ms | ✅ 5x better |
+| Memory Overhead | <20% | <10% | ✅ Exceeded |
+
+### Documentation
+- **Session Management Guide**: User guide for session features
+- **Artifact API Guide**: Complete artifact storage documentation  
+- **Session Examples**: 5 comprehensive Lua examples
+- **Developer Guide**: Session and artifact implementation details
+- **API Reference**: Updated with Session and Artifact globals
+
+### Infrastructure
+- **Test Foundation**: Moved test categorization to beginning of phase
+- **Example Organization**: Prepared structure for Phase 7 reorganization
+- **Release Process**: Streamlined with automated version updates
+
 ## [0.5.0] - 2025-07-29
 
 ### Added

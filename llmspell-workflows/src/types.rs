@@ -199,6 +199,13 @@ pub struct WorkflowConfig {
     pub default_error_strategy: crate::traits::ErrorStrategy,
 }
 
+impl WorkflowConfig {
+    /// Create a new builder for WorkflowConfig
+    pub fn builder() -> WorkflowConfigBuilder {
+        WorkflowConfigBuilder::new()
+    }
+}
+
 impl Default for WorkflowConfig {
     fn default() -> Self {
         Self {
@@ -210,6 +217,74 @@ impl Default for WorkflowConfig {
             continue_on_error: false,
             default_error_strategy: crate::traits::ErrorStrategy::FailFast,
         }
+    }
+}
+
+/// Builder for WorkflowConfig
+#[derive(Debug, Clone)]
+pub struct WorkflowConfigBuilder {
+    config: WorkflowConfig,
+}
+
+impl WorkflowConfigBuilder {
+    /// Create a new builder with default configuration
+    pub fn new() -> Self {
+        Self {
+            config: WorkflowConfig::default(),
+        }
+    }
+
+    /// Set maximum execution time for the entire workflow
+    pub fn max_execution_time(mut self, duration: Option<Duration>) -> Self {
+        self.config.max_execution_time = duration;
+        self
+    }
+
+    /// Set default timeout for individual steps
+    pub fn default_step_timeout(mut self, duration: Duration) -> Self {
+        self.config.default_step_timeout = duration;
+        self
+    }
+
+    /// Set maximum retry attempts for failed steps
+    pub fn max_retry_attempts(mut self, attempts: u32) -> Self {
+        self.config.max_retry_attempts = attempts;
+        self
+    }
+
+    /// Set delay between retry attempts (base delay for exponential backoff)
+    pub fn retry_delay_ms(mut self, delay_ms: u64) -> Self {
+        self.config.retry_delay_ms = delay_ms;
+        self
+    }
+
+    /// Set whether to use exponential backoff for retries
+    pub fn exponential_backoff(mut self, enabled: bool) -> Self {
+        self.config.exponential_backoff = enabled;
+        self
+    }
+
+    /// Set whether to continue execution after step failures
+    pub fn continue_on_error(mut self, enabled: bool) -> Self {
+        self.config.continue_on_error = enabled;
+        self
+    }
+
+    /// Set default error handling strategy
+    pub fn default_error_strategy(mut self, strategy: crate::traits::ErrorStrategy) -> Self {
+        self.config.default_error_strategy = strategy;
+        self
+    }
+
+    /// Build the final WorkflowConfig
+    pub fn build(self) -> WorkflowConfig {
+        self.config
+    }
+}
+
+impl Default for WorkflowConfigBuilder {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

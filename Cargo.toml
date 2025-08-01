@@ -17,11 +17,12 @@ members = [
     "llmspell-testing",
     "llmspell-utils",
     "llmspell-state-persistence",
-    "llmspell-state-traits"
+    "llmspell-state-traits",
+    "llmspell-sessions"
 ]
 
 [workspace.package]
-version = "0.5.0"
+version = "0.6.0"
 edition = "2021"
 authors = ["Lex Lapax<lexlapax@gmail.com>"]
 repository = "https://github.com/lexlapax/rs-llmspell"
@@ -65,7 +66,7 @@ once_cell = "1.19"
 # Testing framework
 mockall = "0.13"
 proptest = "1.4"
-criterion = { version = "0.5", features = ["html_reports"] }
+criterion = { version = "0.5", features = ["html_reports", "async_tokio"] }
 serial_test = "3.1"
 
 # Storage backends
@@ -104,12 +105,22 @@ rand = "0.8"
 
 # Testing utilities
 tempfile = "3.10"
+test-log = { version = "0.2", features = ["trace"] }
 
 # CLI framework
 clap = { version = "4.5", features = ["derive", "env"] }
 
 # Environment and process management
 which = "6.0"
+
+# Binary serialization
+bincode = "1.3"
+
+# Compression (pure Rust, very fast)
+lz4_flex = "0.11"
+
+# Cryptographic hashing (10x faster than SHA2 for content-addressed storage)
+blake3 = "1.5"
 
 [profile.dev]
 opt-level = 0

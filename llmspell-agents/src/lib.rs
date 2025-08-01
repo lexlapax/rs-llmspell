@@ -64,7 +64,7 @@ pub use lifecycle::{
 pub use tool_context::{
     ContextInheritanceRule, ToolContextManager, ToolExecutionContext, ToolExecutionRecord,
 };
-pub use tool_discovery::{RecommendationContext, ToolDiscoveryService, ToolSearchCriteria};
+pub use tool_discovery::{RecommendationContext, ToolDiscovery, ToolSearchCriteria};
 pub use tool_errors::{
     ErrorContext, ErrorRecoveryStrategy, RecoveryAction, ToolErrorHandler, ToolIntegrationError,
 };

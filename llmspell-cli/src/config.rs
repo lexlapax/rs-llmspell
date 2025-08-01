@@ -138,6 +138,17 @@ fn apply_environment_overrides(config: &mut RuntimeConfig) -> Result<()> {
             .with_context(|| "Invalid boolean value for LLMSPELL_ENABLE_STREAMING")?;
     }
 
+    // Override session settings
+    if let Ok(val) = env::var(format!("{}ENABLE_SESSIONS", ENV_PREFIX)) {
+        config.runtime.sessions.enabled = val
+            .parse()
+            .with_context(|| "Invalid boolean value for LLMSPELL_ENABLE_SESSIONS")?;
+    }
+
+    if let Ok(val) = env::var(format!("{}SESSION_BACKEND", ENV_PREFIX)) {
+        config.runtime.sessions.storage_backend = val;
+    }
+
     Ok(())
 }
 

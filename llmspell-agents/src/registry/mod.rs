@@ -19,8 +19,8 @@ pub mod registration;
 // Re-export key types from submodules
 pub use categories::{AgentCategory, AgentTag, CategoryManager, StandardCategories, TagType};
 pub use discovery::{
-    DiscoveryService, RecommendationContext, SearchBuilder, SearchCriteria, SearchResult,
-    SortField, SortOrder,
+    Discovery, RecommendationContext, SearchBuilder, SearchCriteria, SearchResult, SortField,
+    SortOrder,
 };
 pub use metadata::{
     ExtendedAgentMetadata, ExtendedMetadataBuilder, HealthState, HealthStatus, MetadataManager,

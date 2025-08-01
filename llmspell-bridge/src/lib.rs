@@ -109,6 +109,10 @@ pub mod globals;
 // Hook bridge module
 pub mod hook_bridge;
 
+// Session and artifact bridges
+pub mod artifact_bridge;
+pub mod session_bridge;
+
 // Agent bridge modules
 pub mod agent_bridge;
 pub mod agents;

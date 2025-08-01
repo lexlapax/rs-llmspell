@@ -3,8 +3,7 @@
 
 use llmspell_agents::composition::{CompositionStep, DataFlow, ToolComposition};
 use llmspell_agents::{
-    AgentWrappedTool, InvocationConfig, ToolDiscoveryService, ToolInvoker, ToolManager,
-    ToolSearchCriteria,
+    AgentWrappedTool, InvocationConfig, ToolDiscovery, ToolInvoker, ToolManager, ToolSearchCriteria,
 };
 use llmspell_core::{
     traits::{
@@ -127,7 +126,7 @@ impl Tool for FastMockTool {
 async fn test_tool_discovery_performance() {
     // Setup
     let registry = Arc::new(ToolRegistry::new());
-    let discovery = ToolDiscoveryService::new(registry.clone());
+    let discovery = ToolDiscovery::new(registry.clone());
 
     // Register some tools for discovery
     for i in 0..100 {

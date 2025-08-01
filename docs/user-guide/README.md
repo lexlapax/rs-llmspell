@@ -51,6 +51,13 @@ Welcome to the rs-llmspell user documentation! This guide will help you write po
   - Schema migrations and backup/recovery
   - See [State Management Guide](../state-management/) for full persistence features
 
+- **[Session and Artifact API](session-artifact-api.md)** 🚧 - Session management and content storage
+  - Create and manage conversation sessions
+  - Store and retrieve artifacts (tool outputs, agent responses)
+  - Session lifecycle (active, suspended, completed)
+  - Content-addressed storage with automatic compression
+  - Rich metadata and tagging support
+
 ### Configuration
 - **[Configuration Guide](configuration/configuration.md)** - Configure security, resources, and deployment
   - Security settings and best practices
