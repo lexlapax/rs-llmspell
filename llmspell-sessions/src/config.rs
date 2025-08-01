@@ -37,6 +37,13 @@ pub struct SessionManagerConfig {
     pub event_config: EventConfig,
 }
 
+impl SessionManagerConfig {
+    /// Create a new builder for `SessionManagerConfig`
+    pub fn builder() -> SessionManagerConfigBuilder {
+        SessionManagerConfigBuilder::new()
+    }
+}
+
 impl Default for SessionManagerConfig {
     fn default() -> Self {
         Self {
@@ -178,6 +185,60 @@ impl SessionManagerConfigBuilder {
     /// Set compression level (1-9)
     pub fn compression_level(mut self, level: u32) -> Self {
         self.config.compression_level = level.clamp(1, 9);
+        self
+    }
+
+    /// Set persist interval in seconds
+    pub fn persist_interval_secs(mut self, secs: u64) -> Self {
+        self.config.persist_interval_secs = secs;
+        self
+    }
+
+    /// Set default session timeout
+    pub fn default_session_timeout(mut self, timeout: Duration) -> Self {
+        self.config.default_session_timeout = timeout;
+        self
+    }
+
+    /// Enable or disable activity tracking
+    pub fn track_activity(mut self, enabled: bool) -> Self {
+        self.config.track_activity = enabled;
+        self
+    }
+
+    /// Set maximum storage size in bytes
+    pub fn max_storage_size_bytes(mut self, bytes: u64) -> Self {
+        self.config.max_storage_size_bytes = bytes;
+        self
+    }
+
+    /// Enable or disable compression
+    pub fn enable_compression(mut self, enabled: bool) -> Self {
+        self.config.enable_compression = enabled;
+        self
+    }
+
+    /// Enable or disable deduplication
+    pub fn enable_deduplication(mut self, enabled: bool) -> Self {
+        self.config.enable_deduplication = enabled;
+        self
+    }
+
+    /// Set cleanup configuration
+    pub fn cleanup_config(mut self, config: CleanupConfig) -> Self {
+        self.config.cleanup_config = config;
+        self
+    }
+
+    /// Set hook execution configuration
+    pub fn hook_config(mut self, config: HookExecutionConfig) -> Self {
+        self.config.hook_config = config;
+        self
+    }
+
+    /// Set event configuration
+    pub fn event_config(mut self, config: EventConfig) -> Self {
+        self.config.event_config = config;
         self
     }
 

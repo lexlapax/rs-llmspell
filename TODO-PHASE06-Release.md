@@ -226,10 +226,16 @@ Phase 6-Release focuses on polishing the codebase for public release now that we
 #### Task R.1.5: Implement Builder Patterns
 **Priority**: MEDIUM
 **Estimated Time**: 6 hours
-**Status**: TODO
+**Status**: COMPLETED ✅
 **Assigned To**: API Team
 
 **Description**: Add builder patterns for complex configuration objects.
+
+**Files Updated**:
+- ✅ `llmspell-sessions/src/config.rs` - Added `builder()` method to SessionManagerConfig
+- ✅ `llmspell-workflows/src/types.rs` - Created WorkflowConfigBuilder with all configuration options
+- ✅ `llmspell-agents/src/factory.rs` - Created AgentConfigBuilder with comprehensive configuration
+- ✅ `llmspell-agents/examples/builder_patterns.rs` - Created comprehensive example demonstrating all builders
 
 **Targets for Builder Pattern**:
 - `SessionManagerConfig`
@@ -260,10 +266,10 @@ impl SessionManagerConfigBuilder {
 ```
 
 **Acceptance Criteria**:
-- [ ] Builder patterns implemented for all complex configs
-- [ ] Builders provide sensible defaults
-- [ ] Validation in build() method
-- [ ] Examples demonstrating usage
+- [x] Builder patterns implemented for all complex configs ✅
+- [x] Builders provide sensible defaults ✅
+- [x] Validation in build() method ✅
+- [x] Examples demonstrating usage ✅
 
 ---
 

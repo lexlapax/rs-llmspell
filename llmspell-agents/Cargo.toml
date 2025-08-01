@@ -33,6 +33,8 @@ rand = "0.8"
 [dev-dependencies]
 tracing-subscriber.workspace = true
 tempfile = "3.8"
+llmspell-sessions = { path = "../llmspell-sessions" }
+llmspell-workflows = { path = "../llmspell-workflows" }
 
 # Integration test configuration for provider state tests
 [[test]]
