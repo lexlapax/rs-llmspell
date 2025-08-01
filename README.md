@@ -4,7 +4,7 @@ Scriptable LLM interactions via Lua and JavaScript - Cast scripting spells to an
 
 ## Overview
 
-Rs-LLMSpell provides script-driven workflows for LLM interactions with 34 built-in tools, agent coordination, persistent state management, and a powerful hook/event system for extensibility. Currently v0.5.0 (Phase 5 complete), working toward 1.0 release.
+Rs-LLMSpell provides script-driven workflows for LLM interactions with 34 built-in tools, agent coordination, persistent state management, session lifecycle management, and a powerful hook/event system for extensibility. Currently v0.6.0 (Phase 6 complete), working toward 1.0 release.
 
 ## Quick Example
 
@@ -71,6 +71,33 @@ State.migrate({
 })
 ```
 
+### Session Management Example (v0.6.0)
+
+```lua
+-- Create a session for long-running interactions
+local session = Session.create({
+    name = "research_session",
+    max_duration = 3600  -- 1 hour
+})
+
+-- Store artifacts within the session
+local artifact_id = Artifact.store(session.id, "analysis_result", {
+    summary = "Market analysis complete",
+    data = {revenue = 1000000, growth = 0.15}
+})
+
+-- Retrieve artifacts later
+local artifact = Artifact.get(session.id, artifact_id)
+
+-- Suspend and resume sessions
+Session.suspend(session.id)
+-- ... later ...
+Session.resume(session.id)
+
+-- List all artifacts in a session
+local artifacts = Artifact.list(session.id)
+```
+
 ## Installation
 
 ```bash
@@ -88,24 +115,28 @@ cargo build --release
 - **34 Production Tools**: File operations, web scraping, data processing, system utilities
 - **Agent Coordination**: Create and orchestrate LLM agents with different models
 - **Workflow Patterns**: Sequential, parallel, conditional, and loop execution
+- **Session Management**: Long-running sessions with suspend/resume, artifacts, and replay
 - **Persistent State Management**: Multi-backend persistence with migration and backup support
 - **Hook System**: 40+ extensibility points with <1% performance overhead
 - **Event Bus**: Cross-language event propagation at >90K events/sec
 - **Built-in Hooks**: Logging, metrics, caching, rate limiting, retry, cost tracking, and security
 - **State Persistence**: Sled/RocksDB backends, schema migrations, atomic backups
+- **Artifact Storage**: Content-addressed storage with versioning and compression
+- **Session Replay**: Full session replay capability with hook execution history
 - **Security**: Comprehensive sandboxing, resource limits, and sensitive data protection
 - **Multi-Provider**: Support for OpenAI, Anthropic, and local models
 
 ## Current Status
 
+- **v0.6.0 Released**: Session management with artifacts and replay capabilities (2025-08-01)
 - **v0.5.0 Released**: Persistent state management with enterprise features (2025-07-29)
 - **v0.4.0 Released**: Hook and event system with cross-language support (2025-07-25)
 - **v0.3.0 Released**: 34 tools, agent infrastructure, and workflows (2025-07-23)
-- **Phase 5 Complete**: Production-ready state persistence with 36/36 tasks done
-- **Pre-1.0 Software**: Breaking changes expected before stable release
-- **Production-Ready Components**: State persistence, tools, hooks, and events are production quality
+- **Phase 6 Complete**: Production-ready session management with 39/39 tasks done
+- **Pre-1.0 Software**: Breaking changes expected in Phase 7 (API standardization)
+- **Production-Ready Components**: Sessions, state persistence, tools, hooks, and events
 - See [CHANGELOG.md](CHANGELOG.md) for detailed version history
-- See [RELEASE_NOTES_v0.5.0.md](RELEASE_NOTES_v0.5.0.md) for latest release
+- See [RELEASE_NOTES_v0.6.0.md](RELEASE_NOTES_v0.6.0.md) for latest release
 
 ## Documentation
 
@@ -148,4 +179,4 @@ You may choose either license for your use.
 
 ---
 
-**Current Focus**: Working toward 1.0 release with stable APIs and production readiness.
+**Current Focus**: Phase 7 - API consistency and standardization across all crates for 1.0 release.

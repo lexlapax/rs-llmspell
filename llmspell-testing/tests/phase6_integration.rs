@@ -12,7 +12,6 @@ use llmspell_storage::backends::memory::MemoryBackend;
 use std::sync::Arc;
 use std::time::Duration;
 
-#[cfg_attr(test_category = "integration", test_category = "phase6")]
 #[tokio::test]
 async fn test_phase6_complete_session_lifecycle() -> Result<()> {
     // Initialize all Phase 6 components
@@ -94,7 +93,6 @@ async fn test_phase6_complete_session_lifecycle() -> Result<()> {
     Ok(())
 }
 
-#[cfg_attr(test_category = "integration", test_category = "phase6")]
 #[tokio::test]
 async fn test_phase6_performance_validation() -> Result<()> {
     let storage_backend = Arc::new(MemoryBackend::new());

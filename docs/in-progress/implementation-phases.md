@@ -4,25 +4,25 @@
 **Date**: June 2025  
 **Status**: Implementation Roadmap  
 
-> **📋 Complete Implementation Guide**: This document defines all 21 implementation phases for rs-llmspell, from MVP foundation through advanced production features.
+> **📋 Complete Implementation Guide**: This document defines all 22 implementation phases for rs-llmspell, from MVP foundation through advanced production features.
 
 ---
 
 ## Overview
 
-Rs-LLMSpell follows a carefully structured 21-phase implementation approach that prioritizes core functionality while building toward production readiness. Each phase has specific goals, components, and measurable success criteria.
+Rs-LLMSpell follows a carefully structured 22-phase implementation approach that prioritizes core functionality while building toward production readiness. Each phase has specific goals, components, and measurable success criteria.
 
 ### Phase Categories
 
 - **MVP Foundation** (Phases 0-2): Core functionality with comprehensive tools for minimal viable product
 - **MVP Completion** (Phase 3): Tool enhancement, agent infrastructure, and bridge integration
-- **Production Infrastructure** (Phases 4-7): Hook system, state management, sessions, and vector storage
-- **Advanced Features** (Phases 8-10): Workflow orchestration, multimodal tools, and REPL
-- **Extended Features** (Phases 11-14): Daemon mode, MCP protocols, and AI/ML tools
-- **Multi-Language Support** (Phase 15): JavaScript engine and cross-language features
-- **Platform Integration** (Phases 16-19): A2A protocols, library mode, and cross-platform support
-- **Production Optimization** (Phase 20): Performance and security hardening
-- **Additional Enhancements** (Phase 21): Extended tool library and integrations
+- **Production Infrastructure** (Phases 4-6): Hook system, state management, and sessions
+- **Pre-1.0 Polish** (Phase 7): API consistency, documentation, and example reorganization
+- **Advanced Features** (Phases 8-11): Vector storage, workflow orchestration, REPL, and daemon mode
+- **Extended Features** (Phases 12-14): MCP protocols and JavaScript engine
+- **Platform Support** (Phases 15-16): Library mode and cross-platform support
+- **Production Optimization** (Phase 17): Performance and security hardening
+- **Additional Enhancements** (Phases 18-22): Extended tools, A2A protocols, multimodal, and AI/ML tools
 
 ---
 
@@ -422,7 +422,55 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 
 ---
 
-### **Phase 7: Vector Storage and Search Infrastructure (Weeks 23-24)**
+### **Phase 7: API Consistency and Documentation Polish (Weeks 23-27)**
+
+**Goal**: Standardize all public APIs, reorganize examples, and polish documentation for stable 1.0 release  
+**Priority**: CRITICAL (Pre-1.0 Release Requirement)
+**Dependencies**: Requires Phase 6 Session Management completion
+**Status**: Planning Phase - 40 tasks defined
+
+**Components**:
+- **API Consistency (24 tasks, 104.41 hours)**:
+  - Core API standardization (completed - builder patterns)
+  - Test organization foundation with proper categorization
+  - Workflow standardization (trait integration, factory patterns, config builders)
+  - Bridge API standardization (factory methods, config builders, discovery patterns)
+  - Hook execution fixes for tools/workflows
+- **Documentation (11 tasks, 54 hours)**:
+  - Rust API documentation (100% rustdoc coverage)
+  - Example reorganization by audience (Script Users, Rust Developers, System Integrators)
+  - User guide and technical documentation cleanup
+  - Developer guide enhancement
+- **Quality Assurance (1 task, 2 hours)**:
+  - Final test categorization verification
+
+**Major Changes**:
+- **Clean Break Approach**: No backward compatibility - APIs changed in place for 1.0 stability
+- **Test-First Foundation**: Test categorization implemented before API changes to avoid rework
+- **Example Reorganization**: 156+ examples reorganized by audience and learning path
+- **Workflow Standardization**: Workflows implement agent traits following Google ADK pattern
+
+**Success Criteria**:
+- [ ] All APIs follow consistent naming patterns (get_*, set_*, *Manager suffix)
+- [ ] 100% builder pattern adoption for configuration objects
+- [ ] Test suite properly categorized (unit, integration, external)
+- [ ] Examples organized by audience with progressive learning paths
+- [ ] Hook execution working consistently across all crates
+- [ ] Complete rustdoc coverage for all public APIs
+- [ ] User and developer documentation standardized
+- [ ] All breaking changes documented with migration guide
+
+**Testing Requirements**:
+- API consistency validation tests
+- Builder pattern completeness tests
+- Test categorization verification (<35s for fast suite)
+- Example testing framework with CI integration
+- Documentation build and link validation
+- Breaking change detection tests
+
+---
+
+### **Phase 8: Vector Storage and Search Infrastructure (Weeks 28-29)**
 
 **Goal**: Implement vector storage backends and advanced search capabilities
 **Priority**: MEDIUM (Advanced Features)
@@ -467,7 +515,7 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 
 ---
 
-### **Phase 8: Advanced Workflow Features (Weeks 25-26)**
+### **Phase 9: Advanced Workflow Features (Weeks 30-31)**
 
 **Goal**: Enhance basic workflows with enterprise-grade features leveraging full infrastructure
 **Priority**: MEDIUM (Advanced Orchestration)
@@ -521,7 +569,7 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 
 ## Advanced Integration Phases
 
-### **Phase 9: REPL Interactive Mode (Weeks 29-30)**
+### **Phase 10: REPL Interactive Mode (Weeks 32-33)**
 
 **Goal**: Implement interactive REPL for development and debugging  
 **Priority**: MEDIUM (Developer Experience)
@@ -565,7 +613,7 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 
 ---
 
-### **Phase 10: Daemon and Service Mode (Weeks 31-32)**
+### **Phase 11: Daemon and Service Mode (Weeks 34-35)**
 
 **Goal**: Implement long-running daemon mode with scheduler  
 **Priority**: LOW (Advanced Feature)
@@ -612,7 +660,7 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 
 ---
 
-### **Phase 11: MCP Tool Integration (Weeks 33-34)**
+### **Phase 12: MCP Tool Integration (Weeks 36-37)**
 
 **Goal**: Support Model Control Protocol for external tools  
 **Priority**: LOW (Advanced Integration)
@@ -639,7 +687,7 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 
 ---
 
-### **Phase 12: MCP Server Mode (Weeks 35-36)**
+### **Phase 13: MCP Server Mode (Weeks 38-39)**
 
 **Goal**: Expose rs-llmspell tools and agents via MCP protocol  
 **Priority**: LOW (Advanced Integration)
@@ -666,7 +714,7 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 
 ---
 
-### **Phase 13: JavaScript Engine Support (Weeks 39-40)**
+### **Phase 14: JavaScript Engine Support (Weeks 40-41)**
 
 **Goal**: Add JavaScript as second script engine using existing ScriptEngineBridge infrastructure  
 **Priority**: MEDIUM (Enhancement)
@@ -719,7 +767,7 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 
 ## Production Optimization Phase
 
-### **Phase 14: Library Mode Support (Weeks 45-46)**
+### **Phase 15: Library Mode Support (Weeks 42-43)**
 
 **Goal**: Support usage as native module in external runtimes  
 **Priority**: MEDIUM (Alternative Usage Mode)
@@ -748,7 +796,7 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 
 ## Additional Enhancement Phases
 
-### **Phase 15: Cross-Platform Support (Weeks 47-48)**
+### **Phase 16: Cross-Platform Support (Weeks 44-45)**
 
 **Goal**: Full Windows support and cross-platform compatibility  
 **Priority**: MEDIUM (Platform Coverage)
@@ -776,7 +824,7 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 ---
 ## Platform Support Phases
 
-### **Phase 16: Production Optimization (Weeks 49-50)**
+### **Phase 17: Production Optimization (Weeks 46-47)**
 
 **Goal**: Performance optimization and production hardening  
 **Priority**: HIGH (Production Readiness)
@@ -813,7 +861,7 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 
 ## Enhanced Capabilities
 
-### **Phase 17: Additional Optional Enhancements (Extended Tools, Other Enhancements) (Weeks 51-52)**
+### **Phase 18: Additional Optional Enhancements (Extended Tools, Other Enhancements) (Weeks 48-49)**
 
 **Goal**: Implement additional data processing and integration tools  
 **Priority**: LOW (Post-Production Enhancement)
@@ -839,7 +887,7 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 - Security review
 
 ---
-### **Phase 18: A2A Client Support (Weeks 41-42)**
+### **Phase 19: A2A Client Support (Weeks 50-51)**
 
 **Goal**: Agent-to-Agent communication as client  
 **Priority**: LOW (Advanced Networking)
@@ -866,7 +914,7 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 
 ---
 
-### **Phase 19: A2A Server Support (Weeks 43-44)**
+### **Phase 20: A2A Server Support (Weeks 52-53)**
 
 **Goal**: Expose local agents via A2A protocol  
 **Priority**: LOW (Advanced Networking)
@@ -893,7 +941,7 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 
 ---
 
-### **Phase 20: Multimodal Tools Implementation (Weeks 27-28)**
+### **Phase 21: Multimodal Tools Implementation (Weeks 54-55)**
 
 **Goal**: Implement comprehensive multimodal processing tools  
 **Priority**: MEDIUM (Feature Enhancement)
@@ -933,7 +981,7 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 
 ---
 
-### **Phase 21: AI/ML Complex Tools (Weeks 37-38)**
+### **Phase 22: AI/ML Complex Tools (Weeks 56-57)**
 
 **Goal**: Implement AI and ML dependent complex tools  
 **Priority**: MEDIUM (Advanced AI Features)
@@ -953,7 +1001,7 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
 - [ ] Advanced multimodal tools handle complex operations
 - [ ] Model loading and caching optimized
 - [ ] Performance acceptable for production use
-- [ ] Integration with vector storage (from Phase 7)
+- [ ] Integration with vector storage (from Phase 8)
 - [ ] **Cost tracking accurate for all AI operations**
 - [ ] **Rate limiting prevents API quota exhaustion**
 - [ ] **Automatic retry handles transient failures**
@@ -1024,11 +1072,11 @@ Rs-LLMSpell follows a carefully structured 21-phase implementation approach that
    - Phase 1.2 MUST implement ScriptEngineBridge foundation
    - NO direct Lua coupling allowed in ScriptRuntime
    - Bridge pattern implementation is CRITICAL for future phases
-2. **High Priority** (Phases 3-4, 20): Agent infrastructure, hooks, and production optimization
-3. **Medium Priority** (Phases 5-7, 9-10, 14-15, 18-19): State management, sessions, multimodal, and platform support
-   - Phase 15 (JavaScript) becomes much simpler due to existing bridge infrastructure
+2. **High Priority** (Phases 3-4, 7, 17): Agent infrastructure, hooks, API consistency, and production optimization
+3. **Medium Priority** (Phases 5-6, 8-11, 14-16, 21-22): State management, sessions, vector storage, REPL, platform support, and AI/ML tools
+   - Phase 14 (JavaScript) becomes much simpler due to existing bridge infrastructure
    - Additional engines can be added as medium priority features
-4. **Low Priority** (Phases 8, 11-13, 16-17, 21): Workflows, services, protocols, and optional enhancements
+4. **Low Priority** (Phases 9, 12-13, 18-20): Advanced workflows, MCP protocols, and A2A support
 
 ### Breaking Changes Strategy
 
@@ -1058,15 +1106,16 @@ Each phase must pass:
 - **Phase 4**: Hook System depends on Phase 3.3 Agent Infrastructure
 - **Phase 5**: State Management depends on Phase 4 Hook System **(specifically ReplayableHook trait)**
 - **Phase 6**: Session Management depends on Phase 5 State Management
-- **Phase 7**: Vector Storage depends on Phase 6 Session Management
-- **Phase 8**: Workflow Orchestration depends on Phase 7 Vector Storage
-- **Phase 9**: Multimodal Tools depends on Phase 8 Workflows
-- **Phase 10**: REPL depends on Phase 9 Multimodal Tools
+- **Phase 7**: API Consistency depends on Phase 6 Session Management completion
+- **Phase 8**: Vector Storage depends on Phase 7 API Standardization
+- **Phase 9**: Workflow Orchestration depends on Phase 8 Vector Storage
+- **Phase 10**: REPL depends on Phase 21 Multimodal Tools
 - **Phase 11**: Daemon Mode depends on Phase 4 **(FlowController and CircuitBreaker critical)**
-- **Phase 14**: AI/ML Tools depends on Phase 4 **(CostTrackingHook essential)**
-- **Phase 15**: JavaScript Engine Support depends on MVP completion + ScriptEngineBridge foundation from Phase 1.2 **(greatly simplified by Phase 4 JavaScriptHookAdapter)**
-- **Phase 16-17**: A2A Protocol depends on Phase 4 **(DistributedHookContext required)**
-- **Phase 18**: Library Mode depends on Phase 4 **(SelectiveHookRegistry needed)**
+- **Phase 14**: JavaScript Engine Support depends on MVP completion + ScriptEngineBridge foundation from Phase 1.2 **(greatly simplified by Phase 4 JavaScriptHookAdapter)**
+- **Phase 15**: Library Mode depends on Phase 4 **(SelectiveHookRegistry needed)**
+- **Phase 19-20**: A2A Protocol depends on Phase 4 **(DistributedHookContext required)**
+- **Phase 21**: Multimodal Tools depends on Phase 9 Workflows
+- **Phase 22**: AI/ML Tools depends on Phase 4 **(CostTrackingHook essential)**
 - **Cross-language testing**: Can begin in Phase 1 with bridge abstraction tests
 - **Engine implementations**: Can be developed in parallel once ScriptEngineBridge is stable
 - **Third-party engines**: Can be added after Phase 1.2 completion using bridge pattern
@@ -1080,10 +1129,11 @@ Each phase must pass:
 
 - **MVP Foundation**: ✅ COMPLETE (Phases 0-2, delivered in 8 weeks)
 - **MVP with External Tools & Agent Infrastructure**: 16 weeks (Phases 0-3)
-- **Production Infrastructure**: 26.5 weeks (Phases 0-7, includes enhanced hooks +3 days)
-- **Advanced Features**: 29.5 weeks (Phases 0-10, includes workflows -3 days saved, multimodal, REPL)
-- **Multi-Language Ready**: 39.5 weeks (Phases 0-15, JavaScript support -3 days saved)
-- **Full Feature Set**: 51 weeks (All 21 phases, -1 week from Phase 20 optimization)
+- **Production Infrastructure**: 22 weeks (Phases 0-6, includes enhanced hooks +3 days)
+- **Pre-1.0 Polish**: 27 weeks (Phases 0-7, API consistency and documentation)
+- **Advanced Features**: 33 weeks (Phases 0-11, includes vector storage, workflows, REPL, daemon)
+- **Multi-Language Ready**: 41 weeks (Phases 0-14, JavaScript support -3 days saved)
+- **Full Feature Set**: 57 weeks (All 22 phases, -1 week from Phase 17 optimization)
 
 ### Resource Requirements
 
@@ -1108,10 +1158,10 @@ Each phase must pass:
   - **Bridge Abstraction Complexity**: Start simple, ensure it works with Lua first
   - **API Injection Complexity**: Design language-agnostic APIs carefully
 - **Integration risks**: Comprehensive testing at each phase
-- **Architecture Risk**: CRITICAL - implement bridge pattern correctly in Phase 1.2 or face major refactoring in Phase 12
+- **Architecture Risk**: CRITICAL - implement bridge pattern correctly in Phase 1.2 or face major refactoring in Phase 14
 - **Architecture Risk**: Phase 4 hook system designed with future phases in mind, preventing Phase 3-style rework
 - **Cross-Language Risk**: UniversalEvent and language adapters prepared in Phase 4
-- **Distributed Risk**: DistributedHookContext ready for Phase 16-17 A2A protocol
+- **Distributed Risk**: DistributedHookContext ready for Phase 19-20 A2A protocol
 - **Cost Risk**: Built-in cost tracking hooks prevent runaway AI/ML expenses
 
 ---

@@ -1,13 +1,1 @@
-reminders for me
-- testing extract and centralize - integration between crates, integration with external within crate, and functional
-- examples - separate between real world examples and testing lua 
-- why are different workflow patterns not leveraging the workflow traits?
-
-hooks in tools commented out
-
-  I see, so the execute_hook_phase method is where hooks would be executed, but the actual execution is 
-  commented out or stubbed. This shows the pattern though - the ToolExecutor has an optional HookExecutor 
-  and uses it to execute hooks at various phases.
-
-  the agents package does it right
 
