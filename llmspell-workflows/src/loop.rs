@@ -909,12 +909,9 @@ impl LoopWorkflowBuilder {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "workflow")]
 mod tests {
     use super::*;
     use crate::traits::StepType;
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_loop_builder() {
         let workflow = LoopWorkflowBuilder::new("test_loop")
@@ -933,8 +930,6 @@ mod tests {
         assert_eq!(workflow.name(), "test_loop");
         assert_eq!(workflow.config.body.len(), 1);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_range_validation() {
         // Invalid step

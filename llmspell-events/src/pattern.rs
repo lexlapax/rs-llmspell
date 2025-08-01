@@ -80,11 +80,8 @@ impl Default for PatternMatcher {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "event")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_pattern_creation() {
         let pattern = EventPattern::new("test.*").unwrap();
@@ -95,8 +92,6 @@ mod tests {
         assert!(!pattern.is_wildcard);
         assert_eq!(pattern.prefix, None);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_pattern_matching() {
         let pattern = EventPattern::new("system.*").unwrap();
@@ -108,8 +103,6 @@ mod tests {
         assert!(pattern.matches("exact"));
         assert!(!pattern.matches("exact.match"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_pattern_matcher() {
         let matcher = PatternMatcher::new();

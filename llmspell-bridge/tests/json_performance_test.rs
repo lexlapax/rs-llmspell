@@ -6,9 +6,6 @@ use llmspell_bridge::lua::globals::json::inject_json_global;
 use std::time::Instant;
 
 /// Benchmark JSON parsing performance
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "bridge")]
-#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_json_parse_performance() {
     let lua = mlua::Lua::new();
@@ -112,9 +109,6 @@ fn test_json_parse_performance() {
 }
 
 /// Benchmark JSON stringify performance
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "bridge")]
-#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_json_stringify_performance() {
     let lua = mlua::Lua::new();
@@ -203,9 +197,6 @@ fn test_json_stringify_performance() {
 }
 
 /// Benchmark roundtrip performance (parse -> stringify -> parse)
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "bridge")]
-#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_json_roundtrip_performance() {
     let lua = mlua::Lua::new();

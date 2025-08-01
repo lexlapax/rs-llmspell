@@ -327,12 +327,9 @@ impl Default for CircuitBreakerManager {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "hook")]
 mod tests {
     use super::*;
     use std::thread;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_circuit_breaker_states() {
         let config = BreakerConfig {
@@ -368,8 +365,6 @@ mod tests {
         breaker.record_success(Duration::from_millis(10));
         assert_eq!(breaker.state(), BreakerState::Closed);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_slow_call_detection() {
         let config = BreakerConfig {
@@ -387,8 +382,6 @@ mod tests {
         breaker.record_success(Duration::from_millis(70));
         assert_eq!(breaker.state(), BreakerState::Open);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_circuit_breaker_reset() {
         let breaker = CircuitBreaker::new("test".to_string());
@@ -404,8 +397,6 @@ mod tests {
         assert_eq!(stats.total_calls, 0);
         assert_eq!(breaker.state(), BreakerState::Closed);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_circuit_breaker_manager() {
         let manager = CircuitBreakerManager::new();

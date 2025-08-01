@@ -270,16 +270,12 @@ impl fmt::Display for StateScope {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_scope_types() {
         assert!(StateScope::Global.is_global());
         assert!(StateScope::User("alice".to_string()).is_user_scope());
         assert!(StateScope::Agent("agent-1".to_string()).is_agent_scope());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_scope_identifiers() {
         assert_eq!(StateScope::Global.identifier(), None);
@@ -292,8 +288,6 @@ mod tests {
             Some("agent-1")
         );
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_access_control() {
         let global = StateScope::Global;
@@ -319,8 +313,6 @@ mod tests {
         assert!(!agent.can_access(&user));
         assert!(!user.can_access(&agent));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_storage_keys() {
         let global = StateScope::Global;
@@ -331,8 +323,6 @@ mod tests {
         assert_eq!(user.storage_key("preferences"), "user:alice:preferences");
         assert_eq!(agent.storage_key("history"), "agent:agent-1:history");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_storage_key_parsing() {
         let test_cases = vec![
@@ -359,8 +349,6 @@ mod tests {
         assert!(StateScope::parse_storage_key("invalid").is_none());
         assert!(StateScope::parse_storage_key("unknown:type:key").is_none());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_display() {
         assert_eq!(StateScope::Global.to_string(), "global");

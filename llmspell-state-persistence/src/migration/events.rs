@@ -378,11 +378,8 @@ impl MigrationEventBuilder {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "state")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_migration_event_creation() {
         let migration_id = Uuid::new_v4();
@@ -400,8 +397,6 @@ mod tests {
         assert!(!event.is_error());
         assert!(!event.is_completion());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_migration_event_error_classification() {
         let migration_id = Uuid::new_v4();
@@ -421,8 +416,6 @@ mod tests {
         assert!(!completion_event.is_error());
         assert!(completion_event.is_completion());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_universal_event_conversion() {
         let migration_id = Uuid::new_v4();
@@ -443,8 +436,6 @@ mod tests {
         );
         assert_eq!(universal_event.metadata.correlation_id, migration_id);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_event_metadata_creation() {
         let migration_id = Uuid::new_v4();

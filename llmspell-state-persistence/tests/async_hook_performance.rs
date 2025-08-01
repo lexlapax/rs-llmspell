@@ -30,10 +30,6 @@ impl Hook for SlowTestHook {
         self
     }
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "state")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_async_hooks_dont_block_state_operations() {
     // Create manager with persistence enabled so async hooks are available
@@ -121,10 +117,6 @@ async fn test_async_hooks_dont_block_state_operations() {
     // Stop async hooks
     manager.stop_async_hooks().await.unwrap();
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "state")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_async_agent_save_performance() {
     // Create manager with persistence enabled so async hooks are available
@@ -233,10 +225,6 @@ async fn test_async_agent_save_performance() {
 
     manager.stop_async_hooks().await.unwrap();
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "state")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_hook_batching_performance() {
     // Create manager with persistence enabled so async hooks are available
@@ -308,10 +296,6 @@ async fn test_hook_batching_performance() {
 
     manager.stop_async_hooks().await.unwrap();
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "state")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_hook_failure_isolation() {
     // Create manager with persistence enabled so async hooks are available

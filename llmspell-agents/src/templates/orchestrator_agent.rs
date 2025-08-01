@@ -707,11 +707,8 @@ impl BaseAgent for MockOrchestratorAgent {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_orchestrator_agent_template_creation() {
         let template = OrchestratorAgentTemplate::new();
@@ -724,8 +721,6 @@ mod tests {
         assert_eq!(required_params.len(), 1);
         assert_eq!(required_params[0].name, "agent_name");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_simple_orchestrator() {
         let template = OrchestratorAgentTemplate::simple();
@@ -735,8 +730,6 @@ mod tests {
         assert!(!template.config.enable_health_monitoring);
         assert_eq!(template.complexity(), &ComplexityLevel::Basic);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_enterprise_orchestrator() {
         let template = OrchestratorAgentTemplate::enterprise();
@@ -750,8 +743,6 @@ mod tests {
         let enterprise_mode = template.schema().template_config.get("enterprise_mode");
         assert_eq!(enterprise_mode, Some(&true.into()));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_event_driven_orchestrator() {
         let template = OrchestratorAgentTemplate::event_driven();
@@ -767,8 +758,6 @@ mod tests {
         assert!(event_bus_dep.is_some());
         assert!(event_bus_dep.unwrap().required);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_orchestration_strategies() {
         assert_eq!(OrchestrationStrategy::Sequential.name(), "sequential");
@@ -779,8 +768,6 @@ mod tests {
             "test"
         );
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_parameter_validation() {
         let template = OrchestratorAgentTemplate::new();
@@ -800,8 +787,6 @@ mod tests {
         let result = template.validate_parameters(&params).await;
         assert!(result.is_ok());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_required_tools() {
         let template = OrchestratorAgentTemplate::new();
@@ -814,8 +799,6 @@ mod tests {
         let optional_tools = template.optional_tools();
         assert!(optional_tools.contains(&"health_monitor".to_string()));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_capability_support() {
         let template = OrchestratorAgentTemplate::new();
@@ -826,8 +809,6 @@ mod tests {
         assert!(template.supports_capability("error_recovery"));
         assert!(!template.supports_capability("nonexistent_capability"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_parameter_constraints() {
         let template = OrchestratorAgentTemplate::new();

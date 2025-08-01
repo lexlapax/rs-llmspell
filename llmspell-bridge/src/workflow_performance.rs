@@ -250,11 +250,8 @@ pub async fn get_workflow_info_cached(workflow_type: &str) -> Option<WorkflowTyp
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "bridge")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_optimized_converter() {
         let converter = OptimizedConverter::new();
@@ -272,8 +269,6 @@ mod tests {
         });
         assert!(!converter.validate_params("sequential", &params));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_execution_cache() {
         let cache = ExecutionCache::new(10);
@@ -292,8 +287,6 @@ mod tests {
         // Non-existent entry
         assert!(cache.get("workflow2").is_none());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_performance_metrics() {
         let metrics = PerformanceMetrics::new();

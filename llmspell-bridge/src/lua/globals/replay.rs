@@ -311,19 +311,14 @@ impl UserData for LuaHookResultComparator {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "bridge")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_lua_replay_api_creation() {
         let lua = Lua::new();
         let result = create_replay_api(&lua);
         assert!(result.is_ok());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_lua_value_to_json() {
         let lua = Lua::new();

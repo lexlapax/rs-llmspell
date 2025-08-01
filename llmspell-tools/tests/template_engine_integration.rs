@@ -15,10 +15,6 @@ fn extract_result(response_text: &str) -> Value {
     assert!(output["success"].as_bool().unwrap_or(false));
     output["result"].clone()
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_tera_simple_variable_substitution() {
     let tool = TemplateEngineTool::new();
@@ -42,10 +38,6 @@ async fn test_tera_simple_variable_substitution() {
     assert_eq!(output["rendered"], "Hello Alice, welcome to Wonderland!");
     assert_eq!(output["engine"], "tera");
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_tera_loops_and_conditions() {
     let tool = TemplateEngineTool::new();
@@ -79,10 +71,6 @@ No users found.
     assert!(result.text.contains("Alice (25)"));
     assert!(result.text.contains("Bob (30)"));
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_handlebars_block_helpers() {
     let tool = TemplateEngineTool::new();
@@ -117,10 +105,6 @@ Goodbye!
     assert!(result.text.contains("- banana"));
     assert!(result.text.contains("- cherry"));
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_handlebars_custom_helpers() {
     let tool = TemplateEngineTool::new();
@@ -143,10 +127,6 @@ async fn test_handlebars_custom_helpers() {
     let output = extract_result(&result.text);
     assert_eq!(output["rendered"], "ALICE - wonderland");
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_auto_detection() {
     let tool = TemplateEngineTool::new();
@@ -183,10 +163,6 @@ async fn test_auto_detection() {
     assert_eq!(output["rendered"], "Yes");
     assert_eq!(output["engine"], "tera");
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_html_escaping() {
     let tool = TemplateEngineTool::new();
@@ -210,10 +186,6 @@ async fn test_html_escaping() {
     assert!(result.text.contains("&lt;script&gt;"));
     assert!(!result.text.contains("<script>"));
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_complex_data_structures() {
     let tool = TemplateEngineTool::new();
@@ -258,10 +230,6 @@ Employees:
     assert!(result.text.contains("Sales:"));
     assert!(result.text.contains("Charlie: Sales Manager"));
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_error_handling() {
     let tool = TemplateEngineTool::new();
@@ -280,10 +248,6 @@ async fn test_error_handling() {
     let err = result.unwrap_err();
     assert!(err.to_string().contains("Invalid Tera template"));
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_missing_parameters() {
     let tool = TemplateEngineTool::new();
@@ -306,10 +270,6 @@ async fn test_missing_parameters() {
         error_msg
     );
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_tool_schema() {
     let tool = TemplateEngineTool::new();
@@ -336,10 +296,6 @@ async fn test_tool_schema() {
         "tera"
     );
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_metadata_in_output() {
     let tool = TemplateEngineTool::new();

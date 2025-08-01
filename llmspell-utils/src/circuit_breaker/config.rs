@@ -233,11 +233,8 @@ impl ServicePresets {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_config_validation() {
         // Valid config
@@ -264,8 +261,6 @@ mod tests {
         };
         assert!(config.validate().is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_builder_methods() {
         let config = CircuitBreakerConfig::new()

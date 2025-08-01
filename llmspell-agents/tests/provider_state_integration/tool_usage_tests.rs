@@ -28,10 +28,6 @@ async fn create_tool_registry() -> Result<Arc<ToolRegistry>> {
     info!("Registered calculator tool in registry");
     Ok(registry)
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "agent")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "requires OPENAI_API_KEY"]
 async fn test_openai_tool_usage_persistence() -> Result<()> {
@@ -143,10 +139,6 @@ async fn test_openai_tool_usage_persistence() -> Result<()> {
     info!("OpenAI tool usage persistence test completed");
     Ok(())
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "agent")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "requires ANTHROPIC_API_KEY"]
 async fn test_anthropic_tool_usage_persistence() -> Result<()> {
@@ -255,8 +247,6 @@ async fn test_anthropic_tool_usage_persistence() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "external")]
     #[tokio::test]
     async fn test_tool_registry_creation() -> Result<()> {
         let registry = create_tool_registry().await?;

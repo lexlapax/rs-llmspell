@@ -575,11 +575,8 @@ impl BaseAgent for MockToolAgent {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_agent_template_creation() {
         let template = ToolAgentTemplate::new();
@@ -592,8 +589,6 @@ mod tests {
         assert_eq!(required_params.len(), 1);
         assert_eq!(required_params[0].name, "agent_name");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_specialized_tool_agent() {
         let tools = vec!["calculator".to_string(), "file_reader".to_string()];
@@ -607,8 +602,6 @@ mod tests {
         assert!(calculator_dep.is_some());
         assert!(calculator_dep.unwrap().required);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_lightweight_tool_agent() {
         let template = ToolAgentTemplate::lightweight();
@@ -618,8 +611,6 @@ mod tests {
         assert!(!template.config.enable_caching);
         assert_eq!(template.complexity(), &ComplexityLevel::Basic);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_batch_processor_tool_agent() {
         let template = ToolAgentTemplate::batch_processor();
@@ -632,8 +623,6 @@ mod tests {
         let batch_mode = template.schema().template_config.get("batch_mode");
         assert_eq!(batch_mode, Some(&true.into()));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_parameter_validation() {
         let template = ToolAgentTemplate::new();
@@ -652,8 +641,6 @@ mod tests {
         let result = template.validate_parameters(&params).await;
         assert!(result.is_ok());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_template_instantiation() {
         let template = ToolAgentTemplate::new();
@@ -674,8 +661,6 @@ mod tests {
         assert_eq!(result.applied_parameters.get("max_tools"), Some(&15.into()));
         assert_eq!(result.applied_config.get("max_tools"), Some(&15.into()));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_requirements() {
         let template = ToolAgentTemplate::new();
@@ -687,8 +672,6 @@ mod tests {
         let required_tools = template.required_tools();
         assert!(required_tools.is_empty()); // Base template has no required tools
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_capability_support() {
         let template = ToolAgentTemplate::new();

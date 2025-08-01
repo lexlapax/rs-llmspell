@@ -292,8 +292,6 @@ mod tests {
 
         NetworkSandbox::new(context).unwrap()
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_domain_validation() {
         let mut sandbox = create_test_sandbox();
@@ -310,8 +308,6 @@ mod tests {
             .await
             .is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_domain_extraction() {
         let sandbox = create_test_sandbox();
@@ -333,8 +329,6 @@ mod tests {
             "sub.domain.com"
         );
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_http_methods() {
         let mut sandbox = create_test_sandbox();
@@ -351,8 +345,6 @@ mod tests {
             .is_ok());
         assert!(sandbox.delete("https://api.example.com/data").await.is_ok());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_rate_limiting() {
         let rate_config = RateLimitConfig {
@@ -372,8 +364,6 @@ mod tests {
         // Check that violation was recorded
         assert!(!sandbox.get_violations().is_empty());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_network_stats() {
         let mut sandbox = create_test_sandbox();
@@ -387,8 +377,6 @@ mod tests {
         assert!(stats.domain_stats.contains_key("api.example.com"));
         assert!(stats.domain_stats.contains_key("github.com"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_violation_tracking() {
         let mut sandbox = create_test_sandbox();

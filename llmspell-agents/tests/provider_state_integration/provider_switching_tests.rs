@@ -8,10 +8,6 @@ use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionC
 use std::time::Duration;
 use tokio::time::timeout;
 use tracing::{info, warn};
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "agent")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "requires OPENAI_API_KEY and ANTHROPIC_API_KEY"]
 async fn test_switch_openai_to_anthropic() -> Result<()> {
@@ -144,10 +140,6 @@ async fn test_switch_openai_to_anthropic() -> Result<()> {
     info!("Provider switch test completed successfully");
     Ok(())
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "agent")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "requires ANTHROPIC_API_KEY and OPENAI_API_KEY"]
 async fn test_switch_anthropic_to_openai() -> Result<()> {
@@ -260,10 +252,6 @@ async fn test_switch_anthropic_to_openai() -> Result<()> {
     info!("Provider switch test completed successfully");
     Ok(())
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "agent")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "requires OPENAI_API_KEY and ANTHROPIC_API_KEY"]
 async fn test_multiple_provider_switches() -> Result<()> {
@@ -378,10 +366,6 @@ async fn test_multiple_provider_switches() -> Result<()> {
     info!("Multiple provider switch test completed successfully");
     Ok(())
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "agent")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "requires OPENAI_API_KEY or ANTHROPIC_API_KEY"]
 async fn test_provider_switch_with_context_preservation() -> Result<()> {

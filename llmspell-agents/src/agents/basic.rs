@@ -387,12 +387,9 @@ impl StatePersistence for BasicAgent {
 crate::impl_persistent_agent!(BasicAgent);
 
 #[cfg(test)]
-#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
     use crate::builder::AgentBuilder;
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_basic_agent_creation() {
         let config = AgentBuilder::basic("test-agent")
@@ -403,8 +400,6 @@ mod tests {
         let agent = BasicAgent::new(config).unwrap();
         assert_eq!(agent.metadata().name, "test-agent");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_basic_agent_execution() {
         let config = AgentBuilder::basic("test-agent").build().unwrap();
@@ -421,8 +416,6 @@ mod tests {
             .text
             .contains("BasicAgent 'test-agent' received: Hello, agent!"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_basic_agent_conversation() {
         let config = AgentBuilder::basic("test-agent").build().unwrap();
@@ -447,8 +440,6 @@ mod tests {
         let conv = agent.get_conversation().await.unwrap();
         assert_eq!(conv.len(), 0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_basic_agent_state_machine_integration() {
         let config = AgentBuilder::basic("test-agent").build().unwrap();
@@ -485,8 +476,6 @@ mod tests {
         agent.terminate().await.unwrap();
         assert!(!agent.is_healthy().await);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_basic_agent_execution_state_validation() {
         let config = AgentBuilder::basic("test-agent").build().unwrap();
@@ -505,8 +494,6 @@ mod tests {
         let result = agent.execute(input, context).await;
         assert!(result.is_ok());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_basic_agent_validation() {
         let config = AgentBuilder::basic("test-agent").build().unwrap();

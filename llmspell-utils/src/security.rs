@@ -329,11 +329,8 @@ impl Default for ExpressionAnalyzer {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_expression_length_check() {
         let analyzer = ExpressionAnalyzer::with_config(ExpressionComplexityConfig {
@@ -348,8 +345,6 @@ mod tests {
         assert!(!result.is_safe);
         assert!(result.unsafe_reason.unwrap().contains("too long"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_nesting_depth_check() {
         let analyzer = ExpressionAnalyzer::with_config(ExpressionComplexityConfig {
@@ -365,8 +360,6 @@ mod tests {
         assert!(!result.is_safe);
         assert!(result.unsafe_reason.unwrap().contains("too deep"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_operation_count() {
         let analyzer = ExpressionAnalyzer::with_config(ExpressionComplexityConfig {
@@ -382,8 +375,6 @@ mod tests {
         assert!(!result.is_safe);
         assert!(result.unsafe_reason.unwrap().contains("operations"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_function_count() {
         let analyzer = ExpressionAnalyzer::with_config(ExpressionComplexityConfig {
@@ -399,8 +390,6 @@ mod tests {
         assert!(!result.is_safe);
         assert!(result.unsafe_reason.unwrap().contains("function"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_dangerous_patterns() {
         let analyzer = ExpressionAnalyzer::new();
@@ -417,8 +406,6 @@ mod tests {
         assert!(!result.is_safe);
         assert!(result.unsafe_reason.unwrap().contains("large number"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_safe_expressions() {
         let analyzer = ExpressionAnalyzer::new();
@@ -436,8 +423,6 @@ mod tests {
             assert!(result.is_safe, "Expression '{expr}' should be safe");
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_config_presets() {
         let strict = ExpressionComplexityConfig::strict();

@@ -565,7 +565,6 @@ impl<F: ConnectionFactory> PoolBuilder<F> {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
@@ -613,8 +612,6 @@ mod tests {
             })
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_pool_creation() {
         let factory = MockFactory {
@@ -633,8 +630,6 @@ mod tests {
         assert_eq!(stats.available, 2);
         assert_eq!(stats.in_use, 0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_connection_acquisition() {
         let factory = MockFactory {
@@ -664,8 +659,6 @@ mod tests {
         let stats = pool.stats().await;
         assert_eq!(stats.available, 2);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_pool_exhaustion() {
         let factory = MockFactory {
@@ -688,8 +681,6 @@ mod tests {
         let result = pool.acquire().await;
         assert!(matches!(result, Err(PoolError::Exhausted)));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_invalid_connection_handling() {
         let valid = Arc::new(AtomicBool::new(true));

@@ -667,13 +667,10 @@ impl MetricHook for SecurityHook {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "hook")]
 mod tests {
     use super::*;
     use crate::types::{ComponentId, ComponentType, HookPoint};
     use serde_json::json;
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_security_hook_basic() {
         let hook = SecurityHook::new();
@@ -691,8 +688,6 @@ mod tests {
         let events = hook.get_events();
         assert!(!events.is_empty());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_security_hook_parameter_validation() {
         let hook = SecurityHook::new().with_blocking(true);
@@ -714,8 +709,6 @@ mod tests {
             .collect();
         assert!(!violations.is_empty());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_security_hook_sensitive_parameters() {
         let hook = SecurityHook::new();
@@ -737,8 +730,6 @@ mod tests {
             .collect();
         assert_eq!(data_access_events.len(), 2); // password and api_key
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_security_config_defaults() {
         let config = SecurityConfig::default();
@@ -749,8 +740,6 @@ mod tests {
         assert!(config.sensitive_parameters.contains("password"));
         assert!(config.sensitive_parameters.contains("api_key"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_security_event_serialization() {
         let event = SecurityEvent {
@@ -777,8 +766,6 @@ mod tests {
         assert_eq!(deserialized.severity, SecuritySeverity::Medium);
         assert_eq!(deserialized.user_id, Some("user123".to_string()));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_security_storage_filtering() {
         let storage = SecurityStorage::new(SecurityConfig::default());
@@ -836,8 +823,6 @@ mod tests {
             SecurityEventType::SecurityViolation
         );
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_security_statistics() {
         let storage = SecurityStorage::new(SecurityConfig::default());
@@ -878,8 +863,6 @@ mod tests {
         assert!(stats.contains_key("by_type"));
         assert_eq!(stats.get("blocked_events").unwrap().as_u64().unwrap(), 1);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_metric_hook_trait() {
         let hook = SecurityHook::new();
@@ -902,8 +885,6 @@ mod tests {
             .collect();
         assert!(!access_attempts.is_empty());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_hook_metadata() {
         let hook = SecurityHook::new();

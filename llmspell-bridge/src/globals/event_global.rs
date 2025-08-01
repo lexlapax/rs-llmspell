@@ -443,11 +443,8 @@ impl Default for EventGlobal {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "bridge")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_event_global_metadata() {
         let global = EventGlobal::new();

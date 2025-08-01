@@ -391,11 +391,8 @@ impl Clone for BenchmarkConfig {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     #[ignore] // Expensive test - run manually with --include-ignored
     async fn test_production_performance_benchmark() {
@@ -421,8 +418,6 @@ mod tests {
         // For now, we just verify the benchmark infrastructure works
         println!("Benchmark infrastructure working correctly");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_production_hooks() {
         let logging_hook = ProductionLoggingHook::new("test_logging".to_string());

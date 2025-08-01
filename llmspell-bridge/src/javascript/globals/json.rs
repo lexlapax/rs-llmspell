@@ -28,9 +28,7 @@ pub fn inject_json_global(_ctx: &(), _context: &GlobalContext) -> Result<(), LLM
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "bridge")]
 mod tests {
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_inject_json_global_compiles() {
         // Basic compilation test - just verify function exists

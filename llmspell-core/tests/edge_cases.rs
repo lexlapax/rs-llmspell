@@ -10,11 +10,6 @@ use llmspell_core::{
     types::{AgentInput, AgentOutput},
     ComponentId, LLMSpellError, Version,
 };
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "core")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_component_id_edge_cases() {
     // Empty string should still produce valid ID
@@ -43,11 +38,6 @@ fn test_component_id_edge_cases() {
     assert_ne!(id1, id3);
     assert_ne!(id1, id4);
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "core")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_version_edge_cases() {
     // Maximum values
@@ -101,11 +91,6 @@ fn test_version_edge_cases() {
     assert_eq!(v0.to_string(), "0.0.0");
     assert!(v0.is_compatible_with(&v0));
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "core")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_error_edge_cases() {
     // Very long error messages
@@ -139,11 +124,6 @@ fn test_error_edge_cases() {
     };
     assert!(err.to_string().contains("Validation failed"));
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "core")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_agent_input_edge_cases() {
     // Empty prompt
@@ -182,11 +162,6 @@ fn test_agent_input_edge_cases() {
         Some(&serde_json::json!([1, 2, 3]))
     );
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "core")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_agent_output_edge_cases() {
     // Empty content
@@ -226,11 +201,6 @@ fn test_agent_output_edge_cases() {
         Some(&serde_json::json!(2))
     );
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "core")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_conversation_message_edge_cases() {
     // Empty content
@@ -252,11 +222,6 @@ fn test_conversation_message_edge_cases() {
     let msg2 = ConversationMessage::user("second".to_string());
     assert!(msg2.timestamp > msg1.timestamp);
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "core")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_tool_category_edge_cases() {
     // Custom categories with special characters
@@ -272,11 +237,6 @@ fn test_tool_category_edge_cases() {
     let category = ToolCategory::Custom(long_name.clone());
     assert_eq!(category.to_string(), long_name);
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "core")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_security_level_edge_cases() {
     // Ordering tests
@@ -297,11 +257,6 @@ fn test_security_level_edge_cases() {
     assert!(!SecurityLevel::Safe.allows(&SecurityLevel::Restricted));
     assert!(!SecurityLevel::Safe.allows(&SecurityLevel::Privileged));
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "core")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_parameter_type_equality() {
     // Ensure all parameter types are distinct
@@ -324,11 +279,6 @@ fn test_parameter_type_equality() {
         }
     }
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "core")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_message_role_display_consistency() {
     // Ensure display strings are consistent
@@ -341,11 +291,6 @@ fn test_message_role_display_consistency() {
     assert_ne!(MessageRole::User.to_string(), "USER");
     assert_ne!(MessageRole::Assistant.to_string(), "ASSISTANT");
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "core")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_error_retryability_edge_cases() {
     // Network errors should always be retryable

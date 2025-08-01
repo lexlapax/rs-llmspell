@@ -581,7 +581,6 @@ impl SharedStateAccessor {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
     use std::sync::Once;
@@ -597,8 +596,6 @@ mod tests {
                 .try_init();
         });
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_broadcast_channel() {
         init_tracing();
@@ -651,8 +648,6 @@ mod tests {
             .await;
         assert!(result.is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_collaborative_workspace() {
         init_tracing();
@@ -701,8 +696,6 @@ mod tests {
         assert_eq!(lead_msgs.len(), 1); // Should see dev1's message
         assert_eq!(lead_msgs[0].sender_agent_id, "dev1");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_pipeline_processing() {
         init_tracing();

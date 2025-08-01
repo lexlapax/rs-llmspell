@@ -158,7 +158,6 @@ impl Default for GlobalRegistryBuilder {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "bridge")]
 mod tests {
     use super::*;
     use crate::globals::types::GlobalContext;
@@ -194,8 +193,6 @@ mod tests {
             Ok(())
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_dependency_resolution() {
         let mut builder = GlobalRegistryBuilder::new();
@@ -219,8 +216,6 @@ mod tests {
         // Should be injected in order: C, B, A
         assert_eq!(registry.injection_order, vec!["C", "B", "A"]);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_circular_dependency_detection() {
         let mut builder = GlobalRegistryBuilder::new();

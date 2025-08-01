@@ -1061,11 +1061,8 @@ pub struct StateMachineMetrics {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_state_machine_basic_transitions() {
         let machine = AgentStateMachine::default("test-agent".to_string());
@@ -1097,8 +1094,6 @@ mod tests {
         machine.terminate().await.unwrap();
         assert_eq!(machine.current_state().await, AgentState::Terminated);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_state_machine_error_handling() {
         let machine = AgentStateMachine::default("test-agent".to_string());
@@ -1125,8 +1120,6 @@ mod tests {
         let error_msg = machine.get_last_error().await;
         assert_eq!(error_msg, None);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_state_machine_invalid_transitions() {
         let machine = AgentStateMachine::default("test-agent".to_string());
@@ -1144,8 +1137,6 @@ mod tests {
         let result = machine.resume().await;
         assert!(result.is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_state_machine_history() {
         let machine = AgentStateMachine::default("test-agent".to_string());
@@ -1167,8 +1158,6 @@ mod tests {
         assert_eq!(history[3].from, AgentState::Running);
         assert_eq!(history[3].to, AgentState::Paused);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_state_machine_metrics() {
         let machine = AgentStateMachine::default("test-agent".to_string());
@@ -1184,8 +1173,6 @@ mod tests {
         assert!(metrics.is_healthy);
         assert!(metrics.uptime > Duration::from_millis(0));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_state_checks() {
         assert!(AgentState::Ready.can_execute());

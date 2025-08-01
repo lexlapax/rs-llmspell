@@ -233,13 +233,10 @@ impl SessionHookContextHelper {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "session")]
 mod tests {
     use super::*;
     use crate::types::CreateSessionOptions;
     use llmspell_hooks::types::HookPoint;
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_session_context_metadata_enrichment() {
         let options = CreateSessionOptions {
@@ -298,8 +295,6 @@ mod tests {
         );
         assert_eq!(context.data.get("created_by").unwrap(), &json!("test-user"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_lifecycle_context_helper() {
         let session = Session::new(CreateSessionOptions::default());
@@ -316,8 +311,6 @@ mod tests {
         assert!(context.data.contains_key("performance_metrics"));
         assert!(context.data.contains_key("timing"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_artifact_context_helper() {
         let session = Session::new(CreateSessionOptions::default());
@@ -342,8 +335,6 @@ mod tests {
         let operation = context.operation.unwrap();
         assert_eq!(operation.operation_type, "store_artifact");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_minimal_context_helper() {
         let session = Session::new(CreateSessionOptions::default());

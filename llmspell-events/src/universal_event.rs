@@ -291,11 +291,8 @@ impl UniversalEventBuilder {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "event")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_event_creation() {
         let event = UniversalEvent::new(
@@ -308,8 +305,6 @@ mod tests {
         assert_eq!(event.language, Language::Rust);
         assert!(!event.is_expired());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_event_builder() {
         let event = UniversalEventBuilder::new("test.built")
@@ -327,8 +322,6 @@ mod tests {
         assert_eq!(event.metadata.priority, -1);
         assert_eq!(event.metadata.ttl, Some(300));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_event_serialization() {
         let event = UniversalEvent::new(
@@ -344,8 +337,6 @@ mod tests {
         assert_eq!(deserialized.data, event.data);
         assert_eq!(deserialized.sequence, event.sequence);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_pattern_matching() {
         let event = UniversalEvent::new("system.startup", Value::Null, Language::Rust);
@@ -356,8 +347,6 @@ mod tests {
         assert!(!event.matches_pattern("agent.*"));
         assert!(!event.matches_pattern("system.shutdown"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_sequence_ordering() {
         let event1 = UniversalEvent::new("event1", Value::Null, Language::Rust);
@@ -367,8 +356,6 @@ mod tests {
         assert!(event1.sequence < event2.sequence);
         assert!(event2.sequence < event3.sequence);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_ttl_expiration() {
         let mut event = UniversalEvent::new("expiring", Value::Null, Language::Rust).with_ttl(0); // Expire immediately

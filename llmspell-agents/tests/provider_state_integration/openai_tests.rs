@@ -8,10 +8,6 @@ use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionC
 use std::time::Duration;
 use tokio::time::timeout;
 use tracing::{info, warn};
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "agent")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "requires OPENAI_API_KEY"]
 async fn test_openai_conversation_persistence() -> Result<()> {
@@ -107,10 +103,6 @@ async fn test_openai_conversation_persistence() -> Result<()> {
     info!("OpenAI conversation persistence test completed successfully");
     Ok(())
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "agent")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "requires OPENAI_API_KEY"]
 async fn test_openai_token_tracking() -> Result<()> {
@@ -163,10 +155,6 @@ async fn test_openai_token_tracking() -> Result<()> {
     info!("OpenAI token tracking test completed");
     Ok(())
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "agent")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "requires OPENAI_API_KEY"]
 async fn test_openai_error_recovery() -> Result<()> {
@@ -256,10 +244,6 @@ async fn test_openai_error_recovery() -> Result<()> {
     info!("OpenAI error recovery test completed successfully");
     Ok(())
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "agent")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "requires OPENAI_API_KEY"]
 async fn test_openai_system_prompt_persistence() -> Result<()> {

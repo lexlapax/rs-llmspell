@@ -673,7 +673,6 @@ impl Tool for ServiceCheckerTool {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "tool")]
 mod tests {
     use super::*;
     use std::collections::HashMap;
@@ -706,8 +705,6 @@ mod tests {
             output_modalities: vec![],
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tcp_check_localhost() {
         let tool = create_test_tool_with_custom_config();
@@ -728,8 +725,6 @@ mod tests {
         // Note: SSH port might not be open, so we just check the tool doesn't crash
         assert!(result.text.contains("127.0.0.1:22"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_http_check_invalid_url() {
         let tool = create_test_tool_with_custom_config();
@@ -749,8 +744,6 @@ mod tests {
             .unwrap();
         assert!(result.text.contains("not available"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_dns_check_localhost() {
         let tool = create_test_tool_with_custom_config();
@@ -769,8 +762,6 @@ mod tests {
             .unwrap();
         assert!(result.text.contains("localhost"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_blocked_port() {
         let tool = create_test_tool();
@@ -790,8 +781,6 @@ mod tests {
         assert!(result.text.contains("not available"));
         assert!(result.text.contains("not allowed") || result.text.contains("blocked"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_blocked_domain() {
         let tool = create_test_tool();
@@ -810,8 +799,6 @@ mod tests {
             .unwrap();
         assert!(result.text.contains("not available"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_invalid_parameters() {
         let tool = create_test_tool();
@@ -884,8 +871,6 @@ mod tests {
         assert!(result5.is_err());
         assert!(result5.unwrap_err().to_string().contains("exceeds maximum"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_target_parsing() {
         let tool = create_test_tool();
@@ -913,8 +898,6 @@ mod tests {
             .to_string()
             .contains("Invalid port number"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_port_and_domain_validation() {
         let tool = create_test_tool();
@@ -938,8 +921,6 @@ mod tests {
         let tool_permissive = ServiceCheckerTool::new(config);
         assert!(tool_permissive.is_domain_allowed("example.com"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_metadata() {
         let tool = create_test_tool();
@@ -962,8 +943,6 @@ mod tests {
         assert!(required_params.contains(&"check_type".to_string()));
         assert_eq!(required_params.len(), 2);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_custom_config() {
         let tool = create_test_tool_with_custom_config();
@@ -973,8 +952,6 @@ mod tests {
         assert_eq!(tool.config.max_timeout_seconds, 10);
         assert!(tool.config.allow_any_domain);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_https_url_transformation() {
         let tool = create_test_tool_with_custom_config();

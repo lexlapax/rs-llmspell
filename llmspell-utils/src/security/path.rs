@@ -560,12 +560,9 @@ impl Default for PathSecurityValidator {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
     use tempfile::TempDir;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_path_traversal_detection() {
         let validator = PathSecurityValidator::new();
@@ -584,8 +581,6 @@ mod tests {
             assert!(result.is_err(), "Path '{path}' should be rejected");
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_jail_directory_enforcement() {
         let temp_dir = TempDir::new().unwrap();
@@ -602,8 +597,6 @@ mod tests {
         let outside_path = temp_dir.path().parent().unwrap().join("outside.txt");
         assert!(validator.validate(&outside_path).is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_hidden_file_detection() {
         let strict_validator = PathSecurityValidator::with_config(PathSecurityConfig::strict());
@@ -617,8 +610,6 @@ mod tests {
         // Relaxed should allow
         assert!(relaxed_validator.validate(hidden_path).is_ok());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_system_directory_protection() {
         let validator = PathSecurityValidator::new();
@@ -635,8 +626,6 @@ mod tests {
             assert!(result.is_err(), "System path '{path}' should be rejected");
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_path_depth_limit() {
         let config = PathSecurityConfig {
@@ -653,8 +642,6 @@ mod tests {
         let deep_path = Path::new("/a/b/c/d/e/f/g/h/file.txt");
         assert!(validator.validate(deep_path).is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_enhanced_symlink_detection() {
         let config = PathSecurityConfig {
@@ -673,8 +660,6 @@ mod tests {
         // This should pass basic validation
         assert!(validator.validate(simple_path).is_ok());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_cross_platform_validation() {
         let config = PathSecurityConfig {
@@ -709,8 +694,6 @@ mod tests {
         let long_path = format!("/tmp/{}", "a".repeat(300));
         assert!(validator.validate(Path::new(&long_path)).is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_chroot_jail_enforcement() {
         let temp_dir = TempDir::new().unwrap();
@@ -741,8 +724,6 @@ mod tests {
         let outside_path = temp_dir.path().parent().unwrap().join("outside.txt");
         assert!(validator.validate(&outside_path).is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_permission_inheritance_check() {
         let config = PathSecurityConfig {
@@ -760,8 +741,6 @@ mod tests {
         // but we can ensure the validation doesn't crash
         assert!(result.is_ok() || result.is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_strict_configuration() {
         let validator = PathSecurityValidator::with_config(PathSecurityConfig::strict());
@@ -783,8 +762,6 @@ mod tests {
             );
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_relaxed_configuration() {
         let validator = PathSecurityValidator::with_config(PathSecurityConfig::relaxed());

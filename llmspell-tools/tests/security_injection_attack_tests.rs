@@ -9,10 +9,6 @@ use llmspell_tools::{
     GraphQLQueryTool, HttpRequestTool,
 };
 use serde_json::json;
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_template_engine_code_injection() {
     let template_tool = TemplateEngineTool::new();
@@ -69,10 +65,6 @@ async fn test_template_engine_code_injection() {
         }
     }
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_json_processor_jq_injection() {
     let json_tool = JsonProcessorTool::new(Default::default());
@@ -122,10 +114,6 @@ async fn test_json_processor_jq_injection() {
         }
     }
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_graphql_query_injection() {
     let graphql_tool =
@@ -205,10 +193,6 @@ async fn test_graphql_query_injection() {
         }
     }
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_process_executor_argument_injection() {
     let process_tool = ProcessExecutorTool::new(Default::default());
@@ -261,10 +245,6 @@ async fn test_process_executor_argument_injection() {
         }
     }
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_data_validation_regex_dos() {
     let validator_tool = DataValidationTool::new();
@@ -308,10 +288,6 @@ async fn test_data_validation_regex_dos() {
         );
     }
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_http_request_header_injection() {
     let http_tool = HttpRequestTool::new(Default::default()).expect("Failed to create HTTP tool");
@@ -361,10 +337,6 @@ async fn test_http_request_header_injection() {
         }
     }
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_environment_reader_information_leak() {
     let env_tool = EnvironmentReaderTool::new(Default::default());

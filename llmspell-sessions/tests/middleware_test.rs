@@ -14,10 +14,6 @@ use llmspell_sessions::middleware::{
 use std::sync::Arc;
 
 /// Test basic middleware creation
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "session")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_middleware_creation() -> Result<()> {
     let _hook_registry = Arc::new(HookRegistry::new());
@@ -42,10 +38,6 @@ async fn test_middleware_creation() -> Result<()> {
 }
 
 /// Test sequential middleware execution
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "session")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_sequential_middleware() -> Result<()> {
     let hook_registry = Arc::new(HookRegistry::new());
@@ -85,10 +77,6 @@ async fn test_sequential_middleware() -> Result<()> {
 }
 
 /// Test parallel middleware execution
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "session")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_parallel_middleware() -> Result<()> {
     let hook_registry = Arc::new(HookRegistry::new());
@@ -130,10 +118,6 @@ async fn test_parallel_middleware() -> Result<()> {
 }
 
 /// Test voting middleware pattern
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "session")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_voting_middleware() -> Result<()> {
     let hook_registry = Arc::new(HookRegistry::new());
@@ -169,10 +153,6 @@ async fn test_voting_middleware() -> Result<()> {
 }
 
 /// Test operation-specific middleware
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "session")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_operation_specific_middleware() -> Result<()> {
     let hook_registry = Arc::new(HookRegistry::new());
@@ -200,10 +180,6 @@ async fn test_operation_specific_middleware() -> Result<()> {
 }
 
 /// Test middleware configuration update
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "session")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_middleware_config_update() -> Result<()> {
     let hook_registry = Arc::new(HookRegistry::new());
@@ -245,10 +221,6 @@ async fn test_middleware_config_update() -> Result<()> {
 }
 
 /// Test middleware with rate limiting
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "session")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_middleware_rate_limiting() -> Result<()> {
     let hook_registry = Arc::new(HookRegistry::new());
@@ -291,10 +263,6 @@ async fn test_middleware_rate_limiting() -> Result<()> {
 }
 
 /// Test middleware registration and execution
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "session")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_middleware_registration() -> Result<()> {
     let hook_registry = Arc::new(HookRegistry::new());
@@ -335,10 +303,6 @@ async fn test_middleware_registration() -> Result<()> {
 }
 
 /// Test error propagation in middleware
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "session")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_middleware_error_handling() -> Result<()> {
     let hook_registry = Arc::new(HookRegistry::new());

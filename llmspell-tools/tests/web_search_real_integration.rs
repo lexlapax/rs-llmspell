@@ -10,8 +10,6 @@ use llmspell_tools::search::{web_search::WebSearchConfig, WebSearchTool};
 use serde_json::Value;
 
 /// Test basic DuckDuckGo search functionality with real API call
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
 #[tokio::test]
 #[ignore = "external,integration"]
 async fn test_duckduckgo_real_search() {
@@ -60,8 +58,6 @@ async fn test_duckduckgo_real_search() {
 }
 
 /// Test provider fallback mechanism
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
 #[tokio::test]
 #[ignore = "external,integration"]
 async fn test_provider_fallback() {
@@ -110,8 +106,6 @@ async fn test_provider_fallback() {
 }
 
 /// Test search with specific parameters
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
 #[tokio::test]
 #[ignore = "external,integration"]
 async fn test_search_with_parameters() {
@@ -152,8 +146,6 @@ async fn test_search_with_parameters() {
 }
 
 /// Test error handling for invalid queries
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
 #[tokio::test]
 #[ignore = "external,integration"]
 async fn test_error_handling() {
@@ -186,8 +178,6 @@ async fn test_error_handling() {
 }
 
 /// Test that validates the WebSearchTool meets Phase 3.0 standards
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
 #[tokio::test]
 #[ignore = "external,integration"]
 async fn test_phase_30_compliance() {
@@ -227,8 +217,6 @@ async fn test_phase_30_compliance() {
 }
 
 /// Debug test to see raw DuckDuckGo API response
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
 #[tokio::test]
 #[ignore = "external,debug"] // Run with --ignored to see debug output
 async fn debug_duckduckgo_api() {
@@ -269,8 +257,6 @@ async fn debug_duckduckgo_api() {
 }
 
 /// Test with environment variables for API keys
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
 #[tokio::test]
 #[ignore = "external,api_keys"] // Only run if API keys are configured
 async fn test_with_api_keys() {

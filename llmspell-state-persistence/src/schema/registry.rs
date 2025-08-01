@@ -323,7 +323,6 @@ pub struct RegistryStats {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "state")]
 mod tests {
     use super::*;
     use crate::config::FieldSchema;
@@ -341,8 +340,6 @@ mod tests {
         );
         schema
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_registry_creation() {
         let registry = SchemaRegistry::new();
@@ -352,8 +349,6 @@ mod tests {
         assert_eq!(stats.named_schemas, 0);
         assert_eq!(stats.current_version, None);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_schema_registration() {
         let registry = SchemaRegistry::new();
@@ -368,8 +363,6 @@ mod tests {
         let retrieved = registry.get_schema(&version).unwrap();
         assert_eq!(retrieved.version, version);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_version_conflict() {
         let registry = SchemaRegistry::new();
@@ -384,8 +377,6 @@ mod tests {
             Err(SchemaRegistryError::VersionConflict { .. })
         ));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_named_schema_registration() {
         let registry = SchemaRegistry::new();
@@ -404,8 +395,6 @@ mod tests {
         assert_eq!(named_schemas.len(), 1);
         assert_eq!(named_schemas.get("test"), Some(&version));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_current_version_tracking() {
         let registry = SchemaRegistry::new();
@@ -434,8 +423,6 @@ mod tests {
         assert_eq!(stats.latest_version, Some(v2_0_0));
         assert_eq!(stats.oldest_version, Some(v1_0_0));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_compatibility_search() {
         let registry = SchemaRegistry::new();
@@ -465,8 +452,6 @@ mod tests {
         assert!(compatible.contains(&v1_2_0));
         assert!(!compatible.contains(&v2_0_0)); // Different major version
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_migration_candidates() {
         let registry = SchemaRegistry::new();
@@ -490,8 +475,6 @@ mod tests {
         assert!(candidates.contains(&v1_1_0));
         assert!(candidates.contains(&v2_0_0));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_latest_in_major() {
         let registry = SchemaRegistry::new();
@@ -523,8 +506,6 @@ mod tests {
         let latest_v3 = registry.get_latest_in_major(3);
         assert!(latest_v3.is_none());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_schema_removal() {
         let registry = SchemaRegistry::new();
@@ -545,8 +526,6 @@ mod tests {
         assert!(registry.get_schema_by_name("test").is_none());
         assert_eq!(registry.get_stats().total_schemas, 0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_schema_validation() {
         let registry = SchemaRegistry::new();

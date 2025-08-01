@@ -304,12 +304,9 @@ impl HookBatcher {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "state")]
 mod tests {
     use super::*;
     use llmspell_hooks::{ComponentId, ComponentType, HookPoint};
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_async_hook_processor() {
         let executor = Arc::new(HookExecutor::new());
@@ -356,8 +353,6 @@ mod tests {
         // Stop processor
         processor.stop().await.unwrap();
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_hook_batcher() {
         let batcher = HookBatcher::new(3, Duration::from_millis(100));

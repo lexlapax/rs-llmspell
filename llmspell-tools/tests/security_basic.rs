@@ -8,9 +8,6 @@ use llmspell_tools::util::{
 };
 
 /// Test that all utility tools have appropriate security levels
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[test]
 fn test_utility_tools_security_levels() {
     let utility_tools: Vec<(String, Box<dyn Tool>)> = vec![
@@ -96,9 +93,6 @@ fn test_utility_tools_security_levels() {
 }
 
 /// Test that tools have reasonable resource limits
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[test]
 fn test_resource_limits_are_reasonable() {
     let tools = vec![
@@ -144,9 +138,6 @@ fn test_resource_limits_are_reasonable() {
 }
 
 /// Test that tools have appropriate security requirements
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[test]
 fn test_security_requirements_structure() {
     let tools = vec![
@@ -197,9 +188,6 @@ fn test_security_requirements_structure() {
 }
 
 /// Test that sensitive operations are properly controlled
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[test]
 fn test_sensitive_operations_controlled() {
     // Template engine should be safe but may have restrictions
@@ -224,9 +212,6 @@ fn test_sensitive_operations_controlled() {
 }
 
 /// Test that all tools have proper metadata
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[test]
 fn test_tools_have_metadata() {
     let tools = vec![
@@ -270,9 +255,6 @@ fn test_tools_have_metadata() {
 }
 
 /// Test basic security compliance
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[test]
 fn test_basic_security_compliance() {
     let total_tools_tested = 9; // From our utility tools test
@@ -295,9 +277,6 @@ fn test_basic_security_compliance() {
 }
 
 /// Test that security configuration is consistent
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[test]
 fn test_security_configuration_consistency() {
     let tools = vec![

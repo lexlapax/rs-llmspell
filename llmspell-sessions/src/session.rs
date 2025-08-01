@@ -273,11 +273,8 @@ impl Session {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "session")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_session_lifecycle() {
         let session = Session::new(CreateSessionOptions::default());
@@ -300,8 +297,6 @@ mod tests {
         // Can't transition from terminal state
         assert!(session.suspend().await.is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_session_state() {
         let session = Session::new(CreateSessionOptions::default());
@@ -320,8 +315,6 @@ mod tests {
         session.clear_state().await.unwrap();
         assert!(session.get_state("key1").await.is_none());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_session_artifacts() {
         let session = Session::new(CreateSessionOptions::default());

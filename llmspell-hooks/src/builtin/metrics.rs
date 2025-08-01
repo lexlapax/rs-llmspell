@@ -547,12 +547,9 @@ impl ReplayableHook for MetricsHook {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "hook")]
 mod tests {
     use super::*;
     use crate::types::{ComponentId, ComponentType, HookPoint};
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_histogram_basic() {
         let mut histogram = Histogram::new();
@@ -565,8 +562,6 @@ mod tests {
         assert!((histogram.sum - 0.35).abs() < 1e-10);
         assert!((histogram.mean() - 0.11666666666666667).abs() < 1e-10);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_histogram_percentiles() {
         let mut histogram = Histogram::new();
@@ -592,8 +587,6 @@ mod tests {
         assert!(p95 <= 0.25); // Should be within our bucket range
         assert!(p99 <= 0.25); // Should be within our bucket range
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_metrics_hook_basic() {
         let hook = MetricsHook::new();
@@ -611,8 +604,6 @@ mod tests {
         let success_rate = hook.storage.get_success_rate(&HookPoint::SystemStartup);
         assert_eq!(success_rate, 1.0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_metrics_hook_multiple_executions() {
         let storage = Arc::new(MetricsStorage::new());
@@ -635,8 +626,6 @@ mod tests {
         assert!(histogram.is_some());
         assert_eq!(histogram.unwrap().count, 5);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_metrics_storage_custom_metrics() {
         let storage = MetricsStorage::new();
@@ -651,8 +640,6 @@ mod tests {
         assert_eq!(metric_points.len(), 1);
         assert_eq!(metric_points[0].value, 42.0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_metrics_summary() {
         let storage = MetricsStorage::new();
@@ -672,8 +659,6 @@ mod tests {
         assert!(summary.contains_key("success_rates"));
         assert!(summary.contains_key("duration_stats"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_metric_hook_trait() {
         let hook = MetricsHook::new();
@@ -694,8 +679,6 @@ mod tests {
             .get_execution_count(&HookPoint::BeforeToolExecution);
         assert_eq!(count, 1);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_hook_metadata() {
         let hook = MetricsHook::new();
@@ -708,8 +691,6 @@ mod tests {
         assert!(metadata.tags.contains(&"builtin".to_string()));
         assert!(metadata.tags.contains(&"metrics".to_string()));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_replayable_hook_implementation() {
         let hook = MetricsHook::new().with_custom_metrics(true);

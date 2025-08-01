@@ -477,11 +477,8 @@ pub struct TraceStatistics {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_span_creation() {
         let root = TraceSpan::new_root("operation".to_string(), "service".to_string());
@@ -494,8 +491,6 @@ mod tests {
         assert_eq!(child.parent_span_id, Some(root.span_id.clone()));
         assert_eq!(child.service, root.service);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_span_completion() {
         let mut span = TraceSpan::new_root("test".to_string(), "service".to_string());
@@ -513,8 +508,6 @@ mod tests {
         assert!(span.duration.unwrap() >= Duration::from_millis(10));
         assert_eq!(span.status, SpanStatus::Ok);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_trace_collector() {
         let collector = Arc::new(TraceCollector::new(10));
@@ -541,8 +534,6 @@ mod tests {
         assert_eq!(trace[0].span_id, span_id);
         assert_eq!(trace[0].status, SpanStatus::Ok);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_span_context() {
         let span = TraceSpan::new_root("op".to_string(), "service".to_string());
@@ -554,8 +545,6 @@ mod tests {
         assert_eq!(child.trace_id, span.trace_id);
         assert_eq!(child.parent_span_id, Some(span.span_id.clone()));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_trace_analyzer() {
         let root = TraceSpan::new_root("root".to_string(), "service-a".to_string());

@@ -109,7 +109,6 @@ impl Default for ComponentRegistry {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "bridge")]
 mod tests {
     use super::*;
     use async_trait::async_trait;
@@ -181,8 +180,6 @@ mod tests {
             Ok(())
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_agent_registration() {
         let registry = ComponentRegistry::new();

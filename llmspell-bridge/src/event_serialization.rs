@@ -263,12 +263,9 @@ impl EventSerialization {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "bridge")]
 mod tests {
     use super::*;
     use serde_json::json;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_universal_event_json_roundtrip() {
         let original = UniversalEvent::new(
@@ -284,8 +281,6 @@ mod tests {
         assert_eq!(original.data, restored.data);
         assert_eq!(original.language, restored.language);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_lua_array_serialization() {
         let event = UniversalEvent::new(
@@ -309,8 +304,6 @@ mod tests {
             EventSerialization::deserialize_from_language(&lua_serialized, Language::Lua).unwrap();
         assert_eq!(restored.data, json!(["item1", "item2", "item3"]));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_javascript_large_number_handling() {
         let large_number = 9_007_199_254_740_992i64; // Exceeds JS safe integer
@@ -332,8 +325,6 @@ mod tests {
                 .unwrap();
         assert_eq!(restored.data["big"], large_number.to_string());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_language_detection() {
         let test_cases = vec![
@@ -357,8 +348,6 @@ mod tests {
             assert_eq!(event.language, expected);
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_event_compatibility_validation() {
         let event = UniversalEvent::new(
@@ -375,8 +364,6 @@ mod tests {
         assert!(EventSerialization::validate_event_compatibility(&event, Language::Python).is_ok());
         assert!(EventSerialization::validate_event_compatibility(&event, Language::Rust).is_ok());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_lua_array_detection() {
         let lua_array = serde_json::Map::from_iter([

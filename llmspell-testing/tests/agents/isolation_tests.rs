@@ -13,11 +13,6 @@ use tokio::time::timeout;
 
 // Mock state manager for testing
 struct MockStateManager;
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "testing")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_strict_isolation_prevents_cross_agent_access() {
     let state_manager = Arc::new(MockStateManager);
@@ -64,11 +59,6 @@ async fn test_strict_isolation_prevents_cross_agent_access() {
         .check_access("agent2", &StateScope::Global, StateOperation::Write)
         .unwrap());
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "testing")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_shared_scope_controlled_access() {
     let state_manager = Arc::new(MockStateManager);
@@ -147,11 +137,6 @@ async fn test_shared_scope_controlled_access() {
         .check_access("admin", &shared_scope, StateOperation::Delete)
         .unwrap());
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "testing")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_audit_logging_tracks_access_attempts() {
     let state_manager = Arc::new(MockStateManager);
@@ -183,11 +168,6 @@ async fn test_audit_logging_tracks_access_attempts() {
     let allowed_entries: Vec<_> = audit_log.iter().filter(|e| e.allowed).collect();
     assert!(!allowed_entries.is_empty());
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "testing")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_state_leakage_prevention() {
     let state_manager = Arc::new(MockStateManager);
@@ -240,11 +220,6 @@ async fn test_state_leakage_prevention() {
     //     );
     // }
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "testing")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_performance_isolation_overhead() {
     let state_manager = Arc::new(MockStateManager);
@@ -271,11 +246,6 @@ async fn test_performance_isolation_overhead() {
         per_check
     );
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "testing")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_permission_revocation() {
     let state_manager = Arc::new(MockStateManager);
@@ -299,11 +269,6 @@ async fn test_permission_revocation() {
         .check_access("contractor", &scope, StateOperation::Write)
         .unwrap());
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "testing")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_broadcast_channel_isolation() {
     let state_manager = Arc::new(MockStateManager);
@@ -351,11 +316,6 @@ async fn test_broadcast_channel_isolation() {
         .await;
     assert!(result.is_err());
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "testing")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_pipeline_ordered_access() {
     let state_manager = Arc::new(MockStateManager);
@@ -390,11 +350,6 @@ async fn test_pipeline_ordered_access() {
         .unwrap();
     assert_eq!(next, None);
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "testing")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_concurrent_access_safety() {
     let state_manager = Arc::new(MockStateManager);
@@ -463,11 +418,6 @@ async fn test_concurrent_access_safety() {
     //     assert_eq!(value, Some(json!(i)));
     // }
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "testing")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_custom_isolation_policy() {
     let state_manager = Arc::new(MockStateManager);

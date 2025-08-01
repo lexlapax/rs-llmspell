@@ -5,10 +5,6 @@ use llmspell_bridge::multi_agent::{
     create_consensus_workflow, create_fork_join_workflow, create_pipeline_workflow,
 };
 use serde_json::json;
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "bridge")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_pipeline_coordination() {
     // Test sequential agent pipeline
@@ -31,10 +27,6 @@ async fn test_pipeline_coordination() {
     assert_eq!(workflow.name(), "test_pipeline");
     // Note: Cannot access internal steps field directly, but workflow is created
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "bridge")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_fork_join_coordination() {
     // Test parallel agent execution
@@ -67,10 +59,6 @@ async fn test_fork_join_coordination() {
     assert_eq!(workflow.name(), "test_fork_join");
     // Note: Cannot access internal branches field directly, but workflow is created with correct number of tasks
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "bridge")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_consensus_coordination() {
     // Test consensus evaluation pattern
@@ -97,10 +85,6 @@ async fn test_consensus_coordination() {
     assert_eq!(workflow.name(), "test_consensus");
     // Note: Cannot access internal branches field directly, but workflow is created with evaluator branches
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "bridge")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_multi_agent_integration() {
     use llmspell_bridge::{workflows::WorkflowBridge, ComponentRegistry};
@@ -121,10 +105,6 @@ async fn test_multi_agent_integration() {
     assert!(workflow_types.contains(&"sequential".to_string()));
     assert!(workflow_types.contains(&"parallel".to_string()));
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "bridge")]
-#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_coordination_pattern_serialization() {
     use llmspell_bridge::multi_agent::{CoordinationPattern, MultiAgentConfig};
@@ -143,10 +123,6 @@ fn test_coordination_pattern_serialization() {
     let deserialized: MultiAgentConfig = serde_json::from_str(&serialized).unwrap();
     assert_eq!(deserialized.agents.len(), 2);
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "bridge")]
-#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_all_coordination_patterns() {
     use llmspell_bridge::multi_agent::CoordinationPattern;

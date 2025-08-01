@@ -698,19 +698,14 @@ impl Tool for DatabaseConnectorTool {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "tool")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_database_connector_tool_creation() {
         let config = DatabaseConnectorConfig::default();
         let tool = DatabaseConnectorTool::new(config).unwrap();
         assert_eq!(tool.metadata().name, "database_connector");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_tool_metadata() {
         let config = DatabaseConnectorConfig::default();
@@ -723,15 +718,11 @@ mod tests {
         assert_eq!(schema.name, "database_connector");
         assert!(!schema.parameters.is_empty());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_config_from_env() {
         // Test that from_env doesn't panic
         let _config = DatabaseConnectorConfig::from_env();
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_security_validation() {
         let config = DatabaseConnectorConfig::default();
@@ -754,8 +745,6 @@ mod tests {
         assert!(tool.contains_suspicious_patterns("DROP TABLE users"));
         assert!(!tool.contains_suspicious_patterns("SELECT * FROM users WHERE id = 1"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_parameter_validation() {
         let config = DatabaseConnectorConfig::default();

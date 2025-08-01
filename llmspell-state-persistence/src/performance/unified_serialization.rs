@@ -238,12 +238,9 @@ impl<W: Write> StreamingSerializer<W> {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "state")]
 mod tests {
     use super::*;
     use serde_json::json;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_unified_serializer_fast_path() {
         let serializer = UnifiedSerializer::fast();
@@ -261,8 +258,6 @@ mod tests {
 
         assert_eq!(data, deserialized);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_unified_serializer_with_protection() {
         let config = SensitiveDataConfig {
@@ -289,8 +284,6 @@ mod tests {
         assert_eq!(deserialized["password"], "[REDACTED]");
         assert_eq!(deserialized["data"]["password"], "[REDACTED]");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_circular_reference_detection() {
         let _serializer = UnifiedSerializer::new(SensitiveDataConfig::default());

@@ -251,13 +251,10 @@ impl Default for RateLimiter {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "hook")]
 mod tests {
     use super::*;
     use std::thread;
     use std::time::Duration as StdDuration;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_rate_limiter_basic() {
         let config = TokenBucketConfig {
@@ -288,8 +285,6 @@ mod tests {
         let (allowed, _) = limiter.try_acquire("test", 1.0);
         assert!(!allowed);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_rate_limiter_refill() {
         let config = TokenBucketConfig {
@@ -317,8 +312,6 @@ mod tests {
         assert!(allowed);
         assert!(remaining >= 9.0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_rate_limiter_multiple_buckets() {
         let limiter = RateLimiter::new(TokenBucketConfig {
@@ -342,8 +335,6 @@ mod tests {
         assert!(!allowed1);
         assert!(!allowed2);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_bucket_state() {
         let limiter = RateLimiter::new(TokenBucketConfig {
@@ -362,8 +353,6 @@ mod tests {
         assert_eq!(state.tokens, 125.0); // 150 - 25
         assert_eq!(state.total_consumed, 25);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_force_acquire() {
         let limiter = RateLimiter::new(TokenBucketConfig {
@@ -384,8 +373,6 @@ mod tests {
         let state = limiter.get_bucket_state("test");
         assert_eq!(state.tokens, -5.0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_reset_bucket() {
         let limiter = RateLimiter::new(TokenBucketConfig {
@@ -405,8 +392,6 @@ mod tests {
         let state = limiter.get_bucket_state("test");
         assert_eq!(state.tokens, 15.0); // 10 + 5 burst
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_statistics() {
         let limiter = RateLimiter::new(TokenBucketConfig::default());

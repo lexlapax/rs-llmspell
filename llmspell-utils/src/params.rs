@@ -273,7 +273,6 @@ pub fn extract_direct_parameters(input: &AgentInput) -> &HashMap<String, Value> 
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
     use serde_json::json;
@@ -287,32 +286,24 @@ mod tests {
             output_modalities: vec![],
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_extract_parameters() {
         let input = create_test_input(&json!({ "key": "value" }));
         let params = extract_parameters(&input).unwrap();
         assert_eq!(params, &json!({ "key": "value" }));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_extract_required_string() {
         let params = json!({ "name": "test" });
         assert_eq!(extract_required_string(&params, "name").unwrap(), "test");
         assert!(extract_required_string(&params, "missing").is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_extract_optional_string() {
         let params = json!({ "name": "test" });
         assert_eq!(extract_optional_string(&params, "name"), Some("test"));
         assert_eq!(extract_optional_string(&params, "missing"), None);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_extract_string_with_default() {
         let params = json!({ "name": "test" });
@@ -325,16 +316,12 @@ mod tests {
             "default"
         );
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_extract_required_bool() {
         let params = json!({ "enabled": true });
         assert!(extract_required_bool(&params, "enabled").unwrap());
         assert!(extract_required_bool(&params, "missing").is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_extract_numbers() {
         let params = json!({
@@ -350,24 +337,18 @@ mod tests {
                 < 0.00001
         );
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_extract_arrays() {
         let params = json!({ "list": [1, 2, 3] });
         let array = extract_required_array(&params, "list").unwrap();
         assert_eq!(array.len(), 3);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_extract_objects() {
         let params = json!({ "config": { "key": "value" } });
         let obj = extract_required_object(&params, "config").unwrap();
         assert_eq!(obj.get("key").and_then(|v| v.as_str()), Some("value"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_require_one_of() {
         let params = json!({ "a": 1, "c": 3 });
@@ -375,8 +356,6 @@ mod tests {
         assert!(require_one_of(&params, &["b", "c"]).is_ok());
         assert!(require_one_of(&params, &["x", "y"]).is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_require_all_of() {
         let params = json!({ "a": 1, "b": 2, "c": 3 });
@@ -384,8 +363,6 @@ mod tests {
         assert!(require_all_of(&params, &["a", "b", "c"]).is_ok());
         assert!(require_all_of(&params, &["a", "x"]).is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_extract_direct_parameters() {
         let mut parameters = HashMap::new();

@@ -5,9 +5,6 @@ use llmspell_bridge::{
     RuntimeConfig, ScriptRuntime,
 };
 use std::collections::HashMap;
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "bridge")]
 #[tokio::test]
 async fn test_lua_agent_creation_with_mock_provider() {
     // Create runtime config with a mock provider

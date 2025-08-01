@@ -472,13 +472,10 @@ impl EventCorrelationTracker {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "event")]
 mod tests {
     use super::*;
     use crate::universal_event::{Language, UniversalEvent};
     use serde_json::Value;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_correlation_context_creation() {
         let root_context = CorrelationContext::new_root();
@@ -490,8 +487,6 @@ mod tests {
         assert_eq!(child_context.parent_id, Some(root_context.correlation_id));
         assert_ne!(child_context.correlation_id, root_context.correlation_id);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_event_tracking() {
         let tracker = EventCorrelationTracker::default();
@@ -510,8 +505,6 @@ mod tests {
         assert_eq!(stats.total_events, 1);
         assert_eq!(stats.active_correlations, 1);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_event_links() {
         let tracker = EventCorrelationTracker::default();
@@ -533,8 +526,6 @@ mod tests {
         let stats = tracker.get_stats();
         assert_eq!(stats.total_links, 1);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_correlation_cleanup() {
         let config = CorrelationConfig {
@@ -556,8 +547,6 @@ mod tests {
         let events = tracker.get_events(&correlation_id);
         assert_eq!(events.len(), 2); // Should only keep the last 2 events
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_context_metadata() {
         let context = CorrelationContext::new_root()

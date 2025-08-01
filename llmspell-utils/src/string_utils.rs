@@ -693,11 +693,8 @@ pub fn join_with(parts: &[&str], delimiter: &str) -> String {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_truncate() {
         assert_eq!(truncate("Hello, world!", 5), "He...");
@@ -712,8 +709,6 @@ mod tests {
         assert!(result.starts_with("Hello"));
         assert!(result.ends_with("..."));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_truncate_with_ellipsis() {
         // The unicode ellipsis takes 3 bytes, so "Hello," (6 bytes) + "…" (3 bytes) = 9 bytes
@@ -723,8 +718,6 @@ mod tests {
         assert_eq!(truncate_with_ellipsis("Short", 10, "…"), "Short");
         assert_eq!(truncate_with_ellipsis("Test", 1, "..."), ".");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_word_wrap() {
         let text = "This is a long line that needs to be wrapped";
@@ -752,8 +745,6 @@ mod tests {
         let wrapped = word_wrap(multi, 10);
         assert_eq!(wrapped, vec!["Line 1 is", "here", "Line 2 is", "also here"]);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_case_conversions() {
         // snake_case
@@ -774,8 +765,6 @@ mod tests {
         assert_eq!(to_pascal_case("already_PascalCase"), "AlreadyPascalCase");
         assert_eq!(to_pascal_case("io-error"), "IoError");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_sanitize() {
         assert_eq!(sanitize("  Hello\x00World  "), "HelloWorld");
@@ -789,8 +778,6 @@ mod tests {
             "Should only contain spaces, got: {result:?}"
         );
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_escape_special() {
         assert_eq!(escape_special("Hello\nWorld"), "Hello\\nWorld");
@@ -799,8 +786,6 @@ mod tests {
         assert_eq!(escape_special("Tab\there"), "Tab\\there");
         assert_eq!(escape_special("Null\0char"), "Null\\0char");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_indent() {
         let text = "Line 1\nLine 2\nLine 3";
@@ -816,8 +801,6 @@ mod tests {
         let indented = indent(text_nl, 2);
         assert_eq!(indented, "  Line 1\n  Line 2\n");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_dedent() {
         let text = "    Line 1\n    Line 2\n      Line 3";
@@ -834,8 +817,6 @@ mod tests {
         let dedented = dedent(text);
         assert_eq!(dedented, text);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_is_valid_identifier() {
         assert!(is_valid_identifier("valid_name"));
@@ -849,8 +830,6 @@ mod tests {
         assert!(!is_valid_identifier("invalid name"));
         assert!(!is_valid_identifier(""));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_lines_with_endings() {
         let text = "Line 1\nLine 2\r\nLine 3";
@@ -866,8 +845,6 @@ mod tests {
         let lines: Vec<_> = lines_with_endings("").collect();
         assert!(lines.is_empty());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_normalize_whitespace() {
         assert_eq!(normalize_whitespace("Hello    world"), "Hello world");
@@ -879,8 +856,6 @@ mod tests {
         assert_eq!(normalize_whitespace("\t\tTabs\t\t"), "Tabs");
         assert_eq!(normalize_whitespace(""), "");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_count_lines() {
         assert_eq!(count_lines("Single line"), 1);
@@ -889,8 +864,6 @@ mod tests {
         assert_eq!(count_lines("\n\n"), 2);
         assert_eq!(count_lines("No newline at end\n"), 1);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_common_prefix() {
         assert_eq!(
@@ -905,8 +878,6 @@ mod tests {
         // Test with unicode
         assert_eq!(common_prefix(&["你好世界", "你好朋友"]), "你好");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_repeat_char() {
         assert_eq!(repeat_char('=', 5), "=====");
@@ -914,8 +885,6 @@ mod tests {
         assert_eq!(repeat_char('*', 0), "");
         assert_eq!(repeat_char('🦀', 3), "🦀🦀🦀");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_to_uppercase() {
         assert_eq!(to_uppercase("hello world"), "HELLO WORLD");
@@ -923,8 +892,6 @@ mod tests {
         assert_eq!(to_uppercase(""), "");
         assert_eq!(to_uppercase("ALREADY UPPER"), "ALREADY UPPER");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_to_lowercase() {
         assert_eq!(to_lowercase("HELLO WORLD"), "hello world");
@@ -932,8 +899,6 @@ mod tests {
         assert_eq!(to_lowercase(""), "");
         assert_eq!(to_lowercase("already lower"), "already lower");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_reverse() {
         assert_eq!(reverse("hello"), "olleh");
@@ -942,8 +907,6 @@ mod tests {
         assert_eq!(reverse("a"), "a");
         assert_eq!(reverse("🦀rust🦀"), "🦀tsur🦀");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_trim() {
         assert_eq!(trim("  hello  "), "hello");
@@ -952,8 +915,6 @@ mod tests {
         assert_eq!(trim("   "), "");
         assert_eq!(trim(""), "");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_replace_all() {
         assert_eq!(replace_all("hello world", "o", "0"), "hell0 w0rld");
@@ -961,8 +922,6 @@ mod tests {
         assert_eq!(replace_all("no match", "x", "y"), "no match");
         assert_eq!(replace_all("", "x", "y"), "");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_substring() {
         assert_eq!(substring("hello world", 0, 5), "hello");
@@ -972,8 +931,6 @@ mod tests {
         assert_eq!(substring("hello", 5, 3), "");
         assert_eq!(substring("🦀rust", 0, 2), "🦀");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_split_by() {
         assert_eq!(split_by("a,b,c", ","), vec!["a", "b", "c"]);
@@ -982,8 +939,6 @@ mod tests {
         assert_eq!(split_by("", ","), vec![""]);
         assert_eq!(split_by("a,,b", ","), vec!["a", "", "b"]);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_join_with() {
         assert_eq!(join_with(&["a", "b", "c"], ","), "a,b,c");
@@ -995,20 +950,16 @@ mod tests {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "util")]
 mod property_tests {
     use super::*;
     use proptest::prelude::*;
 
     proptest! {
-        #[cfg_attr(test_category = "unit")]
         #[test]
         fn test_truncate_length(s: String, max_len in 0usize..1000) {
             let truncated = truncate(&s, max_len);
             assert!(truncated.len() <= max_len || truncated.len() <= DEFAULT_ELLIPSIS.len());
         }
-
-        #[cfg_attr(test_category = "unit")]
         #[test]
         fn test_sanitize_no_control_chars(s: String) {
             let sanitized = sanitize(&s);
@@ -1016,8 +967,6 @@ mod property_tests {
                 assert!(ch == '\n' || ch == '\t' || (!ch.is_control() && ch.is_ascii()));
             }
         }
-
-        #[cfg_attr(test_category = "unit")]
         #[test]
         fn test_indent_line_count(s: String, spaces in 0usize..10) {
             let indented = indent(&s, spaces);
@@ -1025,8 +974,6 @@ mod property_tests {
                 assert_eq!(count_lines(&s), count_lines(&indented));
             }
         }
-
-        #[cfg_attr(test_category = "unit")]
         #[test]
         fn test_case_conversion_consistency(s in "[a-zA-Z][a-zA-Z0-9_]*") {
             // Test that conversions produce valid identifiers

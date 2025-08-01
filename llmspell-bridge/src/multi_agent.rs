@@ -374,11 +374,8 @@ impl MultiAgentExamples {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "bridge")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_pipeline_workflow_creation() {
         let workflow = create_pipeline_workflow(
@@ -390,8 +387,6 @@ mod tests {
 
         assert_eq!(workflow.step_count(), 2);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_fork_join_workflow_creation() {
         let workflow = create_fork_join_workflow(

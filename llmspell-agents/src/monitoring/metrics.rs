@@ -489,11 +489,8 @@ impl Default for MetricRegistry {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_counter() {
         let counter = Counter::new();
@@ -508,8 +505,6 @@ mod tests {
         counter.reset();
         assert_eq!(counter.get(), 0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_gauge() {
         let gauge = Gauge::new();
@@ -527,8 +522,6 @@ mod tests {
         gauge.sub(3.5);
         assert_eq!(gauge.get(), 50.0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_histogram() {
         let hist = Histogram::new(vec![0.1, 0.5, 1.0, 5.0]);
@@ -554,8 +547,6 @@ mod tests {
             _ => panic!("Expected histogram value"),
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_agent_metrics() {
         let metrics = AgentMetrics::new("test-agent".to_string());
@@ -585,8 +576,6 @@ mod tests {
         assert_eq!(metrics.memory_bytes.get(), 1024.0 * 1024.0);
         assert_eq!(metrics.cpu_percent.get(), 25.5);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_metric_registry() {
         let registry = MetricRegistry::new();

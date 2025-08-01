@@ -17,8 +17,6 @@ mod workflow_tool_tests {
 
         Arc::new(WorkflowBridge::new(registry))
     }
-
-    #[cfg_attr(test_category = "external")]
     #[tokio::test]
     async fn test_filesystem_tools_in_workflows() -> Result<()> {
         let bridge = setup_test_environment();
@@ -58,8 +56,6 @@ mod workflow_tool_tests {
 
         Ok(())
     }
-
-    #[cfg_attr(test_category = "external")]
     #[tokio::test]
     async fn test_data_processing_tools_in_workflows() -> Result<()> {
         let bridge = setup_test_environment();
@@ -98,8 +94,6 @@ mod workflow_tool_tests {
 
         Ok(())
     }
-
-    #[cfg_attr(test_category = "external")]
     #[tokio::test]
     async fn test_utility_tools_in_workflows() -> Result<()> {
         let bridge = setup_test_environment();
@@ -141,8 +135,6 @@ mod workflow_tool_tests {
 
         Ok(())
     }
-
-    #[cfg_attr(test_category = "external")]
     #[tokio::test]
     async fn test_parallel_tool_execution() -> Result<()> {
         let bridge = setup_test_environment();
@@ -195,8 +187,6 @@ mod workflow_tool_tests {
 
         Ok(())
     }
-
-    #[cfg_attr(test_category = "external")]
     #[tokio::test]
     async fn test_tool_composition_in_workflows() -> Result<()> {
         let bridge = setup_test_environment();
@@ -244,8 +234,6 @@ mod workflow_tool_tests {
 
         Ok(())
     }
-
-    #[cfg_attr(test_category = "external")]
     #[tokio::test]
     async fn test_conditional_tool_execution() -> Result<()> {
         let bridge = setup_test_environment();
@@ -297,8 +285,6 @@ mod workflow_tool_tests {
 
         Ok(())
     }
-
-    #[cfg_attr(test_category = "external")]
     #[tokio::test]
     async fn test_loop_tool_execution() -> Result<()> {
         let bridge = setup_test_environment();
@@ -330,8 +316,6 @@ mod workflow_tool_tests {
 
         Ok(())
     }
-
-    #[cfg_attr(test_category = "external")]
     #[tokio::test]
     async fn test_error_handling_with_tools() -> Result<()> {
         let bridge = setup_test_environment();
@@ -387,8 +371,6 @@ mod workflow_tool_tests {
 
         Ok(())
     }
-
-    #[cfg_attr(test_category = "external")]
     #[tokio::test]
     async fn test_tool_timeout_in_workflows() -> Result<()> {
         let bridge = setup_test_environment();
@@ -438,8 +420,6 @@ mod workflow_tool_tests {
 
         Ok(())
     }
-
-    #[cfg_attr(test_category = "external")]
     #[tokio::test]
     async fn test_tool_resource_limits() -> Result<()> {
         let bridge = setup_test_environment();
@@ -470,8 +450,6 @@ mod workflow_tool_tests {
 
         Ok(())
     }
-
-    #[cfg_attr(test_category = "external")]
     #[tokio::test]
     async fn test_all_tool_categories() -> Result<()> {
         let bridge = setup_test_environment();
@@ -515,8 +493,6 @@ mod workflow_tool_tests {
 
         Ok(())
     }
-
-    #[cfg_attr(test_category = "external")]
     #[test]
     fn test_tool_discovery_from_workflows() {
         let registry = Arc::new(ComponentRegistry::new());
@@ -562,8 +538,6 @@ mod workflow_tool_tests {
             );
         }
     }
-
-    #[cfg_attr(test_category = "external")]
     #[tokio::test]
     async fn test_performance_requirements() -> Result<()> {
         use std::time::Instant;

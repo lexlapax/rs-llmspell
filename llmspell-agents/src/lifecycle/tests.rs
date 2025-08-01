@@ -2,7 +2,6 @@
 //! ABOUTME: Tests the enhanced state machine with hooks, circuit breakers, and cancellation
 
 #[cfg(test)]
-#[cfg_attr(test_category = "agent")]
 mod integration_tests {
     use crate::lifecycle::{AgentState, AgentStateMachine, StateMachineConfig};
     use anyhow::Result;
@@ -70,8 +69,6 @@ mod integration_tests {
             Ok(HookResult::Continue)
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_state_machine_hook_integration() {
         // Create hook registry and register test hook
@@ -132,8 +129,6 @@ mod integration_tests {
         });
         assert!(has_relevant_hooks, "Should have called relevant hooks");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_hook_failure_handling() {
         // Create hook registry with failing hook
@@ -166,8 +161,6 @@ mod integration_tests {
             "Failing hook should have been called"
         );
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_circuit_breaker_protection() {
         let config = StateMachineConfig {
@@ -186,8 +179,6 @@ mod integration_tests {
         // will protect based on failure patterns over time
         assert!(state_machine.is_healthy().await);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_cancellation_support() {
         let config = StateMachineConfig::default();
@@ -217,8 +208,6 @@ mod integration_tests {
             assert!(result.is_ok());
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_state_machine_metrics() {
         let config = StateMachineConfig::default();
@@ -240,8 +229,6 @@ mod integration_tests {
         assert!(metrics.is_healthy);
         assert!(metrics.uptime > Duration::from_millis(0));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_error_recovery_flow() {
         let config = StateMachineConfig {
@@ -270,8 +257,6 @@ mod integration_tests {
         let metrics = state_machine.get_metrics().await;
         assert_eq!(metrics.recovery_attempts, 0); // Reset after successful recovery
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_hook_context_metadata() {
         // Hook that verifies context metadata
@@ -336,8 +321,6 @@ mod integration_tests {
             "Hook should have verified metadata"
         );
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_performance_overhead() {
         use std::time::Instant;
@@ -432,8 +415,6 @@ mod integration_tests {
 
         println!("✅ Hook system is functional and ready for production optimization");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_production_performance_validation() {
         use crate::lifecycle::benchmarks::{BenchmarkConfig, PerformanceBenchmark};

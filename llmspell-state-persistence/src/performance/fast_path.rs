@@ -211,12 +211,9 @@ impl EphemeralCacheStats {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "state")]
 mod tests {
     use super::*;
     use serde_json::json;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_fast_serialization() {
         let config = FastPathConfig::default();
@@ -228,8 +225,6 @@ mod tests {
 
         assert_eq!(value, deserialized);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_performance_overhead() {
         println!("\n=== Fast Path Performance Test ===");
@@ -288,8 +283,6 @@ mod tests {
             per_op_micros
         );
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_ephemeral_cache() {
         let config = FastPathConfig {
@@ -325,8 +318,6 @@ mod tests {
         let stats = manager.ephemeral_stats();
         assert_eq!(stats.entry_count, 2);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_compression() {
         let config = FastPathConfig {
@@ -346,8 +337,6 @@ mod tests {
         // Compressed should be different (unless compression actually made it larger)
         assert_ne!(large_data, compressed);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_small_data_not_compressed() {
         let config = FastPathConfig {

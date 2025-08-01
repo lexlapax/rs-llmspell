@@ -312,19 +312,14 @@ pub fn find_optimal_compression(
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "state")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_compression_level_validation() {
         assert!(CompressionLevel::new(0).is_err());
         assert!(CompressionLevel::new(5).is_ok());
         assert!(CompressionLevel::new(10).is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_compression_type_extension() {
         assert_eq!(CompressionType::None.extension(), "");
@@ -333,8 +328,6 @@ mod tests {
         assert_eq!(CompressionType::Lz4.extension(), ".lz4");
         assert_eq!(CompressionType::Brotli.extension(), ".br");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_compression_roundtrip() {
         let data = b"Hello, World! This is test data for compression.".repeat(100);
@@ -346,8 +339,6 @@ mod tests {
         let decompressed = compressor.decompress(&compressed).unwrap();
         assert_eq!(decompressed, data);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_all_compression_algorithms() {
         let data = b"Test data for all compression algorithms".repeat(50);
@@ -366,8 +357,6 @@ mod tests {
             assert_eq!(decompressed, data, "Failed for {:?}", algorithm);
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_compression_analysis() {
         let data = b"Highly compressible data ".repeat(100);
@@ -378,8 +367,6 @@ mod tests {
         assert!(analysis.compression_ratio > 50.0); // Should achieve >50% compression
         assert!(analysis.compressed_size < analysis.original_size);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_compression_edge_cases() {
         // Test 1: Empty data
@@ -403,8 +390,6 @@ mod tests {
         let decompressed_random = compressor.decompress(&compressed_random).unwrap();
         assert_eq!(decompressed_random, random_data);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_compression_ratio_calculation() {
         // Test that compression ratio calculation doesn't panic

@@ -242,11 +242,8 @@ impl StepStateAccess {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "workflow")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_state_scoping() {
         let manager = WorkflowStateManager::new();
@@ -268,8 +265,6 @@ mod tests {
             Some(serde_json::json!("workflow"))
         );
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_workflow_state_accessor() {
         let manager = WorkflowStateManager::new();
@@ -299,8 +294,6 @@ mod tests {
             Some(serde_json::json!({"result": "success"}))
         );
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_list_and_clear() {
         let manager = WorkflowStateManager::new();

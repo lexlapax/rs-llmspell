@@ -527,19 +527,14 @@ impl LifecycleEventRecorder {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_harness_creation() {
         let config = TestConfig::default();
         let harness = TestHarness::new(config).await;
         assert!(harness.interactions.lock().unwrap().is_empty());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_assertions() {
         let output = AgentOutput {
@@ -553,8 +548,6 @@ mod tests {
         assert!(AgentAssertions::assert_output_contains(&output, "Hello").is_ok());
         assert!(AgentAssertions::assert_output_contains(&output, "Goodbye").is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_scenario_builder() {
         let scenario = TestScenarioBuilder::new("test_scenario")

@@ -4,9 +4,6 @@
 use llmspell_hooks::coordination::{CrossComponentCoordinator, ExecutionChain};
 use llmspell_hooks::{ComponentId, ComponentType, HookContext, HookPoint};
 use std::time::Duration;
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "hook")]
 #[tokio::test]
 async fn test_agent_tool_workflow_chain() {
     let coordinator = CrossComponentCoordinator::new();
@@ -58,9 +55,6 @@ async fn test_agent_tool_workflow_chain() {
         other => panic!("Expected Executing state, got {:?}", other),
     }
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "hook")]
 #[tokio::test]
 async fn test_chain_cleanup() {
     let coordinator = CrossComponentCoordinator::new();
@@ -87,9 +81,6 @@ async fn test_chain_cleanup() {
     // Chain should no longer exist
     assert!(coordinator.get_chain_state("cleanup-test").await.is_none());
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "hook")]
 #[tokio::test]
 async fn test_coordinator_capacity_limits() {
     use llmspell_hooks::coordination::CoordinatorConfig;
@@ -129,9 +120,6 @@ async fn test_coordinator_capacity_limits() {
         .to_string()
         .contains("Maximum number of active chains"));
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "hook")]
 #[tokio::test]
 async fn test_cross_component_context() {
     use llmspell_hooks::coordination::CrossComponentContext;
@@ -176,9 +164,6 @@ async fn test_cross_component_context() {
     assert!(cross_context.propagated_data.is_empty());
     assert!(cross_context.previous_metrics.is_empty());
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "hook")]
 #[test]
 fn test_execution_chain_builder() {
     let agent_id = ComponentId::new(ComponentType::Agent, "agent".to_string());

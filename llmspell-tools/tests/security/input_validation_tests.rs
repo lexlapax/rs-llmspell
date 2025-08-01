@@ -435,8 +435,6 @@ pub fn all_input_validation_tests() -> Vec<SecurityTestCase> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "integration")]
     #[test]
     fn test_input_validation_test_creation() {
         let tests = all_input_validation_tests();
@@ -462,8 +460,6 @@ mod tests {
         assert!(categories.contains(&"REGEX".to_string()));
         assert!(categories.contains(&"PROTO".to_string()));
     }
-
-    #[cfg_attr(test_category = "integration")]
     #[test]
     fn test_critical_severity_tests() {
         let tests = all_input_validation_tests();
@@ -481,8 +477,6 @@ mod tests {
         // Command injection should be critical
         assert!(critical_tests.iter().any(|t| t.name.starts_with("CMD_")));
     }
-
-    #[cfg_attr(test_category = "integration")]
     #[test]
     fn test_injection_category_coverage() {
         let tests = all_input_validation_tests();

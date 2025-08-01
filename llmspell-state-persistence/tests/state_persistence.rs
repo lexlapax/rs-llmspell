@@ -19,8 +19,6 @@ mod tests {
             ..Default::default()
         }
     }
-
-    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_state_persistence_across_application_restart() -> Result<()> {
         let temp_dir = TempDir::new()?;
@@ -126,8 +124,6 @@ mod tests {
 
         Ok(())
     }
-
-    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_multi_scope_state_isolation() -> Result<()> {
         let temp_dir = TempDir::new()?;
@@ -195,8 +191,6 @@ mod tests {
 
         Ok(())
     }
-
-    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_concurrent_state_operations() -> Result<()> {
         let temp_dir = TempDir::new()?;
@@ -259,8 +253,6 @@ mod tests {
 
         Ok(())
     }
-
-    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_error_handling_without_data_loss() -> Result<()> {
         let temp_dir = TempDir::new()?;
@@ -312,8 +304,6 @@ mod tests {
 
         Ok(())
     }
-
-    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_memory_usage_scaling() -> Result<()> {
         let temp_dir = TempDir::new()?;
@@ -367,8 +357,6 @@ mod tests {
 
         Ok(())
     }
-
-    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_race_condition_prevention() -> Result<()> {
         let temp_dir = TempDir::new()?;
@@ -451,8 +439,6 @@ mod tests {
 
         Ok(())
     }
-
-    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_different_backend_types() -> Result<()> {
         // Test with memory backend

@@ -699,11 +699,8 @@ impl SessionReplayControls {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "session")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_speed_control() {
         let mut speed = SessionReplaySpeed::default();
@@ -725,8 +722,6 @@ mod tests {
         let adjusted = speed.apply_to_duration(duration);
         assert_eq!(adjusted, Duration::from_secs(1)); // 10s / 10x = 1s
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_breakpoint_conditions() {
         let breakpoint = SessionBreakpoint {
@@ -741,8 +736,6 @@ mod tests {
         assert!(breakpoint.enabled);
         assert!(!breakpoint.one_shot);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_replay_progress() {
         let progress = SessionReplayProgress {

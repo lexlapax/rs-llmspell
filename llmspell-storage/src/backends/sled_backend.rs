@@ -123,8 +123,6 @@ impl StorageBackend for SledBackend {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_sled_backend_basic_operations() {
         let backend = SledBackend::new_temporary().unwrap();
@@ -142,8 +140,6 @@ mod tests {
         backend.delete("key1").await.unwrap();
         assert!(!backend.exists("key1").await.unwrap());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_sled_backend_persistence() {
         let temp_dir = tempfile::tempdir().unwrap();

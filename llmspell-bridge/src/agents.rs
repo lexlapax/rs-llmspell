@@ -168,15 +168,12 @@ pub struct AgentInfo {
 // Removed Default impl - AgentDiscovery now requires provider manager
 
 #[cfg(test)]
-#[cfg_attr(test_category = "bridge")]
 mod tests {
     use super::*;
 
     async fn create_test_provider_manager() -> Arc<llmspell_providers::ProviderManager> {
         Arc::new(llmspell_providers::ProviderManager::new())
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_agent_discovery() {
         let provider_manager = create_test_provider_manager().await;
@@ -190,8 +187,6 @@ mod tests {
         let templates = discovery.list_templates().await;
         assert!(!templates.is_empty());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_agent_caching() {
         let provider_manager = create_test_provider_manager().await;

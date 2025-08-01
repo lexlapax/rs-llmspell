@@ -325,14 +325,11 @@ pub enum RegistryError {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "hook")]
 mod tests {
     use super::*;
     use crate::context::HookContext;
     use crate::result::HookResult;
     use crate::traits::FnHook;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_hook_registration() {
         let registry = HookRegistry::new();
@@ -353,8 +350,6 @@ mod tests {
             Some(&1)
         );
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_priority_ordering() {
         let registry = HookRegistry::new();
@@ -394,8 +389,6 @@ mod tests {
         let names = registry.get_hook_names(&HookPoint::BeforeAgentInit);
         assert_eq!(names, vec!["high", "normal", "low"]);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_language_filtering() {
         let registry = HookRegistry::new();
@@ -428,8 +421,6 @@ mod tests {
             registry.get_hooks_by_language(&HookPoint::BeforeAgentInit, Language::Native);
         assert_eq!(native_hooks.len(), 1);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_duplicate_registration() {
         let registry = HookRegistry::new();
@@ -444,8 +435,6 @@ mod tests {
 
         assert!(matches!(result, Err(RegistryError::DuplicateHook(_))));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_unregister() {
         let registry = HookRegistry::new();
@@ -462,8 +451,6 @@ mod tests {
         assert!(!registry.has_hook(&HookPoint::BeforeAgentInit, "test_hook"));
         assert_eq!(registry.stats().total_hooks, 0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_enable_disable() {
         let registry = HookRegistry::new();
@@ -485,8 +472,6 @@ mod tests {
         let hooks = registry.get_hooks(&HookPoint::BeforeAgentInit);
         assert_eq!(hooks.len(), 1);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_global_enable() {
         let registry = HookRegistry::new();
@@ -506,8 +491,6 @@ mod tests {
         let hooks = registry.get_hooks(&HookPoint::BeforeAgentInit);
         assert_eq!(hooks.len(), 1);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_bulk_registration() {
         let registry = HookRegistry::new();
@@ -532,8 +515,6 @@ mod tests {
         assert_eq!(registry.stats().total_hooks, 3);
         assert_eq!(registry.get_hook_points().len(), 3);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_clear_operations() {
         let registry = HookRegistry::new();

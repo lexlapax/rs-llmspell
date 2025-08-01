@@ -424,11 +424,8 @@ impl ArtifactEventBuilder {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "core")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_event_builder() {
         let component_id = ComponentId::new();
@@ -451,8 +448,6 @@ mod tests {
         assert_eq!(event.source, component_id);
         assert_eq!(event.context.get("user").unwrap(), "test-user");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_event_names() {
         let component_id = ComponentId::new();

@@ -218,12 +218,9 @@ where
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "bridge")]
 mod tests {
     use super::*;
     use tokio::runtime::Runtime;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_block_on_async_success() {
         let rt = Runtime::new().unwrap();
@@ -238,8 +235,6 @@ mod tests {
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), 42);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_block_on_async_error() {
         let rt = Runtime::new().unwrap();
@@ -260,8 +255,6 @@ mod tests {
         let err = result.unwrap_err();
         assert!(matches!(err, mlua::Error::ExternalError(_)));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_block_on_async_timeout() {
         let rt = Runtime::new().unwrap();
@@ -283,8 +276,6 @@ mod tests {
             assert!(msg.contains("timed out"));
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_block_on_async_panic_safety() {
         let rt = Runtime::new().unwrap();
@@ -307,8 +298,6 @@ mod tests {
             assert!(msg.contains("Runtime panic"));
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_block_on_async_lua_success() {
         let rt = Runtime::new().unwrap();

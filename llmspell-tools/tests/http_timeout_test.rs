@@ -3,10 +3,6 @@
 use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
 use llmspell_tools::api::http_request::{HttpRequestConfig, HttpRequestTool};
 use serde_json::json;
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_http_timeout_with_short_timeout() {
     // Create tool with very short timeout
@@ -42,10 +38,6 @@ async fn test_http_timeout_with_short_timeout() {
         );
     }
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_http_no_timeout_with_long_timeout() {
     // Create tool with long timeout

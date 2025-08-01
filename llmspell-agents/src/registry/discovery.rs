@@ -452,11 +452,8 @@ impl Default for SearchBuilder {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_search_builder() {
         let criteria = SearchBuilder::new()

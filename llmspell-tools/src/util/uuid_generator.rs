@@ -493,12 +493,9 @@ impl Tool for UuidGeneratorTool {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "tool")]
 mod tests {
     use super::*;
     use serde_json::Value;
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_generate_v4_uuid() {
         let tool = UuidGeneratorTool::default();
@@ -520,8 +517,6 @@ mod tests {
         let uuid_str = response["result"]["uuid"].as_str().unwrap();
         assert!(Uuid::parse_str(uuid_str).is_ok());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_generate_v5_uuid() {
         let tool = UuidGeneratorTool::default();
@@ -546,8 +541,6 @@ mod tests {
         let uuid = Uuid::parse_str(uuid_str).unwrap();
         assert_eq!(uuid.get_version(), Some(uuid::Version::Sha1));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_generate_component_id() {
         let tool = UuidGeneratorTool::default();
@@ -570,8 +563,6 @@ mod tests {
         let id = response["result"]["id"].as_str().unwrap();
         assert!(id.starts_with("test_"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_generate_deterministic_id() {
         let tool = UuidGeneratorTool::default();
@@ -602,8 +593,6 @@ mod tests {
 
         assert_eq!(id1, id2);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_custom_id_generation() {
         let tool = UuidGeneratorTool::default();
@@ -630,8 +619,6 @@ mod tests {
         assert!(id.ends_with("_v1"));
         assert!(id.contains("_")); // Contains timestamp separator
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_validate_uuid() {
         let tool = UuidGeneratorTool::default();
@@ -653,8 +640,6 @@ mod tests {
         let parsed: Value = serde_json::from_str(&output).unwrap();
         assert_eq!(parsed["valid"], true);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_validate_invalid_uuid() {
         let tool = UuidGeneratorTool::default();
@@ -674,8 +659,6 @@ mod tests {
         let parsed: Value = serde_json::from_str(&output).unwrap();
         assert_eq!(parsed["valid"], false);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_different_formats() {
         let tool = UuidGeneratorTool::default();
@@ -707,8 +690,6 @@ mod tests {
             }
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_metadata() {
         let tool = UuidGeneratorTool::default();

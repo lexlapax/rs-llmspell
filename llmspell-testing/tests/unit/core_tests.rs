@@ -8,24 +8,18 @@
 #[cfg(test)]
 mod core_type_tests {
     use llmspell_core::types::{AgentInput, AgentOutput};
-
-    #[cfg_attr(test_category = "integration")]
     #[test]
     // TODO: Add category: unit
     fn test_agent_input_creation() {
         let input = AgentInput::text("test input");
         assert_eq!(input.text, "test input");
     }
-
-    #[cfg_attr(test_category = "integration")]
     #[test]
     // TODO: Add category: unit
     fn test_agent_output_creation() {
         let output = AgentOutput::text("test output");
         assert_eq!(output.text, "test output");
     }
-
-    #[cfg_attr(test_category = "integration")]
     #[test]
     // TODO: Add category: unit
     fn test_agent_input_with_parameters() {

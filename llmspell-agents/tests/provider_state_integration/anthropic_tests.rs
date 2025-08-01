@@ -8,10 +8,6 @@ use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionC
 use std::time::Duration;
 use tokio::time::timeout;
 use tracing::{info, warn};
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "agent")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "requires ANTHROPIC_API_KEY"]
 async fn test_anthropic_conversation_persistence() -> Result<()> {
@@ -106,10 +102,6 @@ async fn test_anthropic_conversation_persistence() -> Result<()> {
     info!("Anthropic conversation persistence test completed successfully");
     Ok(())
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "agent")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "requires ANTHROPIC_API_KEY"]
 async fn test_anthropic_structured_thinking() -> Result<()> {
@@ -171,10 +163,6 @@ async fn test_anthropic_structured_thinking() -> Result<()> {
     info!("Anthropic structured thinking test completed");
     Ok(())
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "agent")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "requires ANTHROPIC_API_KEY"]
 async fn test_anthropic_long_context() -> Result<()> {
@@ -268,10 +256,6 @@ async fn test_anthropic_long_context() -> Result<()> {
     info!("Anthropic long context test completed successfully");
     Ok(())
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "agent")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "requires ANTHROPIC_API_KEY"]
 async fn test_anthropic_cross_session_memory() -> Result<()> {

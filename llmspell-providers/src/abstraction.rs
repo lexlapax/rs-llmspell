@@ -544,8 +544,6 @@ impl Default for ProviderManager {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_provider_capabilities_default() {
         let caps = ProviderCapabilities::default();
@@ -554,8 +552,6 @@ mod tests {
         assert!(caps.max_context_tokens.is_none());
         assert!(caps.available_models.is_empty());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_provider_config_creation() {
         let config = ProviderConfig::new("openai", "gpt-4");
@@ -564,8 +560,6 @@ mod tests {
         assert_eq!(config.timeout_secs, Some(30));
         assert_eq!(config.max_retries, Some(3));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_provider_registry() {
         let mut registry = ProviderRegistry::new();
@@ -581,8 +575,6 @@ mod tests {
 
         assert_eq!(registry.available_providers(), vec!["mock"]);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_provider_manager_initialization() {
         let manager = ProviderManager::new();
@@ -601,8 +593,6 @@ mod tests {
         let types = manager.available_provider_types().await;
         assert!(types.contains(&"mock".to_string()));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_create_agent_from_spec_no_provider() {
         use crate::ModelSpecifier;
@@ -618,8 +608,6 @@ mod tests {
             assert!(message.contains("No provider specified"));
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_create_agent_from_spec_unknown_provider() {
         use crate::ModelSpecifier;
@@ -635,8 +623,6 @@ mod tests {
             assert!(message.contains("Unknown provider"));
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_model_specifier_base_url_precedence() {
         use crate::ModelSpecifier;
@@ -667,8 +653,6 @@ mod tests {
         // Should fail at validation (expected for our mock)
         assert!(result.is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_model_specifier_provider_extraction() {
         use crate::ModelSpecifier;

@@ -2,7 +2,6 @@
 // ABOUTME: Validates point-in-time recovery, incremental chains, and error handling
 
 #[cfg(test)]
-#[cfg_attr(test_category = "state")]
 mod tests {
     use crate::{
         backup::{BackupManager, RestoreOptions},
@@ -42,8 +41,6 @@ mod tests {
 
         (state_manager, backup_manager, temp_dir)
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_basic_backup_and_restore() {
         let (state_manager, backup_manager, _temp_dir) = create_test_infrastructure().await;
@@ -92,8 +89,6 @@ mod tests {
             .unwrap();
         assert_eq!(restored2, Some(json!({"value": "data2"})));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_incremental_backup_chain() {
         let (state_manager, backup_manager, _temp_dir) = create_test_infrastructure().await;
@@ -166,8 +161,6 @@ mod tests {
             .unwrap();
         assert_eq!(inc2, Some(json!({"version": 3})));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_restore_with_validation() {
         let (state_manager, backup_manager, _temp_dir) = create_test_infrastructure().await;
@@ -203,8 +196,6 @@ mod tests {
             .await
             .unwrap();
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_dry_run_restore() {
         let (state_manager, backup_manager, _temp_dir) = create_test_infrastructure().await;
@@ -244,8 +235,6 @@ mod tests {
             .unwrap();
         assert_eq!(value, Some(json!({"modified": true})));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_backup_before_restore() {
         let (state_manager, backup_manager, _temp_dir) = create_test_infrastructure().await;
@@ -301,8 +290,6 @@ mod tests {
         let backups_after = backup_manager.list_backups().await.unwrap();
         assert_eq!(backups_after.len(), count_before + 1);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_restore_nonexistent_backup() {
         let (_state_manager, backup_manager, _temp_dir) = create_test_infrastructure().await;
@@ -315,8 +302,6 @@ mod tests {
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("Backup not found"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_concurrent_backup_operations() {
         let (state_manager, backup_manager, _temp_dir) = create_test_infrastructure().await;

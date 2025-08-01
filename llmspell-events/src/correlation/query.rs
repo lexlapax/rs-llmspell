@@ -571,7 +571,6 @@ impl Default for TimelineQueryBuilder {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "event")]
 mod tests {
     use super::*;
     use crate::correlation::EventCorrelationTracker;
@@ -583,8 +582,6 @@ mod tests {
         event.metadata.correlation_id = correlation_id;
         event
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_time_range() {
         let start = Utc::now() - chrono::Duration::hours(1);
@@ -600,8 +597,6 @@ mod tests {
         let future = Utc::now() + chrono::Duration::hours(1);
         assert!(!range.contains(future));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_query_builder() {
         let correlation_id = Uuid::new_v4();
@@ -620,8 +615,6 @@ mod tests {
         assert!(query.root_causes_only);
         assert_eq!(query.limit, Some(100));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_query_execution() {
         let tracker = EventCorrelationTracker::default();
@@ -653,8 +646,6 @@ mod tests {
         let result = executor.query_by_time_range(start, end);
         assert_eq!(result.entries.len(), 3); // All events should be in range
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_query_result_sorting() {
         let query = TimelineQuery::default();

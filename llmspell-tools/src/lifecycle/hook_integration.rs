@@ -644,7 +644,6 @@ impl<T: Tool> HookableToolExecution for T {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "tool")]
 mod tests {
     use super::*;
     use llmspell_core::traits::base_agent::BaseAgent;
@@ -711,8 +710,6 @@ mod tests {
                 .with_returns(ParameterType::String)
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_executor_creation() {
         let config = ToolLifecycleConfig::default();
@@ -721,8 +718,6 @@ mod tests {
         // Just verify it was created successfully
         assert!(!executor.component_id.name.is_empty());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_execution_without_hooks() {
         let config = ToolLifecycleConfig {
@@ -743,8 +738,6 @@ mod tests {
         let output = result.unwrap();
         assert!(output.text.contains("Processed: test input"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_hook_context_creation() {
         let component_id = ComponentId::new(ComponentType::Tool, "test_tool".to_string());
@@ -762,8 +755,6 @@ mod tests {
         assert_eq!(context.security_level, SecurityLevel::Safe);
         assert_eq!(context.get_hook_point(), HookPoint::BeforeToolExecution);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_hook_point_mapping() {
         let component_id = ComponentId::new(ComponentType::Tool, "test_tool".to_string());
@@ -814,8 +805,6 @@ mod tests {
             assert_eq!(context.get_hook_point(), expected_point);
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_resource_metrics_integration() {
         use llmspell_utils::resource_limits::{ResourceLimits, ResourceTracker};
@@ -856,8 +845,6 @@ mod tests {
                 >= 1
         );
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_execution_metrics_structure() {
         let metrics = ExecutionMetrics::default();
@@ -868,8 +855,6 @@ mod tests {
         assert_eq!(metrics.average_memory_usage, 0);
         assert_eq!(metrics.average_cpu_time, 0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_executor_with_resource_tracking() {
         let config = ToolLifecycleConfig::default();
@@ -890,8 +875,6 @@ mod tests {
         let metrics = executor.get_execution_metrics();
         assert_eq!(metrics.total_executions, 0); // TODO: This will be tracked in future
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_security_validation_pass() {
         let config = ToolLifecycleConfig {
@@ -912,8 +895,6 @@ mod tests {
             "Safe tool should pass Privileged security validation"
         );
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_security_validation_fail() {
         // Create a restricted security config
@@ -1004,8 +985,6 @@ mod tests {
             assert!(e.to_string().contains("security level"));
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_audit_logging_enabled() {
         let config = ToolLifecycleConfig {
@@ -1028,8 +1007,6 @@ mod tests {
         // We can't easily test the audit log output in a unit test,
         // but we can verify the execution completed without errors
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_audit_logging_disabled() {
         let config = ToolLifecycleConfig {
@@ -1048,8 +1025,6 @@ mod tests {
             .await;
         assert!(result.is_ok());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_security_validation_disabled() {
         let config = ToolLifecycleConfig {

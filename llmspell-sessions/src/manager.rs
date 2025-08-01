@@ -1615,7 +1615,6 @@ impl SessionManager {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "session")]
 mod tests {
     use super::*;
     use crate::SessionStatus;
@@ -1639,8 +1638,6 @@ mod tests {
         )
         .unwrap()
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_create_session() {
         let manager = create_test_manager().await;
@@ -1653,8 +1650,6 @@ mod tests {
         let session_id = manager.create_session(options).await.unwrap();
         assert!(manager.get_session(&session_id).await.is_ok());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_session_lifecycle() {
         let manager = create_test_manager().await;
@@ -1679,8 +1674,6 @@ mod tests {
         manager.complete_session(&session_id).await.unwrap();
         assert!(manager.get_session(&session_id).await.is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_save_load_session() {
         let manager = create_test_manager().await;
@@ -1700,8 +1693,6 @@ mod tests {
         let loaded = manager.load_session(&session_id).await.unwrap();
         assert_eq!(loaded.id().await, session_id);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_list_sessions() {
         let manager = create_test_manager().await;
@@ -1729,8 +1720,6 @@ mod tests {
         let sessions = manager.list_sessions(query).await.unwrap();
         assert_eq!(sessions.len(), 3);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_user_artifact_storage() {
         let manager = create_test_manager().await;
@@ -1778,8 +1767,6 @@ mod tests {
         let result = manager.get_artifact(&session_id, &artifact_id).await;
         assert!(result.is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_artifact_with_metadata() {
         let manager = create_test_manager().await;
@@ -1826,8 +1813,6 @@ mod tests {
             &serde_json::json!("1.0.0")
         );
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_store_file_artifact() {
         let manager = create_test_manager().await;
@@ -1858,8 +1843,6 @@ mod tests {
         assert_eq!(artifact.metadata.name, "test_file.json");
         assert_eq!(artifact.get_content().unwrap(), content.as_bytes());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_artifact_operations_on_inactive_session() {
         let manager = create_test_manager().await;
@@ -1901,8 +1884,6 @@ mod tests {
         let result = manager.delete_artifact(&session_id, &artifact_id).await;
         assert!(result.is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_query_artifacts() {
         let manager = create_test_manager().await;

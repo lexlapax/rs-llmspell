@@ -284,8 +284,6 @@ pub fn create_rig_provider(
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_rig_provider_capabilities() {
         let config = ProviderConfig::new("openai", "gpt-4");
@@ -298,8 +296,6 @@ mod tests {
             _ => panic!("Expected configuration error"),
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_unsupported_provider() {
         let config = ProviderConfig::new("unsupported", "model");
@@ -311,8 +307,6 @@ mod tests {
             _ => panic!("Expected configuration error"),
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_provider_capabilities_settings() {
         let mut config = ProviderConfig::new("openai", "gpt-4");
@@ -328,8 +322,6 @@ mod tests {
             assert_eq!(caps.available_models, vec!["gpt-4"]);
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_anthropic_capabilities() {
         let mut config = ProviderConfig::new("anthropic", "claude-3-opus");
@@ -341,8 +333,6 @@ mod tests {
             assert_eq!(caps.max_context_tokens, Some(200000)); // Claude 3 Opus context size
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_cohere_capabilities() {
         let mut config = ProviderConfig::new("cohere", "command");

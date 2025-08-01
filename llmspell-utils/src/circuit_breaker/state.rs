@@ -66,27 +66,20 @@ impl StateTransition {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_state_allows_requests() {
         assert!(CircuitState::Closed.allows_requests());
         assert!(!CircuitState::Open.allows_requests());
         assert!(CircuitState::HalfOpen.allows_requests());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_state_is_protecting() {
         assert!(!CircuitState::Closed.is_protecting());
         assert!(CircuitState::Open.is_protecting());
         assert!(!CircuitState::HalfOpen.is_protecting());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_state_display() {
         assert_eq!(CircuitState::Closed.to_string(), "Closed");

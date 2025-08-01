@@ -540,7 +540,6 @@ impl Tool for AgentWrappedTool {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
     use llmspell_core::ComponentMetadata;
@@ -591,8 +590,6 @@ mod tests {
             Ok(AgentOutput::text(format!("Error handled: {}", error)))
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_agent_wrapped_tool_creation() {
         let agent = Arc::new(MockAgent::new("test-agent", "A test agent"));
@@ -602,8 +599,6 @@ mod tests {
         assert_eq!(wrapped.security_level(), SecurityLevel::Safe);
         assert_eq!(wrapped.agent().metadata().name, "test-agent");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_schema_generation() {
         let agent = Arc::new(MockAgent::new("test-agent", "A test agent"));
@@ -614,8 +609,6 @@ mod tests {
         assert!(schema.description.contains("test agent"));
         assert!(!schema.parameters.is_empty());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_parameter_bundling() {
         let agent = Arc::new(MockAgent::new("test-agent", "A test agent"));
@@ -635,8 +628,6 @@ mod tests {
         assert!(result.text.contains("MockAgent executed"));
         assert!(result.text.contains("with params"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_parameter_transforms() {
         let agent = Arc::new(MockAgent::new("test-agent", "A test agent"));
@@ -665,8 +656,6 @@ mod tests {
 
         assert!(result.text.contains("MockAgent executed"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_custom_metadata() {
         let agent = Arc::new(MockAgent::new("test-agent", "A test agent"));
@@ -689,8 +678,6 @@ mod tests {
         assert_eq!(schema.name, "custom-tool-name");
         assert_eq!(schema.description, "Custom tool description");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_parameter_transform_types() {
         let agent = Arc::new(MockAgent::new("test-agent", "A test agent"));

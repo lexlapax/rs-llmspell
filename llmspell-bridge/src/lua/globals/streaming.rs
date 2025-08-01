@@ -234,7 +234,6 @@ pub fn create_lua_stream_bridge(lua: &Lua, receiver: mpsc::Receiver<String>) -> 
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "bridge")]
 mod tests {
     use super::*;
 

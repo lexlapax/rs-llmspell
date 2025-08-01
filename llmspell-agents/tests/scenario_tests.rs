@@ -8,9 +8,6 @@ use mocks::MockAgentBuilder;
 use scenarios::{ScenarioRunner, TestScenarios};
 
 /// Test echo scenario
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "agent")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_echo_scenario() {
     let scenario = TestScenarios::echo_scenario();
@@ -37,9 +34,6 @@ async fn test_echo_scenario() {
 }
 
 /// Test tool invocation scenario
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "agent")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_tool_scenario() {
     use llmspell_core::types::ToolCall;
@@ -82,9 +76,6 @@ async fn test_tool_scenario() {
 }
 
 /// Test error handling scenario
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "agent")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_error_scenario() {
     let scenario = TestScenarios::error_scenario();
@@ -110,9 +101,6 @@ async fn test_error_scenario() {
 }
 
 /// Test performance scenario
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "agent")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_performance_scenario() {
     let scenario = TestScenarios::performance_scenario();
@@ -141,9 +129,6 @@ async fn test_performance_scenario() {
 }
 
 /// Test state transition scenario
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "agent")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_state_transition_scenario() {
     use llmspell_agents::AgentState;
@@ -176,9 +161,6 @@ async fn test_state_transition_scenario() {
 }
 
 /// Test scenario with test harness integration
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "agent")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_scenario_with_harness() {
     let config = TestConfig {
@@ -236,9 +218,6 @@ async fn test_scenario_with_harness() {
 }
 
 /// Test custom scenario creation
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "agent")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_custom_scenario() {
     use llmspell_core::types::AgentInput;

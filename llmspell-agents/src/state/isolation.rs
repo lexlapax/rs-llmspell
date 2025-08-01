@@ -548,14 +548,11 @@ impl IsolatedStateAccessor {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
 
     // Mock state manager for testing
     struct MockStateManager;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_strict_isolation() {
         let state_manager = Arc::new(MockStateManager);
@@ -587,8 +584,6 @@ mod tests {
             .check_access("agent1", &StateScope::Global, StateOperation::Read)
             .unwrap());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_shared_scope_access() {
         let state_manager = Arc::new(MockStateManager);
@@ -643,8 +638,6 @@ mod tests {
             .check_access("agent3", &shared_scope, StateOperation::Read)
             .unwrap());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_audit_logging() {
         let state_manager = Arc::new(MockStateManager);
@@ -669,8 +662,6 @@ mod tests {
         assert!(!audit_log[0].allowed); // First access denied
         assert!(audit_log[1].allowed); // Second access allowed
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_permission_grant_revoke() {
         let state_manager = Arc::new(MockStateManager);

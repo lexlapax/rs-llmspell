@@ -455,7 +455,6 @@ macro_rules! impl_tool_state_persistence {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "tool")]
 mod tests {
     use super::*;
     use llmspell_core::types::{AgentInput, AgentOutput};
@@ -584,8 +583,6 @@ mod tests {
             .unwrap(),
         )
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_state_creation() {
         let metadata = ComponentMetadata::new("test-tool".to_string(), "Test tool".to_string());
@@ -596,8 +593,6 @@ mod tests {
         assert_eq!(tool_state.execution_stats.total_executions, 0);
         assert!(tool_state.result_cache.is_empty());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_state_persistence() {
         let state_manager = create_test_state_manager().await;
@@ -618,8 +613,6 @@ mod tests {
         let loaded = tool.load_state().await.unwrap();
         assert!(loaded);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_state_registry() {
         let state_manager = create_test_state_manager().await;

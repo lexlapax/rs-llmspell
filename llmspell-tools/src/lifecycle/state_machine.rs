@@ -286,11 +286,8 @@ impl ExecutionStats {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "tool")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_state_machine_creation() {
         let state_machine = ToolStateMachine::new("test_tool".to_string());
@@ -304,8 +301,6 @@ mod tests {
                 .await
         );
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_valid_state_transitions() {
         let state_machine = ToolStateMachine::new("test_tool".to_string());
@@ -341,8 +336,6 @@ mod tests {
             ToolExecutionState::Terminated
         );
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_failure_flow() {
         let state_machine = ToolStateMachine::new("test_tool".to_string());
@@ -358,8 +351,6 @@ mod tests {
         assert!(state_machine.start_cleanup().await.is_ok());
         assert!(state_machine.terminate().await.is_ok());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_invalid_transitions() {
         let state_machine = ToolStateMachine::new("test_tool".to_string());
@@ -373,8 +364,6 @@ mod tests {
         let result = state_machine.complete_execution().await;
         assert!(result.is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_execution_stats() {
         let state_machine = ToolStateMachine::new("test_tool".to_string());
@@ -394,8 +383,6 @@ mod tests {
         assert!(stats.is_healthy);
         assert!(!stats.is_terminal); // Completed is not terminal until cleanup
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_transition_history() {
         let state_machine = ToolStateMachine::new("test_tool".to_string());
@@ -419,8 +406,6 @@ mod tests {
         assert_eq!(history[3].from, ToolExecutionState::Executing);
         assert_eq!(history[3].to, ToolExecutionState::Completed);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_state_checks() {
         let state_machine = ToolStateMachine::new("test_tool".to_string());

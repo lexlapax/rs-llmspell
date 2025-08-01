@@ -26,9 +26,7 @@ pub fn inject_workflow_global(_ctx: &(), _context: &GlobalContext) -> Result<(),
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "bridge")]
 mod tests {
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_workflow_global_stub() {
         // Basic compilation test - just verify function exists

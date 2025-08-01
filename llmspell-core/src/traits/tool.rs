@@ -571,22 +571,17 @@ pub trait Tool: BaseAgent {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "core")]
 mod tests {
     use super::*;
     use crate::types::{AgentInput, AgentOutput};
     use crate::ComponentMetadata;
     use crate::ExecutionContext;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_tool_category_display() {
         assert_eq!(ToolCategory::Filesystem.to_string(), "filesystem");
         assert_eq!(ToolCategory::Web.to_string(), "web");
         assert_eq!(ToolCategory::Custom("ai".to_string()).to_string(), "ai");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_security_level_ordering() {
         assert!(SecurityLevel::Safe < SecurityLevel::Restricted);
@@ -594,8 +589,6 @@ mod tests {
         assert!(SecurityLevel::Privileged.allows(&SecurityLevel::Safe));
         assert!(!SecurityLevel::Safe.allows(&SecurityLevel::Privileged));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_parameter_def_creation() {
         let param = ParameterDef {
@@ -610,8 +603,6 @@ mod tests {
         assert!(param.required);
         assert_eq!(param.param_type, ParameterType::String);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_tool_schema_builder() {
         let schema = ToolSchema::new("test_tool".to_string(), "A test tool".to_string())
@@ -636,8 +627,6 @@ mod tests {
         assert_eq!(schema.returns, Some(ParameterType::String));
         assert_eq!(schema.required_parameters(), vec!["text"]);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_tool_schema_json_conversion() {
         let schema =
@@ -764,8 +753,6 @@ mod tests {
             self.schema.clone()
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_parameter_validation() {
         let tool = MockTool::new();
@@ -806,8 +793,6 @@ mod tests {
             .to_string()
             .contains("must be an object"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_execution() {
         let tool = MockTool::new();
@@ -838,8 +823,6 @@ mod tests {
         let result = tool.execute(input, context).await.unwrap();
         assert_eq!(result.text, "HELLO WORLD");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_tool_metadata() {
         let tool = MockTool::new();

@@ -638,7 +638,6 @@ pub enum CascadeDirection {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
     use llmspell_core::{
@@ -730,8 +729,6 @@ mod tests {
             Ok(AgentOutput::text("Mock tool invocation"))
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_lifecycle_state_transitions() {
         let manager = CompositeLifecycleManager::new(LifecycleConfig::default());
@@ -765,8 +762,6 @@ mod tests {
         manager.shutdown().await.unwrap();
         assert_eq!(manager.state().await, LifecycleState::Terminated);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_invalid_state_transitions() {
         let manager = CompositeLifecycleManager::new(LifecycleConfig::default());
@@ -777,8 +772,6 @@ mod tests {
         // Try to resume when not paused
         assert!(manager.resume().await.is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_health_check() {
         let manager = CompositeLifecycleManager::new(LifecycleConfig::default());

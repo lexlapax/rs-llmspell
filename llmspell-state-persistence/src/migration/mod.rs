@@ -183,11 +183,8 @@ impl MigrationContext {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "state")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_migration_result_lifecycle() {
         let from_version = SemanticVersion::new(1, 0, 0);
@@ -210,8 +207,6 @@ mod tests {
         assert_eq!(result.items_migrated, 50);
         assert_eq!(result.steps_completed, 3);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_migration_context() {
         let config = MigrationConfig::default();
@@ -222,8 +217,6 @@ mod tests {
         assert_eq!(context.current_step, 0);
         assert_eq!(context.total_steps, 5);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_migration_config_defaults() {
         let config = MigrationConfig::default();

@@ -471,13 +471,10 @@ impl MetricHook for DebuggingHook {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "hook")]
 mod tests {
     use super::*;
     use crate::types::{ComponentId, ComponentType, HookPoint};
     use serde_json::json;
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_debugging_hook_basic() {
         let hook = DebuggingHook::new();
@@ -497,8 +494,6 @@ mod tests {
         assert_eq!(traces.len(), 1);
         assert_eq!(traces[0].hook_point, HookPoint::SystemStartup);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_debugging_hook_with_context_data() {
         let hook = DebuggingHook::new();
@@ -520,8 +515,6 @@ mod tests {
         assert!(trace.context_data.is_object());
         assert!(trace.metadata.contains_key("test_meta"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_debugging_config() {
         let config = DebuggingConfig {
@@ -536,8 +529,6 @@ mod tests {
         assert!(!hook.storage.config.capture_stack_traces);
         assert!(!hook.storage.config.include_context_data);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_trace_storage_filtering() {
         let storage = TraceStorage::new(DebuggingConfig::default());
@@ -582,8 +573,6 @@ mod tests {
         assert_eq!(test2_traces.len(), 1);
         assert_eq!(test2_traces[0].hook_point, HookPoint::BeforeAgentInit);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_trace_statistics() {
         let storage = TraceStorage::new(DebuggingConfig::default());
@@ -620,8 +609,6 @@ mod tests {
         assert!(stats.contains_key("by_component_type"));
         assert!(stats.contains_key("duration_stats"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_metric_hook_trait() {
         let hook = DebuggingHook::new();
@@ -640,8 +627,6 @@ mod tests {
         let traces = hook.get_traces();
         assert!(traces.len() >= 2); // At least pre and post execution traces
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_max_traces_limit() {
         let config = DebuggingConfig {
@@ -675,8 +660,6 @@ mod tests {
         assert_eq!(traces[1].component_name, "test3");
         assert_eq!(traces[2].component_name, "test4");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_hook_metadata() {
         let hook = DebuggingHook::new();

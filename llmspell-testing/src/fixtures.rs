@@ -35,7 +35,6 @@ use llmspell_core::{
 };
 
 #[cfg(test)]
-#[cfg_attr(test_category = "testing")]
 use llmspell_core::traits::agent::MessageRole;
 use serde_json::json;
 use std::path::{Path, PathBuf};
@@ -383,11 +382,8 @@ pub fn list_fixture_files(subdir: impl AsRef<Path>) -> Result<Vec<PathBuf>, std:
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "testing")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_sample_fixtures() {
         // Test metadata fixture
@@ -410,8 +406,6 @@ mod tests {
         assert_eq!(steps.len(), 3);
         assert_eq!(steps[1].dependencies.len(), 1);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_fixture_variants() {
         let metadata_variants = component_metadata_variants();
@@ -423,8 +417,6 @@ mod tests {
         let errors = error_scenarios();
         assert!(errors.len() >= 4);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_fixtures_dir() {
         let dir = fixtures_dir();
@@ -457,16 +449,12 @@ mod tests {
             data_dir
         );
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_fixture_path() {
         let path = fixture_path("test.txt");
         assert!(path.ends_with("test.txt"));
         assert!(path.to_string_lossy().contains("fixtures"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_load_fixture_json() {
         // Test with existing migration test data
@@ -476,8 +464,6 @@ mod tests {
             assert!(json.is_object());
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_temp_fixtures() {
         // Create a temp fixture
@@ -499,8 +485,6 @@ mod tests {
             assert!(!path.exists());
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_list_fixture_files() {
         let lua_files = list_fixture_files("lua");

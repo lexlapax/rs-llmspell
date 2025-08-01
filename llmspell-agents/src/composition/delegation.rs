@@ -506,18 +506,13 @@ impl DelegatingAgentBuilder {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_delegating_agent_creation() {
         let agent = DelegatingAgent::new("test-delegator", DelegationConfig::default());
         assert_eq!(agent.metadata().name, "test-delegator");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_agent_registration() {
         let delegator = DelegatingAgent::new("delegator", DelegationConfig::default());
@@ -562,8 +557,6 @@ mod tests {
         let agents = delegator.agents.read().await;
         assert_eq!(agents.len(), 1);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_delegation_strategy() {
         let strategies = vec![
@@ -586,8 +579,6 @@ mod tests {
             }
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_delegation_request() {
         let request = DelegationRequest {

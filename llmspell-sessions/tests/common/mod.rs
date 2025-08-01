@@ -186,15 +186,11 @@ impl Timer {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_fixture_creation() {
         let fixture = TestFixture::new().await.expect("Failed to create fixture");
         assert!(fixture.session_manager.list_sessions().await.unwrap().is_empty());
     }
-
-    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_create_test_sessions() {
         let fixture = TestFixture::new().await.expect("Failed to create fixture");
@@ -207,8 +203,6 @@ mod tests {
         let listed = fixture.session_manager.list_sessions().await.unwrap();
         assert_eq!(listed.len(), 3);
     }
-
-    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_timer() {
         let timer = Timer::start();

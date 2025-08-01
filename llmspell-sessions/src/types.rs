@@ -359,11 +359,8 @@ impl Default for SessionSortBy {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "session")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_session_id() {
         let id1 = SessionId::new();
@@ -378,8 +375,6 @@ mod tests {
         let parsed_id = SessionId::from_str(&id_str).unwrap();
         assert_eq!(id1, parsed_id);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_session_status() {
         assert!(SessionStatus::Active.is_active());
@@ -389,8 +384,6 @@ mod tests {
         assert!(SessionStatus::Completed.is_terminal());
         assert!(!SessionStatus::Active.is_terminal());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_session_metadata() {
         let id = SessionId::new();
@@ -414,8 +407,6 @@ mod tests {
         metadata.add_tag("test"); // Duplicate
         assert_eq!(metadata.tags.len(), 1);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_resource_limits_default() {
         let limits = ResourceLimits::default();
@@ -424,8 +415,6 @@ mod tests {
         assert!(limits.max_operations.is_some());
         assert!(limits.max_storage_bytes.is_some());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_session_config_default() {
         let config = SessionConfig::default();

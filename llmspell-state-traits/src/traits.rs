@@ -620,8 +620,6 @@ mod tests {
     impl StatePersistence for MockStateManager {}
 
     impl TypedStatePersistence for MockStateManager {}
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_state_manager_basic() {
         let manager = MockStateManager::new();
@@ -645,8 +643,6 @@ mod tests {
         assert!(manager.delete(StateScope::Global, "test").await.unwrap());
         assert!(!manager.exists(StateScope::Global, "test").await.unwrap());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_state_persistence_typed() {
         let manager = MockStateManager::new();
@@ -672,8 +668,6 @@ mod tests {
                 .unwrap();
         assert_eq!(retrieved, Some(data));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_batch_operations() {
         let manager = MockStateManager::new();
@@ -695,8 +689,6 @@ mod tests {
         assert_eq!(result.get("key2"), Some(&json!("value2")));
         assert_eq!(result.get("key3"), Some(&json!("value3")));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_scope_operations() {
         let manager = MockStateManager::new();
@@ -759,8 +751,6 @@ mod tests {
             .await
             .unwrap());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_transaction_id() {
         let id1 = TransactionId::new();

@@ -296,10 +296,6 @@ async fn test_sync_timeout_behavior() {
         result.err()
     );
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "bridge")]
-#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_sync_utils_panic_safety() {
     // This test is already covered in sync_utils module tests

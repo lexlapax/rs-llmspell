@@ -380,7 +380,6 @@ impl From<String> for SubscribeError {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "event")]
 mod tests {
     use super::*;
     use crate::universal_event::{Language, UniversalEvent};
@@ -389,8 +388,6 @@ mod tests {
     fn create_test_event(event_type: &str) -> UniversalEvent {
         UniversalEvent::new(event_type, Value::Null, Language::Rust)
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_basic_pub_sub() {
         let bus = EventBus::new();
@@ -402,8 +399,6 @@ mod tests {
         let received = receiver.recv().await.unwrap();
         assert_eq!(received.event_type, "test.event");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_pattern_matching() {
         let bus = EventBus::new();
@@ -426,8 +421,6 @@ mod tests {
         let received = agent_receiver.recv().await.unwrap();
         assert_eq!(received.event_type, "agent.created");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_broadcast_all() {
         let bus = EventBus::new();
@@ -439,8 +432,6 @@ mod tests {
         let received = broadcast_receiver.recv().await.unwrap();
         assert_eq!(received.event_type, "any.event");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_multiple_subscribers() {
         let bus = EventBus::new();
@@ -457,8 +448,6 @@ mod tests {
         assert_eq!(received1.event_type, "multi.test");
         assert_eq!(received2.event_type, "multi.test");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_statistics() {
         let bus = EventBus::new();
@@ -469,8 +458,6 @@ mod tests {
         let stats = bus.get_stats();
         assert!(stats.events_processed > 0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_builder() {
         let bus = EventBusBuilder::new().with_broadcast_capacity(5000).build();

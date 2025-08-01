@@ -466,12 +466,9 @@ macro_rules! progress {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
     use tokio::sync::Mutex;
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_progress_reporter() {
         let (reporter, mut receiver) = ProgressReporter::new("Test Operation", Some(100));
@@ -500,8 +497,6 @@ mod tests {
             _ => panic!("Expected Update event"),
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_progress_increment() {
         let (reporter, mut receiver) = ProgressReporter::new("Increment Test", Some(10));
@@ -516,8 +511,6 @@ mod tests {
         // Check final value
         assert_eq!(reporter.current().await, 5);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_progress_tracker() {
         let tracker = ProgressTracker::new();
@@ -549,8 +542,6 @@ mod tests {
         let events = events.lock().await;
         assert!(events.len() >= 2); // Started + Update
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_progress_completion() {
         let (reporter, mut receiver) = ProgressReporter::new("Complete Test", None);
@@ -571,8 +562,6 @@ mod tests {
             _ => panic!("Expected Completed event"),
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_progress_builder() {
         let reporter = ProgressBuilder::new("Built Operation")

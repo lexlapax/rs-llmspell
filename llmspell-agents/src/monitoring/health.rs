@@ -455,11 +455,8 @@ impl HealthCheck for AgentHealthCheck {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_health_status_score() {
         assert_eq!(HealthStatus::Healthy.score(), 100);
@@ -467,8 +464,6 @@ mod tests {
         assert_eq!(HealthStatus::Unhealthy.score(), 0);
         assert_eq!(HealthStatus::Unknown.score(), 25);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_health_indicator_builders() {
         let healthy = HealthIndicator::healthy("test".to_string());
@@ -484,8 +479,6 @@ mod tests {
         assert_eq!(degraded.status, HealthStatus::Degraded);
         assert_eq!(degraded.details.get("count"), Some(&serde_json::json!(42)));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_component_health_status_calculation() {
         let indicators = vec![
@@ -515,8 +508,6 @@ mod tests {
             HealthStatus::Unhealthy
         );
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_health_check_result() {
         let mut components = HashMap::new();
@@ -551,8 +542,6 @@ mod tests {
         assert_eq!(result.total_duration, Duration::from_millis(30));
         assert!(result.summary().contains("1/2 components healthy"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_agent_health_check() {
         let metadata = ComponentMetadata::new("test-agent".to_string(), "Test Agent".to_string());

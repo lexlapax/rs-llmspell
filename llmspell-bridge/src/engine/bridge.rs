@@ -130,11 +130,8 @@ pub struct SecurityContext {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "bridge")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_engine_features_default() {
         let features = EngineFeatures::default();
@@ -143,8 +140,6 @@ mod tests {
         assert!(!features.multimodal);
         assert!(features.max_script_size.is_none());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_security_context_default() {
         let security = SecurityContext::default();

@@ -50,11 +50,8 @@ impl Default for JsonGlobal {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "bridge")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_json_global_metadata() {
         let global = JsonGlobal::new();

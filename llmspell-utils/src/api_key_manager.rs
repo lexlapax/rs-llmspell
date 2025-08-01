@@ -409,11 +409,8 @@ impl ApiKeyManager {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_api_key_manager_basic() {
         let manager = ApiKeyManager::new();
@@ -441,8 +438,6 @@ mod tests {
         let audit_log = manager.get_audit_log(None);
         assert_eq!(audit_log.len(), 2); // Create + Read
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_key_rotation() {
         let manager = ApiKeyManager::new();
@@ -473,8 +468,6 @@ mod tests {
             .iter()
             .any(|entry| matches!(entry.action, ApiKeyAction::Rotate)));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_load_from_env() {
         // Set test environment variable

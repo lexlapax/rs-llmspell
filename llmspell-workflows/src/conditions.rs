@@ -710,12 +710,9 @@ impl ConditionEvaluator {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "workflow")]
 mod tests {
     use super::*;
     use std::time::Duration;
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_always_condition() {
         let evaluator = ConditionEvaluator::new(Duration::from_secs(1));
@@ -726,8 +723,6 @@ mod tests {
         assert!(result.is_true);
         assert!(result.is_success());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_never_condition() {
         let evaluator = ConditionEvaluator::new(Duration::from_secs(1));
@@ -738,8 +733,6 @@ mod tests {
         assert!(!result.is_true);
         assert!(result.is_success());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_shared_data_equals_condition() {
         let evaluator = ConditionEvaluator::new(Duration::from_secs(1));
@@ -763,8 +756,6 @@ mod tests {
         let result = evaluator.evaluate(&condition, &context).await.unwrap();
         assert!(!result.is_true);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_and_condition() {
         let evaluator = ConditionEvaluator::new(Duration::from_secs(1));
@@ -780,8 +771,6 @@ mod tests {
         let result = evaluator.evaluate(&condition, &context).await.unwrap();
         assert!(!result.is_true);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_or_condition() {
         let evaluator = ConditionEvaluator::new(Duration::from_secs(1));
@@ -797,8 +786,6 @@ mod tests {
         let result = evaluator.evaluate(&condition, &context).await.unwrap();
         assert!(!result.is_true);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_not_condition() {
         let evaluator = ConditionEvaluator::new(Duration::from_secs(1));
@@ -814,8 +801,6 @@ mod tests {
         let result = evaluator.evaluate(&condition, &context).await.unwrap();
         assert!(result.is_true);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_custom_condition_simple() {
         let evaluator = ConditionEvaluator::new(Duration::from_secs(1));

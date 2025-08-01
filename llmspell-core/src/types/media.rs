@@ -500,11 +500,8 @@ impl TryFrom<&str> for VideoFormat {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "core")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_media_content_text() {
         let content = MediaContent::Text("Hello, world!".to_string());
@@ -513,8 +510,6 @@ mod tests {
         assert!(content.validate_size().is_ok());
         assert_eq!(format!("{}", content), "Text(13 chars)");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_media_content_image() {
         let content = MediaContent::Image {
@@ -534,8 +529,6 @@ mod tests {
         assert!(content.validate_size().is_ok());
         assert_eq!(format!("{}", content), "Image(Jpeg, 1920x1080)");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_media_content_audio() {
         let content = MediaContent::Audio {
@@ -554,8 +547,6 @@ mod tests {
         assert!(content.validate_size().is_ok());
         assert_eq!(format!("{}", content), "Audio(Mp3, 180000ms)");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_media_content_video() {
         let content = MediaContent::Video {
@@ -575,8 +566,6 @@ mod tests {
         assert!(content.validate_size().is_ok());
         assert_eq!(format!("{}", content), "Video(Mp4, 1920x1080, 60000ms)");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_media_content_binary() {
         let content = MediaContent::Binary {
@@ -593,8 +582,6 @@ mod tests {
             "Binary(512 bytes, application/pdf, document.pdf)"
         );
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_size_validation() {
         // Test oversized image
@@ -612,8 +599,6 @@ mod tests {
 
         assert!(oversized_image.validate_size().is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_image_format_conversions() {
         assert_eq!(ImageFormat::try_from("png").unwrap(), ImageFormat::Png);
@@ -624,8 +609,6 @@ mod tests {
         assert_eq!(ImageFormat::Png.mime_type(), "image/png");
         assert_eq!(ImageFormat::Jpeg.extensions(), &["jpg", "jpeg"]);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_audio_format_conversions() {
         assert_eq!(AudioFormat::try_from("mp3").unwrap(), AudioFormat::Mp3);
@@ -635,8 +618,6 @@ mod tests {
         assert_eq!(AudioFormat::Mp3.mime_type(), "audio/mpeg");
         assert_eq!(AudioFormat::Ogg.extensions(), &["ogg", "oga"]);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_video_format_conversions() {
         assert_eq!(VideoFormat::try_from("mp4").unwrap(), VideoFormat::Mp4);
@@ -646,8 +627,6 @@ mod tests {
         assert_eq!(VideoFormat::Mp4.mime_type(), "video/mp4");
         assert_eq!(VideoFormat::Mkv.extensions(), &["mkv"]);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_display_implementations() {
         assert_eq!(format!("{}", ImageFormat::Png), "PNG");
@@ -656,8 +635,6 @@ mod tests {
         assert_eq!(format!("{}", ColorSpace::RGB), "RGB");
         assert_eq!(format!("{}", MediaType::Image), "Image");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_serialization() {
         let metadata = ImageMetadata {
@@ -673,8 +650,6 @@ mod tests {
 
         assert_eq!(metadata, deserialized);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_media_content_serialization() {
         let content = MediaContent::Image {

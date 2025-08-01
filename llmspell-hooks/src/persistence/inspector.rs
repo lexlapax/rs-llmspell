@@ -432,11 +432,8 @@ pub struct ComparisonResult {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "hook")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_inspection_query() {
         let query = InspectionQuery {
@@ -457,8 +454,6 @@ mod tests {
         let deserialized: InspectionQuery = serde_json::from_str(&serialized).unwrap();
         assert_eq!(deserialized.limit, Some(100));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_pattern_detection() {
         // Test pattern type serialization

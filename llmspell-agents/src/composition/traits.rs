@@ -287,11 +287,8 @@ impl From<CompositionError> for LLMSpellError {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_capability_creation() {
         let cap = Capability {
@@ -304,8 +301,6 @@ mod tests {
         assert_eq!(cap.name, "text-processing");
         assert_eq!(cap.category, CapabilityCategory::DataProcessing);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_composition_metadata() {
         let mut metadata = CompositionMetadata {
@@ -323,8 +318,6 @@ mod tests {
         assert_eq!(metadata.composition_type, CompositionType::Hierarchical);
         assert_eq!(metadata.max_components, Some(10));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_execution_pattern() {
         let condition = ExecutionCondition {
@@ -344,8 +337,6 @@ mod tests {
             _ => panic!("Expected conditional pattern"),
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_composite_agent_builder() {
         let builder = CompositeAgentBuilder::new("test-composite")

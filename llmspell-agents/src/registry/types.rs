@@ -334,18 +334,13 @@ impl AgentRegistry for InMemoryAgentRegistry {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_agent_status_equality() {
         assert_eq!(AgentStatus::Active, AgentStatus::Active);
         assert_ne!(AgentStatus::Active, AgentStatus::Paused);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_agent_metrics_default() {
         let metrics = AgentMetrics::default();

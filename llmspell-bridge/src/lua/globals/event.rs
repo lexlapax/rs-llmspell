@@ -12,7 +12,6 @@ pub fn inject_event_global(lua: &mlua::Lua, context: &GlobalContext) -> Result<(
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "bridge")]
 mod tests {
     use super::*;
     use crate::{ComponentRegistry, ProviderManager};
@@ -24,8 +23,6 @@ mod tests {
         let providers = Arc::new(ProviderManager::new(Default::default()).await.unwrap());
         GlobalContext::new(registry, providers)
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_event_global_injection() {
         let lua = Lua::new();

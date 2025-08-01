@@ -103,14 +103,11 @@ pub fn is_artifact_hook_point(point: &HookPoint) -> bool {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "hook")]
 mod tests {
     use super::*;
     use llmspell_core::events::ArtifactEventBuilder;
     use llmspell_core::state::ArtifactMetadata;
     use llmspell_core::types::ComponentId;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_artifact_hook_points() {
         let point = ArtifactHookPoints::to_hook_point(ArtifactHookPoints::BEFORE_CREATE);
@@ -119,8 +116,6 @@ mod tests {
         let non_artifact_point = HookPoint::BeforeAgentInit;
         assert!(!is_artifact_hook_point(&non_artifact_point));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_event_to_hook_point() {
         let component_id = ComponentId::new();

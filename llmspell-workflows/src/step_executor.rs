@@ -463,12 +463,9 @@ impl StepExecutor {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "workflow")]
 mod tests {
     use super::*;
     use crate::types::WorkflowState;
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_step_executor_tool_execution() {
         let config = WorkflowConfig::default();
@@ -489,8 +486,6 @@ mod tests {
         assert!(result.output.contains("Calculator result"));
         assert_eq!(result.retry_count, 0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_step_executor_agent_execution() {
         let config = WorkflowConfig::default();
@@ -512,8 +507,6 @@ mod tests {
         assert!(result.output.contains("Agent"));
         assert!(result.output.contains("processed"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_step_executor_custom_execution() {
         let config = WorkflowConfig::default();
@@ -533,8 +526,6 @@ mod tests {
         assert!(result.success);
         assert!(result.output.contains("Data transformed"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_step_executor_with_retry() {
         let config = WorkflowConfig {
@@ -567,8 +558,6 @@ mod tests {
         assert_eq!(result.retry_count, 3);
         assert!(result.error.is_some());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_step_executor_timeout() {
         let config = WorkflowConfig::default();

@@ -425,12 +425,9 @@ enum ResourceStatus {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "session")]
 mod tests {
     use super::*;
     use llmspell_hooks::{types::ComponentId, HookPoint};
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_resource_policy_creation() {
         let config = ResourceConfig::default();
@@ -439,8 +436,6 @@ mod tests {
         assert_eq!(policy.metadata.name, "SessionResourcePolicy");
         assert!(policy.cost_tracker.is_some());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_memory_limit_check() {
         let config = ResourceConfig {
@@ -463,8 +458,6 @@ mod tests {
         assert!(!result.should_continue());
         assert!(context.data.contains_key("resource_limit_exceeded"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_token_limit_check() {
         let config = ResourceConfig {
@@ -486,8 +479,6 @@ mod tests {
         let result = policy.execute(&mut context).await.unwrap();
         assert!(!result.should_continue());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_operation_count_update() {
         let config = ResourceConfig::default();

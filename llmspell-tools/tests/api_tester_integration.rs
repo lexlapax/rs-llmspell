@@ -7,10 +7,6 @@ use common::*;
 use llmspell_core::BaseAgent;
 use llmspell_tools::ApiTesterTool;
 use serde_json::json;
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "external,tool,integration"]
 async fn test_api_tester_get_request() {
@@ -46,10 +42,6 @@ async fn test_api_tester_get_request() {
         }
     }
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "external,tool,integration"]
 async fn test_api_tester_post_request() {
@@ -92,10 +84,6 @@ async fn test_api_tester_post_request() {
         }
     }
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "external,tool,integration"]
 async fn test_api_tester_status_codes() {
@@ -160,10 +148,6 @@ async fn test_api_tester_status_codes() {
         successful_tests
     );
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "external,tool,integration,slow"]
 async fn test_api_tester_timeout() {
@@ -193,10 +177,6 @@ async fn test_api_tester_timeout() {
         }
     }
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "external,tool,integration"]
 async fn test_api_tester_invalid_url() {
@@ -214,10 +194,6 @@ async fn test_api_tester_invalid_url() {
     let error = result.unwrap_err();
     assert!(error.to_string().contains("URL validation failed"));
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "tool,integration"]
 async fn test_api_tester_network_error() {
@@ -242,10 +218,6 @@ async fn test_api_tester_network_error() {
         }
     }
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "external,tool,integration"]
 async fn test_api_tester_all_http_methods() {
@@ -293,10 +265,6 @@ async fn test_api_tester_all_http_methods() {
         }
     }
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "external,tool,integration"]
 async fn test_api_tester_response_time_measurement() {

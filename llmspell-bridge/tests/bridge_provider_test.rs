@@ -9,8 +9,6 @@ use llmspell_bridge::{
 use std::sync::Arc;
 
 /// Test provider manager creation
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "bridge")]
 #[tokio::test]
 async fn test_provider_manager_creation() {
     let config = ProviderManagerConfig::default();
@@ -81,8 +79,6 @@ async fn test_script_list_providers() {
 }
 
 /// Test that scripts work but globals need inject_apis
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "bridge")]
 #[tokio::test]
 async fn test_script_without_api_injection() {
     let lua_config = LuaConfig::default();
@@ -110,8 +106,6 @@ async fn test_script_without_api_injection() {
 }
 
 /// Test provider configuration validation
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "bridge")]
 #[tokio::test]
 async fn test_provider_config_validation() {
     let mut config = ProviderManagerConfig::default();

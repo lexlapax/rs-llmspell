@@ -148,7 +148,6 @@ impl ApiKeyStorage for PersistentApiKeyStorage {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
     use chrono::Utc;
@@ -165,8 +164,6 @@ mod tests {
             usage_count: 0,
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_persistent_storage() {
         let temp_dir = TempDir::new().unwrap();
@@ -202,8 +199,6 @@ mod tests {
         storage.delete("test_key").unwrap();
         assert_eq!(storage.get("test_key").unwrap(), None);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_encryption_decryption() {
         let temp_dir = TempDir::new().unwrap();

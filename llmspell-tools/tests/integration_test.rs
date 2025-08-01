@@ -3,9 +3,6 @@
 use llmspell_core::{traits::tool::ToolCategory, types::AgentInput, ExecutionContext};
 use llmspell_tools::{search::web_search::WebSearchConfig, ToolRegistry, WebSearchTool};
 use std::collections::HashMap;
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
 #[tokio::test]
 async fn test_web_search_tool_registration() {
     // Create registry
@@ -32,9 +29,6 @@ async fn test_web_search_tool_registration() {
     let web_tools = registry.get_tools_by_category(&ToolCategory::Web).await;
     assert!(web_tools.contains(&"web_search".to_string()));
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
 #[tokio::test]
 #[ignore = "Requires external API keys"]
 async fn test_web_search_tool_execution_through_registry() {

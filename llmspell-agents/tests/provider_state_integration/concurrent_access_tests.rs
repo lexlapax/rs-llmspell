@@ -10,10 +10,6 @@ use std::time::Duration;
 use tokio::sync::Barrier;
 use tokio::time::{sleep, timeout};
 use tracing::{info, warn};
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "agent")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "requires OPENAI_API_KEY"]
 async fn test_concurrent_openai_agents_shared_state() -> Result<()> {
@@ -161,10 +157,6 @@ async fn test_concurrent_openai_agents_shared_state() -> Result<()> {
     info!("Concurrent OpenAI access test completed successfully");
     Ok(())
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "agent")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "requires ANTHROPIC_API_KEY"]
 async fn test_concurrent_anthropic_agents_race_conditions() -> Result<()> {
@@ -304,10 +296,6 @@ async fn test_concurrent_anthropic_agents_race_conditions() -> Result<()> {
     info!("Anthropic race condition test completed");
     Ok(())
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "agent")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "requires OPENAI_API_KEY and ANTHROPIC_API_KEY"]
 async fn test_concurrent_mixed_providers() -> Result<()> {
@@ -461,10 +449,6 @@ async fn test_concurrent_mixed_providers() -> Result<()> {
     info!("Mixed provider concurrent test completed");
     Ok(())
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "agent")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "requires OPENAI_API_KEY or ANTHROPIC_API_KEY"]
 async fn test_concurrent_state_conflict_resolution() -> Result<()> {

@@ -6,10 +6,6 @@ use llmspell_tools::util::Base64EncoderTool;
 use serde_json::{json, Value};
 use std::fs;
 use tempfile::TempDir;
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_standard_base64_roundtrip() {
     let tool = Base64EncoderTool::new();
@@ -60,10 +56,6 @@ async fn test_standard_base64_roundtrip() {
         assert_eq!(decoded, test_text, "Failed to roundtrip: {}", test_text);
     }
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_url_safe_base64() {
     let tool = Base64EncoderTool::new();
@@ -114,10 +106,6 @@ async fn test_url_safe_base64() {
     let decoded = output["result"]["output"].as_str().unwrap();
     assert_eq!(decoded, test_data);
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_binary_data_handling() {
     let tool = Base64EncoderTool::new();
@@ -186,10 +174,6 @@ async fn test_binary_data_handling() {
         );
     }
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_file_operations() {
     let tool = Base64EncoderTool::new();
@@ -245,10 +229,6 @@ async fn test_file_operations() {
     let decoded_content = fs::read_to_string(&decoded_path).unwrap();
     assert_eq!(decoded_content, test_content);
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_large_file_handling() {
     let tool = Base64EncoderTool::new();
@@ -280,10 +260,6 @@ async fn test_large_file_handling() {
     // Verify success
     assert!(output["success"].as_bool().unwrap());
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_error_handling() {
     let tool = Base64EncoderTool::new();
@@ -332,10 +308,6 @@ async fn test_error_handling() {
     let result = tool.execute(input, ExecutionContext::default()).await;
     assert!(result.is_err());
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_mixed_variants() {
     let tool = Base64EncoderTool::new();
@@ -409,10 +381,6 @@ async fn test_mixed_variants() {
     let decoded = output_value["result"]["output"].as_str().unwrap();
     assert_eq!(decoded, test_text);
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_tool_metadata() {
     use llmspell_core::traits::tool::{SecurityLevel, Tool, ToolCategory};

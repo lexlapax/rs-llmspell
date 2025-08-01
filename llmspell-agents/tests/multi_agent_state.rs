@@ -20,8 +20,6 @@ mod tests {
         config.enabled = true;
         config
     }
-
-    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_multi_agent_state_isolation() -> Result<()> {
         let temp_dir = TempDir::new()?;
@@ -130,8 +128,6 @@ mod tests {
 
         Ok(())
     }
-
-    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_agent_state_sharing_patterns() -> Result<()> {
         let temp_dir = TempDir::new()?;
@@ -208,8 +204,6 @@ mod tests {
 
         Ok(())
     }
-
-    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_agent_state_persistence_across_restart() -> Result<()> {
         let temp_dir = TempDir::new()?;
@@ -308,8 +302,6 @@ mod tests {
 
         Ok(())
     }
-
-    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_concurrent_multi_agent_state_access() -> Result<()> {
         let temp_dir = TempDir::new()?;
@@ -416,8 +408,6 @@ mod tests {
 
         Ok(())
     }
-
-    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_agent_state_migration_scenario() -> Result<()> {
         let temp_dir = TempDir::new()?;

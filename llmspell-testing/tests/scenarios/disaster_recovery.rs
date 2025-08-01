@@ -233,7 +233,6 @@ mod disaster_recovery_scenarios {
     }
 
     #[tokio::test]
-    #[cfg_attr(test_category = "integration", test_category = "integration")]
     async fn test_complete_system_disaster_recovery() {
         let app = TestApplication::new().await;
 
@@ -337,7 +336,6 @@ mod disaster_recovery_scenarios {
     }
 
     #[tokio::test]
-    #[cfg_attr(test_category = "integration", test_category = "integration")]
     async fn test_partial_system_failure_recovery() {
         let app = TestApplication::new().await;
 
@@ -389,7 +387,6 @@ mod disaster_recovery_scenarios {
     }
 
     #[tokio::test]
-    #[cfg_attr(test_category = "integration", test_category = "integration")]
     async fn test_point_in_time_recovery() {
         let app = TestApplication::new().await;
 
@@ -501,7 +498,6 @@ mod disaster_recovery_scenarios {
     }
 
     #[tokio::test]
-    #[cfg_attr(test_category = "integration", test_category = "integration")]
     async fn test_recovery_under_load() {
         let app = TestApplication::new().await;
 
@@ -600,7 +596,6 @@ mod disaster_recovery_scenarios {
     }
 
     #[tokio::test]
-    #[cfg_attr(test_category = "integration", test_category = "integration")]
     async fn test_cascading_failure_recovery() {
         let app = TestApplication::new().await;
 

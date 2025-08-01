@@ -380,7 +380,6 @@ impl MigrationComplexity {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "state")]
 mod tests {
     use super::*;
     use crate::config::FieldSchema;
@@ -398,8 +397,6 @@ mod tests {
         );
         schema
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_migration_step_conversion() {
         let legacy = LegacyMigrationStep {
@@ -419,8 +416,6 @@ mod tests {
         assert_eq!(converted_back.to_version, legacy.to_version);
         assert_eq!(converted_back.migration_type, legacy.migration_type);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_migration_planner() {
         let mut planner = MigrationPlanner::new();
@@ -456,8 +451,6 @@ mod tests {
         let paths = planner.find_migration_paths(&v1_0_0).unwrap();
         assert!(!paths.is_empty());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_migration_complexity() {
         let complexity = MigrationComplexity {
@@ -472,8 +465,6 @@ mod tests {
         assert!(complexity.is_simple());
         assert!(!complexity.is_complex());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_plan_validation() {
         let planner = MigrationPlanner::new();

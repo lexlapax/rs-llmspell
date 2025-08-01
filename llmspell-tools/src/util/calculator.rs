@@ -497,11 +497,8 @@ impl CalculatorTool {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "tool")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_basic_arithmetic() {
         let tool = CalculatorTool::new();
@@ -524,8 +521,6 @@ mod tests {
         assert_eq!(output["result"]["result"], 14.0);
         assert_eq!(output["result"]["result_type"], "float");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_variables() {
         let tool = CalculatorTool::new();
@@ -553,8 +548,6 @@ mod tests {
         assert_eq!(output["result"]["variables"]["x"], 3.0);
         assert_eq!(output["result"]["variables"]["y"], 4.0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_power_operations() {
         let tool = CalculatorTool::new();
@@ -597,8 +590,6 @@ mod tests {
         assert_eq!(output["result"]["result"], 2.0);
         assert_eq!(output["result"]["result_type"], "float");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_expression_validation() {
         let tool = CalculatorTool::new();
@@ -641,8 +632,6 @@ mod tests {
         // The error message should indicate an issue with the expression
         assert!(output["result"].get("error").is_some());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_division_by_zero() {
         let tool = CalculatorTool::new();
@@ -666,8 +655,6 @@ mod tests {
         assert_eq!(output["result"]["result"], "Infinity");
         assert_eq!(output["result"]["result_type"], "special");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_functions_list() {
         let tool = CalculatorTool::new();
@@ -690,8 +677,6 @@ mod tests {
         assert!(output["result"]["logical"].is_array());
         assert!(output["result"]["examples"].is_object());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_metadata() {
         let tool = CalculatorTool::new();
@@ -704,8 +689,6 @@ mod tests {
         assert_eq!(tool.category(), ToolCategory::Utility);
         assert_eq!(tool.security_level(), SecurityLevel::Safe);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_mathematical_functions() {
         let tool = CalculatorTool::new();
@@ -764,8 +747,6 @@ mod tests {
         assert!(output["success"].as_bool().unwrap_or(false));
         assert!((output["result"]["result"].as_f64().unwrap() - 2.0).abs() < 0.0001);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_dos_protection_long_expression() {
         let tool = CalculatorTool::new();
@@ -793,8 +774,6 @@ mod tests {
             .unwrap()
             .contains("too long"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_dos_protection_deep_nesting() {
         let tool = CalculatorTool::new();
@@ -822,8 +801,6 @@ mod tests {
             .unwrap()
             .contains("too deep"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_dos_protection_too_many_operations() {
         let tool = CalculatorTool::new();
@@ -854,8 +831,6 @@ mod tests {
             .unwrap()
             .contains("operations"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_dos_protection_timeout() {
         let tool = CalculatorTool::new();
@@ -890,8 +865,6 @@ mod tests {
             assert!(error_msg.contains("timeout") || error_msg.contains("operations"));
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_dos_protection_large_numbers() {
         let tool = CalculatorTool::new();
@@ -919,8 +892,6 @@ mod tests {
             .unwrap()
             .contains("large number"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_dos_protection_dangerous_patterns() {
         let tool = CalculatorTool::new();
@@ -958,8 +929,6 @@ mod tests {
             );
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_hook_integration_capability() {
         let tool = CalculatorTool::new();
@@ -977,8 +946,6 @@ mod tests {
         );
         assert!(metadata["hook_integration_benefits"].is_array());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_calculator_with_hook_executor() {
         use crate::lifecycle::{ToolExecutor, ToolLifecycleConfig};
@@ -1003,8 +970,6 @@ mod tests {
         assert!(parsed["success"].as_bool().unwrap_or(false));
         assert_eq!(parsed["result"]["result"], 5.0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_calculator_hook_integration_with_variables() {
         use crate::lifecycle::{ToolExecutor, ToolLifecycleConfig};
@@ -1029,8 +994,6 @@ mod tests {
         assert!(parsed["success"].as_bool().unwrap_or(false));
         assert_eq!(parsed["result"]["result"], 25.0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_hookable_tool_execution_trait() {
         use crate::lifecycle::{HookableToolExecution, ToolExecutor, ToolLifecycleConfig};

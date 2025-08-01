@@ -318,12 +318,9 @@ impl CreationHook for CompositeHook {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
     use crate::builder::AgentBuilder;
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_validation_hook() {
         let hook = ValidationHook::new()
@@ -351,8 +348,6 @@ mod tests {
             .unwrap();
         assert!(hook.before_create(&invalid_config).await.is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_security_hook() {
         let hook = SecurityHook::new()
@@ -380,8 +375,6 @@ mod tests {
             .unwrap();
         assert!(hook.before_create(&invalid_config).await.is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_metrics_hook() {
         let hook = MetricsHook::new();
@@ -394,8 +387,6 @@ mod tests {
         // In real usage, after_create would be called with actual agent
         // hook.after_create(&agent).await.unwrap();
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_logging_hook() {
         // Just test that it doesn't panic
@@ -407,8 +398,6 @@ mod tests {
         let agent: Arc<dyn Agent> = Arc::new(crate::agents::BasicAgent::new(config).unwrap());
         assert!(hook.after_create(&agent).await.is_ok());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_composite_hook() {
         use std::sync::atomic::{AtomicUsize, Ordering};
@@ -450,8 +439,6 @@ mod tests {
         assert_eq!(count1.load(Ordering::SeqCst), 2);
         assert_eq!(count2.load(Ordering::SeqCst), 2);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_composite_hook_error_propagation() {
         struct FailingHook;

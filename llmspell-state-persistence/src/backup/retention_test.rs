@@ -2,14 +2,11 @@
 // ABOUTME: Isolated test for debugging retention issues
 
 #[cfg(test)]
-#[cfg_attr(test_category = "state")]
 mod test {
     use crate::backup::retention::*;
     use crate::backup::*;
     use std::collections::HashMap;
     use std::time::{Duration, SystemTime};
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_retention_basic() {
         // Create test metadata

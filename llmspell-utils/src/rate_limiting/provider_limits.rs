@@ -215,11 +215,8 @@ impl ProviderLimits {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_provider_limits() {
         let openai = ProviderLimits::openai();
@@ -231,8 +228,6 @@ mod tests {
         assert_eq!(duckduckgo.requests_per_minute, 20);
         assert!(!duckduckgo.allow_burst);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_for_provider() {
         let config = ProviderLimits::for_provider("openai");

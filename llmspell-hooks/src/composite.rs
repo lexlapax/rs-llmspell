@@ -359,14 +359,11 @@ impl<T: Hook + 'static> AsAny for T {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "hook")]
 mod tests {
     use super::*;
     use crate::traits::FnHook;
     use crate::types::{ComponentId, ComponentType, HookPoint};
     use std::sync::atomic::{AtomicUsize, Ordering};
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_sequential_composition() {
         let counter = Arc::new(AtomicUsize::new(0));
@@ -396,8 +393,6 @@ mod tests {
         assert!(matches!(result, HookResult::Modified(_)));
         assert_eq!(counter.load(Ordering::SeqCst), 11); // Both executed
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_parallel_composition() {
         let hook1 = FnHook::new("hook1", |_ctx| Ok(HookResult::Continue));
@@ -423,8 +418,6 @@ mod tests {
         // Should return the Modified result (highest priority non-Continue)
         assert!(matches!(result, HookResult::Modified(_)));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_first_match_composition() {
         let counter = Arc::new(AtomicUsize::new(0));
@@ -460,8 +453,6 @@ mod tests {
         assert!(matches!(result, HookResult::Cancel(_)));
         assert_eq!(counter.load(Ordering::SeqCst), 11); // First two executed
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_voting_composition() {
         let hook1 = FnHook::new("hook1", |_ctx| Ok(HookResult::Continue));
@@ -485,8 +476,6 @@ mod tests {
         // 3 out of 4 voted Continue (75% > 50% threshold)
         assert!(matches!(result, HookResult::Continue));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_empty_composite() {
         let composite = CompositeHook::new("empty", CompositionPattern::Sequential);
@@ -500,8 +489,6 @@ mod tests {
         let result = composite.execute(&mut context).await.unwrap();
         assert!(matches!(result, HookResult::Continue));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_composite_builder() {
         let hook1 = FnHook::new("hook1", |_ctx| Ok(HookResult::Continue));
@@ -520,8 +507,6 @@ mod tests {
         assert_eq!(composite.metadata.tags.len(), 2);
         assert_eq!(composite.len(), 2);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_nested_composite() {
         let hook1 = FnHook::new("hook1", |_ctx| Ok(HookResult::Continue));

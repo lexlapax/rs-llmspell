@@ -44,11 +44,8 @@ pub use context::{
 pub const DISTRIBUTED_PROTOCOL_VERSION: &str = "0.1.0";
 
 #[cfg(test)]
-#[cfg_attr(test_category = "hook")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_module_exports() {
         // Verify exports are accessible

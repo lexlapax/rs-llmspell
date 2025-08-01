@@ -401,7 +401,6 @@ impl EventHandler for LoggingEventHandler {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
     use llmspell_core::ComponentId;
@@ -424,8 +423,6 @@ mod tests {
             vec!["test_event".to_string()]
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_event_publish_subscribe() {
         let bus = ContextEventBus::new();
@@ -461,8 +458,6 @@ mod tests {
         assert_eq!(received.len(), 1);
         assert_eq!(received[0].id, event.id);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_event_targeting() {
         let bus = ContextEventBus::new();
@@ -515,8 +510,6 @@ mod tests {
         assert_eq!(received1.len(), 1);
         assert_eq!(received2.len(), 0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_event_history() {
         let config = EventBusConfig {
@@ -550,8 +543,6 @@ mod tests {
             .await;
         assert!(ctx_events.len() <= 3); // Should have some events from this context
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_event_correlation() {
         let bus = ContextEventBus::new();

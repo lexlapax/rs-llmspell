@@ -162,12 +162,9 @@ pub struct SessionInfrastructure {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "bridge")]
 mod tests {
     use super::*;
     use crate::{ComponentRegistry, ProviderManager};
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_session_infrastructure_creation() {
         let context = GlobalContext::new(

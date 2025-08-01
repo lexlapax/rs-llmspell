@@ -28,9 +28,6 @@ fn extract_result(output: &str) -> Value {
     let parsed: Value = serde_json::from_str(output).expect("Invalid JSON");
     parsed["result"].clone()
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
 #[tokio::test]
 async fn test_all_refactored_tools_response_format() {
     // Test that all refactored tools use consistent response format
@@ -200,9 +197,6 @@ async fn test_all_refactored_tools_response_format() {
     assert!(output["operation"].is_string());
     assert!(output["result"].is_object());
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
 #[tokio::test]
 async fn test_refactored_tools_error_consistency() {
     // Test that all tools handle errors consistently
@@ -263,9 +257,6 @@ async fn test_refactored_tools_error_consistency() {
         );
     }
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
 #[tokio::test]
 async fn test_refactored_tools_functionality() {
     // Test actual functionality of refactored tools
@@ -421,9 +412,6 @@ async fn test_refactored_tools_functionality() {
     let output = extract_result(&result.text);
     assert_eq!(output["rendered"], "Hello, World!");
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
 #[tokio::test]
 async fn test_tool_chaining_integration() {
     // Test chaining multiple refactored tools together

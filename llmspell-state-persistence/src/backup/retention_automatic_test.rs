@@ -2,7 +2,6 @@
 // ABOUTME: Verifies that max_backups limit is enforced automatically
 
 #[cfg(test)]
-#[cfg_attr(test_category = "state")]
 mod test {
     use crate::backup::*;
     use crate::{
@@ -13,8 +12,6 @@ mod test {
     use std::sync::Arc;
     use std::time::Duration;
     use tempfile::TempDir;
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_automatic_cleanup_during_creation() {
         // Create state manager

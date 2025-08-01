@@ -429,11 +429,8 @@ impl ExtendedMetadataBuilder {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_metadata_manager() {
         let mut manager = MetadataManager::new();

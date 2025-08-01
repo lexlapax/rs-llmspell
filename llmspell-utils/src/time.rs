@@ -258,12 +258,9 @@ pub fn format_duration(duration: &Duration) -> String {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
     use chrono::Timelike;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_parse_datetime_formats() {
         let test_dates = vec![
@@ -284,8 +281,6 @@ mod tests {
             assert!(result.is_ok(), "Failed to parse: {date_str}");
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_parse_timestamp() {
         let timestamp = 1_705_315_800; // 2024-01-15 10:30:00 UTC
@@ -294,8 +289,6 @@ mod tests {
         assert_eq!(result.month(), 1);
         assert_eq!(result.day(), 15);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_timezone_conversion() {
         let utc_time = parse_datetime("2024-01-15T10:30:00Z").unwrap();
@@ -308,8 +301,6 @@ mod tests {
         // Tokyo is UTC+9
         assert_eq!(tokyo_time.hour(), 19);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_date_arithmetic() {
         let dt = parse_datetime("2024-01-15T10:30:00Z").unwrap();
@@ -324,8 +315,6 @@ mod tests {
         assert_eq!(minus_30_mins.hour(), 10);
         assert_eq!(minus_30_mins.minute(), 0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_leap_year() {
         assert!(is_leap_year(2024));
@@ -333,8 +322,6 @@ mod tests {
         assert!(is_leap_year(2000));
         assert!(!is_leap_year(1900));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_days_in_month() {
         assert_eq!(days_in_month(2024, 2), Some(29)); // Leap year
@@ -343,8 +330,6 @@ mod tests {
         assert_eq!(days_in_month(2024, 4), Some(30));
         assert_eq!(days_in_month(2024, 13), None); // Invalid month
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_format_duration() {
         let duration = Duration::seconds(3665); // 1 hour, 1 minute, 5 seconds
@@ -356,8 +341,6 @@ mod tests {
         let duration = Duration::seconds(86400 * 2 + 3600 * 3); // 2 days, 3 hours
         assert_eq!(format_duration(&duration), "2 days, 3 hours");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_start_end_of_day() {
         let dt = parse_datetime("2024-01-15T14:30:45Z").unwrap();

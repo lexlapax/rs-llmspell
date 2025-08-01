@@ -476,13 +476,10 @@ pub fn create_pattern_parameter(
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
     use crate::templates::schema::{ComplexityLevel, TemplateCategory, TemplateMetadata};
     use crate::templates::tool_agent::ToolAgentTemplate;
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_template_customizer() {
         let base_template = Box::new(ToolAgentTemplate::new());
@@ -516,8 +513,6 @@ mod tests {
         let result = customized.validate_parameters(&params).await;
         assert!(result.is_ok());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_template_mixins() {
         let base_template = Box::new(ToolAgentTemplate::new());
@@ -549,8 +544,6 @@ mod tests {
             Some(&100.into())
         );
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_template_builder() {
         let metadata = TemplateMetadata {
@@ -589,8 +582,6 @@ mod tests {
         assert_eq!(template.schema().tool_dependencies.len(), 2);
         assert_eq!(template.schema().capability_requirements.len(), 1);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_parameter_helpers() {
         let range_param =
@@ -609,8 +600,6 @@ mod tests {
         assert_eq!(pattern_param.constraints.len(), 1);
         assert_eq!(pattern_param.examples.len(), 2);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_customization_overrides() {
         let base_template = Box::new(ToolAgentTemplate::new());

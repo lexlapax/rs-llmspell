@@ -281,13 +281,10 @@ impl Clone for ProviderRateLimiter {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
     #[cfg(feature = "rate-limiting-http")]
     use reqwest::header::{HeaderMap, HeaderValue};
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     #[cfg(feature = "rate-limiting-http")]
     fn test_rate_limit_info_from_headers() {
@@ -301,8 +298,6 @@ mod tests {
         assert_eq!(info.limit, Some(100));
         assert_eq!(info.reset_at, Some(1_234_567_890));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_provider_rate_limiter() {
         let mut limiter = ProviderRateLimiter::new();

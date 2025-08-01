@@ -17,10 +17,6 @@ fn clean_env_vars() {
     env::remove_var("LLMSPELL_DEFAULT_PROVIDER");
     env::remove_var("LLMSPELL_ALLOW_NETWORK_ACCESS");
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[serial]
 async fn test_default_config() {
@@ -35,10 +31,6 @@ async fn test_default_config() {
     assert_eq!(config.runtime.script_timeout_seconds, 300);
     assert_eq!(config.runtime.security.max_memory_bytes, Some(50_000_000));
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_create_config_file() {
     let dir = tempdir().unwrap();
@@ -57,10 +49,6 @@ async fn test_create_config_file() {
     let config = load_runtime_config(Some(&config_path)).await.unwrap();
     assert_eq!(config.default_engine, "lua");
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[serial]
 async fn test_environment_overrides() {
@@ -89,10 +77,6 @@ async fn test_environment_overrides() {
     // Clean up - use helper
     clean_env_vars();
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[serial]
 async fn test_config_discovery() {
@@ -114,10 +98,6 @@ async fn test_config_discovery() {
     // Clean up
     env::set_current_dir(original_dir).unwrap();
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_validate_config() {
     let config = load_runtime_config(None).await.unwrap();
@@ -125,10 +105,6 @@ async fn test_validate_config() {
     // Default config should be valid
     validate_config(&config).unwrap();
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_invalid_config_validation() {
     let mut config = load_runtime_config(None).await.unwrap();
@@ -141,10 +117,6 @@ async fn test_invalid_config_validation() {
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("not configured"));
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_missing_config_file() {
     let dir = tempdir().unwrap();
@@ -155,10 +127,6 @@ async fn test_missing_config_file() {
     assert!(result.is_err());
     assert!(result.unwrap_err().to_string().contains("not found"));
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_malformed_config_file() {
     let dir = tempdir().unwrap();

@@ -176,12 +176,9 @@ impl HookAdapter for LuaHookAdapter {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "bridge")]
 mod tests {
     use super::*;
     use llmspell_hooks::types::{ComponentId, ComponentType, HookPoint};
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_lua_hook_adapter() {
         let lua = Lua::new();

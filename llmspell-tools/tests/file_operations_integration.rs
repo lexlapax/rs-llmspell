@@ -26,10 +26,6 @@ fn create_test_dir() -> PathBuf {
 fn cleanup_test_dir(path: &PathBuf) {
     let _ = std::fs::remove_dir_all(path);
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_file_operations_basic() {
     let test_dir = create_test_dir();
@@ -141,10 +137,6 @@ async fn test_file_operations_basic() {
 
     cleanup_test_dir(&test_dir);
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_directory_operations() {
     let test_base = create_test_dir();
@@ -195,10 +187,6 @@ async fn test_directory_operations() {
 
     cleanup_test_dir(&test_base);
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_copy_move_operations() {
     let test_dir = create_test_dir();
@@ -268,10 +256,6 @@ async fn test_copy_move_operations() {
 
     cleanup_test_dir(&test_dir);
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_security_sandbox() {
     let tool = FileOperationsTool::default();
@@ -302,10 +286,6 @@ async fn test_security_sandbox() {
     let result = tool.execute(traversal_input, context).await;
     assert!(result.is_err() || result.unwrap().text.contains("error"));
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_tool_metadata() {
     let tool = FileOperationsTool::default();
@@ -335,10 +315,6 @@ async fn test_tool_metadata() {
         .expect("operation parameter should exist");
     assert!(operation_param.required);
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_error_handling() {
     let tool = FileOperationsTool::default();
@@ -379,10 +355,6 @@ async fn test_error_handling() {
     let result = tool.execute(missing_content_input, context).await;
     assert!(result.is_err());
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_recursive_directory_creation() {
     let test_dir = create_test_dir();
@@ -411,10 +383,6 @@ async fn test_recursive_directory_creation() {
 
     cleanup_test_dir(&test_dir);
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_file_size_limits() {
     let test_dir = create_test_dir();
@@ -444,10 +412,6 @@ async fn test_file_size_limits() {
 
     cleanup_test_dir(&test_dir);
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_atomic_writes() {
     let test_dir = create_test_dir();

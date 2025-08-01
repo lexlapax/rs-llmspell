@@ -632,14 +632,11 @@ impl Default for HookExecutorBuilder {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "hook")]
 mod tests {
     use super::*;
     use crate::traits::FnHook;
     use crate::types::HookPoint;
     use tokio;
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_hook_executor_basic() {
         let executor = HookExecutor::new();
@@ -661,8 +658,6 @@ mod tests {
         let metrics = executor.get_metrics("test_hook").unwrap();
         assert_eq!(metrics.execution_count, 1);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_circuit_breaker_protection() {
         let config = HookExecutorConfig {
@@ -704,8 +699,6 @@ mod tests {
             _ => panic!("Expected Skipped result"),
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_slow_hook_detection() {
         let config = HookExecutorConfig {
@@ -749,8 +742,6 @@ mod tests {
             _ => panic!("Expected Skipped result due to slow execution"),
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_hook_cancellation() {
         let executor = HookExecutor::new();
@@ -780,8 +771,6 @@ mod tests {
         assert!(matches!(results[0], HookResult::Continue));
         assert!(matches!(results[1], HookResult::Cancel(_)));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_custom_hook_configuration() {
         let executor = HookExecutor::new();

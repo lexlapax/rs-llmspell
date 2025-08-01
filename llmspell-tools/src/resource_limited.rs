@@ -197,7 +197,6 @@ where
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "tool")]
 mod tests {
     use super::*;
 
@@ -257,8 +256,6 @@ mod tests {
             ToolSchema::new("mock_tool".to_string(), "Mock tool for testing".to_string())
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_resource_limited_tool() {
         let mock_tool = MockTool::new(50);
@@ -271,8 +268,6 @@ mod tests {
         assert!(result.text.contains("Success"));
         assert!(result.text.contains("Resource usage:"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_timeout_enforcement() {
         let mock_tool = MockTool::new(200);
@@ -297,8 +292,6 @@ mod tests {
             }
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_file_size_checking() {
         let tracker = ResourceTracker::new(ResourceLimits {
@@ -313,8 +306,6 @@ mod tests {
         let result = tracker.check_file_size(2048);
         assert!(result.is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_memory_tracking() {
         let tracker = ResourceTracker::new(ResourceLimits {

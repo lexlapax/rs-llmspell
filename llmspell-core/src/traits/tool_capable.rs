@@ -519,7 +519,6 @@ pub trait ToolCapable: BaseAgent {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "core")]
 mod tests {
     use super::*;
     use crate::types::{AgentInput, AgentOutput};
@@ -629,8 +628,6 @@ mod tests {
             )))
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_tool_query_builder() {
         let query = ToolQuery::new()
@@ -644,8 +641,6 @@ mod tests {
         assert_eq!(query.max_security_level, Some("safe".to_string()));
         assert_eq!(query.text_search, Some("search".to_string()));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_tool_info_builder() {
         let info = ToolInfo::new("test_tool", "Test description", "utility", "safe")
@@ -661,8 +656,6 @@ mod tests {
         assert_eq!(info.schema, json!({"type": "object"}));
         assert_eq!(info.requirements, json!({"mem": "10MB"}));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_tool_composition_builder() {
         let composition = ToolComposition::new("test_workflow", "Test composition")
@@ -680,8 +673,6 @@ mod tests {
         assert!(composition.parallel);
         assert_eq!(composition.steps[0].tool_name, "tool1");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_capable_discovery() {
         let agent = MockToolCapableAgent::new();
@@ -697,8 +688,6 @@ mod tests {
         let no_tools = agent.discover_tools(&empty_query).await.unwrap();
         assert_eq!(no_tools.len(), 0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_capable_invocation() {
         let agent = MockToolCapableAgent::new();
@@ -725,8 +714,6 @@ mod tests {
         let no_info = agent.get_tool_info("nonexistent").await.unwrap();
         assert!(no_info.is_none());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_capable_composition() {
         let agent = MockToolCapableAgent::new();
@@ -750,8 +737,6 @@ mod tests {
         assert!(result.text.contains("Executed composition 'test_flow'"));
         assert!(result.text.contains("2 steps"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_capable_listing() {
         let agent = MockToolCapableAgent::new();

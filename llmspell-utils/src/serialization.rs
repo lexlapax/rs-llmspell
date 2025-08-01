@@ -493,12 +493,9 @@ pub fn validate_json_fields(json: &str, required_fields: &[&str]) -> Result<()> 
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
     use std::collections::HashMap;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_json_serialization() {
         #[derive(Serialize, Deserialize, PartialEq, Debug)]
@@ -530,8 +527,6 @@ mod tests {
         let deserialized: TestStruct = from_json(&json).unwrap();
         assert_eq!(deserialized, original);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_toml_serialization() {
         #[derive(Serialize, Deserialize, PartialEq, Debug)]
@@ -559,8 +554,6 @@ mod tests {
         let deserialized: Config = from_toml(&toml).unwrap();
         assert_eq!(deserialized, config);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_yaml_serialization() {
         let mut map = HashMap::new();
@@ -574,8 +567,6 @@ mod tests {
         let deserialized: HashMap<String, String> = from_yaml(&yaml).unwrap();
         assert_eq!(deserialized["name"], "test");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_merge_json() {
         let base: JsonValue = from_json(
@@ -614,8 +605,6 @@ mod tests {
         assert_eq!(b_obj["d"], 4); // Overridden
         assert_eq!(b_obj["f"], 5); // Added from override
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_format_conversion() {
         let json = r#"{"name": "test", "values": [1, 2, 3]}"#;
@@ -635,8 +624,6 @@ mod tests {
         let parsed2: JsonValue = from_json(&json2).unwrap();
         assert_eq!(parsed1, parsed2);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_format_detection() {
         assert_eq!(Format::from_extension("json"), Some(Format::Json));
@@ -649,8 +636,6 @@ mod tests {
         assert_eq!(Format::Yaml.extension(), "yaml");
         assert_eq!(Format::Toml.extension(), "toml");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_from_json_or_default() {
         #[derive(Deserialize, Default, PartialEq, Debug)]
@@ -669,8 +654,6 @@ mod tests {
         assert_eq!(settings.timeout, 0);
         assert_eq!(settings.retries, 0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_validate_json_fields() {
         let json = r#"{
@@ -685,8 +668,6 @@ mod tests {
         let not_object = r"[]";
         assert!(validate_json_fields(not_object, &["any"]).is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_error_handling() {
         // Invalid JSON
@@ -704,13 +685,11 @@ mod tests {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "util")]
 mod property_tests {
     use super::*;
     use proptest::prelude::*;
 
     proptest! {
-        #[cfg_attr(test_category = "unit")]
         #[test]
         fn test_json_roundtrip(s: String, n: i32, b: bool) {
             #[derive(Serialize, Deserialize, PartialEq, Debug)]
@@ -730,8 +709,6 @@ mod property_tests {
             let recovered: TestData = from_json(&json).unwrap();
             assert_eq!(data, recovered);
         }
-
-        #[cfg_attr(test_category = "unit")]
         #[test]
         fn test_merge_preserves_structure(
             keys in prop::collection::vec("[a-z]+", 1..5),

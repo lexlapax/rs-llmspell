@@ -374,8 +374,6 @@ mod tests {
 
         ResourceMonitor::new(context).unwrap()
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_monitor_lifecycle() {
         let mut monitor = create_test_monitor();
@@ -388,8 +386,6 @@ mod tests {
         assert!(monitor.stop().await.is_ok());
         assert!(!monitor.is_monitoring().await);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_usage_recording() {
         let monitor = create_test_monitor();
@@ -409,8 +405,6 @@ mod tests {
         assert_eq!(usage.file_operations, 1);
         assert_eq!(usage.custom_usage.get("api_calls"), Some(&5));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_resource_stats() {
         let monitor = create_test_monitor();
@@ -425,8 +419,6 @@ mod tests {
         assert!(stats.efficiency_metrics.memory_efficiency >= 0.0);
         assert!(stats.efficiency_metrics.memory_efficiency <= 1.0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_counter_reset() {
         let mut monitor = create_test_monitor();
@@ -443,8 +435,6 @@ mod tests {
         assert_eq!(usage.network_bytes, 0);
         assert_eq!(usage.file_operations, 0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_limit_enforcement() {
         let security_reqs = SecurityRequirements::safe();

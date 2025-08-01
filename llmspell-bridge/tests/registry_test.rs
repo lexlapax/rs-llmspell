@@ -11,8 +11,6 @@ mod registry_tests {
     use llmspell_state_persistence::StateManager;
     use llmspell_storage::MemoryBackend;
     use std::sync::Arc;
-
-    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_session_artifact_registration_order() {
         // Create minimal infrastructure
@@ -98,8 +96,6 @@ mod registry_tests {
             "Session should be registered before Artifact"
         );
     }
-
-    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_registry_without_session_manager() {
         // Create context without session manager

@@ -529,6 +529,5 @@ impl Default for SessionDebugger {
 
 // Include test module
 #[cfg(test)]
-#[cfg_attr(test_category = "session")]
 #[path = "session_debug_tests.rs"]
 mod tests;

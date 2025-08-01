@@ -589,11 +589,8 @@ pub fn transform_generic_result(
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "bridge")]
 mod workflow_result_tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_script_workflow_result_serialization() {
         let result = ScriptWorkflowResult {

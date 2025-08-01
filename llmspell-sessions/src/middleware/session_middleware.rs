@@ -629,12 +629,9 @@ impl Hook for VotingMiddleware {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "session")]
 mod tests {
     use super::*;
     use llmspell_hooks::types::{ComponentId, ComponentType};
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_middleware_creation() {
         let hook_registry = Arc::new(HookRegistry::new());
@@ -646,8 +643,6 @@ mod tests {
         assert!(middleware.initialize().is_ok());
         assert_eq!(middleware.middleware_chains.len(), 5);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_middleware_execution() {
         let hook_registry = Arc::new(HookRegistry::new());
@@ -679,8 +674,6 @@ mod tests {
 
         assert!(result.should_continue());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_parallel_middleware() {
         let hook_registry = Arc::new(HookRegistry::new());

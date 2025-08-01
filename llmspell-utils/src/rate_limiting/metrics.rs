@@ -247,11 +247,8 @@ impl Default for MetricsCollector {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_metrics_collector() {
         let collector = MetricsCollector::new();
@@ -285,8 +282,6 @@ mod tests {
         assert_eq!(metrics.usage_percentage(), Some(95.0));
         assert!(metrics.is_critical());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_response_time_tracking() {
         let collector = MetricsCollector::new();

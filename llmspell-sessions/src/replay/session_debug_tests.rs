@@ -65,10 +65,6 @@ fn create_test_replay_session(_session_id: SessionId) -> ReplaySession {
         start_time: SystemTime::now(),
     }
 }
-
-#[cfg_attr(test_category = "unit")]
-#[cfg_attr(test_category = "session")]
-#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_session_debugger_creation() {
     let debugger = SessionDebugger::new();
@@ -78,10 +74,6 @@ fn test_session_debugger_creation() {
     assert!(debugger.get_all_states(&session_id).is_err());
     assert!(debugger.get_timeline(&session_id).is_none());
 }
-
-#[cfg_attr(test_category = "unit")]
-#[cfg_attr(test_category = "session")]
-#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_import_replay_session() {
     let debugger = SessionDebugger::new();
@@ -99,10 +91,6 @@ fn test_import_replay_session() {
     let error_analysis = debugger.analyze_errors(&session_id);
     assert_eq!(error_analysis.total_errors, 2);
 }
-
-#[cfg_attr(test_category = "unit")]
-#[cfg_attr(test_category = "session")]
-#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_inspect_state_at_timestamp() {
     let debugger = SessionDebugger::new();
@@ -147,10 +135,6 @@ fn test_inspect_state_at_timestamp() {
     let state = result.unwrap();
     assert_eq!(state.hook_id, "hook_4");
 }
-
-#[cfg_attr(test_category = "unit")]
-#[cfg_attr(test_category = "session")]
-#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_state_comparison() {
     let state1 = SessionState {
@@ -203,10 +187,6 @@ fn test_state_comparison() {
     assert!(comparison.summary.contains("1 result differences"));
     assert!(comparison.summary.contains("1 metadata differences"));
 }
-
-#[cfg_attr(test_category = "unit")]
-#[cfg_attr(test_category = "session")]
-#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_compare_states_at_different_times() {
     let debugger = SessionDebugger::new();
@@ -238,10 +218,6 @@ fn test_compare_states_at_different_times() {
     let comparison = debugger.compare_states(&session_id, time1, time2).unwrap();
     assert!(!comparison.context_diffs.is_empty());
 }
-
-#[cfg_attr(test_category = "unit")]
-#[cfg_attr(test_category = "session")]
-#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_timeline_navigation() {
     let debugger = SessionDebugger::new();
@@ -291,10 +267,6 @@ fn test_timeline_navigation() {
         .navigate_to_timeline_point(&session_id, 10)
         .is_err());
 }
-
-#[cfg_attr(test_category = "unit")]
-#[cfg_attr(test_category = "session")]
-#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_error_analysis() {
     let errors = vec![
@@ -341,10 +313,6 @@ fn test_error_analysis() {
         Some(("ExecutionError".to_string(), 2))
     );
 }
-
-#[cfg_attr(test_category = "unit")]
-#[cfg_attr(test_category = "session")]
-#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_error_rate_calculation() {
     let base_time = SystemTime::now() - Duration::from_secs(3600); // 1 hour ago
@@ -380,10 +348,6 @@ fn test_error_rate_calculation() {
     let rate = analysis.error_rate.unwrap();
     assert!((rate - 3.0).abs() < 0.1); // Allow small floating point difference
 }
-
-#[cfg_attr(test_category = "unit")]
-#[cfg_attr(test_category = "session")]
-#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_export_debug_data() {
     let debugger = SessionDebugger::new();
@@ -415,10 +379,6 @@ fn test_export_debug_data() {
     assert_eq!(debug_data.timeline.unwrap().len(), 1);
     assert_eq!(debug_data.error_analysis.total_errors, 2);
 }
-
-#[cfg_attr(test_category = "unit")]
-#[cfg_attr(test_category = "session")]
-#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_clear_session_data() {
     let debugger = SessionDebugger::new();
@@ -441,10 +401,6 @@ fn test_clear_session_data() {
     let error_analysis = debugger.analyze_errors(&session_id);
     assert_eq!(error_analysis.total_errors, 0);
 }
-
-#[cfg_attr(test_category = "unit")]
-#[cfg_attr(test_category = "session")]
-#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_add_error() {
     let debugger = SessionDebugger::new();
@@ -469,10 +425,6 @@ fn test_add_error() {
     assert_eq!(analysis.total_errors, 1);
     assert_eq!(analysis.errors_by_hook.get("test_hook").unwrap(), &1);
 }
-
-#[cfg_attr(test_category = "unit")]
-#[cfg_attr(test_category = "session")]
-#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_state_comparison_with_arrays() {
     let state1 = SessionState {
@@ -506,10 +458,6 @@ fn test_state_comparison_with_arrays() {
     let comparison = StateComparison::compare(&state1, &state2);
     assert!(!comparison.context_diffs.is_empty());
 }
-
-#[cfg_attr(test_category = "unit")]
-#[cfg_attr(test_category = "session")]
-#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_hook_result_comparison() {
     let debugger = SessionDebugger::new();
@@ -527,10 +475,6 @@ fn test_hook_result_comparison() {
     assert!(!comparison.identical);
     assert!(comparison.difference_type.is_some());
 }
-
-#[cfg_attr(test_category = "unit")]
-#[cfg_attr(test_category = "session")]
-#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_session_state_from_captured() {
     let captured = CapturedState {
@@ -556,10 +500,6 @@ fn test_session_state_from_captured() {
     assert!(session_state.result.contains("Modified"));
     assert_eq!(session_state.metadata, captured.metadata);
 }
-
-#[cfg_attr(test_category = "unit")]
-#[cfg_attr(test_category = "session")]
-#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_timeline_entry_conversion() {
     let executions = vec![
@@ -597,10 +537,6 @@ fn test_timeline_entry_conversion() {
     assert_eq!(timeline[1].hook_id, "hook_2");
     assert_eq!(timeline[1].duration, Duration::from_millis(200));
 }
-
-#[cfg_attr(test_category = "unit")]
-#[cfg_attr(test_category = "session")]
-#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_state_inspection_empty_session() {
     let debugger = SessionDebugger::new();
@@ -610,10 +546,6 @@ fn test_state_inspection_empty_session() {
     let result = debugger.inspect_state_at(&session_id, SystemTime::now());
     assert!(result.is_err());
 }
-
-#[cfg_attr(test_category = "unit")]
-#[cfg_attr(test_category = "session")]
-#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_metadata_comparison() {
     let state1 = SessionState {
@@ -644,10 +576,6 @@ fn test_metadata_comparison() {
     let comparison = StateComparison::compare(&state1, &state2);
     assert_eq!(comparison.metadata_diffs.len(), 3); // 1 changed, 1 added, 1 removed
 }
-
-#[cfg_attr(test_category = "unit")]
-#[cfg_attr(test_category = "session")]
-#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_debug_data_serialization() {
     let debug_data = SessionDebugData {
@@ -688,10 +616,6 @@ fn test_debug_data_serialization() {
     assert!(serialized.contains("timeline"));
     assert!(serialized.contains("error_analysis"));
 }
-
-#[cfg_attr(test_category = "unit")]
-#[cfg_attr(test_category = "session")]
-#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_comparison_with_nested_objects() {
     let state1 = SessionState {

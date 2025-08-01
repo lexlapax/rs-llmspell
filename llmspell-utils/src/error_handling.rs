@@ -340,11 +340,8 @@ impl LoggingStandards {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_safe_error_handler() {
         let handler = SafeErrorHandler::new(true); // production mode
@@ -361,8 +358,6 @@ mod tests {
         assert!(!response.error.contains("/etc/passwd"));
         assert!(response.code.starts_with("ERR_"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_stack_trace_removal() {
         let error_with_stack = r"
@@ -383,8 +378,6 @@ This is the actual error message.
         assert!(cleaned.contains("Error: Something went wrong"));
         assert!(cleaned.contains("This is the actual error message"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_debug_info_manager() {
         let manager = DebugInfoManager::new(true);
@@ -406,8 +399,6 @@ This is the actual error message.
         // which makes it hard to test with dynamic values. In production,
         // this would work with concrete types that implement both traits.
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_error_context_builder() {
         let context = ErrorContext::new()
@@ -421,8 +412,6 @@ This is the actual error message.
         assert_eq!(context.user_id.unwrap(), "user123");
         assert_eq!(context.metadata.get("attempt").unwrap(), "3");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_production_vs_development_mode() {
         let prod_handler = SafeErrorHandler::new(true);

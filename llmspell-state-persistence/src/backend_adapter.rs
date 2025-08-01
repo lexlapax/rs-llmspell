@@ -161,7 +161,6 @@ impl StateStorageAdapter {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "state")]
 mod tests {
     use super::*;
     use serde::{Deserialize, Serialize};
@@ -171,8 +170,6 @@ mod tests {
         value: String,
         count: u32,
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_state_storage_adapter() {
         let backend = create_storage_backend(&StorageBackendType::Memory)

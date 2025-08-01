@@ -132,11 +132,8 @@ impl Default for SessionSecurityManager {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "session")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_same_session_access() {
         let manager = SessionSecurityManager::new(true);
@@ -146,8 +143,6 @@ mod tests {
             .can_access_session(&session_id, &session_id)
             .unwrap());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_strict_isolation() {
         let mut manager = SessionSecurityManager::new(true);
@@ -160,8 +155,6 @@ mod tests {
         // Cross-session access should be denied in strict mode
         assert!(!manager.can_access_session(&session1, &session2).unwrap());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_non_strict_isolation() {
         let mut manager = SessionSecurityManager::new(false);
@@ -174,8 +167,6 @@ mod tests {
         // Cross-session access should be allowed in non-strict mode for active sessions
         assert!(manager.can_access_session(&session1, &session2).unwrap());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_inactive_session_access() {
         let mut manager = SessionSecurityManager::new(false);
@@ -188,8 +179,6 @@ mod tests {
         // Access to inactive session should be denied even in non-strict mode
         assert!(!manager.can_access_session(&session1, &session2).unwrap());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_state_scope_validation() {
         let mut manager = SessionSecurityManager::new(true);

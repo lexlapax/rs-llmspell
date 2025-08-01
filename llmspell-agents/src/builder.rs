@@ -170,12 +170,9 @@ impl AgentBuilder {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
     use serde_json::json;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_basic_builder() {
         let config = AgentBuilder::new("test-agent", "basic")
@@ -187,8 +184,6 @@ mod tests {
         assert_eq!(config.agent_type, "basic");
         assert_eq!(config.description, "A test agent");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_fluent_api() {
         let config = AgentBuilder::new("complex-agent", "llm")
@@ -219,8 +214,6 @@ mod tests {
         assert_eq!(config.resource_limits.max_execution_time_secs, 600);
         assert_eq!(config.resource_limits.max_memory_mb, 1024);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_convenience_builders() {
         // Test basic builder
@@ -247,8 +240,6 @@ mod tests {
         let workflow = AgentBuilder::workflow("my-workflow").build().unwrap();
         assert_eq!(workflow.agent_type, "workflow");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_validation() {
         // Empty name should fail

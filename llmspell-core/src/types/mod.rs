@@ -324,11 +324,8 @@ impl EventMetadata {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "core")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_component_id_generation() {
         let id1 = ComponentId::new();
@@ -338,8 +335,6 @@ mod tests {
         assert_ne!(id1, id2);
         assert_ne!(id1.uuid(), id2.uuid());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_component_id_from_name_deterministic() {
         let name = "test-component";
@@ -350,8 +345,6 @@ mod tests {
         assert_eq!(id1, id2);
         assert_eq!(id1.uuid(), id2.uuid());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_component_id_from_different_names() {
         let id1 = ComponentId::from_name("component-a");
@@ -360,8 +353,6 @@ mod tests {
         // Different names should generate different IDs
         assert_ne!(id1, id2);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_component_id_display() {
         let id = ComponentId::from_name("test");
@@ -371,8 +362,6 @@ mod tests {
         assert!(display_str.len() == 36); // UUID string length
         assert!(display_str.contains('-')); // UUID format
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_component_id_serialization() {
         let id = ComponentId::from_name("test");
@@ -383,8 +372,6 @@ mod tests {
 
         assert_eq!(id, deserialized);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_version_creation() {
         let version = Version::new(1, 2, 3);
@@ -393,8 +380,6 @@ mod tests {
         assert_eq!(version.minor, 2);
         assert_eq!(version.patch, 3);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_version_comparison() {
         let v1_0_0 = Version::new(1, 0, 0);
@@ -412,8 +397,6 @@ mod tests {
         assert!(v2_0_0.is_newer_than(&v1_1_1));
         assert!(!v1_0_0.is_newer_than(&v1_1_0));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_version_compatibility() {
         let v1_0_0 = Version::new(1, 0, 0);
@@ -428,15 +411,11 @@ mod tests {
         assert!(!v1_0_0.is_compatible_with(&v2_0_0));
         assert!(!v2_0_0.is_compatible_with(&v1_0_0));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_version_display() {
         let version = Version::new(1, 2, 3);
         assert_eq!(format!("{}", version), "1.2.3");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_version_serialization() {
         let version = Version::new(1, 2, 3);
@@ -447,8 +426,6 @@ mod tests {
 
         assert_eq!(version, deserialized);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_component_metadata_creation() {
         let name = "test-component".to_string();
@@ -466,8 +443,6 @@ mod tests {
         let duration = now - metadata.created_at;
         assert!(duration.num_seconds() < 5); // Created within last 5 seconds
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_component_metadata_version_update() {
         let mut metadata = ComponentMetadata::new("test".to_string(), "test component".to_string());
@@ -483,8 +458,6 @@ mod tests {
         assert_eq!(metadata.version, new_version);
         assert!(metadata.updated_at > original_updated_at);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_component_metadata_serialization() {
         let metadata = ComponentMetadata::new("test".to_string(), "test component".to_string());
@@ -498,8 +471,6 @@ mod tests {
         assert_eq!(metadata.version, deserialized.version);
         assert_eq!(metadata.description, deserialized.description);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_event_metadata_creation() {
         let metadata = EventMetadata::new();
@@ -509,8 +480,6 @@ mod tests {
         assert!(metadata.span_id.is_none());
         assert!(metadata.attributes.is_empty());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_event_metadata_with_trace() {
         let trace_id = "trace-123".to_string();
@@ -522,8 +491,6 @@ mod tests {
         assert_eq!(metadata.span_id(), Some("span-456"));
         assert!(metadata.timestamp.is_some());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_event_metadata_setters_getters() {
         let mut metadata = EventMetadata::new();
@@ -540,8 +507,6 @@ mod tests {
         assert_eq!(metadata.correlation_id(), Some("corr-678"));
         assert!(metadata.source().is_some());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_event_metadata_attributes() {
         let mut metadata = EventMetadata::new();
@@ -554,8 +519,6 @@ mod tests {
         assert_eq!(metadata.get_attribute("non_existent"), None);
         assert_eq!(metadata.attributes().len(), 2);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_event_metadata_create_child() {
         let mut parent =
@@ -571,8 +534,6 @@ mod tests {
         assert_eq!(child.correlation_id(), Some("corr-parent"));
         assert!(child.attributes().is_empty()); // Child starts with fresh attributes
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_event_metadata_serialization() {
         let mut metadata =

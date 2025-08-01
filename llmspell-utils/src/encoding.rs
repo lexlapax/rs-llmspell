@@ -444,11 +444,8 @@ pub fn remove_bom(data: &[u8]) -> &[u8] {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_hash_string() {
         let text = "Hello, World!";
@@ -466,8 +463,6 @@ mod tests {
             "dffd6021bb2bd5b0af676290809ec3a53191dd81c7f70a4b28688a362182986f"
         );
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_verify_hash() {
         let data = b"test data";
@@ -480,8 +475,6 @@ mod tests {
             HashAlgorithm::Sha256
         ));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_base64_encoding() {
         let data = b"Hello, Base64!";
@@ -496,8 +489,6 @@ mod tests {
         let url_decoded = base64_decode_url_safe(&url_encoded).unwrap();
         assert_eq!(url_decoded, data);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_hex_conversion() {
         let data = vec![0xFF, 0x00, 0xAB, 0xCD];
@@ -507,8 +498,6 @@ mod tests {
         let parsed = from_hex_string(&hex).unwrap();
         assert_eq!(parsed, data);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_text_encoding_detection() {
         // UTF-8 with BOM
@@ -531,8 +520,6 @@ mod tests {
         let detected = detect_text_encoding(ascii);
         assert!(matches!(detected, TextEncoding::Utf8 | TextEncoding::Ascii));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_text_encoding_conversion() {
         // Test simple ASCII conversion
@@ -564,8 +551,6 @@ mod tests {
                 .unwrap();
         assert_eq!(windows_back, ascii_only);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_line_ending_detection() {
         assert_eq!(detect_line_ending("line1\nline2\n"), LineEnding::Lf);
@@ -577,8 +562,6 @@ mod tests {
         );
         assert_eq!(detect_line_ending("no line endings"), LineEnding::Lf); // Default
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_line_ending_conversion() {
         let text = "line1\r\nline2\nline3\r";
@@ -595,8 +578,6 @@ mod tests {
         let cr = convert_line_endings(text, LineEnding::Cr);
         assert_eq!(cr, "line1\rline2\rline3\r");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_tabs_spaces_conversion() {
         let text_with_tabs = "line1\tindented\ttext";
@@ -610,8 +591,6 @@ mod tests {
         let tabs = spaces_to_tabs(text_with_spaces, 4);
         assert_eq!(tabs, text_with_tabs);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_bom_removal() {
         // UTF-8 BOM
@@ -629,8 +608,6 @@ mod tests {
         let result = remove_bom(no_bom);
         assert_eq!(result, no_bom);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_decode_encode_text() {
         let text = "Hello, World!";

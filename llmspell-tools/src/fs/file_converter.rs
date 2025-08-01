@@ -524,7 +524,6 @@ impl Tool for FileConverterTool {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "tool")]
 mod tests {
     use super::*;
     use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
@@ -571,8 +570,6 @@ mod tests {
             output_modalities: vec![],
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_encoding_conversion() {
         let (tool, temp_dir) = create_test_tool();
@@ -598,8 +595,6 @@ mod tests {
             .text
             .contains("File conversion completed successfully"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_line_ending_conversion() {
         let (tool, temp_dir) = create_test_tool();
@@ -631,8 +626,6 @@ mod tests {
         let content = fs::read_to_string(&test_file).await.unwrap();
         assert_eq!(content, "line1\nline2\nline3\n");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_indentation_conversion() {
         let (tool, temp_dir) = create_test_tool();
@@ -665,8 +658,6 @@ mod tests {
         let content = fs::read_to_string(&test_file).await.unwrap();
         assert_eq!(content, "line1    indented    text");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_invalid_operation() {
         let (tool, temp_dir) = create_test_tool();
@@ -685,8 +676,6 @@ mod tests {
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_missing_parameters() {
         let (tool, _temp_dir) = create_test_tool();
@@ -702,8 +691,6 @@ mod tests {
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_nonexistent_file() {
         let (tool, temp_dir) = create_test_tool();
@@ -722,8 +709,6 @@ mod tests {
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_metadata() {
         let (tool, _temp_dir) = create_test_tool();

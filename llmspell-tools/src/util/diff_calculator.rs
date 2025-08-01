@@ -569,12 +569,9 @@ impl Tool for DiffCalculatorTool {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "tool")]
 mod tests {
     use super::*;
     use serde_json::json;
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_text_diff_unified() {
         let tool = DiffCalculatorTool::new();
@@ -602,8 +599,6 @@ mod tests {
         assert_eq!(output["result"]["format"], "unified");
         assert!(output["result"]["diff"].as_str().unwrap().contains("@@"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_text_diff_simple() {
         let tool = DiffCalculatorTool::new();
@@ -634,8 +629,6 @@ mod tests {
             .unwrap()
             .contains("Total changes:"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_json_diff() {
         let tool = DiffCalculatorTool::new();
@@ -676,8 +669,6 @@ mod tests {
         assert_eq!(output["result"]["summary"]["added"], 1);
         assert_eq!(output["result"]["summary"]["modified"], 3); // age, city, hobbies[]
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_missing_input() {
         let tool = DiffCalculatorTool::new();
@@ -693,8 +684,6 @@ mod tests {
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_invalid_format() {
         let tool = DiffCalculatorTool::new();
@@ -712,8 +701,6 @@ mod tests {
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_metadata() {
         let tool = DiffCalculatorTool::new();

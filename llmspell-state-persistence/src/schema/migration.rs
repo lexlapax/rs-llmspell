@@ -558,7 +558,6 @@ pub struct MigrationStats {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "state")]
 mod tests {
     use super::*;
     use crate::config::FieldSchema;
@@ -576,8 +575,6 @@ mod tests {
         );
         schema
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_migration_planner_creation() {
         let planner = MigrationPlanner::new();
@@ -586,8 +583,6 @@ mod tests {
         assert_eq!(stats.total_schemas, 0);
         assert_eq!(stats.total_compatibility_checks, 0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_schema_registration() {
         let mut planner = MigrationPlanner::new();
@@ -599,8 +594,6 @@ mod tests {
         assert!(planner.schema_registry.contains_key(&version));
         assert_eq!(planner.get_migration_stats().total_schemas, 1);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_no_op_migration_plan() {
         let mut planner = MigrationPlanner::new();
@@ -617,8 +610,6 @@ mod tests {
         assert_eq!(plan.risk_level, RiskLevel::Low);
         assert!(!plan.requires_backup);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_simple_migration_plan() {
         let mut planner = MigrationPlanner::new();
@@ -654,8 +645,6 @@ mod tests {
         // Validate the plan
         planner.validate_plan(&plan).unwrap();
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_breaking_migration_plan() {
         let mut planner = MigrationPlanner::new();
@@ -689,8 +678,6 @@ mod tests {
         // Note: warnings may be empty if compatibility checker doesn't generate them
         // for major version changes, which is expected behavior
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_field_mapping_creation() {
         let mut planner = MigrationPlanner::new();
@@ -720,8 +707,6 @@ mod tests {
             _ => panic!("Expected Transform mapping"),
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_migration_path_finding() {
         let mut planner = MigrationPlanner::new();
@@ -741,8 +726,6 @@ mod tests {
         assert_eq!(path[0], v1_0_0);
         assert_eq!(path[1], v1_2_0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_plan_validation() {
         let planner = MigrationPlanner::new();
@@ -770,8 +753,6 @@ mod tests {
             Err(MigrationPlannerError::ValidationFailed { .. })
         ));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_migration_stats() {
         let mut planner = MigrationPlanner::new();

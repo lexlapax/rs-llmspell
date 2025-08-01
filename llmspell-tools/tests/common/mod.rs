@@ -165,24 +165,18 @@ pub fn assert_json_contains(actual: &Value, expected: &Value) {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_create_test_context() {
         let context = create_test_context();
         // Context should be created successfully
         let _ = context;
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_create_agent_input() {
         let input = create_agent_input(json!({"test": "value"})).unwrap();
         // AgentInput stores JSON data internally
         let _ = input;
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_create_simple_input() {
         let input = create_simple_input("test input").unwrap();

@@ -390,7 +390,6 @@ where
 
 /// Add jitter for backoff calculations
 #[cfg(test)]
-#[cfg_attr(test_category = "util")]
 #[allow(
     clippy::cast_precision_loss,
     clippy::cast_possible_truncation,
@@ -403,22 +402,17 @@ fn add_jitter(duration: Duration, jitter_fraction: f64) -> Duration {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
     use tokio::time::sleep;
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_timeout_success() {
         let result = timeout(Duration::from_secs(1), async { 42 }).await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), 42);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_timeout_failure() {
         let result = timeout(Duration::from_millis(10), async {
@@ -428,15 +422,11 @@ mod tests {
         .await;
         assert!(result.is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_timeout_with_default_success() {
         let result = timeout_with_default(Duration::from_secs(1), async { 42 }, 0).await;
         assert_eq!(result, 42);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_timeout_with_default_timeout() {
         let result = timeout_with_default(
@@ -450,8 +440,6 @@ mod tests {
         .await;
         assert_eq!(result, 0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_retry_async_success() {
         let counter = Arc::new(AtomicUsize::new(0));
@@ -481,8 +469,6 @@ mod tests {
         assert_eq!(result, "Success!");
         assert_eq!(counter.load(Ordering::SeqCst), 3);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_retry_async_failure() {
         let counter = Arc::new(AtomicUsize::new(0));
@@ -508,8 +494,6 @@ mod tests {
         ));
         assert_eq!(counter.load(Ordering::SeqCst), 2);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_concurrent_map() {
         let numbers = vec![1, 2, 3, 4, 5];
@@ -517,8 +501,6 @@ mod tests {
 
         assert_eq!(results, vec![2, 4, 6, 8, 10]);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_concurrent_map_with_delay() {
         let numbers = vec![1, 2, 3];
@@ -540,8 +522,6 @@ mod tests {
         assert!(elapsed >= Duration::from_millis(90));
         assert!(elapsed < Duration::from_millis(200));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_cancellable_future() {
         let mut future = CancellableFuture::new(async {
@@ -554,8 +534,6 @@ mod tests {
 
         assert!(matches!(result, Err(AsyncError::Cancelled)));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_race_to_success() {
         type TestFuture<'a> = Pin<Box<dyn Future<Output = Result<&'a str, &'a str>> + Send + 'a>>;
@@ -573,8 +551,6 @@ mod tests {
         let result = race_to_success(futures).await.unwrap();
         assert_eq!(result, "fast");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_add_jitter() {
         let base_duration = Duration::from_millis(100);
@@ -584,8 +560,6 @@ mod tests {
         assert!(jittered.as_millis() >= 90);
         assert!(jittered.as_millis() <= 110);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_retry_with_backoff() {
         let counter = Arc::new(AtomicUsize::new(0));

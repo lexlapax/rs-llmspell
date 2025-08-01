@@ -692,13 +692,10 @@ impl ShutdownHook for LoggingShutdownHook {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
     use crate::lifecycle::events::EventSystemConfig;
     use tokio::time::sleep;
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_shutdown_coordinator_basic() {
         let event_system = Arc::new(LifecycleEventSystem::new(EventSystemConfig::default()));
@@ -734,8 +731,6 @@ mod tests {
         assert_eq!(result.agent_id, "test-agent");
         assert_eq!(state_machine.current_state().await, AgentState::Terminated);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_shutdown_priorities() {
         let event_system = Arc::new(LifecycleEventSystem::new(EventSystemConfig::default()));
@@ -774,8 +769,6 @@ mod tests {
         assert_eq!(results[0].agent_id, "critical-agent");
         assert_eq!(results[2].agent_id, "background-agent");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_shutdown_timeout() {
         let event_system = Arc::new(LifecycleEventSystem::new(EventSystemConfig::default()));
@@ -824,8 +817,6 @@ mod tests {
         assert!(result.success);
         assert_eq!(state_machine.current_state().await, AgentState::Terminated);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_emergency_shutdown() {
         let event_system = Arc::new(LifecycleEventSystem::new(EventSystemConfig::default()));
@@ -847,8 +838,6 @@ mod tests {
         // Should receive emergency signal
         assert!(emergency_task.await.unwrap().is_ok());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_shutdown_request_builder() {
         let request = ShutdownRequest::new("test-agent".to_string())

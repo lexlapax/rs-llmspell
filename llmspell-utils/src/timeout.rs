@@ -402,12 +402,9 @@ pub trait TimeoutExt: Future + Sized {
 impl<F: Future> TimeoutExt for F {}
 
 #[cfg(test)]
-#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
     use tokio::time::sleep;
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_successful_operation() {
         let result = with_timeout(Duration::from_secs(1), async {
@@ -418,8 +415,6 @@ mod tests {
 
         assert_eq!(result.unwrap(), 42);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_timeout() {
         let result = with_timeout(Duration::from_millis(100), async {
@@ -430,8 +425,6 @@ mod tests {
 
         assert!(matches!(result, Err(TimeoutError::Timeout { .. })));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_timeout_config() {
         let config =
@@ -441,8 +434,6 @@ mod tests {
         let validated = config.validate_timeout(Duration::from_secs(10)).unwrap();
         assert_eq!(validated, Duration::from_millis(500));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_timeout_builder() {
         let result = TimeoutBuilder::default()
@@ -456,8 +447,6 @@ mod tests {
 
         assert_eq!(result.unwrap(), "success");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_timeout_manager() {
         let manager = TimeoutManager::new(TimeoutConfig::default());
@@ -489,8 +478,6 @@ mod tests {
         let active = manager.active_operations().await;
         assert_eq!(active.len(), 0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_timeout_extension_trait() {
         use crate::timeout::TimeoutExt;

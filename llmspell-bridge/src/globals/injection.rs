@@ -178,11 +178,8 @@ impl GlobalInjector {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "bridge")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_injection_cache() {
         let cache = InjectionCache::new();
@@ -201,8 +198,6 @@ mod tests {
         cache.clear();
         assert_eq!(cache.hit_rate(), 0.0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_injection_metrics() {
         let metrics = InjectionMetrics {
@@ -214,8 +209,6 @@ mod tests {
         assert!(metrics.is_within_bounds());
         assert_eq!(metrics.average_time_us(), 300);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_injection_metrics_failure_case() {
         // Test failure case

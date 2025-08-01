@@ -818,12 +818,9 @@ impl ParallelWorkflowBuilder {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "workflow")]
 mod tests {
     use super::*;
     use crate::traits::StepType;
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_parallel_builder() {
         let branch1 = ParallelBranch::new("branch1".to_string()).add_step(TraitWorkflowStep::new(
@@ -844,8 +841,6 @@ mod tests {
         assert_eq!(workflow.name(), "test_parallel");
         assert_eq!(workflow.branch_count(), 1);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_parallel_validation() {
         // Empty branches

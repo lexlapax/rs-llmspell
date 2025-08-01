@@ -326,16 +326,12 @@ pub fn skip_if_no_api_key(provider: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "external")]
     #[tokio::test]
     async fn test_context_creation() {
         let context = ProviderTestContext::new().await.unwrap();
         assert!(!context.agent_id.is_empty());
         assert!(context.temp_dir.path().exists());
     }
-
-    #[cfg_attr(test_category = "external")]
     #[test]
     fn test_api_key_checking() {
         // This will return false unless API keys are actually set

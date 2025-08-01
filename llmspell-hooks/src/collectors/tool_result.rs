@@ -204,14 +204,11 @@ impl ArtifactCollector for ToolResultCollector {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "hook")]
 mod tests {
     use super::*;
     use crate::context::OperationContext;
     use crate::types::{ComponentId, ComponentType};
     use uuid::Uuid;
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_result_collection() {
         let mut config = CollectionConfig::default();
@@ -245,8 +242,6 @@ mod tests {
         // Check that artifact was added to context
         assert!(context.data.contains_key("collected_artifact"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_error_collection() {
         let collector = ToolResultCollector::new();

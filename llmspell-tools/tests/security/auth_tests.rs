@@ -432,8 +432,6 @@ pub fn all_auth_tests() -> Vec<SecurityTestCase> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "external")]
     #[test]
     fn test_auth_test_creation() {
         let tests = all_auth_tests();
@@ -457,8 +455,6 @@ mod tests {
         assert!(categories.contains(&"SESSION".to_string()));
         assert!(categories.contains(&"API".to_string()));
     }
-
-    #[cfg_attr(test_category = "external")]
     #[test]
     fn test_critical_auth_tests() {
         let tests = all_auth_tests();
@@ -480,8 +476,6 @@ mod tests {
             .iter()
             .any(|t| t.name == "MFA_BYPASS_ATTEMPT"));
     }
-
-    #[cfg_attr(test_category = "external")]
     #[test]
     fn test_authentication_category_coverage() {
         let tests = all_auth_tests();
@@ -493,8 +487,6 @@ mod tests {
         // Should have comprehensive authentication test coverage
         assert!(auth_tests.len() > 15);
     }
-
-    #[cfg_attr(test_category = "external")]
     #[test]
     fn test_authorization_category_coverage() {
         let tests = all_auth_tests();

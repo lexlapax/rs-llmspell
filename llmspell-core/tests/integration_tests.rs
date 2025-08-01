@@ -209,10 +209,6 @@ impl Tool for TestTool {
         Ok(())
     }
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "core")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_agent_conversation_flow() {
     let agent = TestAgent::new("conversational-agent");
@@ -255,10 +251,6 @@ async fn test_agent_conversation_flow() {
     let conv = agent.get_conversation().await.unwrap();
     assert_eq!(conv.len(), 0);
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "core")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_tool_execution_and_validation() {
     let tool = TestTool::new("string-tool");
@@ -322,10 +314,6 @@ async fn test_tool_execution_and_validation() {
         .unwrap();
     assert_eq!(output.text, "olleh");
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "core")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_error_handling_flow() {
     let agent = TestAgent::new("error-test-agent");
@@ -349,10 +337,6 @@ async fn test_error_handling_flow() {
     let handled = agent.handle_error(err).await.unwrap();
     assert!(handled.text.contains("Error handled"));
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "core")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_component_metadata_updates() {
     let mut metadata =
@@ -374,10 +358,6 @@ async fn test_component_metadata_updates() {
     assert_eq!(metadata.id, deserialized.id);
     assert_eq!(metadata.name, deserialized.name);
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "core")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_execution_context_environment() {
     let mut context = ExecutionContext::with_conversation("test-session".to_string());
@@ -395,10 +375,6 @@ async fn test_execution_context_environment() {
     assert_eq!(context.data.get("ENV"), Some(&serde_json::json!("test")));
     assert_eq!(context.data.get("MISSING"), None);
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "core")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_agent_input_context_manipulation() {
     let input = AgentInput::text("test prompt".to_string())
@@ -423,10 +399,6 @@ async fn test_agent_input_context_manipulation() {
     assert_eq!(nested.get("inner"), Some(&serde_json::json!("value")));
     assert_eq!(nested.get("count"), Some(&serde_json::json!(10)));
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "core")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_agent_output_metadata() {
     let metadata = llmspell_core::types::OutputMetadata {

@@ -753,7 +753,6 @@ pub trait ToolProvider {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
     use serde_json::json;
@@ -800,8 +799,6 @@ mod tests {
             self.tools.contains_key(tool_name)
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_simple_composition() {
         let provider = MockToolProvider::new();
@@ -823,8 +820,6 @@ mod tests {
         assert!(result.success);
         assert_eq!(result.step_results.len(), 1);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_chained_composition() {
         let provider = MockToolProvider::new();
@@ -857,8 +852,6 @@ mod tests {
         let step2_result = result.step_results.get("step2").unwrap();
         assert!(step2_result.success);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_data_flow_transforms() {
         let composition = ToolComposition::new("test");
@@ -881,8 +874,6 @@ mod tests {
             .unwrap();
         assert_eq!(result, json!("constant_value"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_data_transforms() {
         let composition = ToolComposition::new("test");

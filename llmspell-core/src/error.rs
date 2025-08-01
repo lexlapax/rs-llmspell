@@ -430,11 +430,8 @@ macro_rules! log_error {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "core")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_error_severity_ordering() {
         assert!(ErrorSeverity::Info < ErrorSeverity::Warning);
@@ -442,8 +439,6 @@ mod tests {
         assert!(ErrorSeverity::Error < ErrorSeverity::Critical);
         assert!(ErrorSeverity::Critical < ErrorSeverity::Fatal);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_error_categorization() {
         let config_err = LLMSpellError::Configuration {
@@ -464,8 +459,6 @@ mod tests {
         };
         assert_eq!(security_err.category(), ErrorCategory::Security);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_error_severity_mapping() {
         let validation_err = LLMSpellError::Validation {
@@ -486,8 +479,6 @@ mod tests {
         };
         assert_eq!(internal_err.severity(), ErrorSeverity::Fatal);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_error_retryability() {
         // Retryable errors
@@ -520,8 +511,6 @@ mod tests {
         assert!(!security_err.is_retryable());
         assert_eq!(security_err.retry_delay_ms(), None);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_storage_error_retryability() {
         let read_err = LLMSpellError::Storage {
@@ -538,8 +527,6 @@ mod tests {
         };
         assert!(!delete_err.is_retryable());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_error_chaining() {
         use std::io;
@@ -560,8 +547,6 @@ mod tests {
             _ => panic!("Expected Storage error"),
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_error_display() {
         let provider_err = LLMSpellError::Provider {
@@ -573,8 +558,6 @@ mod tests {
         assert!(display.contains("LLM provider error"));
         assert!(display.contains("API rate limit exceeded"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_error_macros() {
         let comp_err = component_error!("Component failed");
@@ -606,8 +589,6 @@ mod tests {
             _ => panic!("Expected Tool error"),
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_script_error_with_details() {
         let script_err = LLMSpellError::Script {
@@ -625,8 +606,6 @@ mod tests {
             _ => panic!("Expected Script error"),
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_workflow_error_with_step() {
         let workflow_err = LLMSpellError::Workflow {
@@ -642,8 +621,6 @@ mod tests {
             _ => panic!("Expected Workflow error"),
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_error_serialization() {
         // Test that errors can be converted to strings and back

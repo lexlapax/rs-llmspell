@@ -3,9 +3,6 @@
 use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
 use llmspell_tools::JsonProcessorTool;
 use serde_json::json;
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
 #[tokio::test]
 async fn test_comprehensive_jq_syntax() {
     let tool = JsonProcessorTool::default();
@@ -193,9 +190,6 @@ async fn test_comprehensive_jq_syntax() {
     let result: Vec<serde_json::Value> = serde_json::from_str(&output.text).unwrap();
     assert!(result.iter().all(|u| u["is_adult"] == true));
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
 #[tokio::test]
 async fn test_streaming_json_lines() {
     let tool = JsonProcessorTool::default();

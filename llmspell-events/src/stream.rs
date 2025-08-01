@@ -320,7 +320,6 @@ pub struct ThroughputMeasurement {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "event")]
 mod tests {
     use super::*;
     use crate::universal_event::Language;
@@ -330,8 +329,6 @@ mod tests {
     fn create_test_event(event_type: &str) -> UniversalEvent {
         UniversalEvent::new(event_type, Value::Null, Language::Rust)
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_batched_stream() {
         let events = vec![
@@ -353,8 +350,6 @@ mod tests {
         let batch2 = batched.next().await.unwrap().unwrap();
         assert_eq!(batch2.len(), 1);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_filtered_stream() {
         let events = vec![
@@ -378,8 +373,6 @@ mod tests {
 
         assert!(filtered.next().await.is_none());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_high_frequency_stream() {
         let stream = StreamUtils::high_frequency_test_stream(100, 1000);
@@ -390,8 +383,6 @@ mod tests {
         assert!(measurement.event_count > 0);
         assert!(measurement.events_per_second > 0.0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_high_throughput_processor() {
         let processor = HighThroughputProcessor::new(1000, 4);

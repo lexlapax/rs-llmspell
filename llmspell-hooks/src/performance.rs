@@ -338,12 +338,9 @@ impl PerformanceMonitor {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "hook")]
 mod tests {
     use super::*;
     use std::thread;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_performance_monitoring() {
         let monitor = PerformanceMonitor::new();
@@ -367,8 +364,6 @@ mod tests {
         assert_eq!(metrics2.execution_count, 2);
         assert_eq!(metrics2.avg_duration, Duration::from_millis(10));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_execution_timer() {
         let monitor = PerformanceMonitor::new();
@@ -384,8 +379,6 @@ mod tests {
         assert_eq!(metrics.execution_count, 1);
         assert!(metrics.max_duration >= Duration::from_millis(50));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_slow_hook_detection() {
         let monitor = PerformanceMonitor::new();
@@ -398,8 +391,6 @@ mod tests {
         assert_eq!(slow_hooks.len(), 1);
         assert_eq!(slow_hooks[0].0, "slow_hook");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_performance_report() {
         let monitor = PerformanceMonitor::new();
@@ -420,8 +411,6 @@ mod tests {
         assert_eq!(report.slowest_hook.unwrap().0, "slow_hook");
         assert_eq!(report.slow_hooks.len(), 1);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_metrics_cleanup() {
         let config = PerformanceConfig {

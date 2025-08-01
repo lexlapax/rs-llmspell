@@ -9,8 +9,6 @@ mod tests {
         registry::ComponentRegistry,
     };
     use std::sync::Arc;
-
-    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_lua_engine_creation() {
         let config = LuaConfig::default();

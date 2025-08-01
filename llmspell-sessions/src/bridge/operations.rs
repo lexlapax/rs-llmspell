@@ -195,7 +195,6 @@ pub struct SessionExport {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "session")]
 mod tests {
     use super::*;
     use crate::{types::CreateSessionOptions, SessionManagerConfigBuilder};
@@ -253,8 +252,6 @@ mod tests {
 
         (session_manager, session_id)
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_update_metadata() {
         let (session_manager, session_id) = setup_test_env().await;
@@ -298,8 +295,6 @@ mod tests {
             Some(&serde_json::json!("custom value"))
         );
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tag_operations() {
         let (session_manager, session_id) = setup_test_env().await;
@@ -346,8 +341,6 @@ mod tests {
             .await
             .expect("Failed to check tag"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_get_session_stats() {
         let (session_manager, session_id) = setup_test_env().await;
@@ -379,8 +372,6 @@ mod tests {
         assert_eq!(stats.tag_count, 2); // "test", "unit"
         assert_eq!(stats.status, "Active");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_export_session() {
         let (session_manager, session_id) = setup_test_env().await;
@@ -417,8 +408,6 @@ mod tests {
         assert!(export.artifacts.is_some());
         assert_eq!(export.artifacts.as_ref().unwrap().len(), 1);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_update_metadata_edge_cases() {
         let (session_manager, session_id) = setup_test_env().await;
@@ -444,8 +433,6 @@ mod tests {
         let tags = ops.get_tags(&session_id).await.expect("Failed to get tags");
         assert_eq!(tags, vec!["valid-tag"]); // Only string values kept
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_concurrent_tag_operations() {
         let (session_manager, session_id) = setup_test_env().await;
@@ -479,8 +466,6 @@ mod tests {
             assert!(tags.contains(&format!("concurrent-{}", i)));
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_nonexistent_session() {
         let (session_manager, _) = setup_test_env().await;

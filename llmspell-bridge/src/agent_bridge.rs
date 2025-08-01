@@ -1667,11 +1667,8 @@ impl AgentBridge {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "bridge")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_agent_bridge_creation() {
         let registry = Arc::new(ComponentRegistry::new());
@@ -1682,8 +1679,6 @@ mod tests {
         let types = bridge.list_agent_types().await;
         assert!(!types.is_empty());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_agent_instance_management() {
         let registry = Arc::new(ComponentRegistry::new());
@@ -1740,8 +1735,6 @@ mod tests {
         let agent_after = bridge.get_agent("test-instance").await;
         assert!(agent_after.is_none());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_agent_execution() {
         let registry = Arc::new(ComponentRegistry::new());
@@ -1791,8 +1784,6 @@ mod tests {
         // In real tests, we'd use a proper mock
         assert!(result.is_ok() || result.is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_agent_state_machine() {
         let registry = Arc::new(ComponentRegistry::new());
@@ -1903,8 +1894,6 @@ mod tests {
         // Cleanup
         bridge.remove_agent("test-state").await.unwrap();
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_context_management() {
         let registry = Arc::new(ComponentRegistry::new());
@@ -1985,8 +1974,6 @@ mod tests {
         bridge.remove_context(&context_id).await.unwrap();
         bridge.remove_context(&child_id).await.unwrap();
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_agent_context_execution() {
         let registry = Arc::new(ComponentRegistry::new());
@@ -2049,8 +2036,6 @@ mod tests {
         bridge.remove_agent("context-test").await.unwrap();
         bridge.remove_context(&context_id).await.unwrap();
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_streaming_execution() {
         let registry = Arc::new(ComponentRegistry::new());
@@ -2109,8 +2094,6 @@ mod tests {
         // Cleanup
         bridge.remove_agent("stream-test").await.unwrap();
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_composition_patterns() {
         let registry = Arc::new(ComponentRegistry::new());

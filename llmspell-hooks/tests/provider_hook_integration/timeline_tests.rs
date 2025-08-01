@@ -12,10 +12,6 @@ use serde_json::json;
 use std::collections::HashMap;
 use std::time::Duration;
 use uuid::Uuid;
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "hook")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_timeline_basic_reconstruction() {
     let fixture = HookTestFixture::new().await;
@@ -72,10 +68,6 @@ async fn test_timeline_basic_reconstruction() {
         );
     }
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "hook")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_timeline_with_parallel_execution() {
     let fixture = HookTestFixture::new().await;
@@ -184,10 +176,6 @@ async fn test_timeline_with_parallel_execution() {
         );
     }
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "hook")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_timeline_causality_chain() {
     let fixture = HookTestFixture::new().await;
@@ -279,10 +267,6 @@ async fn test_timeline_causality_chain() {
         assert!(time_c > time_b, "C should occur after B");
     }
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "hook")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_timeline_with_retries_and_errors() {
     let fixture = HookTestFixture::new().await;
@@ -382,10 +366,6 @@ async fn test_timeline_with_retries_and_errors() {
     assert!(retry_time > error_time, "Retry should occur after error");
     assert!(success_time > retry_time, "Success should occur after retry");
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "hook")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_timeline_performance_analysis() {
     let fixture = HookTestFixture::new().await;

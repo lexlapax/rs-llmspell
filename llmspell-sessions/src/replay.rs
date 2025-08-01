@@ -7,7 +7,6 @@ pub mod session_controls;
 pub mod session_debug;
 
 #[cfg(test)]
-#[cfg_attr(test_category = "session")]
 mod tests;
 
 pub use hook_replay_bridge::HookReplayBridge;

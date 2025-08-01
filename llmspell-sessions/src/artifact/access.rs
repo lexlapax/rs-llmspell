@@ -525,7 +525,6 @@ impl AccessControlManager {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "session")]
 mod tests {
     use super::*;
     use uuid::Uuid;
@@ -537,8 +536,6 @@ mod tests {
     fn create_test_artifact_id() -> ArtifactId {
         ArtifactId::new("test_hash".to_string(), create_test_session_id(), 1)
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_permission_allows() {
         let entry = AccessControlEntry::new(create_test_session_id(), Permission::Write, None);
@@ -547,8 +544,6 @@ mod tests {
         assert!(entry.allows(Permission::Write));
         assert!(!entry.allows(Permission::Admin));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_acl_owner_permissions() {
         let owner = create_test_session_id();
@@ -561,8 +556,6 @@ mod tests {
 
         assert!(!acl.has_permission(&other, Permission::Read));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_acl_grant_revoke() {
         let owner = create_test_session_id();
@@ -578,8 +571,6 @@ mod tests {
         assert!(acl.revoke_permission(&user, owner).is_ok());
         assert!(!acl.has_permission(&user, Permission::Read));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_access_control_manager() {
         let config = AccessControlConfig::default();
@@ -625,8 +616,6 @@ mod tests {
             .await
             .unwrap());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_audit_logging() {
         let config = AccessControlConfig::default();

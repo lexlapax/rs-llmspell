@@ -424,7 +424,6 @@ impl Default for ToolInvoker {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
     use llmspell_core::{
@@ -508,8 +507,6 @@ mod tests {
             )
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_invoker_creation() {
         let config = InvocationConfig::default();
@@ -518,8 +515,6 @@ mod tests {
         assert_eq!(invoker.config().max_execution_time, Duration::from_secs(30));
         assert!(invoker.config().validate_parameters);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_invocation_config_builder() {
         let config = InvocationConfig::new()
@@ -531,8 +526,6 @@ mod tests {
         assert!(!config.validate_parameters);
         assert!(config.debug_logging);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_successful_tool_invocation() {
         let config = InvocationConfig::default();
@@ -548,8 +541,6 @@ mod tests {
         assert!(result.output.text.contains("Processed: hello world"));
         assert!(result.metrics.execution_time > Duration::from_millis(0));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_parameter_validation_failure() {
         let config = InvocationConfig::default();
@@ -565,8 +556,6 @@ mod tests {
         assert!(result.output.text.contains("Validation failed"));
         assert_eq!(result.metrics.validation_errors, 1);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_simple_invocation() {
         let config = InvocationConfig::default();
@@ -579,8 +568,6 @@ mod tests {
         let output = invoker.invoke_simple(tool, params, context).await.unwrap();
         assert!(output.text.contains("Processed: simple test"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_validation_error_creation() {
         let error = ValidationError::new("field1", "Invalid value")

@@ -11,8 +11,6 @@ use tempfile::TempDir;
 use tokio;
 
 /// Test session creation and basic operations
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "bridge")]
 #[tokio::test]
 async fn test_session_creation_and_operations() {
     TestLogger::init();
@@ -69,8 +67,6 @@ async fn test_session_creation_and_operations() {
 }
 
 /// Test session persistence (save/load)
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "bridge")]
 #[tokio::test]
 async fn test_session_persistence() {
     TestLogger::init();
@@ -112,8 +108,6 @@ async fn test_session_persistence() {
 }
 
 /// Test session lifecycle (suspend/resume/complete)
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "bridge")]
 #[tokio::test]
 async fn test_session_lifecycle() {
     TestLogger::init();
@@ -148,8 +142,6 @@ async fn test_session_lifecycle() {
 }
 
 /// Test session replay functionality
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "bridge")]
 #[tokio::test]
 async fn test_session_replay() {
     TestLogger::init();
@@ -189,8 +181,6 @@ async fn test_session_replay() {
 }
 
 /// Test error conditions
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "bridge")]
 #[tokio::test]
 async fn test_session_error_conditions() {
     TestLogger::init();

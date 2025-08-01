@@ -580,7 +580,6 @@ impl StorageBackend for FileStorageBackend {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "hook")]
 mod tests {
     use super::*;
     use crate::types::ComponentType;
@@ -605,8 +604,6 @@ mod tests {
 
         (execution, metadata)
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_in_memory_storage() {
         let backend = InMemoryStorageBackend::new();
@@ -650,8 +647,6 @@ mod tests {
             .unwrap();
         assert!(loaded.is_none());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_compression() {
         // Use larger, repetitive data that compresses well
@@ -678,8 +673,6 @@ mod tests {
             compression_ratio
         );
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_cleanup_by_age() {
         let backend = InMemoryStorageBackend::new();

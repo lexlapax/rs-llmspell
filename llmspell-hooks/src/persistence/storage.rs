@@ -251,11 +251,8 @@ impl Clone for StorageStatistics {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "hook")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_hook_metadata_creation() {
         let mut metadata = HookMetadata::new(
@@ -277,8 +274,6 @@ mod tests {
             Some(&serde_json::json!(100))
         );
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_storage_adapter() {
         let adapter = HookStorageAdapter::new();

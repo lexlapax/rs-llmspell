@@ -598,8 +598,6 @@ pub fn all_path_security_tests() -> Vec<SecurityTestCase> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "integration")]
     #[test]
     fn test_path_security_test_creation() {
         let tests = all_path_security_tests();
@@ -626,8 +624,6 @@ mod tests {
         assert!(categories.contains(&"RACE".to_string()));
         assert!(categories.contains(&"BOUNDARY".to_string()));
     }
-
-    #[cfg_attr(test_category = "integration")]
     #[test]
     fn test_severity_distribution() {
         let tests = all_path_security_tests();
@@ -642,8 +638,6 @@ mod tests {
         assert!(severity_counts.get(&Severity::High).unwrap_or(&0) > &0);
         assert!(severity_counts.get(&Severity::Medium).unwrap_or(&0) > &0);
     }
-
-    #[cfg_attr(test_category = "integration")]
     #[test]
     fn test_expected_behavior() {
         let tests = all_path_security_tests();

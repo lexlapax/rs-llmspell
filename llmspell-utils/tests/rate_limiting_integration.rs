@@ -11,10 +11,6 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "util")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_provider_rate_limiter_creation() {
     let mut configs = HashMap::new();
@@ -30,10 +26,6 @@ async fn test_provider_rate_limiter_creation() {
     assert_eq!(metrics.requests_allowed, 1);
     assert_eq!(metrics.requests_denied, 0);
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "util")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[cfg(feature = "rate-limiting-http")]
 async fn test_rate_limit_headers_parsing() {
@@ -52,10 +44,6 @@ async fn test_rate_limit_headers_parsing() {
     // Should have wait time since remaining is 0
     assert!(info.wait_time().is_some());
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "util")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_provider_specific_limits() {
     let openai_config = ProviderLimits::openai();
@@ -73,10 +61,6 @@ async fn test_provider_specific_limits() {
     let config = ProviderLimits::for_provider("unknown_provider");
     assert_eq!(config.requests_per_minute, 60); // Should use generic
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "util")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_retry_with_backoff() {
     let limiter = ProviderRateLimiter::new();
@@ -112,10 +96,6 @@ async fn test_retry_with_backoff() {
     let elapsed = start.elapsed();
     assert!(elapsed > Duration::from_millis(100));
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "util")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_metrics_collection() {
     let mut limiter = ProviderRateLimiter::new();
@@ -141,10 +121,6 @@ async fn test_metrics_collection() {
     let all_metrics = limiter.get_all_metrics().await;
     assert!(all_metrics.contains_key("test_metrics"));
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "util")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_backoff_strategies() {
     // Test linear backoff
@@ -166,10 +142,6 @@ async fn test_backoff_strategies() {
         Duration::from_millis(300_000)
     );
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "util")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_concurrent_rate_limiting() {
     let limiter = Arc::new(ProviderRateLimiter::new());

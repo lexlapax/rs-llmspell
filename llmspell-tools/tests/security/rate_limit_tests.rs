@@ -364,8 +364,6 @@ pub fn all_rate_limit_tests() -> Vec<SecurityTestCase> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "integration")]
     #[test]
     fn test_rate_limit_test_creation() {
         let tests = all_rate_limit_tests();
@@ -388,8 +386,6 @@ mod tests {
         assert!(categories.contains(&"EVASION".to_string()));
         assert!(categories.contains(&"BURST".to_string()));
     }
-
-    #[cfg_attr(test_category = "integration")]
     #[test]
     fn test_critical_dos_tests() {
         let tests = all_rate_limit_tests();
@@ -409,8 +405,6 @@ mod tests {
         // XML bomb should be critical
         assert!(critical_tests.iter().any(|t| t.name == "APP_XML_BOMB"));
     }
-
-    #[cfg_attr(test_category = "integration")]
     #[test]
     fn test_dos_category_coverage() {
         let tests = all_rate_limit_tests();

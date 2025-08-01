@@ -1478,11 +1478,8 @@ impl Tool for CsvAnalyzerTool {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "tool")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_operation_parsing() {
         assert_eq!(
@@ -1499,8 +1496,6 @@ mod tests {
         );
         assert!("invalid".parse::<CsvOperation>().is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_export_format_parsing() {
         assert_eq!("json".parse::<ExportFormat>().unwrap(), ExportFormat::Json);
@@ -1514,8 +1509,6 @@ mod tests {
         );
         assert!("invalid".parse::<ExportFormat>().is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_csv_analyzer_creation() {
         let config = CsvAnalyzerConfig::default();
@@ -1523,8 +1516,6 @@ mod tests {
 
         assert_eq!(tool.metadata().name, "csv-analyzer-tool");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_streaming_column_stats() {
         let mut stats = StreamingColumnStats::new("test".to_string());

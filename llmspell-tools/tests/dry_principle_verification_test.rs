@@ -11,8 +11,6 @@ use serde_json::{json, Value};
 #[cfg(test)]
 mod dry_principle_tests {
     use super::*;
-
-    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_hash_consistency_across_tools() {
         // Test that hash operations produce consistent results
@@ -45,8 +43,6 @@ mod dry_principle_tests {
             "Hash tool should produce same result as utility"
         );
     }
-
-    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_base64_consistency() {
         // Test that base64 operations are consistent
@@ -77,8 +73,6 @@ mod dry_principle_tests {
             "Base64 tool should produce same result as utility"
         );
     }
-
-    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_uuid_format_consistency() {
         // Test that UUID generation follows consistent patterns
@@ -115,8 +109,6 @@ mod dry_principle_tests {
             "Should be UUID v4"
         );
     }
-
-    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_json_processing_consistency() {
         // Test that JSON operations are consistent
@@ -150,8 +142,6 @@ mod dry_principle_tests {
             "Query should return the original object"
         );
     }
-
-    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_date_time_consistency() {
         // Test that date/time operations are consistent
@@ -180,8 +170,6 @@ mod dry_principle_tests {
         assert_eq!(output["result"]["parsed"]["hour"].as_i64().unwrap(), 10);
         assert_eq!(output["result"]["parsed"]["minute"].as_i64().unwrap(), 30);
     }
-
-    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_error_handling_consistency() {
         // Test that error handling is consistent across tools
@@ -227,8 +215,6 @@ mod dry_principle_tests {
 
         // Both should handle missing parameters consistently
     }
-
-    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_parameter_extraction_consistency() {
         // Test that all tools use consistent parameter extraction
@@ -257,9 +243,6 @@ mod dry_principle_tests {
         }
     }
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
 #[test]
 fn test_shared_utility_usage() {
     // Verify tools are importing from llmspell_utils

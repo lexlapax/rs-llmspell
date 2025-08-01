@@ -493,11 +493,8 @@ impl EventFilter for RateLimitFilter {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_log_levels() {
         assert!(LogLevel::Error > LogLevel::Warn);
@@ -505,8 +502,6 @@ mod tests {
         assert!(LogLevel::Info.should_log(LogLevel::Debug));
         assert!(!LogLevel::Debug.should_log(LogLevel::Info));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_log_event_creation() {
         let mut event = LogEvent::new(
@@ -525,8 +520,6 @@ mod tests {
         assert_eq!(event.fields.get("user_id"), Some(&serde_json::json!("123")));
         assert_eq!(event.trace_id, Some("trace-123".to_string()));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_event_logger() {
         let logger = EventLogger::new("test-agent".to_string(), 100);
@@ -551,8 +544,6 @@ mod tests {
         assert_eq!(stats.level_counts.get(&LogLevel::Warn), Some(&1));
         assert_eq!(stats.level_counts.get(&LogLevel::Error), Some(&1));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_event_filters() {
         let mut logger = EventLogger::new("test-agent".to_string(), 100);
@@ -573,8 +564,6 @@ mod tests {
         assert_eq!(events.len(), 1);
         assert_eq!(events[0].component, "allowed-component");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_rate_limit_filter() {
         let filter = RateLimitFilter::new(2);
@@ -596,8 +585,6 @@ mod tests {
         std::thread::sleep(std::time::Duration::from_secs(1));
         assert!(filter.should_log(&event));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_log_formatting() {
         let event = LogEvent::new(

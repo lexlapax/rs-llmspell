@@ -662,7 +662,6 @@ impl MetricHook for CostTrackingHook {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "hook")]
 mod tests {
     use super::*;
     use crate::types::{ComponentId, ComponentType, HookPoint};
@@ -690,8 +689,6 @@ mod tests {
         );
         context
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_cost_tracking_hook_basic() {
         let hook = CostTrackingHook::new();
@@ -706,8 +703,6 @@ mod tests {
         assert!(context.get_metadata("cost_output").is_some());
         assert_eq!(context.get_metadata("cost_currency").unwrap(), "USD");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_cost_calculation() {
         let hook = CostTrackingHook::new();
@@ -725,8 +720,6 @@ mod tests {
         let expected = 0.0005 + 0.00075;
         assert!((total_cost - expected).abs() < 0.000001);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_budget_alerts() {
         let hook = CostTrackingHook::new()
@@ -762,8 +755,6 @@ mod tests {
             }
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_cost_aggregation() {
         let hook = CostTrackingHook::new();
@@ -786,8 +777,6 @@ mod tests {
         assert!(metrics.total_cost > 0.0);
         assert_eq!(metrics.costs_by_user.len(), 2);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_unknown_provider() {
         let hook = CostTrackingHook::new();
@@ -800,8 +789,6 @@ mod tests {
         // Should not have cost metadata since provider is unknown
         assert!(context.get_metadata("cost_total").is_none());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_custom_provider_pricing() {
         let custom_pricing = ProviderPricing {
@@ -837,8 +824,6 @@ mod tests {
         assert_eq!(total_cost, 0.002);
         assert_eq!(context.get_metadata("cost_currency").unwrap(), "EUR");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_hook_metadata() {
         let hook = CostTrackingHook::new();
@@ -851,8 +836,6 @@ mod tests {
         assert!(metadata.tags.contains(&"builtin".to_string()));
         assert!(metadata.tags.contains(&"cost-tracking".to_string()));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_cost_metrics_calculations() {
         let metrics = CostTrackingMetrics {
@@ -866,8 +849,6 @@ mod tests {
         assert_eq!(metrics.average_cost_per_request(), 0.5);
         assert_eq!(metrics.average_tokens_per_request(), 750.0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_alert_sorting() {
         let mut config = CostTrackingConfig::default();

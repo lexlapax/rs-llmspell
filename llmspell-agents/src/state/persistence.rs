@@ -175,7 +175,6 @@ macro_rules! impl_persistent_agent {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
     use llmspell_core::traits::agent::AgentConfig;
@@ -279,8 +278,6 @@ mod tests {
 
     // Implement PersistentAgent using the macro
     impl_persistent_agent!(MockAgent);
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_state_persistence_trait() {
         let metadata = ComponentMetadata::new("test-agent".to_string(), "Test agent".to_string());

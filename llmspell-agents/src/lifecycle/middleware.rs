@@ -755,12 +755,9 @@ impl LifecycleMiddleware for SecurityMiddleware {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
     use crate::lifecycle::events::EventSystemConfig;
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_middleware_chain_basic() {
         let event_system = Arc::new(LifecycleEventSystem::new(EventSystemConfig::default()));
@@ -780,8 +777,6 @@ mod tests {
         assert_eq!(result.agent_id, "test-agent");
         assert_eq!(result.phase, LifecyclePhase::Initialization);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_middleware_priority_ordering() {
         let event_system = Arc::new(LifecycleEventSystem::new(EventSystemConfig::default()));
@@ -800,8 +795,6 @@ mod tests {
 
         assert_eq!(chain.get_middleware_count().await, 3);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_metrics_middleware() {
         let metrics = Arc::new(MetricsMiddleware::new());
@@ -816,8 +809,6 @@ mod tests {
         assert!(collected_metrics.contains_key("test-agent_initialization_completed"));
         assert!(collected_metrics.contains_key("test-agent_initialization_duration_ms"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_security_middleware() {
         let security = SecurityMiddleware::new()
@@ -847,8 +838,6 @@ mod tests {
         .with_data("auth_token", "valid_token");
         assert!(security.before(&mut authed_context).await.is_ok());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_middleware_error_handling() {
         struct FailingMiddleware;
@@ -896,16 +885,12 @@ mod tests {
         // Should have error data
         assert!(result.get_data("_error").is_some());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_lifecycle_phase_names() {
         assert_eq!(LifecyclePhase::Initialization.name(), "initialization");
         assert_eq!(LifecyclePhase::StateTransition.name(), "state_transition");
         assert_eq!(LifecyclePhase::Custom("test".to_string()).name(), "test");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_middleware_context() {
         let mut context =

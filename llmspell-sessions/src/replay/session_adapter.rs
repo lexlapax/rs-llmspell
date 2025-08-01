@@ -761,11 +761,8 @@ pub struct SessionReplayMetadata {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "session")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_session_replay_config_default() {
         let config = SessionReplayConfig::default();
@@ -774,8 +771,6 @@ mod tests {
         assert!(config.stop_on_error);
         assert_eq!(config.timeout, Duration::from_secs(300));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_session_replay_config_conversion() {
         let session_config = SessionReplayConfig {
@@ -791,8 +786,6 @@ mod tests {
         assert!(!replay_config.stop_on_error);
         assert!(replay_config.tags.contains(&"session".to_string()));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_session_replay_result_from_batch_response() {
         let batch_response = BatchReplayResponse {

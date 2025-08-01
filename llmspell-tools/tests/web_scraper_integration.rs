@@ -7,10 +7,6 @@ use common::*;
 use llmspell_core::BaseAgent;
 use llmspell_tools::WebScraperTool;
 use serde_json::json;
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "external,tool,integration"]
 async fn test_web_scraper_basic() {
@@ -36,10 +32,6 @@ async fn test_web_scraper_basic() {
     assert!(!content["text"].as_str().unwrap().is_empty());
     assert!(content["links"].is_array());
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "external,tool,integration"]
 async fn test_web_scraper_selectors() {
@@ -62,10 +54,6 @@ async fn test_web_scraper_selectors() {
     // Should extract h1 content
     assert!(content["selected_content"].is_array());
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "external,tool,integration"]
 async fn test_web_scraper_metadata() {
@@ -88,10 +76,6 @@ async fn test_web_scraper_metadata() {
     // Should have metadata
     assert!(content["metadata"].is_object() || content["meta_tags"].is_object());
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "external,tool,integration"]
 async fn test_web_scraper_httpbin_html() {
@@ -118,10 +102,6 @@ async fn test_web_scraper_httpbin_html() {
         .contains("Herman Melville"));
     assert!(content["links"].is_array());
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "external,tool,integration"]
 async fn test_web_scraper_invalid_url() {
@@ -138,10 +118,6 @@ async fn test_web_scraper_invalid_url() {
     let error = result.unwrap_err();
     assert!(error.to_string().contains("Invalid URL"));
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "tool,integration"]
 async fn test_web_scraper_network_error() {
@@ -164,10 +140,6 @@ async fn test_web_scraper_network_error() {
         }
     }
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "external,tool,integration,slow"]
 async fn test_web_scraper_timeout() {

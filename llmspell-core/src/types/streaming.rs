@@ -311,11 +311,8 @@ impl fmt::Display for ControlMessage {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "core")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_agent_chunk_serialization() {
         let chunk = AgentChunk {
@@ -334,8 +331,6 @@ mod tests {
         assert_eq!(chunk.content, deserialized.content);
         assert_eq!(chunk.metadata, deserialized.metadata);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_chunk_content_variants_serialization() {
         let test_cases = vec![
@@ -364,8 +359,6 @@ mod tests {
             assert_eq!(content, deserialized);
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_chunk_metadata_serialization() {
         let metadata = ChunkMetadata {
@@ -384,8 +377,6 @@ mod tests {
 
         assert_eq!(metadata, deserialized);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_control_message_variants_serialization() {
         let test_cases = vec![
@@ -418,8 +409,6 @@ mod tests {
             assert_eq!(message, deserialized);
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_display_implementations() {
         let chunk = AgentChunk {
@@ -452,8 +441,6 @@ mod tests {
 
         assert_eq!(format!("{}", control), "StreamEnd (20 chunks in 2000ms)");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_default_chunk_metadata() {
         let metadata = ChunkMetadata::default();

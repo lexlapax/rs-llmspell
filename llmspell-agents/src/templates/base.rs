@@ -498,7 +498,6 @@ impl TemplateFactory {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
     use crate::templates::schema::{
@@ -565,8 +564,6 @@ mod tests {
             })
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_template_factory_registration() {
         let mut factory = TemplateFactory::new();
@@ -580,8 +577,6 @@ mod tests {
         assert!(factory.has_template("mock_template"));
         assert!(!factory.has_template("nonexistent"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_template_factory_categories() {
         let mut factory = TemplateFactory::new();
@@ -595,8 +590,6 @@ mod tests {
         let monitoring_templates = factory.get_templates_by_category(&TemplateCategory::Monitoring);
         assert_eq!(monitoring_templates.len(), 0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_template_factory_search() {
         let mut factory = TemplateFactory::new();
@@ -613,8 +606,6 @@ mod tests {
         let found = factory.find_templates("nonexistent");
         assert_eq!(found.len(), 0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_parameter_validation() {
         let template = MockTemplate::new();
@@ -636,8 +627,6 @@ mod tests {
         let result = template.validate_parameters(&params).await;
         assert!(result.is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_template_metadata() {
         let template = MockTemplate::new();
@@ -647,8 +636,6 @@ mod tests {
         assert_eq!(template.required_tools().len(), 0);
         assert_eq!(template.optional_tools().len(), 0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_template_unregistration() {
         let mut factory = TemplateFactory::new();

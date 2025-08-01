@@ -394,11 +394,8 @@ impl Default for ReplayScheduler {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "hook")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_schedule_once() {
         let schedule = ReplaySchedule::Once {
@@ -415,8 +412,6 @@ mod tests {
         assert!(replay.should_continue());
         assert_eq!(replay.execution_count, 0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_schedule_interval() {
         let schedule = ReplaySchedule::Interval {
@@ -442,8 +437,6 @@ mod tests {
         // Should stop after 5 executions
         assert!(!replay.should_continue());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_cron_expression() {
         let now = Utc::now();

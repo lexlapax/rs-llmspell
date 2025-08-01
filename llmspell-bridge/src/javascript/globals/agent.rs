@@ -25,10 +25,7 @@ pub fn inject_agent_global(_ctx: &(), _context: &GlobalContext) -> Result<(), LL
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "bridge")]
 mod tests {
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_agent_global_stub() {
         // Basic compilation test - just verify function exists

@@ -4,7 +4,6 @@
 use anyhow::Result;
 use llmspell_core::traits::tool::Tool;
 #[cfg(test)]
-#[cfg_attr(test_category = "agent")]
 use llmspell_core::traits::tool::{SecurityLevel, ToolCategory, ToolSchema};
 use std::{
     any::{Any, TypeId},
@@ -194,7 +193,6 @@ impl Default for DIContainerBuilder {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
     use llmspell_core::{
@@ -251,8 +249,6 @@ mod tests {
             ToolSchema::new(self.id.clone(), "Mock tool for testing".to_string())
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_registration() {
         let container = DIContainer::new();
@@ -284,8 +280,6 @@ mod tests {
         #[allow(dead_code)]
         value: String,
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_service_registration() {
         let container = DIContainer::new();
@@ -304,8 +298,6 @@ mod tests {
         let result = container.register_service(service).await;
         assert!(result.is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_scoped_container() {
         let parent = DIContainer::new();
@@ -324,8 +316,6 @@ mod tests {
         let service = scope.get_service::<TestService>().await;
         assert!(service.is_some());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_named_instances() {
         let container = DIContainer::new();
@@ -365,8 +355,6 @@ mod tests {
         let result = container.register_named("svc1".to_string(), service3).await;
         assert!(result.is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_di_builder() {
         let tool = Arc::new(MockTool {
@@ -385,8 +373,6 @@ mod tests {
         let retrieved = container.get_tool("builder-tool").await;
         assert!(retrieved.is_some());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_scoped_tool_access() {
         let parent = DIContainer::new();

@@ -1218,13 +1218,10 @@ impl ArtifactStorageOps for ArtifactStorage {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "session")]
 mod tests {
     use super::*;
     use crate::artifact::SessionArtifact;
     use llmspell_storage::MemoryBackend;
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_artifact_storage_creation() {
         let backend = Arc::new(MemoryBackend::new());
@@ -1233,8 +1230,6 @@ mod tests {
         assert_eq!(storage.config.max_artifact_size, 100 * 1024 * 1024);
         assert!(storage.config.enable_deduplication);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_key_generation() {
         let backend = Arc::new(MemoryBackend::new());
@@ -1252,8 +1247,6 @@ mod tests {
         let chunk_key = storage.chunk_key(&"hash123".to_string(), 0);
         assert_eq!(chunk_key, "artifacts/chunks/hash123/0");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_storage_limits() {
         let backend = Arc::new(MemoryBackend::new());
@@ -1275,8 +1268,6 @@ mod tests {
         let result = storage.check_storage_limits(&session_id, 512).await;
         assert!(result.is_ok());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_store_artifact_basic() {
         let backend = Arc::new(MemoryBackend::new());
@@ -1305,8 +1296,6 @@ mod tests {
         assert_eq!(stats.total_size, content.len());
         assert_eq!(stats.deduplicated_count, 0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_store_artifact_versioning() {
         let backend = Arc::new(MemoryBackend::new());
@@ -1350,8 +1339,6 @@ mod tests {
         assert_eq!(stats.artifact_count, 2);
         assert_eq!(stats.total_size, content1.len() + content2.len());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_store_artifact_deduplication() {
         let backend = Arc::new(MemoryBackend::new());
@@ -1394,8 +1381,6 @@ mod tests {
         // Total size counts both artifacts even if deduplicated
         assert_eq!(stats.total_size, content.len() * 2);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_store_large_artifact() {
         let backend = Arc::new(MemoryBackend::new());
@@ -1426,8 +1411,6 @@ mod tests {
         assert_eq!(stats.artifact_count, 1);
         assert_eq!(stats.total_size, content.len());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_store_artifact_with_compression() {
         let backend = Arc::new(MemoryBackend::new());
@@ -1456,8 +1439,6 @@ mod tests {
         // Size reported is original size, not compressed
         assert_eq!(stats.total_size, content.len());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_version_retrieval() {
         let backend = Arc::new(MemoryBackend::new());
@@ -1511,8 +1492,6 @@ mod tests {
             .unwrap();
         assert_eq!(all_versions.len(), 2);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_batch_retrieval() {
         let backend = Arc::new(MemoryBackend::new());
@@ -1553,8 +1532,6 @@ mod tests {
         assert!(mixed_results[2].is_some());
         assert!(mixed_results[3].is_none()); // Fake ID should be None
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_paginated_retrieval() {
         let backend = Arc::new(MemoryBackend::new());
@@ -1604,8 +1581,6 @@ mod tests {
             .unwrap();
         assert_eq!(empty_page.len(), 0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_streaming_retrieval() {
         let backend = Arc::new(MemoryBackend::new());
@@ -1645,8 +1620,6 @@ mod tests {
             .unwrap();
         assert_eq!(streamed_content, content);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_retrieval_error_cases() {
         let backend = Arc::new(MemoryBackend::new());
@@ -1681,8 +1654,6 @@ mod tests {
         let result = storage.stream_artifact_content(&fake_id, 1024).await;
         assert!(result.is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_list_session_artifacts() {
         let backend = Arc::new(MemoryBackend::new());
@@ -1724,8 +1695,6 @@ mod tests {
         assert!(names.contains(&"input.txt".to_string()));
         assert!(names.contains(&"result.json".to_string()));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_query_artifacts_by_type() {
         let backend = Arc::new(MemoryBackend::new());
@@ -1766,8 +1735,6 @@ mod tests {
             .iter()
             .all(|a| a.artifact_type == ArtifactType::UserInput));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_query_artifacts_by_name_pattern() {
         let backend = Arc::new(MemoryBackend::new());
@@ -1809,8 +1776,6 @@ mod tests {
         assert!(result_names.contains(&"test_file.txt".to_string()));
         assert!(result_names.contains(&"test_output.log".to_string()));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_query_artifacts_with_tags() {
         let backend = Arc::new(MemoryBackend::new());
@@ -1867,8 +1832,6 @@ mod tests {
             .iter()
             .all(|a| a.tags.contains(&"important".to_string())));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_query_artifacts_with_size_filters() {
         let backend = Arc::new(MemoryBackend::new());
@@ -1912,8 +1875,6 @@ mod tests {
         assert!(result_names.contains(&"medium.txt".to_string()));
         assert!(result_names.contains(&"large.txt".to_string()));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_find_by_content_hash() {
         let backend = Arc::new(MemoryBackend::new());
@@ -1946,8 +1907,6 @@ mod tests {
         let found = &results[0];
         assert_eq!(found.name, "file.txt");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_count_statistics() {
         let backend = Arc::new(MemoryBackend::new());

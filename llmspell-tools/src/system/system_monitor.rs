@@ -667,7 +667,6 @@ impl Tool for SystemMonitorTool {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "tool")]
 mod tests {
     use super::*;
 
@@ -699,8 +698,6 @@ mod tests {
             output_modalities: vec![],
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_collect_all_stats() {
         let tool = create_test_tool();
@@ -720,8 +717,6 @@ mod tests {
         assert!(result.text.contains("CPU"));
         assert!(result.text.contains("Memory"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_collect_cpu_stats() {
         let tool = create_test_tool();
@@ -740,8 +735,6 @@ mod tests {
         assert!(result.text.contains("CPU usage"));
         assert!(result.text.contains("cores"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_collect_memory_stats() {
         let tool = create_test_tool();
@@ -760,8 +753,6 @@ mod tests {
         assert!(result.text.contains("Memory usage"));
         assert!(result.text.contains("%"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_collect_disk_stats() {
         let tool = create_test_tool();
@@ -780,8 +771,6 @@ mod tests {
         assert!(result.text.contains("Disk usage"));
         assert!(result.text.contains("mount"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_invalid_operation() {
         let tool = create_test_tool();
@@ -800,8 +789,6 @@ mod tests {
             .to_string()
             .contains("Invalid operation"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_default_operation() {
         let tool = create_test_tool();
@@ -815,8 +802,6 @@ mod tests {
             .unwrap();
         assert!(result.text.contains("System stats"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_basic_system_info() {
         let tool = create_test_tool();
@@ -826,8 +811,6 @@ mod tests {
         assert!(stats.memory_usage_percent >= 0.0);
         assert!(stats.memory_usage_percent <= 100.0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_cpu_usage_measurement() {
         let tool = create_test_tool();
@@ -836,8 +819,6 @@ mod tests {
         assert!(cpu_usage >= 0.0);
         assert!(cpu_usage <= 100.0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_disk_usage_collection() {
         let tool = create_test_tool();
@@ -852,8 +833,6 @@ mod tests {
             assert!(stats.total_bytes >= stats.used_bytes);
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_process_count() {
         let tool = create_test_tool();
@@ -864,8 +843,6 @@ mod tests {
             assert!(count > 0);
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_metadata() {
         let tool = create_test_tool();
@@ -886,8 +863,6 @@ mod tests {
         let required_params = schema.required_parameters();
         assert_eq!(required_params.len(), 0); // All parameters are optional
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_custom_config() {
         let tool = create_test_tool_with_custom_config();
@@ -897,8 +872,6 @@ mod tests {
         assert_eq!(tool.config.cpu_sample_duration_ms, 500);
         assert!(!tool.config.include_disk_details);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_selective_collection() {
         let config = SystemMonitorConfig {
@@ -925,7 +898,6 @@ mod tests {
     }
 
     #[cfg(unix)]
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_load_average() {
         let tool = create_test_tool();
@@ -937,8 +909,6 @@ mod tests {
             assert!(load_avg[2] >= 0.0);
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_uptime() {
         let tool = create_test_tool();

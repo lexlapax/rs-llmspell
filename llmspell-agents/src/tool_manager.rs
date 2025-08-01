@@ -502,14 +502,11 @@ impl ToolManager {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
     use llmspell_core::traits::tool_capable::{ToolComposition, ToolQuery};
     use llmspell_tools::registry::ToolRegistry;
     use serde_json::json;
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_manager_creation() {
         let registry = Arc::new(ToolRegistry::new());
@@ -519,8 +516,6 @@ mod tests {
         assert!(manager.config.enable_metadata_cache);
         assert!(manager.config.enable_availability_cache);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_manager_with_config() {
         let registry = Arc::new(ToolRegistry::new());
@@ -539,8 +534,6 @@ mod tests {
         assert_eq!(manager.config.max_parallel_executions, 2);
         assert!(!manager.config.validate_parameters);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_discovery() {
         let registry = Arc::new(ToolRegistry::new());
@@ -551,8 +544,6 @@ mod tests {
         let tools = manager.discover_tools(&query).await.unwrap();
         assert_eq!(tools.len(), 0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_availability_checks() {
         let registry = Arc::new(ToolRegistry::new());
@@ -564,8 +555,6 @@ mod tests {
         // Test that result is cached (second call should use cache)
         assert!(!manager.tool_available("nonexistent_tool").await);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_listing() {
         let registry = Arc::new(ToolRegistry::new());
@@ -575,8 +564,6 @@ mod tests {
         // Should be empty for a new registry
         assert_eq!(tools.len(), 0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_info_retrieval() {
         let registry = Arc::new(ToolRegistry::new());
@@ -586,8 +573,6 @@ mod tests {
         let info = manager.get_tool_info("nonexistent").await.unwrap();
         assert!(info.is_none());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_composition_empty() {
         let registry = Arc::new(ToolRegistry::new());
@@ -599,8 +584,6 @@ mod tests {
         let result = manager.compose_tools(&composition, context).await.unwrap();
         assert!(result.text.contains("no output"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_parameter_substitution() {
         let registry = Arc::new(ToolRegistry::new());
@@ -622,8 +605,6 @@ mod tests {
         );
         assert_eq!(result["other"], JsonValue::String("value".to_string()));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_cache_clearing() {
         let registry = Arc::new(ToolRegistry::new());

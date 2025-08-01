@@ -7,11 +7,6 @@ use llmspell_core::{
 };
 use llmspell_tools::JsonProcessorTool;
 use serde_json::json;
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_json_processor_complex_workflow() {
     let tool = JsonProcessorTool::default();
@@ -65,11 +60,6 @@ async fn test_json_processor_complex_workflow() {
     let employees: serde_json::Value = serde_json::from_str(&output.text).unwrap();
     assert_eq!(employees.as_array().unwrap().len(), 3);
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_json_processor_schema_validation_complex() {
     let tool = JsonProcessorTool::default();
@@ -151,11 +141,6 @@ async fn test_json_processor_schema_validation_complex() {
     let errors = validation_result["errors"].as_array().unwrap();
     assert!(!errors.is_empty());
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_json_processor_array_filtering() {
     let tool = JsonProcessorTool::default();
@@ -186,11 +171,6 @@ async fn test_json_processor_array_filtering() {
     assert_eq!(items.len(), 2);
     assert!(items.iter().all(|item| item["category"] == "electronics"));
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_json_processor_merge_complex() {
     let tool = JsonProcessorTool::default();
@@ -247,11 +227,6 @@ async fn test_json_processor_merge_complex() {
 
     assert_eq!(merged["api"]["version"], "v2");
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_json_processor_tool_metadata() {
     let tool = JsonProcessorTool::default();
@@ -277,11 +252,6 @@ async fn test_json_processor_tool_metadata() {
     assert!(params.iter().any(|p| p.name == "query"));
     assert!(params.iter().any(|p| p.name == "schema"));
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_json_processor_error_handling() {
     let tool = JsonProcessorTool::default();
@@ -322,11 +292,6 @@ async fn test_json_processor_error_handling() {
     let result = tool.execute(input, ExecutionContext::default()).await;
     assert!(result.is_err());
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_enhanced_jq_complex_workflow() {
     let tool = JsonProcessorTool::default();
@@ -413,11 +378,6 @@ async fn test_enhanced_jq_complex_workflow() {
     assert!(output.text.contains("\"engineering\""));
     assert!(output.text.contains("\"sales\""));
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_streaming_json_lines() {
     let tool = JsonProcessorTool::default();
@@ -467,11 +427,6 @@ async fn test_streaming_json_lines() {
     assert!(output.text.contains("ERROR"));
     assert!(output.text.contains("WARN"));
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_advanced_array_operations() {
     let tool = JsonProcessorTool::default();

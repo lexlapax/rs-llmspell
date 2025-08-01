@@ -3,7 +3,6 @@
 
 #[cfg(test)]
 mod tests {
-    #[cfg_attr(test_category = "integration")]
     #[test]
     fn test_placeholder() {
         assert!(true);

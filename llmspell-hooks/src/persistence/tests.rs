@@ -2,7 +2,6 @@
 // ABOUTME: Tests storage, replay, and inspection capabilities
 
 #[cfg(test)]
-#[cfg_attr(test_category = "hook")]
 mod tests {
     use crate::context::HookContext;
     use crate::persistence::*;
@@ -88,8 +87,6 @@ mod tests {
             metadata: std::collections::HashMap::new(),
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_storage_backend_lifecycle() {
         let backend = InMemoryStorageBackend::new();
@@ -127,8 +124,6 @@ mod tests {
         assert_eq!(stats.total_executions, 1);
         assert!(stats.compression_ratio < 1.0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_hook_persistence_manager() {
         // Create mock replay manager (simplified)
@@ -163,8 +158,6 @@ mod tests {
         let stats = persistence_manager.get_storage_statistics().await.unwrap();
         assert_eq!(stats.total_executions, 0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_replay_engine() {
         let mut engine = HookReplayEngine::new();
@@ -185,8 +178,6 @@ mod tests {
         assert_eq!(success, 1);
         assert_eq!(failed, 0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_replay_manager_session() {
         let replay_manager = Arc::new(MockReplayManager);
@@ -224,8 +215,6 @@ mod tests {
         let ended_session = manager.end_session(&session_name).unwrap();
         assert_eq!(ended_session.executions_replayed, 0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_hook_inspector_analysis() {
         let storage_backend = Arc::new(InMemoryStorageBackend::new());
@@ -259,8 +248,6 @@ mod tests {
         assert_eq!(analysis.execution_by_hook.get("hook1"), Some(&2));
         assert_eq!(analysis.execution_by_hook.get("hook2"), Some(&1));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_execution_pattern_detection() {
         let storage_backend = Arc::new(InMemoryStorageBackend::new());
@@ -284,8 +271,6 @@ mod tests {
             .find(|p| matches!(p.pattern_type, PatternType::Sequential));
         assert!(sequential_pattern.is_some());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_timeline_construction() {
         let replay_manager = Arc::new(MockReplayManager);
@@ -335,8 +320,6 @@ mod tests {
         assert_eq!(timeline.entries.len(), 2);
         assert!(timeline.total_duration >= Duration::from_secs(0));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_replay_options_modification() {
         let mut engine = HookReplayEngine::new();
@@ -355,8 +338,6 @@ mod tests {
             .unwrap();
         assert!(matches!(result, HookResult::Continue));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_inspection_query_filtering() {
         let storage_backend = Arc::new(InMemoryStorageBackend::new());

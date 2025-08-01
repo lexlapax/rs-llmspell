@@ -303,19 +303,14 @@ pub struct ProviderConfig {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "bridge")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_provider_manager_creation() {
         let config = ProviderManagerConfig::default();
         let manager = ProviderManager::new(config).await.unwrap();
         assert!(manager.get_default_provider().await.is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_provider_config_validation() {
         let config = ProviderManagerConfig {

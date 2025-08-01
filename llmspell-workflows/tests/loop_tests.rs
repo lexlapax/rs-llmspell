@@ -8,9 +8,6 @@ use serde_json::json;
 use std::time::Duration;
 
 /// Test basic range iteration
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "workflow")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_range_iteration() {
     let workflow = LoopWorkflowBuilder::new("test_range")
@@ -34,9 +31,6 @@ async fn test_range_iteration() {
 }
 
 /// Test range with negative step
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "workflow")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_range_negative_step() {
     let workflow = LoopWorkflowBuilder::new("test_negative_range")
@@ -59,9 +53,6 @@ async fn test_range_negative_step() {
 }
 
 /// Test invalid range configuration
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "workflow")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_invalid_range() {
     // Zero step
@@ -83,9 +74,6 @@ async fn test_invalid_range() {
 }
 
 /// Test collection iteration
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "workflow")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_collection_iteration() {
     let items = vec![json!("apple"), json!("banana"), json!("cherry")];
@@ -110,9 +98,6 @@ async fn test_collection_iteration() {
 }
 
 /// Test empty collection
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "workflow")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_empty_collection() {
     let workflow = LoopWorkflowBuilder::new("test_empty")
@@ -135,9 +120,6 @@ async fn test_empty_collection() {
 }
 
 /// Test while condition
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "workflow")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_while_condition() {
     let workflow = LoopWorkflowBuilder::new("test_while")
@@ -159,9 +141,6 @@ async fn test_while_condition() {
 }
 
 /// Test break conditions
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "workflow")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_break_conditions() {
     let workflow = LoopWorkflowBuilder::new("test_break")
@@ -185,9 +164,6 @@ async fn test_break_conditions() {
 }
 
 /// Test multiple break conditions
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "workflow")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_multiple_break_conditions() {
     let workflow = LoopWorkflowBuilder::new("test_multi_break")
@@ -212,9 +188,6 @@ async fn test_multiple_break_conditions() {
 }
 
 /// Test continue on error
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "workflow")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_continue_on_error() {
     let workflow = LoopWorkflowBuilder::new("test_continue_on_error")
@@ -237,9 +210,6 @@ async fn test_continue_on_error() {
 }
 
 /// Test fail fast on error
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "workflow")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_fail_fast() {
     // Use empty tool name to trigger failure
@@ -265,9 +235,6 @@ async fn test_fail_fast() {
 }
 
 /// Test timeout
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "workflow")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_timeout() {
     let workflow = LoopWorkflowBuilder::new("test_timeout")
@@ -292,9 +259,6 @@ async fn test_timeout() {
 }
 
 /// Test iteration delay
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "workflow")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_iteration_delay() {
     let start = std::time::Instant::now();
@@ -320,9 +284,6 @@ async fn test_iteration_delay() {
 }
 
 /// Test result aggregation - CollectAll
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "workflow")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_aggregation_collect_all() {
     let workflow = LoopWorkflowBuilder::new("test_collect_all")
@@ -350,9 +311,6 @@ async fn test_aggregation_collect_all() {
 }
 
 /// Test result aggregation - LastOnly
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "workflow")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_aggregation_last_only() {
     let workflow = LoopWorkflowBuilder::new("test_last_only")
@@ -376,9 +334,6 @@ async fn test_aggregation_last_only() {
 }
 
 /// Test result aggregation - FirstN
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "workflow")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_aggregation_first_n() {
     let workflow = LoopWorkflowBuilder::new("test_first_n")
@@ -406,9 +361,6 @@ async fn test_aggregation_first_n() {
 }
 
 /// Test result aggregation - LastN
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "workflow")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_aggregation_last_n() {
     let workflow = LoopWorkflowBuilder::new("test_last_n")
@@ -436,9 +388,6 @@ async fn test_aggregation_last_n() {
 }
 
 /// Test complex workflow with multiple steps
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "workflow")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_multiple_steps() {
     let workflow = LoopWorkflowBuilder::new("test_multi_step")
@@ -474,9 +423,6 @@ async fn test_multiple_steps() {
 }
 
 /// Test workflow configuration integration
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "workflow")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_workflow_config() {
     let config = WorkflowConfig {
@@ -507,9 +453,6 @@ async fn test_workflow_config() {
 }
 
 /// Test empty body validation
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "workflow")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_empty_body_validation() {
     let result = LoopWorkflowBuilder::new("test_empty_body")
@@ -523,9 +466,6 @@ async fn test_empty_body_validation() {
 }
 
 /// Test missing iterator validation
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "workflow")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_missing_iterator_validation() {
     let result = LoopWorkflowBuilder::new("test_no_iterator")
@@ -545,9 +485,6 @@ async fn test_missing_iterator_validation() {
 }
 
 /// Test loop metadata in results
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "workflow")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_loop_metadata() {
     let workflow = LoopWorkflowBuilder::new("test_metadata")

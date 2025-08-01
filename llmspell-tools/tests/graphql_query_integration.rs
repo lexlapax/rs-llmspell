@@ -7,10 +7,6 @@ use llmspell_core::{
 };
 use llmspell_tools::GraphQLQueryTool;
 use serde_json::json;
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_graphql_tool_creation() {
     let tool = GraphQLQueryTool::default();
@@ -22,10 +18,6 @@ async fn test_graphql_tool_creation() {
         llmspell_core::traits::tool::SecurityLevel::Privileged
     ));
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_graphql_introspection() {
     let tool = GraphQLQueryTool::default();
@@ -50,10 +42,6 @@ async fn test_graphql_introspection() {
     assert!(output.text.contains("Country"));
     assert!(output.text.contains("cached"));
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_graphql_query() {
     let tool = GraphQLQueryTool::default();
@@ -104,10 +92,6 @@ async fn test_graphql_query() {
     assert!(result_str.contains("USD"));
     assert!(result_str.contains("🇺🇸"));
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_graphql_query_without_variables() {
     let tool = GraphQLQueryTool::default();
@@ -139,10 +123,6 @@ async fn test_graphql_query_without_variables() {
     assert!(output.text.contains("Asia"));
     assert!(output.text.contains("North America"));
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_graphql_with_custom_headers() {
     let tool = GraphQLQueryTool::default();
@@ -166,10 +146,6 @@ async fn test_graphql_with_custom_headers() {
     // Should still work with custom headers
     assert!(output.text.contains("continents"));
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_graphql_error_handling() {
     let tool = GraphQLQueryTool::default();
@@ -191,10 +167,6 @@ async fn test_graphql_error_handling() {
         assert!(e.to_string().contains("invalidField") || e.to_string().contains("errors"));
     }
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_graphql_depth_limit() {
     let tool = GraphQLQueryTool::default();
@@ -244,10 +216,6 @@ async fn test_graphql_depth_limit() {
         assert!(e.to_string().contains("depth"));
     }
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_invalid_endpoint() {
     let tool = GraphQLQueryTool::default();
@@ -263,10 +231,6 @@ async fn test_invalid_endpoint() {
     let result = tool.execute(input, ExecutionContext::default()).await;
     assert!(result.is_err());
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_missing_endpoint() {
     let tool = GraphQLQueryTool::default();
@@ -287,10 +251,6 @@ async fn test_missing_endpoint() {
             .contains("Missing required parameter 'endpoint'"));
     }
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_missing_query_for_query_operation() {
     let tool = GraphQLQueryTool::default();
@@ -310,10 +270,6 @@ async fn test_missing_query_for_query_operation() {
         assert!(e.to_string().contains("Missing required parameter 'input'"));
     }
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_subscription_not_supported() {
     let tool = GraphQLQueryTool::default();
@@ -334,10 +290,6 @@ async fn test_subscription_not_supported() {
         assert!(e.to_string().contains("subscriptions not yet supported"));
     }
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_graphql_with_operation_name() {
     let tool = GraphQLQueryTool::default();
@@ -368,10 +320,6 @@ async fn test_graphql_with_operation_name() {
     assert!(output.text.contains("United States"));
     assert!(output.text.contains("Washington"));
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_graphql_schema_caching() {
     let tool = GraphQLQueryTool::default();

@@ -550,7 +550,6 @@ impl Tool for VideoProcessorTool {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "tool")]
 mod tests {
     use super::*;
     use std::collections::HashMap;
@@ -575,8 +574,6 @@ mod tests {
             output_modalities: vec![],
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_format_detection_by_extension() {
         let tool = create_test_tool();
@@ -602,8 +599,6 @@ mod tests {
             assert_eq!(format, expected_format);
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_resolution_naming() {
         let res_4k = VideoResolution {
@@ -633,8 +628,6 @@ mod tests {
         };
         assert_eq!(res_square.aspect_ratio(), "1:1");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_metadata_extraction() {
         let tool = create_test_tool();
@@ -660,8 +653,6 @@ mod tests {
         assert!(result.text.contains("Mp4"));
         assert!(result.text.contains("Size: 17 bytes"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_format_detection_operation() {
         let tool = create_test_tool();
@@ -685,8 +676,6 @@ mod tests {
 
         assert!(result.text.contains("Detected video format: Mkv"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_file_size_limit() {
         let config = VideoProcessorConfig {
@@ -713,8 +702,6 @@ mod tests {
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("exceeds maximum"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_thumbnail_not_implemented() {
         let tool = create_test_tool();
@@ -737,8 +724,6 @@ mod tests {
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("not implemented"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_extract_frame_not_implemented() {
         let tool = create_test_tool();
@@ -764,8 +749,6 @@ mod tests {
         assert!(error_msg.contains("not implemented"));
         assert!(error_msg.contains("5s"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_invalid_operation() {
         let tool = create_test_tool();
@@ -784,8 +767,6 @@ mod tests {
             .to_string()
             .contains("Invalid operation"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_missing_required_parameters() {
         let tool = create_test_tool();
@@ -821,8 +802,6 @@ mod tests {
             .to_string()
             .contains("target_path is required"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_metadata() {
         let tool = create_test_tool();
@@ -843,8 +822,6 @@ mod tests {
         assert!(params.iter().any(|p| p.name == "target_path"));
         assert!(params.iter().any(|p| p.name == "timestamp_seconds"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_default_operation() {
         let tool = create_test_tool();
@@ -868,8 +845,6 @@ mod tests {
 
         assert!(result.text.contains("Video file"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_empty_file_path() {
         let tool = create_test_tool();
@@ -886,8 +861,6 @@ mod tests {
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("cannot be empty"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_supported_formats() {
         let config = VideoProcessorConfig::default();

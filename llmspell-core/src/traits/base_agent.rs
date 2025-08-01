@@ -195,7 +195,6 @@ pub trait BaseAgent: Send + Sync {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "core")]
 mod tests {
     use super::*;
     use crate::types::{AgentInput, AgentOutput};
@@ -245,8 +244,6 @@ mod tests {
             Ok(AgentOutput::text(format!("Error handled: {}", error)))
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_base_agent_implementation() {
         let agent = MockAgent::new();
@@ -262,8 +259,6 @@ mod tests {
         let result = agent.execute(input, context).await.unwrap();
         assert_eq!(result.text, "Processed: test prompt");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_base_agent_validation() {
         let agent = MockAgent::new();
@@ -283,8 +278,6 @@ mod tests {
             panic!("Expected validation error");
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_base_agent_error_handling() {
         let agent = MockAgent::new();
@@ -298,8 +291,6 @@ mod tests {
         assert!(result.text.contains("Error handled"));
         assert!(result.text.contains("Test error"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_base_agent_streaming_default() {
         let agent = MockAgent::new();

@@ -279,11 +279,8 @@ impl Default for ComponentIdBuilder {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_generate_component_id() {
         let id1 = generate_component_id("agent");
@@ -294,16 +291,12 @@ mod tests {
         assert_ne!(id1, id2); // Should be unique
         assert_eq!(id1.len(), 42); // "agent_" (6) + UUID (36)
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_generate_short_id() {
         let id = generate_short_id("tool");
         assert!(id.starts_with("tool_"));
         assert!(id.len() <= 14); // "tool_" (5) + 8 chars max
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_generate_deterministic_id() {
         let id1 = generate_deterministic_id(NAMESPACE_AGENT, "test-agent");
@@ -313,8 +306,6 @@ mod tests {
         assert_eq!(id1, id2); // Same input produces same output
         assert_ne!(id1, id3); // Different input produces different output
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_generate_sequential_id() {
         let id1 = generate_sequential_id("seq");
@@ -325,8 +316,6 @@ mod tests {
         assert!(id2 < id3);
         assert!(id1.starts_with("seq_"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_validate_component_id() {
         let valid_id = generate_component_id("workflow");
@@ -338,8 +327,6 @@ mod tests {
         assert!(!validate_component_id("invalid_format", None));
         assert!(!validate_component_id("prefix_not-a-uuid", None));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_extract_prefix() {
         let id = generate_component_id("custom");
@@ -347,8 +334,6 @@ mod tests {
         assert_eq!(extract_prefix("no-underscore"), None);
         assert_eq!(extract_prefix("multiple_under_scores"), Some("multiple"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_extract_uuid() {
         let id = generate_component_id("prefix");
@@ -358,8 +343,6 @@ mod tests {
 
         assert_eq!(extract_uuid("no-underscore"), None);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_component_id_builder() {
         // Basic usage
@@ -391,8 +374,6 @@ mod tests {
         let parts: Vec<&str> = id4.split('_').collect();
         assert!(parts.len() >= 3); // prefix, timestamp, uuid
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_namespace_uniqueness() {
         // Ensure namespaces are different
@@ -400,8 +381,6 @@ mod tests {
         assert_ne!(NAMESPACE_AGENT, NAMESPACE_WORKFLOW);
         assert_ne!(NAMESPACE_TOOL, NAMESPACE_WORKFLOW);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_different_prefixes() {
         let agent_id = generate_component_id("agent");
@@ -420,13 +399,11 @@ mod tests {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "util")]
 mod property_tests {
     use super::*;
     use proptest::prelude::*;
 
     proptest! {
-        #[cfg_attr(test_category = "unit")]
         #[test]
         fn test_id_generation_properties(prefix in "[a-z]+") {
             let id = generate_component_id(&prefix);
@@ -441,8 +418,6 @@ mod property_tests {
             assert_eq!(extract_prefix(&id), Some(prefix.as_str()));
             assert!(extract_uuid(&id).is_some());
         }
-
-        #[cfg_attr(test_category = "unit")]
         #[test]
         fn test_deterministic_properties(name in "[a-zA-Z0-9-]+") {
             let id1 = generate_deterministic_id(NAMESPACE_AGENT, &name);
@@ -454,8 +429,6 @@ mod property_tests {
             // Valid UUID format
             assert!(Uuid::parse_str(&id1).is_ok());
         }
-
-        #[cfg_attr(test_category = "unit")]
         #[test]
         fn test_builder_properties(
             prefix in "[a-z]+",

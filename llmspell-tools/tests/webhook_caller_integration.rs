@@ -7,10 +7,6 @@ use common::*;
 use llmspell_core::BaseAgent;
 use llmspell_tools::WebhookCallerTool;
 use serde_json::json;
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_webhook_caller_post() {
     let tool = WebhookCallerTool::new();
@@ -43,10 +39,6 @@ async fn test_webhook_caller_post() {
     let response_body = result["response"]["json"]["json"].as_object().unwrap();
     assert_eq!(response_body["event"], "test_event");
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_webhook_caller_with_headers() {
     let tool = WebhookCallerTool::new();
@@ -75,10 +67,6 @@ async fn test_webhook_caller_with_headers() {
     assert_eq!(request_headers["X-Webhook-Secret"], "test-secret");
     assert_eq!(request_headers["X-Event-Type"], "user.created");
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_webhook_caller_get_method() {
     let tool = WebhookCallerTool::new();
@@ -98,10 +86,6 @@ async fn test_webhook_caller_get_method() {
     assert_eq!(result["status_code"], 200);
     assert!(result["response_time_ms"].as_f64().unwrap() > 0.0);
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_webhook_caller_retry_on_failure() {
     let tool = WebhookCallerTool::new();
@@ -124,10 +108,6 @@ async fn test_webhook_caller_retry_on_failure() {
     assert_eq!(result["status_code"], 500);
     assert!(result.get("retries_attempted").is_some() || result.get("retry_count").is_some());
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_webhook_caller_timeout() {
     let tool = WebhookCallerTool::new();
@@ -192,10 +172,6 @@ async fn test_webhook_caller_timeout() {
         }
     }
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_webhook_caller_invalid_url() {
     let tool = WebhookCallerTool::new();
@@ -212,10 +188,6 @@ async fn test_webhook_caller_invalid_url() {
     let error = result.unwrap_err();
     assert!(error.to_string().contains("URL") || error.to_string().contains("url"));
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_webhook_caller_custom_method() {
     let tool = WebhookCallerTool::new();

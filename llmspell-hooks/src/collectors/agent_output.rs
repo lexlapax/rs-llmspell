@@ -224,12 +224,9 @@ impl ArtifactCollector for AgentOutputCollector {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "hook")]
 mod tests {
     use super::*;
     use crate::types::{ComponentId, ComponentType};
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_agent_output_collection() {
         let mut config = CollectionConfig::default();
@@ -268,8 +265,6 @@ mod tests {
         // Check that artifact was added to context
         assert!(context.data.contains_key("collected_artifact"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_text_output_collection() {
         let mut config = CollectionConfig::default();
@@ -292,8 +287,6 @@ mod tests {
         assert!(artifact_data.name.ends_with(".txt"));
         assert_eq!(artifact_data.mime_type, "text/plain");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_size_limits() {
         let mut config = CollectionConfig::default();

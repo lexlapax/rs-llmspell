@@ -418,7 +418,6 @@ impl Default for FlowControllerBuilder {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "event")]
 mod tests {
     use super::*;
     use crate::universal_event::{Language, UniversalEvent};
@@ -428,8 +427,6 @@ mod tests {
     fn create_test_event() -> UniversalEvent {
         UniversalEvent::new("test.event", Value::Null, Language::Rust)
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_flow_controller_basic() {
         let config = FlowControllerConfig::default();
@@ -448,8 +445,6 @@ mod tests {
         assert!(popped.is_some());
         assert!(controller.is_buffer_empty());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_rate_limiting() {
         let config = FlowControllerConfig {
@@ -474,8 +469,6 @@ mod tests {
         sleep(Duration::from_millis(600)).await;
         assert!(controller.can_process(&event).await);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_token_bucket() {
         let mut bucket = TokenBucket::new(10.0, 5.0); // 10 capacity, 5/sec refill
@@ -488,8 +481,6 @@ mod tests {
         // Check available tokens (use approximate comparison due to floating point precision)
         assert!(bucket.available_tokens() < 0.001);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_overflow_handling() {
         let config = FlowControllerConfig {
@@ -517,8 +508,6 @@ mod tests {
         let result = controller.handle_overflow(event3).await;
         assert!(matches!(result, OverflowResult::Dropped { .. }));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_statistics() {
         let controller = FlowController::new(FlowControllerConfig::default());
@@ -530,8 +519,6 @@ mod tests {
         assert_eq!(stats.events_processed, 1);
         assert_eq!(stats.current_buffer_size, 1);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_builder() {
         let (controller, _rx) = FlowControllerBuilder::new()

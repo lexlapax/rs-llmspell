@@ -505,7 +505,6 @@ impl Tool for EnvironmentReaderTool {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "tool")]
 mod tests {
     use super::*;
     use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
@@ -548,8 +547,6 @@ mod tests {
         let config = EnvironmentReaderConfig::default();
         EnvironmentReaderTool::with_sandbox(config, sandbox_context)
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_get_existing_variable() {
         let tool = create_test_tool();
@@ -569,8 +566,6 @@ mod tests {
             .unwrap();
         assert!(result.text.contains("PATH"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_get_nonexistent_variable() {
         let mut config = EnvironmentReaderConfig::default();
@@ -592,8 +587,6 @@ mod tests {
             .unwrap();
         assert!(result.text.contains("not found"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_get_blocked_variable() {
         let tool = create_test_tool();
@@ -610,8 +603,6 @@ mod tests {
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("not permitted"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_list_variables() {
         let tool = create_test_tool();
@@ -630,8 +621,6 @@ mod tests {
         assert!(result.text.contains("Found"));
         assert!(result.text.contains("environment variables"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_pattern_matching() {
         let tool = create_test_tool();
@@ -650,8 +639,6 @@ mod tests {
             .unwrap();
         assert!(result.text.contains("Found"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_set_variable_disabled() {
         let tool = create_test_tool();
@@ -669,8 +656,6 @@ mod tests {
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("not permitted"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_set_variable_enabled() {
         let allowed_patterns = vec!["TEST_*".to_string()];
@@ -696,8 +681,6 @@ mod tests {
             .unwrap();
         assert!(result.text.contains("Set environment variable"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_invalid_operation() {
         let tool = create_test_tool();
@@ -716,8 +699,6 @@ mod tests {
             .to_string()
             .contains("Unknown operation"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_missing_parameters() {
         let tool = create_test_tool();
@@ -747,8 +728,6 @@ mod tests {
         let result3 = tool.execute(input3, ExecutionContext::default()).await;
         assert!(result3.is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_sandbox_permissions() {
         let tool = create_test_tool_with_sandbox();
@@ -793,8 +772,6 @@ mod tests {
             "HOME should be denied when not in sandbox permissions"
         );
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_pattern_matching_logic() {
         let tool = create_test_tool();
@@ -813,8 +790,6 @@ mod tests {
         assert!(!tool.matches_pattern("HOME", "PATH*"));
         assert!(!tool.matches_pattern("HOME", "*PATH"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_blocked_patterns_precedence() {
         let tool = create_test_tool();
@@ -830,8 +805,6 @@ mod tests {
         assert!(tool.is_var_allowed("HOME"));
         assert!(tool.is_var_allowed("USER"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_metadata() {
         let tool = create_test_tool();

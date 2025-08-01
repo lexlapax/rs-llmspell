@@ -888,13 +888,10 @@ pub fn list_dir(path: &Path) -> Result<Vec<DirEntry>> {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
     use std::env;
     use std::fs;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_normalize_path() {
         // Test basic normalization
@@ -909,8 +906,6 @@ mod tests {
         let path = normalize_path(Path::new("/home/user/"));
         assert_eq!(path, Path::new("/home/user"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_is_absolute_path() {
         assert!(is_absolute_path(Path::new("/home/user")));
@@ -918,8 +913,6 @@ mod tests {
         assert!(!is_absolute_path(Path::new("./relative")));
         assert!(!is_absolute_path(Path::new("../parent")));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_join_paths() {
         // Basic join
@@ -934,8 +927,6 @@ mod tests {
         let joined = join_paths(&[Path::new("/home"), Path::new(""), Path::new("user")]);
         assert_eq!(joined, Path::new("/home/user"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_parent_dir() {
         assert_eq!(
@@ -951,8 +942,6 @@ mod tests {
         // Root has no parent
         assert_eq!(parent_dir(Path::new("/")), None);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_expand_path_tilde() {
         // Set HOME for consistent testing
@@ -973,8 +962,6 @@ mod tests {
             env::remove_var("HOME");
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_expand_path_env_vars() {
         // Set test environment variable
@@ -998,8 +985,6 @@ mod tests {
         // Cleanup
         env::remove_var("TEST_VAR");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_ensure_dir() {
         let temp_dir = std::env::temp_dir();
@@ -1021,8 +1006,6 @@ mod tests {
         // Cleanup
         let _ = fs::remove_dir_all(&test_dir);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_ensure_dir_file_exists() {
         let temp_dir = std::env::temp_dir();
@@ -1039,8 +1022,6 @@ mod tests {
         // Cleanup
         let _ = fs::remove_file(&test_file);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_read_write_file() {
         let temp_dir = std::env::temp_dir();
@@ -1059,8 +1040,6 @@ mod tests {
         // Cleanup
         let _ = fs::remove_file(&test_file);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_write_file_creates_parent_dirs() {
         let temp_dir = std::env::temp_dir();
@@ -1085,8 +1064,6 @@ mod tests {
         // Cleanup
         let _ = fs::remove_dir_all(test_file.parent().unwrap().parent().unwrap());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_atomic_write() {
         let temp_dir = std::env::temp_dir();
@@ -1115,8 +1092,6 @@ mod tests {
         // Cleanup
         let _ = fs::remove_file(&test_file);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_copy_file() {
         let temp_dir = std::env::temp_dir();
@@ -1140,8 +1115,6 @@ mod tests {
         let _ = fs::remove_file(&source);
         let _ = fs::remove_file(&dest);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_remove_file_if_exists() {
         let temp_dir = std::env::temp_dir();
@@ -1159,8 +1132,6 @@ mod tests {
         // Remove again (should still succeed)
         assert!(remove_file_if_exists(&test_file).is_ok());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_remove_dir_all_if_exists() {
         let temp_dir = std::env::temp_dir();
@@ -1181,8 +1152,6 @@ mod tests {
         // Remove again (should still succeed)
         assert!(remove_dir_all_if_exists(&test_dir).is_ok());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_append_file() {
         let temp_dir = std::env::temp_dir();
@@ -1203,8 +1172,6 @@ mod tests {
         // Cleanup
         let _ = fs::remove_file(&test_file);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_append_file_creates_parent_dirs() {
         let temp_dir = std::env::temp_dir();
@@ -1224,8 +1191,6 @@ mod tests {
         // Cleanup
         let _ = fs::remove_dir_all(test_file.parent().unwrap().parent().unwrap());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_move_file() {
         let temp_dir = std::env::temp_dir();
@@ -1249,8 +1214,6 @@ mod tests {
         // Cleanup
         let _ = fs::remove_file(&dest);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_move_file_creates_parent_dirs() {
         let temp_dir = std::env::temp_dir();
@@ -1274,8 +1237,6 @@ mod tests {
         // Cleanup
         let _ = fs::remove_dir_all(dest.parent().unwrap().parent().unwrap());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_get_metadata() {
         let temp_dir = std::env::temp_dir();
@@ -1303,8 +1264,6 @@ mod tests {
         let _ = fs::remove_file(&test_file);
         let _ = fs::remove_dir(&test_dir);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_file_exists() {
         let temp_dir = std::env::temp_dir();
@@ -1321,8 +1280,6 @@ mod tests {
         fs::remove_file(&test_file).unwrap();
         assert!(!file_exists(&test_file));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_list_dir() {
         let temp_dir = std::env::temp_dir();
@@ -1362,8 +1319,6 @@ mod tests {
         // Cleanup
         let _ = fs::remove_dir_all(&test_dir);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_list_empty_dir() {
         let temp_dir = std::env::temp_dir();
@@ -1376,8 +1331,6 @@ mod tests {
         // Cleanup
         let _ = fs::remove_dir(&test_dir);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_list_dir_error() {
         let temp_dir = std::env::temp_dir();
@@ -1395,7 +1348,6 @@ mod tests {
     }
 
     #[cfg(unix)]
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_unix_specific_paths() {
         // Test Unix-specific path handling
@@ -1405,7 +1357,6 @@ mod tests {
     }
 
     #[cfg(windows)]
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_windows_specific_paths() {
         // Test Windows-specific path handling
@@ -1424,13 +1375,11 @@ mod tests {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "util")]
 mod property_tests {
     use super::*;
     use proptest::prelude::*;
 
     proptest! {
-        #[cfg_attr(test_category = "unit")]
         #[test]
         fn test_normalize_path_idempotent(path in prop::collection::vec("[a-zA-Z0-9./\\-_]+", 1..10)) {
             let path_str = path.join("/");
@@ -1439,8 +1388,6 @@ mod property_tests {
             let normalized_again = normalize_path(&normalized);
             assert_eq!(normalized, normalized_again);
         }
-
-        #[cfg_attr(test_category = "unit")]
         #[test]
         fn test_join_paths_associative(
             a in "[a-zA-Z0-9]+",
@@ -1455,8 +1402,6 @@ mod property_tests {
             let result2 = join_paths(&[path_a, &join_paths(&[path_b, path_c])]);
             assert_eq!(result1, result2);
         }
-
-        #[cfg_attr(test_category = "unit")]
         #[test]
         fn test_write_read_roundtrip(data: Vec<u8>) {
             let temp_dir = std::env::temp_dir();

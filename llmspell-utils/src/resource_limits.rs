@@ -311,11 +311,8 @@ macro_rules! track_operation {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_resource_limits_creation() {
         let default_limits = ResourceLimits::default();
@@ -327,8 +324,6 @@ mod tests {
         let unlimited_limits = ResourceLimits::unlimited();
         assert_eq!(unlimited_limits.max_memory_bytes, None);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_memory_tracking() {
         let limits = ResourceLimits {
@@ -350,8 +345,6 @@ mod tests {
         // Should succeed now
         assert!(tracker.track_memory(200).is_ok());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_operation_tracking() {
         let limits = ResourceLimits {
@@ -368,8 +361,6 @@ mod tests {
         // 6th operation should fail
         assert!(tracker.track_operation().is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_concurrent_operations() {
         let limits = ResourceLimits {
@@ -394,8 +385,6 @@ mod tests {
         // Drop all guards
         drop(guard2);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_file_size_check() {
         let limits = ResourceLimits {
@@ -411,8 +400,6 @@ mod tests {
         // Should fail
         assert!(tracker.check_file_size(1025).is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_timeout() {
         let limits = ResourceLimits {
@@ -439,8 +426,6 @@ mod tests {
             .await;
         assert!(result.is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_memory_guard() {
         let limits = ResourceLimits {
@@ -456,8 +441,6 @@ mod tests {
         // Memory should be released after guard is dropped
         assert_eq!(tracker.get_metrics().memory_bytes, 0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_metrics() {
         let limits = ResourceLimits::default();

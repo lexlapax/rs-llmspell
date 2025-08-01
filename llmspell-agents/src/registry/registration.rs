@@ -294,11 +294,8 @@ impl RegistrationHook for CompositeRegistrationHook {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_registration_builder() {
         let options = RegistrationBuilder::new()

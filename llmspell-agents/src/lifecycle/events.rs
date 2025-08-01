@@ -699,7 +699,6 @@ impl LifecycleEventListener for MetricsEventListener {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering};
@@ -734,8 +733,6 @@ mod tests {
             self.interested_types.is_empty() || self.interested_types.contains(event_type)
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_event_system_basic() {
         let event_system = LifecycleEventSystem::default();
@@ -773,8 +770,6 @@ mod tests {
             Some(&1)
         );
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_event_filtering() {
         let event_system = LifecycleEventSystem::default();
@@ -821,8 +816,6 @@ mod tests {
         // Should only receive the error event
         assert_eq!(listener.get_events_received(), 1);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_agent_specific_filtering() {
         let event_system = LifecycleEventSystem::default();
@@ -866,8 +859,6 @@ mod tests {
         // Should only receive the target agent event
         assert_eq!(listener.get_events_received(), 1);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_event_history() {
         let event_system = LifecycleEventSystem::default();
@@ -895,8 +886,6 @@ mod tests {
         assert_eq!(agent_events.len(), 1);
         assert_eq!(agent_events[0].agent_id, "agent-2");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_logging_listener() {
         let listener = LoggingEventListener::new();
@@ -916,8 +905,6 @@ mod tests {
         // Should not panic
         listener.handle_event(&event).await.unwrap();
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_metrics_listener() {
         let listener = MetricsEventListener::new();

@@ -156,12 +156,9 @@ pub fn create_simple_mock_agent() -> MockBaseAgent {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "testing")]
 mod tests {
     use super::*;
     use tokio;
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_mock_base_agent() {
         let mut mock = MockBaseAgent::new();
@@ -176,8 +173,6 @@ mod tests {
         let result = mock.execute(input, context).await.unwrap();
         assert_eq!(result.text, "Echo: Hello");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_simple_mock_helper() {
         let mock = create_simple_mock_agent();

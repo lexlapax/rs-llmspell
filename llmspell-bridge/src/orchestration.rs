@@ -479,19 +479,14 @@ impl OrchestrationTemplates {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "bridge")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_orchestration_plan_creation() {
         let plan = OrchestrationTemplates::data_pipeline_orchestration();
         assert_eq!(plan.name, "Data Processing Pipeline");
         assert_eq!(count_nodes(&plan.root_workflow), 4); // root + 3 children
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_orchestration_runtime() {
         let _runtime = OrchestrationRuntime::new(OrchestrationConfig::default());

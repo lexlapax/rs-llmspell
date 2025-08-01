@@ -99,12 +99,9 @@ impl EnhancedStateSchema {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "state")]
 mod tests {
     use super::*;
     use crate::config::FieldSchema;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_enhanced_schema_creation() {
         let version = SemanticVersion::new(1, 2, 3);
@@ -117,8 +114,6 @@ mod tests {
         assert!(schema.migration_path.is_empty());
         assert!(schema.dependencies.is_empty());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_legacy_conversion() {
         let legacy = StateSchema::v1();
@@ -131,8 +126,6 @@ mod tests {
         assert_eq!(converted_back.compatibility, legacy.compatibility);
         assert_eq!(converted_back.migration_path, legacy.migration_path);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_field_operations() {
         let mut schema = EnhancedStateSchema::new(SemanticVersion::new(1, 0, 0));
@@ -153,8 +146,6 @@ mod tests {
         assert!(removed.is_some());
         assert!(!schema.fields.contains_key("test_field"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_dependency_management() {
         let mut schema = EnhancedStateSchema::new(SemanticVersion::new(2, 0, 0));
@@ -169,8 +160,6 @@ mod tests {
         assert!(schema.dependencies.contains(&dep1));
         assert!(schema.dependencies.contains(&dep2));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_metadata_operations() {
         let mut schema = EnhancedStateSchema::new(SemanticVersion::new(1, 0, 0));

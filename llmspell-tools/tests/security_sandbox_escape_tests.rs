@@ -8,10 +8,6 @@ use llmspell_tools::system::{ProcessExecutorTool, SystemMonitorTool};
 use serde_json::json;
 use std::sync::Arc;
 use tempfile::TempDir;
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_file_sandbox_path_traversal_prevention() {
     let file_tool = FileOperationsTool::new(Default::default());
@@ -46,10 +42,6 @@ async fn test_file_sandbox_path_traversal_prevention() {
         );
     }
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_file_sandbox_symlink_escape() {
     let temp_dir = TempDir::new().unwrap();
@@ -90,10 +82,6 @@ async fn test_file_sandbox_symlink_escape() {
         }
     }
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_process_executor_command_injection() {
     let process_tool = ProcessExecutorTool::new(Default::default());
@@ -137,10 +125,6 @@ async fn test_process_executor_command_injection() {
         }
     }
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_file_search_directory_traversal() {
     let temp_dir = TempDir::new().unwrap();
@@ -191,10 +175,6 @@ async fn test_file_search_directory_traversal() {
         }
     }
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_system_monitor_information_disclosure() {
     let monitor_tool = SystemMonitorTool::new(Default::default());
@@ -225,10 +205,6 @@ async fn test_system_monitor_information_disclosure() {
         );
     }
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_sandbox_resource_exhaustion_prevention() {
     let temp_dir = TempDir::new().unwrap();
@@ -264,10 +240,6 @@ async fn test_sandbox_resource_exhaustion_prevention() {
         }
     }
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "tool")]
-#[cfg_attr(test_category = "security")]
 #[test]
 fn test_sandbox_escape_via_environment_variables() {
     use std::env;

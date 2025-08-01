@@ -297,13 +297,10 @@ impl ReplayableHook for LoggingHook {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "hook")]
 mod tests {
     use super::*;
     use crate::types::{ComponentId, ComponentType, HookPoint};
     use serde_json::json;
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_logging_hook_basic() {
         let hook = LoggingHook::new();
@@ -317,8 +314,6 @@ mod tests {
         assert!(context.get_metadata("logged_at").is_some());
         assert!(context.get_metadata("logging_hook_version").is_some());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_logging_hook_with_data() {
         let hook = LoggingHook::new().with_context_data(true);
@@ -332,8 +327,6 @@ mod tests {
         let result = hook.execute(&mut context).await.unwrap();
         assert!(matches!(result, HookResult::Continue));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_logging_hook_different_levels() {
         for level in [
@@ -351,8 +344,6 @@ mod tests {
             assert!(matches!(result, HookResult::Continue));
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_data_truncation() {
         let hook = LoggingHook::new().with_max_data_size(10);
@@ -362,8 +353,6 @@ mod tests {
         assert!(truncated.len() > 10); // Includes "... (truncated)"
         assert!(truncated.contains("... (truncated)"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_performance_logging() {
         let hook = LoggingHook::new().with_performance_logging(true);
@@ -380,8 +369,6 @@ mod tests {
             .await
             .unwrap();
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_logging_config_defaults() {
         let config = LoggingConfig::default();
@@ -391,8 +378,6 @@ mod tests {
         assert!(config.log_performance);
         assert_eq!(config.max_data_size, 1024);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_hook_metadata() {
         let hook = LoggingHook::new();
@@ -405,8 +390,6 @@ mod tests {
         assert!(metadata.tags.contains(&"builtin".to_string()));
         assert!(metadata.tags.contains(&"logging".to_string()));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_should_execute() {
         let hook = LoggingHook::new();
@@ -415,8 +398,6 @@ mod tests {
 
         assert!(hook.should_execute(&context));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_replayable_hook_implementation() {
         let hook = LoggingHook::new()

@@ -93,11 +93,8 @@ pub fn create_builtin_templates() -> TemplateFactory {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_builtin_templates() {
         let factory = create_builtin_templates();
@@ -121,8 +118,6 @@ mod tests {
         let monitor_templates = factory.get_templates_by_category(&TemplateCategory::Monitoring);
         assert!(!monitor_templates.is_empty());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_template_search() {
         let factory = create_builtin_templates();

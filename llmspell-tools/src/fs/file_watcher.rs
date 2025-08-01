@@ -444,7 +444,6 @@ impl Tool for FileWatcherTool {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "tool")]
 mod tests {
     use super::*;
     use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
@@ -472,8 +471,6 @@ mod tests {
         let tool = FileWatcherTool::new(config, sandbox);
         (tool, temp_dir)
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_file_watcher_tool_metadata() {
         let (tool, _temp_dir) = create_test_tool();
@@ -484,22 +481,16 @@ mod tests {
             "Monitors file system changes and events"
         );
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_file_watcher_tool_category() {
         let (tool, _temp_dir) = create_test_tool();
         assert_eq!(tool.category(), ToolCategory::Filesystem);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_file_watcher_tool_security_level() {
         let (tool, _temp_dir) = create_test_tool();
         assert_eq!(tool.security_level(), SecurityLevel::Restricted);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_schema() {
         let (tool, _temp_dir) = create_test_tool();
@@ -511,8 +502,6 @@ mod tests {
         );
         assert!(!schema.parameters.is_empty());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_config_operation() {
         let (tool, _temp_dir) = create_test_tool();
@@ -544,8 +533,6 @@ mod tests {
         assert!(output["result"]["default_debounce_ms"].is_number());
         assert!(output["result"]["max_paths"].is_number());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_watch_operation_requires_paths() {
         let (tool, _temp_dir) = create_test_tool();
@@ -573,8 +560,6 @@ mod tests {
             .to_string()
             .contains("Missing required array parameter 'input'"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_watch_operation_with_nonexistent_path() {
         let (tool, _temp_dir) = create_test_tool();
@@ -600,8 +585,6 @@ mod tests {
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_watch_operation_with_valid_path() {
         let (tool, temp_dir) = create_test_tool();
@@ -634,8 +617,6 @@ mod tests {
         assert!(output["result"]["events"].is_array());
         assert!(output["result"]["event_count"].is_number());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_convert_notify_event() {
         let (tool, temp_dir) = create_test_tool();

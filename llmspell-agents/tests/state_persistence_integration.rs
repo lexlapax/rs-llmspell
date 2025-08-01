@@ -16,10 +16,6 @@ use llmspell_core::{
 use llmspell_state_persistence::{PersistenceConfig, StateManager, StorageBackendType};
 use std::sync::Arc;
 use tempfile::TempDir;
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "agent")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_basic_agent_state_persistence() -> Result<()> {
     // Create a temporary directory for storage
@@ -109,10 +105,6 @@ async fn test_basic_agent_state_persistence() -> Result<()> {
 
     Ok(())
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "agent")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_mock_agent_state_persistence() -> Result<()> {
     // Create mock agent configuration with pre-programmed responses
@@ -182,10 +174,6 @@ async fn test_mock_agent_state_persistence() -> Result<()> {
 
     Ok(())
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "agent")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_state_persistence_with_multiple_agents() -> Result<()> {
     // Create state manager
@@ -259,10 +247,6 @@ async fn test_state_persistence_with_multiple_agents() -> Result<()> {
 
     Ok(())
 }
-
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "agent")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_state_persistence_error_handling() -> Result<()> {
     // Create agent without state manager
@@ -291,9 +275,6 @@ async fn test_state_persistence_error_handling() -> Result<()> {
 }
 
 // Placeholder for Task 5.2.7: Real Provider Integration Tests
-#[cfg_attr(test_category = "external")]
-#[cfg_attr(test_category = "agent")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "Task 5.2.7: Requires real LLM provider configuration"]
 async fn test_llm_agent_state_persistence_with_real_provider() -> Result<()> {

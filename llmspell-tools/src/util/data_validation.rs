@@ -683,11 +683,8 @@ impl Tool for DataValidationTool {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "tool")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_required_validation() {
         let tool = DataValidationTool::new();
@@ -714,8 +711,6 @@ mod tests {
         assert!(!validation_result.valid);
         assert_eq!(validation_result.errors.len(), 1);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_type_validation() {
         let tool = DataValidationTool::new();
@@ -744,8 +739,6 @@ mod tests {
             .message
             .contains("Expected type 'number'"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_length_validation() {
         let tool = DataValidationTool::new();
@@ -772,8 +765,6 @@ mod tests {
         assert!(!validation_result.valid);
         assert!(validation_result.errors[0].message.contains("at least 3"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_email_validation() {
         let tool = DataValidationTool::new();
@@ -822,8 +813,6 @@ mod tests {
             serde_json::from_value(output["result"].clone()).unwrap();
         assert!(!validation_result.valid);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_custom_validator() {
         let tool = DataValidationTool::new();
@@ -849,8 +838,6 @@ mod tests {
             serde_json::from_value(output["result"].clone()).unwrap();
         assert!(validation_result.valid);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_complex_object_validation() {
         let tool = DataValidationTool::new();

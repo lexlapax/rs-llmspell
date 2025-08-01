@@ -599,12 +599,9 @@ impl Default for EventCorrelator {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "hook")]
 mod tests {
     use super::*;
     use crate::ComponentType;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_correlation_id_creation() {
         let id1 = CorrelationId::new();
@@ -613,8 +610,6 @@ mod tests {
         assert_ne!(id1, id2);
         assert!(!id1.to_string().is_empty());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_correlation_id_child() {
         let parent = CorrelationId::new();
@@ -625,8 +620,6 @@ mod tests {
         let child2 = parent.create_child();
         assert_ne!(child, child2);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_correlator_creation() {
         let correlator = EventCorrelator::new();
@@ -638,8 +631,6 @@ mod tests {
         assert_eq!(traces.len(), 1);
         assert_eq!(traces[0].correlation_id, correlation_id);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_event_recording() {
         let correlator = EventCorrelator::new();
@@ -668,8 +659,6 @@ mod tests {
         assert_eq!(trace.events[0].component_id, component_id);
         assert_eq!(trace.events[0].message, "Test event");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_chain_trace() {
         let correlator = EventCorrelator::new();
@@ -729,8 +718,6 @@ mod tests {
             Some(&"cross_component".to_string())
         );
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_trace_completion() {
         let correlator = EventCorrelator::new();
@@ -748,8 +735,6 @@ mod tests {
 
         assert_eq!(trace.status, TraceStatus::Completed);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_trace_failure() {
         let correlator = EventCorrelator::new();
@@ -771,8 +756,6 @@ mod tests {
             Some(&"Test failure".to_string())
         );
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_trace_analysis() {
         let correlator = EventCorrelator::new();

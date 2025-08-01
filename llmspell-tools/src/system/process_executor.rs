@@ -719,7 +719,6 @@ impl ProcessExecutorTool {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "tool")]
 mod tests {
     use super::*;
     use tempfile::TempDir;
@@ -751,8 +750,6 @@ mod tests {
             output_modalities: vec![],
         }
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_execute_simple_command() {
         let tool = create_test_tool();
@@ -771,8 +768,6 @@ mod tests {
             .unwrap();
         assert!(result.text.contains("executed successfully"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_execute_blocked_command() {
         let tool = create_test_tool();
@@ -789,8 +784,6 @@ mod tests {
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("not permitted"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_execute_nonexistent_command() {
         let tool = create_test_tool();
@@ -807,8 +800,6 @@ mod tests {
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("not found"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_execute_with_working_directory() {
         let tool = create_test_tool();
@@ -828,8 +819,6 @@ mod tests {
             .unwrap();
         assert!(result.text.contains("executed successfully"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_execute_with_environment_vars() {
         let tool = create_test_tool();
@@ -853,8 +842,6 @@ mod tests {
             .unwrap();
         assert!(result.text.contains("executed successfully"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_executable_validation() {
         let tool = create_test_tool();
@@ -891,8 +878,6 @@ mod tests {
             .to_string()
             .contains("dangerous characters"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_missing_parameters() {
         let tool = create_test_tool();
@@ -923,8 +908,6 @@ mod tests {
         assert!(result2.is_err());
         assert!(result2.unwrap_err().to_string().contains("cannot be empty"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_working_directory_validation() {
         let tool = create_test_tool();
@@ -942,8 +925,6 @@ mod tests {
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("does not exist"));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_executable_allowed_check() {
         let tool = create_test_tool();
@@ -959,8 +940,6 @@ mod tests {
         // Test unknown executable (should be denied by default)
         assert!(!tool.is_executable_allowed("unknown_command").unwrap());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_metadata() {
         let tool = create_test_tool();
@@ -979,8 +958,6 @@ mod tests {
         assert!(required_params.contains(&"executable".to_string()));
         assert_eq!(required_params.len(), 1);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_custom_config() {
         let tool = create_test_tool_with_custom_config();
@@ -989,8 +966,6 @@ mod tests {
         assert_eq!(tool.config.max_execution_time_seconds, 5);
         assert_eq!(tool.config.max_output_size, 1024);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_resolve_executable() {
         let tool = create_test_tool();
@@ -1003,8 +978,6 @@ mod tests {
         let result = tool.resolve_executable("nonexistent_command_12345").await;
         assert!(result.is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_arbitrary_commands_disabled() {
         let config = ProcessExecutorConfig {
@@ -1016,8 +989,6 @@ mod tests {
         // Should not allow arbitrary commands
         assert!(!tool.is_executable_allowed("arbitrary_command").unwrap());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_arbitrary_commands_enabled() {
         let config = ProcessExecutorConfig {
@@ -1032,8 +1003,6 @@ mod tests {
         // But still respect blocked list
         assert!(!tool.is_executable_allowed("rm").unwrap());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_hook_integration_metadata() {
         let tool = create_test_tool();
@@ -1056,8 +1025,6 @@ mod tests {
         // Verify security critical flag
         assert_eq!(metadata["resource_limits"]["security_critical"], true);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_process_executor_hook_integration() {
         use crate::lifecycle::{ToolExecutor, ToolLifecycleConfig};
@@ -1075,8 +1042,6 @@ mod tests {
         // May succeed or fail based on system, but should not panic
         assert!(result.is_ok() || result.is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_hookable_tool_execution_trait_process() {
         use crate::lifecycle::{HookableToolExecution, ToolExecutor, ToolLifecycleConfig};

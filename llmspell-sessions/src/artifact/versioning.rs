@@ -202,12 +202,9 @@ impl VersionManager {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "session")]
 mod tests {
     use super::*;
     use llmspell_storage::MemoryBackend;
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_version_numbering() {
         let backend = Arc::new(MemoryBackend::new());
@@ -233,8 +230,6 @@ mod tests {
         assert_eq!(v2.version, 2);
         assert_eq!(v2.previous_hash, Some("hash1".to_string()));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_version_history() {
         let backend = Arc::new(MemoryBackend::new());

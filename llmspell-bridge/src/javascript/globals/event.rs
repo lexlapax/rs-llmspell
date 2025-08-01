@@ -30,11 +30,8 @@ pub fn inject_event_global(_ctx: &mut (), _context: &GlobalContext) -> Result<()
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "bridge")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_event_global_stub_compiles() {
         // This test just ensures the stub compiles correctly
@@ -43,7 +40,6 @@ mod tests {
     }
 
     #[cfg(feature = "javascript")]
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_javascript_event_injection() {
         use crate::{ComponentRegistry, ProviderManager};

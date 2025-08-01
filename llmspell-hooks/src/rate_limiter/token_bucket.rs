@@ -128,13 +128,10 @@ impl TokenBucket {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "hook")]
 mod tests {
     use super::*;
     use std::thread;
     use std::time::Duration as StdDuration;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_token_bucket_creation() {
         let config = TokenBucketConfig {
@@ -147,8 +144,6 @@ mod tests {
         let bucket = TokenBucket::new(config);
         assert_eq!(bucket.tokens, 150.0); // capacity + burst
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_token_acquisition() {
         let config = TokenBucketConfig {
@@ -175,8 +170,6 @@ mod tests {
         assert!(!allowed);
         assert_eq!(remaining, 0.0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_token_refill() {
         let config = TokenBucketConfig {
@@ -199,8 +192,6 @@ mod tests {
         let tokens = bucket.get_tokens();
         assert!(tokens >= 10.0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_burst_capacity() {
         let config = TokenBucketConfig {
@@ -217,8 +208,6 @@ mod tests {
         assert!(allowed);
         assert_eq!(remaining, 5.0); // 30 - 25
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_force_acquire() {
         let config = TokenBucketConfig {
@@ -240,8 +229,6 @@ mod tests {
         // Bucket should be in debt
         assert_eq!(bucket.tokens, -5.0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_bucket_state() {
         let config = TokenBucketConfig {
@@ -260,8 +247,6 @@ mod tests {
         assert_eq!(state.tokens, 125.0);
         assert_eq!(state.total_consumed, 25);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_reset() {
         let config = TokenBucketConfig {
@@ -283,8 +268,6 @@ mod tests {
         assert_eq!(bucket.total_consumed, 0);
         assert_eq!(bucket.total_refilled, 0);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_refill_cap() {
         let config = TokenBucketConfig {

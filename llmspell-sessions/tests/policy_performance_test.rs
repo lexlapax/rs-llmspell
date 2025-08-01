@@ -11,9 +11,6 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 /// Baseline test - measure hook system overhead without policies
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "session")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_baseline_hook_overhead() -> Result<()> {
     let hook_registry = Arc::new(HookRegistry::new());
@@ -48,9 +45,6 @@ async fn test_baseline_hook_overhead() -> Result<()> {
 }
 
 /// Test with all policies enabled
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "session")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_policy_overhead() -> Result<()> {
     let hook_registry = Arc::new(HookRegistry::new());
@@ -142,9 +136,6 @@ async fn test_policy_overhead() -> Result<()> {
 }
 
 /// Test different composition patterns performance
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "session")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_composition_performance() -> Result<()> {
     let patterns = vec![
@@ -231,9 +222,6 @@ async fn test_composition_performance() -> Result<()> {
 }
 
 /// Test memory overhead of policies
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "session")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_memory_overhead() -> Result<()> {
     // Create multiple policy managers to test memory usage
@@ -262,9 +250,6 @@ async fn test_memory_overhead() -> Result<()> {
 }
 
 /// Test circuit breaker integration
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "session")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_circuit_breaker_protection() -> Result<()> {
     let hook_registry = Arc::new(HookRegistry::new());

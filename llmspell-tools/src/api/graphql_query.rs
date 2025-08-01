@@ -665,11 +665,8 @@ impl Tool for GraphQLQueryTool {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "tool")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_operation_parsing() {
         assert_eq!(
@@ -686,8 +683,6 @@ mod tests {
         );
         assert!("invalid".parse::<GraphQLOperation>().is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_query_depth_estimation() {
         let tool = GraphQLQueryTool::default();
@@ -701,8 +696,6 @@ mod tests {
         let flat_query = "{ user posts comments }";
         assert_eq!(tool.estimate_query_depth(flat_query), 1);
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_schema_cache_expiry() {
         let entry = SchemaCacheEntry {
@@ -719,8 +712,6 @@ mod tests {
         };
         assert!(!fresh_entry.is_expired());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_graphql_tool_creation() {
         let config = GraphQLConfig::default();

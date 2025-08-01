@@ -9,7 +9,6 @@ pub mod shutdown;
 pub mod state_machine;
 
 #[cfg(test)]
-#[cfg_attr(test_category = "agent")]
 pub mod tests;
 
 pub mod benchmarks;

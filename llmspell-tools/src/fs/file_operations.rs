@@ -979,11 +979,8 @@ impl FileOperationsTool {
 }
 
 #[cfg(test)]
-#[cfg_attr(test_category = "tool")]
 mod tests {
     use super::*;
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_operation_parsing() {
         assert_eq!(
@@ -1004,8 +1001,6 @@ mod tests {
         );
         assert!("invalid".parse::<FileOperation>().is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_file_operations_tool_creation() {
         let config = FileOperationsConfig::default();
@@ -1013,8 +1008,6 @@ mod tests {
 
         assert_eq!(tool.metadata().name, "file-operations-tool");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_parse_parameters_standardized() {
         let tool = FileOperationsTool::default();
@@ -1041,8 +1034,6 @@ mod tests {
         assert_eq!(parsed.source_path, Some(PathBuf::from("/tmp/source.txt")));
         assert_eq!(parsed.target_path, Some(PathBuf::from("/tmp/target.txt")));
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_hook_integration_metadata() {
         let tool = FileOperationsTool::default();
@@ -1062,8 +1053,6 @@ mod tests {
         assert!(metadata["security_considerations"].is_array());
         assert_eq!(metadata["security_level"], "Privileged");
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_file_operations_hook_integration() {
         use crate::lifecycle::{ToolExecutor, ToolLifecycleConfig};
@@ -1086,8 +1075,6 @@ mod tests {
         // and should return a proper response structure
         assert!(result.is_ok() || result.is_err());
     }
-
-    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_hookable_tool_execution_trait() {
         use crate::lifecycle::{HookableToolExecution, ToolExecutor, ToolLifecycleConfig};

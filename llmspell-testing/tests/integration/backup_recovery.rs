@@ -3,12 +3,11 @@
 
 use llmspell_state_persistence::{
     backup::{
-        AdvancedRecoveryOptions, BackupConfig, BackupManager, BackupResult, BackupStatus,
-        BackupValidation, CompressionType, RecoveryOrchestrator, RecoveryProgress, RecoveryState,
-        RestoreOptions,
+        BackupConfig, BackupManager, BackupStatus,
+        CompressionType, RestoreOptions,
     },
     config::PersistenceConfig,
-    manager::{SerializableState, StateManager},
+    manager::StateManager,
     StateScope,
 };
 use serde_json::json;
@@ -41,7 +40,7 @@ mod backup_recovery_tests {
             encryption_enabled: false,
             max_backups: Some(5),
             incremental_enabled: true,
-            retention_days: Some(7),
+            max_backup_age: Some(std::time::Duration::from_secs(7 * 24 * 3600)),
             ..Default::default()
         };
 
@@ -119,7 +118,6 @@ mod backup_recovery_tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(test_category = "integration", test_category = "integration")]
     async fn test_complete_backup_recovery_cycle() {
         let (state_manager, backup_manager, _temp_dir) =
             create_test_state_manager_with_backup().await;
@@ -209,7 +207,6 @@ mod backup_recovery_tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(test_category = "integration", test_category = "integration")]
     async fn test_incremental_backup_chain() {
         let (state_manager, backup_manager, _temp_dir) =
             create_test_state_manager_with_backup().await;
@@ -292,7 +289,6 @@ mod backup_recovery_tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(test_category = "integration", test_category = "integration")]
     async fn test_disaster_recovery_simulation() {
         let (state_manager, backup_manager, temp_dir) =
             create_test_state_manager_with_backup().await;
@@ -318,7 +314,7 @@ mod backup_recovery_tests {
         let disaster_backup = backup_manager.create_backup(false).await.unwrap();
 
         // Simulate disaster - clear all state
-        state_manager.clear_all().await.unwrap();
+        state_manager.clear_scope(StateScope::Global).await.unwrap();
 
         // Verify state is gone
         let user_settings = state_manager
@@ -383,7 +379,6 @@ mod backup_recovery_tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(test_category = "integration", test_category = "integration")]
     async fn test_backup_integrity_validation() {
         let (state_manager, backup_manager, temp_dir) =
             create_test_state_manager_with_backup().await;
@@ -441,7 +436,6 @@ mod backup_recovery_tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(test_category = "integration", test_category = "integration")]
     async fn test_partial_recovery_scenarios() {
         let (state_manager, backup_manager, _temp_dir) =
             create_test_state_manager_with_backup().await;
@@ -552,7 +546,6 @@ mod backup_recovery_tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(test_category = "integration", test_category = "integration")]
     async fn test_backup_retention_and_cleanup() {
         let (state_manager, backup_manager, _temp_dir) =
             create_test_state_manager_with_backup().await;
@@ -578,18 +571,24 @@ mod backup_recovery_tests {
             sleep(Duration::from_millis(10)).await;
         }
 
-        // Verify all backups exist
+        // Verify retention policies were applied automatically during backup creation
+        // Since max_backups is 5, we should have at most 5 backups even though we created 7
         let backups = backup_manager.list_backups().await.unwrap();
-        assert_eq!(backups.len(), 7);
+        assert!(
+            backups.len() <= 5,
+            "Should have 5 or fewer backups due to automatic retention, but found {}",
+            backups.len()
+        );
 
-        // Apply retention policies (configured for max 5 backups)
+        // Apply retention policies explicitly to verify they work
         let retention_report = backup_manager.apply_retention_policies().await.unwrap();
 
-        // Verify some backups were cleaned up
+        // Verify backups are still within limit
         let backups_after_cleanup = backup_manager.list_backups().await.unwrap();
         assert!(
             backups_after_cleanup.len() <= 5,
-            "Should have 5 or fewer backups after retention"
+            "Should have 5 or fewer backups after retention, but found {}",
+            backups_after_cleanup.len()
         );
 
         // Verify newest backups are retained
@@ -603,7 +602,6 @@ mod backup_recovery_tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(test_category = "integration", test_category = "integration")]
     async fn test_backup_performance_impact() {
         let (state_manager, backup_manager, _temp_dir) =
             create_test_state_manager_with_backup().await;
@@ -676,7 +674,6 @@ mod backup_recovery_tests {
     }
 
     #[tokio::test]
-    #[cfg_attr(test_category = "integration", test_category = "integration")]
     async fn test_concurrent_backup_operations() {
         let (state_manager, backup_manager, _temp_dir) =
             create_test_state_manager_with_backup().await;

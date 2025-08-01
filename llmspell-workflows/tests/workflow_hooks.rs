@@ -12,10 +12,6 @@ use llmspell_workflows::{
 };
 use serde_json::json;
 use std::sync::Arc;
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "workflow")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_sequential_workflow_with_hooks() {
     // Create workflow executor without hook executor (testing basic integration)
@@ -49,10 +45,6 @@ async fn test_sequential_workflow_with_hooks() {
     assert!(result.success);
     assert_eq!(result.successful_steps.len(), 2);
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "workflow")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_conditional_workflow_with_hooks() {
     // Create workflow executor
@@ -83,10 +75,6 @@ async fn test_conditional_workflow_with_hooks() {
     assert!(result.success);
     assert_eq!(result.executed_branches.len(), 1);
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "workflow")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_loop_workflow_with_hooks() {
     // Create workflow executor
@@ -115,10 +103,6 @@ async fn test_loop_workflow_with_hooks() {
     assert!(result.success);
     assert_eq!(result.completed_iterations, 3);
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "workflow")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_parallel_workflow_with_hooks() {
     // Create workflow executor
@@ -157,10 +141,6 @@ async fn test_parallel_workflow_with_hooks() {
     assert!(result.success);
     assert_eq!(result.branch_results.len(), 2);
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "workflow")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_workflow_without_hooks() {
     // Test that workflows work without hooks (backward compatibility)
@@ -177,10 +157,6 @@ async fn test_workflow_without_hooks() {
     let result = workflow.execute().await.unwrap();
     assert!(result.success);
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "workflow")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_error_handling_with_hooks() {
     // Create workflow executor
@@ -216,10 +192,6 @@ async fn test_error_handling_with_hooks() {
     assert_eq!(result.failed_steps.len(), 1);
     assert_eq!(result.successful_steps.len(), 1);
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "workflow")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_state_management_with_hooks() {
     // Create workflow executor
@@ -255,10 +227,6 @@ async fn test_state_management_with_hooks() {
     let value = workflow.get_shared_data("test_key").await.unwrap();
     assert_eq!(value, Some(json!("test_value")));
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "workflow")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_nested_workflow_patterns() {
     // Test that complex nested workflow patterns work with hooks
@@ -305,10 +273,6 @@ async fn test_nested_workflow_patterns() {
     assert_eq!(result.executed_branches.len(), 1);
     assert_eq!(result.executed_branches[0].branch_name, "main_branch");
 }
-
-#[cfg_attr(test_category = "integration")]
-#[cfg_attr(test_category = "workflow")]
-#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_workflow_lifecycle_config() {
     // Test workflow with custom lifecycle configuration
