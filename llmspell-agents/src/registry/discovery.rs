@@ -87,14 +87,14 @@ pub struct SearchResult {
     pub match_reasons: Vec<String>,
 }
 
-/// Agent discovery service
-pub struct DiscoveryService<R: AgentRegistry> {
+/// Agent discovery
+pub struct Discovery<R: AgentRegistry> {
     registry: Arc<R>,
     metadata_cache: Arc<tokio::sync::RwLock<HashMap<String, ExtendedAgentMetadata>>>,
 }
 
-impl<R: AgentRegistry> DiscoveryService<R> {
-    /// Create new discovery service
+impl<R: AgentRegistry> Discovery<R> {
+    /// Create new discovery instance
     pub fn new(registry: Arc<R>) -> Self {
         Self {
             registry,

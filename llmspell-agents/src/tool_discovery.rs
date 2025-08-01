@@ -13,22 +13,22 @@ use serde_json::Value as JsonValue;
 use std::collections::HashMap;
 use std::sync::Arc;
 
-/// High-level tool discovery service that provides convenient APIs
+/// High-level tool discovery that provides convenient APIs
 /// for finding and filtering tools based on various criteria.
 ///
-/// This service wraps the lower-level ToolRegistry to provide
+/// This wraps the lower-level ToolRegistry to provide
 /// more ergonomic APIs for agent developers.
 ///
 /// # Examples
 ///
 /// ```
-/// use llmspell_agents::tool_discovery::ToolDiscoveryService;
+/// use llmspell_agents::tool_discovery::ToolDiscovery;
 /// use llmspell_tools::registry::ToolRegistry;
 /// use std::sync::Arc;
 ///
 /// # async fn example() -> llmspell_core::Result<()> {
 /// let registry = Arc::new(ToolRegistry::new());
-/// let discovery = ToolDiscoveryService::new(registry);
+/// let discovery = ToolDiscovery::new(registry);
 ///
 /// // Find filesystem tools
 /// let fs_tools = discovery.find_by_category("filesystem").await?;
@@ -41,12 +41,12 @@ use std::sync::Arc;
 /// # Ok(())
 /// # }
 /// ```
-pub struct ToolDiscoveryService {
+pub struct ToolDiscovery {
     registry: Arc<ToolRegistry>,
 }
 
-impl ToolDiscoveryService {
-    /// Create a new tool discovery service
+impl ToolDiscovery {
+    /// Create a new tool discovery instance
     pub fn new(registry: Arc<ToolRegistry>) -> Self {
         Self { registry }
     }
@@ -433,7 +433,7 @@ mod tests {
     #[tokio::test]
     async fn test_tool_discovery_service_creation() {
         let registry = Arc::new(ToolRegistry::new());
-        let discovery = ToolDiscoveryService::new(registry);
+        let discovery = ToolDiscovery::new(registry);
 
         // Test that service was created successfully
         assert!(!(discovery.tool_exists("nonexistent").await));
@@ -470,7 +470,7 @@ mod tests {
     #[tokio::test]
     async fn test_find_by_category() {
         let registry = Arc::new(ToolRegistry::new());
-        let discovery = ToolDiscoveryService::new(registry);
+        let discovery = ToolDiscovery::new(registry);
 
         // Test empty result for nonexistent category
         let tools = discovery.find_by_category("nonexistent").await.unwrap();
@@ -480,7 +480,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_recommended_tools() {
         let registry = Arc::new(ToolRegistry::new());
-        let discovery = ToolDiscoveryService::new(registry);
+        let discovery = ToolDiscovery::new(registry);
 
         let context = RecommendationContext::new()
             .with_task_type("file_processing")
