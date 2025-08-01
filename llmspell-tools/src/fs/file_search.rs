@@ -577,10 +577,11 @@ mod tests {
     use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
     use llmspell_security::sandbox::SandboxContext;
     use std::collections::HashMap;
+    use llmspell_testing::tool_helpers::{create_test_tool, create_test_tool_input};
     use tempfile::TempDir;
     use tokio::fs;
 
-    fn create_test_tool() -> (FileSearchTool, TempDir) {
+    fn create_test_file_search() -> (FileSearchTool, TempDir) {
         let temp_dir = TempDir::new().unwrap();
 
         // Create sandbox context
@@ -605,22 +606,9 @@ mod tests {
         (tool, temp_dir)
     }
 
-    fn create_test_input(text: &str, params: serde_json::Value) -> AgentInput {
-        AgentInput {
-            text: text.to_string(),
-            media: vec![],
-            context: None,
-            parameters: {
-                let mut map = HashMap::new();
-                map.insert("parameters".to_string(), params);
-                map
-            },
-            output_modalities: vec![],
-        }
-    }
     #[tokio::test]
     async fn test_search_single_file() {
-        let (tool, temp_dir) = create_test_tool();
+        let (tool, temp_dir) = create_test_file_search();
 
         // Create test file
         let test_file = temp_dir.path().join("test.txt");
@@ -631,15 +619,12 @@ mod tests {
         .await
         .unwrap();
 
-        let input = create_test_input(
-            "Search for pattern in file",
-            json!({
-                "pattern": "pattern",
-                "path": test_file.to_string_lossy(),
-                "case_sensitive": false,
-                "context_lines": 1
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("pattern", "pattern"),
+            ("path", &test_file.to_string_lossy()),
+            ("case_sensitive", "false"),
+            ("context_lines", "1"),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -652,7 +637,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_search_directory_recursive() {
-        let (tool, temp_dir) = create_test_tool();
+        let (tool, temp_dir) = create_test_file_search();
 
         // Create directory structure
         let subdir = temp_dir.path().join("subdir");
@@ -668,16 +653,12 @@ mod tests {
             .await
             .unwrap();
 
-        let input = create_test_input(
-            "Search for TODO in directory",
-            json!({
-                "pattern": "TODO",
-                "path": temp_dir.path().to_string_lossy(),
-                "recursive": true,
-                "include_extensions": ["txt"],
-                "context_lines": 0
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("pattern", "TODO"),
+            ("path", &temp_dir.path().to_string_lossy()),
+            ("recursive", "true"),
+            ("context_lines", "0"),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -689,7 +670,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_search_with_regex() {
-        let (tool, temp_dir) = create_test_tool();
+        let (tool, temp_dir) = create_test_file_search();
 
         let test_file = temp_dir.path().join("test.log");
         fs::write(
@@ -699,15 +680,11 @@ mod tests {
         .await
         .unwrap();
 
-        let input = create_test_input(
-            "Search for error patterns",
-            json!({
-                "pattern": r"(ERROR|WARNING):",
-                "path": test_file.to_string_lossy(),
-                "use_regex": true,
-                "context_lines": 0
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("path", &test_file.to_string_lossy()),
+            ("use_regex", "true"),
+            ("context_lines", "0"),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -718,7 +695,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_search_with_file_extension_filter() {
-        let (tool, temp_dir) = create_test_tool();
+        let (tool, temp_dir) = create_test_file_search();
 
         // Create files with different extensions
         let txt_file = temp_dir.path().join("test.txt");
@@ -729,15 +706,11 @@ mod tests {
         fs::write(&rs_file, "pattern in rust").await.unwrap();
         fs::write(&bin_file, "pattern in binary").await.unwrap();
 
-        let input = create_test_input(
-            "Search with extension filter",
-            json!({
-                "pattern": "pattern",
-                "path": temp_dir.path().to_string_lossy(),
-                "include_extensions": ["txt", "rs"],
-                "recursive": false
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("pattern", "pattern"),
+            ("path", &temp_dir.path().to_string_lossy()),
+            ("recursive", "false"),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -748,7 +721,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_search_with_context_lines() {
-        let (tool, temp_dir) = create_test_tool();
+        let (tool, temp_dir) = create_test_file_search();
 
         let test_file = temp_dir.path().join("test.txt");
         fs::write(
@@ -758,14 +731,11 @@ mod tests {
         .await
         .unwrap();
 
-        let input = create_test_input(
-            "Search with context",
-            json!({
-                "pattern": "MATCH",
-                "path": test_file.to_string_lossy(),
-                "context_lines": 2
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("pattern", "MATCH"),
+            ("path", &test_file.to_string_lossy()),
+            ("context_lines", "2"),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -778,17 +748,14 @@ mod tests {
     }
     #[tokio::test]
     async fn test_search_nonexistent_path() {
-        let (tool, temp_dir) = create_test_tool();
+        let (tool, temp_dir) = create_test_file_search();
 
         let nonexistent = temp_dir.path().join("nonexistent.txt");
 
-        let input = create_test_input(
-            "Search nonexistent file",
-            json!({
-                "pattern": "test",
-                "path": nonexistent.to_string_lossy()
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("pattern", "test"),
+            ("path", &nonexistent.to_string_lossy()),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -796,18 +763,14 @@ mod tests {
     }
     #[tokio::test]
     async fn test_search_empty_pattern() {
-        let (tool, temp_dir) = create_test_tool();
+        let (tool, temp_dir) = create_test_file_search();
 
         let test_file = temp_dir.path().join("test.txt");
         fs::write(&test_file, "content").await.unwrap();
 
-        let input = create_test_input(
-            "Search with empty pattern",
-            json!({
-                "pattern": "",
-                "path": test_file.to_string_lossy()
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("path", &test_file.to_string_lossy()),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -818,39 +781,33 @@ mod tests {
     }
     #[tokio::test]
     async fn test_search_invalid_regex() {
-        let (tool, temp_dir) = create_test_tool();
+        let (tool, temp_dir) = create_test_file_search();
 
         let test_file = temp_dir.path().join("test.txt");
         fs::write(&test_file, "content").await.unwrap();
 
-        let input = create_test_input(
-            "Search with invalid regex",
-            json!({
-                "pattern": "[invalid",
-                "path": test_file.to_string_lossy(),
-                "use_regex": true
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("pattern", "[invalid"),
+            ("path", &test_file.to_string_lossy()),
+            ("use_regex", "true"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
     }
     #[tokio::test]
     async fn test_search_no_matches() {
-        let (tool, temp_dir) = create_test_tool();
+        let (tool, temp_dir) = create_test_file_search();
 
         let test_file = temp_dir.path().join("test.txt");
         fs::write(&test_file, "This file has no matches for the pattern")
             .await
             .unwrap();
 
-        let input = create_test_input(
-            "Search for non-existent pattern",
-            json!({
-                "pattern": "NONEXISTENT",
-                "path": test_file.to_string_lossy()
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("pattern", "NONEXISTENT"),
+            ("path", &test_file.to_string_lossy()),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())

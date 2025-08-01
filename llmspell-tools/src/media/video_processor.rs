@@ -556,27 +556,13 @@ mod tests {
     use std::fs;
     use tempfile::TempDir;
 
-    fn create_test_tool() -> VideoProcessorTool {
+    fn create_test_video_processor() -> VideoProcessorTool {
         let config = VideoProcessorConfig::default();
         VideoProcessorTool::new(config)
     }
-
-    fn create_test_input(text: &str, params: serde_json::Value) -> AgentInput {
-        AgentInput {
-            text: text.to_string(),
-            media: vec![],
-            context: None,
-            parameters: {
-                let mut map = HashMap::new();
-                map.insert("parameters".to_string(), params);
-                map
-            },
-            output_modalities: vec![],
-        }
-    }
     #[tokio::test]
     async fn test_format_detection_by_extension() {
-        let tool = create_test_tool();
+        let tool = create_test_video_processor();
         let temp_dir = TempDir::new().unwrap();
 
         // Test various extensions
@@ -630,19 +616,15 @@ mod tests {
     }
     #[tokio::test]
     async fn test_metadata_extraction() {
-        let tool = create_test_tool();
+        let tool = create_test_video_processor();
         let temp_dir = TempDir::new().unwrap();
         let file_path = temp_dir.path().join("video.mp4");
 
         fs::write(&file_path, b"dummy mp4 content").unwrap();
 
-        let input = create_test_input(
-            "Extract metadata",
-            json!({
-                "operation": "metadata",
-                "file_path": file_path.to_str().unwrap()
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "metadata"),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -655,19 +637,15 @@ mod tests {
     }
     #[tokio::test]
     async fn test_format_detection_operation() {
-        let tool = create_test_tool();
+        let tool = create_test_video_processor();
         let temp_dir = TempDir::new().unwrap();
         let file_path = temp_dir.path().join("test.mkv");
 
         fs::write(&file_path, b"dummy").unwrap();
 
-        let input = create_test_input(
-            "Detect format",
-            json!({
-                "operation": "detect",
-                "file_path": file_path.to_str().unwrap()
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "detect"),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -690,13 +668,9 @@ mod tests {
         // Create a file larger than the limit
         fs::write(&file_path, vec![0u8; 100]).unwrap();
 
-        let input = create_test_input(
-            "Extract metadata",
-            json!({
-                "operation": "metadata",
-                "file_path": file_path.to_str().unwrap()
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "metadata"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -704,21 +678,17 @@ mod tests {
     }
     #[tokio::test]
     async fn test_thumbnail_not_implemented() {
-        let tool = create_test_tool();
+        let tool = create_test_video_processor();
         let temp_dir = TempDir::new().unwrap();
         let video_path = temp_dir.path().join("video.mp4");
         let target_path = temp_dir.path().join("thumb.jpg");
 
         fs::write(&video_path, b"dummy").unwrap();
 
-        let input = create_test_input(
-            "Generate thumbnail",
-            json!({
-                "operation": "thumbnail",
-                "file_path": video_path.to_str().unwrap(),
-                "target_path": target_path.to_str().unwrap()
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "thumbnail"),
+            ("target_path", "target_path.to_str().unwrap()"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -726,22 +696,18 @@ mod tests {
     }
     #[tokio::test]
     async fn test_extract_frame_not_implemented() {
-        let tool = create_test_tool();
+        let tool = create_test_video_processor();
         let temp_dir = TempDir::new().unwrap();
         let video_path = temp_dir.path().join("video.mp4");
         let target_path = temp_dir.path().join("frame.jpg");
 
         fs::write(&video_path, b"dummy").unwrap();
 
-        let input = create_test_input(
-            "Extract frame",
-            json!({
-                "operation": "extract_frame",
-                "file_path": video_path.to_str().unwrap(),
-                "target_path": target_path.to_str().unwrap(),
-                "timestamp_seconds": 5.0
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "extract_frame"),
+            ("target_path", "target_path.to_str().unwrap()"),
+            ("timestamp_seconds", "5.0"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -751,14 +717,11 @@ mod tests {
     }
     #[tokio::test]
     async fn test_invalid_operation() {
-        let tool = create_test_tool();
+        let tool = create_test_video_processor();
 
-        let input = create_test_input(
-            "Invalid operation",
-            json!({
-                "operation": "invalid"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "invalid"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -769,15 +732,12 @@ mod tests {
     }
     #[tokio::test]
     async fn test_missing_required_parameters() {
-        let tool = create_test_tool();
+        let tool = create_test_video_processor();
 
         // Missing file_path for metadata operation
-        let input = create_test_input(
-            "Extract metadata",
-            json!({
-                "operation": "metadata"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "metadata"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -787,13 +747,10 @@ mod tests {
             .contains("Missing required parameter 'file_path'"));
 
         // Missing target_path for thumbnail
-        let input = create_test_input(
-            "Generate thumbnail",
-            json!({
-                "operation": "thumbnail",
-                "file_path": "/tmp/video.mp4"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "thumbnail"),
+            ("file_path", "/tmp/video.mp4"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -804,7 +761,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_tool_metadata() {
-        let tool = create_test_tool();
+        let tool = create_test_video_processor();
 
         let metadata = tool.metadata();
         assert_eq!(metadata.name, "video_processor");
@@ -824,19 +781,16 @@ mod tests {
     }
     #[tokio::test]
     async fn test_default_operation() {
-        let tool = create_test_tool();
+        let tool = create_test_video_processor();
         let temp_dir = TempDir::new().unwrap();
         let file_path = temp_dir.path().join("test.mp4");
 
         fs::write(&file_path, b"dummy").unwrap();
 
         // No operation specified, should default to metadata
-        let input = create_test_input(
-            "Process video",
-            json!({
-                "file_path": file_path.to_str().unwrap()
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ,
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -847,15 +801,11 @@ mod tests {
     }
     #[tokio::test]
     async fn test_empty_file_path() {
-        let tool = create_test_tool();
+        let tool = create_test_video_processor();
 
-        let input = create_test_input(
-            "Detect format",
-            json!({
-                "operation": "detect",
-                "file_path": ""
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "detect"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());

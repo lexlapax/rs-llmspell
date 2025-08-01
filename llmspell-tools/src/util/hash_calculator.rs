@@ -363,32 +363,22 @@ mod tests {
     use super::*;
     use llmspell_core::LLMSpellError;
     use llmspell_utils::file_utils::write_file;
+    use llmspell_testing::tool_helpers::{create_test_tool, create_test_tool_input};
     use tempfile::TempDir;
 
-    fn create_test_tool() -> HashCalculatorTool {
+    fn create_test_hash_calculator() -> HashCalculatorTool {
         HashCalculatorTool::new(HashCalculatorConfig::default())
     }
 
-    fn create_test_input(params: serde_json::Value) -> AgentInput {
-        let mut input = AgentInput::text("test");
-        // The extract_parameters function expects a "parameters" key containing the actual parameters
-        input = input.with_parameter(
-            "parameters",
-            params.get("parameters").cloned().unwrap_or(json!({})),
-        );
-        input
-    }
     #[tokio::test]
     async fn test_hash_string() {
-        let tool = create_test_tool();
-        let input = create_test_input(json!({
-            "parameters": {
-                "operation": "hash",
-                "input": "hello world",
-                "algorithm": "sha256",
-                "format": "hex"
-            }
-        }));
+        let tool = create_test_hash_calculator();
+        let input = create_test_tool_input(vec![
+            ("operation", "hash"),
+            ("input", "hello world"),
+            ("algorithm", "sha256"),
+            ("format", "hex"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_ok());
@@ -401,19 +391,17 @@ mod tests {
     }
     #[tokio::test]
     async fn test_hash_file() {
-        let tool = create_test_tool();
+        let tool = create_test_hash_calculator();
         let temp_dir = TempDir::new().unwrap();
         let file_path = temp_dir.path().join("test.txt");
         write_file(&file_path, b"file content").unwrap();
 
-        let input = create_test_input(json!({
-            "parameters": {
-                "operation": "hash",
-                "input_type": "file",
-                "file": file_path.to_str().unwrap(),
-                "algorithm": "md5"
-            }
-        }));
+        let input = create_test_tool_input(vec![
+            ("operation", "hash"),
+            ("input_type", "file"),
+            ("file", &file_path.to_str().unwrap()),
+            ("algorithm", "md5"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_ok());
@@ -425,16 +413,13 @@ mod tests {
     }
     #[tokio::test]
     async fn test_verify_hash_success() {
-        let tool = create_test_tool();
-        let input = create_test_input(json!({
-            "parameters": {
-                "operation": "verify",
-                "input": "test",
-                "algorithm": "sha256",
-                "expected_hash": "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
-                "expected_format": "hex"
-            }
-        }));
+        let tool = create_test_hash_calculator();
+        let input = create_test_tool_input(vec![
+            ("operation", "verify"),
+            ("input", "test"),
+            ("algorithm", "sha256"),
+            ("expected_hash", "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_ok());
@@ -446,16 +431,13 @@ mod tests {
     }
     #[tokio::test]
     async fn test_verify_hash_failure() {
-        let tool = create_test_tool();
-        let input = create_test_input(json!({
-            "parameters": {
-                "operation": "verify",
-                "input": "test",
-                "algorithm": "sha256",
-                "expected_hash": "0000000000000000000000000000000000000000000000000000000000000000",
-                "expected_format": "hex"
-            }
-        }));
+        let tool = create_test_hash_calculator();
+        let input = create_test_tool_input(vec![
+            ("operation", "verify"),
+            ("input", "test"),
+            ("algorithm", "sha256"),
+            ("expected_hash", "0000000000000000000000000000000000000000000000000000000000000000"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_ok());
@@ -467,13 +449,10 @@ mod tests {
     }
     #[tokio::test]
     async fn test_missing_required_parameter() {
-        let tool = create_test_tool();
-        let input = create_test_input(json!({
-            "parameters": {
-                // Missing "operation" parameter
-                "data": "test"
-            }
-        }));
+        let tool = create_test_hash_calculator();
+        let input = create_test_tool_input(vec![
+            ("data", "test"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -484,14 +463,12 @@ mod tests {
     }
     #[tokio::test]
     async fn test_invalid_algorithm() {
-        let tool = create_test_tool();
-        let input = create_test_input(json!({
-            "parameters": {
-                "operation": "hash",
-                "input": "test",
-                "algorithm": "invalid" // Should default to SHA-256
-            }
-        }));
+        let tool = create_test_hash_calculator();
+        let input = create_test_tool_input(vec![
+            ("operation", "hash"),
+            ("input", "test"),
+            ("algorithm", "invalid"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_ok());
@@ -511,13 +488,11 @@ mod tests {
         let file_path = temp_dir.path().join("large.txt");
         write_file(&file_path, b"This content is larger than 10 bytes").unwrap();
 
-        let input = create_test_input(json!({
-            "parameters": {
-                "operation": "hash",
-                "input_type": "file",
-                "file": file_path.to_str().unwrap()
-            }
-        }));
+        let input = create_test_tool_input(vec![
+            ("operation", "hash"),
+            ("input_type", "file"),
+            ("file", &file_path.to_str().unwrap()),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());

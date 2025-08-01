@@ -448,9 +448,10 @@ mod tests {
     use super::*;
     use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
     use llmspell_security::sandbox::SandboxContext;
+    use llmspell_testing::tool_helpers::{create_test_tool, create_test_tool_input};
     use tempfile::TempDir;
 
-    fn create_test_tool() -> (FileWatcherTool, TempDir) {
+    fn create_test_file_watcher() -> (FileWatcherTool, TempDir) {
         let temp_dir = TempDir::new().unwrap();
         let config = FileWatcherConfig::default();
 
@@ -473,7 +474,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_file_watcher_tool_metadata() {
-        let (tool, _temp_dir) = create_test_tool();
+        let (tool, _temp_dir) = create_test_file_watcher();
         let metadata = tool.metadata();
         assert_eq!(metadata.name, "file_watcher");
         assert_eq!(
@@ -483,17 +484,17 @@ mod tests {
     }
     #[tokio::test]
     async fn test_file_watcher_tool_category() {
-        let (tool, _temp_dir) = create_test_tool();
+        let (tool, _temp_dir) = create_test_file_watcher();
         assert_eq!(tool.category(), ToolCategory::Filesystem);
     }
     #[tokio::test]
     async fn test_file_watcher_tool_security_level() {
-        let (tool, _temp_dir) = create_test_tool();
+        let (tool, _temp_dir) = create_test_file_watcher();
         assert_eq!(tool.security_level(), SecurityLevel::Restricted);
     }
     #[tokio::test]
     async fn test_schema() {
-        let (tool, _temp_dir) = create_test_tool();
+        let (tool, _temp_dir) = create_test_file_watcher();
         let schema = tool.schema();
         assert_eq!(schema.name, "file_watcher");
         assert_eq!(
@@ -504,23 +505,10 @@ mod tests {
     }
     #[tokio::test]
     async fn test_config_operation() {
-        let (tool, _temp_dir) = create_test_tool();
-        let input = AgentInput {
-            text: "Get file watcher configuration".to_string(),
-            media: vec![],
-            context: None,
-            parameters: {
-                let mut map = HashMap::new();
-                map.insert(
-                    "parameters".to_string(),
-                    json!({
-                        "operation": "config"
-                    }),
-                );
-                map
-            },
-            output_modalities: vec![],
-        };
+        let (tool, _temp_dir) = create_test_file_watcher();
+        let input = create_test_tool_input(vec![
+            ("operation", "config"),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -535,23 +523,10 @@ mod tests {
     }
     #[tokio::test]
     async fn test_watch_operation_requires_paths() {
-        let (tool, _temp_dir) = create_test_tool();
-        let input = AgentInput {
-            text: "Watch for file changes".to_string(),
-            media: vec![],
-            context: None,
-            parameters: {
-                let mut map = HashMap::new();
-                map.insert(
-                    "parameters".to_string(),
-                    json!({
-                        "operation": "watch"
-                    }),
-                );
-                map
-            },
-            output_modalities: vec![],
-        };
+        let (tool, _temp_dir) = create_test_file_watcher();
+        let input = create_test_tool_input(vec![
+            ("operation", "watch"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -562,51 +537,35 @@ mod tests {
     }
     #[tokio::test]
     async fn test_watch_operation_with_nonexistent_path() {
-        let (tool, _temp_dir) = create_test_tool();
-        let input = AgentInput {
-            text: "Watch for file changes".to_string(),
-            media: vec![],
-            context: None,
-            parameters: {
-                let mut map = HashMap::new();
-                map.insert(
-                    "parameters".to_string(),
-                    json!({
-                        "operation": "watch",
-                        "input": ["/nonexistent/path"],
-                        "timeout_seconds": 1
-                    }),
-                );
-                map
-            },
-            output_modalities: vec![],
-        };
+        let (tool, _temp_dir) = create_test_file_watcher();
+        let input = create_test_tool_input(vec![
+            ("operation", "watch"),
+            ("timeout_seconds", "1"),
+        ]);
+        
+        // Need to add the array parameter separately since create_test_tool_input handles simple values
+        let mut input = input;
+        input.parameters.get_mut("parameters")
+            .and_then(|v| v.as_object_mut())
+            .map(|obj| obj.insert("input".to_string(), json!(["/nonexistent/path"])));
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
     }
     #[tokio::test]
     async fn test_watch_operation_with_valid_path() {
-        let (tool, temp_dir) = create_test_tool();
-        let input = AgentInput {
-            text: "Watch for file changes".to_string(),
-            media: vec![],
-            context: None,
-            parameters: {
-                let mut map = HashMap::new();
-                map.insert(
-                    "parameters".to_string(),
-                    json!({
-                        "operation": "watch",
-                        "input": [temp_dir.path().to_string_lossy()],
-                        "timeout_seconds": 1,
-                        "max_events": 10
-                    }),
-                );
-                map
-            },
-            output_modalities: vec![],
-        };
+        let (tool, temp_dir) = create_test_file_watcher();
+        let input = create_test_tool_input(vec![
+            ("operation", "watch"),
+            ("timeout_seconds", "1"),
+            ("max_events", "10"),
+        ]);
+        
+        // Need to add the array parameter separately
+        let mut input = input;
+        input.parameters.get_mut("parameters")
+            .and_then(|v| v.as_object_mut())
+            .map(|obj| obj.insert("input".to_string(), json!([temp_dir.path().to_string_lossy()])));
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -619,7 +578,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_convert_notify_event() {
-        let (tool, temp_dir) = create_test_tool();
+        let (tool, temp_dir) = create_test_file_watcher();
         let config = WatchConfig::new().add_path(temp_dir.path());
 
         let notify_event = notify::Event {

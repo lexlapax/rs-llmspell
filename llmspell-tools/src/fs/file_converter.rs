@@ -528,11 +528,12 @@ mod tests {
     use super::*;
     use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
     use llmspell_security::sandbox::SandboxContext;
+    use llmspell_testing::tool_helpers::{create_test_tool, create_test_tool_input};
     use std::collections::HashMap;
     use tempfile::TempDir;
     use tokio::fs;
 
-    fn create_test_tool() -> (FileConverterTool, TempDir) {
+    fn create_test_file_converter() -> (FileConverterTool, TempDir) {
         let temp_dir = TempDir::new().unwrap();
 
         // Create sandbox context
@@ -557,35 +558,19 @@ mod tests {
         (tool, temp_dir)
     }
 
-    fn create_test_input(text: &str, params: serde_json::Value) -> AgentInput {
-        AgentInput {
-            text: text.to_string(),
-            media: vec![],
-            context: None,
-            parameters: {
-                let mut map = HashMap::new();
-                map.insert("parameters".to_string(), params);
-                map
-            },
-            output_modalities: vec![],
-        }
-    }
     #[tokio::test]
     async fn test_encoding_conversion() {
-        let (tool, temp_dir) = create_test_tool();
+        let (tool, temp_dir) = create_test_file_converter();
 
         // Create test file
         let test_file = temp_dir.path().join("test.txt");
         fs::write(&test_file, "Hello, World!").await.unwrap();
 
-        let input = create_test_input(
-            "Convert file encoding",
-            json!({
-                "operation": "encoding",
-                "path": test_file.to_string_lossy(),
-                "to_encoding": "utf8"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "encoding"),
+            ("path", &test_file.to_string_lossy()),
+            ("to_encoding", "utf8"),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -597,7 +582,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_line_ending_conversion() {
-        let (tool, temp_dir) = create_test_tool();
+        let (tool, temp_dir) = create_test_file_converter();
 
         // Create test file with mixed line endings
         let test_file = temp_dir.path().join("test.txt");
@@ -605,14 +590,11 @@ mod tests {
             .await
             .unwrap();
 
-        let input = create_test_input(
-            "Convert line endings",
-            json!({
-                "operation": "line_endings",
-                "path": test_file.to_string_lossy(),
-                "line_ending": "lf"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "line_endings"),
+            ("path", &test_file.to_string_lossy()),
+            ("line_ending", "lf"),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -628,7 +610,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_indentation_conversion() {
-        let (tool, temp_dir) = create_test_tool();
+        let (tool, temp_dir) = create_test_file_converter();
 
         // Create test file with tabs
         let test_file = temp_dir.path().join("test.txt");
@@ -636,15 +618,12 @@ mod tests {
             .await
             .unwrap();
 
-        let input = create_test_input(
-            "Convert tabs to spaces",
-            json!({
-                "operation": "indentation",
-                "path": test_file.to_string_lossy(),
-                "convert_to_spaces": true,
-                "tab_size": 4
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "indentation"),
+            ("path", &test_file.to_string_lossy()),
+            ("convert_to_spaces", "true"),
+            ("tab_size", "4"),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -660,25 +639,22 @@ mod tests {
     }
     #[tokio::test]
     async fn test_invalid_operation() {
-        let (tool, temp_dir) = create_test_tool();
+        let (tool, temp_dir) = create_test_file_converter();
 
         let test_file = temp_dir.path().join("test.txt");
         fs::write(&test_file, "test").await.unwrap();
 
-        let input = create_test_input(
-            "Invalid operation",
-            json!({
-                "operation": "invalid",
-                "path": test_file.to_string_lossy()
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "invalid"),
+            ("path", &test_file.to_string_lossy()),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
     }
     #[tokio::test]
     async fn test_missing_parameters() {
-        let (tool, _temp_dir) = create_test_tool();
+        let (tool, _temp_dir) = create_test_file_converter();
 
         let input = AgentInput {
             text: "Missing params".to_string(),
@@ -693,25 +669,22 @@ mod tests {
     }
     #[tokio::test]
     async fn test_nonexistent_file() {
-        let (tool, temp_dir) = create_test_tool();
+        let (tool, temp_dir) = create_test_file_converter();
 
         let nonexistent_file = temp_dir.path().join("nonexistent.txt");
 
-        let input = create_test_input(
-            "Convert nonexistent file",
-            json!({
-                "operation": "encoding",
-                "path": nonexistent_file.to_string_lossy(),
-                "to_encoding": "utf8"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "encoding"),
+            ("path", &nonexistent_file.to_string_lossy()),
+            ("to_encoding", "utf8"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
     }
     #[tokio::test]
     async fn test_tool_metadata() {
-        let (tool, _temp_dir) = create_test_tool();
+        let (tool, _temp_dir) = create_test_file_converter();
 
         let metadata = tool.metadata();
         assert_eq!(metadata.name, "file_converter");

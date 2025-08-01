@@ -721,9 +721,10 @@ impl ProcessExecutorTool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use llmspell_testing::tool_helpers::{create_test_tool, create_test_tool_input};
     use tempfile::TempDir;
 
-    fn create_test_tool() -> ProcessExecutorTool {
+    fn create_test_process_executor() -> ProcessExecutorTool {
         let config = ProcessExecutorConfig::default();
         ProcessExecutorTool::new(config)
     }
@@ -736,31 +737,14 @@ mod tests {
         };
         ProcessExecutorTool::new(config)
     }
-
-    fn create_test_input(text: &str, params: serde_json::Value) -> AgentInput {
-        AgentInput {
-            text: text.to_string(),
-            media: vec![],
-            context: None,
-            parameters: {
-                let mut map = HashMap::new();
-                map.insert("parameters".to_string(), params);
-                map
-            },
-            output_modalities: vec![],
-        }
-    }
     #[tokio::test]
     async fn test_execute_simple_command() {
-        let tool = create_test_tool();
+        let tool = create_test_process_executor();
 
-        let input = create_test_input(
-            "Execute echo command",
-            json!({
-                "executable": "echo",
-                "arguments": ["Hello", "World"]
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("executable", "echo"),
+            ("arguments", "["Hello", "World"]"),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -770,15 +754,12 @@ mod tests {
     }
     #[tokio::test]
     async fn test_execute_blocked_command() {
-        let tool = create_test_tool();
+        let tool = create_test_process_executor();
 
-        let input = create_test_input(
-            "Execute blocked command",
-            json!({
-                "executable": "rm",
-                "arguments": ["-rf", "/"]
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("executable", "rm"),
+            ("arguments", "["-rf", "/"]"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -786,15 +767,12 @@ mod tests {
     }
     #[tokio::test]
     async fn test_execute_nonexistent_command() {
-        let tool = create_test_tool();
+        let tool = create_test_process_executor();
 
-        let input = create_test_input(
-            "Execute nonexistent command",
-            json!({
-                "executable": "nonexistent_command_12345",
-                "arguments": ["arg1"]
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("executable", "nonexistent_command_12345"),
+            ("arguments", "["arg1"]"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -802,16 +780,13 @@ mod tests {
     }
     #[tokio::test]
     async fn test_execute_with_working_directory() {
-        let tool = create_test_tool();
+        let tool = create_test_process_executor();
         let temp_dir = TempDir::new().unwrap();
 
-        let input = create_test_input(
-            "Execute pwd in temp directory",
-            json!({
-                "executable": "pwd",
-                "working_directory": temp_dir.path().to_string_lossy()
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("executable", "pwd"),
+            ("working_directory", "temp_dir.path().to_string_lossy()"),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -821,20 +796,17 @@ mod tests {
     }
     #[tokio::test]
     async fn test_execute_with_environment_vars() {
-        let tool = create_test_tool();
+        let tool = create_test_process_executor();
 
         let env = json!({
             "TEST_VAR": "test_value"
         });
 
-        let input = create_test_input(
-            "Execute command with environment",
-            json!({
-                "executable": "echo",
-                "arguments": ["$TEST_VAR"],
-                "environment": env
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("executable", "echo"),
+            ("arguments", "["$TEST_VAR"]"),
+            ("environment", "env"),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -844,7 +816,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_executable_validation() {
-        let tool = create_test_tool();
+        let tool = create_test_process_executor();
 
         // Test dangerous characters
         let input1 = create_test_input(
@@ -880,7 +852,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_missing_parameters() {
-        let tool = create_test_tool();
+        let tool = create_test_process_executor();
 
         // Missing executable
         let input1 = AgentInput {
@@ -910,16 +882,13 @@ mod tests {
     }
     #[tokio::test]
     async fn test_working_directory_validation() {
-        let tool = create_test_tool();
+        let tool = create_test_process_executor();
 
         // Nonexistent directory
-        let input = create_test_input(
-            "Nonexistent working directory",
-            json!({
-                "executable": "echo",
-                "working_directory": "/nonexistent/directory/12345"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("executable", "echo"),
+            ("working_directory", "/nonexistent/directory/12345"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -927,7 +896,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_executable_allowed_check() {
-        let tool = create_test_tool();
+        let tool = create_test_process_executor();
 
         // Test allowed executable
         assert!(tool.is_executable_allowed("echo").unwrap());
@@ -942,7 +911,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_tool_metadata() {
-        let tool = create_test_tool();
+        let tool = create_test_process_executor();
 
         let metadata = tool.metadata();
         assert_eq!(metadata.name, "process_executor");
@@ -968,7 +937,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_resolve_executable() {
-        let tool = create_test_tool();
+        let tool = create_test_process_executor();
 
         // Test resolving a common executable
         let result = tool.resolve_executable("echo").await;
@@ -1005,7 +974,7 @@ mod tests {
     }
     #[test]
     fn test_hook_integration_metadata() {
-        let tool = create_test_tool();
+        let tool = create_test_process_executor();
 
         // Test that the tool supports hooks
         assert!(tool.supports_hooks());
@@ -1028,7 +997,7 @@ mod tests {
     #[tokio::test]
     async fn test_process_executor_hook_integration() {
         use crate::lifecycle::{ToolExecutor, ToolLifecycleConfig};
-        let tool = create_test_tool();
+        let tool = create_test_process_executor();
 
         let config = ToolLifecycleConfig::default();
         let tool_executor = ToolExecutor::new(config, None, None);
@@ -1045,7 +1014,7 @@ mod tests {
     #[tokio::test]
     async fn test_hookable_tool_execution_trait_process() {
         use crate::lifecycle::{HookableToolExecution, ToolExecutor, ToolLifecycleConfig};
-        let tool = create_test_tool();
+        let tool = create_test_process_executor();
 
         // Verify the tool implements HookableToolExecution
         let config = ToolLifecycleConfig::default();

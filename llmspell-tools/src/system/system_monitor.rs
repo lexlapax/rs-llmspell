@@ -669,8 +669,9 @@ impl Tool for SystemMonitorTool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use llmspell_testing::tool_helpers::{create_test_tool, create_test_tool_input};
 
-    fn create_test_tool() -> SystemMonitorTool {
+    fn create_test_system_monitor() -> SystemMonitorTool {
         let config = SystemMonitorConfig::default();
         SystemMonitorTool::new(config)
     }
@@ -684,30 +685,13 @@ mod tests {
         };
         SystemMonitorTool::new(config)
     }
-
-    fn create_test_input(text: &str, params: serde_json::Value) -> AgentInput {
-        AgentInput {
-            text: text.to_string(),
-            media: vec![],
-            context: None,
-            parameters: {
-                let mut map = HashMap::new();
-                map.insert("parameters".to_string(), params);
-                map
-            },
-            output_modalities: vec![],
-        }
-    }
     #[tokio::test]
     async fn test_collect_all_stats() {
-        let tool = create_test_tool();
+        let tool = create_test_system_monitor();
 
-        let input = create_test_input(
-            "Get system statistics",
-            json!({
-                "operation": "all"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "all"),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -719,14 +703,11 @@ mod tests {
     }
     #[tokio::test]
     async fn test_collect_cpu_stats() {
-        let tool = create_test_tool();
+        let tool = create_test_system_monitor();
 
-        let input = create_test_input(
-            "Get CPU statistics",
-            json!({
-                "operation": "cpu"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "cpu"),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -737,14 +718,11 @@ mod tests {
     }
     #[tokio::test]
     async fn test_collect_memory_stats() {
-        let tool = create_test_tool();
+        let tool = create_test_system_monitor();
 
-        let input = create_test_input(
-            "Get memory statistics",
-            json!({
-                "operation": "memory"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "memory"),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -755,14 +733,11 @@ mod tests {
     }
     #[tokio::test]
     async fn test_collect_disk_stats() {
-        let tool = create_test_tool();
+        let tool = create_test_system_monitor();
 
-        let input = create_test_input(
-            "Get disk statistics",
-            json!({
-                "operation": "disk"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "disk"),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -773,14 +748,11 @@ mod tests {
     }
     #[tokio::test]
     async fn test_invalid_operation() {
-        let tool = create_test_tool();
+        let tool = create_test_system_monitor();
 
-        let input = create_test_input(
-            "Invalid operation",
-            json!({
-                "operation": "invalid"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "invalid"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -791,7 +763,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_default_operation() {
-        let tool = create_test_tool();
+        let tool = create_test_system_monitor();
 
         // No operation parameter should default to "all"
         let input = create_test_input("Get default statistics", json!({}));
@@ -804,7 +776,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_basic_system_info() {
-        let tool = create_test_tool();
+        let tool = create_test_system_monitor();
 
         let stats = tool.get_basic_system_info().await.unwrap();
         assert!(stats.cpu_count > 0);
@@ -813,7 +785,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_cpu_usage_measurement() {
-        let tool = create_test_tool();
+        let tool = create_test_system_monitor();
 
         let cpu_usage = tool.get_cpu_usage().await;
         assert!(cpu_usage >= 0.0);
@@ -821,7 +793,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_disk_usage_collection() {
-        let tool = create_test_tool();
+        let tool = create_test_system_monitor();
 
         let disk_usage = tool.get_disk_usage().await;
         // Disk usage collection might return empty on some test environments
@@ -835,7 +807,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_process_count() {
-        let tool = create_test_tool();
+        let tool = create_test_system_monitor();
 
         let process_count = tool.get_process_count().await;
         // Process count might be None on some platforms
@@ -845,7 +817,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_tool_metadata() {
-        let tool = create_test_tool();
+        let tool = create_test_system_monitor();
 
         let metadata = tool.metadata();
         assert_eq!(metadata.name, "system_monitor");
@@ -900,7 +872,7 @@ mod tests {
     #[cfg(unix)]
     #[tokio::test]
     async fn test_load_average() {
-        let tool = create_test_tool();
+        let tool = create_test_system_monitor();
 
         // Load average might not be available in all test environments
         if let Ok(load_avg) = tool.get_load_average() {
@@ -911,7 +883,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_uptime() {
-        let tool = create_test_tool();
+        let tool = create_test_system_monitor();
 
         let uptime = tool.get_uptime().await;
         // Uptime might not be available in all test environments

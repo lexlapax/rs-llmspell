@@ -507,26 +507,13 @@ impl Tool for EnvironmentReaderTool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use llmspell_testing::tool_helpers::{create_test_tool, create_test_tool_input};
     use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
     use std::collections::HashMap;
 
-    fn create_test_tool() -> EnvironmentReaderTool {
+    fn create_test_environment_reader() -> EnvironmentReaderTool {
         let config = EnvironmentReaderConfig::default();
         EnvironmentReaderTool::new(config)
-    }
-
-    fn create_test_input(text: &str, params: serde_json::Value) -> AgentInput {
-        AgentInput {
-            text: text.to_string(),
-            media: vec![],
-            context: None,
-            parameters: {
-                let mut map = HashMap::new();
-                map.insert("parameters".to_string(), params);
-                map
-            },
-            output_modalities: vec![],
-        }
     }
 
     fn create_test_tool_with_sandbox() -> EnvironmentReaderTool {
@@ -549,16 +536,13 @@ mod tests {
     }
     #[tokio::test]
     async fn test_get_existing_variable() {
-        let tool = create_test_tool();
+        let tool = create_test_environment_reader();
 
         // Test getting PATH variable (should be allowed by default)
-        let input = create_test_input(
-            "Get PATH environment variable",
-            json!({
-                "operation": "get",
-                "variable_name": "PATH"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "get"),
+            ("variable_name", "PATH"),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -573,13 +557,10 @@ mod tests {
         config.allowed_patterns.push("NONEXISTENT*".to_string());
         let tool = EnvironmentReaderTool::new(config);
 
-        let input = create_test_input(
-            "Get nonexistent variable",
-            json!({
-                "operation": "get",
-                "variable_name": "NONEXISTENT_VAR_12345"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "get"),
+            ("variable_name", "NONEXISTENT_VAR_12345"),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -589,15 +570,12 @@ mod tests {
     }
     #[tokio::test]
     async fn test_get_blocked_variable() {
-        let tool = create_test_tool();
+        let tool = create_test_environment_reader();
 
-        let input = create_test_input(
-            "Get blocked variable",
-            json!({
-                "operation": "get",
-                "variable_name": "SECRET_PASSWORD"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "get"),
+            ("variable_name", "SECRET_PASSWORD"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -605,14 +583,11 @@ mod tests {
     }
     #[tokio::test]
     async fn test_list_variables() {
-        let tool = create_test_tool();
+        let tool = create_test_environment_reader();
 
-        let input = create_test_input(
-            "List environment variables",
-            json!({
-                "operation": "list"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "list"),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -623,15 +598,12 @@ mod tests {
     }
     #[tokio::test]
     async fn test_pattern_matching() {
-        let tool = create_test_tool();
+        let tool = create_test_environment_reader();
 
-        let input = create_test_input(
-            "Get PATH variables",
-            json!({
-                "operation": "pattern",
-                "pattern": "PATH*"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "pattern"),
+            ("pattern", "PATH*"),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -641,16 +613,13 @@ mod tests {
     }
     #[tokio::test]
     async fn test_set_variable_disabled() {
-        let tool = create_test_tool();
+        let tool = create_test_environment_reader();
 
-        let input = create_test_input(
-            "Set test variable",
-            json!({
-                "operation": "set",
-                "variable_name": "TEST_VAR",
-                "value": "test_value"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "set"),
+            ("variable_name", "TEST_VAR"),
+            ("value", "test_value"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -666,14 +635,11 @@ mod tests {
         };
         let tool = EnvironmentReaderTool::new(config);
 
-        let input = create_test_input(
-            "Set test variable",
-            json!({
-                "operation": "set",
-                "variable_name": "TEST_VAR_12345",
-                "value": "test_value"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "set"),
+            ("variable_name", "TEST_VAR_12345"),
+            ("value", "test_value"),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -683,14 +649,11 @@ mod tests {
     }
     #[tokio::test]
     async fn test_invalid_operation() {
-        let tool = create_test_tool();
+        let tool = create_test_environment_reader();
 
-        let input = create_test_input(
-            "Invalid operation",
-            json!({
-                "operation": "invalid"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "invalid"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -701,7 +664,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_missing_parameters() {
-        let tool = create_test_tool();
+        let tool = create_test_environment_reader();
 
         // Missing operation
         let input1 = create_test_input("Missing operation", json!({}));
@@ -774,7 +737,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_pattern_matching_logic() {
-        let tool = create_test_tool();
+        let tool = create_test_environment_reader();
 
         // Test exact match
         assert!(tool.matches_pattern("PATH", "PATH"));
@@ -792,7 +755,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_blocked_patterns_precedence() {
-        let tool = create_test_tool();
+        let tool = create_test_environment_reader();
 
         // SECRET_KEY should be blocked even though it might match allowed patterns
         assert!(!tool.is_var_allowed("SECRET_KEY"));
@@ -807,7 +770,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_tool_metadata() {
-        let tool = create_test_tool();
+        let tool = create_test_environment_reader();
 
         let metadata = tool.metadata();
         assert_eq!(metadata.name, "environment_reader");

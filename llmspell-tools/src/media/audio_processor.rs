@@ -653,25 +653,12 @@ mod tests {
     use super::*;
     use std::collections::HashMap;
     use std::fs;
+    use llmspell_testing::tool_helpers::{create_test_tool, create_test_tool_input};
     use tempfile::TempDir;
 
-    fn create_test_tool() -> AudioProcessorTool {
+    fn create_test_audio_processor() -> AudioProcessorTool {
         let config = AudioProcessorConfig::default();
         AudioProcessorTool::new(config)
-    }
-
-    fn create_test_input(text: &str, params: serde_json::Value) -> AgentInput {
-        AgentInput {
-            text: text.to_string(),
-            media: vec![],
-            context: None,
-            parameters: {
-                let mut map = HashMap::new();
-                map.insert("parameters".to_string(), params);
-                map
-            },
-            output_modalities: vec![],
-        }
     }
 
     fn create_test_wav_file(path: &Path) -> std::io::Result<()> {
@@ -702,7 +689,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_format_detection_by_extension() {
-        let tool = create_test_tool();
+        let tool = create_test_audio_processor();
         let temp_dir = TempDir::new().unwrap();
 
         // Test various extensions
@@ -725,7 +712,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_wav_file_analysis() {
-        let tool = create_test_tool();
+        let tool = create_test_audio_processor();
         let temp_dir = TempDir::new().unwrap();
         let wav_path = temp_dir.path().join("test.wav");
 
@@ -740,19 +727,16 @@ mod tests {
     }
     #[tokio::test]
     async fn test_metadata_extraction() {
-        let tool = create_test_tool();
+        let tool = create_test_audio_processor();
         let temp_dir = TempDir::new().unwrap();
         let file_path = temp_dir.path().join("audio.mp3");
 
         fs::write(&file_path, b"dummy mp3 content").unwrap();
 
-        let input = create_test_input(
-            "Extract metadata",
-            json!({
-                "operation": "metadata",
-                "file_path": file_path.to_str().unwrap()
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "metadata"),
+            ("file_path", &file_path.to_str().unwrap()),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -764,19 +748,16 @@ mod tests {
     }
     #[tokio::test]
     async fn test_format_detection_operation() {
-        let tool = create_test_tool();
+        let tool = create_test_audio_processor();
         let temp_dir = TempDir::new().unwrap();
         let file_path = temp_dir.path().join("test.wav");
 
         create_test_wav_file(&file_path).unwrap();
 
-        let input = create_test_input(
-            "Detect format",
-            json!({
-                "operation": "detect",
-                "file_path": file_path.to_str().unwrap()
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "detect"),
+            ("file_path", &file_path.to_str().unwrap()),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -799,13 +780,10 @@ mod tests {
         // Create a file larger than the limit
         fs::write(&file_path, vec![0u8; 100]).unwrap();
 
-        let input = create_test_input(
-            "Extract metadata",
-            json!({
-                "operation": "metadata",
-                "file_path": file_path.to_str().unwrap()
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "metadata"),
+            ("file_path", &file_path.to_str().unwrap()),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -813,22 +791,19 @@ mod tests {
     }
     #[tokio::test]
     async fn test_wav_to_wav_conversion() {
-        let tool = create_test_tool();
+        let tool = create_test_audio_processor();
         let temp_dir = TempDir::new().unwrap();
         let source_path = temp_dir.path().join("input.wav");
         let target_path = temp_dir.path().join("output.wav");
 
         create_test_wav_file(&source_path).unwrap();
 
-        let input = create_test_input(
-            "Convert audio",
-            json!({
-                "operation": "convert",
-                "source_path": source_path.to_str().unwrap(),
-                "target_path": target_path.to_str().unwrap(),
-                "target_format": "wav"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "convert"),
+            ("source_path", &source_path.to_str().unwrap()),
+            ("target_path", &target_path.to_str().unwrap()),
+            ("target_format", "wav"),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -840,22 +815,19 @@ mod tests {
     }
     #[tokio::test]
     async fn test_unsupported_conversion() {
-        let tool = create_test_tool();
+        let tool = create_test_audio_processor();
         let temp_dir = TempDir::new().unwrap();
         let source_path = temp_dir.path().join("input.wav");
         let target_path = temp_dir.path().join("output.flac");
 
         create_test_wav_file(&source_path).unwrap();
 
-        let input = create_test_input(
-            "Convert audio",
-            json!({
-                "operation": "convert",
-                "source_path": source_path.to_str().unwrap(),
-                "target_path": target_path.to_str().unwrap(),
-                "target_format": "flac"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "convert"),
+            ("source_path", &source_path.to_str().unwrap()),
+            ("target_path", &target_path.to_str().unwrap()),
+            ("target_format", "flac"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -863,14 +835,11 @@ mod tests {
     }
     #[tokio::test]
     async fn test_invalid_operation() {
-        let tool = create_test_tool();
+        let tool = create_test_audio_processor();
 
-        let input = create_test_input(
-            "Invalid operation",
-            json!({
-                "operation": "invalid"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "invalid"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -881,15 +850,12 @@ mod tests {
     }
     #[tokio::test]
     async fn test_missing_required_parameters() {
-        let tool = create_test_tool();
+        let tool = create_test_audio_processor();
 
         // Missing file_path for metadata operation
-        let input = create_test_input(
-            "Extract metadata",
-            json!({
-                "operation": "metadata"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "metadata"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -900,7 +866,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_tool_metadata() {
-        let tool = create_test_tool();
+        let tool = create_test_audio_processor();
 
         let metadata = tool.metadata();
         assert_eq!(metadata.name, "audio_processor");
@@ -921,19 +887,16 @@ mod tests {
     }
     #[tokio::test]
     async fn test_default_operation() {
-        let tool = create_test_tool();
+        let tool = create_test_audio_processor();
         let temp_dir = TempDir::new().unwrap();
         let file_path = temp_dir.path().join("test.wav");
 
         create_test_wav_file(&file_path).unwrap();
 
         // No operation specified, should default to metadata
-        let input = create_test_input(
-            "Process audio",
-            json!({
-                "file_path": file_path.to_str().unwrap()
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("file_path", &file_path.to_str().unwrap()),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -944,15 +907,12 @@ mod tests {
     }
     #[tokio::test]
     async fn test_empty_file_path() {
-        let tool = create_test_tool();
+        let tool = create_test_audio_processor();
 
-        let input = create_test_input(
-            "Detect format",
-            json!({
-                "operation": "detect",
-                "file_path": ""
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "detect"),
+            ("file_path", ""),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -960,15 +920,12 @@ mod tests {
     }
     #[tokio::test]
     async fn test_file_not_found() {
-        let tool = create_test_tool();
+        let tool = create_test_audio_processor();
 
-        let input = create_test_input(
-            "Extract metadata",
-            json!({
-                "operation": "metadata",
-                "file_path": "/non/existent/file.wav"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "metadata"),
+            ("file_path", "/non/existent/file.wav"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());

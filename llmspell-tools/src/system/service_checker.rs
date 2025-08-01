@@ -675,9 +675,10 @@ impl Tool for ServiceCheckerTool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use llmspell_testing::tool_helpers::{create_test_tool, create_test_tool_input};
     use std::collections::HashMap;
 
-    fn create_test_tool() -> ServiceCheckerTool {
+    fn create_test_service_checker() -> ServiceCheckerTool {
         let config = ServiceCheckerConfig::default();
         ServiceCheckerTool::new(config)
     }
@@ -691,32 +692,15 @@ mod tests {
         };
         ServiceCheckerTool::new(config)
     }
-
-    fn create_test_input(text: &str, params: serde_json::Value) -> AgentInput {
-        AgentInput {
-            text: text.to_string(),
-            media: vec![],
-            context: None,
-            parameters: {
-                let mut map = HashMap::new();
-                map.insert("parameters".to_string(), params);
-                map
-            },
-            output_modalities: vec![],
-        }
-    }
     #[tokio::test]
     async fn test_tcp_check_localhost() {
         let tool = create_test_tool_with_custom_config();
 
-        let input = create_test_input(
-            "Check TCP port",
-            json!({
-                "target": "127.0.0.1:22",
-                "check_type": "tcp",
-                "timeout_seconds": 1
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("target", "127.0.0.1:22"),
+            ("check_type", "tcp"),
+            ("timeout_seconds", "1"),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -729,14 +713,11 @@ mod tests {
     async fn test_http_check_invalid_url() {
         let tool = create_test_tool_with_custom_config();
 
-        let input = create_test_input(
-            "Check HTTP service",
-            json!({
-                "target": "http://nonexistent-domain-12345.invalid",
-                "check_type": "http",
-                "timeout_seconds": 1
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("target", "http://nonexistent-domain-12345.invalid"),
+            ("check_type", "http"),
+            ("timeout_seconds", "1"),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -748,13 +729,10 @@ mod tests {
     async fn test_dns_check_localhost() {
         let tool = create_test_tool_with_custom_config();
 
-        let input = create_test_input(
-            "Check DNS resolution",
-            json!({
-                "target": "localhost:80",
-                "check_type": "dns"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("target", "localhost:80"),
+            ("check_type", "dns"),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -764,15 +742,12 @@ mod tests {
     }
     #[tokio::test]
     async fn test_blocked_port() {
-        let tool = create_test_tool();
+        let tool = create_test_service_checker();
 
-        let input = create_test_input(
-            "Check blocked port",
-            json!({
-                "target": "127.0.0.1:7", // Echo port (blocked by default)
-                "check_type": "tcp"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("target", "127.0.0.1:7", // Echo port (blocked by default)"),
+            ("check_type", "tcp"),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -783,15 +758,12 @@ mod tests {
     }
     #[tokio::test]
     async fn test_blocked_domain() {
-        let tool = create_test_tool();
+        let tool = create_test_service_checker();
 
-        let input = create_test_input(
-            "Check blocked domain",
-            json!({
-                "target": "evil.example.com:80",
-                "check_type": "tcp"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("target", "evil.example.com:80"),
+            ("check_type", "tcp"),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -801,7 +773,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_invalid_parameters() {
-        let tool = create_test_tool();
+        let tool = create_test_service_checker();
 
         // Missing target
         let input1 = create_test_input(
@@ -873,7 +845,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_target_parsing() {
-        let tool = create_test_tool();
+        let tool = create_test_service_checker();
 
         // Valid target
         let result1 = tool.parse_target("localhost:80");
@@ -900,7 +872,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_port_and_domain_validation() {
-        let tool = create_test_tool();
+        let tool = create_test_service_checker();
 
         // Test port validation
         assert!(tool.is_port_allowed(80)); // Allowed
@@ -923,7 +895,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_tool_metadata() {
-        let tool = create_test_tool();
+        let tool = create_test_service_checker();
 
         let metadata = tool.metadata();
         assert_eq!(metadata.name, "service_checker");
@@ -956,14 +928,11 @@ mod tests {
     async fn test_https_url_transformation() {
         let tool = create_test_tool_with_custom_config();
 
-        let input = create_test_input(
-            "Check HTTPS service",
-            json!({
-                "target": "http://httpbin.org/status/200",
-                "check_type": "https",
-                "timeout_seconds": 5
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("target", "http://httpbin.org/status/200"),
+            ("check_type", "https"),
+            ("timeout_seconds", "5"),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())

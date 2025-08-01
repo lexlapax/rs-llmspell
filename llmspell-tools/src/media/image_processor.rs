@@ -817,27 +817,13 @@ mod tests {
     use std::fs;
     use tempfile::TempDir;
 
-    fn create_test_tool() -> ImageProcessorTool {
+    fn create_test_image_processor() -> ImageProcessorTool {
         let config = ImageProcessorConfig::default();
         ImageProcessorTool::new(config)
     }
-
-    fn create_test_input(text: &str, params: serde_json::Value) -> AgentInput {
-        AgentInput {
-            text: text.to_string(),
-            media: vec![],
-            context: None,
-            parameters: {
-                let mut map = HashMap::new();
-                map.insert("parameters".to_string(), params);
-                map
-            },
-            output_modalities: vec![],
-        }
-    }
     #[tokio::test]
     async fn test_format_detection_by_extension() {
-        let tool = create_test_tool();
+        let tool = create_test_image_processor();
         let temp_dir = TempDir::new().unwrap();
 
         // Test various extensions
@@ -894,19 +880,15 @@ mod tests {
     }
     #[tokio::test]
     async fn test_metadata_extraction() {
-        let tool = create_test_tool();
+        let tool = create_test_image_processor();
         let temp_dir = TempDir::new().unwrap();
         let file_path = temp_dir.path().join("image.png");
 
         fs::write(&file_path, b"dummy png content").unwrap();
 
-        let input = create_test_input(
-            "Extract metadata",
-            json!({
-                "operation": "metadata",
-                "file_path": file_path.to_str().unwrap()
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "metadata"),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -919,19 +901,15 @@ mod tests {
     }
     #[tokio::test]
     async fn test_format_detection_operation() {
-        let tool = create_test_tool();
+        let tool = create_test_image_processor();
         let temp_dir = TempDir::new().unwrap();
         let file_path = temp_dir.path().join("test.jpeg");
 
         fs::write(&file_path, b"dummy").unwrap();
 
-        let input = create_test_input(
-            "Detect format",
-            json!({
-                "operation": "detect",
-                "file_path": file_path.to_str().unwrap()
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "detect"),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -954,13 +932,9 @@ mod tests {
         // Create a file larger than the limit
         fs::write(&file_path, vec![0u8; 100]).unwrap();
 
-        let input = create_test_input(
-            "Extract metadata",
-            json!({
-                "operation": "metadata",
-                "file_path": file_path.to_str().unwrap()
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "metadata"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -968,22 +942,18 @@ mod tests {
     }
     #[tokio::test]
     async fn test_resize_not_implemented() {
-        let tool = create_test_tool();
+        let tool = create_test_image_processor();
         let temp_dir = TempDir::new().unwrap();
         let input_path = temp_dir.path().join("input.png");
         let output_path = temp_dir.path().join("output.png");
 
         fs::write(&input_path, b"dummy").unwrap();
 
-        let input = create_test_input(
-            "Resize image",
-            json!({
-                "operation": "resize",
-                "source_path": input_path.to_str().unwrap(),
-                "target_path": output_path.to_str().unwrap(),
-                "width": 100
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "resize"),
+            ("source_path", "input_path.to_str().unwrap()"),
+            ("width", "100"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -991,22 +961,18 @@ mod tests {
     }
     #[tokio::test]
     async fn test_convert_not_implemented() {
-        let tool = create_test_tool();
+        let tool = create_test_image_processor();
         let temp_dir = TempDir::new().unwrap();
         let input_path = temp_dir.path().join("input.png");
         let output_path = temp_dir.path().join("output.jpg");
 
         fs::write(&input_path, b"dummy").unwrap();
 
-        let input = create_test_input(
-            "Convert image",
-            json!({
-                "operation": "convert",
-                "source_path": input_path.to_str().unwrap(),
-                "target_path": output_path.to_str().unwrap(),
-                "target_format": "jpeg"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "convert"),
+            ("source_path", "input_path.to_str().unwrap()"),
+            ("target_format", "jpeg"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -1014,14 +980,11 @@ mod tests {
     }
     #[tokio::test]
     async fn test_invalid_operation() {
-        let tool = create_test_tool();
+        let tool = create_test_image_processor();
 
-        let input = create_test_input(
-            "Invalid operation",
-            json!({
-                "operation": "invalid"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "invalid"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -1032,15 +995,12 @@ mod tests {
     }
     #[tokio::test]
     async fn test_missing_required_parameters() {
-        let tool = create_test_tool();
+        let tool = create_test_image_processor();
 
         // Missing file_path for metadata operation
-        let input = create_test_input(
-            "Extract metadata",
-            json!({
-                "operation": "metadata"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "metadata"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -1050,14 +1010,11 @@ mod tests {
             .contains("Missing required parameter 'file_path'"));
 
         // Missing width and height for resize
-        let input = create_test_input(
-            "Resize image",
-            json!({
-                "operation": "resize",
-                "source_path": "/tmp/input.png",
-                "target_path": "/tmp/output.png"
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "resize"),
+            ("source_path", "/tmp/input.png"),
+            ("target_path", "/tmp/output.png"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -1068,21 +1025,17 @@ mod tests {
     }
     #[tokio::test]
     async fn test_crop_parameter_validation() {
-        let tool = create_test_tool();
+        let tool = create_test_image_processor();
 
         // Missing crop parameters
-        let input = create_test_input(
-            "Crop image",
-            json!({
-                "operation": "crop",
-                "source_path": "/tmp/input.png",
-                "target_path": "/tmp/output.png",
-                "x": 0,
-                "y": 0,
-                "width": 100
-                // Missing height
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "crop"),
+            ("source_path", "/tmp/input.png"),
+            ("target_path", "/tmp/output.png"),
+            ("x", "0"),
+            ("y", "0"),
+            ("width", "100"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -1093,7 +1046,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_tool_metadata() {
-        let tool = create_test_tool();
+        let tool = create_test_image_processor();
 
         let metadata = tool.metadata();
         assert_eq!(metadata.name, "image_processor");
@@ -1114,19 +1067,16 @@ mod tests {
     }
     #[tokio::test]
     async fn test_default_operation() {
-        let tool = create_test_tool();
+        let tool = create_test_image_processor();
         let temp_dir = TempDir::new().unwrap();
         let file_path = temp_dir.path().join("test.png");
 
         fs::write(&file_path, b"dummy").unwrap();
 
         // No operation specified, should default to metadata
-        let input = create_test_input(
-            "Process image",
-            json!({
-                "file_path": file_path.to_str().unwrap()
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ,
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -1137,15 +1087,11 @@ mod tests {
     }
     #[tokio::test]
     async fn test_empty_file_path() {
-        let tool = create_test_tool();
+        let tool = create_test_image_processor();
 
-        let input = create_test_input(
-            "Detect format",
-            json!({
-                "operation": "detect",
-                "file_path": ""
-            }),
-        );
+        let input = create_test_tool_input(vec![
+            ("operation", "detect"),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
