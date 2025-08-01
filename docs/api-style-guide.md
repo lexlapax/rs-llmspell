@@ -193,9 +193,12 @@ impl SessionManager {
 }
 ```
 
-### Setters
+### Setters and Storage Operations
 
-Always use `set_` prefix for setters:
+Use appropriate verbs based on the operation type:
+
+#### Property Setters
+Use `set_` for simple in-memory property updates:
 
 ```rust
 // ✅ GOOD
@@ -206,6 +209,39 @@ impl Session {
     }
 }
 ```
+
+#### Storage Operations
+Use `store_` for operations that persist to storage:
+
+```rust
+// ✅ GOOD
+impl ApiKeyStorage {
+    // Persists to database/file system
+    pub fn store(&mut self, key_id: &str, key: &str) -> Result<()> { }
+}
+
+impl ArtifactStorage {
+    // Writes to persistent storage
+    pub async fn store_artifact(&self, artifact: &Artifact) -> Result<()> { }
+}
+```
+
+#### Entity Creation
+Use `create_` for operations that instantiate new entities:
+
+```rust
+// ✅ GOOD
+impl SessionManager {
+    // Creates a new session instance
+    pub async fn create_session(&self, options: Options) -> Result<SessionId> { }
+}
+```
+
+#### Summary of Patterns
+- **get/set**: For simple property access
+- **get/store**: For storage/persistence operations  
+- **create/get**: For entity creation and retrieval
+- **load/save**: Alternative for file-based operations
 
 ## Method Naming Patterns
 

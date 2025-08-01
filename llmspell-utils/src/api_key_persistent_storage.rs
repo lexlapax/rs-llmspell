@@ -68,7 +68,7 @@ impl ApiKeyStorage for PersistentApiKeyStorage {
         Ok(())
     }
 
-    fn retrieve(&self, key_id: &str) -> Result<Option<String>, String> {
+    fn get(&self, key_id: &str) -> Result<Option<String>, String> {
         match self.db.get(key_id.as_bytes()) {
             Ok(Some(data)) => {
                 let stored_data: StoredKeyData = serde_json::from_slice(&data)
@@ -80,7 +80,7 @@ impl ApiKeyStorage for PersistentApiKeyStorage {
         }
     }
 
-    fn retrieve_metadata(&self, key_id: &str) -> Result<Option<ApiKeyMetadata>, String> {
+    fn get_metadata(&self, key_id: &str) -> Result<Option<ApiKeyMetadata>, String> {
         match self.db.get(key_id.as_bytes()) {
             Ok(Some(data)) => {
                 let stored_data: StoredKeyData = serde_json::from_slice(&data)
@@ -179,11 +179,11 @@ mod tests {
             .unwrap();
 
         // Retrieve the key
-        let retrieved = storage.retrieve("test_key").unwrap();
+        let retrieved = storage.get("test_key").unwrap();
         assert_eq!(retrieved, Some("my_secret_key".to_string()));
 
         // Retrieve metadata
-        let retrieved_metadata = storage.retrieve_metadata("test_key").unwrap().unwrap();
+        let retrieved_metadata = storage.get_metadata("test_key").unwrap().unwrap();
         assert_eq!(retrieved_metadata.service, "test_service");
 
         // Update metadata
@@ -193,12 +193,12 @@ mod tests {
             .update_metadata("test_key", &updated_metadata)
             .unwrap();
 
-        let retrieved_metadata = storage.retrieve_metadata("test_key").unwrap().unwrap();
+        let retrieved_metadata = storage.get_metadata("test_key").unwrap().unwrap();
         assert_eq!(retrieved_metadata.usage_count, 5);
 
         // Delete the key
         storage.delete("test_key").unwrap();
-        assert_eq!(storage.retrieve("test_key").unwrap(), None);
+        assert_eq!(storage.get("test_key").unwrap(), None);
     }
 
     #[test]
