@@ -273,6 +273,827 @@ impl SessionManagerConfigBuilder {
 
 ---
 
+#### Task R.1.6: Factory Method Standardization
+**Priority**: HIGH
+**Estimated Time**: 2.5 hours
+**Status**: TODO
+**Assigned To**: API Team
+
+**Description**: Standardize factory method naming across bridge components.
+
+**Implementation Steps**:
+1. **Analysis and Discovery** (20 min):
+   - Search for all factory methods: `grep -r "pub fn new\|pub fn with_\|pub fn create_\|pub fn from_" llmspell-bridge/src/`
+   - Identify specific files with factory methods
+   - Document current patterns per component
+   - Create comprehensive list of files to update
+
+2. **Audit Current Patterns** (30 min):
+   - Document all `new()`, `with_*()`, `create_*()` methods
+   - Identify inconsistencies
+   - Propose standard patterns
+
+3. **Implement Standards** (1 hour):
+   - `new()` - Simple construction with defaults
+   - `with_*()` - Construction with specific components
+   - `from_*()` - Construction from other types
+   - `builder()` - Builder pattern entry point
+
+4. **Update Bridge Components** (30 min):
+   - Apply naming standards
+   - Update documentation
+   - Ensure consistency
+
+5. **Quality Assurance** (15 min):
+   - Run `cargo clean && cargo build --all-features`
+   - Run `cargo test --workspace`
+   - Fix any compilation or test errors
+   - Run `./scripts/quality-check-minimal.sh`
+   - Verify all checks pass
+
+6. **Update TODO** (5 min):
+   - Document all files actually modified
+   - Note any additional discoveries
+   - Update time estimates if needed
+
+**Files to Update**:
+- `llmspell-bridge/src/agents.rs` (AgentDiscovery methods)
+- `llmspell-bridge/src/workflows.rs` (WorkflowDiscovery methods)
+- `llmspell-bridge/src/providers.rs` (ProviderManager methods)
+- `llmspell-bridge/src/session_bridge.rs` (SessionBridge methods)
+- `llmspell-bridge/src/artifact_bridge.rs` (ArtifactBridge methods)
+- `llmspell-bridge/src/hook_bridge.rs` (HookBridge methods)
+- `llmspell-bridge/src/event_bridge.rs` (EventBridge methods)
+- All component registry files
+
+**Acceptance Criteria**:
+- [ ] Consistent factory patterns
+- [ ] Clear documentation
+- [ ] No breaking changes
+- [ ] Examples updated
+- [ ] All tests passing
+- [ ] Quality checks passing
+
+---
+
+#### Task R.1.7: Core Bridge Config Builder Usage
+**Priority**: HIGH
+**Estimated Time**: 4.58 hours
+**Status**: TODO
+**Assigned To**: Bridge Team
+
+**Description**: Update bridge layer to use existing builder patterns for core configuration objects.
+
+**Implementation Steps**:
+1. **Analysis and Discovery** (20 min):
+   - Search for struct literals: `grep -r "Config {" llmspell-bridge/src/`
+   - Find SessionManagerConfig usage: `grep -r "SessionManagerConfig" llmspell-bridge/src/`
+   - Find AgentConfig usage: `grep -r "AgentConfig" llmspell-bridge/src/`
+   - Find WorkflowConfig usage: `grep -r "WorkflowConfig" llmspell-bridge/src/`
+   - List all files using struct literal initialization
+
+2. **Session Infrastructure Updates** (1.5 hours):
+   - Update `session_infrastructure.rs` to use `SessionManagerConfig::builder()`
+   - Replace struct literal with builder pattern
+   - Add validation in builder
+   - Update error handling
+
+3. **Agent Bridge Updates** (1.5 hours):
+   - Create helper method to build `AgentConfig` using builder
+   - Update `create_agent()` to use `AgentConfig::builder()`
+   - Replace JSON → Config manual conversion
+   - Expose builder pattern through bridge API
+
+4. **Workflow Bridge Updates** (1 hour):
+   - Update workflow creation to use `WorkflowConfig::builder()`
+   - Add builder support for workflow parameters
+   - Standardize config validation
+
+5. **Quality Assurance** (20 min):
+   - Run `cargo clean && cargo build --all-features`
+   - Run `cargo test --workspace`
+   - Run specific bridge tests: `cargo test -p llmspell-bridge`
+   - Fix any compilation or test failures
+   - Run `./scripts/quality-check-minimal.sh`
+   - Verify all checks pass
+
+6. **Update TODO** (5 min):
+   - Document all struct literals replaced
+   - List any additional config objects found
+   - Update file list if new ones discovered
+
+**Files to Update**:
+- `llmspell-bridge/src/globals/session_infrastructure.rs`
+- `llmspell-bridge/src/agent_bridge.rs`
+- `llmspell-bridge/src/agents.rs`
+- `llmspell-bridge/src/workflows.rs`
+
+**Acceptance Criteria**:
+- [ ] SessionManagerConfig uses builder pattern
+- [ ] AgentConfig uses builder pattern
+- [ ] WorkflowConfig uses builder pattern
+- [ ] No struct literals for these configs
+- [ ] Tests updated to use builders
+- [ ] All bridge tests passing
+- [ ] Quality checks passing
+
+---
+
+#### Task R.1.8: Bridge-Specific Config Builders
+**Priority**: HIGH
+**Estimated Time**: 5.42 hours
+**Status**: TODO
+**Assigned To**: Bridge Team
+
+**Description**: Create and implement builder patterns for bridge-specific configuration objects.
+
+**Implementation Steps**:
+1. **Analysis and Discovery** (25 min):
+   - Search for bridge-specific configs: `grep -r "Config" llmspell-bridge/src/ | grep -v "AgentConfig\|WorkflowConfig\|SessionManagerConfig"`
+   - Find OrchestrationConfig usage: `grep -r "OrchestrationConfig" llmspell-bridge/src/`
+   - Find RetryConfig usage: `grep -r "RetryConfig" llmspell-bridge/src/`
+   - Find ProviderManagerConfig usage: `grep -r "ProviderManagerConfig" llmspell-bridge/src/`
+   - Find CreateSessionOptions usage: `grep -r "CreateSessionOptions" llmspell-*/src/`
+   - Document all struct literal usages
+
+2. **Orchestration Builders** (1.5 hours):
+   - Create builder for `OrchestrationConfig`
+   - Create builder for `RetryConfig`
+   - Update orchestration templates to use builders
+   - Add validation and defaults
+
+3. **Provider Builders** (2 hours):
+   - Create builder for `ProviderManagerConfig`
+   - Create builder for `ProviderConfig`
+   - Update provider initialization
+   - Add environment variable support in builders
+
+4. **Session Options Builder** (1.5 hours):
+   - Create builder for `CreateSessionOptions`
+   - Add fluent interface for session creation
+   - Update session bridge usage
+
+5. **Quality Assurance** (25 min):
+   - Run `cargo clean && cargo build --all-features`
+   - Run `cargo test --workspace`
+   - Test new builders: `cargo test -p llmspell-bridge builder`
+   - Test sessions: `cargo test -p llmspell-sessions`
+   - Fix any compilation or test failures
+   - Run `./scripts/quality-check-minimal.sh`
+   - Verify all checks pass
+
+6. **Update TODO** (5 min):
+   - Document all new builders created
+   - List all files where builders were applied
+   - Note any additional config objects discovered
+
+**Files to Create/Update**:
+- `llmspell-bridge/src/orchestration.rs` (add builders)
+- `llmspell-bridge/src/providers.rs` (add builders)
+- `llmspell-sessions/src/types.rs` (add CreateSessionOptions builder)
+- `llmspell-bridge/src/globals/session_infrastructure.rs` (use CreateSessionOptions builder)
+- `llmspell-bridge/src/session_bridge.rs` (use CreateSessionOptions builder)
+- `llmspell-bridge/src/runtime.rs` (use ProviderManagerConfig builder)
+
+**Acceptance Criteria**:
+- [ ] All bridge-specific configs have builders
+- [ ] Builders provide sensible defaults
+- [ ] Validation in build() methods
+- [ ] Examples demonstrating usage
+- [ ] All new builder tests passing
+- [ ] Quality checks passing
+
+---
+
+#### Task R.1.9: Infrastructure Config Builders
+**Priority**: MEDIUM
+**Estimated Time**: 6.5 hours
+**Status**: TODO
+**Assigned To**: Infrastructure Team
+
+**Description**: Create configuration builders for infrastructure components that currently use parameterless new().
+
+**Implementation Steps**:
+1. **Analysis & Discovery** (30 min):
+   - Find parameterless new() in infrastructure: `grep -r "fn new()" llmspell-hooks/ llmspell-events/ llmspell-state-persistence/`
+   - Search for struct literal configs: `grep -r "Config\s*{" llmspell-bridge/src/`
+   - List hook infrastructure: `grep -r "HookRegistry\|HookExecutor" llmspell-hooks/src/`
+   - List event infrastructure: `grep -r "EventBus::new\|EventDispatcher::new" llmspell-events/src/`
+   - List state infrastructure: `grep -r "StateManager::new" llmspell-state-persistence/src/`
+   - Update implementation plan based on findings
+
+2. **Hook Infrastructure Configs** (2 hours):
+   - Design `HookRegistryConfig` with capacity, thread pool settings
+   - Design `HookExecutorConfig` with concurrency limits, timeout
+   - Create builders for both
+   - Update initialization code
+
+3. **Event System Config** (1.5 hours):
+   - Design `EventBusConfig` with buffer size, channel capacity
+   - Create builder pattern
+   - Update EventBus::new() to accept config
+
+4. **State Management Config** (1.5 hours):
+   - Design `StateManagerConfig` with storage backend, cache settings
+   - Create builder pattern
+   - Update StateManager initialization
+
+5. **Circuit Breaker Integration** (1 hour):
+   - Ensure `CircuitBreakerConfig` has builder
+   - Update hook system to use builder
+   - Add presets for common scenarios
+
+6. **Quality Assurance** (30 min):
+   - Run `cargo clean && cargo build --all-features`
+   - Run `cargo test --workspace`
+   - Test infrastructure crates individually:
+     - `cargo test -p llmspell-hooks`
+     - `cargo test -p llmspell-events`
+     - `cargo test -p llmspell-state-persistence`
+     - `cargo test -p llmspell-utils`
+   - Fix any compilation or test failures
+   - Run `./scripts/quality-check-minimal.sh`
+   - Verify all checks pass
+
+7. **Update TODO** (5 min):
+   - Document all config objects created
+   - List all infrastructure components updated
+   - Note any additional discoveries
+
+**Files to Create/Update**:
+- `llmspell-hooks/src/registry.rs` (add HookRegistryConfig)
+- `llmspell-hooks/src/executor.rs` (add HookExecutorConfig)
+- `llmspell-events/src/bus.rs` (add EventBusConfig)
+- `llmspell-state-persistence/src/lib.rs` (add StateManagerConfig)
+- `llmspell-utils/src/circuit_breaker/config.rs` (enhance builder)
+
+**Acceptance Criteria**:
+- [ ] All infrastructure components have config options
+- [ ] Builders follow consistent patterns
+- [ ] Backward compatibility maintained
+- [ ] Performance impact documented
+- [ ] All infrastructure tests passing
+- [ ] Quality checks passing
+
+---
+
+#### Task R.1.10: Script Engine Config Builders
+**Priority**: MEDIUM
+**Estimated Time**: 4.33 hours
+**Status**: TODO
+**Assigned To**: Script Team
+
+**Description**: Enhance script engine configuration with comprehensive builders.
+
+**Implementation Steps**:
+1. **Analysis & Discovery** (20 min):
+   - Find script configs: `grep -r "Config" llmspell-bridge/src/engine/ llmspell-bridge/src/runtime.rs`
+   - Search for LuaConfig usage: `grep -r "LuaConfig" llmspell-bridge/src/`
+   - Search for JSConfig usage: `grep -r "JSConfig" llmspell-bridge/src/`
+   - Search for RuntimeConfig usage: `grep -r "RuntimeConfig" llmspell-bridge/src/`
+   - Find existing builder patterns: `grep -r "builder()" llmspell-bridge/src/engine/`
+   - Update implementation plan based on findings
+
+2. **Lua Config Builder** (1.5 hours):
+   - Enhance `LuaConfig` with builder pattern
+   - Add security settings, memory limits
+   - Support stdlib configuration
+   - Add examples
+
+3. **JavaScript Config Builder** (1.5 hours):
+   - Enhance `JSConfig` with builder pattern
+   - Add module resolution settings
+   - Configure security boundaries
+   - Add TypeScript support flags
+
+4. **Runtime Config Builder** (1 hour):
+   - Enhance `RuntimeConfig` with builder
+   - Support multi-engine configuration
+   - Add resource limits per engine
+   - Configure shared state access
+
+5. **Quality Assurance** (20 min):
+   - Run `cargo clean && cargo build --all-features`
+   - Run `cargo test --workspace`
+   - Test script engines: `cargo test -p llmspell-bridge engine`
+   - Run scripting examples to verify functionality
+   - Fix any compilation or test failures
+   - Run `./scripts/quality-check-minimal.sh`
+   - Verify all checks pass
+
+6. **Update TODO** (5 min):
+   - Document all config builders created/enhanced
+   - List any additional script config needs
+   - Note performance considerations
+
+**Files to Update**:
+- `llmspell-bridge/src/engine/factory.rs`
+- `llmspell-bridge/src/runtime.rs`
+- Examples in `examples/scripting/`
+
+**Acceptance Criteria**:
+- [ ] All script configs use builders
+- [ ] Security options exposed
+- [ ] Resource limits configurable
+- [ ] Examples for each language
+- [ ] Script engine tests passing
+- [ ] Quality checks passing
+
+---
+
+#### Task R.1.11: Bridge Discovery Pattern Unification
+**Priority**: MEDIUM
+**Estimated Time**: 4.42 hours
+**Status**: TODO
+**Assigned To**: Core Bridge Team
+
+**Description**: Unify discovery patterns across all bridge components.
+
+**Implementation Steps**:
+1. **Analysis & Discovery** (25 min):
+   - Find existing discovery components: `grep -r "Discovery" llmspell-bridge/src/`
+   - List AgentDiscovery methods: `grep -r "impl.*AgentDiscovery" llmspell-bridge/src/agents.rs -A 20`
+   - List WorkflowDiscovery methods: `grep -r "impl.*WorkflowDiscovery" llmspell-bridge/src/workflows.rs -A 20`
+   - Check for ToolDiscovery: `grep -r "ToolDiscovery" llmspell-bridge/src/`
+   - Check for StorageDiscovery: `grep -r "StorageDiscovery" llmspell-bridge/src/`
+   - Check for ProviderDiscovery: `grep -r "ProviderDiscovery" llmspell-bridge/src/`
+   - Document method signature differences
+   - Update implementation plan based on findings
+
+2. **Create Unified Discovery Trait** (1 hour):
+   ```rust
+   pub trait BridgeDiscovery<T> {
+       fn discover_types(&self) -> Vec<String>;
+       fn get_type_info(&self, type_name: &str) -> Option<T>;
+       fn list_instances(&self) -> Vec<String>;
+       fn has_type(&self, type_name: &str) -> bool;
+   }
+   ```
+
+3. **Implement for All Components** (2.5 hours):
+   - Implement for `AgentDiscovery`
+   - Implement for `WorkflowDiscovery`
+   - Create `ToolDiscovery` in bridge layer
+   - Create `StorageDiscovery` for backend types (Memory, Sled, RocksDB)
+   - Enhance `ProviderDiscovery` to follow unified pattern
+   - Align method signatures
+
+4. **Update Usage** (30 min):
+   - Update all discovery usage
+   - Remove redundant methods
+   - Ensure consistent return types
+   - Note: Hooks, Events, State, Sessions don't need discovery (runtime instances)
+
+5. **Quality Assurance** (25 min):
+   - Run `cargo clean && cargo build --all-features`
+   - Run `cargo test --workspace`
+   - Test discovery implementations:
+     - `cargo test -p llmspell-bridge discovery`
+   - Verify all discoveries work from scripts
+   - Fix any compilation or test failures
+   - Run `./scripts/quality-check-minimal.sh`
+   - Verify all checks pass
+
+6. **Update TODO** (5 min):
+   - Document all discovery components created/updated
+   - List method signature alignments made
+   - Note any additional discovery needs
+
+**Files to Update**:
+- `llmspell-bridge/src/agents.rs`
+- `llmspell-bridge/src/workflows.rs`
+- `llmspell-bridge/src/tools.rs` (create new)
+- `llmspell-bridge/src/storage/discovery.rs` (create new)
+- `llmspell-bridge/src/providers.rs` (enhance existing)
+- `llmspell-bridge/src/lib.rs`
+
+**Acceptance Criteria**:
+- [ ] Unified discovery trait defined
+- [ ] All discoveries implement trait
+- [ ] Consistent method names
+- [ ] Tool discovery added
+- [ ] Storage discovery added
+- [ ] Provider discovery enhanced
+- [ ] All discovery tests passing
+- [ ] Quality checks passing
+
+---
+
+#### Task R.1.12: Bridge Tool API Standardization
+**Priority**: HIGH
+**Estimated Time**: 3.33 hours
+**Status**: TODO
+**Assigned To**: Bridge Team
+
+**Description**: Standardize tool-related APIs in the bridge layer and create missing components.
+
+**Implementation Steps**:
+1. **Analysis & Discovery** (20 min):
+   - Check for existing ToolDiscovery: `grep -r "ToolDiscovery" llmspell-bridge/src/`
+   - Find tool registration: `grep -r "register_tool\|ToolRegistry" llmspell-bridge/src/`
+   - List tool-related globals: `grep -r "tool" llmspell-bridge/src/lua/globals/ llmspell-bridge/src/javascript/globals/`
+   - Check tool categorization: `grep -r "ToolCategory\|tool_category" llmspell-*/src/`
+   - Find invoke_tool usage: `grep -r "invoke_tool" llmspell-bridge/src/`
+   - Document existing API patterns and inconsistencies
+
+2. **Create ToolDiscovery Component** (1.5 hours):
+   - Create `llmspell-bridge/src/tools/discovery.rs`
+   - Implement discovery pattern matching AgentDiscovery
+   - Add tool categorization and filtering
+   - Unify with existing tool registration
+
+3. **Standardize Tool Global APIs** (1 hour):
+   - Ensure consistent naming: `list_tools`, `get_tool`, `invoke_tool`
+   - Add `discover_tools_by_category`
+   - Add `get_tool_schema` method
+   - Standardize error handling
+
+4. **Tool Configuration** (30 min):
+   - Design `ToolConfig` if needed
+   - Add builder pattern for tool initialization
+   - Standardize resource limits and security
+
+5. **Quality Assurance** (20 min):
+   - Run `cargo clean && cargo build --all-features`
+   - Run `cargo test --workspace`
+   - Test tool functionality:
+     - `cargo test -p llmspell-bridge tool`
+     - `cargo test -p llmspell-tools`
+   - Verify tool discovery from scripts
+   - Fix any compilation or test failures
+   - Run `./scripts/quality-check-minimal.sh`
+   - Verify all checks pass
+
+6. **Update TODO** (5 min):
+   - Document ToolDiscovery implementation details
+   - List all standardized API methods
+   - Note any tool categorization decisions
+
+**Files to Create/Update**:
+- `llmspell-bridge/src/tools/discovery.rs` (new)
+- `llmspell-bridge/src/tools.rs` (update)
+- `llmspell-bridge/src/lua/globals/tool.rs`
+- `llmspell-bridge/src/javascript/globals/tool.rs`
+
+**Acceptance Criteria**:
+- [ ] ToolDiscovery implemented
+- [ ] Consistent API naming
+- [ ] Tool categorization working
+- [ ] Examples updated
+- [ ] Tool tests passing
+- [ ] Quality checks passing
+
+---
+
+#### Task R.1.13: Provider and Session API Standardization
+**Priority**: HIGH
+**Estimated Time**: 4.42 hours
+**Status**: TODO
+**Assigned To**: Core Bridge Team
+
+**Description**: Standardize provider and session/artifact APIs for consistency.
+
+**Implementation Steps**:
+1. **Analysis & Discovery** (25 min):
+   - List provider methods: `grep -r "impl.*ProviderManager\|impl.*ProviderDiscovery" llmspell-bridge/src/ -A 20`
+   - Find provider_supports usage: `grep -r "provider_supports" llmspell-bridge/src/`
+   - List session methods: `grep -r "impl.*SessionBridge" llmspell-bridge/src/session_bridge.rs -A 20`
+   - List artifact methods: `grep -r "impl.*ArtifactBridge" llmspell-bridge/src/artifact_bridge.rs -A 20`
+   - Check naming patterns: `grep -r "fn\s\+\w\+" llmspell-bridge/src/providers.rs llmspell-bridge/src/session_bridge.rs llmspell-bridge/src/artifact_bridge.rs`
+   - Document API inconsistencies and patterns
+
+2. **Provider API Standardization** (1.5 hours):
+   - Rename methods for consistency:
+     - Ensure all use `get_*`, `list_*`, `create_*` patterns
+     - `provider_supports` → `check_provider_capability`
+   - Add `ProviderDiscovery` wrapper if beneficial
+   - Standardize provider info structure
+
+3. **Session API Refinement** (1.5 hours):
+   - Review SessionBridge methods for naming consistency
+   - Ensure all follow: `create_session`, `get_session`, `list_sessions`
+   - Standardize query/filter patterns
+   - Add session state transition methods
+
+4. **Artifact API Enhancement** (1 hour):
+   - Ensure CRUD consistency: `store_artifact`, `get_artifact`, `list_artifacts`, `delete_artifact`
+   - Add `update_artifact_metadata`
+   - Add `query_artifacts` with rich filtering
+   - Standardize artifact type handling
+
+5. **Quality Assurance** (25 min):
+   - Run `cargo clean && cargo build --all-features`
+   - Run `cargo test --workspace`
+   - Test specific components:
+     - `cargo test -p llmspell-providers`
+     - `cargo test -p llmspell-sessions`
+     - `cargo test -p llmspell-bridge session`
+   - Fix any compilation or test failures
+   - Run `./scripts/quality-check-minimal.sh`
+   - Verify all checks pass
+
+6. **Update TODO** (5 min):
+   - Document all API methods renamed
+   - List query/filter patterns added
+   - Note any breaking changes avoided
+
+**Files to Update**:
+- `llmspell-bridge/src/providers.rs`
+- `llmspell-bridge/src/session_bridge.rs`
+- `llmspell-bridge/src/artifact_bridge.rs`
+- Related Lua/JS globals
+
+**Acceptance Criteria**:
+- [ ] Consistent naming patterns
+- [ ] No breaking changes
+- [ ] Enhanced query capabilities
+- [ ] Documentation updated
+- [ ] Provider and session tests passing
+- [ ] Quality checks passing
+
+---
+
+#### Task R.1.14: State and Storage API Standardization
+**Priority**: MEDIUM
+**Estimated Time**: 4.42 hours
+**Status**: TODO
+**Assigned To**: Infrastructure Team
+
+**Description**: Standardize state persistence and storage APIs in the bridge layer.
+
+**Implementation Steps**:
+1. **Analysis & Discovery** (25 min):
+   - Review StateGlobal methods: `grep -r "impl.*StateGlobal" llmspell-bridge/src/globals/state_global.rs -A 30`
+   - Check state patterns: `grep -r "get_state\|set_state\|delete_state" llmspell-bridge/src/`
+   - Find storage backend usage: `grep -r "StorageBackend\|storage_backend" llmspell-bridge/src/`
+   - List available backends: `grep -r "MemoryBackend\|SledBackend\|RocksDB" llmspell-storage/src/`
+   - Check for StorageDiscovery: `grep -r "StorageDiscovery" llmspell-bridge/src/`
+   - Document state scope handling patterns
+
+2. **State API Enhancement** (2 hours):
+   - Review StateGlobal methods
+   - Standardize scope handling
+   - Add `list_states`, `query_states` methods
+   - Ensure consistent get/set/delete patterns
+   - Add state migration helpers
+
+3. **Storage Backend Exposure** (1.5 hours):
+   - Create `StorageDiscovery` for available backends
+   - Standardize backend configuration
+   - Add `StorageConfig` with builder
+   - Expose backend capabilities query
+
+4. **Integration Points** (30 min):
+   - Ensure state and storage APIs align
+   - Standardize error messages
+   - Add performance metrics access
+
+5. **Quality Assurance** (25 min):
+   - Run `cargo clean && cargo build --all-features`
+   - Run `cargo test --workspace`
+   - Test state and storage:
+     - `cargo test -p llmspell-state-persistence`
+     - `cargo test -p llmspell-storage`
+     - `cargo test -p llmspell-bridge state`
+   - Fix any compilation or test failures
+   - Run `./scripts/quality-check-minimal.sh`
+   - Verify all checks pass
+
+6. **Update TODO** (5 min):
+   - Document state API enhancements
+   - List storage backends exposed
+   - Note integration improvements
+
+**Files to Create/Update**:
+- `llmspell-bridge/src/storage/discovery.rs` (new)
+- `llmspell-bridge/src/globals/state_global.rs`
+- `llmspell-bridge/src/globals/state_infrastructure.rs`
+
+**Acceptance Criteria**:
+- [ ] State APIs consistent
+- [ ] Storage discovery implemented
+- [ ] Migration paths clear
+- [ ] Examples demonstrating usage
+- [ ] State and storage tests passing
+- [ ] Quality checks passing
+
+---
+
+#### Task R.1.15: Hook and Event API Unification
+**Priority**: MEDIUM
+**Estimated Time**: 3.33 hours
+**Status**: TODO
+**Assigned To**: Event Team
+
+**Description**: Unify and standardize hook and event APIs across the bridge.
+
+**Implementation Steps**:
+1. **Analysis & Discovery** (20 min):
+   - Review HookBridge methods: `grep -r "impl.*HookBridge" llmspell-bridge/src/hook_bridge.rs -A 30`
+   - Review EventBridge methods: `grep -r "impl.*EventBridge" llmspell-bridge/src/event_bridge.rs -A 30`
+   - Check hook registration: `grep -r "register_hook" llmspell-bridge/src/`
+   - Check event publishing: `grep -r "publish_event\|emit_event" llmspell-bridge/src/`
+   - Find hook points: `grep -r "HookPoint" llmspell-hooks/src/`
+   - Document API patterns and inconsistencies
+
+2. **Hook API Standardization** (1.5 hours):
+   - Review HookBridge methods
+   - Standardize: `register_hook`, `unregister_hook`, `list_hooks`
+   - Add `get_hook_info`, `enable_hook`, `disable_hook`
+   - Ensure consistent hook point naming
+
+3. **Event API Enhancement** (1 hour):
+   - Review EventBridge methods
+   - Standardize: `publish_event`, `subscribe_events`, `unsubscribe`
+   - Add event filtering and pattern matching
+   - Align with hook execution events
+
+4. **Integration** (30 min):
+   - Ensure hooks can publish events
+   - Standardize event payloads
+   - Add correlation IDs
+
+5. **Quality Assurance** (20 min):
+   - Run `cargo clean && cargo build --all-features`
+   - Run `cargo test --workspace`
+   - Test hook and event systems:
+     - `cargo test -p llmspell-hooks`
+     - `cargo test -p llmspell-events`
+     - `cargo test -p llmspell-bridge hook event`
+   - Fix any compilation or test failures
+   - Run `./scripts/quality-check-minimal.sh`
+   - Verify all checks pass
+
+6. **Update TODO** (5 min):
+   - Document hook API standardizations
+   - List event API enhancements
+   - Note integration improvements
+
+**Files to Update**:
+- `llmspell-bridge/src/hook_bridge.rs`
+- `llmspell-bridge/src/event_bridge.rs`
+- Related globals for both systems
+
+**Acceptance Criteria**:
+- [ ] Consistent API patterns
+- [ ] Hook-event integration working
+- [ ] Pattern matching implemented
+- [ ] Performance acceptable
+- [ ] Hook and event tests passing
+- [ ] Quality checks passing
+
+---
+
+#### Task R.1.16: Script API Naming Standardization
+**Priority**: HIGH
+**Estimated Time**: 4.5 hours
+**Status**: TODO
+**Assigned To**: Script Bridge Team
+
+**Description**: Standardize API naming conventions across Lua and JavaScript bridges.
+
+**Implementation Steps**:
+1. **Analysis & Discovery** (30 min):
+   - Find all camelCase in Lua: `grep -r "getCurrent\|setCurrent\|getShared\|canReplay\|getReplay\|listReplay" llmspell-bridge/src/lua/`
+   - List all Lua global methods: `grep -r "methods\.add" llmspell-bridge/src/lua/globals/`
+   - List all JS global methods: `grep -r "define_property\|method" llmspell-bridge/src/javascript/globals/`
+   - Document all camelCase methods that need conversion
+   - Create comprehensive list of naming inconsistencies
+
+2. **Lua API Standardization** (2 hours):
+   - Convert camelCase to snake_case for consistency
+   - `getCurrent` → `get_current`
+   - `setCurrent` → `set_current`
+   - `getSharedMemory` → `get_shared_memory`
+   - `canReplay` → `can_replay`
+   - `getReplayMetadata` → `get_replay_metadata`
+   - `listReplayable` → `list_replayable`
+   - Update all Lua global method names
+
+3. **JavaScript API Alignment** (1 hour):
+   - Ensure JavaScript APIs follow same patterns
+   - Update method names for consistency
+   - Document naming convention choice
+
+4. **Global Object Methods** (1 hour):
+   - Standardize discovery methods: use `discover_*` consistently
+   - Standardize listing methods: use `list_*` consistently
+   - Align getter methods: always use `get_*` prefix
+
+5. **Quality Assurance** (30 min):
+   - Run `cargo clean && cargo build --all-features`
+   - Run `cargo test --workspace`
+   - Test script APIs specifically:
+     - `cargo test -p llmspell-bridge lua`
+     - `cargo test -p llmspell-bridge javascript`
+   - Run script examples to verify functionality
+   - Fix any compilation or test failures
+   - Run `./scripts/quality-check-minimal.sh`
+   - Verify all checks pass
+
+6. **Update TODO** (5 min):
+   - Document all method names changed
+   - List any breaking changes for migration guide
+   - Note consistency improvements
+
+**Files to Update**:
+- `llmspell-bridge/src/lua/globals/*.rs` (all global files)
+- `llmspell-bridge/src/javascript/globals/*.rs`
+- Examples using old API names
+
+**Acceptance Criteria**:
+- [ ] Consistent naming across all script APIs
+- [ ] Documentation updated
+- [ ] Examples updated
+- [ ] Migration guide created
+- [ ] Script API tests passing
+- [ ] Quality checks passing
+
+---
+
+#### Task R.1.17: Configuration Builder Exposure in Script APIs
+**Priority**: MEDIUM
+**Estimated Time**: 6.58 hours
+**Status**: TODO
+**Assigned To**: Script Integration Team
+
+**Description**: Expose builder patterns through script language APIs.
+
+**Implementation Steps**:
+1. **Analysis & Discovery** (35 min):
+   - Find existing builder patterns: `grep -r "builder()" llmspell-*/src/`
+   - Check current Lua object creation: `grep -r "create\|new" llmspell-bridge/src/lua/globals/`
+   - Check current JS object creation: `grep -r "create\|new" llmspell-bridge/src/javascript/globals/`
+   - List all config types needing builders: AgentConfig, WorkflowConfig, SessionManagerConfig, etc.
+   - Document current creation patterns and builder requirements
+
+2. **Lua Builder API Design** (2 hours):
+   ```lua
+   -- Current approach
+   local agent = Agent.create({
+       name = "assistant",
+       model = "openai/gpt-4"
+   })
+   
+   -- New builder approach
+   local agent = Agent.builder()
+       :name("assistant")
+       :model("openai/gpt-4")
+       :temperature(0.7)
+       :max_tokens(2000)
+       :build()
+   ```
+
+3. **Lua Implementation** (2 hours):
+   - Create builder userdata types
+   - Implement method chaining
+   - Add validation on build()
+   - Support both patterns for compatibility
+
+4. **JavaScript Builder API** (1.5 hours):
+   - Design similar builder pattern
+   - Implement for agents, workflows
+   - Ensure type safety where possible
+
+5. **Documentation** (30 min):
+   - Document both patterns
+   - Show migration examples
+   - Update tutorials
+
+6. **Quality Assurance** (35 min):
+   - Run `cargo clean && cargo build --all-features`
+   - Run `cargo test --workspace`
+   - Test builder implementations:
+     - `cargo test -p llmspell-bridge builder`
+   - Run Lua builder examples
+   - Run JavaScript builder examples
+   - Verify both old and new patterns work
+   - Fix any compilation or test failures
+   - Run `./scripts/quality-check-minimal.sh`
+   - Verify all checks pass
+
+7. **Update TODO** (5 min):
+   - Document all builders exposed to scripts
+   - List pattern migration examples created
+   - Note compatibility approach
+
+**Files to Create/Update**:
+- `llmspell-bridge/src/lua/builders/mod.rs` (new)
+- `llmspell-bridge/src/lua/builders/agent_builder.rs` (new)
+- `llmspell-bridge/src/lua/builders/workflow_builder.rs` (new)
+- `llmspell-bridge/src/javascript/builders/` (new)
+- Update all global injection files
+
+**Acceptance Criteria**:
+- [ ] Builder patterns available in Lua
+- [ ] Builder patterns available in JS
+- [ ] Examples demonstrating usage
+- [ ] Both old and new patterns work
+- [ ] Builder tests passing
+- [ ] Quality checks passing
+
+---
+
 ### Set 2: Rust API Documentation (Day 3-5)
 
 #### Task R.2.1: Core Crate Documentation
@@ -649,12 +1470,18 @@ impl SessionManagerConfigBuilder {
 
 ## Summary
 
-**Total Tasks**: 13
-**Estimated Total Time**: 47 hours
-**Target Duration**: 7 days
+**Total Tasks**: 22
+**Estimated Total Time**: 101.83 hours
+**Target Duration**: 14 days
 
 ### Task Distribution:
-- Set 1 (API Consistency): 5 tasks, 20 hours
+- Set 1 (API Consistency): 17 tasks, 73.83 hours
+  - Core API Standardization: 5 tasks, 20 hours (R.1.1-R.1.5) ✅ COMPLETED
+  - Bridge API Standardization: 12 tasks, 53.83 hours (R.1.6-R.1.17) 🆕 NEW
+    - Factory Standards: R.1.6 (2.25 hours)
+    - Config Builders: R.1.7-R.1.10 (20.58 hours)
+    - Discovery & API Standards: R.1.11-R.1.15 (19.92 hours)
+    - Script Integration: R.1.16-R.1.17 (11.08 hours)
 - Set 2 (Rust Documentation): 3 tasks, 14 hours  
 - Set 3 (Documentation Cleanup): 4 tasks, 14 hours
 
@@ -663,6 +1490,7 @@ impl SessionManagerConfigBuilder {
 2. **Documentation Drift**: Keeping docs in sync with rapid development
 3. **Naming Conflicts**: Some renamings may conflict with Rust keywords
 4. **Time Estimation**: Documentation often takes longer than estimated
+5. **Quality Assurance**: Each task now includes quality checks to prevent regression
 
 ### Success Metrics:
 - 100% public API documentation coverage
@@ -682,7 +1510,19 @@ impl SessionManagerConfigBuilder {
 ## Release Checklist
 
 - [ ] All API inconsistencies resolved
-- [ ] Builder patterns implemented
+- [ ] Core builder patterns implemented (R.1.5) ✅
+- [ ] Factory methods standardized (R.1.6)
+- [ ] Bridge layer uses existing builders (R.1.7)
+- [ ] Bridge-specific builders created (R.1.8)
+- [ ] Infrastructure configs have builders (R.1.9)
+- [ ] Script engine configs have builders (R.1.10)
+- [ ] Discovery patterns unified (R.1.11)
+- [ ] Tool APIs standardized with ToolDiscovery (R.1.12)
+- [ ] Provider and Session APIs standardized (R.1.13)
+- [ ] State and Storage APIs standardized (R.1.14)
+- [ ] Hook and Event APIs unified (R.1.15)
+- [ ] Script APIs standardized to snake_case (R.1.16)
+- [ ] Builders exposed in Lua/JS APIs (R.1.17)
 - [ ] Rustdoc coverage 100%
 - [ ] User guide standardized
 - [ ] Technical docs updated
