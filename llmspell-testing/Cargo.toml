@@ -54,6 +54,7 @@ experimental-tests = []
 # Optional features
 test-runner = ["clap", "colored"]
 test-utilities = []
+mocks = []
 
 # Binary for test runner
 [[bin]]

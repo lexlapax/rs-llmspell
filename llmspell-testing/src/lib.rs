@@ -57,12 +57,16 @@
 //! ```
 
 // Test utilities modules
+pub mod agent_helpers;
 pub mod attributes;
 pub mod benchmarks;
+pub mod environment_helpers;
 pub mod fixtures;
 pub mod generators;
 pub mod macros;
 pub mod mocks;
+pub mod state_helpers;
+pub mod tool_helpers;
 
 // Test runner support
 #[cfg(feature = "test-runner")]

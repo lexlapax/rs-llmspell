@@ -7,21 +7,24 @@ use llmspell_core::{
 };
 use serde_json::{json, Value};
 
-/// Create a standard test execution context
-pub fn create_test_context() -> ExecutionContext {
-    ExecutionContext::new()
-}
+// Re-export consolidated test helpers
+pub use llmspell_testing::environment_helpers::create_test_context;
+pub use llmspell_testing::tool_helpers::{create_test_tool_input, create_test_tool_input_json};
 
-/// Create an agent input with the given parameters
+// create_test_context is now re-exported from llmspell_testing::environment_helpers
+
+/// Create an agent input with the given parameters (delegates to llmspell-testing)
 pub fn create_agent_input(params: Value) -> Result<AgentInput, LLMSpellError> {
-    // AgentInput expects parameters to be wrapped in a "parameters" object
-    let mut input = AgentInput::text("");
-    let wrapped_params = json!({ "parameters": params });
-    if let Value::Object(map) = wrapped_params {
-        // Convert serde_json::Map to HashMap
-        input.parameters = map.into_iter().collect();
+    // Convert Value to HashMap for the helper
+    if let Value::Object(map) = params {
+        let params_map: std::collections::HashMap<String, Value> = map.into_iter().collect();
+        Ok(create_test_tool_input_json("", params_map))
+    } else {
+        Err(LLMSpellError::Validation {
+            message: "Parameters must be a JSON object".to_string(),
+            field: Some("params".to_string()),
+        })
     }
-    Ok(input)
 }
 
 /// Create an agent input with a single "input" parameter
