@@ -160,6 +160,7 @@ mod tests {
     use super::*;
     use tokio;
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_mock_base_agent() {
         let mut mock = MockBaseAgent::new();
@@ -175,6 +176,7 @@ mod tests {
         assert_eq!(result.text, "Echo: Hello");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_simple_mock_helper() {
         let mock = create_simple_mock_agent();

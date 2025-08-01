@@ -581,6 +581,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_registration() {
         let registry = ToolRegistry::new();
@@ -609,6 +610,7 @@ mod tests {
         assert_eq!(info.security_level, SecurityLevel::Safe);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_discovery() {
         let registry = ToolRegistry::new();
@@ -656,6 +658,7 @@ mod tests {
         assert!(names.contains(&"util_tool".to_string()));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_validation() {
         let registry = ToolRegistry::new();
@@ -717,6 +720,7 @@ mod tests {
         assert!(result.is_err());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_unregistration() {
         let registry = ToolRegistry::new();
@@ -744,6 +748,7 @@ mod tests {
         assert!(registry.get_tool_info("temp_tool").await.is_none());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_registry_statistics() {
         let registry = ToolRegistry::new();
@@ -771,6 +776,7 @@ mod tests {
         assert_eq!(stats.security_level_counts[&SecurityLevel::Privileged], 1);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_capability_matcher() {
         let tool_info = ToolInfo {
@@ -820,6 +826,7 @@ mod tests {
         assert!(!matcher.matches(&tool_info));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_registry_with_hooks() {
         use llmspell_hooks::{HookExecutor as HookExecutorImpl, HookRegistry};
@@ -870,6 +877,7 @@ mod tests {
         assert!(result.is_ok());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_registry_without_hooks() {
         let registry = ToolRegistry::new();
@@ -899,6 +907,7 @@ mod tests {
         assert!(output.text.contains("Executed no_hook_tool"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_execution_error_handling() {
         let registry = ToolRegistry::new();
@@ -919,6 +928,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_resource_usage_stats_with_hooks() {
         use llmspell_hooks::{HookExecutor as HookExecutorImpl, HookRegistry};
@@ -958,6 +968,7 @@ mod tests {
         assert_eq!(stats.resource_limits_hit, 0);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_resource_usage_stats_without_hooks() {
         let registry = ToolRegistry::new();
@@ -981,6 +992,7 @@ mod tests {
         assert_eq!(stats.total_executions, 0);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_execution_metrics_from_registry() {
         use llmspell_hooks::{HookExecutor as HookExecutorImpl, HookRegistry};

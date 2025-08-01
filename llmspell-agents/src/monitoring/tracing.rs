@@ -480,6 +480,7 @@ pub struct TraceStatistics {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_span_creation() {
         let root = TraceSpan::new_root("operation".to_string(), "service".to_string());
@@ -493,6 +494,7 @@ mod tests {
         assert_eq!(child.service, root.service);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_span_completion() {
         let mut span = TraceSpan::new_root("test".to_string(), "service".to_string());
@@ -511,6 +513,7 @@ mod tests {
         assert_eq!(span.status, SpanStatus::Ok);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_trace_collector() {
         let collector = Arc::new(TraceCollector::new(10));
@@ -538,6 +541,7 @@ mod tests {
         assert_eq!(trace[0].status, SpanStatus::Ok);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_span_context() {
         let span = TraceSpan::new_root("op".to_string(), "service".to_string());
@@ -550,6 +554,7 @@ mod tests {
         assert_eq!(child.parent_span_id, Some(span.span_id.clone()));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_trace_analyzer() {
         let root = TraceSpan::new_root("root".to_string(), "service-a".to_string());

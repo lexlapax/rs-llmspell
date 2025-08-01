@@ -714,6 +714,7 @@ impl Default for ToolErrorHandler {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_error_severity() {
         let error = ToolIntegrationError::SecurityViolation {
@@ -727,6 +728,7 @@ mod tests {
         assert!(!error.is_recoverable());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_recovery_actions() {
         let error = ToolIntegrationError::InvocationFailed {
@@ -746,6 +748,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_error_context() {
         let mut context = ErrorContext::new("test_operation", "test_component")
@@ -768,6 +771,7 @@ mod tests {
         assert_eq!(context.successful_recovery_count(), 0);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_error_display() {
         let error = ToolIntegrationError::ToolNotFound {
@@ -781,6 +785,7 @@ mod tests {
         assert!(display_string.contains("tool2"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_error_handler() {
         let handler =

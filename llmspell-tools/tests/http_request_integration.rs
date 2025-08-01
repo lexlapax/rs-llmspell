@@ -8,6 +8,8 @@ use llmspell_core::{
 use llmspell_tools::HttpRequestTool;
 use serde_json::json;
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 async fn test_http_request_tool_creation() {
     let tool = HttpRequestTool::new(Default::default()).unwrap();
@@ -20,6 +22,8 @@ async fn test_http_request_tool_creation() {
     ));
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 async fn test_http_get_request() {
     let tool = HttpRequestTool::new(Default::default()).unwrap();
@@ -64,6 +68,8 @@ async fn test_http_get_request() {
     }
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 async fn test_http_post_request() {
     let tool = HttpRequestTool::new(Default::default()).unwrap();
@@ -91,6 +97,8 @@ async fn test_http_post_request() {
     assert!(output.text.contains("123"));
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 async fn test_http_basic_auth() {
     let tool = HttpRequestTool::new(Default::default()).unwrap();
@@ -118,6 +126,8 @@ async fn test_http_basic_auth() {
     assert!(output.text.contains("authenticated"));
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 async fn test_http_bearer_auth() {
     let tool = HttpRequestTool::new(Default::default()).unwrap();
@@ -144,6 +154,8 @@ async fn test_http_bearer_auth() {
     assert!(output.text.contains("authenticated"));
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 async fn test_http_custom_headers() {
     let tool = HttpRequestTool::new(Default::default()).unwrap();
@@ -179,6 +191,8 @@ async fn test_http_custom_headers() {
     }
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 async fn test_http_error_handling() {
     let tool = HttpRequestTool::new(Default::default()).unwrap();
@@ -200,6 +214,8 @@ async fn test_http_error_handling() {
     assert!(output.text.contains("404"));
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 async fn test_http_retry_logic() {
     let tool = HttpRequestTool::new(Default::default()).unwrap();
@@ -239,6 +255,8 @@ async fn test_http_retry_logic() {
     }
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 async fn test_http_json_response_parsing() {
     let tool = HttpRequestTool::new(Default::default()).unwrap();
@@ -261,6 +279,8 @@ async fn test_http_json_response_parsing() {
     assert!(output.text.contains("json"));
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 #[ignore = "httpbin.org delay endpoint may not respect long delays"]
 async fn test_http_timeout() {
@@ -286,6 +306,8 @@ async fn test_http_timeout() {
     }
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 async fn test_http_put_request() {
     let tool = HttpRequestTool::new(Default::default()).unwrap();
@@ -314,6 +336,8 @@ async fn test_http_put_request() {
     assert_eq!(response["metadata"]["method"], "PUT");
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 async fn test_http_delete_request() {
     let tool = HttpRequestTool::new(Default::default()).unwrap();
@@ -338,6 +362,8 @@ async fn test_http_delete_request() {
     assert_eq!(response["metadata"]["method"], "DELETE");
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 #[ignore = "httpbin.org intermittent network issues"]
 async fn test_http_api_key_auth() {
@@ -366,6 +392,8 @@ async fn test_http_api_key_auth() {
     assert!(output.text.contains("my-api-key-123"));
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 async fn test_invalid_url() {
     let tool = HttpRequestTool::new(Default::default()).unwrap();
@@ -382,6 +410,8 @@ async fn test_invalid_url() {
     assert!(result.is_err());
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 async fn test_missing_url() {
     let tool = HttpRequestTool::new(Default::default()).unwrap();

@@ -303,6 +303,7 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_encode_decode_text() {
         let tool = Base64EncoderTool::new();
@@ -345,6 +346,7 @@ mod tests {
         assert_eq!(decoded, test_text);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_url_safe_variant() {
         let tool = Base64EncoderTool::new();
@@ -390,6 +392,7 @@ mod tests {
         assert_eq!(decoded, test_data);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_binary_input() {
         let tool = Base64EncoderTool::new();
@@ -415,6 +418,7 @@ mod tests {
         assert_eq!(encoded, "3q2+7w==");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_invalid_operation() {
         let tool = Base64EncoderTool::new();
@@ -431,6 +435,7 @@ mod tests {
         assert!(result.is_err());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_missing_input() {
         let tool = Base64EncoderTool::new();
@@ -446,6 +451,7 @@ mod tests {
         assert!(result.is_err());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_metadata() {
         let tool = Base64EncoderTool::new();

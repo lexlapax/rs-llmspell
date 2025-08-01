@@ -54,6 +54,7 @@ impl GlobalObject for ReplayGlobal {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_replay_global_metadata() {
         let global = ReplayGlobal::new();

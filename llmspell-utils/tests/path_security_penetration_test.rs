@@ -5,6 +5,7 @@ use llmspell_utils::security::path::{PathSecurityConfig, PathSecurityValidator};
 use std::path::Path;
 use tempfile::TempDir;
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_path_traversal_attack_vectors() {
     let validator = PathSecurityValidator::with_config(PathSecurityConfig::strict());
@@ -37,6 +38,7 @@ fn test_path_traversal_attack_vectors() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_unicode_path_traversal_attacks() {
     let validator = PathSecurityValidator::with_config(PathSecurityConfig::strict());
@@ -63,6 +65,7 @@ fn test_unicode_path_traversal_attacks() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_null_byte_injection_attacks() {
     let validator = PathSecurityValidator::with_config(PathSecurityConfig::strict());
@@ -88,6 +91,7 @@ fn test_null_byte_injection_attacks() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_case_sensitivity_attacks() {
     let validator = PathSecurityValidator::with_config(PathSecurityConfig::strict());
@@ -112,6 +116,7 @@ fn test_case_sensitivity_attacks() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_double_encoding_attacks() {
     let validator = PathSecurityValidator::with_config(PathSecurityConfig::strict());
@@ -133,6 +138,7 @@ fn test_double_encoding_attacks() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_overlong_utf8_attacks() {
     let validator = PathSecurityValidator::with_config(PathSecurityConfig::strict());
@@ -156,6 +162,7 @@ fn test_overlong_utf8_attacks() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_windows_reserved_device_names() {
     let validator = PathSecurityValidator::with_config(PathSecurityConfig::strict());
@@ -178,6 +185,7 @@ fn test_windows_reserved_device_names() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_path_length_dos_attacks() {
     let validator = PathSecurityValidator::with_config(PathSecurityConfig::strict());
@@ -201,6 +209,7 @@ fn test_path_length_dos_attacks() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_symlink_manipulation_attacks() {
     let temp_dir = TempDir::new().unwrap();
@@ -240,6 +249,7 @@ fn test_symlink_manipulation_attacks() {
     // The test is primarily about the symlink attack detection logic
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_permission_escalation_attacks() {
     let validator = PathSecurityValidator::with_config(PathSecurityConfig::strict());
@@ -265,6 +275,7 @@ fn test_permission_escalation_attacks() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_jail_escape_attacks() {
     let temp_dir = TempDir::new().unwrap();
@@ -301,6 +312,7 @@ fn test_jail_escape_attacks() {
     // which is acceptable behavior for the security validator
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_chroot_jail_bypass_attacks() {
     let temp_dir = TempDir::new().unwrap();
@@ -337,6 +349,7 @@ fn test_chroot_jail_bypass_attacks() {
     assert!(result.is_ok(), "Safe path within chroot should be allowed");
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_complex_attack_combinations() {
     let temp_dir = TempDir::new().unwrap();
@@ -364,6 +377,7 @@ fn test_complex_attack_combinations() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_edge_case_paths() {
     let validator = PathSecurityValidator::with_config(PathSecurityConfig::strict());
@@ -407,6 +421,7 @@ fn test_edge_case_paths() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_performance_under_attack() {
     let validator = PathSecurityValidator::with_config(PathSecurityConfig::strict());

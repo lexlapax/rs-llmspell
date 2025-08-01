@@ -66,6 +66,7 @@ fn create_test_replay_session(_session_id: SessionId) -> ReplaySession {
     }
 }
 
+#[cfg_attr(test_category = "unit")]
 #[test]
 fn test_session_debugger_creation() {
     let debugger = SessionDebugger::new();
@@ -76,6 +77,7 @@ fn test_session_debugger_creation() {
     assert!(debugger.get_timeline(&session_id).is_none());
 }
 
+#[cfg_attr(test_category = "unit")]
 #[test]
 fn test_import_replay_session() {
     let debugger = SessionDebugger::new();
@@ -94,6 +96,7 @@ fn test_import_replay_session() {
     assert_eq!(error_analysis.total_errors, 2);
 }
 
+#[cfg_attr(test_category = "unit")]
 #[test]
 fn test_inspect_state_at_timestamp() {
     let debugger = SessionDebugger::new();
@@ -139,6 +142,7 @@ fn test_inspect_state_at_timestamp() {
     assert_eq!(state.hook_id, "hook_4");
 }
 
+#[cfg_attr(test_category = "unit")]
 #[test]
 fn test_state_comparison() {
     let state1 = SessionState {
@@ -192,6 +196,7 @@ fn test_state_comparison() {
     assert!(comparison.summary.contains("1 metadata differences"));
 }
 
+#[cfg_attr(test_category = "unit")]
 #[test]
 fn test_compare_states_at_different_times() {
     let debugger = SessionDebugger::new();
@@ -224,6 +229,7 @@ fn test_compare_states_at_different_times() {
     assert!(!comparison.context_diffs.is_empty());
 }
 
+#[cfg_attr(test_category = "unit")]
 #[test]
 fn test_timeline_navigation() {
     let debugger = SessionDebugger::new();
@@ -274,6 +280,7 @@ fn test_timeline_navigation() {
         .is_err());
 }
 
+#[cfg_attr(test_category = "unit")]
 #[test]
 fn test_error_analysis() {
     let errors = vec![
@@ -321,6 +328,7 @@ fn test_error_analysis() {
     );
 }
 
+#[cfg_attr(test_category = "unit")]
 #[test]
 fn test_error_rate_calculation() {
     let base_time = SystemTime::now() - Duration::from_secs(3600); // 1 hour ago
@@ -357,6 +365,7 @@ fn test_error_rate_calculation() {
     assert!((rate - 3.0).abs() < 0.1); // Allow small floating point difference
 }
 
+#[cfg_attr(test_category = "unit")]
 #[test]
 fn test_export_debug_data() {
     let debugger = SessionDebugger::new();
@@ -389,6 +398,7 @@ fn test_export_debug_data() {
     assert_eq!(debug_data.error_analysis.total_errors, 2);
 }
 
+#[cfg_attr(test_category = "unit")]
 #[test]
 fn test_clear_session_data() {
     let debugger = SessionDebugger::new();
@@ -412,6 +422,7 @@ fn test_clear_session_data() {
     assert_eq!(error_analysis.total_errors, 0);
 }
 
+#[cfg_attr(test_category = "unit")]
 #[test]
 fn test_add_error() {
     let debugger = SessionDebugger::new();
@@ -437,6 +448,7 @@ fn test_add_error() {
     assert_eq!(analysis.errors_by_hook.get("test_hook").unwrap(), &1);
 }
 
+#[cfg_attr(test_category = "unit")]
 #[test]
 fn test_state_comparison_with_arrays() {
     let state1 = SessionState {
@@ -471,6 +483,7 @@ fn test_state_comparison_with_arrays() {
     assert!(!comparison.context_diffs.is_empty());
 }
 
+#[cfg_attr(test_category = "unit")]
 #[test]
 fn test_hook_result_comparison() {
     let debugger = SessionDebugger::new();
@@ -489,6 +502,7 @@ fn test_hook_result_comparison() {
     assert!(comparison.difference_type.is_some());
 }
 
+#[cfg_attr(test_category = "unit")]
 #[test]
 fn test_session_state_from_captured() {
     let captured = CapturedState {
@@ -515,6 +529,7 @@ fn test_session_state_from_captured() {
     assert_eq!(session_state.metadata, captured.metadata);
 }
 
+#[cfg_attr(test_category = "unit")]
 #[test]
 fn test_timeline_entry_conversion() {
     let executions = vec![
@@ -553,6 +568,7 @@ fn test_timeline_entry_conversion() {
     assert_eq!(timeline[1].duration, Duration::from_millis(200));
 }
 
+#[cfg_attr(test_category = "unit")]
 #[test]
 fn test_state_inspection_empty_session() {
     let debugger = SessionDebugger::new();
@@ -563,6 +579,7 @@ fn test_state_inspection_empty_session() {
     assert!(result.is_err());
 }
 
+#[cfg_attr(test_category = "unit")]
 #[test]
 fn test_metadata_comparison() {
     let state1 = SessionState {
@@ -594,6 +611,7 @@ fn test_metadata_comparison() {
     assert_eq!(comparison.metadata_diffs.len(), 3); // 1 changed, 1 added, 1 removed
 }
 
+#[cfg_attr(test_category = "unit")]
 #[test]
 fn test_debug_data_serialization() {
     let debug_data = SessionDebugData {
@@ -635,6 +653,7 @@ fn test_debug_data_serialization() {
     assert!(serialized.contains("error_analysis"));
 }
 
+#[cfg_attr(test_category = "unit")]
 #[test]
 fn test_comparison_with_nested_objects() {
     let state1 = SessionState {

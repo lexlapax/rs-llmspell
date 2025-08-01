@@ -271,6 +271,7 @@ impl fmt::Display for StateScope {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_scope_types() {
         assert!(StateScope::Global.is_global());
@@ -278,6 +279,7 @@ mod tests {
         assert!(StateScope::Agent("agent-1".to_string()).is_agent_scope());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_scope_identifiers() {
         assert_eq!(StateScope::Global.identifier(), None);
@@ -291,6 +293,7 @@ mod tests {
         );
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_access_control() {
         let global = StateScope::Global;
@@ -317,6 +320,7 @@ mod tests {
         assert!(!user.can_access(&agent));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_storage_keys() {
         let global = StateScope::Global;
@@ -328,6 +332,7 @@ mod tests {
         assert_eq!(agent.storage_key("history"), "agent:agent-1:history");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_storage_key_parsing() {
         let test_cases = vec![
@@ -355,6 +360,7 @@ mod tests {
         assert!(StateScope::parse_storage_key("unknown:type:key").is_none());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_display() {
         assert_eq!(StateScope::Global.to_string(), "global");

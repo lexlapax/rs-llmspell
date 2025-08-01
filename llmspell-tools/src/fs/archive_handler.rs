@@ -1200,6 +1200,7 @@ mod tests {
     use super::*;
     use tempfile::TempDir;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_detect_format() {
         assert!(matches!(
@@ -1220,6 +1221,7 @@ mod tests {
         ));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_safe_path() {
         assert!(ArchiveHandlerTool::is_safe_path(Path::new("file.txt")));
@@ -1230,6 +1232,7 @@ mod tests {
         )));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_create_and_extract_zip() {
         let temp_dir = TempDir::new().unwrap();

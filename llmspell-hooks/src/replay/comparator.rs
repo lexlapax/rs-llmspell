@@ -552,6 +552,7 @@ impl fmt::Display for ComparisonResult {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_identical_results() {
         let comparator = HookResultComparator::new();
@@ -562,6 +563,7 @@ mod tests {
         assert!(result.differences.is_empty());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_variant_mismatch() {
         let comparator = HookResultComparator::new();
@@ -579,6 +581,7 @@ mod tests {
         assert_eq!(result.differences[0].severity, DifferenceSeverity::Critical);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_data_comparison() {
         let comparator = HookResultComparator::new();
@@ -610,6 +613,7 @@ mod tests {
         assert_eq!(result.differences[0].path, "field2");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_ignore_fields() {
         let config = ComparatorConfig {

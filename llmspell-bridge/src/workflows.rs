@@ -672,6 +672,7 @@ impl WorkflowExecutor for ParallelWorkflowExecutor {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_workflow_discovery() {
         let discovery = WorkflowDiscovery::new();
@@ -1482,6 +1483,7 @@ impl Default for WorkflowRegistry {
 mod workflow_bridge_tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_workflow_bridge_creation() {
         let registry = Arc::new(ComponentRegistry::new());
@@ -1493,6 +1495,7 @@ mod workflow_bridge_tests {
         assert!(types.contains(&"sequential".to_string()));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_workflow_info() {
         let registry = Arc::new(ComponentRegistry::new());
@@ -1508,6 +1511,7 @@ mod workflow_bridge_tests {
         assert_eq!(all_info.len(), 4);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_bridge_metrics() {
         let registry = Arc::new(ComponentRegistry::new());
@@ -1525,6 +1529,7 @@ mod workflow_bridge_tests {
 mod workflow_registry_tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_workflow_registry() {
         let registry = WorkflowRegistry::new();
@@ -1538,6 +1543,7 @@ mod workflow_registry_tests {
         assert_eq!(template.workflow_type, "sequential");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_search_criteria() {
         let criteria = SearchCriteria {

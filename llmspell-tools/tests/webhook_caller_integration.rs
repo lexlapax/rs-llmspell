@@ -8,6 +8,7 @@ use llmspell_core::BaseAgent;
 use llmspell_tools::WebhookCallerTool;
 use serde_json::json;
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_webhook_caller_post() {
     let tool = WebhookCallerTool::new();
@@ -41,6 +42,7 @@ async fn test_webhook_caller_post() {
     assert_eq!(response_body["event"], "test_event");
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_webhook_caller_with_headers() {
     let tool = WebhookCallerTool::new();
@@ -70,6 +72,7 @@ async fn test_webhook_caller_with_headers() {
     assert_eq!(request_headers["X-Event-Type"], "user.created");
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_webhook_caller_get_method() {
     let tool = WebhookCallerTool::new();
@@ -90,6 +93,7 @@ async fn test_webhook_caller_get_method() {
     assert!(result["response_time_ms"].as_f64().unwrap() > 0.0);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_webhook_caller_retry_on_failure() {
     let tool = WebhookCallerTool::new();
@@ -113,6 +117,7 @@ async fn test_webhook_caller_retry_on_failure() {
     assert!(result.get("retries_attempted").is_some() || result.get("retry_count").is_some());
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_webhook_caller_timeout() {
     let tool = WebhookCallerTool::new();
@@ -178,6 +183,7 @@ async fn test_webhook_caller_timeout() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_webhook_caller_invalid_url() {
     let tool = WebhookCallerTool::new();
@@ -195,6 +201,7 @@ async fn test_webhook_caller_invalid_url() {
     assert!(error.to_string().contains("URL") || error.to_string().contains("url"));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_webhook_caller_custom_method() {
     let tool = WebhookCallerTool::new();

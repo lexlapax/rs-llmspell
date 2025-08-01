@@ -181,6 +181,7 @@ impl StateClassConfig {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_state_class_properties() {
         assert!(!StateClass::Trusted.requires_circular_check());
@@ -191,6 +192,7 @@ mod tests {
         assert!(StateClass::Standard.should_persist());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_state_class_inference() {
         assert_eq!(
@@ -215,6 +217,7 @@ mod tests {
         );
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_config_pattern_matching() {
         let config = StateClassConfig::production();
@@ -226,6 +229,7 @@ mod tests {
         assert_eq!(config.classify_key("temp:cache"), StateClass::Ephemeral);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_benchmark_mode() {
         let config = StateClassConfig::benchmark();

@@ -9,6 +9,8 @@ use std::time::Duration;
 use tokio::time::timeout;
 use tracing::{info, warn};
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 #[ignore = "requires ANTHROPIC_API_KEY"]
 async fn test_anthropic_conversation_persistence() -> Result<()> {
@@ -104,6 +106,8 @@ async fn test_anthropic_conversation_persistence() -> Result<()> {
     Ok(())
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 #[ignore = "requires ANTHROPIC_API_KEY"]
 async fn test_anthropic_structured_thinking() -> Result<()> {
@@ -166,6 +170,8 @@ async fn test_anthropic_structured_thinking() -> Result<()> {
     Ok(())
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 #[ignore = "requires ANTHROPIC_API_KEY"]
 async fn test_anthropic_long_context() -> Result<()> {
@@ -260,6 +266,8 @@ async fn test_anthropic_long_context() -> Result<()> {
     Ok(())
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 #[ignore = "requires ANTHROPIC_API_KEY"]
 async fn test_anthropic_cross_session_memory() -> Result<()> {

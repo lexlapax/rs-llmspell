@@ -171,6 +171,7 @@ mod tests {
     use crate::types::{ComponentId, ComponentType, HookPoint};
     use std::sync::atomic::{AtomicUsize, Ordering};
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_sequential_execution() {
         let counter = Arc::new(AtomicUsize::new(0));
@@ -200,6 +201,7 @@ mod tests {
         assert_eq!(counter.load(Ordering::SeqCst), 111);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_sequential_early_termination() {
         let counter = Arc::new(AtomicUsize::new(0));

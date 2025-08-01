@@ -400,6 +400,7 @@ mod tests {
     use std::sync::Arc;
     use tokio::sync::Mutex;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_workflow_step_builder() {
         let component_id = ComponentId::new();
@@ -418,6 +419,7 @@ mod tests {
         assert_eq!(step.timeout, Some(Duration::from_secs(30)));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_retry_policy_default() {
         let policy = RetryPolicy::default();
@@ -426,6 +428,7 @@ mod tests {
         assert!(policy.exponential_backoff);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_step_result_creation() {
         let step_id = ComponentId::new();
@@ -445,6 +448,7 @@ mod tests {
         assert_eq!(failure.retry_count, 2);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_workflow_config_default() {
         let config = WorkflowConfig::default();
@@ -552,6 +556,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_workflow_step_management() {
         let workflow = MockWorkflow::new();
@@ -574,6 +579,7 @@ mod tests {
         assert_eq!(steps[0].id, step2.id);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_workflow_execution_planning() {
         let workflow = MockWorkflow::new();
@@ -597,6 +603,7 @@ mod tests {
         assert_eq!(plan[2].id, step3.id);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_workflow_circular_dependency_detection() {
         let workflow = MockWorkflow::new();
@@ -619,6 +626,7 @@ mod tests {
         assert!(result.unwrap_err().to_string().contains("circular"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_workflow_validation() {
         let workflow = MockWorkflow::new();
@@ -650,6 +658,7 @@ mod tests {
         );
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_workflow_execution_and_results() {
         let workflow = MockWorkflow::new();

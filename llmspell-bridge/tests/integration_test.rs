@@ -60,6 +60,8 @@ async fn test_script_execution_through_bridge() {
 }
 
 /// Test engine switching capability (even with only Lua)
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 async fn test_engine_switching_integration() {
     // Test that we can create engines by name
@@ -120,6 +122,8 @@ async fn test_streaming_through_bridge() {
 }
 
 /// Test provider integration through scripts
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 #[ignore = "Requires OPENAI_API_KEY - run with --ignored flag"]
 async fn test_provider_integration() {

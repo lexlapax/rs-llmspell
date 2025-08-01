@@ -167,6 +167,7 @@ impl FromStr for ModelSpecifier {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_parse_model_only() {
         let spec = ModelSpecifier::parse("gpt-4").unwrap();
@@ -177,6 +178,7 @@ mod tests {
         assert!(!spec.has_base_url());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_parse_provider_model() {
         let spec = ModelSpecifier::parse("openai/gpt-4").unwrap();
@@ -187,6 +189,7 @@ mod tests {
         assert!(!spec.has_base_url());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_parse_nested_provider() {
         let spec = ModelSpecifier::parse("openrouter/deepseek/model").unwrap();
@@ -196,6 +199,7 @@ mod tests {
         assert!(spec.has_provider());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_parse_deeply_nested() {
         let spec = ModelSpecifier::parse("a/b/c/d/model").unwrap();
@@ -203,6 +207,7 @@ mod tests {
         assert_eq!(spec.provider, Some("a/b/c/d".to_string()));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_parse_empty_string() {
         let result = ModelSpecifier::parse("");
@@ -212,12 +217,14 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_parse_whitespace_only() {
         let result = ModelSpecifier::parse("   ");
         assert!(result.is_err());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_parse_with_base_url() {
         let spec =
@@ -230,6 +237,7 @@ mod tests {
         assert!(spec.has_base_url());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_parse_with_base_url_none() {
         let spec = ModelSpecifier::parse_with_base_url("openai/gpt-4", None).unwrap();
@@ -237,6 +245,7 @@ mod tests {
         assert!(!spec.has_base_url());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_constructor_methods() {
         let spec1 = ModelSpecifier::new("gpt-4");
@@ -253,6 +262,7 @@ mod tests {
         assert_eq!(spec3.base_url, Some("https://api.custom.com".to_string()));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_provider_or_default() {
         let spec1 = ModelSpecifier::new("gpt-4");
@@ -262,6 +272,7 @@ mod tests {
         assert_eq!(spec2.provider_or_default("default"), "openai");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_to_string() {
         let spec1 = ModelSpecifier::new("gpt-4");
@@ -274,12 +285,14 @@ mod tests {
         assert_eq!(spec3.to_string(), "openrouter/deepseek/model");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_display_trait() {
         let spec = ModelSpecifier::with_provider("openai", "gpt-4");
         assert_eq!(format!("{}", spec), "openai/gpt-4");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_from_str_trait() {
         let spec: ModelSpecifier = "openai/gpt-4".parse().unwrap();
@@ -287,6 +300,7 @@ mod tests {
         assert_eq!(spec.provider, Some("openai".to_string()));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_serde_serialization() {
         let spec = ModelSpecifier::with_base_url("openai", "gpt-4", "https://api.custom.com");
@@ -299,6 +313,7 @@ mod tests {
         assert_eq!(spec, deserialized);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_edge_cases() {
         // Test with special characters in model names
@@ -311,6 +326,7 @@ mod tests {
         assert_eq!(spec.provider, Some("anthropic".to_string()));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_clone_and_eq() {
         let spec1 = ModelSpecifier::with_provider("openai", "gpt-4");

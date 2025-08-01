@@ -17,9 +17,24 @@
 
 **Total**: 175 test files
 
+### Benchmark Distribution by Crate
+- **llmspell-core**: 1 benchmark file
+- **llmspell-tools**: 4 benchmark files
+- **llmspell-utils**: 1 benchmark file
+- **llmspell-workflows**: 1 benchmark file
+- **llmspell-bridge**: 2 benchmark files
+- **llmspell-sessions**: 1 benchmark file
+- **llmspell-testing**: 11 benchmark files (largest)
+
+**Total**: 21 benchmark files
+
 ### Categorization Status
-- **Categorized**: 3 files (1.7%)
-- **Uncategorized**: 172 files (98.3%)
+- **Test Files**:
+  - **Categorized**: 3 files (1.7%)
+  - **Uncategorized**: 172 files (98.3%)
+- **Benchmark Files**:
+  - **Categorized**: 0 files (0%)
+  - **Uncategorized**: 21 files (100%)
 
 ### Already Categorized Tests
 1. `llmspell-testing/tests/integration/backup_recovery.rs`
@@ -54,6 +69,8 @@ The `llmspell-testing` crate provides:
 3. **External Dependencies**: Tests requiring network/API access not isolated
 4. **Inconsistent Organization**: No clear pattern for test placement
 5. **CI Performance**: All tests run together, including slow external tests
+6. **Uncategorized Benchmarks**: All 21 benchmark files lack category attributes
+7. **Benchmark Execution**: No clear separation between tests and benchmarks
 
 ## Categorization Plan
 
@@ -66,7 +83,8 @@ The `llmspell-testing` crate provides:
 6. **workflow**: Workflow pattern tests
 7. **bridge**: Script bridge integration tests
 8. **security**: Security-specific tests
-9. **performance**: Performance benchmarks
+9. **performance**: Performance validation tests (pass/fail)
+10. **benchmark**: Performance measurement tests (using Criterion)
 
 ### Implementation Strategy
 1. Start with llmspell-tools (52 files) as it has the most tests

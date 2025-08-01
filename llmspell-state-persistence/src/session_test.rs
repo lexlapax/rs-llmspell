@@ -8,6 +8,7 @@ mod session_tests {
     use serde_json::json;
     use tempfile::TempDir;
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_session_scope_basic_operations() {
         let temp_dir = TempDir::new().unwrap();
@@ -84,6 +85,7 @@ mod session_tests {
         assert_eq!(prefs_after, Some(json!({"theme": "dark"})));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_session_scope_isolation_from_global() {
         let temp_dir = TempDir::new().unwrap();
@@ -125,6 +127,7 @@ mod session_tests {
         assert_eq!(session_config, Some(json!("session-config")));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_clear_session_scope() {
         let temp_dir = TempDir::new().unwrap();

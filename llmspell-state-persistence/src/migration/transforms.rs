@@ -717,6 +717,7 @@ impl TransformationResult {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_field_transform_source_fields() {
         let transform = FieldTransform::Copy {
@@ -728,6 +729,7 @@ mod tests {
         assert_eq!(transform.target_fields(), vec!["new_field"]);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_state_transformation_creation() {
         let mut transformation = StateTransformation::new(
@@ -749,6 +751,7 @@ mod tests {
         assert_eq!(transformation.field_transforms.len(), 1);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_data_transformer() {
         let transformer = DataTransformer::new();
@@ -789,6 +792,7 @@ mod tests {
         assert!(state.value.get("parsed_number").is_some());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_transformation_result() {
         let mut result = TransformationResult::new("test".to_string());

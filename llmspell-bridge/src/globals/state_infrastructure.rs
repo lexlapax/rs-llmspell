@@ -253,6 +253,7 @@ mod tests {
     use super::*;
     use crate::{ComponentRegistry, ProviderManager};
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_state_infrastructure_creation() {
         let context = GlobalContext::new(
@@ -280,6 +281,7 @@ mod tests {
         ));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_migration_infrastructure_creation() {
         let context = GlobalContext::new(

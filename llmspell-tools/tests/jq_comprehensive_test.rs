@@ -4,6 +4,7 @@ use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionC
 use llmspell_tools::JsonProcessorTool;
 use serde_json::json;
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_comprehensive_jq_syntax() {
     let tool = JsonProcessorTool::default();
@@ -192,6 +193,7 @@ async fn test_comprehensive_jq_syntax() {
     assert!(result.iter().all(|u| u["is_adult"] == true));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_streaming_json_lines() {
     let tool = JsonProcessorTool::default();

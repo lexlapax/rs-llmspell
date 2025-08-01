@@ -255,6 +255,7 @@ pub struct PolicyEvaluationResult {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_policy_manager_creation() {
         let config = SessionPolicyConfig::default();
@@ -270,6 +271,7 @@ mod tests {
 
     // TODO: Enable this test once we implement actual hook registration
     #[ignore]
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_policy_registration() {
         let config = SessionPolicyConfig::default();
@@ -286,6 +288,7 @@ mod tests {
         assert!(!hook_registry.get_hooks(&HookPoint::SessionEnd).is_empty());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_policy_composition_patterns() {
         // Test sequential composition

@@ -576,6 +576,7 @@ mod tests {
         schema
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_migration_planner_creation() {
         let planner = MigrationPlanner::new();
@@ -585,6 +586,7 @@ mod tests {
         assert_eq!(stats.total_compatibility_checks, 0);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_schema_registration() {
         let mut planner = MigrationPlanner::new();
@@ -597,6 +599,7 @@ mod tests {
         assert_eq!(planner.get_migration_stats().total_schemas, 1);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_no_op_migration_plan() {
         let mut planner = MigrationPlanner::new();
@@ -614,6 +617,7 @@ mod tests {
         assert!(!plan.requires_backup);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_simple_migration_plan() {
         let mut planner = MigrationPlanner::new();
@@ -650,6 +654,7 @@ mod tests {
         planner.validate_plan(&plan).unwrap();
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_breaking_migration_plan() {
         let mut planner = MigrationPlanner::new();
@@ -684,6 +689,7 @@ mod tests {
         // for major version changes, which is expected behavior
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_field_mapping_creation() {
         let mut planner = MigrationPlanner::new();
@@ -714,6 +720,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_migration_path_finding() {
         let mut planner = MigrationPlanner::new();
@@ -734,6 +741,7 @@ mod tests {
         assert_eq!(path[1], v1_2_0);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_plan_validation() {
         let planner = MigrationPlanner::new();
@@ -762,6 +770,7 @@ mod tests {
         ));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_migration_stats() {
         let mut planner = MigrationPlanner::new();

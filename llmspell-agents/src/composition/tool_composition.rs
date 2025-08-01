@@ -800,6 +800,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_simple_composition() {
         let provider = MockToolProvider::new();
@@ -822,6 +823,7 @@ mod tests {
         assert_eq!(result.step_results.len(), 1);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_chained_composition() {
         let provider = MockToolProvider::new();
@@ -855,6 +857,7 @@ mod tests {
         assert!(step2_result.success);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_data_flow_transforms() {
         let composition = ToolComposition::new("test");
@@ -878,6 +881,7 @@ mod tests {
         assert_eq!(result, json!("constant_value"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_data_transforms() {
         let composition = ToolComposition::new("test");

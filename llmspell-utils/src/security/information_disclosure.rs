@@ -407,6 +407,7 @@ impl LoggingFilter {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_sensitive_data_masking() {
         let config = InfoDisclosureConfig::default();
@@ -426,6 +427,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_path_sanitization() {
         let config = InfoDisclosureConfig::default();
@@ -444,6 +446,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_debug_info_filtering() {
         let config = InfoDisclosureConfig::default();
@@ -462,6 +465,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_error_sanitization() {
         let config = InfoDisclosureConfig::production();
@@ -482,6 +486,7 @@ mod tests {
         assert_eq!(sanitized.category, None); // database not in allowed list
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_development_vs_production() {
         let dev_config = InfoDisclosureConfig::development();
@@ -494,6 +499,7 @@ mod tests {
         assert!(prod_config.sanitize_paths);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_logging_filter() {
         let config = InfoDisclosureConfig::default();
@@ -512,6 +518,7 @@ mod tests {
         assert!(!filter.should_filter(mostly_safe));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_error_categorization() {
         let preventer = Arc::new(InfoDisclosurePreventer::production());

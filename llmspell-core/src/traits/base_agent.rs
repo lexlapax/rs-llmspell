@@ -245,6 +245,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_base_agent_implementation() {
         let agent = MockAgent::new();
@@ -261,6 +262,7 @@ mod tests {
         assert_eq!(result.text, "Processed: test prompt");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_base_agent_validation() {
         let agent = MockAgent::new();
@@ -281,6 +283,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_base_agent_error_handling() {
         let agent = MockAgent::new();
@@ -295,6 +298,7 @@ mod tests {
         assert!(result.text.contains("Test error"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_base_agent_streaming_default() {
         let agent = MockAgent::new();

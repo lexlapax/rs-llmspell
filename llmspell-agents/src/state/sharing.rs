@@ -597,6 +597,7 @@ mod tests {
         });
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_broadcast_channel() {
         init_tracing();
@@ -650,6 +651,7 @@ mod tests {
         assert!(result.is_err());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_collaborative_workspace() {
         init_tracing();
@@ -699,6 +701,7 @@ mod tests {
         assert_eq!(lead_msgs[0].sender_agent_id, "dev1");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_pipeline_processing() {
         init_tracing();

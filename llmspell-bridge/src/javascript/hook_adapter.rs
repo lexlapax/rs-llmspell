@@ -63,6 +63,7 @@ impl HookAdapter for JavaScriptHookAdapter {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_javascript_hook_adapter_stub() {
         let adapter = JavaScriptHookAdapter::new();

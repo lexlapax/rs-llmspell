@@ -5,6 +5,7 @@ use llmspell_bridge::runtime::{RuntimeConfig, ScriptRuntime};
 use llmspell_tools::registry::ToolRegistry;
 use std::path::PathBuf;
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_lua_tool_integration() {
     // Initialize tool registry
@@ -43,6 +44,7 @@ async fn test_lua_tool_integration() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_tool_response_format_consistency() {
     use llmspell_core::traits::base_agent::BaseAgent;
@@ -168,6 +170,7 @@ async fn test_tool_response_format_consistency() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_tool_error_handling_consistency() {
     use llmspell_core::traits::base_agent::BaseAgent;

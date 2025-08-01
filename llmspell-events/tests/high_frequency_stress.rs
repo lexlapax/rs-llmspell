@@ -29,6 +29,7 @@ mod stress_tests {
         )
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     #[cfg_attr(not(feature = "stress_tests"), ignore)]
     async fn test_10k_events_per_second_sustained() {
@@ -101,6 +102,7 @@ mod stress_tests {
         );
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     #[cfg_attr(not(feature = "stress_tests"), ignore)]
     async fn test_concurrent_publishers_stress() {
@@ -204,6 +206,7 @@ mod stress_tests {
         );
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     #[cfg_attr(not(feature = "stress_tests"), ignore)]
     async fn test_memory_stability_under_load() {
@@ -303,6 +306,7 @@ mod stress_tests {
         );
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     #[cfg_attr(not(feature = "stress_tests"), ignore)]
     async fn test_backpressure_handling() {
@@ -391,6 +395,7 @@ mod stress_tests {
         assert!(final_received > 0, "Should have processed some events");
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     #[cfg_attr(not(feature = "stress_tests"), ignore)]
     async fn test_stream_processing_performance() {
@@ -467,6 +472,7 @@ mod stress_tests {
 }
 
 // Integration test for the complete enhanced EventBus
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_enhanced_eventbus_integration() {
     // Create EventBus with persistence

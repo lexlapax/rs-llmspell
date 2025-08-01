@@ -301,6 +301,7 @@ impl SessionEventBuilder {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_session_event_creation() {
         let session_id = SessionId::new();
@@ -319,6 +320,7 @@ mod tests {
         assert!(event.correlation_context.parent_id.is_none());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_correlated_events() {
         let session_id = SessionId::new();
@@ -342,6 +344,7 @@ mod tests {
         );
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_event_linking() {
         let session_id = SessionId::new();
@@ -361,6 +364,7 @@ mod tests {
         );
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_event_builder() {
         let session_id = SessionId::new();
@@ -388,6 +392,7 @@ mod tests {
         );
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_event_type_strings() {
         assert_eq!(SessionEventType::Created.to_event_type(), "session.created");

@@ -393,6 +393,7 @@ impl AtomicBackupBuilder {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_atomic_backup_builder() {
         let builder = AtomicBackup::builder("test_backup".to_string())
@@ -406,6 +407,7 @@ mod tests {
         assert!(builder.exclude_patterns.is_some());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_backup_operation_status() {
         let operation = BackupOperation {
@@ -422,6 +424,7 @@ mod tests {
         assert!(operation.completed_at.is_none());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_snapshot_metadata_serialization() {
         let metadata = SnapshotMetadata {

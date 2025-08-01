@@ -831,6 +831,7 @@ impl TestDoubles {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_mock_agent_basic() {
         let agent = MockAgentBuilder::new("test")
@@ -847,6 +848,7 @@ mod tests {
         assert_eq!(agent.execution_count(), 1);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_mock_agent_failure() {
         let agent = MockAgentBuilder::new("test")
@@ -859,6 +861,7 @@ mod tests {
         assert!(result.is_err());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_mock_tool() {
         let tool = MockTool::new("test_tool");
@@ -876,6 +879,7 @@ mod tests {
         assert_eq!(tool.execution_count(), 1);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_test_doubles() {
         let echo = TestDoubles::echo_agent("echo");

@@ -446,6 +446,7 @@ impl Default for EventGlobal {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_event_global_metadata() {
         let global = EventGlobal::new();

@@ -438,6 +438,7 @@ mod tests {
     use super::*;
     use crate::types::{ComponentId, ComponentType, HookPoint};
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_remote_agent_id() {
         let agent = RemoteAgentId::new("node-1", "agent-1")
@@ -452,6 +453,7 @@ mod tests {
         );
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_propagation_flags() {
         let mut flags = PropagationFlags::default()
@@ -472,6 +474,7 @@ mod tests {
         assert!(!flags.can_propagate());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_security_context() {
         let agent1 = RemoteAgentId::new("trusted-node", "trusted-agent");
@@ -491,6 +494,7 @@ mod tests {
         assert!(security.is_timestamp_valid(Duration::from_secs(300)));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_distributed_context_creation() {
         let base_context = HookContext::new(
@@ -515,6 +519,7 @@ mod tests {
         );
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_remote_results() {
         let base_context = HookContext::new(
@@ -550,6 +555,7 @@ mod tests {
         assert!(!distributed.all_remote_succeeded());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_propagation() {
         let base_context = HookContext::new(
@@ -576,6 +582,7 @@ mod tests {
         assert!(!propagated2.should_propagate()); // Max hops reached
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_context_builder() {
         let base_context = HookContext::new(
@@ -603,6 +610,7 @@ mod tests {
         assert!(distributed.security_context.auth_token.is_some());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_serialization() {
         let base_context = HookContext::new(

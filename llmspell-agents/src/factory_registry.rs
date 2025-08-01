@@ -207,6 +207,7 @@ mod tests {
         Arc::new(llmspell_providers::ProviderManager::new())
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_factory_registry() {
         let registry = FactoryRegistry::new();
@@ -248,6 +249,7 @@ mod tests {
         assert!(result.is_err());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_global_registry() {
         let registry = global_registry();
@@ -255,6 +257,7 @@ mod tests {
         let _ = registry;
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_custom_factory() {
         let provider_manager = create_test_provider_manager();
@@ -272,6 +275,7 @@ mod tests {
         assert!(!templates.is_empty());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_custom_factory_customization() {
         let provider_manager = create_test_provider_manager();
@@ -288,6 +292,7 @@ mod tests {
         assert_eq!(agent.metadata().name, "basic-agent");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_registry_default_factory() {
         let registry = FactoryRegistry::new();
@@ -323,6 +328,7 @@ mod tests {
         assert_eq!(agent.metadata().name, "test");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_registry_specific_factory() {
         let registry = FactoryRegistry::new();

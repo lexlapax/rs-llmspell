@@ -40,6 +40,7 @@ async fn evaluate_expression(
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_complex_arithmetic() {
     // Test order of operations
@@ -59,6 +60,7 @@ async fn test_complex_arithmetic() {
     assert_eq!(result["result"], 17.0); // 8 + 9 = 17
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_variable_substitution() {
     // Basic variable substitution
@@ -91,6 +93,7 @@ async fn test_variable_substitution() {
     assert!((result["result"].as_f64().unwrap() - 78.53975).abs() < 0.0001);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_comparison_operations() {
     // Test comparison operations - fasteval returns 1.0 for true, 0.0 for false
@@ -109,6 +112,7 @@ async fn test_comparison_operations() {
     assert_eq!(result["result"], 1.0); // Both comparisons are true, so 1.0 * 1.0 = 1.0
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_logical_operations() {
     // Fasteval uses && and || for logical operations with numeric values
@@ -133,6 +137,7 @@ async fn test_logical_operations() {
 
 // String operations are not supported by fasteval - removed test
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_edge_cases() {
     // Test very large numbers
@@ -152,6 +157,7 @@ async fn test_edge_cases() {
     assert_eq!(result["result"], -2.0); // fasteval returns floats
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_validation_operation() {
     let tool = CalculatorTool::new();
@@ -191,6 +197,7 @@ async fn test_validation_operation() {
     assert!(output["result"].get("error").is_some());
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_error_handling() {
     // Division by zero returns Infinity
@@ -213,6 +220,7 @@ async fn test_error_handling() {
     assert!(result.is_ok());
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_functions_list() {
     let tool = CalculatorTool::new();
@@ -249,6 +257,7 @@ async fn test_functions_list() {
     assert!(arithmetic.contains(&json!("^")));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_tool_characteristics() {
     let tool = CalculatorTool::new();
@@ -276,6 +285,7 @@ async fn test_tool_characteristics() {
     assert!(limits.max_cpu_time_ms.is_some());
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_mixed_type_variables() {
     // Test with mixed numeric types

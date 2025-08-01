@@ -244,6 +244,7 @@ mod tests {
     use llmspell_core::ComponentId;
     use std::time::Duration;
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_fail_fast_strategy() {
         let handler = ErrorHandler::new(ErrorStrategy::FailFast);
@@ -263,6 +264,7 @@ mod tests {
         assert_eq!(action, ErrorAction::StopWorkflow);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_continue_strategy() {
         let handler = ErrorHandler::new(ErrorStrategy::Continue);
@@ -282,6 +284,7 @@ mod tests {
         assert_eq!(action, ErrorAction::ContinueToNext);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_retry_strategy() {
         let handler = ErrorHandler::new(ErrorStrategy::Retry {
@@ -320,6 +323,7 @@ mod tests {
         assert_eq!(action, ErrorAction::StopWorkflow);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_retry_delay_calculation() {
         let handler = ErrorHandler::new(ErrorStrategy::FailFast);
@@ -342,6 +346,7 @@ mod tests {
         assert_eq!(delay_fixed, Duration::from_millis(1000));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_workflow_error_analysis() {
         let handler = ErrorHandler::new(ErrorStrategy::FailFast);

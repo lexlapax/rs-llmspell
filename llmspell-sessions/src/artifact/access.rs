@@ -537,6 +537,7 @@ mod tests {
         ArtifactId::new("test_hash".to_string(), create_test_session_id(), 1)
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_permission_allows() {
         let entry = AccessControlEntry::new(create_test_session_id(), Permission::Write, None);
@@ -546,6 +547,7 @@ mod tests {
         assert!(!entry.allows(Permission::Admin));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_acl_owner_permissions() {
         let owner = create_test_session_id();
@@ -559,6 +561,7 @@ mod tests {
         assert!(!acl.has_permission(&other, Permission::Read));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_acl_grant_revoke() {
         let owner = create_test_session_id();
@@ -575,6 +578,7 @@ mod tests {
         assert!(!acl.has_permission(&user, Permission::Read));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_access_control_manager() {
         let config = AccessControlConfig::default();
@@ -621,6 +625,7 @@ mod tests {
             .unwrap());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_audit_logging() {
         let config = AccessControlConfig::default();

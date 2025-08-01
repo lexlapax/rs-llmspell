@@ -619,6 +619,7 @@ impl BaseAgent for HttpRequestTool {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_hook_integration_metadata() {
         let tool = HttpRequestTool::new(HttpRequestConfig::default()).unwrap();
@@ -641,6 +642,7 @@ mod tests {
         assert!(metadata["authentication_types"].is_array());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_http_request_hook_integration() {
         use crate::lifecycle::{ToolExecutor, ToolLifecycleConfig};
@@ -664,6 +666,7 @@ mod tests {
         assert!(result.is_ok() || result.is_err());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_hookable_tool_execution_trait_http() {
         use crate::lifecycle::{HookableToolExecution, ToolExecutor, ToolLifecycleConfig};

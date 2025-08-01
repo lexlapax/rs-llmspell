@@ -780,6 +780,7 @@ impl BaseAgent for MockMonitorAgent {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_monitor_agent_template_creation() {
         let template = MonitorAgentTemplate::new();
@@ -793,6 +794,7 @@ mod tests {
         assert_eq!(required_params[0].name, "agent_name");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_system_monitor() {
         let template = MonitorAgentTemplate::system_monitor();
@@ -813,6 +815,7 @@ mod tests {
         assert_eq!(system_mode, Some(&true.into()));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_application_monitor() {
         let template = MonitorAgentTemplate::application_monitor();
@@ -836,6 +839,7 @@ mod tests {
         assert_eq!(app_mode, Some(&true.into()));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_lightweight_monitor() {
         let template = MonitorAgentTemplate::lightweight();
@@ -847,6 +851,7 @@ mod tests {
         assert_eq!(template.complexity(), &ComplexityLevel::Basic);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_monitoring_scopes() {
         assert_eq!(MonitoringScope::System.name(), "system");
@@ -854,6 +859,7 @@ mod tests {
         assert_eq!(MonitoringScope::Custom("test".to_string()).name(), "test");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_alert_severities() {
         assert_eq!(AlertSeverity::Info.name(), "info");
@@ -862,6 +868,7 @@ mod tests {
         assert_eq!(AlertSeverity::Critical.name(), "critical");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_parameter_validation() {
         let template = MonitorAgentTemplate::new();
@@ -882,6 +889,7 @@ mod tests {
         assert!(result.is_ok());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_threshold_constraints() {
         let template = MonitorAgentTemplate::new();
@@ -903,6 +911,7 @@ mod tests {
         assert!(result.is_err());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_required_tools() {
         let template = MonitorAgentTemplate::new();
@@ -917,6 +926,7 @@ mod tests {
         assert!(optional_tools.contains(&"log_analyzer".to_string()));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_capability_support() {
         let template = MonitorAgentTemplate::new();

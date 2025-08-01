@@ -8,6 +8,7 @@ use llmspell_core::BaseAgent;
 use llmspell_tools::SitemapCrawlerTool;
 use serde_json::json;
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_sitemap_crawler_xml() {
     let tool = SitemapCrawlerTool::new();
@@ -39,6 +40,7 @@ async fn test_sitemap_crawler_xml() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_sitemap_crawler_robots_txt() {
     let tool = SitemapCrawlerTool::new();
@@ -65,6 +67,7 @@ async fn test_sitemap_crawler_robots_txt() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_sitemap_crawler_with_filters() {
     let tool = SitemapCrawlerTool::new();
@@ -94,6 +97,7 @@ async fn test_sitemap_crawler_with_filters() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_sitemap_crawler_depth_limit() {
     let tool = SitemapCrawlerTool::new();
@@ -118,6 +122,7 @@ async fn test_sitemap_crawler_depth_limit() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_sitemap_crawler_invalid_url() {
     let tool = SitemapCrawlerTool::new();
@@ -134,6 +139,7 @@ async fn test_sitemap_crawler_invalid_url() {
     assert!(error.to_string().contains("URL") || error.to_string().contains("url"));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_sitemap_crawler_non_sitemap_url() {
     let tool = SitemapCrawlerTool::new();
@@ -158,6 +164,7 @@ async fn test_sitemap_crawler_non_sitemap_url() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_sitemap_crawler_timeout() {
     let tool = SitemapCrawlerTool::new();

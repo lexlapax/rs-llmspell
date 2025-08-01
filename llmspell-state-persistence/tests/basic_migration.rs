@@ -11,6 +11,7 @@ use serde_json::json;
 use std::sync::Arc;
 use std::time::SystemTime;
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_basic_migration_with_defaults() {
     // Create test data
@@ -66,6 +67,7 @@ async fn test_basic_migration_with_defaults() {
     assert!(state.value.get("age").is_none());
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_copy_and_remove_migration() {
     let mut state = SerializableState {
@@ -115,6 +117,7 @@ async fn test_copy_and_remove_migration() {
     assert!(state.value.get("deprecated_field").is_none());
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_state_persistence_with_migration() {
     // Create state manager

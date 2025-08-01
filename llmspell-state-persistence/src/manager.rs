@@ -1717,6 +1717,7 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_state_manager_basic_operations() {
         let manager = StateManager::new().await.unwrap();
@@ -1741,6 +1742,7 @@ mod tests {
         assert_eq!(value, None);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_state_scoping() {
         let manager = StateManager::new().await.unwrap();
@@ -1784,6 +1786,7 @@ mod tests {
         assert_eq!(agent2, Some(json!("agent2")));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_key_validation() {
         let manager = StateManager::new().await.unwrap();
@@ -1805,6 +1808,7 @@ mod tests {
         assert!(result.is_ok());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_agent_state_persistence() {
         use crate::agent_state::{MessageRole, PersistentAgentState};
@@ -1845,6 +1849,7 @@ mod tests {
         assert!(loaded_after_delete.is_none());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_agent_metadata_retrieval() {
         use crate::agent_state::PersistentAgentState;

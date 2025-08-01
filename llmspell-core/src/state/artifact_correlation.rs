@@ -334,6 +334,7 @@ impl Default for ArtifactCorrelationManager {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_artifact_id() {
         let id1 = ArtifactId::new("test-artifact");
@@ -343,6 +344,7 @@ mod tests {
         assert!(!id2.0.is_empty());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_artifact_metadata() {
         let mut metadata = ArtifactMetadata::new(
@@ -362,6 +364,7 @@ mod tests {
         assert_eq!(metadata.metadata.get("language").unwrap(), "rust");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_correlation_manager() {
         let manager = ArtifactCorrelationManager::new();
@@ -386,6 +389,7 @@ mod tests {
         assert_eq!(artifacts[0], artifact_id);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_artifact_lineage() {
         let manager = ArtifactCorrelationManager::new();

@@ -254,6 +254,7 @@ mod tests {
     use super::*;
     use llmspell_hooks::{types::ComponentId, HookPoint};
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_timeout_policy_creation() {
         let config = TimeoutConfig::default();
@@ -266,6 +267,7 @@ mod tests {
         )));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_activity_time_update() {
         let config = TimeoutConfig::default();
@@ -281,6 +283,7 @@ mod tests {
         assert!(context.data.contains_key("last_activity_time"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_max_duration_check() {
         let config = TimeoutConfig {
@@ -306,6 +309,7 @@ mod tests {
         assert!(context.data.contains_key("timeout_reason"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_idle_timeout_check() {
         let config = TimeoutConfig {

@@ -261,6 +261,7 @@ pub fn unregister_engine_plugin(name: &str) -> bool {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_lua_config_default() {
         let config = LuaConfig::default();
@@ -269,6 +270,7 @@ mod tests {
         assert!(config.package_paths.is_empty());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_js_config_default() {
         let config = JSConfig::default();
@@ -277,6 +279,7 @@ mod tests {
         assert!(config.enable_console);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_engine_factory_unknown_engine() {
         let result = EngineFactory::create_from_name("unknown", &Value::Null);

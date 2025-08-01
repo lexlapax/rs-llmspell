@@ -165,6 +165,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_persistent_storage() {
         let temp_dir = TempDir::new().unwrap();
@@ -201,6 +202,7 @@ mod tests {
         assert_eq!(storage.get("test_key").unwrap(), None);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_encryption_decryption() {
         let temp_dir = TempDir::new().unwrap();

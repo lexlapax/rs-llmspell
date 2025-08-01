@@ -494,6 +494,7 @@ pub enum Severity {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_html_sanitization() {
         let sanitizer = InputSanitizer::new();
@@ -515,6 +516,7 @@ mod tests {
         assert!(!js_sanitized.contains("javascript:"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_sql_sanitization() {
         let sanitizer = InputSanitizer::new();
@@ -536,6 +538,7 @@ mod tests {
         assert!(!union_sanitized.contains("SELECT"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_command_sanitization() {
         let sanitizer = InputSanitizer::new();
@@ -556,6 +559,7 @@ mod tests {
         assert!(meta_sanitized.contains("\\;"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_format_string_sanitization() {
         let sanitizer = InputSanitizer::new();
@@ -573,6 +577,7 @@ mod tests {
         assert!(safe_fmt_sanitized.contains("%.2f"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_xml_sanitization() {
         let sanitizer = InputSanitizer::new();
@@ -589,6 +594,7 @@ mod tests {
         assert!(!entity_sanitized.contains("ENTITY"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_path_sanitization() {
         let sanitizer = InputSanitizer::new();
@@ -606,6 +612,7 @@ mod tests {
         assert!(sanitizer.sanitize_path("subdir/file.txt").is_ok());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_validation_report() {
         let sanitizer = InputSanitizer::new();
@@ -625,6 +632,7 @@ mod tests {
             .any(|i| i.issue_type == IssueType::SqlInjection));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_config_modes() {
         // Test strict mode
@@ -637,6 +645,7 @@ mod tests {
         assert!(relaxed.sanitize(&long_input).is_ok());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_blocked_patterns() {
         let config = SanitizationConfig {

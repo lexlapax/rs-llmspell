@@ -699,6 +699,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_collect_all_stats() {
         let tool = create_test_tool();
@@ -719,6 +720,7 @@ mod tests {
         assert!(result.text.contains("Memory"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_collect_cpu_stats() {
         let tool = create_test_tool();
@@ -738,6 +740,7 @@ mod tests {
         assert!(result.text.contains("cores"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_collect_memory_stats() {
         let tool = create_test_tool();
@@ -757,6 +760,7 @@ mod tests {
         assert!(result.text.contains("%"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_collect_disk_stats() {
         let tool = create_test_tool();
@@ -776,6 +780,7 @@ mod tests {
         assert!(result.text.contains("mount"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_invalid_operation() {
         let tool = create_test_tool();
@@ -795,6 +800,7 @@ mod tests {
             .contains("Invalid operation"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_default_operation() {
         let tool = create_test_tool();
@@ -809,6 +815,7 @@ mod tests {
         assert!(result.text.contains("System stats"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_basic_system_info() {
         let tool = create_test_tool();
@@ -819,6 +826,7 @@ mod tests {
         assert!(stats.memory_usage_percent <= 100.0);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_cpu_usage_measurement() {
         let tool = create_test_tool();
@@ -828,6 +836,7 @@ mod tests {
         assert!(cpu_usage <= 100.0);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_disk_usage_collection() {
         let tool = create_test_tool();
@@ -843,6 +852,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_process_count() {
         let tool = create_test_tool();
@@ -854,6 +864,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_metadata() {
         let tool = create_test_tool();
@@ -875,6 +886,7 @@ mod tests {
         assert_eq!(required_params.len(), 0); // All parameters are optional
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_custom_config() {
         let tool = create_test_tool_with_custom_config();
@@ -885,6 +897,7 @@ mod tests {
         assert!(!tool.config.include_disk_details);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_selective_collection() {
         let config = SystemMonitorConfig {
@@ -911,6 +924,7 @@ mod tests {
     }
 
     #[cfg(unix)]
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_load_average() {
         let tool = create_test_tool();
@@ -923,6 +937,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_uptime() {
         let tool = create_test_tool();

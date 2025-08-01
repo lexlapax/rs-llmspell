@@ -253,6 +253,7 @@ mod tests {
         (session_manager, session_id)
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_update_metadata() {
         let (session_manager, session_id) = setup_test_env().await;
@@ -297,6 +298,7 @@ mod tests {
         );
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tag_operations() {
         let (session_manager, session_id) = setup_test_env().await;
@@ -344,6 +346,7 @@ mod tests {
             .expect("Failed to check tag"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_get_session_stats() {
         let (session_manager, session_id) = setup_test_env().await;
@@ -376,6 +379,7 @@ mod tests {
         assert_eq!(stats.status, "Active");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_export_session() {
         let (session_manager, session_id) = setup_test_env().await;
@@ -413,6 +417,7 @@ mod tests {
         assert_eq!(export.artifacts.as_ref().unwrap().len(), 1);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_update_metadata_edge_cases() {
         let (session_manager, session_id) = setup_test_env().await;
@@ -439,6 +444,7 @@ mod tests {
         assert_eq!(tags, vec!["valid-tag"]); // Only string values kept
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_concurrent_tag_operations() {
         let (session_manager, session_id) = setup_test_env().await;
@@ -473,6 +479,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_nonexistent_session() {
         let (session_manager, _) = setup_test_env().await;

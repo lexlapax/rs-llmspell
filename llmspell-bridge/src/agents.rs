@@ -175,6 +175,7 @@ mod tests {
         Arc::new(llmspell_providers::ProviderManager::new())
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_agent_discovery() {
         let provider_manager = create_test_provider_manager().await;
@@ -189,6 +190,7 @@ mod tests {
         assert!(!templates.is_empty());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_agent_caching() {
         let provider_manager = create_test_provider_manager().await;

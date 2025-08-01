@@ -194,6 +194,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_dependency_resolution() {
         let mut builder = GlobalRegistryBuilder::new();
@@ -218,6 +219,7 @@ mod tests {
         assert_eq!(registry.injection_order, vec!["C", "B", "A"]);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_circular_dependency_detection() {
         let mut builder = GlobalRegistryBuilder::new();

@@ -7,6 +7,7 @@ use serde_json::{json, Value};
 use std::fs;
 use tempfile::TempDir;
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_standard_base64_roundtrip() {
     let tool = Base64EncoderTool::new();
@@ -58,6 +59,7 @@ async fn test_standard_base64_roundtrip() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_url_safe_base64() {
     let tool = Base64EncoderTool::new();
@@ -109,6 +111,7 @@ async fn test_url_safe_base64() {
     assert_eq!(decoded, test_data);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_binary_data_handling() {
     let tool = Base64EncoderTool::new();
@@ -178,6 +181,7 @@ async fn test_binary_data_handling() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_file_operations() {
     let tool = Base64EncoderTool::new();
@@ -234,6 +238,7 @@ async fn test_file_operations() {
     assert_eq!(decoded_content, test_content);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_large_file_handling() {
     let tool = Base64EncoderTool::new();
@@ -266,6 +271,7 @@ async fn test_large_file_handling() {
     assert!(output["success"].as_bool().unwrap());
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_error_handling() {
     let tool = Base64EncoderTool::new();
@@ -315,6 +321,7 @@ async fn test_error_handling() {
     assert!(result.is_err());
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_mixed_variants() {
     let tool = Base64EncoderTool::new();
@@ -389,6 +396,7 @@ async fn test_mixed_variants() {
     assert_eq!(decoded, test_text);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_tool_metadata() {
     use llmspell_core::traits::tool::{SecurityLevel, Tool, ToolCategory};

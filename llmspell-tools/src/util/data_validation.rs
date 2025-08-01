@@ -686,6 +686,7 @@ impl Tool for DataValidationTool {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_required_validation() {
         let tool = DataValidationTool::new();
@@ -713,6 +714,7 @@ mod tests {
         assert_eq!(validation_result.errors.len(), 1);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_type_validation() {
         let tool = DataValidationTool::new();
@@ -742,6 +744,7 @@ mod tests {
             .contains("Expected type 'number'"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_length_validation() {
         let tool = DataValidationTool::new();
@@ -769,6 +772,7 @@ mod tests {
         assert!(validation_result.errors[0].message.contains("at least 3"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_email_validation() {
         let tool = DataValidationTool::new();
@@ -818,6 +822,7 @@ mod tests {
         assert!(!validation_result.valid);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_custom_validator() {
         let tool = DataValidationTool::new();
@@ -844,6 +849,7 @@ mod tests {
         assert!(validation_result.valid);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_complex_object_validation() {
         let tool = DataValidationTool::new();

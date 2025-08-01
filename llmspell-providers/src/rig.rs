@@ -285,6 +285,7 @@ pub fn create_rig_provider(
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_rig_provider_capabilities() {
         let config = ProviderConfig::new("openai", "gpt-4");
@@ -298,6 +299,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_unsupported_provider() {
         let config = ProviderConfig::new("unsupported", "model");
@@ -310,6 +312,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_provider_capabilities_settings() {
         let mut config = ProviderConfig::new("openai", "gpt-4");
@@ -326,6 +329,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_anthropic_capabilities() {
         let mut config = ProviderConfig::new("anthropic", "claude-3-opus");
@@ -338,6 +342,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_cohere_capabilities() {
         let mut config = ProviderConfig::new("cohere", "command");

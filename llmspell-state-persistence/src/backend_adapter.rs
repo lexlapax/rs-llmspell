@@ -171,6 +171,7 @@ mod tests {
         count: u32,
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_state_storage_adapter() {
         let backend = create_storage_backend(&StorageBackendType::Memory)

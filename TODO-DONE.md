@@ -1,7 +1,7 @@
 ** in context document is `/TODO.md` this is to keep done items so that the document is short for llm reading purposes.
 ### Set 1: API Consistency and Naming Conventions (Day 1-3)
 
-#### Task 1.1: API Inventory and Analysis
+#### Task 7.1.1: API Inventory and Analysis
 **Priority**: CRITICAL
 **Estimated Time**: 4 hours
 **Status**: COMPLETED ✅
@@ -47,7 +47,7 @@
 
 ---
 
-#### Task 1.2: API Standardization Plan
+#### Task 7.1.2: API Standardization Plan
 **Priority**: HIGH
 **Estimated Time**: 3 hours
 **Status**: COMPLETED ✅
@@ -103,7 +103,7 @@
 
 ---
 
-#### Task 1.3: Implement Manager/Service Standardization
+#### Task 7.1.3: Implement Manager/Service Standardization
 **Priority**: HIGH
 **Estimated Time**: 4 hours
 **Status**: COMPLETED ✅
@@ -147,7 +147,7 @@
 
 ---
 
-#### Task 1.4: Implement Retrieve/Get Standardization
+#### Task 7.1.4: Implement Retrieve/Get Standardization
 **Priority**: MEDIUM
 **Estimated Time**: 3 hours
 **Status**: COMPLETED ✅
@@ -189,7 +189,7 @@
 
 ---
 
-#### Task 1.5: Implement Builder Patterns
+#### Task 7.1.5: Implement Builder Patterns
 **Priority**: MEDIUM
 **Estimated Time**: 6 hours
 **Status**: COMPLETED ✅

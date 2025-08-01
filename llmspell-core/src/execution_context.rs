@@ -391,6 +391,7 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_context_creation() {
         let ctx = ExecutionContext::with_conversation("conv-123".to_string());
@@ -399,6 +400,7 @@ mod tests {
         assert_eq!(ctx.scope, ContextScope::Global);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_context_hierarchy() {
         let root = ExecutionContext::new().with_data("root_data".to_string(), json!("root_value"));
@@ -415,6 +417,7 @@ mod tests {
         // HierarchicalContext should handle inheritance
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_inheritance_policies() {
         let parent = ExecutionContext::new()
@@ -448,6 +451,7 @@ mod tests {
         assert_eq!(copy_child.get("parent_key"), None);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_shared_memory() {
         let ctx = ExecutionContext::new()
@@ -475,6 +479,7 @@ mod tests {
         assert_eq!(value2, None);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_context_builder() {
         let ctx = ExecutionContextBuilder::new()
@@ -491,6 +496,7 @@ mod tests {
         assert_eq!(ctx.get("preference"), Some(json!("dark_mode")));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_capability_checking() {
         let mut ctx = ExecutionContext::new();
@@ -504,6 +510,7 @@ mod tests {
         assert!(!ctx.has_capability("delete"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_context_merging() {
         let mut ctx1 = ExecutionContext::new().with_data("key1".to_string(), json!("value1"));
@@ -519,6 +526,7 @@ mod tests {
         assert_eq!(ctx1.get("key3"), Some(json!("value3")));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_scope_display() {
         assert_eq!(ContextScope::Global.to_string(), "global");

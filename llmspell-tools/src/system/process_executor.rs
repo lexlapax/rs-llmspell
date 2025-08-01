@@ -751,6 +751,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_execute_simple_command() {
         let tool = create_test_tool();
@@ -770,6 +771,7 @@ mod tests {
         assert!(result.text.contains("executed successfully"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_execute_blocked_command() {
         let tool = create_test_tool();
@@ -787,6 +789,7 @@ mod tests {
         assert!(result.unwrap_err().to_string().contains("not permitted"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_execute_nonexistent_command() {
         let tool = create_test_tool();
@@ -804,6 +807,7 @@ mod tests {
         assert!(result.unwrap_err().to_string().contains("not found"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_execute_with_working_directory() {
         let tool = create_test_tool();
@@ -824,6 +828,7 @@ mod tests {
         assert!(result.text.contains("executed successfully"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_execute_with_environment_vars() {
         let tool = create_test_tool();
@@ -848,6 +853,7 @@ mod tests {
         assert!(result.text.contains("executed successfully"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_executable_validation() {
         let tool = create_test_tool();
@@ -885,6 +891,7 @@ mod tests {
             .contains("dangerous characters"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_missing_parameters() {
         let tool = create_test_tool();
@@ -916,6 +923,7 @@ mod tests {
         assert!(result2.unwrap_err().to_string().contains("cannot be empty"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_working_directory_validation() {
         let tool = create_test_tool();
@@ -934,6 +942,7 @@ mod tests {
         assert!(result.unwrap_err().to_string().contains("does not exist"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_executable_allowed_check() {
         let tool = create_test_tool();
@@ -950,6 +959,7 @@ mod tests {
         assert!(!tool.is_executable_allowed("unknown_command").unwrap());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_metadata() {
         let tool = create_test_tool();
@@ -969,6 +979,7 @@ mod tests {
         assert_eq!(required_params.len(), 1);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_custom_config() {
         let tool = create_test_tool_with_custom_config();
@@ -978,6 +989,7 @@ mod tests {
         assert_eq!(tool.config.max_output_size, 1024);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_resolve_executable() {
         let tool = create_test_tool();
@@ -991,6 +1003,7 @@ mod tests {
         assert!(result.is_err());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_arbitrary_commands_disabled() {
         let config = ProcessExecutorConfig {
@@ -1003,6 +1016,7 @@ mod tests {
         assert!(!tool.is_executable_allowed("arbitrary_command").unwrap());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_arbitrary_commands_enabled() {
         let config = ProcessExecutorConfig {
@@ -1018,6 +1032,7 @@ mod tests {
         assert!(!tool.is_executable_allowed("rm").unwrap());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_hook_integration_metadata() {
         let tool = create_test_tool();
@@ -1041,6 +1056,7 @@ mod tests {
         assert_eq!(metadata["resource_limits"]["security_critical"], true);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_process_executor_hook_integration() {
         use crate::lifecycle::{ToolExecutor, ToolLifecycleConfig};
@@ -1059,6 +1075,7 @@ mod tests {
         assert!(result.is_ok() || result.is_err());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_hookable_tool_execution_trait_process() {
         use crate::lifecycle::{HookableToolExecution, ToolExecutor, ToolLifecycleConfig};

@@ -8,6 +8,7 @@ mod tests {
     // Placeholder for agent unit tests
     // These will be populated from existing unit tests in llmspell-agents/src/
 
+    #[cfg_attr(test_category = "integration")]
     #[test]
     fn test_placeholder() {
         assert!(true);

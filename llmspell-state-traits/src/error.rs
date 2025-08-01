@@ -197,6 +197,7 @@ impl From<std::io::Error> for StateError {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_error_creation() {
         let err = StateError::not_found("global", "test_key");
@@ -211,6 +212,7 @@ mod tests {
         assert!(err.is_permanent());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_error_display() {
         let err = StateError::not_found("global", "test_key");
@@ -223,6 +225,7 @@ mod tests {
         assert_eq!(err.to_string(), "Serialization error: invalid data");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_error_conversion() {
         // Create a JSON parse error

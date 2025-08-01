@@ -20,6 +20,8 @@ fn create_test_metadata(service: &str) -> ApiKeyMetadata {
     }
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[test]
 fn test_api_key_manager_basic_operations() {
     let manager = ApiKeyManager::new();
@@ -49,6 +51,8 @@ fn test_api_key_manager_basic_operations() {
     assert_eq!(create_entry.action, ApiKeyAction::Create);
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[test]
 fn test_api_key_rotation() {
     let manager = ApiKeyManager::new();
@@ -79,6 +83,8 @@ fn test_api_key_rotation() {
     assert_eq!(rotation_entry.service, "rotation_service");
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[test]
 fn test_environment_variable_loading() {
     let mut manager = ApiKeyManager::new();
@@ -106,6 +112,8 @@ fn test_environment_variable_loading() {
     std::env::remove_var("LLMSPELL_API_KEY_ANTHROPIC");
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[test]
 fn test_configuration_file_loading() {
     let manager = ApiKeyManager::new();
@@ -131,6 +139,8 @@ fn test_configuration_file_loading() {
     );
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[test]
 fn test_persistent_storage_integration() {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
@@ -180,6 +190,8 @@ fn test_persistent_storage_integration() {
     }
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[test]
 fn test_key_expiration() {
     let manager = ApiKeyManager::new();
@@ -209,6 +221,8 @@ fn test_key_expiration() {
     assert!(metadata.expires_at.is_some());
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[test]
 fn test_audit_log_limits() {
     let manager = ApiKeyManager::new();
@@ -234,6 +248,8 @@ fn test_audit_log_limits() {
     assert!(full_log.len() >= 20);
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[test]
 fn test_key_usage_tracking() {
     let manager = ApiKeyManager::new();
@@ -258,6 +274,8 @@ fn test_key_usage_tracking() {
     assert!(metadata.last_used.is_some());
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[test]
 fn test_invalid_operations() {
     let manager = ApiKeyManager::new();

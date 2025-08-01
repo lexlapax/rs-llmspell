@@ -328,6 +328,7 @@ mod tests {
     use crate::traits::FnHook;
     use crate::types::{ComponentId, ComponentType, HookPoint};
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_simple_majority() {
         let hook = VotingHook::builder("test_majority")
@@ -345,6 +346,7 @@ mod tests {
         assert!(matches!(result, HookResult::Continue));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_unanimous_requirement() {
         let hook = VotingHook::builder("test_unanimous")
@@ -362,6 +364,7 @@ mod tests {
         assert!(matches!(result, HookResult::Continue));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_supermajority() {
         let hook = VotingHook::builder("test_supermajority")
@@ -380,6 +383,7 @@ mod tests {
         assert!(matches!(result, HookResult::Modified(_)));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_voting_aggregator() {
         let mut aggregator = VotingAggregator::new();
@@ -397,6 +401,7 @@ mod tests {
         assert_eq!(summary["Cancel"], 1);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_tie_breaker_strategies() {
         let mut aggregator = VotingAggregator::new();
@@ -420,6 +425,7 @@ mod tests {
         assert!(matches!(winner, HookResult::Continue));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_empty_voting() {
         let hook = VotingHook::new("empty_voting");

@@ -58,6 +58,7 @@ mod tests {
     use super::*;
     use crate::{ComponentRegistry, ProviderManager};
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_hook_global_metadata() {
         let context = Arc::new(GlobalContext::new(

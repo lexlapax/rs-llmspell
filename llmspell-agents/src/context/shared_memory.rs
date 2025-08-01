@@ -454,6 +454,7 @@ mod tests {
     use llmspell_core::ComponentId;
     use serde_json::json;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_memory_region_permissions() {
         let region = MemoryRegion::new("test".to_string(), ContextScope::Global);
@@ -473,6 +474,7 @@ mod tests {
         assert!(region.has_permission(&writer, MemoryPermission::Write));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_memory_region_operations() {
         let region = MemoryRegion::new("test".to_string(), ContextScope::Global);
@@ -498,6 +500,7 @@ mod tests {
         assert_eq!(value, None);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_memory_region_permission_denied() {
         let region = MemoryRegion::new("test".to_string(), ContextScope::Global);
@@ -511,6 +514,7 @@ mod tests {
         assert!(region.remove("key", &unauthorized).is_err());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_shared_memory_manager() {
         let manager = SharedMemoryManager::new();
@@ -535,6 +539,7 @@ mod tests {
         assert!(manager.get_region("region1").is_none());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_memory_change_notifications() {
         let region = MemoryRegion::new("test".to_string(), ContextScope::Global);

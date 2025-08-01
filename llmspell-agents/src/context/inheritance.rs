@@ -372,6 +372,7 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_default_inheritance_rules() {
         let rules = InheritanceRules::new();
@@ -384,6 +385,7 @@ mod tests {
             .contains("agent_private_state"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_field_inheritance() {
         let rules = InheritanceRules::new()
@@ -410,6 +412,7 @@ mod tests {
         assert_eq!(child.get("normal_field"), None);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_field_transforms() {
         let rules = InheritanceRules::new()
@@ -434,6 +437,7 @@ mod tests {
         assert_eq!(child.get("prefixed_field"), Some(json!("child_value")));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_conflict_resolution() {
         // Test ChildWins
@@ -471,6 +475,7 @@ mod tests {
         assert_eq!(merged["b"], 2);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_security_validator() {
         let mut rules = InheritanceRules::new();

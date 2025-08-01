@@ -12,6 +12,7 @@ use llmspell_tools::{
 };
 use serde_json::{json, Value};
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_simple_required_validation() {
     let tool = DataValidationTool::new();
@@ -64,6 +65,7 @@ async fn test_simple_required_validation() {
     assert_eq!(validation_result.errors.len(), 0);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_multiple_validation_rules() {
     let tool = DataValidationTool::new();
@@ -95,6 +97,7 @@ async fn test_multiple_validation_rules() {
     assert!(validation_result.errors[0].message.contains("at least 3"));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_numeric_range_validation() {
     let tool = DataValidationTool::new();
@@ -146,6 +149,7 @@ async fn test_numeric_range_validation() {
     assert!(validation_result.errors[0].message.contains("at most 65"));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_enum_validation() {
     let tool = DataValidationTool::new();
@@ -197,6 +201,7 @@ async fn test_enum_validation() {
         .contains("must be one of"));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_email_and_url_validation() {
     let tool = DataValidationTool::new();
@@ -246,6 +251,7 @@ async fn test_email_and_url_validation() {
     assert!(validation_result.valid);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_date_validation() {
     let tool = DataValidationTool::new();
@@ -294,6 +300,7 @@ async fn test_date_validation() {
     assert!(!validation_result.valid);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_array_validation() {
     let tool = DataValidationTool::new();
@@ -357,6 +364,7 @@ async fn test_array_validation() {
     assert!(validation_result.errors[0].message.contains("unique"));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_nested_object_validation() {
     let tool = DataValidationTool::new();
@@ -451,6 +459,7 @@ async fn test_nested_object_validation() {
     assert!(validation_result.valid);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_custom_validators() {
     let tool = DataValidationTool::new();
@@ -522,6 +531,7 @@ async fn test_custom_validators() {
     assert!(validation_result.valid);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_fail_fast_configuration() {
     let config = DataValidationConfig {
@@ -555,6 +565,7 @@ async fn test_fail_fast_configuration() {
     assert_eq!(validation_result.errors.len(), 1); // Only first error due to fail_fast
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_tool_metadata() {
     let tool = DataValidationTool::new();
@@ -572,6 +583,7 @@ async fn test_tool_metadata() {
     assert!(rules_param.required);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_validation_error_details() {
     let tool = DataValidationTool::new();

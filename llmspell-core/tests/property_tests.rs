@@ -92,6 +92,7 @@ prop_compose! {
 }
 
 proptest! {
+    #[cfg_attr(test_category = "integration")]
     #[test]
     fn test_component_id_deterministic(name in arb_component_name()) {
         // Property: Same name always produces same ComponentId
@@ -100,6 +101,7 @@ proptest! {
         prop_assert_eq!(id1, id2);
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[test]
     fn test_component_id_different_names(
         name1 in arb_component_name(),
@@ -112,6 +114,7 @@ proptest! {
         prop_assert_ne!(id1, id2);
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[test]
     fn test_component_id_serialization_roundtrip(name in arb_component_name()) {
         // Property: ComponentId survives serialization/deserialization
@@ -121,6 +124,7 @@ proptest! {
         prop_assert_eq!(id, deserialized);
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[test]
     fn test_version_ordering_properties(v1 in arb_version(), v2 in arb_version()) {
         // Property: Version ordering is transitive
@@ -133,6 +137,7 @@ proptest! {
         }
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[test]
     fn test_version_compatibility_properties(v in arb_version()) {
         // Property: A version is always compatible with itself
@@ -147,6 +152,7 @@ proptest! {
         prop_assert!(!v.is_compatible_with(&v3));
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[test]
     fn test_version_serialization_roundtrip(v in arb_version()) {
         // Property: Version survives serialization/deserialization
@@ -158,6 +164,7 @@ proptest! {
         prop_assert_eq!(v.to_string(), deserialized.to_string());
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[test]
     fn test_agent_input_context_preservation(input in arb_agent_input()) {
         // Property: Parameter values are preserved
@@ -169,6 +176,7 @@ proptest! {
         prop_assert_eq!(input.parameters.get("non_existent_key_xyz"), None);
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[test]
     fn test_agent_input_serialization_roundtrip(input in arb_agent_input()) {
         // Property: AgentInput survives serialization/deserialization
@@ -178,6 +186,7 @@ proptest! {
         prop_assert_eq!(input.parameters, deserialized.parameters);
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[test]
     fn test_agent_output_metadata_preservation(
         content in prop::string::string_regex("[a-zA-Z0-9 ]{1,100}").unwrap(),
@@ -203,6 +212,7 @@ proptest! {
         }
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[test]
     fn test_conversation_message_properties(msg in arb_conversation_message()) {
         // Property: Message fields are preserved
@@ -217,6 +227,7 @@ proptest! {
         prop_assert!(diff.num_seconds() < 60); // Should be created within last minute
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[test]
     fn test_execution_context_environment_properties(
         session_id in prop::string::string_regex("[a-zA-Z0-9-]{1,50}").unwrap(),
@@ -247,6 +258,7 @@ proptest! {
         prop_assert_eq!(context.user_id, user_id);
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[test]
     fn test_retry_policy_properties(policy in arb_retry_policy()) {
         // Property: All fields are preserved
@@ -261,6 +273,7 @@ proptest! {
         prop_assert_eq!(policy.max_attempts, deserialized.max_attempts);
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[test]
     fn test_component_metadata_timestamp_ordering(
         name in arb_component_name(),
@@ -277,6 +290,7 @@ proptest! {
         prop_assert!(metadata_mut.updated_at > metadata.updated_at);
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[test]
     fn test_agent_config_optional_fields(
         max_conversation_length in prop::option::of(1usize..1000),
@@ -305,6 +319,7 @@ proptest! {
 
 // Additional complex property tests
 proptest! {
+    #[cfg_attr(test_category = "integration")]
     #[test]
     fn test_workflow_step_dependency_properties(
         name in arb_component_name(),
@@ -329,6 +344,7 @@ proptest! {
         }
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[test]
     fn test_error_severity_ordering_transitivity(
         errors in prop::collection::vec(
@@ -360,6 +376,7 @@ proptest! {
 mod regression_tests {
     use super::*;
 
+    #[cfg_attr(test_category = "integration")]
     #[test]
     fn test_empty_string_component_id() {
         // Regression test: empty strings should produce valid IDs
@@ -368,6 +385,7 @@ mod regression_tests {
         assert_eq!(id1, id2);
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[test]
     fn test_unicode_component_names() {
         // Regression test: unicode should work in component names
@@ -386,6 +404,7 @@ mod regression_tests {
         }
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[test]
     fn test_very_large_version_numbers() {
         // Regression test: large version numbers

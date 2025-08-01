@@ -6,6 +6,7 @@ use predicates::prelude::*;
 use std::fs;
 use tempfile::tempdir;
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_cli_help() {
     let mut cmd = Command::cargo_bin("llmspell").unwrap();
@@ -17,6 +18,7 @@ fn test_cli_help() {
         ));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_cli_version() {
     let mut cmd = Command::cargo_bin("llmspell").unwrap();
@@ -26,6 +28,7 @@ fn test_cli_version() {
         .stdout(predicate::str::contains("llmspell"));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_run_command_help() {
     let mut cmd = Command::cargo_bin("llmspell").unwrap();
@@ -36,6 +39,7 @@ fn test_run_command_help() {
         .stdout(predicate::str::contains("Execute a script file"));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_invalid_engine() {
     let mut cmd = Command::cargo_bin("llmspell").unwrap();
@@ -48,6 +52,7 @@ fn test_invalid_engine() {
         .stderr(predicate::str::contains("invalid value 'ruby'"));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_javascript_not_implemented() {
     let mut cmd = Command::cargo_bin("llmspell").unwrap();
@@ -62,6 +67,7 @@ fn test_javascript_not_implemented() {
         ));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_python_not_implemented() {
     let mut cmd = Command::cargo_bin("llmspell").unwrap();
@@ -76,6 +82,7 @@ fn test_python_not_implemented() {
         ));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_run_missing_file() {
     let mut cmd = Command::cargo_bin("llmspell").unwrap();
@@ -86,6 +93,7 @@ fn test_run_missing_file() {
         .stderr(predicate::str::contains("Script file not found"));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_run_simple_lua_script() {
     let dir = tempdir().unwrap();
@@ -100,6 +108,7 @@ fn test_run_simple_lua_script() {
         .stdout(predicate::str::contains("Hello from test!"));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_exec_inline_code() {
     let mut cmd = Command::cargo_bin("llmspell").unwrap();
@@ -110,6 +119,7 @@ fn test_exec_inline_code() {
         .stdout(predicate::str::contains("Inline execution works!"));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_output_format_json() {
     let mut cmd = Command::cargo_bin("llmspell").unwrap();
@@ -122,6 +132,7 @@ fn test_output_format_json() {
         .stdout(predicate::str::contains("\"result\": 42"));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_providers_command() {
     let mut cmd = Command::cargo_bin("llmspell").unwrap();
@@ -131,6 +142,7 @@ fn test_providers_command() {
         .stdout(predicate::str::contains("Available Providers"));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_info_command() {
     let mut cmd = Command::cargo_bin("llmspell").unwrap();
@@ -140,6 +152,7 @@ fn test_info_command() {
         .stdout(predicate::str::contains("lua - Available"));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_repl_not_implemented() {
     let mut cmd = Command::cargo_bin("llmspell").unwrap();
@@ -149,6 +162,7 @@ fn test_repl_not_implemented() {
         .stderr(predicate::str::contains("REPL mode not implemented"));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_validate_missing_config() {
     let mut cmd = Command::cargo_bin("llmspell").unwrap();

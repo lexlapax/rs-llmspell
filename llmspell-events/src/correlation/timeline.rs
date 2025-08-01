@@ -622,6 +622,7 @@ mod tests {
         event
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_timeline_entry_creation() {
         let event = create_test_event("test.event", Uuid::new_v4());
@@ -634,6 +635,7 @@ mod tests {
         assert!(entry.is_leaf_effect());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_timeline_building() {
         let tracker = EventCorrelationTracker::default();
@@ -656,6 +658,7 @@ mod tests {
         assert!(timeline.duration >= chrono::Duration::zero());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_causality_chain_creation() {
         let root_id = Uuid::new_v4();
@@ -673,6 +676,7 @@ mod tests {
         assert_eq!(chain.duration, chrono::Duration::seconds(1));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_timeline_queries() {
         let mut timeline = EventTimeline::new();

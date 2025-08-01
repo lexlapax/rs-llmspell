@@ -8,6 +8,7 @@ use serde_json::json;
 use std::time::Duration;
 
 /// Test basic parallel execution
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_basic_parallel() {
     let branch1 = ParallelBranch::new("branch1".to_string()).add_step(WorkflowStep::new(
@@ -42,6 +43,7 @@ async fn test_basic_parallel() {
 }
 
 /// Test optional branches
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_optional_branches() {
     let required = ParallelBranch::new("required".to_string()).add_step(WorkflowStep::new(
@@ -77,6 +79,7 @@ async fn test_optional_branches() {
 }
 
 /// Test fail-fast behavior
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_fail_fast() {
     let fast_fail = ParallelBranch::new("fast_fail".to_string()).add_step(WorkflowStep::new(
@@ -123,6 +126,7 @@ async fn test_fail_fast() {
 }
 
 /// Test concurrency limits
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_concurrency_limits() {
     let mut branches = Vec::new();
@@ -158,6 +162,7 @@ async fn test_concurrency_limits() {
 }
 
 /// Test branch timeout
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_branch_timeout() {
     let timeout_branch = ParallelBranch::new("timeout_branch".to_string())
@@ -184,6 +189,7 @@ async fn test_branch_timeout() {
 }
 
 /// Test workflow timeout
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_workflow_timeout() {
     let mut branches = Vec::new();
@@ -218,6 +224,7 @@ async fn test_workflow_timeout() {
 }
 
 /// Test empty branch validation
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_empty_branches() {
     let result = ParallelWorkflowBuilder::new("test_empty").build();
@@ -229,6 +236,7 @@ async fn test_empty_branches() {
 }
 
 /// Test zero concurrency validation
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_zero_concurrency() {
     let branch = ParallelBranch::new("branch".to_string()).add_step(WorkflowStep::new(
@@ -251,6 +259,7 @@ async fn test_zero_concurrency() {
 }
 
 /// Test multiple steps per branch
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_multiple_steps_per_branch() {
     let branch = ParallelBranch::new("multi_step".to_string())
@@ -290,6 +299,7 @@ async fn test_multiple_steps_per_branch() {
 }
 
 /// Test error propagation in branches
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 #[tracing::instrument]
 async fn test_error_propagation() {
@@ -349,6 +359,7 @@ async fn test_error_propagation() {
 }
 
 /// Test workflow configuration integration
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_workflow_config() {
     let config = WorkflowConfig {
@@ -380,6 +391,7 @@ async fn test_workflow_config() {
 }
 
 /// Test result report generation
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_result_report() {
     let branch1 = ParallelBranch::new("success_branch".to_string()).add_step(WorkflowStep::new(
@@ -418,6 +430,7 @@ async fn test_result_report() {
 }
 
 /// Test mixed success and failure handling
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_mixed_results() {
     let mut branches = Vec::new();
@@ -466,6 +479,7 @@ async fn test_mixed_results() {
 }
 
 /// Test branch builder methods
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_branch_builder() {
     let branch = ParallelBranch::new("test_branch".to_string())

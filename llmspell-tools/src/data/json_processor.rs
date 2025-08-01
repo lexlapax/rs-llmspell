@@ -635,6 +635,7 @@ impl JsonProcessorTool {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_operation_parsing() {
         assert_eq!(
@@ -652,6 +653,7 @@ mod tests {
         assert!("invalid".parse::<JsonOperation>().is_err());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_json_processor_creation() {
         let config = JsonProcessorConfig::default();
@@ -661,6 +663,7 @@ mod tests {
         assert_eq!(tool.metadata().name, "json-processor-tool");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_jq_query() {
         let tool = JsonProcessorTool::default();
@@ -697,6 +700,7 @@ mod tests {
         assert_eq!(results[0], serde_json::json!(30.0)); // Average age
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_hook_integration_metadata() {
         let tool = JsonProcessorTool::default();
@@ -718,6 +722,7 @@ mod tests {
         assert!(metadata["supported_operations"].is_array());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_json_processor_hook_integration() {
         use crate::lifecycle::{ToolExecutor, ToolLifecycleConfig};
@@ -737,6 +742,7 @@ mod tests {
         assert!(output.text.contains("success") || output.text.contains("test"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_hookable_tool_execution_trait_json() {
         use crate::lifecycle::{HookableToolExecution, ToolExecutor, ToolLifecycleConfig};

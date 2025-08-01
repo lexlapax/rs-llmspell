@@ -5,6 +5,7 @@ use llmspell_bridge::workflows::WorkflowBridge;
 use llmspell_bridge::ComponentRegistry;
 use std::sync::Arc;
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_workflow_bridge_creation() {
     let registry = Arc::new(ComponentRegistry::new());
@@ -19,6 +20,7 @@ async fn test_workflow_bridge_creation() {
     assert!(types.contains(&"loop".to_string()));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_workflow_info_retrieval() {
     let registry = Arc::new(ComponentRegistry::new());
@@ -35,6 +37,7 @@ async fn test_workflow_info_retrieval() {
     assert_eq!(all_info.len(), 4);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_sequential_workflow_creation() {
     let registry = Arc::new(ComponentRegistry::new());
@@ -54,6 +57,7 @@ async fn test_sequential_workflow_creation() {
     assert_eq!(active[0].1, "sequential");
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_workflow_metrics() {
     let registry = Arc::new(ComponentRegistry::new());
@@ -77,6 +81,7 @@ async fn test_workflow_metrics() {
     assert_eq!(metrics["active_workflows"], 1);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_workflow_removal() {
     let registry = Arc::new(ComponentRegistry::new());
@@ -104,6 +109,7 @@ async fn test_workflow_removal() {
     assert!(bridge.remove_workflow("non_existent").await.is_err());
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_workflow_discovery() {
     let registry = Arc::new(ComponentRegistry::new());
@@ -120,6 +126,7 @@ async fn test_workflow_discovery() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_parallel_workflow_creation() {
     let registry = Arc::new(ComponentRegistry::new());
@@ -138,6 +145,7 @@ async fn test_parallel_workflow_creation() {
     assert!(workflow_id.starts_with("workflow_"));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_conditional_workflow_creation() {
     let registry = Arc::new(ComponentRegistry::new());
@@ -154,6 +162,7 @@ async fn test_conditional_workflow_creation() {
     assert!(workflow_id.starts_with("workflow_"));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_loop_workflow_creation() {
     let registry = Arc::new(ComponentRegistry::new());

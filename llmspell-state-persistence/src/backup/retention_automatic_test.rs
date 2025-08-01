@@ -13,6 +13,7 @@ mod test {
     use std::time::Duration;
     use tempfile::TempDir;
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_automatic_cleanup_during_creation() {
         // Create state manager

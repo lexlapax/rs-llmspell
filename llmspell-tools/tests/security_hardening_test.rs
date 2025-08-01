@@ -10,6 +10,7 @@ use llmspell_core::{types::AgentInput, BaseAgent, ExecutionContext};
 use llmspell_tools::util::calculator::CalculatorTool;
 use serde_json::{json, Value as JsonValue};
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_calculator_dos_protection_comprehensive() {
     let tool = CalculatorTool::new();
@@ -136,6 +137,7 @@ async fn test_calculator_dos_protection_comprehensive() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_calculator_safe_expressions_still_work() {
     let tool = CalculatorTool::new();
@@ -181,6 +183,7 @@ async fn test_calculator_safe_expressions_still_work() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_calculator_timeout_protection() {
     let tool = CalculatorTool::new();
@@ -221,6 +224,7 @@ async fn test_calculator_timeout_protection() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_expression_validation_operation() {
     let tool = CalculatorTool::new();

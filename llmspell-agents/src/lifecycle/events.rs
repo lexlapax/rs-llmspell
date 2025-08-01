@@ -734,6 +734,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_event_system_basic() {
         let event_system = LifecycleEventSystem::default();
@@ -772,6 +773,7 @@ mod tests {
         );
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_event_filtering() {
         let event_system = LifecycleEventSystem::default();
@@ -819,6 +821,7 @@ mod tests {
         assert_eq!(listener.get_events_received(), 1);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_agent_specific_filtering() {
         let event_system = LifecycleEventSystem::default();
@@ -863,6 +866,7 @@ mod tests {
         assert_eq!(listener.get_events_received(), 1);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_event_history() {
         let event_system = LifecycleEventSystem::default();
@@ -891,6 +895,7 @@ mod tests {
         assert_eq!(agent_events[0].agent_id, "agent-2");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_logging_listener() {
         let listener = LoggingEventListener::new();
@@ -911,6 +916,7 @@ mod tests {
         listener.handle_event(&event).await.unwrap();
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_metrics_listener() {
         let listener = MetricsEventListener::new();

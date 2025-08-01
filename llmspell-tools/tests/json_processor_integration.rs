@@ -8,6 +8,7 @@ use llmspell_core::{
 use llmspell_tools::JsonProcessorTool;
 use serde_json::json;
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_json_processor_complex_workflow() {
     let tool = JsonProcessorTool::default();
@@ -62,6 +63,7 @@ async fn test_json_processor_complex_workflow() {
     assert_eq!(employees.as_array().unwrap().len(), 3);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_json_processor_schema_validation_complex() {
     let tool = JsonProcessorTool::default();
@@ -144,6 +146,7 @@ async fn test_json_processor_schema_validation_complex() {
     assert!(!errors.is_empty());
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_json_processor_array_filtering() {
     let tool = JsonProcessorTool::default();
@@ -175,6 +178,7 @@ async fn test_json_processor_array_filtering() {
     assert!(items.iter().all(|item| item["category"] == "electronics"));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_json_processor_merge_complex() {
     let tool = JsonProcessorTool::default();
@@ -232,6 +236,7 @@ async fn test_json_processor_merge_complex() {
     assert_eq!(merged["api"]["version"], "v2");
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_json_processor_tool_metadata() {
     let tool = JsonProcessorTool::default();
@@ -258,6 +263,7 @@ async fn test_json_processor_tool_metadata() {
     assert!(params.iter().any(|p| p.name == "schema"));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_json_processor_error_handling() {
     let tool = JsonProcessorTool::default();
@@ -299,6 +305,7 @@ async fn test_json_processor_error_handling() {
     assert!(result.is_err());
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_enhanced_jq_complex_workflow() {
     let tool = JsonProcessorTool::default();
@@ -386,6 +393,7 @@ async fn test_enhanced_jq_complex_workflow() {
     assert!(output.text.contains("\"sales\""));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_streaming_json_lines() {
     let tool = JsonProcessorTool::default();
@@ -436,6 +444,7 @@ async fn test_streaming_json_lines() {
     assert!(output.text.contains("WARN"));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_advanced_array_operations() {
     let tool = JsonProcessorTool::default();

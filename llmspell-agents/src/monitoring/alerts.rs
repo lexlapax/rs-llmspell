@@ -614,6 +614,7 @@ impl NotificationChannel for ConsoleNotificationChannel {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_threshold_operators() {
         assert!(ThresholdOperator::GreaterThan.evaluate(10.0, 5.0));
@@ -624,6 +625,7 @@ mod tests {
         assert!(!ThresholdOperator::Equal.evaluate(5.0, 6.0));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_alert_creation() {
         let mut alert = Alert::new(
@@ -648,6 +650,7 @@ mod tests {
         assert!(alert.resolved_at.is_some());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_alert_rule() {
         let rule = AlertRule {
@@ -670,6 +673,7 @@ mod tests {
         assert_eq!(rule.severity, AlertSeverity::Warning);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_alert_manager() {
         let manager = AlertManager::new(AlertConfig::default());

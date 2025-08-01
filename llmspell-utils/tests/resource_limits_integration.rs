@@ -5,6 +5,7 @@ use llmspell_utils::resource_limits::{MemoryGuard, ResourceLimits, ResourceTrack
 use std::time::Duration;
 use tokio::time::sleep;
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_memory_limit_enforcement() {
     let limits = ResourceLimits {
@@ -31,6 +32,7 @@ fn test_memory_limit_enforcement() {
     assert!(tracker.track_memory(200_000).is_ok());
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_operation_count_limits() {
     let limits = ResourceLimits {
@@ -58,6 +60,7 @@ fn test_operation_count_limits() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_file_size_limits() {
     let limits = ResourceLimits {
@@ -81,6 +84,7 @@ fn test_file_size_limits() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_cpu_time_tracking() {
     let limits = ResourceLimits {
@@ -104,6 +108,7 @@ fn test_cpu_time_tracking() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_concurrent_operations_limit() {
     let limits = ResourceLimits {
@@ -135,6 +140,7 @@ fn test_concurrent_operations_limit() {
     drop(guard3);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_operation_timeout() {
     let limits = ResourceLimits {
@@ -167,6 +173,7 @@ async fn test_operation_timeout() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_memory_guard_lifecycle() {
     let limits = ResourceLimits {
@@ -197,6 +204,7 @@ fn test_memory_guard_lifecycle() {
     let _guard = MemoryGuard::new(&tracker, 900_000).unwrap();
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_resource_metrics() {
     let limits = ResourceLimits::default();
@@ -219,6 +227,7 @@ fn test_resource_metrics() {
     assert_eq!(tracker.get_metrics().concurrent_ops, 1);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_limit_configurations() {
     // Test default limits
@@ -250,6 +259,7 @@ fn test_limit_configurations() {
     assert_eq!(unlimited.max_operations, None);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_complex_resource_scenario() {
     let limits = ResourceLimits {

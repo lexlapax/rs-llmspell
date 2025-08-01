@@ -24,6 +24,7 @@ pub fn inject_hook_global(_ctx: &mut (), _context: &GlobalContext) -> Result<()>
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_hook_global_stub() {
         // Basic compilation test

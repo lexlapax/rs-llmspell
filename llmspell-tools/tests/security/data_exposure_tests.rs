@@ -395,6 +395,7 @@ pub fn all_data_exposure_tests() -> Vec<SecurityTestCase> {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "integration")]
     #[test]
     fn test_data_exposure_test_creation() {
         let tests = all_data_exposure_tests();
@@ -419,6 +420,7 @@ mod tests {
         assert!(categories.contains(&"SOCIAL".to_string()));
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[test]
     fn test_critical_exposure_tests() {
         let tests = all_data_exposure_tests();
@@ -436,6 +438,7 @@ mod tests {
             .any(|t| t.name == "EXPOSE_CONFIG_FILES"));
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[test]
     fn test_information_disclosure_coverage() {
         let tests = all_data_exposure_tests();

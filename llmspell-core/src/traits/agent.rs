@@ -267,6 +267,7 @@ mod tests {
     use crate::ExecutionContext;
     use std::collections::VecDeque;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_message_role_display() {
         assert_eq!(MessageRole::System.to_string(), "system");
@@ -274,6 +275,7 @@ mod tests {
         assert_eq!(MessageRole::Assistant.to_string(), "assistant");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_conversation_message_creation() {
         let content = "Test message".to_string();
@@ -293,6 +295,7 @@ mod tests {
         assert_eq!(assistant_msg.role, MessageRole::Assistant);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_conversation_message_serialization() {
         let msg = ConversationMessage::user("Test".to_string());
@@ -304,6 +307,7 @@ mod tests {
         assert_eq!(msg.content, deserialized.content);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_agent_config_default() {
         let config = AgentConfig::default();
@@ -314,6 +318,7 @@ mod tests {
         assert_eq!(config.max_tokens, Some(2000));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_agent_config_serialization() {
         let config = AgentConfig {
@@ -407,6 +412,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_agent_conversation_management() {
         let agent = MockLLMAgent::new();
@@ -442,6 +448,7 @@ mod tests {
         assert_eq!(agent.conversation_length().await.unwrap(), 0);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_agent_conversation_trimming() {
         let config = AgentConfig {
@@ -483,6 +490,7 @@ mod tests {
         assert!(conversation[1].content.contains("Message 4")); // Should keep latest messages
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_agent_config_usage() {
         let agent = MockLLMAgent::new();

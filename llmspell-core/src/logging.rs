@@ -237,6 +237,7 @@ macro_rules! log_execution_end {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_logging_config_default() {
         let config = LoggingConfig::default();
@@ -246,6 +247,7 @@ mod tests {
         assert!(!config.with_thread_names);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_logging_config_development() {
         let config = LoggingConfig::development();
@@ -256,6 +258,7 @@ mod tests {
         assert!(config.with_span_events);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_logging_config_production() {
         let config = LoggingConfig::production();
@@ -265,6 +268,7 @@ mod tests {
         assert!(config.with_file_lines);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_logging_initialization() {
         // We can't actually initialize logging in tests (it's global state)

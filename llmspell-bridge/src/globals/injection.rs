@@ -181,6 +181,7 @@ impl GlobalInjector {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_injection_cache() {
         let cache = InjectionCache::new();
@@ -200,6 +201,7 @@ mod tests {
         assert_eq!(cache.hit_rate(), 0.0);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_injection_metrics() {
         let metrics = InjectionMetrics {
@@ -212,6 +214,7 @@ mod tests {
         assert_eq!(metrics.average_time_us(), 300);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_injection_metrics_failure_case() {
         // Test failure case

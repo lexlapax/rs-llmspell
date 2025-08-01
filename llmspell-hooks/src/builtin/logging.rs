@@ -302,6 +302,7 @@ mod tests {
     use crate::types::{ComponentId, ComponentType, HookPoint};
     use serde_json::json;
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_logging_hook_basic() {
         let hook = LoggingHook::new();
@@ -316,6 +317,7 @@ mod tests {
         assert!(context.get_metadata("logging_hook_version").is_some());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_logging_hook_with_data() {
         let hook = LoggingHook::new().with_context_data(true);
@@ -330,6 +332,7 @@ mod tests {
         assert!(matches!(result, HookResult::Continue));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_logging_hook_different_levels() {
         for level in [
@@ -348,6 +351,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_data_truncation() {
         let hook = LoggingHook::new().with_max_data_size(10);
@@ -358,6 +362,7 @@ mod tests {
         assert!(truncated.contains("... (truncated)"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_performance_logging() {
         let hook = LoggingHook::new().with_performance_logging(true);
@@ -375,6 +380,7 @@ mod tests {
             .unwrap();
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_logging_config_defaults() {
         let config = LoggingConfig::default();
@@ -385,6 +391,7 @@ mod tests {
         assert_eq!(config.max_data_size, 1024);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_hook_metadata() {
         let hook = LoggingHook::new();
@@ -398,6 +405,7 @@ mod tests {
         assert!(metadata.tags.contains(&"logging".to_string()));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_should_execute() {
         let hook = LoggingHook::new();
@@ -407,6 +415,7 @@ mod tests {
         assert!(hook.should_execute(&context));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_replayable_hook_implementation() {
         let hook = LoggingHook::new()

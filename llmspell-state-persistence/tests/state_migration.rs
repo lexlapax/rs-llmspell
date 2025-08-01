@@ -18,6 +18,7 @@ use std::time::SystemTime;
 
 /// Test complex schema migration with multiple transformations
 /// NOTE: This test requires Custom transformations to be fully implemented
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 #[ignore = "Requires Custom transformer implementation"]
 async fn test_complex_schema_migration() {
@@ -193,6 +194,7 @@ async fn test_complex_schema_migration() {
 }
 
 /// Test large dataset migration performance
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_large_dataset_migration_performance() {
     let start_time = std::time::Instant::now();
@@ -274,6 +276,7 @@ async fn test_large_dataset_migration_performance() {
 
 /// Test multi-step migration chain
 /// NOTE: This test requires multi-step migration planner to be fully implemented
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 #[ignore = "Requires multi-step migration planner implementation"]
 async fn test_multi_step_migration_chain() {
@@ -479,6 +482,7 @@ async fn test_multi_step_migration_chain() {
 }
 
 /// Test migration rollback simulation
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_migration_rollback_on_error() {
     // Create state manager
@@ -539,6 +543,7 @@ async fn test_migration_rollback_on_error() {
 
 /// Test migration data integrity validation
 /// NOTE: This test requires Custom transformations to be fully implemented
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 #[ignore = "Requires Custom transformer implementation"]
 async fn test_migration_data_integrity() {
@@ -709,6 +714,7 @@ async fn test_migration_data_integrity() {
 
 /// Test concurrent migration operations
 /// NOTE: This test requires Custom transformations to be fully implemented
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 #[ignore = "Requires Custom transformer implementation"]
 async fn test_concurrent_migration_safety() {

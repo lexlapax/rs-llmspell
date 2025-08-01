@@ -9,6 +9,8 @@ use std::time::Duration;
 use tokio::time::timeout;
 use tracing::{info, warn};
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 #[ignore = "requires OPENAI_API_KEY and ANTHROPIC_API_KEY"]
 async fn test_switch_openai_to_anthropic() -> Result<()> {
@@ -142,6 +144,8 @@ async fn test_switch_openai_to_anthropic() -> Result<()> {
     Ok(())
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 #[ignore = "requires ANTHROPIC_API_KEY and OPENAI_API_KEY"]
 async fn test_switch_anthropic_to_openai() -> Result<()> {
@@ -255,6 +259,8 @@ async fn test_switch_anthropic_to_openai() -> Result<()> {
     Ok(())
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 #[ignore = "requires OPENAI_API_KEY and ANTHROPIC_API_KEY"]
 async fn test_multiple_provider_switches() -> Result<()> {
@@ -370,6 +376,8 @@ async fn test_multiple_provider_switches() -> Result<()> {
     Ok(())
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 #[ignore = "requires OPENAI_API_KEY or ANTHROPIC_API_KEY"]
 async fn test_provider_switch_with_context_preservation() -> Result<()> {

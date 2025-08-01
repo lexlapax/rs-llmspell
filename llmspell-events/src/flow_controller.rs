@@ -428,6 +428,7 @@ mod tests {
         UniversalEvent::new("test.event", Value::Null, Language::Rust)
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_flow_controller_basic() {
         let config = FlowControllerConfig::default();
@@ -447,6 +448,7 @@ mod tests {
         assert!(controller.is_buffer_empty());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_rate_limiting() {
         let config = FlowControllerConfig {
@@ -472,6 +474,7 @@ mod tests {
         assert!(controller.can_process(&event).await);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_token_bucket() {
         let mut bucket = TokenBucket::new(10.0, 5.0); // 10 capacity, 5/sec refill
@@ -485,6 +488,7 @@ mod tests {
         assert!(bucket.available_tokens() < 0.001);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_overflow_handling() {
         let config = FlowControllerConfig {
@@ -513,6 +517,7 @@ mod tests {
         assert!(matches!(result, OverflowResult::Dropped { .. }));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_statistics() {
         let controller = FlowController::new(FlowControllerConfig::default());
@@ -525,6 +530,7 @@ mod tests {
         assert_eq!(stats.current_buffer_size, 1);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_builder() {
         let (controller, _rx) = FlowControllerBuilder::new()

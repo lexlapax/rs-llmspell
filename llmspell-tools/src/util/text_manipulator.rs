@@ -404,6 +404,7 @@ impl Tool for TextManipulatorTool {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_missing_required_option() {
         let tool = TextManipulatorTool::default();
@@ -427,6 +428,7 @@ mod tests {
         );
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_metadata() {
         let tool = TextManipulatorTool::default();
@@ -440,6 +442,7 @@ mod tests {
         assert_eq!(schema.required_parameters(), vec!["input", "operation"]);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_all_operations() {
         let tool = TextManipulatorTool::default();

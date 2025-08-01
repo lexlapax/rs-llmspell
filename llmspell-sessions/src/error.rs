@@ -214,6 +214,7 @@ mod tests {
     use super::*;
     use crate::SessionStatus;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_session_error_display() {
         // Test each error variant's display output
@@ -251,6 +252,7 @@ mod tests {
         assert_eq!(error.to_string(), "Validation error: invalid data");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_invalid_session_state_error() {
         let error = SessionError::InvalidSessionState {
@@ -264,6 +266,7 @@ mod tests {
         );
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_artifact_errors() {
         let error = SessionError::ArtifactNotFound {
@@ -281,6 +284,7 @@ mod tests {
         );
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_resource_and_access_errors() {
         let error = SessionError::AccessDenied {
@@ -308,6 +312,7 @@ mod tests {
         assert_eq!(error.to_string(), "Data integrity error: checksum mismatch");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_general_error_constructors() {
         let error = SessionError::general("general error");
@@ -330,6 +335,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_replay_error_constructors() {
         let error = SessionError::replay("replay failed");
@@ -353,6 +359,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_from_serde_json_error() {
         // Test deserialization error (EOF)
@@ -370,6 +377,7 @@ mod tests {
         // Most serde_json errors are actually data/parsing errors
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_from_io_error() {
         let io_error = std::io::Error::new(std::io::ErrorKind::NotFound, "file not found");
@@ -383,6 +391,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_from_bincode_error() {
         // Create a bincode error by trying to deserialize invalid data
@@ -397,6 +406,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_error_is_send_sync() {
         // Verify that SessionError implements Send + Sync
@@ -404,6 +414,7 @@ mod tests {
         assert_send_sync::<SessionError>();
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_result_type_alias() {
         // Test that Result<T> works as expected
@@ -419,6 +430,7 @@ mod tests {
         assert!(test_error_function().is_err());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_from_state_error() {
         use llmspell_state_traits::StateError;
@@ -440,6 +452,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_error_source_chain() {
         use std::error::Error;
@@ -453,6 +466,7 @@ mod tests {
         assert!(error.source().is_some());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_hook_and_event_errors() {
         let error = SessionError::Hook("hook failed".to_string());
@@ -462,6 +476,7 @@ mod tests {
         assert_eq!(error.to_string(), "Event error: event dispatch failed");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_serialization_deserialization_errors() {
         let error = SessionError::Serialization("failed to serialize".to_string());

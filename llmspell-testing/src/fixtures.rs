@@ -385,6 +385,7 @@ pub fn list_fixture_files(subdir: impl AsRef<Path>) -> Result<Vec<PathBuf>, std:
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_sample_fixtures() {
         // Test metadata fixture
@@ -408,6 +409,7 @@ mod tests {
         assert_eq!(steps[1].dependencies.len(), 1);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_fixture_variants() {
         let metadata_variants = component_metadata_variants();
@@ -420,6 +422,7 @@ mod tests {
         assert!(errors.len() >= 4);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_fixtures_dir() {
         let dir = fixtures_dir();
@@ -453,6 +456,7 @@ mod tests {
         );
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_fixture_path() {
         let path = fixture_path("test.txt");
@@ -460,6 +464,7 @@ mod tests {
         assert!(path.to_string_lossy().contains("fixtures"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_load_fixture_json() {
         // Test with existing migration test data
@@ -470,6 +475,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_temp_fixtures() {
         // Create a temp fixture
@@ -492,6 +498,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_list_fixture_files() {
         let lua_files = list_fixture_files("lua");

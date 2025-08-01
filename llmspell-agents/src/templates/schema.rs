@@ -382,6 +382,7 @@ impl TemplateSchema {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_template_schema_creation() {
         let metadata = TemplateMetadata {
@@ -404,6 +405,7 @@ mod tests {
         assert!(schema.parameters.is_empty());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_parameter_definition() {
         let param = ParameterDefinition {
@@ -421,6 +423,7 @@ mod tests {
         assert_eq!(param.constraints.len(), 1);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_schema_validation() {
         let metadata = TemplateMetadata {
@@ -441,6 +444,7 @@ mod tests {
         assert!(schema.validate().is_ok());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_schema_validation_empty_id() {
         let metadata = TemplateMetadata {
@@ -461,6 +465,7 @@ mod tests {
         assert!(schema.validate().is_err());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_template_category_names() {
         assert_eq!(TemplateCategory::ToolExecution.name(), "tool_execution");
@@ -468,12 +473,14 @@ mod tests {
         assert_eq!(TemplateCategory::Custom("test".to_string()).name(), "test");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_complexity_descriptions() {
         assert!(!ComplexityLevel::Basic.description().is_empty());
         assert!(!ComplexityLevel::Expert.description().is_empty());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_schema_builder_pattern() {
         let metadata = TemplateMetadata {

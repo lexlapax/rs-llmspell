@@ -166,6 +166,8 @@ pub fn assert_json_contains(actual: &Value, expected: &Value) {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "external")]
+    #[ignore]
     #[test]
     fn test_create_test_context() {
         let context = create_test_context();
@@ -173,6 +175,8 @@ mod tests {
         let _ = context;
     }
 
+    #[cfg_attr(test_category = "external")]
+    #[ignore]
     #[test]
     fn test_create_agent_input() {
         let input = create_agent_input(json!({"test": "value"})).unwrap();
@@ -180,6 +184,8 @@ mod tests {
         let _ = input;
     }
 
+    #[cfg_attr(test_category = "external")]
+    #[ignore]
     #[test]
     fn test_create_simple_input() {
         let input = create_simple_input("test input").unwrap();

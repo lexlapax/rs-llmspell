@@ -362,6 +362,7 @@ impl Default for SessionSortBy {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_session_id() {
         let id1 = SessionId::new();
@@ -377,6 +378,7 @@ mod tests {
         assert_eq!(id1, parsed_id);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_session_status() {
         assert!(SessionStatus::Active.is_active());
@@ -387,6 +389,7 @@ mod tests {
         assert!(!SessionStatus::Active.is_terminal());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_session_metadata() {
         let id = SessionId::new();
@@ -411,6 +414,7 @@ mod tests {
         assert_eq!(metadata.tags.len(), 1);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_resource_limits_default() {
         let limits = ResourceLimits::default();
@@ -420,6 +424,7 @@ mod tests {
         assert!(limits.max_storage_bytes.is_some());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_session_config_default() {
         let config = SessionConfig::default();

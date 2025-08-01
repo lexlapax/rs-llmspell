@@ -31,6 +31,7 @@ mod tests {
         .unwrap()
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_session_create_performance() {
         let manager = create_test_manager().await;
@@ -55,6 +56,7 @@ mod tests {
         let _ = manager.delete_session(&session_id).await;
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_session_save_performance() {
         let manager = create_test_manager().await;
@@ -81,6 +83,7 @@ mod tests {
         let _ = manager.delete_session(&session_id).await;
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_session_load_performance() {
         let manager = create_test_manager().await;
@@ -119,6 +122,7 @@ mod tests {
         let _ = manager.delete_session(&session_id2).await;
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_hook_overhead() {
         // Test with hooks enabled

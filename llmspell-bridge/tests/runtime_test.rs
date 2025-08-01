@@ -139,6 +139,7 @@ async fn test_runtime_engine_switching_placeholder() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_runtime_with_custom_engine_name() {
     let config = RuntimeConfig::default();
@@ -157,6 +158,7 @@ async fn test_runtime_with_custom_engine_name() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_available_engines() {
     let engines = EngineFactory::list_available_engines();

@@ -210,6 +210,7 @@ mod tests {
     use crate::types::{ComponentId, ComponentType};
     use uuid::Uuid;
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_result_collection() {
         let mut config = CollectionConfig::default();
@@ -244,6 +245,7 @@ mod tests {
         assert!(context.data.contains_key("collected_artifact"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_error_collection() {
         let collector = ToolResultCollector::new();

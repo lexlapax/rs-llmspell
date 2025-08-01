@@ -401,6 +401,7 @@ mod tests {
     use std::thread;
     use std::time::Duration as StdDuration;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_ttl_entry_creation() {
         let entry = TtlEntry::new("test_value", Duration::from_secs(60));
@@ -411,6 +412,7 @@ mod tests {
         assert!(entry.remaining_ttl() > Duration::from_secs(50));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_ttl_entry_expiration() {
         let mut entry = TtlEntry::new("test_value", Duration::from_millis(100));
@@ -426,6 +428,7 @@ mod tests {
         assert_eq!(entry.access_count, 2);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_ttl_entry_extension() {
         let mut entry = TtlEntry::new("test_value", Duration::from_millis(100));
@@ -437,6 +440,7 @@ mod tests {
         assert!(entry.remaining_ttl() > Duration::from_millis(500));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_ttl_cache_basic_operations() {
         let cache = TtlCache::new();
@@ -460,6 +464,7 @@ mod tests {
         assert!(cache.is_empty());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_ttl_cache_expiration() {
         let config = TtlCacheConfig {
@@ -478,6 +483,7 @@ mod tests {
         assert_eq!(stats.expired_entries, 1);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_ttl_cache_custom_ttl() {
         let cache = TtlCache::new();
@@ -491,6 +497,7 @@ mod tests {
         assert_eq!(cache.get(&"long"), Some("value"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_ttl_cache_extend_on_access() {
         let config = TtlCacheConfig {
@@ -512,6 +519,7 @@ mod tests {
         assert_eq!(cache.get(&"key1"), Some("value1"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_ttl_cache_max_entries() {
         let config = TtlCacheConfig {
@@ -530,6 +538,7 @@ mod tests {
         assert!(!cache.contains_key(&"key3"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_ttl_cache_cleanup() {
         let config = TtlCacheConfig {
@@ -550,6 +559,7 @@ mod tests {
         assert_eq!(cache.len(), 0);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_ttl_cache_keys() {
         let cache = TtlCache::new();
@@ -563,6 +573,7 @@ mod tests {
         assert!(keys.contains(&"key2"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_ttl_cache_clear() {
         let cache = TtlCache::new();
@@ -576,6 +587,7 @@ mod tests {
         assert!(cache.is_empty());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_ttl_cache_stats() {
         let cache = TtlCache::new();
@@ -598,6 +610,7 @@ mod tests {
         assert_eq!(stats.total_puts, 1);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_ttl_cache_clone() {
         let cache1 = TtlCache::new();

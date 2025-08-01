@@ -666,6 +666,7 @@ impl Tool for EmailSenderTool {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_email_sender_tool_creation() {
         let config = EmailSenderConfig::default();
@@ -673,6 +674,7 @@ mod tests {
         assert_eq!(tool.metadata().name, "email_sender");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_tool_metadata() {
         let config = EmailSenderConfig::default();
@@ -686,6 +688,7 @@ mod tests {
         assert!(!schema.parameters.is_empty());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_config_from_env() {
         // Set up test environment variables
@@ -706,6 +709,7 @@ mod tests {
         std::env::remove_var("EMAIL_DEFAULT_SENDER");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_parameter_validation() {
         let config = EmailSenderConfig::default();

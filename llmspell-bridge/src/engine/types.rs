@@ -85,6 +85,7 @@ mod tests {
 
     // API surface tests removed - functionality moved to globals
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_script_engine_error_conversion() {
         let err = ScriptEngineError::ExecutionError {

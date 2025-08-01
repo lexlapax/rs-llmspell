@@ -380,6 +380,7 @@ impl Default for AgentOutputBuilder {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_agent_input_text_constructor() {
         let input = AgentInput::text("Hello, world!");
@@ -390,6 +391,7 @@ mod tests {
         assert_eq!(input.output_modalities, vec![MediaType::Text]);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_agent_input_builder() {
         let context = ExecutionContext::new()
@@ -411,6 +413,7 @@ mod tests {
         assert_eq!(input.output_modalities.len(), 2);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_agent_input_with_media() {
         let media = MediaContent::Text("Additional context".to_string());
@@ -421,6 +424,7 @@ mod tests {
         assert!(input.has_media());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_agent_output_text_constructor() {
         let output = AgentOutput::text("Response text");
@@ -430,6 +434,7 @@ mod tests {
         assert!(output.transfer_to.is_none());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_agent_output_builder() {
         let tool_call = ToolCall {
@@ -458,6 +463,7 @@ mod tests {
         assert_eq!(output.metadata.token_count, Some(150));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_agent_output_with_transfer() {
         let agent_id = ComponentId::from_name("next-agent");
@@ -467,6 +473,7 @@ mod tests {
         assert_eq!(output.transfer_to, Some(agent_id));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_execution_context() {
         let context = ExecutionContext::with_conversation("conv-123".to_string())
@@ -481,6 +488,7 @@ mod tests {
         assert_eq!(context.data["user_name"], "Alice");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_tool_output() {
         let output = ToolOutput {
@@ -496,6 +504,7 @@ mod tests {
         assert_eq!(output.execution_time_ms, Some(25));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_serialization() {
         let input = AgentInput::text("Test").with_parameter("key", "value");
@@ -510,6 +519,7 @@ mod tests {
         assert_eq!(output.text, deserialized.text);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_display_formatting() {
         let input = AgentInput::text("This is a very long prompt that should be truncated in the display output for readability");

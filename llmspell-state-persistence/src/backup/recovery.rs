@@ -302,6 +302,7 @@ impl RecoveryOrchestrator {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_recovery_state_serialization() {
         let state = RecoveryState::RestoringData;
@@ -310,6 +311,7 @@ mod tests {
         assert_eq!(state, deserialized);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_advanced_recovery_options_defaults() {
         let options = AdvancedRecoveryOptions::default();

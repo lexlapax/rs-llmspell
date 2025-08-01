@@ -307,6 +307,7 @@ mod tests {
         (artifact_id, metadata)
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_search_by_name_pattern() {
         let mut index = MetadataIndex::new();
@@ -336,6 +337,7 @@ mod tests {
         assert!(result.artifacts.iter().all(|a| a.name.contains("test")));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_search_by_type() {
         let mut index = MetadataIndex::new();
@@ -361,6 +363,7 @@ mod tests {
             .all(|a| a.artifact_type == ArtifactType::UserInput));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_search_with_tags() {
         let mut index = MetadataIndex::new();
@@ -405,6 +408,7 @@ mod tests {
             .all(|a| a.tags.contains(&"important".to_string())));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_search_with_size_filters() {
         let mut index = MetadataIndex::new();
@@ -433,6 +437,7 @@ mod tests {
         assert_eq!(result.artifacts[0].name, "medium.txt");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_search_sorting() {
         let mut index = MetadataIndex::new();
@@ -471,6 +476,7 @@ mod tests {
         assert_eq!(result.artifacts[2].size, 256); // beta.txt
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_search_pagination() {
         let mut index = MetadataIndex::new();

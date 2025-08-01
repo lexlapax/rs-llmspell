@@ -605,6 +605,7 @@ mod tests {
         (execution, metadata)
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_in_memory_storage() {
         let backend = InMemoryStorageBackend::new();
@@ -649,6 +650,7 @@ mod tests {
         assert!(loaded.is_none());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_compression() {
         // Use larger, repetitive data that compresses well
@@ -676,6 +678,7 @@ mod tests {
         );
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_cleanup_by_age() {
         let backend = InMemoryStorageBackend::new();

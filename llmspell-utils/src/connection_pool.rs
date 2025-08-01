@@ -613,6 +613,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_pool_creation() {
         let factory = MockFactory {
@@ -632,6 +633,7 @@ mod tests {
         assert_eq!(stats.in_use, 0);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_connection_acquisition() {
         let factory = MockFactory {
@@ -662,6 +664,7 @@ mod tests {
         assert_eq!(stats.available, 2);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_pool_exhaustion() {
         let factory = MockFactory {
@@ -685,6 +688,7 @@ mod tests {
         assert!(matches!(result, Err(PoolError::Exhausted)));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_invalid_connection_handling() {
         let valid = Arc::new(AtomicBool::new(true));

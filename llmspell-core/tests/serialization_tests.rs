@@ -12,6 +12,7 @@ use llmspell_core::{
     ComponentId, ComponentMetadata, ExecutionContext, Version,
 };
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_component_id_json_roundtrip() {
     let id = ComponentId::from_name("test-component");
@@ -22,6 +23,7 @@ fn test_component_id_json_roundtrip() {
     assert_eq!(id, deserialized);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_version_json_roundtrip() {
     let version = Version::new(1, 2, 3);
@@ -35,6 +37,7 @@ fn test_version_json_roundtrip() {
     assert_eq!(deserialized.patch, 3);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_component_metadata_json_roundtrip() {
     let metadata = ComponentMetadata::new(
@@ -51,6 +54,7 @@ fn test_component_metadata_json_roundtrip() {
     assert_eq!(metadata.version, deserialized.version);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_agent_input_json_roundtrip() {
     let input = AgentInput::text("test prompt".to_string())
@@ -71,6 +75,7 @@ fn test_agent_input_json_roundtrip() {
     assert_eq!(input.parameters, deserialized.parameters);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_agent_output_json_roundtrip() {
     let metadata = llmspell_core::types::OutputMetadata {
@@ -93,6 +98,7 @@ fn test_agent_output_json_roundtrip() {
     assert_eq!(output.metadata.model, deserialized.metadata.model);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_execution_context_json_roundtrip() {
     let mut context = ExecutionContext::with_conversation("session-123".to_string());
@@ -107,6 +113,7 @@ fn test_execution_context_json_roundtrip() {
     assert_eq!(context.data, deserialized.data);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_conversation_message_json_roundtrip() {
     let messages = vec![
@@ -126,6 +133,7 @@ fn test_conversation_message_json_roundtrip() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_message_role_json_roundtrip() {
     let roles = vec![
@@ -141,6 +149,7 @@ fn test_message_role_json_roundtrip() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_agent_config_json_roundtrip() {
     let config = AgentConfig {
@@ -162,6 +171,7 @@ fn test_agent_config_json_roundtrip() {
     assert_eq!(config.max_tokens, deserialized.max_tokens);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_tool_schema_json_roundtrip() {
     let schema = ToolSchema::new("test_tool".to_string(), "A test tool".to_string())
@@ -188,6 +198,7 @@ fn test_tool_schema_json_roundtrip() {
     assert_eq!(schema.parameters.len(), deserialized.parameters.len());
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_tool_category_json_roundtrip() {
     let categories = vec![
@@ -207,6 +218,7 @@ fn test_tool_category_json_roundtrip() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_security_level_json_roundtrip() {
     let levels = vec![
@@ -222,6 +234,7 @@ fn test_security_level_json_roundtrip() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_parameter_type_json_roundtrip() {
     let types = vec![
@@ -240,6 +253,7 @@ fn test_parameter_type_json_roundtrip() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_workflow_step_json_roundtrip() {
     let component_id = ComponentId::from_name("process-component");
@@ -259,6 +273,7 @@ fn test_workflow_step_json_roundtrip() {
     assert_eq!(step.dependencies, deserialized.dependencies);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_step_result_json_roundtrip() {
     let step_id = ComponentId::from_name("test-step");
@@ -292,6 +307,7 @@ fn test_step_result_json_roundtrip() {
     assert_eq!(deserialized.retry_count, 2);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_workflow_status_json_roundtrip() {
     let statuses = vec![
@@ -309,6 +325,7 @@ fn test_workflow_status_json_roundtrip() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_retry_policy_json_roundtrip() {
     let policies = vec![
@@ -335,6 +352,7 @@ fn test_retry_policy_json_roundtrip() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_complex_nested_serialization() {
     // Test deeply nested structures

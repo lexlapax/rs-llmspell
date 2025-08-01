@@ -657,6 +657,7 @@ mod tests {
         file_path
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_search_options_builder() {
         let options = SearchOptions::new()
@@ -683,6 +684,7 @@ mod tests {
         assert_eq!(options.max_depth, 5);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_search_in_file_literal() {
         let temp_dir = TempDir::new().unwrap();
@@ -704,6 +706,7 @@ mod tests {
         assert_eq!(matches[1].column_number, 9);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_search_in_file_case_insensitive() {
         let temp_dir = TempDir::new().unwrap();
@@ -718,6 +721,7 @@ mod tests {
         assert_eq!(matches[1].matched_text, "pattern");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_search_in_file_regex() {
         let temp_dir = TempDir::new().unwrap();
@@ -735,6 +739,7 @@ mod tests {
         assert_eq!(matches[2].matched_text, "ERROR:");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_search_in_file_with_context() {
         let temp_dir = TempDir::new().unwrap();
@@ -750,6 +755,7 @@ mod tests {
         assert_eq!(search_match.context_after, vec!["Line 4", "Line 5"]);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_search_in_file_max_matches() {
         let temp_dir = TempDir::new().unwrap();
@@ -762,6 +768,7 @@ mod tests {
         assert_eq!(matches.len(), 3);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_search_in_directory_basic() {
         let temp_dir = TempDir::new().unwrap();
@@ -787,6 +794,7 @@ mod tests {
         assert!(result.has_matches());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_search_in_directory_with_extension_filter() {
         let temp_dir = TempDir::new().unwrap();
@@ -803,6 +811,7 @@ mod tests {
         assert_eq!(result.total_matches, 2);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_search_in_directory_recursive() {
         let temp_dir = TempDir::new().unwrap();
@@ -825,6 +834,7 @@ mod tests {
         assert_eq!(result.files_searched, 2); // Root and nested files
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_search_in_directory_exclude_dirs() {
         let temp_dir = TempDir::new().unwrap();
@@ -847,6 +857,7 @@ mod tests {
         assert_eq!(result.total_matches, 1);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_search_result_methods() {
         let mut result = SearchResult::new();
@@ -877,6 +888,7 @@ mod tests {
         assert!(grouped.contains_key(&PathBuf::from("test.txt")));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_should_search_file() {
         let temp_dir = TempDir::new().unwrap();
@@ -903,6 +915,7 @@ mod tests {
         assert!(!should_search_file(&txt_file, &options)); // Not in include list
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_multiple_matches_per_line() {
         let temp_dir = TempDir::new().unwrap();
@@ -918,6 +931,7 @@ mod tests {
         assert_eq!(matches[2].column_number, 25);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_invalid_regex_pattern() {
         let temp_dir = TempDir::new().unwrap();
@@ -933,6 +947,7 @@ mod tests {
             .contains("Invalid regex pattern"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_file_too_large() {
         let temp_dir = TempDir::new().unwrap();

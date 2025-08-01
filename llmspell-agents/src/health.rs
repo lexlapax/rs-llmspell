@@ -700,6 +700,7 @@ mod tests {
     use super::*;
     use crate::lifecycle::{events::EventSystemConfig, resources::ResourceLimits};
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_health_monitor_basic() {
         let event_system = Arc::new(LifecycleEventSystem::new(EventSystemConfig::default()));
@@ -734,6 +735,7 @@ mod tests {
         assert_eq!(result.status, HealthStatus::Healthy);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_health_status_severity() {
         assert_eq!(HealthStatus::Healthy.severity(), 0);
@@ -751,6 +753,7 @@ mod tests {
         assert!(!HealthStatus::Healthy.needs_attention());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_state_machine_health_check() {
         let state_machine = Arc::new(AgentStateMachine::default("test-agent".to_string()));
@@ -769,6 +772,7 @@ mod tests {
         assert_eq!(result.status, HealthStatus::Critical);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_resource_health_check() {
         let event_system = Arc::new(LifecycleEventSystem::new(EventSystemConfig::default()));
@@ -785,6 +789,7 @@ mod tests {
         assert!(result.metrics.contains_key("allocation_count"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_responsiveness_health_check() {
         let check = ResponsivenessHealthCheck;
@@ -796,6 +801,7 @@ mod tests {
         assert_eq!(result.status, HealthStatus::Healthy);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_health_check_result_builder() {
         let result = HealthCheckResult::new(

@@ -223,6 +223,7 @@ impl Clone for RetentionStatistics {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_retention_policy_presets() {
         let short = RetentionPolicy::short_term();
@@ -238,6 +239,7 @@ mod tests {
         assert_eq!(all.max_count, None);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_retention_manager() {
         let manager = RetentionManager::default();
@@ -255,6 +257,7 @@ mod tests {
         assert_eq!(default.max_age, Some(Duration::from_secs(7 * 24 * 60 * 60)));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_should_retain() {
         let manager = RetentionManager::default();

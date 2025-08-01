@@ -17,6 +17,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use uuid::Uuid;
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_sequential_workflow_hooks() {
     let fixture = HookTestFixture::new().await;
@@ -108,6 +109,7 @@ async fn test_sequential_workflow_hooks() {
     );
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_parallel_workflow_hooks() {
     let fixture = HookTestFixture::new().await;
@@ -240,6 +242,7 @@ async fn test_parallel_workflow_hooks() {
     );
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_conditional_workflow_hooks() {
     let fixture = HookTestFixture::new().await;
@@ -355,6 +358,7 @@ async fn test_conditional_workflow_hooks() {
     assert!(!executed_branches.contains("text_processing"));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_workflow_error_handling_hooks() {
     let fixture = HookTestFixture::new().await;
@@ -432,6 +436,7 @@ async fn test_workflow_error_handling_hooks() {
     assert_hook_persisted(&fixture.storage, &workflow_id.to_string(), "LoggingHook").await;
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_workflow_rate_limiting() {
     let fixture = HookTestFixture::new().await;
@@ -480,6 +485,7 @@ async fn test_workflow_rate_limiting() {
     );
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_nested_workflow_hooks() {
     let fixture = HookTestFixture::new().await;
@@ -564,6 +570,7 @@ async fn test_nested_workflow_hooks() {
     assert!(!parent_stored.is_empty(), "Parent workflow events not found");
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_workflow_with_llm_and_tools() {
     let fixture = HookTestFixture::new().await;

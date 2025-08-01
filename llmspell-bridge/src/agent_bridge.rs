@@ -1670,6 +1670,7 @@ impl AgentBridge {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_agent_bridge_creation() {
         let registry = Arc::new(ComponentRegistry::new());
@@ -1681,6 +1682,7 @@ mod tests {
         assert!(!types.is_empty());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_agent_instance_management() {
         let registry = Arc::new(ComponentRegistry::new());
@@ -1738,6 +1740,7 @@ mod tests {
         assert!(agent_after.is_none());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_agent_execution() {
         let registry = Arc::new(ComponentRegistry::new());
@@ -1788,6 +1791,7 @@ mod tests {
         assert!(result.is_ok() || result.is_err());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_agent_state_machine() {
         let registry = Arc::new(ComponentRegistry::new());
@@ -1899,6 +1903,7 @@ mod tests {
         bridge.remove_agent("test-state").await.unwrap();
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_context_management() {
         let registry = Arc::new(ComponentRegistry::new());
@@ -1980,6 +1985,7 @@ mod tests {
         bridge.remove_context(&child_id).await.unwrap();
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_agent_context_execution() {
         let registry = Arc::new(ComponentRegistry::new());
@@ -2043,6 +2049,7 @@ mod tests {
         bridge.remove_context(&context_id).await.unwrap();
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_streaming_execution() {
         let registry = Arc::new(ComponentRegistry::new());
@@ -2102,6 +2109,7 @@ mod tests {
         bridge.remove_agent("stream-test").await.unwrap();
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_composition_patterns() {
         let registry = Arc::new(ComponentRegistry::new());

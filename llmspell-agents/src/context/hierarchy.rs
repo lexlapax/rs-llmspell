@@ -281,6 +281,7 @@ mod tests {
     use llmspell_core::ComponentId;
     use serde_json::json;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_hierarchical_context_creation() {
         let mut hierarchy = HierarchicalContext::new();
@@ -303,6 +304,7 @@ mod tests {
         assert_eq!(child_ctx.depth(), 1);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_context_removal() {
         let mut hierarchy = HierarchicalContext::new();
@@ -334,6 +336,7 @@ mod tests {
         assert!(hierarchy.get(&child1.id).is_none());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_context_stats() {
         let mut hierarchy = HierarchicalContext::new();
@@ -375,6 +378,7 @@ mod tests {
         assert_eq!(stats.max_depth, 3); // root1 -> child1 -> grandchild
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_node_metadata() {
         let mut node = ContextNode::new(ExecutionContext::new());

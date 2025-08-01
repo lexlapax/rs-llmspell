@@ -134,6 +134,7 @@ pub trait RequiresApiKey {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_api_key_config() {
         let config = ApiKeyConfig::new("test_service")
@@ -144,6 +145,7 @@ mod tests {
         assert_eq!(key, Some("test_key".to_string()));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_add_and_get_key() {
         use std::time::{SystemTime, UNIX_EPOCH};

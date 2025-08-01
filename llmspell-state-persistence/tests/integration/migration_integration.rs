@@ -202,6 +202,7 @@ fn create_user_schema_v2() -> EnhancedStateSchema {
 mod backend_integration_tests {
     use super::*;
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_migration_with_memory_backend() {
         let (state_manager, _temp_dir) = create_test_state_manager_with_backend("memory")
@@ -229,6 +230,7 @@ mod backend_integration_tests {
         assert_eq!(retrieved, Some(test_data));
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_migration_with_sled_backend() {
         let (state_manager, _temp_dir) = create_test_state_manager_with_backend("sled")
@@ -263,6 +265,7 @@ mod backend_integration_tests {
 mod schema_evolution_integration_tests {
     use super::*;
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_simple_schema_evolution() {
         let (state_manager, _temp_dir) = create_test_state_manager_with_backend("memory")
@@ -351,6 +354,7 @@ mod schema_evolution_integration_tests {
         }
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_complex_schema_evolution() {
         let mut planner = MigrationPlanner::new();
@@ -392,6 +396,7 @@ mod agent_integration_tests {
     use super::*;
     use llmspell_state_persistence::agent_state::*;
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_agent_state_with_migration() {
         let (state_manager, _temp_dir) = create_test_state_manager_with_backend("memory")
@@ -480,6 +485,7 @@ mod agent_integration_tests {
         }
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_agent_conversation_evolution() {
         let (state_manager, _temp_dir) = create_test_state_manager_with_backend("memory")
@@ -562,6 +568,7 @@ mod agent_integration_tests {
 mod hook_integration_tests {
     use super::*;
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_migration_with_hooks() {
         let (state_manager, _temp_dir) = create_test_state_manager_with_backend("memory")
@@ -615,6 +622,7 @@ mod hook_integration_tests {
         }
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test] 
     async fn test_event_correlation_tracking() {
         let (state_manager, _temp_dir) = create_test_state_manager_with_backend("memory")

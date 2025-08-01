@@ -475,6 +475,7 @@ mod tests {
     use llmspell_core::ExecutionContext;
     use serde_json::json;
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_execution_context_creation() {
         let base_context = ExecutionContext::new();
@@ -484,6 +485,7 @@ mod tests {
         assert_eq!(tool_context.get_tool_data("nonexistent").await, None);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_data_storage() {
         let base_context = ExecutionContext::new();
@@ -497,6 +499,7 @@ mod tests {
         assert_eq!(retrieved, Some(json!({"value": 42})));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_shared_data_storage() {
         let base_context = ExecutionContext::new();
@@ -510,6 +513,7 @@ mod tests {
         assert_eq!(retrieved, Some(json!("shared_value")));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_inheritance_rules() {
         let base_context = ExecutionContext::new();
@@ -523,6 +527,7 @@ mod tests {
         assert_eq!(rule, ContextInheritanceRule::Inherit);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_child_context_creation() {
         let base_context = ExecutionContext::new();
@@ -544,6 +549,7 @@ mod tests {
         );
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_execution_recording() {
         let base_context = ExecutionContext::new();
@@ -568,6 +574,7 @@ mod tests {
         assert!(!tool_context.has_executed_tool("other_tool").await);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_context_manager() {
         let manager = ToolContextManager::new();
@@ -587,6 +594,7 @@ mod tests {
         assert_eq!(manager.context_count().await, 0);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_context_serialization() {
         let base_context = ExecutionContext::new();

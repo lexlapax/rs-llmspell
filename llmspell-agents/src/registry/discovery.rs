@@ -455,6 +455,7 @@ impl Default for SearchBuilder {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_search_builder() {
         let criteria = SearchBuilder::new()

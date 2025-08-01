@@ -391,6 +391,7 @@ mod tests {
     use super::*;
     use crate::builder::AgentBuilder;
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_basic_agent_creation() {
         let config = AgentBuilder::basic("test-agent")
@@ -402,6 +403,7 @@ mod tests {
         assert_eq!(agent.metadata().name, "test-agent");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_basic_agent_execution() {
         let config = AgentBuilder::basic("test-agent").build().unwrap();
@@ -419,6 +421,7 @@ mod tests {
             .contains("BasicAgent 'test-agent' received: Hello, agent!"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_basic_agent_conversation() {
         let config = AgentBuilder::basic("test-agent").build().unwrap();
@@ -444,6 +447,7 @@ mod tests {
         assert_eq!(conv.len(), 0);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_basic_agent_state_machine_integration() {
         let config = AgentBuilder::basic("test-agent").build().unwrap();
@@ -481,6 +485,7 @@ mod tests {
         assert!(!agent.is_healthy().await);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_basic_agent_execution_state_validation() {
         let config = AgentBuilder::basic("test-agent").build().unwrap();
@@ -500,6 +505,7 @@ mod tests {
         assert!(result.is_ok());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_basic_agent_validation() {
         let config = AgentBuilder::basic("test-agent").build().unwrap();

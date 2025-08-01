@@ -290,6 +290,7 @@ impl From<CompositionError> for LLMSpellError {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_capability_creation() {
         let cap = Capability {
@@ -303,6 +304,7 @@ mod tests {
         assert_eq!(cap.category, CapabilityCategory::DataProcessing);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_composition_metadata() {
         let mut metadata = CompositionMetadata {
@@ -321,6 +323,7 @@ mod tests {
         assert_eq!(metadata.max_components, Some(10));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_execution_pattern() {
         let condition = ExecutionCondition {
@@ -341,6 +344,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_composite_agent_builder() {
         let builder = CompositeAgentBuilder::new("test-composite")

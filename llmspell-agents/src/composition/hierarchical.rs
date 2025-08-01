@@ -581,6 +581,7 @@ mod tests {
     use llmspell_core::types::{AgentInput, AgentOutput};
     use llmspell_core::{ComponentMetadata, LLMSpellError};
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_hierarchical_agent_creation() {
         let agent = HierarchicalAgentBuilder::new("test-hierarchical")
@@ -591,6 +592,7 @@ mod tests {
         assert_eq!(agent.depth(), 0);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_component_management() {
         let mut agent = HierarchicalCompositeAgent::new("parent", HierarchicalConfig::default());
@@ -637,6 +639,7 @@ mod tests {
         assert_eq!(components.len(), 1);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_capability_aggregation() {
         let agent = HierarchicalAgentBuilder::new("capable-agent")

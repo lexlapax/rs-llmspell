@@ -260,6 +260,7 @@ pub trait PersistentAgent {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_persistent_agent_state_creation() {
         let state = PersistentAgentState::new("agent_123".to_string(), "assistant".to_string());
@@ -271,6 +272,7 @@ mod tests {
         assert!(state.correlation_context.is_none());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_agent_state_serialization() {
         use llmspell_storage::StorageSerialize;

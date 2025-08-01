@@ -247,6 +247,7 @@ mod tests {
     use super::*;
     use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_sandbox_context_creation() {
         let security_reqs = SecurityRequirements::safe()
@@ -267,6 +268,7 @@ mod tests {
         assert!(context.allowed_env_vars.contains(&"HOME".to_string()));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_path_permissions() {
         let security_reqs = SecurityRequirements::safe()
@@ -281,6 +283,7 @@ mod tests {
         assert!(!context.is_path_allowed(Path::new("/etc/passwd")));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_domain_permissions() {
         let security_reqs = SecurityRequirements::safe()
@@ -295,6 +298,7 @@ mod tests {
         assert!(!context.is_domain_allowed("malicious.com"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_env_var_permissions() {
         let security_reqs = SecurityRequirements::safe()
@@ -309,6 +313,7 @@ mod tests {
         assert!(!context.is_env_var_allowed("SECRET_KEY"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_wildcard_permissions() {
         let security_reqs = SecurityRequirements::privileged();

@@ -12,6 +12,7 @@ fn extract_result(response_text: &str) -> Value {
     output["result"].clone()
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_parse_multiple_formats() {
     let tool = DateTimeHandlerTool::new();
@@ -57,6 +58,7 @@ async fn test_parse_multiple_formats() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_timezone_conversion_with_dst() {
     let tool = DateTimeHandlerTool::new();
@@ -102,6 +104,7 @@ async fn test_timezone_conversion_with_dst() {
     assert!(output["converted"].as_str().unwrap().contains("EST"));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_current_time_operations() {
     let tool = DateTimeHandlerTool::new();
@@ -146,6 +149,7 @@ async fn test_current_time_operations() {
     assert!(output["datetime"].as_str().unwrap().contains("JST"));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_date_arithmetic_operations() {
     let tool = DateTimeHandlerTool::new();
@@ -211,6 +215,7 @@ async fn test_date_arithmetic_operations() {
     assert!(output["result"].as_str().unwrap().contains("2024-12-30"));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_leap_year_handling() {
     let tool = DateTimeHandlerTool::new();
@@ -271,6 +276,7 @@ async fn test_leap_year_handling() {
     assert_eq!(output["info"]["days_in_month"], 28);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_date_difference_calculations() {
     let tool = DateTimeHandlerTool::new();
@@ -322,6 +328,7 @@ async fn test_date_difference_calculations() {
         .contains("5 days ago"));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_date_info_details() {
     let tool = DateTimeHandlerTool::new();
@@ -355,6 +362,7 @@ async fn test_date_info_details() {
         .contains("23:59:59"));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_format_options() {
     let tool = DateTimeHandlerTool::new();
@@ -404,6 +412,7 @@ async fn test_format_options() {
     assert!(output["example_formats"]["ISO8601"].is_string());
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_error_handling() {
     let tool = DateTimeHandlerTool::new();
@@ -457,6 +466,7 @@ async fn test_error_handling() {
     assert!(result.is_err());
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_edge_cases() {
     let tool = DateTimeHandlerTool::new();
@@ -519,6 +529,7 @@ async fn test_edge_cases() {
     assert!(output["converted"].is_string());
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_tool_metadata() {
     use llmspell_core::traits::tool::{SecurityLevel, Tool, ToolCategory};

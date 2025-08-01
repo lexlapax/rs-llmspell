@@ -144,6 +144,7 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_no_circular_reference() {
         let value = json!({
@@ -160,6 +161,7 @@ mod tests {
         assert!(detector.check_value(&value).is_ok());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_circular_reference_detection() {
         // Create a value that would have circular reference if we could
@@ -183,6 +185,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_safe_serialize() {
         #[derive(Serialize)]

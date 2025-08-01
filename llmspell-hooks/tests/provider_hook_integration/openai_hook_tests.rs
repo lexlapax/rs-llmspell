@@ -8,6 +8,8 @@ use tokio::time::timeout;
 use tracing::{info, warn};
 use tracing_subscriber;
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 #[ignore = "requires OPENAI_API_KEY"]
 async fn test_openai_hook_execution_and_persistence() -> Result<()> {
@@ -83,6 +85,8 @@ async fn test_openai_hook_execution_and_persistence() -> Result<()> {
     Ok(())
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 #[ignore = "requires OPENAI_API_KEY"]
 async fn test_openai_cost_tracking_hook() -> Result<()> {
@@ -129,6 +133,8 @@ async fn test_openai_cost_tracking_hook() -> Result<()> {
     Ok(())
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 #[ignore = "requires OPENAI_API_KEY"]
 async fn test_openai_rate_limiting_hook() -> Result<()> {

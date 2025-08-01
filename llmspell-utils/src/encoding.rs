@@ -447,6 +447,7 @@ pub fn remove_bom(data: &[u8]) -> &[u8] {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_hash_string() {
         let text = "Hello, World!";
@@ -465,6 +466,7 @@ mod tests {
         );
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_verify_hash() {
         let data = b"test data";
@@ -478,6 +480,7 @@ mod tests {
         ));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_base64_encoding() {
         let data = b"Hello, Base64!";
@@ -493,6 +496,7 @@ mod tests {
         assert_eq!(url_decoded, data);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_hex_conversion() {
         let data = vec![0xFF, 0x00, 0xAB, 0xCD];
@@ -503,6 +507,7 @@ mod tests {
         assert_eq!(parsed, data);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_text_encoding_detection() {
         // UTF-8 with BOM
@@ -526,6 +531,7 @@ mod tests {
         assert!(matches!(detected, TextEncoding::Utf8 | TextEncoding::Ascii));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_text_encoding_conversion() {
         // Test simple ASCII conversion
@@ -558,6 +564,7 @@ mod tests {
         assert_eq!(windows_back, ascii_only);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_line_ending_detection() {
         assert_eq!(detect_line_ending("line1\nline2\n"), LineEnding::Lf);
@@ -570,6 +577,7 @@ mod tests {
         assert_eq!(detect_line_ending("no line endings"), LineEnding::Lf); // Default
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_line_ending_conversion() {
         let text = "line1\r\nline2\nline3\r";
@@ -587,6 +595,7 @@ mod tests {
         assert_eq!(cr, "line1\rline2\rline3\r");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_tabs_spaces_conversion() {
         let text_with_tabs = "line1\tindented\ttext";
@@ -601,6 +610,7 @@ mod tests {
         assert_eq!(tabs, text_with_tabs);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_bom_removal() {
         // UTF-8 BOM
@@ -619,6 +629,7 @@ mod tests {
         assert_eq!(result, no_bom);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_decode_encode_text() {
         let text = "Hello, World!";

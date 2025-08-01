@@ -435,6 +435,7 @@ pub struct ComparisonResult {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_inspection_query() {
         let query = InspectionQuery {
@@ -456,6 +457,7 @@ mod tests {
         assert_eq!(deserialized.limit, Some(100));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_pattern_detection() {
         // Test pattern type serialization

@@ -297,6 +297,7 @@ impl RegistrationHook for CompositeRegistrationHook {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_registration_builder() {
         let options = RegistrationBuilder::new()

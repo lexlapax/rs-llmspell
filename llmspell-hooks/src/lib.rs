@@ -117,6 +117,7 @@ pub mod prelude {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_crate_exports() {
         // Verify all major types are accessible
@@ -130,6 +131,7 @@ mod tests {
         let _context = HookContext::new(HookPoint::SystemStartup, component_id);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     #[allow(clippy::len_zero)]
     fn test_version() {

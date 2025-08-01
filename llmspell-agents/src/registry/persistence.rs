@@ -296,6 +296,7 @@ mod tests {
     use super::*;
     use llmspell_storage::MemoryBackend;
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_persistent_registry_basic_operations() {
         let storage = Arc::new(MemoryBackend::new());
@@ -409,6 +410,7 @@ mod tests {
         assert!(!registry.exists("test-agent").await.unwrap());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_persistent_registry_persistence() {
         let storage = Arc::new(MemoryBackend::new());

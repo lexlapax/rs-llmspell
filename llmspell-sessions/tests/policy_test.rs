@@ -17,6 +17,7 @@ use llmspell_storage::MemoryBackend;
 use std::sync::Arc;
 use std::time::Duration;
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_timeout_policy_enforcement() -> Result<()> {
     let hook_registry = Arc::new(HookRegistry::new());
@@ -57,6 +58,7 @@ async fn test_timeout_policy_enforcement() -> Result<()> {
     Ok(())
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_resource_limit_policy_enforcement() -> Result<()> {
     let hook_registry = Arc::new(HookRegistry::new());
@@ -94,6 +96,7 @@ async fn test_resource_limit_policy_enforcement() -> Result<()> {
     Ok(())
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_rate_limit_policy_enforcement() -> Result<()> {
     let hook_registry = Arc::new(HookRegistry::new());
@@ -128,6 +131,7 @@ async fn test_rate_limit_policy_enforcement() -> Result<()> {
     Ok(())
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_policy_composition_sequential() -> Result<()> {
     let hook_registry = Arc::new(HookRegistry::new());
@@ -150,6 +154,7 @@ async fn test_policy_composition_sequential() -> Result<()> {
     Ok(())
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_policy_composition_parallel() -> Result<()> {
     let hook_registry = Arc::new(HookRegistry::new());
@@ -178,6 +183,7 @@ async fn test_policy_composition_parallel() -> Result<()> {
     Ok(())
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_policy_composition_voting() -> Result<()> {
     let hook_registry = Arc::new(HookRegistry::new());
@@ -206,6 +212,7 @@ async fn test_policy_composition_voting() -> Result<()> {
     Ok(())
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_policy_integration_with_session_manager() -> Result<()> {
     // Create infrastructure
@@ -255,6 +262,7 @@ async fn test_policy_integration_with_session_manager() -> Result<()> {
     Ok(())
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_policy_configuration_update() -> Result<()> {
     let hook_registry = Arc::new(HookRegistry::new());
@@ -284,6 +292,7 @@ async fn test_policy_configuration_update() -> Result<()> {
     Ok(())
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_operation_specific_rate_limits() -> Result<()> {
     let hook_registry = Arc::new(HookRegistry::new());
@@ -324,6 +333,7 @@ async fn test_operation_specific_rate_limits() -> Result<()> {
     Ok(())
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_warning_thresholds() -> Result<()> {
     let hook_registry = Arc::new(HookRegistry::new());

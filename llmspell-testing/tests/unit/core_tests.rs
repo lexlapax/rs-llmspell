@@ -9,6 +9,7 @@
 mod core_type_tests {
     use llmspell_core::types::{AgentInput, AgentOutput};
 
+    #[cfg_attr(test_category = "integration")]
     #[test]
     // TODO: Add category: unit
     fn test_agent_input_creation() {
@@ -16,6 +17,7 @@ mod core_type_tests {
         assert_eq!(input.text, "test input");
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[test]
     // TODO: Add category: unit
     fn test_agent_output_creation() {
@@ -23,6 +25,7 @@ mod core_type_tests {
         assert_eq!(output.text, "test output");
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[test]
     // TODO: Add category: unit
     fn test_agent_input_with_parameters() {

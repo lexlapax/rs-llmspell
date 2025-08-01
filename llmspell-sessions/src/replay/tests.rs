@@ -70,6 +70,7 @@ mod tests {
         .unwrap()
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_replay_engine_creation() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
@@ -91,6 +92,7 @@ mod tests {
             .is_ok());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_session_replay_adapter_creation() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
@@ -109,6 +111,7 @@ mod tests {
         assert!(!can_replay, "Non-existent session should not be replayable");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_session_replay_config_defaults() {
         let config = SessionReplayConfig::default();
@@ -120,6 +123,7 @@ mod tests {
         assert!(config.target_timestamp.is_none());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_session_replay_config_conversion() {
         let session_config = SessionReplayConfig {
@@ -140,6 +144,7 @@ mod tests {
         assert!(replay_config.tags.contains(&"session".to_string()));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_session_manager_replay_integration() {
         let manager = create_test_session_manager().await;
@@ -185,6 +190,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_replay_engine_direct_access() {
         let manager = create_test_session_manager().await;
@@ -198,6 +204,7 @@ mod tests {
         assert!(!can_replay);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_replay_adapter_timeline_empty_session() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
@@ -231,6 +238,7 @@ mod tests {
         assert!(result.is_err());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_replay_adapter_with_correlation_id() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
@@ -280,6 +288,7 @@ mod tests {
         assert!(timeline.is_empty());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_replay_status_tracking() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
@@ -322,6 +331,7 @@ mod tests {
         assert_eq!(status.total_hooks, 10);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_replay_stop() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
@@ -366,6 +376,7 @@ mod tests {
         ));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_replay_progress_update() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
@@ -405,6 +416,7 @@ mod tests {
         assert_eq!(status.current_hook, Some("hook_five".to_string()));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_clear_completed_replays() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
@@ -481,6 +493,7 @@ mod tests {
         assert!(adapter.get_replay_status(&session4).is_none());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_session_storage_with_metadata() {
         let manager = create_test_session_manager().await;
@@ -503,6 +516,7 @@ mod tests {
         assert!(!can_replay);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_query_session_hooks() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
@@ -543,6 +557,7 @@ mod tests {
         assert!(results.is_empty());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_get_session_replay_metadata() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
@@ -585,6 +600,7 @@ mod tests {
         assert!(!replay_metadata.can_replay);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_list_replayable_sessions() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
@@ -625,6 +641,7 @@ mod tests {
         assert!(replayable.is_empty());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_storage_key_patterns() {
         // Test that our key patterns are correct and compatible
@@ -672,6 +689,7 @@ mod tests {
         assert!(storage_backend.get(&metadata_key).await.unwrap().is_some());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_storage_integration_with_existing_infrastructure() {
         // Test that we're using existing storage infrastructure correctly
@@ -703,6 +721,7 @@ mod tests {
         assert!(keys.iter().any(|k| k.contains(&session_id.to_string())));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_query_functionality_with_filters() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
@@ -747,6 +766,7 @@ mod tests {
         assert!(results.is_empty()); // No hooks stored yet
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_no_new_storage_code_written() {
         // Verify we're only using existing storage backends and not implementing new ones
@@ -769,6 +789,7 @@ mod tests {
         assert!(!can_replay); // No hooks yet
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_session_replay_controls_creation() {
         use super::super::session_controls::{SessionReplayControlConfig, SessionReplayControls};
@@ -781,6 +802,7 @@ mod tests {
         assert!(active_replays.is_empty());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_session_replay_scheduling() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
@@ -820,6 +842,7 @@ mod tests {
         assert!(result.is_err()); // No executions to replay
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_replay_pause_resume() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
@@ -841,6 +864,7 @@ mod tests {
         assert!(adapter.resume_replay(&session_id).await.is_err());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_replay_speed_control() {
         use super::super::session_controls::SessionReplaySpeed;
@@ -866,6 +890,7 @@ mod tests {
         assert_eq!(adjusted, Duration::from_secs(5)); // 10s / 2x = 5s
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_breakpoint_management() {
         use super::super::session_controls::{SessionBreakpoint, SessionBreakpointCondition};
@@ -903,6 +928,7 @@ mod tests {
             .is_ok());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_step_debugging() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
@@ -922,6 +948,7 @@ mod tests {
         assert!(result.is_ok());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_replay_progress_tracking() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
@@ -947,6 +974,7 @@ mod tests {
         adapter.clear_session_controls(&session_id);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_session_replay_state_conversions() {
         use super::super::session_controls::SessionReplayState;
@@ -971,6 +999,7 @@ mod tests {
         assert!(SessionReplayState::Paused.to_replay_state().is_none());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_controls_with_session_manager() {
         let manager = create_test_session_manager().await;

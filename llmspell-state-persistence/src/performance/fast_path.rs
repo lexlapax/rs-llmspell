@@ -215,6 +215,7 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_fast_serialization() {
         let config = FastPathConfig::default();
@@ -227,6 +228,7 @@ mod tests {
         assert_eq!(value, deserialized);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_performance_overhead() {
         println!("\n=== Fast Path Performance Test ===");
@@ -286,6 +288,7 @@ mod tests {
         );
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_ephemeral_cache() {
         let config = FastPathConfig {
@@ -322,6 +325,7 @@ mod tests {
         assert_eq!(stats.entry_count, 2);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_compression() {
         let config = FastPathConfig {
@@ -342,6 +346,7 @@ mod tests {
         assert_ne!(large_data, compressed);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_small_data_not_compressed() {
         let config = FastPathConfig {

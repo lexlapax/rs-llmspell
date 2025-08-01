@@ -445,6 +445,7 @@ mod tests {
         UniversalEvent::new(event_type, Value::Null, Language::Rust)
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_storage_adapter_basic_operations() {
         let backend = MemoryBackend::new();
@@ -458,6 +459,7 @@ mod tests {
         assert_eq!(events[0].event_type, "test.event");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_storage_stats() {
         let backend = MemoryBackend::new();
@@ -475,6 +477,7 @@ mod tests {
         assert_eq!(stats.events_by_type["test.event2"], 1);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_persistence_manager() {
         let backend = MemoryBackend::new();

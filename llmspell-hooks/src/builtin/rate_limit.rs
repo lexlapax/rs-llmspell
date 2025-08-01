@@ -576,6 +576,7 @@ mod tests {
         HookContext::new(HookPoint::BeforeToolExecution, component_id)
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_rate_limit_hook_basic() {
         let hook = RateLimitHook::new()
@@ -594,6 +595,7 @@ mod tests {
         assert!(context.get_metadata("X-RateLimit-Reset").is_some());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_rate_limit_exceeded() {
         let hook = RateLimitHook::new().with_rate_per_second(1.0).with_burst(2);
@@ -614,6 +616,7 @@ mod tests {
         assert!(context.get_metadata("X-RateLimit-Retry-After").is_some());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_rate_limit_strategies() {
         // Test per-component strategy
@@ -635,6 +638,7 @@ mod tests {
         assert!(matches!(result2, HookResult::Continue));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_rate_limit_delay_action() {
         // Use a very fast refill rate for testing
@@ -665,6 +669,7 @@ mod tests {
         assert!(matches!(result, HookResult::Continue));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_rate_limit_custom_limits() {
         let hook = RateLimitHook::new()
@@ -694,6 +699,7 @@ mod tests {
         assert_eq!(limit, "100");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_rate_limit_warning_threshold() {
         let hook = RateLimitHook::new()
@@ -714,6 +720,7 @@ mod tests {
         assert!(context.get_metadata("X-RateLimit-Warning").is_some());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_rate_limit_metrics() {
         let hook = RateLimitHook::new().with_rate_per_second(1.0).with_burst(1); // Total capacity = 2
@@ -732,6 +739,7 @@ mod tests {
         assert_eq!(metrics.allowed_ratio(), 2.0 / 3.0);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_hook_metadata() {
         let hook = RateLimitHook::new();
@@ -745,6 +753,7 @@ mod tests {
         assert!(metadata.tags.contains(&"rate-limit".to_string()));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_rate_limit_config_defaults() {
         let config = RateLimitConfig::default();
@@ -759,6 +768,7 @@ mod tests {
         assert_eq!(config.warning_threshold, 0.8);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_replayable_hook_implementation() {
         let hook = RateLimitHook::new()

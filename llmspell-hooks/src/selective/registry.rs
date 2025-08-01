@@ -595,6 +595,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_feature_flags() {
         let mut features = HookFeatures::new();
@@ -609,6 +610,7 @@ mod tests {
         assert!(!features.is_feature_enabled("logging"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_feature_dependencies() {
         let mut features = HookFeatures::new();
@@ -619,6 +621,7 @@ mod tests {
         assert!(features.is_feature_enabled("basic")); // Automatically enabled
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_selective_registration() {
         let mut features = HookFeatures::new();
@@ -643,6 +646,7 @@ mod tests {
         assert_eq!(hooks.len(), 1);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_feature_filtering() {
         let features = HookFeatures::new(); // No features enabled
@@ -673,6 +677,7 @@ mod tests {
         assert_eq!(hooks.len(), 1);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_lazy_instantiation() {
         let features = HookFeatures::with_features(vec!["core"]);
@@ -708,6 +713,7 @@ mod tests {
         assert_eq!(*counter.read(), 2); // Still 2
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_memory_management() {
         let features = HookFeatures::with_features(vec!["test"]);
@@ -742,6 +748,7 @@ mod tests {
         assert!(stats.instantiated_hooks <= 5); // May be less due to LRU
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_statistics() {
         let features = HookFeatures::with_features(vec!["stats"]);
@@ -778,6 +785,7 @@ mod tests {
         assert_eq!(stats.feature_usage.get("logging"), Some(&1));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_instantiation_tracking() {
         let features = HookFeatures::with_features(vec!["test"]);
@@ -810,6 +818,7 @@ mod tests {
         assert!(hook_entry.is_instantiated());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_clear_instances() {
         let features = HookFeatures::with_features(vec!["clear"]);

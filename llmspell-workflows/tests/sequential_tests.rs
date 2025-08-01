@@ -9,6 +9,7 @@ use llmspell_workflows::{
 use std::time::Duration;
 
 /// Test basic workflow creation and step management
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_workflow_creation_and_setup() {
     let config = WorkflowConfig::default();
@@ -23,6 +24,7 @@ async fn test_workflow_creation_and_setup() {
 }
 
 /// Test workflow execution with multiple tool types
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_mixed_tool_workflow_execution() {
     let config = WorkflowConfig::default();
@@ -81,6 +83,7 @@ async fn test_mixed_tool_workflow_execution() {
 }
 
 /// Test workflow with shared data between steps
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_workflow_shared_data() {
     let config = WorkflowConfig::default();
@@ -119,6 +122,7 @@ async fn test_workflow_shared_data() {
 }
 
 /// Test workflow continue-on-error strategy
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_workflow_continue_strategy() {
     let config = WorkflowConfig {
@@ -162,6 +166,7 @@ async fn test_workflow_continue_strategy() {
 }
 
 /// Test workflow step timeout functionality
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_workflow_step_timeout() {
     let config = WorkflowConfig::default();
@@ -193,6 +198,7 @@ async fn test_workflow_step_timeout() {
 }
 
 /// Test workflow execution statistics
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_workflow_execution_statistics() {
     let config = WorkflowConfig::default();
@@ -225,6 +231,7 @@ async fn test_workflow_execution_statistics() {
 }
 
 /// Test workflow reset functionality
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_workflow_reset() {
     let config = WorkflowConfig::default();
@@ -267,6 +274,7 @@ async fn test_workflow_reset() {
 }
 
 /// Test workflow performance requirements (<50ms creation)
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_workflow_performance_creation() {
     let start = std::time::Instant::now();
@@ -285,6 +293,7 @@ async fn test_workflow_performance_creation() {
 }
 
 /// Test workflow with retry strategy
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_workflow_retry_strategy() {
     let config = WorkflowConfig::default();
@@ -316,6 +325,7 @@ async fn test_workflow_retry_strategy() {
 }
 
 /// Integration test: Complete data processing pipeline
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_complete_data_pipeline() {
     let config = WorkflowConfig::default();

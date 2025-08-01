@@ -23,6 +23,7 @@ use uuid::Uuid;
 mod migration_event_tests {
     use super::*;
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_migration_event_creation_and_properties() {
         let migration_id = Uuid::new_v4();
@@ -70,6 +71,7 @@ mod migration_event_tests {
         assert!(completed_event.is_completion());
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_migration_event_metadata_creation() {
         let migration_id = Uuid::new_v4();
@@ -92,6 +94,7 @@ mod migration_event_tests {
         assert!(metadata.tags.contains(&"dry_run".to_string())); // dry_run=true adds this tag
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_validation_event_creation() {
         let migration_id = Uuid::new_v4();
@@ -123,6 +126,7 @@ mod migration_event_tests {
         assert!(failed_validation.is_error());
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_step_events_creation() {
         let migration_id = Uuid::new_v4();
@@ -211,6 +215,7 @@ mod migration_engine_event_integration_tests {
         (schema_v1, schema_v2)
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_migration_event_emission_during_migration() {
         let (engine, _event_bus, _correlation_tracker) = create_test_migration_engine().await;
@@ -248,6 +253,7 @@ mod migration_engine_event_integration_tests {
         assert!(migration_result.is_successful());
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_migration_event_correlation_tracking() {
         let (engine, _event_bus, _correlation_tracker) = create_test_migration_engine().await;
@@ -288,6 +294,7 @@ mod migration_engine_event_integration_tests {
         // The internal correlation tracking is tested at the event system level
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_migration_hook_execution_integration() {
         let (engine, _event_bus, _correlation_tracker) = create_test_migration_engine().await;
@@ -325,6 +332,7 @@ mod migration_engine_event_integration_tests {
         assert!(migration_result.is_successful());
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_migration_performance_requirements() {
         let (engine, _event_bus, _correlation_tracker) = create_test_migration_engine().await;
@@ -373,6 +381,7 @@ mod migration_engine_event_integration_tests {
         );
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_migration_event_filtering_and_querying() {
         let (engine, _event_bus, _correlation_tracker) = create_test_migration_engine().await;

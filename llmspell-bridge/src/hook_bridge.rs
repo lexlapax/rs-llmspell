@@ -255,6 +255,7 @@ impl HookBridge {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_hook_bridge_creation() {
         let context = Arc::new(GlobalContext::new(
@@ -269,6 +270,7 @@ mod tests {
         assert!(bridge.language_hooks.read().await.is_empty());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_hook_registration() {
         let context = Arc::new(GlobalContext::new(

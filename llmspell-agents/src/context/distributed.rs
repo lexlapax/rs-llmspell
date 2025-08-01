@@ -557,6 +557,7 @@ impl NodeDiscovery for MockNodeDiscovery {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_distributed_context_creation() {
         let discovery = Arc::new(MockNodeDiscovery::new());
@@ -567,6 +568,7 @@ mod tests {
         assert_eq!(dist_ctx.local_node.status, NodeStatus::Healthy);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_node_discovery() {
         let discovery = Arc::new(MockNodeDiscovery::new());
@@ -595,6 +597,7 @@ mod tests {
         assert!(nodes.contains_key("node1"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_replication_strategies() {
         let discovery = Arc::new(MockNodeDiscovery::new());
@@ -614,6 +617,7 @@ mod tests {
         assert_eq!(replication.pending.len(), 0);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_cluster_stats() {
         let discovery = Arc::new(MockNodeDiscovery::new());

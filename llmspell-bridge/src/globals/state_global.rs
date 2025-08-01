@@ -822,6 +822,7 @@ impl Default for StateGlobal {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_state_global_metadata() {
         let global = StateGlobal::new();
@@ -830,6 +831,7 @@ mod tests {
         assert_eq!(metadata.version, "1.0.0"); // Phase 5 version with StateManager
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_state_in_memory_storage() {
         let global = StateGlobal::new();

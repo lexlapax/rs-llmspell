@@ -108,6 +108,7 @@ impl Agent for ConcurrentAgent {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_concurrent_agent_execution() {
     let agent = Arc::new(ConcurrentAgent::new("concurrent-test"));
@@ -146,6 +147,7 @@ async fn test_concurrent_agent_execution() {
     assert_eq!(conv.len(), num_tasks * 2); // User + Assistant messages
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_component_id_thread_safety() {
     let num_threads = 50;
@@ -176,6 +178,7 @@ async fn test_component_id_thread_safety() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_concurrent_conversation_modifications() {
     let agent = Arc::new(RwLock::new(ConcurrentAgent::new("conversation-test")));
@@ -217,6 +220,7 @@ async fn test_concurrent_conversation_modifications() {
     assert_eq!(conv.len(), 20);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_metadata_immutability() {
     // ComponentMetadata should be safely shareable
@@ -243,6 +247,7 @@ async fn test_metadata_immutability() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_execution_context_concurrent_access() {
     let context = Arc::new({
@@ -285,6 +290,7 @@ async fn test_execution_context_concurrent_access() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_error_thread_safety() {
     use std::thread;

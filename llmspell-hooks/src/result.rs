@@ -173,6 +173,7 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_hook_result_continuation() {
         assert!(HookResult::Continue.should_continue());
@@ -180,12 +181,14 @@ mod tests {
         assert!(!HookResult::Cancel("test".to_string()).should_continue());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_hook_result_cancellation() {
         assert!(HookResult::Cancel("reason".to_string()).is_cancelled());
         assert!(!HookResult::Continue.is_cancelled());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_hook_result_special_handling() {
         assert!(!HookResult::Continue.requires_special_handling());
@@ -193,6 +196,7 @@ mod tests {
         assert!(HookResult::Cancel("test".to_string()).requires_special_handling());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_retry_builder() {
         let result = RetryBuilder::new()
@@ -212,6 +216,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_fork_builder() {
         let result = ForkBuilder::new()
@@ -239,6 +244,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_hook_result_serialization() {
         let results = vec![

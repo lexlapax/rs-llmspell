@@ -755,6 +755,7 @@ mod tests {
     use super::*;
     use crate::traits::StepType;
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_conditional_workflow_creation() {
         let workflow =
@@ -763,6 +764,7 @@ mod tests {
         assert_eq!(workflow.branch_count(), 0);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_conditional_branch_creation() {
         let condition = Condition::Always;
@@ -781,6 +783,7 @@ mod tests {
         assert!(!branch.is_default);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_conditional_workflow_builder() {
         let condition = Condition::Always;
@@ -803,6 +806,7 @@ mod tests {
         assert_eq!(workflow.branch_count(), 1);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_conditional_workflow_execution_always_true() {
         let condition = Condition::Always;
@@ -828,6 +832,7 @@ mod tests {
         assert_eq!(result.successful_steps(), 1);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_conditional_workflow_execution_never_condition() {
         let condition = Condition::Never;
@@ -853,6 +858,7 @@ mod tests {
         assert_eq!(result.total_steps(), 0);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_conditional_workflow_default_branch() {
         let condition = Condition::Never;
@@ -891,6 +897,7 @@ mod tests {
         assert_eq!(result.successful_steps(), 1);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_conditional_workflow_shared_data_condition() {
         // Set up shared data

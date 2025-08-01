@@ -481,6 +481,7 @@ mod tests {
     use crate::templates::schema::{ComplexityLevel, TemplateCategory, TemplateMetadata};
     use crate::templates::tool_agent::ToolAgentTemplate;
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_template_customizer() {
         let base_template = Box::new(ToolAgentTemplate::new());
@@ -515,6 +516,7 @@ mod tests {
         assert!(result.is_ok());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_template_mixins() {
         let base_template = Box::new(ToolAgentTemplate::new());
@@ -547,6 +549,7 @@ mod tests {
         );
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_template_builder() {
         let metadata = TemplateMetadata {
@@ -586,6 +589,7 @@ mod tests {
         assert_eq!(template.schema().capability_requirements.len(), 1);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_parameter_helpers() {
         let range_param =
@@ -605,6 +609,7 @@ mod tests {
         assert_eq!(pattern_param.examples.len(), 2);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_customization_overrides() {
         let base_template = Box::new(ToolAgentTemplate::new());

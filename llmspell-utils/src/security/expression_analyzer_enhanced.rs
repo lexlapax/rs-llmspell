@@ -317,6 +317,7 @@ impl Default for EnhancedExpressionAnalyzer {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_banned_patterns() {
         let analyzer = EnhancedExpressionAnalyzer::new();
@@ -329,6 +330,7 @@ mod tests {
         assert!(!result.is_safe);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_memory_estimation() {
         let config = EnhancedExpressionConfig {
@@ -342,6 +344,7 @@ mod tests {
         assert!(result.unsafe_reason.unwrap().contains("memory usage"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_recursive_depth() {
         let config = EnhancedExpressionConfig {
@@ -357,6 +360,7 @@ mod tests {
         assert!(reason.contains("Recursive depth") || reason.contains("recursive"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_exponential_patterns() {
         let analyzer = EnhancedExpressionAnalyzer::new();
@@ -377,6 +381,7 @@ mod tests {
         );
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_variable_counting() {
         let config = EnhancedExpressionConfig {

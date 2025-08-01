@@ -254,6 +254,7 @@ mod tests {
     use std::sync::atomic::{AtomicU32, Ordering};
     use std::sync::Arc;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_backoff_strategies() {
         let linear = BackoffStrategy::Linear { increment_ms: 100 };
@@ -273,6 +274,7 @@ mod tests {
         );
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_retry_handler_success() {
         let handler = RetryHandler;
@@ -306,6 +308,7 @@ mod tests {
         assert_eq!(attempts.load(Ordering::SeqCst), 3);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_retry_handler_exhausted() {
         let handler = RetryHandler;

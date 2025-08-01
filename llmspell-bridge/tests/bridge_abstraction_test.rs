@@ -13,6 +13,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 /// Test that engines implement the bridge trait correctly
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_bridge_trait_implementation() {
     // Create Lua engine through factory
@@ -24,6 +25,7 @@ async fn test_bridge_trait_implementation() {
 }
 
 /// Test engine factory pattern
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_engine_factory_pattern() {
     // Test Lua engine creation
@@ -42,6 +44,7 @@ async fn test_engine_factory_pattern() {
 }
 
 /// Test engine capability detection
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_engine_capabilities() {
     let lua_config = LuaConfig::default();
@@ -63,6 +66,7 @@ async fn test_engine_capabilities() {
 }
 
 /// Test execution context management
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_execution_context() {
     let lua_config = LuaConfig::default();
@@ -236,6 +240,7 @@ async fn test_output_metadata() {
 }
 
 /// Test security context enforcement
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_security_enforcement() {
     let lua_config = LuaConfig::default();
@@ -253,6 +258,7 @@ async fn test_security_enforcement() {
 }
 
 /// Test memory limits
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_memory_limits() {
     let lua_config = LuaConfig {
@@ -299,6 +305,7 @@ fn assert_engine_compliance(engine: &dyn ScriptEngineBridge) {
 }
 
 /// Test engine info and registration
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_engine_info() {
     let info = EngineInfo {
@@ -313,6 +320,7 @@ async fn test_engine_info() {
 }
 
 /// Test cross-engine compatibility framework (for Phase 5)
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_cross_engine_compatibility_framework() {
     // This test validates that our framework is ready for multiple engines
@@ -344,6 +352,7 @@ async fn test_cross_engine_compatibility_framework() {
 }
 
 /// Test streaming execution implementation
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_streaming_execution_stub() {
     let lua_config = LuaConfig::default();

@@ -222,6 +222,7 @@ mod tests {
     use super::*;
     use tokio::runtime::Runtime;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_block_on_async_success() {
         let rt = Runtime::new().unwrap();
@@ -237,6 +238,7 @@ mod tests {
         assert_eq!(result.unwrap(), 42);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_block_on_async_error() {
         let rt = Runtime::new().unwrap();
@@ -258,6 +260,7 @@ mod tests {
         assert!(matches!(err, mlua::Error::ExternalError(_)));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_block_on_async_timeout() {
         let rt = Runtime::new().unwrap();
@@ -280,6 +283,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_block_on_async_panic_safety() {
         let rt = Runtime::new().unwrap();
@@ -303,6 +307,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_block_on_async_lua_success() {
         let rt = Runtime::new().unwrap();

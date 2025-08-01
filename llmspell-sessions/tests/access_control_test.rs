@@ -34,6 +34,7 @@ mod tests {
         .unwrap()
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_artifact_owner_permissions() {
         let manager = create_test_session_manager().await;
@@ -67,6 +68,7 @@ mod tests {
             .is_ok());
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_cross_session_access_denied() {
         let manager = create_test_session_manager().await;
@@ -104,6 +106,7 @@ mod tests {
             .contains("does not have delete permission"));
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_permission_granting() {
         let manager = create_test_session_manager().await;
@@ -174,6 +177,7 @@ mod tests {
             .is_ok());
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_permission_revocation() {
         let manager = create_test_session_manager().await;
@@ -226,6 +230,7 @@ mod tests {
             .is_err());
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_acl_viewing() {
         let manager = create_test_session_manager().await;
@@ -281,6 +286,7 @@ mod tests {
             .is_err());
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_audit_logging() {
         let manager = create_test_session_manager().await;
@@ -320,6 +326,7 @@ mod tests {
         assert!(!denied_entries.is_empty());
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_session_isolation() {
         let manager = create_test_session_manager().await;
@@ -372,6 +379,7 @@ mod tests {
         assert_eq!(artifacts2[0].name, "common.txt");
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_non_admin_cannot_grant_permissions() {
         let manager = create_test_session_manager().await;
@@ -421,6 +429,7 @@ mod tests {
             .contains("cannot grant permissions"));
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_access_control_with_different_artifact_types() {
         let manager = create_test_session_manager().await;
@@ -476,6 +485,7 @@ mod tests {
         assert!(result.is_ok());
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_access_control_performance_impact() {
         use std::time::Instant;
@@ -514,6 +524,7 @@ mod tests {
         );
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_security_edge_cases() {
         let manager = create_test_session_manager().await;
@@ -572,6 +583,7 @@ mod tests {
             .contains("Cannot revoke owner's permissions"));
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_audit_log_completeness() {
         let manager = create_test_session_manager().await;

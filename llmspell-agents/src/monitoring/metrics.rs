@@ -492,6 +492,7 @@ impl Default for MetricRegistry {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_counter() {
         let counter = Counter::new();
@@ -507,6 +508,7 @@ mod tests {
         assert_eq!(counter.get(), 0);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_gauge() {
         let gauge = Gauge::new();
@@ -525,6 +527,7 @@ mod tests {
         assert_eq!(gauge.get(), 50.0);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_histogram() {
         let hist = Histogram::new(vec![0.1, 0.5, 1.0, 5.0]);
@@ -551,6 +554,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_agent_metrics() {
         let metrics = AgentMetrics::new("test-agent".to_string());
@@ -581,6 +585,7 @@ mod tests {
         assert_eq!(metrics.cpu_percent.get(), 25.5);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_metric_registry() {
         let registry = MetricRegistry::new();

@@ -365,6 +365,7 @@ mod tests {
     use super::*;
     use serde_json::json;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_sensitive_field_detection() {
         let protector = SensitiveDataProtector::with_default();
@@ -377,6 +378,7 @@ mod tests {
         assert!(!protector.is_sensitive_field("username"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_api_key_pattern_detection() {
         let protector = SensitiveDataProtector::with_default();
@@ -395,6 +397,7 @@ mod tests {
         assert!(!protector.contains_sensitive_data("just a normal string"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_value_redaction() {
         let mut value = json!({
@@ -425,6 +428,7 @@ mod tests {
         assert!(value["tokens"].as_str().unwrap().starts_with("[REDACTED]"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_restore_redacted_values() {
         let original = json!({

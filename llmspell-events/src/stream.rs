@@ -330,6 +330,7 @@ mod tests {
         UniversalEvent::new(event_type, Value::Null, Language::Rust)
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_batched_stream() {
         let events = vec![
@@ -352,6 +353,7 @@ mod tests {
         assert_eq!(batch2.len(), 1);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_filtered_stream() {
         let events = vec![
@@ -376,6 +378,7 @@ mod tests {
         assert!(filtered.next().await.is_none());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_high_frequency_stream() {
         let stream = StreamUtils::high_frequency_test_stream(100, 1000);
@@ -387,6 +390,7 @@ mod tests {
         assert!(measurement.events_per_second > 0.0);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_high_throughput_processor() {
         let processor = HighThroughputProcessor::new(1000, 4);

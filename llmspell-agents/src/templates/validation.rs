@@ -861,6 +861,7 @@ mod tests {
         TemplateSchema::new(metadata)
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_validation_result() {
         let mut result = ValidationResult::success();
@@ -879,6 +880,7 @@ mod tests {
         assert!(!result.is_valid); // Errors invalidate
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_schema_validation() {
         let validator = TemplateValidator::new();
@@ -896,6 +898,7 @@ mod tests {
         assert!(result.errors.iter().any(|e| matches!(e, ValidationError::MissingRequired { field, .. } if field == "metadata.id")));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_parameter_validation() {
         let validator = TemplateValidator::new();
@@ -922,6 +925,7 @@ mod tests {
             .any(|e| matches!(e, ValidationError::IncompatibleConfig { .. })));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_resource_validation() {
         let mut validator = TemplateValidator::new();
@@ -946,6 +950,7 @@ mod tests {
         assert!(result.errors.iter().any(|e| matches!(e, ValidationError::ResourceLimitExceeded { resource, .. } if resource == "memory")));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_instantiation_validation() {
         let validator = TemplateValidator::new();
@@ -975,6 +980,7 @@ mod tests {
         assert!(result.is_valid);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_constraint_validation() {
         let validator = TemplateValidator::new();
@@ -1000,6 +1006,7 @@ mod tests {
         assert!(!result.is_valid);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_complexity_analysis() {
         let mut schema = create_test_schema();

@@ -452,6 +452,7 @@ mod tests {
     use serde_json::json;
     use std::collections::HashMap;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_tool_schema() {
         let tool = WebScraperTool::new(WebScraperConfig::default());
@@ -462,6 +463,7 @@ mod tests {
         assert!(schema.parameters[0].required);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_url_validation() {
         let tool = WebScraperTool::new(WebScraperConfig::default());
@@ -485,6 +487,7 @@ mod tests {
         assert!(result.is_err());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_js_wait_not_implemented() {
         let tool = WebScraperTool::new(WebScraperConfig::default());

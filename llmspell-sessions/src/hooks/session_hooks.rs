@@ -567,6 +567,7 @@ mod tests {
         types::{ComponentId, ComponentType, HookPoint},
     };
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_session_start_hook() {
         let hook = SessionStartHook::new();
@@ -585,6 +586,7 @@ mod tests {
         assert!(context.data.contains_key("start_timestamp"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_session_end_hook() {
         let hook = SessionEndHook::new();
@@ -605,6 +607,7 @@ mod tests {
         assert!(context.data.contains_key("session_duration_ms"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_replay_id() {
         let start_hook = SessionStartHook::new();
@@ -614,6 +617,7 @@ mod tests {
         assert_eq!(end_hook.replay_id(), "session_end:1.0.0");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_hook_serialization() {
         let hook = SessionCheckpointHook::new();
@@ -638,6 +642,7 @@ mod tests {
         );
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_default_hooks_creation() {
         let hooks = SessionHookRegistry::default_hooks();

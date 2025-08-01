@@ -303,6 +303,7 @@ mod tests {
     use crate::agent_state::{AgentMetadata, AgentStateData, ExecutionState, ToolUsageStats};
     use std::collections::HashMap;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_lock_free_basic_operations() {
         let store = LockFreeAgentStore::new();
@@ -361,6 +362,7 @@ mod tests {
         assert!(store.get("test-agent").is_none());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_concurrent_updates() {
         use std::thread;
@@ -427,6 +429,7 @@ mod tests {
         println!("Final custom data entries: {}", custom_data_count);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_performance_comparison() {
         use parking_lot::RwLock;
@@ -500,6 +503,7 @@ mod tests {
         println!("\nNote: Lock-free structures excel at concurrent access, not necessarily single-threaded performance.");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_fast_agent_ops() {
         let ops = FastAgentStateOps::new();

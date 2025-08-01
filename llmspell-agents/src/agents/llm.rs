@@ -494,6 +494,7 @@ crate::impl_persistent_agent!(LLMAgent);
 mod tests {
     use crate::builder::AgentBuilder;
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_llm_agent_creation() {
         // This test requires a provider manager setup

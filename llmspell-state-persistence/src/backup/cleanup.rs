@@ -269,6 +269,7 @@ mod tests {
     use super::*;
     use crate::backup::retention::{RetentionDecision, RetentionPriority};
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_cleanup_dry_run() {
         let temp_dir = tempfile::tempdir().unwrap();
@@ -298,6 +299,7 @@ mod tests {
         // This is fine for a dry run test
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_cleanup_scheduler() {
         let scheduler = CleanupScheduler::new(Duration::from_secs(60));

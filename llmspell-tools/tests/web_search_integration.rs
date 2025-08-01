@@ -9,6 +9,8 @@ use llmspell_core::{
 use llmspell_tools::search::{WebSearchConfig, WebSearchTool};
 use serde_json::Value;
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 async fn test_basic_web_search() {
     let config = WebSearchConfig::default();
@@ -35,6 +37,8 @@ async fn test_basic_web_search() {
     assert_eq!(response["operation"], "search");
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 async fn test_parameter_validation() {
     let tool = WebSearchTool::new(WebSearchConfig::default()).unwrap();
@@ -55,6 +59,8 @@ async fn test_parameter_validation() {
     assert!(result.is_ok());
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 async fn test_search_with_options() {
     let tool = WebSearchTool::new(WebSearchConfig::default()).unwrap();
@@ -106,6 +112,8 @@ async fn test_search_with_options() {
     assert!(result.is_ok());
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 async fn test_search_types() {
     let tool = WebSearchTool::new(WebSearchConfig::default()).unwrap();
@@ -158,6 +166,8 @@ async fn test_search_types() {
     assert!(result.is_ok());
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 async fn test_duckduckgo_provider() {
     let tool = WebSearchTool::new(WebSearchConfig::default()).unwrap();
@@ -184,6 +194,8 @@ async fn test_duckduckgo_provider() {
     }
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 async fn test_error_handling() {
     let tool = WebSearchTool::new(WebSearchConfig::default()).unwrap();
@@ -203,6 +215,8 @@ async fn test_error_handling() {
     assert_eq!(response["operation"], "search");
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 async fn test_tool_metadata() {
     let tool = WebSearchTool::new(WebSearchConfig::default()).unwrap();
@@ -231,6 +245,8 @@ async fn test_tool_metadata() {
     assert!(input_param.required);
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 async fn test_response_format() {
     let tool = WebSearchTool::new(WebSearchConfig::default()).unwrap();
@@ -266,6 +282,8 @@ async fn test_response_format() {
     assert!(result_data["results"].is_array());
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 async fn test_provider_fallback() {
     // Test fallback behavior: if no valid provider is found, it should use the default

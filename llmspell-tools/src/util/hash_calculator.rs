@@ -379,6 +379,7 @@ mod tests {
         input
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_hash_string() {
         let tool = create_test_tool();
@@ -401,6 +402,7 @@ mod tests {
         assert!(response["result"]["hash"].is_string());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_hash_file() {
         let tool = create_test_tool();
@@ -426,6 +428,7 @@ mod tests {
         assert_eq!(response["result"]["algorithm"], "MD5");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_verify_hash_success() {
         let tool = create_test_tool();
@@ -448,6 +451,7 @@ mod tests {
         assert!(response["result"]["verified"].as_bool().unwrap_or(false));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_verify_hash_failure() {
         let tool = create_test_tool();
@@ -470,6 +474,7 @@ mod tests {
         assert!(!response["result"]["verified"].as_bool().unwrap_or(true));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_missing_required_parameter() {
         let tool = create_test_tool();
@@ -488,6 +493,7 @@ mod tests {
         ));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_invalid_algorithm() {
         let tool = create_test_tool();
@@ -507,6 +513,7 @@ mod tests {
         assert_eq!(response["result"]["algorithm"], "SHA-256");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_file_size_limit() {
         let tool = HashCalculatorTool::new(HashCalculatorConfig {

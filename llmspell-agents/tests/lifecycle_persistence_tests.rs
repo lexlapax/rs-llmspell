@@ -22,6 +22,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::time::sleep;
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_save_on_pause() -> Result<()> {
     // Create state manager
@@ -107,6 +108,7 @@ async fn test_save_on_pause() -> Result<()> {
     Ok(())
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_save_on_stop() -> Result<()> {
     // Create state manager
@@ -192,6 +194,7 @@ async fn test_save_on_stop() -> Result<()> {
     Ok(())
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_auto_save() -> Result<()> {
     // Create state manager
@@ -246,6 +249,7 @@ async fn test_auto_save() -> Result<()> {
     Ok(())
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_circuit_breaker() -> Result<()> {
     // Create state manager
@@ -315,6 +319,7 @@ async fn test_circuit_breaker() -> Result<()> {
     Ok(())
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_non_blocking_saves() -> Result<()> {
     // Create state manager
@@ -406,6 +411,7 @@ async fn test_non_blocking_saves() -> Result<()> {
     Ok(())
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_presets() -> Result<()> {
     // Test different preset configurations

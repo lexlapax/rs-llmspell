@@ -540,6 +540,7 @@ mod tests {
     use super::*;
     use std::time::Duration;
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_state_manager_lifecycle() {
         let config = WorkflowConfig::default();
@@ -561,6 +562,7 @@ mod tests {
         );
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_shared_data_management() {
         let config = WorkflowConfig::default();
@@ -587,6 +589,7 @@ mod tests {
         assert!(all_data.contains_key("test_key"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_step_execution_tracking() {
         let config = WorkflowConfig::default();
@@ -614,6 +617,7 @@ mod tests {
         assert!(history[0].success);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_execution_statistics() {
         let config = WorkflowConfig::default();
@@ -648,6 +652,7 @@ mod tests {
         assert_eq!(stats.total_duration, Duration::from_secs(3));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_state_reset() {
         let config = WorkflowConfig::default();

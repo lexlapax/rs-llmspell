@@ -270,6 +270,7 @@ mod tests {
         UniversalEvent::new("test.event", Value::Null, Language::Rust)
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_drop_oldest_handler() {
         let handler = DropOldestHandler;
@@ -280,6 +281,7 @@ mod tests {
         assert_eq!(handler.strategy_name(), "drop_oldest");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_drop_newest_handler() {
         let handler = DropNewestHandler;
@@ -290,6 +292,7 @@ mod tests {
         assert_eq!(handler.strategy_name(), "drop_newest");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_reject_handler() {
         let handler = RejectHandler;
@@ -300,6 +303,7 @@ mod tests {
         assert_eq!(handler.strategy_name(), "reject");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_overflow_config() {
         let config = OverflowConfig::new(OverflowStrategy::Block, 1000);
@@ -316,6 +320,7 @@ mod tests {
         assert!(!config.is_full(999));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_overflow_result() {
         assert!(OverflowResult::Accepted.is_success());
@@ -328,6 +333,7 @@ mod tests {
         assert!(!OverflowResult::Accepted.should_retry());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_overflow_handler_factory() {
         let handler = OverflowHandlerFactory::create(OverflowStrategy::DropOldest);

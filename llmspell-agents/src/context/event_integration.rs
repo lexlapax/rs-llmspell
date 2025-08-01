@@ -424,6 +424,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_event_publish_subscribe() {
         let bus = ContextEventBus::new();
@@ -460,6 +461,7 @@ mod tests {
         assert_eq!(received[0].id, event.id);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_event_targeting() {
         let bus = ContextEventBus::new();
@@ -513,6 +515,7 @@ mod tests {
         assert_eq!(received2.len(), 0);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_event_history() {
         let config = EventBusConfig {
@@ -547,6 +550,7 @@ mod tests {
         assert!(ctx_events.len() <= 3); // Should have some events from this context
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_event_correlation() {
         let bus = ContextEventBus::new();

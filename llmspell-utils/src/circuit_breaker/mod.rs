@@ -360,6 +360,7 @@ mod tests {
     use super::*;
     use std::time::Duration;
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_circuit_breaker_state_transitions() {
         let config = CircuitBreakerConfig {
@@ -397,6 +398,7 @@ mod tests {
         assert_eq!(breaker.current_state().await, CircuitState::Closed);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_circuit_breaker_execute() {
         let breaker = CircuitBreaker::new(CircuitBreakerConfig::default());

@@ -178,6 +178,7 @@ impl Default for HookReplayEngine {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_replay_options() {
         let options = ReplayOptions::default();
@@ -186,6 +187,7 @@ mod tests {
         assert!(!options.simulate_timing);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_replay_engine_creation() {
         let engine = HookReplayEngine::new();

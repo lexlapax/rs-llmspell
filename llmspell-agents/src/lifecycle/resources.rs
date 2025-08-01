@@ -636,6 +636,7 @@ mod tests {
     use super::*;
     use crate::lifecycle::events::EventSystemConfig;
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_resource_allocation_basic() {
         let event_system = Arc::new(LifecycleEventSystem::new(EventSystemConfig::default()));
@@ -665,6 +666,7 @@ mod tests {
         assert_eq!(allocations.len(), 0);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_resource_limits() {
         let event_system = Arc::new(LifecycleEventSystem::new(EventSystemConfig::default()));
@@ -700,6 +702,7 @@ mod tests {
         assert!(result.is_err());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_deallocate_all() {
         let event_system = Arc::new(LifecycleEventSystem::new(EventSystemConfig::default()));
@@ -727,6 +730,7 @@ mod tests {
         assert_eq!(allocations.len(), 0);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_usage_statistics() {
         let event_system = Arc::new(LifecycleEventSystem::new(EventSystemConfig::default()));
@@ -759,6 +763,7 @@ mod tests {
         );
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_security_hook() {
         let event_system = Arc::new(LifecycleEventSystem::new(EventSystemConfig::default()));
@@ -787,6 +792,7 @@ mod tests {
         assert!(result.is_err());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_resource_types() {
         assert_eq!(ResourceType::Memory.name(), "memory");
@@ -794,6 +800,7 @@ mod tests {
         assert_eq!(ResourceType::Custom("test".to_string()).name(), "test");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_resource_request_builder() {
         let request = ResourceRequest::new("test-agent".to_string(), ResourceType::Memory, 1024)

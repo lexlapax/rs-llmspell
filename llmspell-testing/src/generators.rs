@@ -363,6 +363,7 @@ mod tests {
     use super::*;
 
     proptest! {
+        #[cfg_attr(test_category = "unit")]
         #[test]
         fn test_component_id_generation(id in component_id_strategy()) {
             // Should be a valid ComponentId
@@ -370,6 +371,7 @@ mod tests {
             let _ = id;
         }
 
+        #[cfg_attr(test_category = "unit")]
         #[test]
         fn test_component_id_from_name((name, id) in component_id_from_name_strategy()) {
             // Same name should generate same ID
@@ -377,6 +379,7 @@ mod tests {
             assert_eq!(id, id2);
         }
 
+        #[cfg_attr(test_category = "unit")]
         #[test]
         fn test_version_generation(version in version_strategy()) {
             // Version should serialize/deserialize correctly
@@ -385,12 +388,14 @@ mod tests {
             assert_eq!(version, parsed);
         }
 
+        #[cfg_attr(test_category = "unit")]
         #[test]
         fn test_agent_input_generation(input in agent_input_strategy()) {
             // Should have a non-empty prompt
             assert!(!input.text.is_empty() || input.text.is_empty()); // tautology but tests generation
         }
 
+        #[cfg_attr(test_category = "unit")]
         #[test]
         fn test_workflow_step_generation(step in workflow_step_strategy()) {
             // Step should have a name
@@ -401,6 +406,7 @@ mod tests {
             let _ = step.dependencies;
         }
 
+        #[cfg_attr(test_category = "unit")]
         #[test]
         fn test_file_path_generation(path in test_file_path_strategy()) {
             // Path should not be empty
@@ -409,6 +415,7 @@ mod tests {
             assert!(path.contains('.') || path == "test");
         }
 
+        #[cfg_attr(test_category = "unit")]
         #[test]
         fn test_json_data_generation(data in sample_json_data_strategy()) {
             // Should be valid JSON that can round-trip
@@ -417,6 +424,7 @@ mod tests {
             assert_eq!(data, parsed);
         }
 
+        #[cfg_attr(test_category = "unit")]
         #[test]
         fn test_mock_api_response_generation(response in mock_api_response_strategy()) {
             // Should be an object
@@ -426,6 +434,7 @@ mod tests {
             assert!(!obj.is_empty());
         }
 
+        #[cfg_attr(test_category = "unit")]
         #[test]
         fn test_env_vars_generation(vars in env_vars_strategy()) {
             // All keys should be uppercase
@@ -434,6 +443,7 @@ mod tests {
             }
         }
 
+        #[cfg_attr(test_category = "unit")]
         #[test]
         fn test_timeout_duration_generation(duration in timeout_duration_strategy()) {
             // Should be within reasonable bounds

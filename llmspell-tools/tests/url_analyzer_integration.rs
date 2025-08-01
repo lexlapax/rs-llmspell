@@ -8,6 +8,7 @@ use llmspell_core::BaseAgent;
 use llmspell_tools::UrlAnalyzerTool;
 use serde_json::json;
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_url_analyzer_basic() {
     let tool = UrlAnalyzerTool::new();
@@ -35,6 +36,7 @@ async fn test_url_analyzer_basic() {
     assert_eq!(result["fragment"], "section");
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_url_analyzer_simple_url() {
     let tool = UrlAnalyzerTool::new();
@@ -57,6 +59,7 @@ async fn test_url_analyzer_simple_url() {
     assert!(result["fragment"].is_null());
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_url_analyzer_with_port() {
     let tool = UrlAnalyzerTool::new();
@@ -78,6 +81,7 @@ async fn test_url_analyzer_with_port() {
     assert_eq!(result["path"], "/api/v1/users");
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_url_analyzer_with_auth() {
     let tool = UrlAnalyzerTool::new();
@@ -99,6 +103,7 @@ async fn test_url_analyzer_with_auth() {
     assert!(result.get("username").is_some() || result.get("has_auth").is_some());
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_url_analyzer_decode_params() {
     let tool = UrlAnalyzerTool::new();
@@ -120,6 +125,7 @@ async fn test_url_analyzer_decode_params() {
     assert_eq!(result["query_params"]["category"], "books/magazines");
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_url_analyzer_invalid_url() {
     let tool = UrlAnalyzerTool::new();
@@ -146,6 +152,7 @@ async fn test_url_analyzer_invalid_url() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_url_analyzer_relative_url() {
     let tool = UrlAnalyzerTool::new();
@@ -183,6 +190,7 @@ async fn test_url_analyzer_relative_url() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_url_analyzer_special_characters() {
     let tool = UrlAnalyzerTool::new();

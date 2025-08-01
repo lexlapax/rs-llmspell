@@ -513,6 +513,7 @@ mod tests {
         schema
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_compatible_schemas() {
         let schema_v1 = create_test_schema(SemanticVersion::new(1, 0, 0));
@@ -541,6 +542,7 @@ mod tests {
         assert_eq!(result.warnings.len(), 2); // Version upgrade + field added
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_breaking_change_detection() {
         let mut schema_v1 = create_test_schema(SemanticVersion::new(1, 0, 0));
@@ -565,6 +567,7 @@ mod tests {
         assert!(result2.migration_required);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_field_type_change() {
         let schema_v1 = create_test_schema(SemanticVersion::new(1, 0, 0));
@@ -584,6 +587,7 @@ mod tests {
         assert_eq!(result.risk_level, RiskLevel::Critical);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_required_field_changes() {
         let schema_v1 = create_test_schema(SemanticVersion::new(1, 0, 0));
@@ -601,6 +605,7 @@ mod tests {
         assert!(!result2.breaking_changes.is_empty());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_compatibility_matrix() {
         let mut matrix = CompatibilityMatrix::new();
@@ -652,6 +657,7 @@ mod tests {
         assert_eq!(stats.migration_required, 1);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_safe_upgrade_check() {
         let schema_v1 = create_test_schema(SemanticVersion::new(1, 0, 0));

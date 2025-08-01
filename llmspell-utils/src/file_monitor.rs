@@ -235,6 +235,7 @@ mod tests {
     use super::*;
     use std::path::PathBuf;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_file_event_creation() {
         let event = FileEvent::new(FileEventType::Create, PathBuf::from("/test/file.txt"));
@@ -243,6 +244,7 @@ mod tests {
         assert!(event.old_path.is_none());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_rename_event_creation() {
         let event = FileEvent::new_rename(
@@ -254,6 +256,7 @@ mod tests {
         assert_eq!(event.old_path, Some(PathBuf::from("/test/old.txt")));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_pattern_matching() {
         let event = FileEvent::new(FileEventType::Create, PathBuf::from("/test/file.txt"));
@@ -262,6 +265,7 @@ mod tests {
         assert!(!event.matches_pattern("*.log"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_watch_config_builder() {
         let config = WatchConfig::new()
@@ -280,6 +284,7 @@ mod tests {
         assert_eq!(config.timeout_seconds, Some(60));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_should_watch_path() {
         let config = WatchConfig::new().pattern("*.txt");
@@ -287,6 +292,7 @@ mod tests {
         assert!(!should_watch_path(&PathBuf::from("file.log"), &config));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_debounce_events() {
         let mut events = Vec::new();

@@ -777,6 +777,7 @@ impl BackupManager {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_backup_id_generation() {
         let _config = BackupConfig::default();
@@ -800,6 +801,7 @@ mod tests {
         assert!(id.starts_with("backup_"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_backup_type_serialization() {
         let full = BackupType::Full;

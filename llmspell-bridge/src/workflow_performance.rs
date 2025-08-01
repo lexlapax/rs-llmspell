@@ -253,6 +253,7 @@ pub async fn get_workflow_info_cached(workflow_type: &str) -> Option<WorkflowTyp
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_optimized_converter() {
         let converter = OptimizedConverter::new();
@@ -271,6 +272,7 @@ mod tests {
         assert!(!converter.validate_params("sequential", &params));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_execution_cache() {
         let cache = ExecutionCache::new(10);
@@ -290,6 +292,7 @@ mod tests {
         assert!(cache.get("workflow2").is_none());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_performance_metrics() {
         let metrics = PerformanceMetrics::new();

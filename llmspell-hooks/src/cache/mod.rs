@@ -393,6 +393,7 @@ mod tests {
         HookContext::new(HookPoint::SystemStartup, component_id)
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_cache_key_generation() {
         let context = create_test_context();
@@ -405,6 +406,7 @@ mod tests {
         assert!(key1.component_id.contains("System:test"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_cache_key_uniqueness() {
         let mut context1 = create_test_context();
@@ -421,6 +423,7 @@ mod tests {
         assert_ne!(key1.context_hash, key2.context_hash);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_cache_entry_expiration() {
         let key = CacheKey {
@@ -444,6 +447,7 @@ mod tests {
         assert_eq!(entry.access_count, 2);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_lru_eviction() {
         let lru = LruEviction::new(3);
@@ -468,6 +472,7 @@ mod tests {
         assert_eq!(candidates[0], "key2"); // Now key2 is least recently used
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_cache_basic_operations() {
         let cache = Cache::new(100, Duration::from_secs(60));
@@ -489,6 +494,7 @@ mod tests {
         assert_eq!(cache.stats().cache_misses, 2);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_cache_ttl_expiration() {
         let cache = Cache::new(100, Duration::from_millis(50));
@@ -510,6 +516,7 @@ mod tests {
         assert!(cache.get(&key).is_none());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_cache_lru_eviction() {
         let cache = Cache::new(2, Duration::from_secs(60)); // Small cache
@@ -540,6 +547,7 @@ mod tests {
         assert!(cache.get(&key3).is_some()); // Should still be there
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_cache_stats() {
         let cache = Cache::new(100, Duration::from_secs(60));
@@ -568,6 +576,7 @@ mod tests {
         assert_eq!(stats.hit_ratio(), 0.5);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_cache_clear() {
         let cache = Cache::new(100, Duration::from_secs(60));
@@ -583,6 +592,7 @@ mod tests {
         assert!(cache.get(&key).is_none());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_cache_cleanup() {
         let cache = Cache::new(100, Duration::from_millis(50));

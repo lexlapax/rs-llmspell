@@ -11,6 +11,7 @@ use serde_json::json;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_hash_calculator_large_input_limit() {
     let hash_tool = HashCalculatorTool::new(Default::default());
@@ -45,6 +46,7 @@ async fn test_hash_calculator_large_input_limit() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_json_processor_recursive_query_limit() {
     let json_tool = JsonProcessorTool::new(Default::default());
@@ -76,6 +78,7 @@ async fn test_json_processor_recursive_query_limit() {
     );
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_text_manipulator_regex_bomb_protection() {
     let text_tool = TextManipulatorTool::new(Default::default());
@@ -113,6 +116,7 @@ async fn test_text_manipulator_regex_bomb_protection() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_calculator_computation_limit() {
     let calc_tool = CalculatorTool::new();
@@ -161,6 +165,7 @@ async fn test_calculator_computation_limit() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_csv_analyzer_large_file_limit() {
     let csv_tool = CsvAnalyzerTool::new(Default::default());
@@ -202,6 +207,7 @@ async fn test_csv_analyzer_large_file_limit() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_archive_handler_zip_bomb_protection() {
     use llmspell_security::sandbox::{FileSandbox, SandboxContext};
@@ -241,6 +247,7 @@ async fn test_archive_handler_zip_bomb_protection() {
     );
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_concurrent_resource_usage() {
     use tokio::task::JoinSet;

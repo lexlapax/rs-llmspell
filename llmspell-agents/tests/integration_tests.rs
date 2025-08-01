@@ -16,6 +16,7 @@ fn create_test_provider_manager() -> Arc<llmspell_providers::ProviderManager> {
 }
 
 /// Test agent factory creation
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_agent_factory_creation() {
     let factory = DefaultAgentFactory::new(create_test_provider_manager());
@@ -35,6 +36,7 @@ async fn test_agent_factory_creation() {
 }
 
 /// Test agent builder pattern
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_agent_builder() {
     let config = AgentBuilder::new("builder_agent", "basic")
@@ -53,6 +55,7 @@ async fn test_agent_builder() {
 }
 
 /// Test agent lifecycle transitions
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_agent_lifecycle() {
     let state_machine = AgentStateMachine::new("lifecycle_test".to_string(), Default::default());
@@ -89,6 +92,7 @@ async fn test_agent_lifecycle() {
 }
 
 /// Test agent template instantiation
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_agent_templates() {
     let template = OrchestratorAgentTemplate::default();
@@ -117,6 +121,7 @@ async fn test_agent_templates() {
 }
 
 /// Test dependency injection container
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_di_container() {
     let container = DIContainer::new();
@@ -130,6 +135,7 @@ async fn test_di_container() {
 }
 
 /// Test resource limits enforcement
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_resource_limits() {
     let limits = ResourceLimits {
@@ -146,6 +152,7 @@ async fn test_resource_limits() {
 }
 
 /// Test agent with tool integration
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_agent_with_tools() {
     use mocks::TestDoubles;
@@ -165,6 +172,7 @@ async fn test_agent_with_tools() {
 }
 
 /// Test concurrent agent execution
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_concurrent_agent_execution() {
     use mocks::MockAgentBuilder;
@@ -205,6 +213,7 @@ async fn test_concurrent_agent_execution() {
 }
 
 /// Test agent error handling
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_agent_error_handling() {
     use mocks::TestDoubles;
@@ -219,6 +228,7 @@ async fn test_agent_error_handling() {
 }
 
 /// Test agent state persistence across operations
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_agent_state_persistence() {
     use mocks::MockAgentBuilder;
@@ -260,6 +270,7 @@ async fn test_agent_state_persistence() {
 }
 
 /// Test execution context propagation
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_execution_context_propagation() {
     use mocks::MockAgentBuilder;
@@ -285,6 +296,7 @@ async fn test_execution_context_propagation() {
 }
 
 /// Test agent performance requirements
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_agent_performance() {
     use mocks::MockAgentBuilder;

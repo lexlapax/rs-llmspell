@@ -340,6 +340,7 @@ impl MetadataSearchBuilder {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_metadata_index() {
         let mut index = MetadataIndex::new();
@@ -372,6 +373,7 @@ mod tests {
         assert_eq!(index.total_count(), 0);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_metadata_search_builder() {
         let builder = MetadataSearchBuilder::new()

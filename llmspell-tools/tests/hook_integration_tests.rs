@@ -23,6 +23,7 @@ use serde_json::json;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_tool_executor_basic_execution() {
     let config = ToolLifecycleConfig {
@@ -50,6 +51,7 @@ async fn test_tool_executor_basic_execution() {
     assert!(output.text.contains("4"));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_security_validation_with_safe_tool() {
     let config = ToolLifecycleConfig {
@@ -78,6 +80,7 @@ async fn test_security_validation_with_safe_tool() {
     assert!(result.is_ok());
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_security_validation_with_restricted_tool() {
     let config = ToolLifecycleConfig {
@@ -111,6 +114,7 @@ async fn test_security_validation_with_restricted_tool() {
     assert!(error_msg.contains("security level") || error_msg.contains("exceeds maximum"));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_audit_logging_enabled() {
     let config = ToolLifecycleConfig {
@@ -140,6 +144,7 @@ async fn test_audit_logging_enabled() {
     // but execution should complete successfully with logging enabled
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_error_handling_with_invalid_expression() {
     let config = ToolLifecycleConfig {
@@ -169,6 +174,7 @@ async fn test_error_handling_with_invalid_expression() {
     assert!(output_text.contains("false") || output_text.contains("error"));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_resource_tracking_integration() {
     let config = ToolLifecycleConfig {
@@ -199,6 +205,7 @@ async fn test_resource_tracking_integration() {
     // Resource tracking happens internally through the tool's execution
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_hook_performance_overhead() {
     // Test with hooks disabled
@@ -263,6 +270,7 @@ async fn test_hook_performance_overhead() {
     );
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_circuit_breaker_functionality() {
     let config = ToolLifecycleConfig {
@@ -295,6 +303,7 @@ async fn test_circuit_breaker_functionality() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_hook_integration_with_multiple_tool_types() {
     let config = ToolLifecycleConfig {
@@ -345,6 +354,7 @@ async fn test_hook_integration_with_multiple_tool_types() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_tool_registry_with_executor() {
     let config = ToolLifecycleConfig {
@@ -391,6 +401,7 @@ async fn test_tool_registry_with_executor() {
     assert!(output.text.contains("4"));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_hookable_tool_execution_trait() {
     // Test that tools implement HookableToolExecution trait
@@ -416,6 +427,7 @@ async fn test_hookable_tool_execution_trait() {
     assert!(output.text.contains("25"));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_different_security_levels() {
     let tools_and_levels = vec![
@@ -442,6 +454,7 @@ async fn test_different_security_levels() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_max_hook_execution_time() {
     let config = ToolLifecycleConfig {
@@ -469,6 +482,7 @@ async fn test_max_hook_execution_time() {
     assert!(result.is_ok());
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_security_level_ordering() {
     // Test that security levels have proper ordering
@@ -485,6 +499,7 @@ async fn test_security_level_ordering() {
     assert!(SecurityLevel::Privileged.allows(&SecurityLevel::Privileged));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_tool_execution_phases() {
     // This test verifies that all 8 hook phases are represented in ToolExecutionPhase

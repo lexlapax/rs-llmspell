@@ -440,6 +440,7 @@ impl Tool for TemplateEngineTool {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_detect_engine() {
         // Handlebars patterns
@@ -469,6 +470,7 @@ mod tests {
         );
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tera_rendering() {
         let tool = TemplateEngineTool::new();
@@ -492,6 +494,7 @@ mod tests {
         assert_eq!(output["result"]["rendered"], "Hello World!");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_handlebars_rendering() {
         let tool = TemplateEngineTool::new();
@@ -516,6 +519,7 @@ mod tests {
         assert_eq!(output["result"]["rendered"], "Hello Alice!");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_template_sanitization() {
         let tool = TemplateEngineTool::new();
@@ -536,6 +540,7 @@ mod tests {
             .contains("dangerous pattern"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_size_limits() {
         let config = TemplateEngineConfig {

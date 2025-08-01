@@ -7,6 +7,7 @@ use std::collections::HashSet;
 use std::thread;
 use std::time::Duration;
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_component_id_deterministic() {
     // Same name should always produce same ID
@@ -16,6 +17,7 @@ fn test_component_id_deterministic() {
     assert_eq!(id1, id2);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_component_id_uniqueness() {
     // Different names should produce different IDs
@@ -24,6 +26,7 @@ fn test_component_id_uniqueness() {
     assert_ne!(id1, id2);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_component_id_thread_safety() {
     // ComponentId generation should be thread-safe
@@ -36,6 +39,7 @@ fn test_component_id_thread_safety() {
     assert_eq!(ids.len(), 10);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_version_comparison() {
     let v1 = Version::new(1, 0, 0);
@@ -49,6 +53,7 @@ fn test_version_comparison() {
     assert!(v1 < v4);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_version_equality() {
     let v1 = Version::new(1, 2, 3);
@@ -59,6 +64,7 @@ fn test_version_equality() {
     assert_ne!(v1, v3);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_version_compatibility() {
     let v1 = Version::new(1, 0, 0);
@@ -77,6 +83,7 @@ fn test_version_compatibility() {
     assert!(!v3.is_compatible_with(&v4));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_version_display() {
     let v = Version::new(1, 2, 3);
@@ -92,6 +99,7 @@ fn test_version_display() {
     );
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_component_metadata_creation() {
     let metadata =
@@ -102,6 +110,7 @@ fn test_component_metadata_creation() {
     assert_eq!(metadata.version, Version::new(0, 1, 0));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_component_metadata_update_version() {
     let mut metadata = ComponentMetadata::new("test".to_string(), "Test component".to_string());
@@ -117,6 +126,7 @@ fn test_component_metadata_update_version() {
     assert!(metadata.updated_at > original_updated_at);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_component_metadata_serialization() {
     let metadata = ComponentMetadata::new(
@@ -136,6 +146,7 @@ fn test_component_metadata_serialization() {
     assert_eq!(metadata.version, deserialized.version);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_component_metadata_timestamps() {
     let metadata = ComponentMetadata::new(
@@ -152,6 +163,7 @@ fn test_component_metadata_timestamps() {
     assert!(diff.num_seconds() < 1);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_component_id_serialization() {
     let id = ComponentId::from_name("serialization-test");
@@ -165,6 +177,7 @@ fn test_component_id_serialization() {
     assert_eq!(id, deserialized);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_version_serialization() {
     let version = Version::new(1, 2, 3);

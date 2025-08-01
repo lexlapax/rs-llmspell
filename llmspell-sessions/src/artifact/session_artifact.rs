@@ -370,6 +370,7 @@ impl SessionArtifact {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_artifact_creation() {
         let session_id = SessionId::new();
@@ -392,6 +393,7 @@ mod tests {
         assert!(!artifact.metadata.is_compressed); // Too small to compress
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_content_hashing() {
         let content1 = b"Test content".to_vec();
@@ -405,6 +407,7 @@ mod tests {
         assert_eq!(hash1, hash3); // Same content = same hash
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_compression() {
         let session_id = SessionId::new();
@@ -431,6 +434,7 @@ mod tests {
         assert!(ratio < 0.5); // Should compress well for repeated content
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_mime_type_detection() {
         let session_id = SessionId::new();
@@ -457,6 +461,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_storage_serialize() {
         let session_id = SessionId::new();
@@ -484,6 +489,7 @@ mod tests {
         );
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_integrity_verification() {
         let session_id = SessionId::new();
@@ -499,6 +505,7 @@ mod tests {
         assert!(artifact.verify_integrity());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_derived_artifact() {
         let session_id = SessionId::new();

@@ -250,6 +250,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_registration() {
         let container = DIContainer::new();
@@ -282,6 +283,7 @@ mod tests {
         value: String,
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_service_registration() {
         let container = DIContainer::new();
@@ -301,6 +303,7 @@ mod tests {
         assert!(result.is_err());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_scoped_container() {
         let parent = DIContainer::new();
@@ -320,6 +323,7 @@ mod tests {
         assert!(service.is_some());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_named_instances() {
         let container = DIContainer::new();
@@ -360,6 +364,7 @@ mod tests {
         assert!(result.is_err());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_di_builder() {
         let tool = Arc::new(MockTool {
@@ -379,6 +384,7 @@ mod tests {
         assert!(retrieved.is_some());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_scoped_tool_access() {
         let parent = DIContainer::new();

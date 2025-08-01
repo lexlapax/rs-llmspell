@@ -133,6 +133,7 @@ pub struct SecurityContext {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_engine_features_default() {
         let features = EngineFeatures::default();
@@ -142,6 +143,7 @@ mod tests {
         assert!(features.max_script_size.is_none());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_security_context_default() {
         let security = SecurityContext::default();

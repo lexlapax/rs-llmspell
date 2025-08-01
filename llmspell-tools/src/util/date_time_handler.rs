@@ -461,6 +461,7 @@ impl Tool for DateTimeHandlerTool {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_parse_operation() {
         let tool = DateTimeHandlerTool::new();
@@ -488,6 +489,7 @@ mod tests {
         assert_eq!(output["result"]["parsed"]["weekday"], "Monday");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_now_operation() {
         let tool = DateTimeHandlerTool::new();
@@ -511,6 +513,7 @@ mod tests {
         assert!(output["result"]["datetime"].is_string());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_timezone_conversion() {
         let tool = DateTimeHandlerTool::new();
@@ -538,6 +541,7 @@ mod tests {
             .contains("EST"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_date_arithmetic() {
         let tool = DateTimeHandlerTool::new();
@@ -589,6 +593,7 @@ mod tests {
             .contains("2024-01-15T08:30:00"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_date_difference() {
         let tool = DateTimeHandlerTool::new();
@@ -616,6 +621,7 @@ mod tests {
             .contains("5 days"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_date_info() {
         let tool = DateTimeHandlerTool::new();
@@ -640,6 +646,7 @@ mod tests {
         assert_eq!(output["result"]["info"]["weekday"], "Thursday");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_metadata() {
         let tool = DateTimeHandlerTool::new();

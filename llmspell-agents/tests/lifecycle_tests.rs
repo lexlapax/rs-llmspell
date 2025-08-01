@@ -33,6 +33,7 @@ use std::time::Duration;
 use tokio::time::sleep;
 
 /// Integration test for complete lifecycle workflow
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_complete_lifecycle_workflow() {
     // Setup event system
@@ -159,6 +160,7 @@ async fn test_complete_lifecycle_workflow() {
     assert_eq!(health_result.status, HealthStatus::Unhealthy);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_event_system_integration() {
     let event_system = Arc::new(LifecycleEventSystem::new(EventSystemConfig::default()));
@@ -236,6 +238,7 @@ async fn test_event_system_integration() {
     assert!(metrics.keys().any(|k| k.contains("StateChanged")));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_resource_management_integration() {
     let event_system = Arc::new(LifecycleEventSystem::new(EventSystemConfig::default()));
@@ -292,6 +295,7 @@ async fn test_resource_management_integration() {
     assert_eq!(agent_allocations.len(), 0);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_middleware_integration() {
     let event_system = Arc::new(LifecycleEventSystem::new(EventSystemConfig::default()));
@@ -329,6 +333,7 @@ async fn test_middleware_integration() {
     assert!(!execution_history.is_empty());
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_shutdown_coordinator_integration() {
     let event_system = Arc::new(LifecycleEventSystem::new(EventSystemConfig::default()));
@@ -399,6 +404,7 @@ async fn test_shutdown_coordinator_integration() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_health_monitoring_integration() {
     let event_system = Arc::new(LifecycleEventSystem::new(EventSystemConfig::default()));
@@ -470,6 +476,7 @@ async fn test_health_monitoring_integration() {
     assert!(latest.is_some());
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_error_scenarios_and_recovery() {
     let event_system = Arc::new(LifecycleEventSystem::new(EventSystemConfig::default()));
@@ -539,6 +546,7 @@ async fn test_error_scenarios_and_recovery() {
     assert_eq!(state_machine.current_state().await, AgentState::Terminated);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_concurrent_operations() {
     let event_system = Arc::new(LifecycleEventSystem::new(EventSystemConfig::default()));
@@ -597,6 +605,7 @@ async fn test_concurrent_operations() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_performance_requirements() {
     let event_system = Arc::new(LifecycleEventSystem::new(EventSystemConfig::default()));
@@ -704,6 +713,7 @@ impl LifecycleMiddleware for TestMiddleware {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_custom_middleware() {
     let event_system = Arc::new(LifecycleEventSystem::new(EventSystemConfig::default()));

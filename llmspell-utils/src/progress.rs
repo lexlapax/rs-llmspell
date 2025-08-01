@@ -470,6 +470,7 @@ mod tests {
     use super::*;
     use tokio::sync::Mutex;
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_progress_reporter() {
         let (reporter, mut receiver) = ProgressReporter::new("Test Operation", Some(100));
@@ -499,6 +500,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_progress_increment() {
         let (reporter, mut receiver) = ProgressReporter::new("Increment Test", Some(10));
@@ -514,6 +516,7 @@ mod tests {
         assert_eq!(reporter.current().await, 5);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_progress_tracker() {
         let tracker = ProgressTracker::new();
@@ -546,6 +549,7 @@ mod tests {
         assert!(events.len() >= 2); // Started + Update
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_progress_completion() {
         let (reporter, mut receiver) = ProgressReporter::new("Complete Test", None);
@@ -567,6 +571,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_progress_builder() {
         let reporter = ProgressBuilder::new("Built Operation")

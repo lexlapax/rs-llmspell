@@ -24,6 +24,7 @@ mod tests {
         GlobalContext::new(registry, providers)
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_event_global_injection() {
         let lua = Lua::new();

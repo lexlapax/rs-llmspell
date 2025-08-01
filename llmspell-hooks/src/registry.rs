@@ -331,6 +331,7 @@ mod tests {
     use crate::result::HookResult;
     use crate::traits::FnHook;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_hook_registration() {
         let registry = HookRegistry::new();
@@ -352,6 +353,7 @@ mod tests {
         );
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_priority_ordering() {
         let registry = HookRegistry::new();
@@ -392,6 +394,7 @@ mod tests {
         assert_eq!(names, vec!["high", "normal", "low"]);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_language_filtering() {
         let registry = HookRegistry::new();
@@ -425,6 +428,7 @@ mod tests {
         assert_eq!(native_hooks.len(), 1);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_duplicate_registration() {
         let registry = HookRegistry::new();
@@ -440,6 +444,7 @@ mod tests {
         assert!(matches!(result, Err(RegistryError::DuplicateHook(_))));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_unregister() {
         let registry = HookRegistry::new();
@@ -457,6 +462,7 @@ mod tests {
         assert_eq!(registry.stats().total_hooks, 0);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_enable_disable() {
         let registry = HookRegistry::new();
@@ -479,6 +485,7 @@ mod tests {
         assert_eq!(hooks.len(), 1);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_global_enable() {
         let registry = HookRegistry::new();
@@ -499,6 +506,7 @@ mod tests {
         assert_eq!(hooks.len(), 1);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_bulk_registration() {
         let registry = HookRegistry::new();
@@ -524,6 +532,7 @@ mod tests {
         assert_eq!(registry.get_hook_points().len(), 3);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_clear_operations() {
         let registry = HookRegistry::new();

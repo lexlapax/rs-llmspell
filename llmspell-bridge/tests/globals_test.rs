@@ -17,6 +17,7 @@ mod lua_globals {
         Arc::new(GlobalContext::new(registry, providers))
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_global_registry_creation() -> Result<()> {
         let context = setup_test_context().await;

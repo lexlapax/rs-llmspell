@@ -8,6 +8,7 @@ use llmspell_state_persistence::{
 use serde_json::json;
 use std::time::SystemTime;
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_field_copy() {
     let transformer = DataTransformer::new();
@@ -44,6 +45,7 @@ fn test_field_copy() {
     assert!(state.value.get("old_name").is_none());
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_field_default() {
     let transformer = DataTransformer::new();
@@ -84,6 +86,7 @@ fn test_field_default() {
     assert_eq!(state.value.get("name"), Some(&json!("John Doe")));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_field_remove() {
     let transformer = DataTransformer::new();
@@ -124,6 +127,7 @@ fn test_field_remove() {
     assert_eq!(state.value.get("name"), Some(&json!("John Doe")));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_multiple_transforms() {
     let transformer = DataTransformer::new();

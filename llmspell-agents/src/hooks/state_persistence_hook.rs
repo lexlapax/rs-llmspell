@@ -341,6 +341,7 @@ impl Clone for StatePersistenceHook {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_persistence_config_default() {
         let config = PersistenceConfig::default();
@@ -354,6 +355,7 @@ mod tests {
         assert!(config.non_blocking);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_state_persistence_hook_creation() {
         let state_manager = Arc::new(StateManager::new().await.unwrap());

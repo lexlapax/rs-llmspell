@@ -516,6 +516,7 @@ impl CapabilityRequirementBuilder {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_capability_aggregator() {
         let aggregator = CapabilityAggregator::new();
@@ -538,6 +539,7 @@ mod tests {
         assert_eq!(provider_caps[0].name, "text-processing");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_pattern_matching() {
         let aggregator = CapabilityAggregator::new();
@@ -549,6 +551,7 @@ mod tests {
         assert!(!aggregator.matches_pattern("text-processing", "image-*"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_capability_matching() {
         let aggregator = CapabilityAggregator::new();
@@ -585,6 +588,7 @@ mod tests {
         assert_eq!(matches[0].capability.name, "text-analysis");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_usage_statistics() {
         let aggregator = CapabilityAggregator::new();

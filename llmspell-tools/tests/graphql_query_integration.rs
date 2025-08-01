@@ -8,6 +8,7 @@ use llmspell_core::{
 use llmspell_tools::GraphQLQueryTool;
 use serde_json::json;
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_graphql_tool_creation() {
     let tool = GraphQLQueryTool::default();
@@ -20,6 +21,7 @@ async fn test_graphql_tool_creation() {
     ));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_graphql_introspection() {
     let tool = GraphQLQueryTool::default();
@@ -45,6 +47,7 @@ async fn test_graphql_introspection() {
     assert!(output.text.contains("cached"));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_graphql_query() {
     let tool = GraphQLQueryTool::default();
@@ -96,6 +99,7 @@ async fn test_graphql_query() {
     assert!(result_str.contains("🇺🇸"));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_graphql_query_without_variables() {
     let tool = GraphQLQueryTool::default();
@@ -128,6 +132,7 @@ async fn test_graphql_query_without_variables() {
     assert!(output.text.contains("North America"));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_graphql_with_custom_headers() {
     let tool = GraphQLQueryTool::default();
@@ -152,6 +157,7 @@ async fn test_graphql_with_custom_headers() {
     assert!(output.text.contains("continents"));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_graphql_error_handling() {
     let tool = GraphQLQueryTool::default();
@@ -174,6 +180,7 @@ async fn test_graphql_error_handling() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_graphql_depth_limit() {
     let tool = GraphQLQueryTool::default();
@@ -224,6 +231,7 @@ async fn test_graphql_depth_limit() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_invalid_endpoint() {
     let tool = GraphQLQueryTool::default();
@@ -240,6 +248,7 @@ async fn test_invalid_endpoint() {
     assert!(result.is_err());
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_missing_endpoint() {
     let tool = GraphQLQueryTool::default();
@@ -261,6 +270,7 @@ async fn test_missing_endpoint() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_missing_query_for_query_operation() {
     let tool = GraphQLQueryTool::default();
@@ -281,6 +291,7 @@ async fn test_missing_query_for_query_operation() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_subscription_not_supported() {
     let tool = GraphQLQueryTool::default();
@@ -302,6 +313,7 @@ async fn test_subscription_not_supported() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_graphql_with_operation_name() {
     let tool = GraphQLQueryTool::default();
@@ -333,6 +345,7 @@ async fn test_graphql_with_operation_name() {
     assert!(output.text.contains("Washington"));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_graphql_schema_caching() {
     let tool = GraphQLQueryTool::default();

@@ -619,6 +619,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_search_single_file() {
         let (tool, temp_dir) = create_test_tool();
@@ -652,6 +653,7 @@ mod tests {
         assert!(!result.text.is_empty());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_search_directory_recursive() {
         let (tool, temp_dir) = create_test_tool();
@@ -690,6 +692,7 @@ mod tests {
         assert!(result.text.contains("2 files"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_search_with_regex() {
         let (tool, temp_dir) = create_test_tool();
@@ -720,6 +723,7 @@ mod tests {
         assert!(result.text.contains("Found 3 matches"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_search_with_file_extension_filter() {
         let (tool, temp_dir) = create_test_tool();
@@ -751,6 +755,7 @@ mod tests {
         assert!(result.text.contains("Found 2 matches")); // Only txt and rs files
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_search_with_context_lines() {
         let (tool, temp_dir) = create_test_tool();
@@ -782,6 +787,7 @@ mod tests {
         assert!(!result.text.is_empty());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_search_nonexistent_path() {
         let (tool, temp_dir) = create_test_tool();
@@ -801,6 +807,7 @@ mod tests {
         assert!(result.unwrap_err().to_string().contains("does not exist"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_search_empty_pattern() {
         let (tool, temp_dir) = create_test_tool();
@@ -824,6 +831,7 @@ mod tests {
             .contains("Pattern cannot be empty"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_search_invalid_regex() {
         let (tool, temp_dir) = create_test_tool();
@@ -844,6 +852,7 @@ mod tests {
         assert!(result.is_err());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_search_no_matches() {
         let (tool, temp_dir) = create_test_tool();
@@ -870,6 +879,7 @@ mod tests {
         assert!(result.text.contains("1 files searched"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_metadata() {
         let (tool, _temp_dir) = create_test_tool();
@@ -891,6 +901,7 @@ mod tests {
         assert_eq!(required_params.len(), 2);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_parameter_validation() {
         let (tool, _temp_dir) = create_test_tool();

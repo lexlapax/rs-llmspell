@@ -138,6 +138,7 @@ impl Priority {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_priority_comparison() {
         assert!(Priority::HIGHEST.is_higher_than(&Priority::HIGH));
@@ -148,6 +149,7 @@ mod tests {
         assert!(Priority::LOWEST.is_lower_than(&Priority::LOW));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_priority_sorting() {
         #[derive(Debug)]
@@ -183,6 +185,7 @@ mod tests {
         assert_eq!(items[3].name, "low");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_priority_buckets() {
         assert_eq!(
@@ -207,6 +210,7 @@ mod tests {
         );
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_priority_builder() {
         let base = Priority::NORMAL;
@@ -221,6 +225,7 @@ mod tests {
         assert_eq!(offset.0, Priority::NORMAL.0 - 5);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_priority_distance() {
         let p1 = Priority(0);
@@ -233,6 +238,7 @@ mod tests {
         assert_eq!(p1.distance_from(&p3), 50);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_bucket_ranges() {
         let (min, max) = PriorityBucket::Normal.range();

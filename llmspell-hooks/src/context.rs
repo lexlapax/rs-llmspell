@@ -214,6 +214,7 @@ mod tests {
     use crate::types::ComponentType;
     use serde_json::json;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_hook_context_creation() {
         let component_id = ComponentId::new(ComponentType::Agent, "test".to_string());
@@ -226,6 +227,7 @@ mod tests {
         assert!(context.metadata.is_empty());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_hook_context_builder() {
         let component_id = ComponentId::new(ComponentType::Tool, "calculator".to_string());
@@ -247,6 +249,7 @@ mod tests {
         assert_eq!(context.get_metadata("tool_version"), Some("1.0.0"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_child_context() {
         let component_id = ComponentId::new(ComponentType::Workflow, "pipeline".to_string());
@@ -260,6 +263,7 @@ mod tests {
         assert!(child.parent_context.is_some());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_operation_context() {
         let component_id = ComponentId::new(ComponentType::Tool, "test".to_string());
@@ -282,6 +286,7 @@ mod tests {
         assert_eq!(context.operation_result(), Some(&json!({"value": 4})));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_error_context() {
         let component_id = ComponentId::new(ComponentType::Agent, "test".to_string());
@@ -300,6 +305,7 @@ mod tests {
         assert_eq!(context.error_message(), Some("Test error"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_context_serialization() {
         let component_id = ComponentId::new(ComponentType::System, "main".to_string());

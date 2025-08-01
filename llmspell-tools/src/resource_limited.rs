@@ -257,6 +257,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_resource_limited_tool() {
         let mock_tool = MockTool::new(50);
@@ -270,6 +271,7 @@ mod tests {
         assert!(result.text.contains("Resource usage:"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_timeout_enforcement() {
         let mock_tool = MockTool::new(200);
@@ -295,6 +297,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_file_size_checking() {
         let tracker = ResourceTracker::new(ResourceLimits {
@@ -310,6 +313,7 @@ mod tests {
         assert!(result.is_err());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_memory_tracking() {
         let tracker = ResourceTracker::new(ResourceLimits {

@@ -202,6 +202,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_basic_hook() {
         let hook = TestHook {
@@ -216,6 +217,7 @@ mod tests {
         assert_eq!(hook.metadata().name, "test_hook");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_fn_hook() {
         let hook = FnHook::new("function_hook", |ctx: &mut HookContext| {
@@ -250,6 +252,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_hook_adapter() {
         let adapter = TestAdapter;
@@ -286,6 +289,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_replayable_hook() {
         let hook = TestReplayableHook;
@@ -301,6 +305,7 @@ mod tests {
         assert!(hook.is_replayable());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_hook_extensions() {
         let hook = TestHook {

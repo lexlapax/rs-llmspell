@@ -134,6 +134,7 @@ pub mod presets {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_builder_default() {
         let config = PersistenceConfigBuilder::new().build();
@@ -142,6 +143,7 @@ mod tests {
         assert!(config.save_on_pause);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_builder_custom() {
         let config = PersistenceConfigBuilder::new()
@@ -155,6 +157,7 @@ mod tests {
         assert!(!config.save_on_pause);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_presets() {
         let dev = presets::development();

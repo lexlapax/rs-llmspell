@@ -478,6 +478,7 @@ mod tests {
     use super::*;
     use crate::traits::StepType;
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_sequential_workflow_creation() {
         let workflow =
@@ -486,6 +487,7 @@ mod tests {
         assert_eq!(workflow.step_count(), 0);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_sequential_workflow_builder() {
         let step = WorkflowStep::new(
@@ -505,6 +507,7 @@ mod tests {
         assert_eq!(workflow.step_count(), 1);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_sequential_workflow_execution_success() {
         let step1 = WorkflowStep::new(
@@ -536,6 +539,7 @@ mod tests {
         assert_eq!(result.success_rate(), 100.0);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_sequential_workflow_execution_with_failure() {
         let step1 = WorkflowStep::new(
@@ -568,6 +572,7 @@ mod tests {
         assert!(result.error_message.is_some());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_sequential_workflow_continue_on_error() {
         let step1 = WorkflowStep::new(
@@ -609,6 +614,7 @@ mod tests {
         assert_eq!(result.total_steps(), 3);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_sequential_workflow_shared_data() {
         let workflow =
@@ -630,6 +636,7 @@ mod tests {
         assert_eq!(missing, None);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_sequential_workflow_status_tracking() {
         let workflow =

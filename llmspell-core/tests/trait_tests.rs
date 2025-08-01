@@ -15,6 +15,7 @@ use llmspell_core::{
 use llmspell_testing::mocks::*;
 use mockall::predicate::*;
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_base_agent_mock_behavior() {
     let mut mock = MockBaseAgent::new();
@@ -41,6 +42,7 @@ async fn test_base_agent_mock_behavior() {
     assert_eq!(result.text, "Mocked: test input");
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_agent_mock_conversation_management() {
     let mut mock = MockAgent::new();
@@ -75,6 +77,7 @@ async fn test_agent_mock_conversation_management() {
     mock.clear_conversation().await.unwrap();
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_tool_mock_schema_validation() {
     let mut mock = MockTool::new();
@@ -123,6 +126,7 @@ async fn test_tool_mock_schema_validation() {
         .is_err());
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_workflow_mock_step_execution() {
     let mut mock = MockWorkflow::new();
@@ -166,6 +170,7 @@ async fn test_workflow_mock_step_execution() {
     assert_eq!(status, WorkflowStatus::Running);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_tool_category_enum_variants() {
     // Test all category variants
@@ -188,6 +193,7 @@ fn test_tool_category_enum_variants() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_security_level_ordering() {
     assert!(SecurityLevel::Safe < SecurityLevel::Restricted);
@@ -202,6 +208,7 @@ fn test_security_level_ordering() {
     assert!(!SecurityLevel::Safe.allows(&SecurityLevel::Privileged));
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_message_role_variants() {
     let roles = vec![
@@ -222,6 +229,7 @@ fn test_message_role_variants() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_workflow_status_transitions() {
     // Test all status variants
@@ -242,6 +250,7 @@ fn test_workflow_status_transitions() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_retry_policy_configuration() {
     let default_policy = RetryPolicy::default();
@@ -259,6 +268,7 @@ fn test_retry_policy_configuration() {
     assert!(!custom_policy.exponential_backoff);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_execution_context_builder() {
     let mut context = ExecutionContext::with_conversation("test-session".to_string());
@@ -274,6 +284,7 @@ fn test_execution_context_builder() {
     assert_eq!(context.data.get("KEY3"), None);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_agent_config_defaults() {
     let config = AgentConfig::default();
@@ -285,6 +296,7 @@ fn test_agent_config_defaults() {
     assert_eq!(config.system_prompt, None);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_parameter_type_variants() {
     let types = vec![
@@ -303,6 +315,7 @@ fn test_parameter_type_variants() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[test]
 fn test_conversation_message_creation() {
     let user_msg = ConversationMessage::user("Hello".to_string());

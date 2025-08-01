@@ -77,6 +77,7 @@ mod timeout_tests {
         }
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_all_tools_timeout() {
         println!("Testing ApiTester timeout...");
@@ -160,6 +161,7 @@ mod invalid_url_tests {
         }
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_all_tools_invalid_urls() {
         test_tool_invalid_url(ApiTesterTool::new(), "ApiTester").await;
@@ -175,6 +177,7 @@ mod invalid_url_tests {
 mod network_failure_tests {
     use super::*;
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_dns_resolution_failure() {
         let tools: Vec<(&str, Box<dyn BaseAgent>)> = vec![
@@ -210,6 +213,7 @@ mod network_failure_tests {
         }
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_connection_refused() {
         // Local port that's likely not in use
@@ -242,6 +246,7 @@ mod network_failure_tests {
 mod http_status_tests {
     use super::*;
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_http_error_statuses() {
         let statuses = vec![400, 401, 403, 404, 500, 502, 503];
@@ -295,6 +300,7 @@ mod http_status_tests {
 mod rate_limit_tests {
     use super::*;
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_rapid_requests() {
         let _tool = ApiTesterTool::new();
@@ -334,6 +340,7 @@ mod rate_limit_tests {
 mod input_validation_tests {
     use super::*;
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_missing_required_parameters() {
         let tool = ApiTesterTool::new();
@@ -349,6 +356,7 @@ mod input_validation_tests {
         assert!(result.is_err());
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_invalid_parameter_types() {
         let tool = ApiTesterTool::new();
@@ -365,6 +373,7 @@ mod input_validation_tests {
         let _ = tool.execute(input, context).await;
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_extremely_long_urls() {
         let tool = UrlAnalyzerTool::new();

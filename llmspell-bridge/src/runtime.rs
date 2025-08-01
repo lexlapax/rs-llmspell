@@ -486,6 +486,7 @@ impl From<SecurityConfig> for crate::engine::SecurityContext {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_runtime_config_default() {
         let config = RuntimeConfig::default();
@@ -495,6 +496,7 @@ mod tests {
         assert!(!config.supports_engine("python"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_security_config_conversion() {
         let config = SecurityConfig::default();

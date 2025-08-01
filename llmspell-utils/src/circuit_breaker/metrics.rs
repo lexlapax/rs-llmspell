@@ -247,6 +247,7 @@ impl From<&CircuitMetrics> for AlertLevel {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_metrics_collection() {
         let collector = MetricsCollector::new();
@@ -269,6 +270,7 @@ mod tests {
         assert!((metrics.rejection_rate() - 33.333_333).abs() < 0.001);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_state_tracking() {
         let collector = MetricsCollector::new();
@@ -289,6 +291,7 @@ mod tests {
         assert!(metrics.last_state_change.is_some());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_alert_levels() {
         // Healthy state

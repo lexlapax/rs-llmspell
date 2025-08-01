@@ -508,6 +508,7 @@ mod tests {
     use llmspell_tools::registry::ToolRegistry;
     use serde_json::json;
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_manager_creation() {
         let registry = Arc::new(ToolRegistry::new());
@@ -518,6 +519,7 @@ mod tests {
         assert!(manager.config.enable_availability_cache);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_manager_with_config() {
         let registry = Arc::new(ToolRegistry::new());
@@ -537,6 +539,7 @@ mod tests {
         assert!(!manager.config.validate_parameters);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_discovery() {
         let registry = Arc::new(ToolRegistry::new());
@@ -548,6 +551,7 @@ mod tests {
         assert_eq!(tools.len(), 0);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_availability_checks() {
         let registry = Arc::new(ToolRegistry::new());
@@ -560,6 +564,7 @@ mod tests {
         assert!(!manager.tool_available("nonexistent_tool").await);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_listing() {
         let registry = Arc::new(ToolRegistry::new());
@@ -570,6 +575,7 @@ mod tests {
         assert_eq!(tools.len(), 0);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_info_retrieval() {
         let registry = Arc::new(ToolRegistry::new());
@@ -580,6 +586,7 @@ mod tests {
         assert!(info.is_none());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_composition_empty() {
         let registry = Arc::new(ToolRegistry::new());
@@ -592,6 +599,7 @@ mod tests {
         assert!(result.text.contains("no output"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_parameter_substitution() {
         let registry = Arc::new(ToolRegistry::new());
@@ -614,6 +622,7 @@ mod tests {
         assert_eq!(result["other"], JsonValue::String("value".to_string()));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_cache_clearing() {
         let registry = Arc::new(ToolRegistry::new());

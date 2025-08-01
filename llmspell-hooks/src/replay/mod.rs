@@ -127,6 +127,7 @@ pub struct BatchReplayResponse {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_replay_config_default() {
         let config = ReplayConfig::default();
@@ -136,6 +137,7 @@ mod tests {
         assert_eq!(config.timeout, Duration::from_secs(30));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_parameter_modification() {
         let modification = ParameterModification {

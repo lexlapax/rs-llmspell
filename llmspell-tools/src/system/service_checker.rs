@@ -706,6 +706,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tcp_check_localhost() {
         let tool = create_test_tool_with_custom_config();
@@ -727,6 +728,7 @@ mod tests {
         assert!(result.text.contains("127.0.0.1:22"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_http_check_invalid_url() {
         let tool = create_test_tool_with_custom_config();
@@ -747,6 +749,7 @@ mod tests {
         assert!(result.text.contains("not available"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_dns_check_localhost() {
         let tool = create_test_tool_with_custom_config();
@@ -766,6 +769,7 @@ mod tests {
         assert!(result.text.contains("localhost"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_blocked_port() {
         let tool = create_test_tool();
@@ -786,6 +790,7 @@ mod tests {
         assert!(result.text.contains("not allowed") || result.text.contains("blocked"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_blocked_domain() {
         let tool = create_test_tool();
@@ -805,6 +810,7 @@ mod tests {
         assert!(result.text.contains("not available"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_invalid_parameters() {
         let tool = create_test_tool();
@@ -878,6 +884,7 @@ mod tests {
         assert!(result5.unwrap_err().to_string().contains("exceeds maximum"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_target_parsing() {
         let tool = create_test_tool();
@@ -906,6 +913,7 @@ mod tests {
             .contains("Invalid port number"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_port_and_domain_validation() {
         let tool = create_test_tool();
@@ -930,6 +938,7 @@ mod tests {
         assert!(tool_permissive.is_domain_allowed("example.com"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_metadata() {
         let tool = create_test_tool();
@@ -953,6 +962,7 @@ mod tests {
         assert_eq!(required_params.len(), 2);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_custom_config() {
         let tool = create_test_tool_with_custom_config();
@@ -963,6 +973,7 @@ mod tests {
         assert!(tool.config.allow_any_domain);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_https_url_transformation() {
         let tool = create_test_tool_with_custom_config();

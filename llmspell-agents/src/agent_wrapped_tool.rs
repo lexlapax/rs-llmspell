@@ -591,6 +591,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_agent_wrapped_tool_creation() {
         let agent = Arc::new(MockAgent::new("test-agent", "A test agent"));
@@ -601,6 +602,7 @@ mod tests {
         assert_eq!(wrapped.agent().metadata().name, "test-agent");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_schema_generation() {
         let agent = Arc::new(MockAgent::new("test-agent", "A test agent"));
@@ -612,6 +614,7 @@ mod tests {
         assert!(!schema.parameters.is_empty());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_parameter_bundling() {
         let agent = Arc::new(MockAgent::new("test-agent", "A test agent"));
@@ -632,6 +635,7 @@ mod tests {
         assert!(result.text.contains("with params"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_parameter_transforms() {
         let agent = Arc::new(MockAgent::new("test-agent", "A test agent"));
@@ -661,6 +665,7 @@ mod tests {
         assert!(result.text.contains("MockAgent executed"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_custom_metadata() {
         let agent = Arc::new(MockAgent::new("test-agent", "A test agent"));
@@ -684,6 +689,7 @@ mod tests {
         assert_eq!(schema.description, "Custom tool description");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_parameter_transform_types() {
         let agent = Arc::new(MockAgent::new("test-agent", "A test agent"));

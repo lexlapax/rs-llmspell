@@ -1,5 +1,6 @@
 //! Simple performance check for hook overhead
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_simple_hook_overhead() {
     use llmspell_core::{types::AgentInput, ExecutionContext};

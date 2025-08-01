@@ -565,6 +565,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_template_factory_registration() {
         let mut factory = TemplateFactory::new();
@@ -579,6 +580,7 @@ mod tests {
         assert!(!factory.has_template("nonexistent"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_template_factory_categories() {
         let mut factory = TemplateFactory::new();
@@ -593,6 +595,7 @@ mod tests {
         assert_eq!(monitoring_templates.len(), 0);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_template_factory_search() {
         let mut factory = TemplateFactory::new();
@@ -610,6 +613,7 @@ mod tests {
         assert_eq!(found.len(), 0);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_parameter_validation() {
         let template = MockTemplate::new();
@@ -632,6 +636,7 @@ mod tests {
         assert!(result.is_err());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_template_metadata() {
         let template = MockTemplate::new();
@@ -642,6 +647,7 @@ mod tests {
         assert_eq!(template.optional_tools().len(), 0);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_template_unregistration() {
         let mut factory = TemplateFactory::new();

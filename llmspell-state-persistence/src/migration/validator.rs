@@ -653,6 +653,7 @@ mod tests {
     use super::*;
     use crate::schema::EnhancedStateSchema;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_validation_result() {
         let mut result = ValidationResult::new();
@@ -684,6 +685,7 @@ mod tests {
         assert_eq!(result.errors_count, 1);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_validation_rules() {
         let rules = ValidationRules::strict();
@@ -694,6 +696,7 @@ mod tests {
         assert!(!enabled_rules.is_empty());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_migration_validator() {
         use crate::schema::SemanticVersion;

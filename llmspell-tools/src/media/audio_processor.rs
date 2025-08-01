@@ -701,6 +701,7 @@ mod tests {
         Ok(())
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_format_detection_by_extension() {
         let tool = create_test_tool();
@@ -725,6 +726,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_wav_file_analysis() {
         let tool = create_test_tool();
@@ -741,6 +743,7 @@ mod tests {
         assert_eq!(metadata.bit_rate, Some(44100 * 2 * 16)); // 1411200 bps
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_metadata_extraction() {
         let tool = create_test_tool();
@@ -766,6 +769,7 @@ mod tests {
         assert!(result.text.contains("Mp3"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_format_detection_operation() {
         let tool = create_test_tool();
@@ -790,6 +794,7 @@ mod tests {
         assert!(result.text.contains("Detected audio format: Wav"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_file_size_limit() {
         let config = AudioProcessorConfig {
@@ -817,6 +822,7 @@ mod tests {
         assert!(result.unwrap_err().to_string().contains("exceeds maximum"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_wav_to_wav_conversion() {
         let tool = create_test_tool();
@@ -845,6 +851,7 @@ mod tests {
         assert!(target_path.exists());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_unsupported_conversion() {
         let tool = create_test_tool();
@@ -869,6 +876,7 @@ mod tests {
         assert!(result.unwrap_err().to_string().contains("not supported"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_invalid_operation() {
         let tool = create_test_tool();
@@ -888,6 +896,7 @@ mod tests {
             .contains("Invalid operation"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_missing_required_parameters() {
         let tool = create_test_tool();
@@ -908,6 +917,7 @@ mod tests {
             .contains("file_path is required"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_metadata() {
         let tool = create_test_tool();
@@ -930,6 +940,7 @@ mod tests {
         assert!(params.iter().any(|p| p.name == "target_format"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_default_operation() {
         let tool = create_test_tool();
@@ -954,6 +965,7 @@ mod tests {
         assert!(result.text.contains("Audio file"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_empty_file_path() {
         let tool = create_test_tool();
@@ -971,6 +983,7 @@ mod tests {
         assert!(result.unwrap_err().to_string().contains("cannot be empty"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_file_not_found() {
         let tool = create_test_tool();

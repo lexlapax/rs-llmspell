@@ -8,6 +8,7 @@ mod test {
     use std::collections::HashMap;
     use std::time::{Duration, SystemTime};
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_retention_basic() {
         // Create test metadata

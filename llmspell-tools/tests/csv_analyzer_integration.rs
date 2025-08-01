@@ -5,6 +5,7 @@ use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionC
 use llmspell_tools::CsvAnalyzerTool;
 use serde_json::json;
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_complex_csv_analysis_workflow() {
     let tool = CsvAnalyzerTool::default();
@@ -89,6 +90,7 @@ async fn test_complex_csv_analysis_workflow() {
     assert_eq!(parsed.as_array().unwrap().len(), 5);
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_malformed_csv_handling() {
     let tool = CsvAnalyzerTool::default();
@@ -128,6 +130,7 @@ newline",300
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_large_csv_streaming() {
     let tool = CsvAnalyzerTool::default();
@@ -165,6 +168,7 @@ async fn test_large_csv_streaming() {
     assert_eq!(line_count, 11); // 1 header + 10 samples
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_csv_validation() {
     let tool = CsvAnalyzerTool::default();
@@ -205,6 +209,7 @@ async fn test_csv_validation() {
     }
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_csv_transform_operation() {
     let tool = CsvAnalyzerTool::default();
@@ -244,6 +249,7 @@ Orange,2.00,150
     assert!(!result.text.contains("product,")); // Old name should be gone
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_encoding_detection() {
     let tool = CsvAnalyzerTool::default();

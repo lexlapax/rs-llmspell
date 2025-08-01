@@ -311,6 +311,7 @@ pub fn validation_response(valid: bool, errors: &Option<Vec<ValidationError>>) -
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_success_response() {
         let response = ResponseBuilder::success("test_op")
@@ -322,6 +323,7 @@ mod tests {
         assert_eq!(response["message"], "Test completed");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_error_response() {
         let response = ResponseBuilder::error("test_op", "Something went wrong").build();
@@ -331,6 +333,7 @@ mod tests {
         assert_eq!(response["error"]["message"], "Something went wrong");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_with_result() {
         let response = ResponseBuilder::success("test_op")
@@ -340,6 +343,7 @@ mod tests {
         assert_eq!(response["result"]["data"], json!([1, 2, 3]));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_with_metadata() {
         let response = ResponseBuilder::success("test_op")
@@ -351,6 +355,7 @@ mod tests {
         assert_eq!(response["metadata"]["key2"], 42);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_with_file_info() {
         let response = ResponseBuilder::success("read_file")
@@ -361,6 +366,7 @@ mod tests {
         assert_eq!(response["metadata"]["file_size"], 1024);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_build_for_output() {
         let (text, response) = ResponseBuilder::success("test_op")
@@ -377,6 +383,7 @@ mod tests {
         assert_eq!(response["success"], false);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_helper_functions() {
         let response = success_response("test", "All good");
@@ -398,6 +405,7 @@ mod tests {
         assert_eq!(response["metadata"]["count"], 3);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_error_details() {
         let error_details = ErrorDetails::new("Test error")
@@ -414,6 +422,7 @@ mod tests {
         assert_eq!(response["error"]["details"]["field"], "test");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_validation_response() {
         let errors = vec![
@@ -440,6 +449,7 @@ mod tests {
         assert_eq!(errors[1]["code"], "FORMAT");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_validation_response_success() {
         let response = validation_response(true, &None);

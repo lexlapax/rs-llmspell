@@ -159,6 +159,7 @@ impl ReplayableHook for StatefulTestHook {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_basic_hook_persistence_and_replay() -> Result<()> {
         // Create in-memory storage
@@ -253,6 +254,7 @@ mod tests {
         Ok(())
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_hook_execution_with_event_bus() -> Result<()> {
         // Create event bus
@@ -321,6 +323,7 @@ mod tests {
         Ok(())
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_hook_replay_performance() -> Result<()> {
         // Create storage
@@ -420,6 +423,7 @@ mod tests {
         Ok(())
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_builtin_hooks_with_persistence() -> Result<()> {
         // Create storage
@@ -491,6 +495,7 @@ mod tests {
         Ok(())
     }
 
+    #[cfg_attr(test_category = "integration")]
     #[tokio::test]
     async fn test_hook_registry_integration() -> Result<()> {
         let registry = HookRegistry::new();

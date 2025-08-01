@@ -9,6 +9,7 @@ mod backup_tests {
     use crate::backup::*;
     use crate::StateScope;
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_backup_config_defaults() {
         let config = BackupConfig::default();
@@ -21,6 +22,7 @@ mod backup_tests {
         assert!(config.incremental_enabled);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_compression_types() {
         let types = vec![
@@ -49,6 +51,7 @@ mod backup_tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_compression_level_validation() {
         assert!(CompressionLevel::new(0).is_err());
@@ -60,6 +63,7 @@ mod backup_tests {
         assert_eq!(CompressionLevel::best().as_u32(), 9);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_compression_type_extensions() {
         assert_eq!(CompressionType::None.extension(), "");
@@ -69,6 +73,7 @@ mod backup_tests {
         assert_eq!(CompressionType::Brotli.extension(), ".br");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_atomic_backup_builder() {
         let _builder = AtomicBackup::builder("test_backup".to_string())
@@ -81,6 +86,7 @@ mod backup_tests {
         // Builder successfully created with all options
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_backup_operation_status() {
         let operation = BackupOperation {
@@ -98,6 +104,7 @@ mod backup_tests {
         assert_eq!(operation.entries_processed, 0);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_restore_options_defaults() {
         let options = RestoreOptions::default();
@@ -107,6 +114,7 @@ mod backup_tests {
         assert!(options.target_version.is_none());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_backup_validation_result() {
         let validation = BackupValidation {
@@ -125,6 +133,7 @@ mod backup_tests {
         assert_eq!(validation.warnings.len(), 1);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_compression_analysis() {
         let compressor = BackupCompression::new(CompressionType::Zstd, CompressionLevel::default());
@@ -138,6 +147,7 @@ mod backup_tests {
         assert_eq!(analysis.algorithm, CompressionType::Zstd);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_backup_metadata_serialization() {
         let metadata = BackupMetadata {
@@ -211,6 +221,7 @@ mod integration_tests {
         (backup_manager, temp_dir)
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_backup_and_restore_integration() {
         // Create state manager and add test data
@@ -276,6 +287,7 @@ mod integration_tests {
         assert_eq!(value2, json!({"nested": "value"}));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_empty_backup() {
         let state_manager = create_test_state_manager().await;
@@ -296,6 +308,7 @@ mod integration_tests {
             .expect("Failed to restore backup");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_compression_edge_cases() {
         // Test with different compression types
@@ -390,6 +403,7 @@ mod integration_tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_backup_retention_policies() {
         // This test verifies manual retention policy application
@@ -475,6 +489,7 @@ mod integration_tests {
         assert_eq!(backups_after.len(), 3);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_importance_based_retention() {
         let state_manager = create_test_state_manager().await;
@@ -531,6 +546,7 @@ mod integration_tests {
         // because it's marked as Critical importance
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_concurrent_operations() {
         let state_manager = create_test_state_manager().await;

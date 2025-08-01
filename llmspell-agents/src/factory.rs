@@ -457,6 +457,7 @@ impl AgentFactory for DefaultAgentFactory {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_default_resource_limits() {
         let limits = ResourceLimits::default();
@@ -471,6 +472,7 @@ mod tests {
         DefaultAgentFactory::new(provider_manager)
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_factory_templates() {
         let factory = create_test_factory().await;
@@ -479,6 +481,7 @@ mod tests {
         assert!(templates.contains(&"llm"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_config_validation() {
         let factory = create_test_factory().await;
@@ -536,6 +539,7 @@ mod tests {
         assert!(factory.validate_config(&invalid_config).is_err());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_agent_creation() {
         let factory = create_test_factory().await;
@@ -554,6 +558,7 @@ mod tests {
         assert_eq!(agent.metadata().name, "test-basic");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_agent_creation_unknown_type() {
         let factory = create_test_factory().await;
@@ -574,6 +579,7 @@ mod tests {
         assert!(err.to_string().contains("Unknown agent type"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_create_from_template() {
         let factory = create_test_factory().await;
@@ -586,6 +592,7 @@ mod tests {
         assert!(result.is_err());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_hooks_execution() {
         use std::sync::atomic::{AtomicBool, Ordering};
@@ -635,6 +642,7 @@ mod tests {
         assert!(after_called.load(Ordering::SeqCst));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_add_custom_template() {
         let mut factory = create_test_factory().await;

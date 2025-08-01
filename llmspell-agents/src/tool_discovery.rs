@@ -430,6 +430,7 @@ mod tests {
     use super::*;
     use llmspell_tools::registry::ToolRegistry;
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_discovery_service_creation() {
         let registry = Arc::new(ToolRegistry::new());
@@ -439,6 +440,7 @@ mod tests {
         assert!(!(discovery.tool_exists("nonexistent").await));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_search_criteria_builder() {
         let criteria = ToolSearchCriteria::new()
@@ -453,6 +455,7 @@ mod tests {
         assert_eq!(criteria.text_search, Some("file".to_string()));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_recommendation_context_builder() {
         let context = RecommendationContext::new()
@@ -467,6 +470,7 @@ mod tests {
         assert_eq!(context.user_preferences.len(), 1);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_find_by_category() {
         let registry = Arc::new(ToolRegistry::new());
@@ -477,6 +481,7 @@ mod tests {
         assert_eq!(tools.len(), 0);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_get_recommended_tools() {
         let registry = Arc::new(ToolRegistry::new());

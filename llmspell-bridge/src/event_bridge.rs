@@ -162,6 +162,7 @@ mod tests {
         Arc::new(GlobalContext::new(registry, providers))
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_event_bridge_creation() {
         let context = create_test_context().await;
@@ -170,6 +171,7 @@ mod tests {
         assert_eq!(bridge.subscription_count(), 0);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_event_publish_and_subscribe() {
         let context = create_test_context().await;
@@ -206,6 +208,7 @@ mod tests {
         assert_eq!(bridge.subscription_count(), 0);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_subscription_management() {
         let context = create_test_context().await;
@@ -236,6 +239,7 @@ mod tests {
         assert_eq!(bridge.subscription_count(), 1);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_stats() {
         let context = create_test_context().await;

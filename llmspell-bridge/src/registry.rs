@@ -181,6 +181,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_agent_registration() {
         let registry = ComponentRegistry::new();

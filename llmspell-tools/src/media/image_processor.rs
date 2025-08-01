@@ -836,6 +836,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_format_detection_by_extension() {
         let tool = create_test_tool();
@@ -863,6 +864,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_mime_types() {
         assert_eq!(ImageFormat::Png.mime_type(), "image/png");
@@ -872,6 +874,7 @@ mod tests {
         assert_eq!(ImageFormat::Unknown.mime_type(), "application/octet-stream");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_image_dimensions() {
         let landscape = ImageDimensions {
@@ -896,6 +899,7 @@ mod tests {
         assert_eq!(square.orientation(), "square");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_metadata_extraction() {
         let tool = create_test_tool();
@@ -922,6 +926,7 @@ mod tests {
         assert!(result.text.contains("Size: 17 bytes"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_format_detection_operation() {
         let tool = create_test_tool();
@@ -946,6 +951,7 @@ mod tests {
         assert!(result.text.contains("Detected image format: Jpeg"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_file_size_limit() {
         let config = ImageProcessorConfig {
@@ -973,6 +979,7 @@ mod tests {
         assert!(result.unwrap_err().to_string().contains("exceeds maximum"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_resize_not_implemented() {
         let tool = create_test_tool();
@@ -997,6 +1004,7 @@ mod tests {
         assert!(result.unwrap_err().to_string().contains("not implemented"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_convert_not_implemented() {
         let tool = create_test_tool();
@@ -1021,6 +1029,7 @@ mod tests {
         assert!(result.unwrap_err().to_string().contains("not implemented"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_invalid_operation() {
         let tool = create_test_tool();
@@ -1040,6 +1049,7 @@ mod tests {
             .contains("Invalid operation"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_missing_required_parameters() {
         let tool = create_test_tool();
@@ -1077,6 +1087,7 @@ mod tests {
             .contains("At least one of width or height"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_crop_parameter_validation() {
         let tool = create_test_tool();
@@ -1103,6 +1114,7 @@ mod tests {
             .contains("height is required"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_tool_metadata() {
         let tool = create_test_tool();
@@ -1125,6 +1137,7 @@ mod tests {
         assert!(params.iter().any(|p| p.name == "degrees"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_default_operation() {
         let tool = create_test_tool();
@@ -1149,6 +1162,7 @@ mod tests {
         assert!(result.text.contains("Image file"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_empty_file_path() {
         let tool = create_test_tool();
@@ -1166,6 +1180,7 @@ mod tests {
         assert!(result.unwrap_err().to_string().contains("cannot be empty"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_supported_formats() {
         let config = ImageProcessorConfig::default();

@@ -454,6 +454,7 @@ pub enum ViolationSeverity {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_resource_usage_snapshot() {
         let usage = ResourceUsage::snapshot();
@@ -462,6 +463,7 @@ mod tests {
         assert!(usage.thread_count > 0);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_performance_report_from_snapshots() {
         let mut snapshots = Vec::new();
@@ -499,6 +501,7 @@ mod tests {
         assert!(summary.contains("CPU: avg 30.0%, peak 40.0%"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_performance_threshold_violations() {
         let metrics = Arc::new(AgentMetrics::new("test-agent".to_string()));
@@ -536,6 +539,7 @@ mod tests {
         assert!(violations.iter().any(|v| v.metric == "throughput"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_snapshot_storage() {
         let metrics = Arc::new(AgentMetrics::new("test-agent".to_string()));

@@ -53,6 +53,7 @@ impl Default for JsonGlobal {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_json_global_metadata() {
         let global = JsonGlobal::new();

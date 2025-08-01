@@ -449,6 +449,7 @@ mod tests {
         HookContext::new(HookPoint::SystemStartup, component_id)
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_caching_hook_basic() {
         let hook = CachingHook::new();
@@ -463,6 +464,7 @@ mod tests {
         assert!(context.get_metadata("caching_hook_version").is_some());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_caching_hook_cache_hit() {
         let hook = CachingHook::new();
@@ -489,6 +491,7 @@ mod tests {
         assert_eq!(metrics.hit_ratio(), 1.0);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_caching_config_defaults() {
         let config = CachingConfig::default();
@@ -503,6 +506,7 @@ mod tests {
         assert!(!config.cache_errors);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_caching_strategy_success_only() {
         let hook = CachingHook::new().with_strategy(CachingStrategy::CacheSuccessOnly);
@@ -513,6 +517,7 @@ mod tests {
         assert!(!hook.should_cache_result(&HookResult::Redirect("/path".to_string())));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_caching_strategy_cache_all() {
         let hook = CachingHook::new().with_strategy(CachingStrategy::CacheAll);
@@ -522,6 +527,7 @@ mod tests {
         assert!(hook.should_cache_result(&HookResult::Redirect("/path".to_string())));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_should_cache_hook_point() {
         let mut config = CachingConfig::default();
@@ -535,6 +541,7 @@ mod tests {
         assert!(!hook.should_cache_hook_point(&HookPoint::BeforeAgentInit)); // Custom non-cacheable
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_should_cache_hook_point_with_whitelist() {
         let mut config = CachingConfig::default();
@@ -552,6 +559,7 @@ mod tests {
         // Not in whitelist
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_should_cache_by_execution_time() {
         let hook = CachingHook::new().with_min_execution_time(Duration::from_millis(50));
@@ -561,6 +569,7 @@ mod tests {
         assert!(hook.should_cache_by_execution_time(Duration::from_millis(50)));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_try_cache_result() {
         let hook = CachingHook::new();
@@ -582,6 +591,7 @@ mod tests {
         assert_eq!(metrics.time_saved_ms, 100);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_cache_error_handling() {
         let hook = CachingHook::new().with_error_caching(false);
@@ -605,6 +615,7 @@ mod tests {
         assert_eq!(metrics.cache_puts, 0);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_cache_error_caching_enabled() {
         let hook = CachingHook::new()
@@ -629,6 +640,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_cache_key_from_context() {
         let mut context1 = create_test_context();
@@ -648,6 +660,7 @@ mod tests {
         assert_ne!(key1, key2);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_caching_metrics() {
         let hook = CachingHook::new();
@@ -671,6 +684,7 @@ mod tests {
         assert_eq!(metrics.hit_ratio(), 1.0 / 3.0);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_cache_stats_integration() {
         let hook = CachingHook::new();
@@ -692,6 +706,7 @@ mod tests {
         assert_eq!(stats.current_size, 0);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_metric_hook_trait() {
         let hook = CachingHook::new();
@@ -711,6 +726,7 @@ mod tests {
         assert!(cached.is_some());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_hook_metadata() {
         let hook = CachingHook::new();
@@ -725,6 +741,7 @@ mod tests {
         assert!(metadata.tags.contains(&"performance".to_string()));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_builder_methods() {
         let hook = CachingHook::new()

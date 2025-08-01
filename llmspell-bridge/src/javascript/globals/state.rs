@@ -34,6 +34,7 @@ pub fn inject_state_global(
 #[cfg(test)]
 mod tests {
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_inject_state_global_compiles() {
         // Basic compilation test - just verify function exists

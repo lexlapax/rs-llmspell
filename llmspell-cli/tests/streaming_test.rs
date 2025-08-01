@@ -7,6 +7,7 @@ use llmspell_bridge::engine::{ScriptMetadata, ScriptStream};
 use llmspell_cli::{output::print_stream, OutputFormat};
 use llmspell_core::types::{AgentChunk, ChunkContent, ChunkMetadata, ControlMessage};
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_streaming_text_output() {
     // Create a mock stream
@@ -56,6 +57,7 @@ async fn test_streaming_text_output() {
     assert!(result.is_ok());
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_streaming_json_output() {
     // Create a mock stream with tool calls
@@ -100,6 +102,7 @@ async fn test_streaming_json_output() {
     assert!(result.is_ok());
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_streaming_with_media() {
     // Create a mock stream with media content
@@ -140,6 +143,7 @@ async fn test_streaming_with_media() {
     assert!(result.is_ok());
 }
 
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 async fn test_streaming_control_messages() {
     // Create a mock stream with various control messages
@@ -210,6 +214,7 @@ async fn test_streaming_control_messages() {
 // This test would be for manual testing of Ctrl+C handling
 // It's commented out because it requires manual intervention
 /*
+#[cfg_attr(test_category = "integration")]
 #[tokio::test]
 #[ignore = "Manual test - requires Ctrl+C interaction"]
 async fn test_streaming_interruption() {

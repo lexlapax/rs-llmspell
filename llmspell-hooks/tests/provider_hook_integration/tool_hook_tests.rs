@@ -16,6 +16,8 @@ use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 async fn test_tool_execution_hooks() {
     let fixture = HookTestFixture::new().await;
@@ -69,6 +71,8 @@ async fn test_tool_execution_hooks() {
     assert_hook_persisted(&fixture.storage, &correlation_id, "MetricsHook").await;
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 async fn test_tool_security_validation() {
     let fixture = HookTestFixture::new().await;
@@ -148,6 +152,8 @@ async fn test_tool_security_validation() {
     );
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 async fn test_tool_retry_on_failure() {
     let fixture = HookTestFixture::new().await;
@@ -189,6 +195,8 @@ async fn test_tool_retry_on_failure() {
     assert!(metrics.retry_reasons.contains_key("connection_error: timeout after 30s"));
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 async fn test_tool_caching_for_deterministic_operations() {
     let fixture = HookTestFixture::new().await;
@@ -251,6 +259,8 @@ async fn test_tool_caching_for_deterministic_operations() {
     assert!(stats.hit_rate > 0.0);
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 async fn test_tool_cost_tracking() {
     let fixture = HookTestFixture::new().await;
@@ -311,6 +321,8 @@ async fn test_tool_cost_tracking() {
     assert_eq!(metrics.operations_by_component.get("translation-api"), Some(&20));
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 async fn test_tool_debugging_traces() {
     let fixture = HookTestFixture::new().await;
@@ -370,6 +382,8 @@ async fn test_tool_debugging_traces() {
     assert!(trace.stack_trace.is_some());
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 async fn test_tool_chain_hooks() {
     let fixture = HookTestFixture::new().await;

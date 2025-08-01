@@ -392,6 +392,7 @@ macro_rules! bail_error {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_error_builder_basic() {
         let error = ErrorBuilder::new("Test error").build();
@@ -399,6 +400,7 @@ mod tests {
         assert_eq!(error.to_string(), "Test error");
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_error_builder_with_source() {
         let source = SimpleError::new("Source error".to_string());
@@ -408,6 +410,7 @@ mod tests {
         assert!(error.source().is_some());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_error_builder_with_context() {
         let error = ErrorBuilder::new("Error with context")
@@ -425,6 +428,7 @@ mod tests {
         assert!(display.contains("key2: 42"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_with_context_trait() {
         let result: Result<(), _> = Err(SimpleError::new("Original error".to_string()));
@@ -434,6 +438,7 @@ mod tests {
         assert!(error.source().is_some());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_error_templates() {
         let io_err = templates::io_error("Failed to read", "/tmp/test.txt").build();
@@ -471,6 +476,7 @@ mod tests {
         assert_eq!(parse_err.get_context("column"), Some("5"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_build_error_macro() {
         let error1 = build_error!("Simple error");
@@ -486,6 +492,7 @@ mod tests {
         assert_eq!(error3.get_context("count"), Some("42"));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_error_display_formatting() {
         let error = ErrorBuilder::new("Main message")
@@ -594,6 +601,7 @@ pub mod llmspell {
     mod tests {
         use super::*;
 
+        #[cfg_attr(test_category = "unit")]
         #[test]
         fn test_validation_error() {
             let err = validation_error("Invalid input", Some("email".to_string()));
@@ -606,6 +614,7 @@ pub mod llmspell {
             }
         }
 
+        #[cfg_attr(test_category = "unit")]
         #[test]
         fn test_tool_error() {
             let err = tool_error("Tool failed", Some("json_processor".to_string()));

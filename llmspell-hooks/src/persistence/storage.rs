@@ -254,6 +254,7 @@ impl Clone for StorageStatistics {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_hook_metadata_creation() {
         let mut metadata = HookMetadata::new(
@@ -276,6 +277,7 @@ mod tests {
         );
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_storage_adapter() {
         let adapter = HookStorageAdapter::new();

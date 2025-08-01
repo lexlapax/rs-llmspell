@@ -311,12 +311,14 @@ mod tests {
     use std::sync::atomic::{AtomicU32, Ordering};
     use std::sync::Arc;
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_successful_operation() {
         let result = retry_default(|| async { Ok::<_, &str>(42) }).await;
         assert_eq!(result.unwrap(), 42);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_retry_on_failure() {
         let counter = Arc::new(AtomicU32::new(0));
@@ -338,6 +340,7 @@ mod tests {
         assert_eq!(counter.load(Ordering::SeqCst), 3);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_exhausted_retries() {
         let result = retry_default(|| async { Err::<i32, _>("permanent failure") }).await;
@@ -351,6 +354,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_custom_retry_policy() {
         struct CustomPolicy;
@@ -374,6 +378,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_delay_calculation() {
         let config = RetryConfig {

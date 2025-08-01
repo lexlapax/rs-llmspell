@@ -298,6 +298,7 @@ mod tests {
     use super::*;
     use crate::backup::BackupStats;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_retention_priority_ordering() {
         assert!(RetentionPriority::Critical > RetentionPriority::Important);
@@ -305,6 +306,7 @@ mod tests {
         assert!(RetentionPriority::Standard > RetentionPriority::Low);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_time_based_policy() {
         let policy = TimeBasedPolicy::new(Duration::from_secs(7 * 24 * 3600)); // 7 days

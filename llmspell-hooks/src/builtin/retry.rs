@@ -514,6 +514,7 @@ mod tests {
         context
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_retry_hook_basic() {
         let hook = RetryHook::new();
@@ -527,6 +528,7 @@ mod tests {
         assert!(context.get_metadata("retry_delay_ms").is_some());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_retry_hook_non_retryable() {
         let hook = RetryHook::new();
@@ -536,6 +538,7 @@ mod tests {
         assert!(matches!(result, HookResult::Continue));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_retry_hook_max_attempts() {
         let hook = RetryHook::new().with_max_attempts(2);
@@ -554,6 +557,7 @@ mod tests {
         assert_eq!(metrics.max_attempts_reached, 1);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_backoff_strategies() {
         // Test fixed backoff
@@ -587,6 +591,7 @@ mod tests {
         }
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_jitter_strategies() {
         // Test full jitter
@@ -608,6 +613,7 @@ mod tests {
         assert!(delays.iter().all(|&d| d <= 1000));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_retryable_patterns() {
         let hook = RetryHook::new()
@@ -630,6 +636,7 @@ mod tests {
         assert!(matches!(result, HookResult::Continue));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[tokio::test]
     async fn test_retry_metrics() {
         let hook = RetryHook::new().with_max_attempts(3);
@@ -651,6 +658,7 @@ mod tests {
         assert_eq!(metrics.success_rate(), 1.0);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_fibonacci_calculation() {
         let hook = RetryHook::new();
@@ -662,6 +670,7 @@ mod tests {
         assert_eq!(hook.fibonacci(5), 8);
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_hook_metadata() {
         let hook = RetryHook::new();
@@ -675,6 +684,7 @@ mod tests {
         assert!(metadata.tags.contains(&"retry".to_string()));
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_retry_config_defaults() {
         let config = RetryConfig::default();

@@ -27,6 +27,7 @@ pub fn inject_tool_global(_ctx: &(), _context: &GlobalContext) -> Result<(), LLM
 
 #[cfg(test)]
 mod tests {
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_tool_global_stub() {
         // Basic compilation test - just verify function exists

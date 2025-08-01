@@ -135,6 +135,7 @@ impl Default for SessionSecurityManager {
 mod tests {
     use super::*;
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_same_session_access() {
         let manager = SessionSecurityManager::new(true);
@@ -145,6 +146,7 @@ mod tests {
             .unwrap());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_strict_isolation() {
         let mut manager = SessionSecurityManager::new(true);
@@ -158,6 +160,7 @@ mod tests {
         assert!(!manager.can_access_session(&session1, &session2).unwrap());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_non_strict_isolation() {
         let mut manager = SessionSecurityManager::new(false);
@@ -171,6 +174,7 @@ mod tests {
         assert!(manager.can_access_session(&session1, &session2).unwrap());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_inactive_session_access() {
         let mut manager = SessionSecurityManager::new(false);
@@ -184,6 +188,7 @@ mod tests {
         assert!(!manager.can_access_session(&session1, &session2).unwrap());
     }
 
+    #[cfg_attr(test_category = "unit")]
     #[test]
     fn test_state_scope_validation() {
         let mut manager = SessionSecurityManager::new(true);

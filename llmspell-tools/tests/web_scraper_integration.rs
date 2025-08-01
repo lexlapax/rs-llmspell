@@ -8,6 +8,8 @@ use llmspell_core::BaseAgent;
 use llmspell_tools::WebScraperTool;
 use serde_json::json;
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 #[ignore = "external,tool,integration"]
 async fn test_web_scraper_basic() {
@@ -34,6 +36,8 @@ async fn test_web_scraper_basic() {
     assert!(content["links"].is_array());
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 #[ignore = "external,tool,integration"]
 async fn test_web_scraper_selectors() {
@@ -57,6 +61,8 @@ async fn test_web_scraper_selectors() {
     assert!(content["selected_content"].is_array());
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 #[ignore = "external,tool,integration"]
 async fn test_web_scraper_metadata() {
@@ -80,6 +86,8 @@ async fn test_web_scraper_metadata() {
     assert!(content["metadata"].is_object() || content["meta_tags"].is_object());
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 #[ignore = "external,tool,integration"]
 async fn test_web_scraper_httpbin_html() {
@@ -107,6 +115,8 @@ async fn test_web_scraper_httpbin_html() {
     assert!(content["links"].is_array());
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 #[ignore = "external,tool,integration"]
 async fn test_web_scraper_invalid_url() {
@@ -124,6 +134,8 @@ async fn test_web_scraper_invalid_url() {
     assert!(error.to_string().contains("Invalid URL"));
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 #[ignore = "tool,integration"]
 async fn test_web_scraper_network_error() {
@@ -147,6 +159,8 @@ async fn test_web_scraper_network_error() {
     }
 }
 
+#[cfg_attr(test_category = "external")]
+#[ignore]
 #[tokio::test]
 #[ignore = "external,tool,integration,slow"]
 async fn test_web_scraper_timeout() {
