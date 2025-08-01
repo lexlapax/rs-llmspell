@@ -12,7 +12,9 @@ use llmspell_core::{
 };
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "core")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_component_id_edge_cases() {
     // Empty string should still produce valid ID
@@ -43,7 +45,9 @@ fn test_component_id_edge_cases() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "core")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_version_edge_cases() {
     // Maximum values
@@ -99,7 +103,9 @@ fn test_version_edge_cases() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "core")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_error_edge_cases() {
     // Very long error messages
@@ -135,7 +141,9 @@ fn test_error_edge_cases() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "core")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_agent_input_edge_cases() {
     // Empty prompt
@@ -176,7 +184,9 @@ fn test_agent_input_edge_cases() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "core")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_agent_output_edge_cases() {
     // Empty content
@@ -218,7 +228,9 @@ fn test_agent_output_edge_cases() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "core")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_conversation_message_edge_cases() {
     // Empty content
@@ -242,7 +254,9 @@ fn test_conversation_message_edge_cases() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "core")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_tool_category_edge_cases() {
     // Custom categories with special characters
@@ -260,7 +274,9 @@ fn test_tool_category_edge_cases() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "core")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_security_level_edge_cases() {
     // Ordering tests
@@ -283,7 +299,9 @@ fn test_security_level_edge_cases() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "core")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_parameter_type_equality() {
     // Ensure all parameter types are distinct
@@ -308,7 +326,9 @@ fn test_parameter_type_equality() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "core")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_message_role_display_consistency() {
     // Ensure display strings are consistent
@@ -323,7 +343,9 @@ fn test_message_role_display_consistency() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "core")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_error_retryability_edge_cases() {
     // Network errors should always be retryable

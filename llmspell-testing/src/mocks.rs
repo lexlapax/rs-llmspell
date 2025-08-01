@@ -156,6 +156,7 @@ pub fn create_simple_mock_agent() -> MockBaseAgent {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "testing")]
 mod tests {
     use super::*;
     use tokio;

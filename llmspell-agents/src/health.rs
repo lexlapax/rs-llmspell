@@ -696,6 +696,7 @@ impl HealthCheck for ResponsivenessHealthCheck {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
     use crate::lifecycle::{events::EventSystemConfig, resources::ResourceLimits};

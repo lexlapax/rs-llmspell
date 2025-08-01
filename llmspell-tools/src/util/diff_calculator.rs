@@ -569,6 +569,7 @@ impl Tool for DiffCalculatorTool {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "tool")]
 mod tests {
     use super::*;
     use serde_json::json;

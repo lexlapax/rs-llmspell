@@ -312,6 +312,7 @@ pub fn find_optimal_compression(
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "state")]
 mod tests {
     use super::*;
 

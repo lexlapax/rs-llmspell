@@ -434,7 +434,6 @@ mod tests {
     use super::*;
 
     #[cfg_attr(test_category = "external")]
-    #[ignore]
     #[test]
     fn test_auth_test_creation() {
         let tests = all_auth_tests();
@@ -460,7 +459,6 @@ mod tests {
     }
 
     #[cfg_attr(test_category = "external")]
-    #[ignore]
     #[test]
     fn test_critical_auth_tests() {
         let tests = all_auth_tests();
@@ -484,7 +482,6 @@ mod tests {
     }
 
     #[cfg_attr(test_category = "external")]
-    #[ignore]
     #[test]
     fn test_authentication_category_coverage() {
         let tests = all_auth_tests();
@@ -498,7 +495,6 @@ mod tests {
     }
 
     #[cfg_attr(test_category = "external")]
-    #[ignore]
     #[test]
     fn test_authorization_category_coverage() {
         let tests = all_auth_tests();

@@ -260,6 +260,7 @@ pub trait Agent: BaseAgent {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "core")]
 mod tests {
     use super::*;
     use crate::types::{AgentInput, AgentOutput};

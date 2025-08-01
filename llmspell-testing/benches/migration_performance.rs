@@ -1,6 +1,8 @@
 // ABOUTME: Performance benchmarks for state migration operations
 // ABOUTME: Measures throughput, latency, and scalability of migration engine
 
+#![cfg_attr(test_category = "benchmark")]
+
 use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
 use llmspell_state_persistence::{
     manager::SerializableState,

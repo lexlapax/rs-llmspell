@@ -550,6 +550,7 @@ impl Tool for VideoProcessorTool {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "tool")]
 mod tests {
     use super::*;
     use std::collections::HashMap;

@@ -6,6 +6,7 @@ use llmspell_tools::CsvAnalyzerTool;
 use serde_json::json;
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
 #[tokio::test]
 async fn test_complex_csv_analysis_workflow() {
     let tool = CsvAnalyzerTool::default();
@@ -91,6 +92,7 @@ async fn test_complex_csv_analysis_workflow() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
 #[tokio::test]
 async fn test_malformed_csv_handling() {
     let tool = CsvAnalyzerTool::default();
@@ -131,6 +133,7 @@ newline",300
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
 #[tokio::test]
 async fn test_large_csv_streaming() {
     let tool = CsvAnalyzerTool::default();
@@ -169,6 +172,7 @@ async fn test_large_csv_streaming() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
 #[tokio::test]
 async fn test_csv_validation() {
     let tool = CsvAnalyzerTool::default();
@@ -210,6 +214,7 @@ async fn test_csv_validation() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
 #[tokio::test]
 async fn test_csv_transform_operation() {
     let tool = CsvAnalyzerTool::default();
@@ -250,6 +255,7 @@ Orange,2.00,150
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
 #[tokio::test]
 async fn test_encoding_detection() {
     let tool = CsvAnalyzerTool::default();

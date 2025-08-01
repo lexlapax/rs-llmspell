@@ -13,7 +13,8 @@ use std::time::Duration;
 use tokio::time::sleep;
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "util")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_provider_rate_limiter_creation() {
     let mut configs = HashMap::new();
@@ -31,7 +32,8 @@ async fn test_provider_rate_limiter_creation() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "util")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[cfg(feature = "rate-limiting-http")]
 async fn test_rate_limit_headers_parsing() {
@@ -52,7 +54,8 @@ async fn test_rate_limit_headers_parsing() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "util")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_provider_specific_limits() {
     let openai_config = ProviderLimits::openai();
@@ -72,7 +75,8 @@ async fn test_provider_specific_limits() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "util")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_retry_with_backoff() {
     let limiter = ProviderRateLimiter::new();
@@ -110,7 +114,8 @@ async fn test_retry_with_backoff() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "util")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_metrics_collection() {
     let mut limiter = ProviderRateLimiter::new();
@@ -138,7 +143,8 @@ async fn test_metrics_collection() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "util")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_backoff_strategies() {
     // Test linear backoff
@@ -162,7 +168,8 @@ async fn test_backoff_strategies() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "util")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_concurrent_rate_limiting() {
     let limiter = Arc::new(ProviderRateLimiter::new());

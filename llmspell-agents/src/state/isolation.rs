@@ -548,6 +548,7 @@ impl IsolatedStateAccessor {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
 

@@ -9,6 +9,7 @@ use serde_json::json;
 use std::time::SystemTime;
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "state")]
 #[test]
 fn test_field_copy() {
     let transformer = DataTransformer::new();
@@ -46,6 +47,7 @@ fn test_field_copy() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "state")]
 #[test]
 fn test_field_default() {
     let transformer = DataTransformer::new();
@@ -87,6 +89,7 @@ fn test_field_default() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "state")]
 #[test]
 fn test_field_remove() {
     let transformer = DataTransformer::new();
@@ -128,6 +131,7 @@ fn test_field_remove() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "state")]
 #[test]
 fn test_multiple_transforms() {
     let transformer = DataTransformer::new();

@@ -435,6 +435,7 @@ impl<B: StorageBackend> Drop for EventPersistenceManager<B> {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "event")]
 mod tests {
     use super::*;
     use crate::universal_event::{Language, UniversalEvent};

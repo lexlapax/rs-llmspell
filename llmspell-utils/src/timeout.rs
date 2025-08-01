@@ -402,6 +402,7 @@ pub trait TimeoutExt: Future + Sized {
 impl<F: Future> TimeoutExt for F {}
 
 #[cfg(test)]
+#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
     use tokio::time::sleep;

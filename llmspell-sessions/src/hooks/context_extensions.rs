@@ -233,6 +233,7 @@ impl SessionHookContextHelper {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "session")]
 mod tests {
     use super::*;
     use crate::types::CreateSessionOptions;

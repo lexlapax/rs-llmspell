@@ -308,6 +308,7 @@ pub fn validation_response(valid: bool, errors: &Option<Vec<ValidationError>>) -
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
 

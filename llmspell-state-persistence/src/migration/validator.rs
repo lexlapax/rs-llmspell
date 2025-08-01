@@ -649,6 +649,7 @@ impl MigrationValidator {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "state")]
 mod tests {
     use super::*;
     use crate::schema::EnhancedStateSchema;

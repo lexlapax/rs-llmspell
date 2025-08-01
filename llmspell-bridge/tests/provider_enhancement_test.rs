@@ -356,7 +356,6 @@ async fn test_multiple_providers_same_script() {
 mod provider_config_tests {
 
     #[cfg_attr(test_category = "external")]
-    #[ignore]
     #[test]
     fn test_model_specifier_parsing() {
         // Direct unit test of ModelSpecifier parsing
@@ -380,7 +379,6 @@ mod provider_config_tests {
     }
 
     #[cfg_attr(test_category = "external")]
-    #[ignore]
     #[test]
     fn test_model_specifier_validation() {
         use llmspell_providers::model_specifier::ModelSpecifier;

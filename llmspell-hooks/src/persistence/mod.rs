@@ -8,6 +8,7 @@ mod retention;
 mod storage;
 mod storage_backend;
 #[cfg(test)]
+#[cfg_attr(test_category = "hook")]
 mod tests;
 
 pub use inspector::{

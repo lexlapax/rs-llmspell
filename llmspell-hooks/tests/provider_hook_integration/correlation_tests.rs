@@ -14,6 +14,7 @@ use std::collections::{HashMap, HashSet};
 use uuid::Uuid;
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "hook")]
 #[tokio::test]
 async fn test_correlation_across_agent_and_tools() {
     let fixture = HookTestFixture::new().await;
@@ -126,6 +127,7 @@ async fn test_correlation_across_agent_and_tools() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "hook")]
 #[tokio::test]
 async fn test_correlation_with_parallel_tools() {
     let fixture = HookTestFixture::new().await;
@@ -217,6 +219,7 @@ async fn test_correlation_with_parallel_tools() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "hook")]
 #[tokio::test]
 async fn test_correlation_with_nested_workflows() {
     let fixture = HookTestFixture::new().await;
@@ -305,6 +308,7 @@ async fn test_correlation_with_nested_workflows() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "hook")]
 #[tokio::test]
 async fn test_correlation_with_error_propagation() {
     let fixture = HookTestFixture::new().await;
@@ -402,6 +406,7 @@ async fn test_correlation_with_error_propagation() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "hook")]
 #[tokio::test]
 async fn test_correlation_replay_preserves_relationships() {
     let fixture = HookTestFixture::new().await;

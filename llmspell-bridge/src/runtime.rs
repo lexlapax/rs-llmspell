@@ -483,6 +483,7 @@ impl From<SecurityConfig> for crate::engine::SecurityContext {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "bridge")]
 mod tests {
     use super::*;
 

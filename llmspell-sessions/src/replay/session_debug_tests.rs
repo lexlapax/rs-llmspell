@@ -67,6 +67,8 @@ fn create_test_replay_session(_session_id: SessionId) -> ReplaySession {
 }
 
 #[cfg_attr(test_category = "unit")]
+#[cfg_attr(test_category = "session")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_session_debugger_creation() {
     let debugger = SessionDebugger::new();
@@ -78,6 +80,8 @@ fn test_session_debugger_creation() {
 }
 
 #[cfg_attr(test_category = "unit")]
+#[cfg_attr(test_category = "session")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_import_replay_session() {
     let debugger = SessionDebugger::new();
@@ -97,6 +101,8 @@ fn test_import_replay_session() {
 }
 
 #[cfg_attr(test_category = "unit")]
+#[cfg_attr(test_category = "session")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_inspect_state_at_timestamp() {
     let debugger = SessionDebugger::new();
@@ -143,6 +149,8 @@ fn test_inspect_state_at_timestamp() {
 }
 
 #[cfg_attr(test_category = "unit")]
+#[cfg_attr(test_category = "session")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_state_comparison() {
     let state1 = SessionState {
@@ -197,6 +205,8 @@ fn test_state_comparison() {
 }
 
 #[cfg_attr(test_category = "unit")]
+#[cfg_attr(test_category = "session")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_compare_states_at_different_times() {
     let debugger = SessionDebugger::new();
@@ -230,6 +240,8 @@ fn test_compare_states_at_different_times() {
 }
 
 #[cfg_attr(test_category = "unit")]
+#[cfg_attr(test_category = "session")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_timeline_navigation() {
     let debugger = SessionDebugger::new();
@@ -281,6 +293,8 @@ fn test_timeline_navigation() {
 }
 
 #[cfg_attr(test_category = "unit")]
+#[cfg_attr(test_category = "session")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_error_analysis() {
     let errors = vec![
@@ -329,6 +343,8 @@ fn test_error_analysis() {
 }
 
 #[cfg_attr(test_category = "unit")]
+#[cfg_attr(test_category = "session")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_error_rate_calculation() {
     let base_time = SystemTime::now() - Duration::from_secs(3600); // 1 hour ago
@@ -366,6 +382,8 @@ fn test_error_rate_calculation() {
 }
 
 #[cfg_attr(test_category = "unit")]
+#[cfg_attr(test_category = "session")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_export_debug_data() {
     let debugger = SessionDebugger::new();
@@ -399,6 +417,8 @@ fn test_export_debug_data() {
 }
 
 #[cfg_attr(test_category = "unit")]
+#[cfg_attr(test_category = "session")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_clear_session_data() {
     let debugger = SessionDebugger::new();
@@ -423,6 +443,8 @@ fn test_clear_session_data() {
 }
 
 #[cfg_attr(test_category = "unit")]
+#[cfg_attr(test_category = "session")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_add_error() {
     let debugger = SessionDebugger::new();
@@ -449,6 +471,8 @@ fn test_add_error() {
 }
 
 #[cfg_attr(test_category = "unit")]
+#[cfg_attr(test_category = "session")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_state_comparison_with_arrays() {
     let state1 = SessionState {
@@ -484,6 +508,8 @@ fn test_state_comparison_with_arrays() {
 }
 
 #[cfg_attr(test_category = "unit")]
+#[cfg_attr(test_category = "session")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_hook_result_comparison() {
     let debugger = SessionDebugger::new();
@@ -503,6 +529,8 @@ fn test_hook_result_comparison() {
 }
 
 #[cfg_attr(test_category = "unit")]
+#[cfg_attr(test_category = "session")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_session_state_from_captured() {
     let captured = CapturedState {
@@ -530,6 +558,8 @@ fn test_session_state_from_captured() {
 }
 
 #[cfg_attr(test_category = "unit")]
+#[cfg_attr(test_category = "session")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_timeline_entry_conversion() {
     let executions = vec![
@@ -569,6 +599,8 @@ fn test_timeline_entry_conversion() {
 }
 
 #[cfg_attr(test_category = "unit")]
+#[cfg_attr(test_category = "session")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_state_inspection_empty_session() {
     let debugger = SessionDebugger::new();
@@ -580,6 +612,8 @@ fn test_state_inspection_empty_session() {
 }
 
 #[cfg_attr(test_category = "unit")]
+#[cfg_attr(test_category = "session")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_metadata_comparison() {
     let state1 = SessionState {
@@ -612,6 +646,8 @@ fn test_metadata_comparison() {
 }
 
 #[cfg_attr(test_category = "unit")]
+#[cfg_attr(test_category = "session")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_debug_data_serialization() {
     let debug_data = SessionDebugData {
@@ -654,6 +690,8 @@ fn test_debug_data_serialization() {
 }
 
 #[cfg_attr(test_category = "unit")]
+#[cfg_attr(test_category = "session")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_comparison_with_nested_objects() {
     let state1 = SessionState {

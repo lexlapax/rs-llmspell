@@ -244,6 +244,7 @@ impl From<&CircuitMetrics> for AlertLevel {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
 

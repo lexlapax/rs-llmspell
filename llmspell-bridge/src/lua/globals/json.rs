@@ -62,6 +62,7 @@ pub fn inject_json_global(lua: &Lua) -> Result<(), LLMSpellError> {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "bridge")]
 mod tests {
     use super::*;
 

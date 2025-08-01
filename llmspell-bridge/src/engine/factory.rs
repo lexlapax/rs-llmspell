@@ -258,6 +258,7 @@ pub fn unregister_engine_plugin(name: &str) -> bool {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "bridge")]
 mod tests {
     use super::*;
 

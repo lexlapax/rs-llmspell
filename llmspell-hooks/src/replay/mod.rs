@@ -124,6 +124,7 @@ pub struct BatchReplayResponse {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "hook")]
 mod tests {
     use super::*;
 

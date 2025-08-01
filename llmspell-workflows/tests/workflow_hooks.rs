@@ -14,6 +14,8 @@ use serde_json::json;
 use std::sync::Arc;
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "workflow")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_sequential_workflow_with_hooks() {
     // Create workflow executor without hook executor (testing basic integration)
@@ -49,6 +51,8 @@ async fn test_sequential_workflow_with_hooks() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "workflow")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_conditional_workflow_with_hooks() {
     // Create workflow executor
@@ -81,6 +85,8 @@ async fn test_conditional_workflow_with_hooks() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "workflow")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_loop_workflow_with_hooks() {
     // Create workflow executor
@@ -111,6 +117,8 @@ async fn test_loop_workflow_with_hooks() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "workflow")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_parallel_workflow_with_hooks() {
     // Create workflow executor
@@ -151,6 +159,8 @@ async fn test_parallel_workflow_with_hooks() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "workflow")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_workflow_without_hooks() {
     // Test that workflows work without hooks (backward compatibility)
@@ -169,6 +179,8 @@ async fn test_workflow_without_hooks() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "workflow")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_error_handling_with_hooks() {
     // Create workflow executor
@@ -206,6 +218,8 @@ async fn test_error_handling_with_hooks() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "workflow")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_state_management_with_hooks() {
     // Create workflow executor
@@ -243,6 +257,8 @@ async fn test_state_management_with_hooks() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "workflow")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_nested_workflow_patterns() {
     // Test that complex nested workflow patterns work with hooks
@@ -291,6 +307,8 @@ async fn test_nested_workflow_patterns() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "workflow")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_workflow_lifecycle_config() {
     // Test workflow with custom lifecycle configuration

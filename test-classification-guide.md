@@ -133,34 +133,53 @@ fn test_tool_input_validation() {
 
 ## Test Execution Commands
 
-### Fast Feedback (Unit + Integration)
+### Fast Test Suite (Unit + Integration)
 ```bash
-cargo test --features unit-tests,integration-tests
+cargo test -p llmspell-testing --features fast-tests
 # Should complete in <35 seconds
+# Ideal for CI/PR checks and development feedback
 ```
 
-### Benchmarks
+### Comprehensive Test Suite (All but External)
 ```bash
-cargo bench --features benchmark-tests
+cargo test -p llmspell-testing --features comprehensive-tests
+# Includes unit, integration, component, security, and performance tests
+# Excludes external tests requiring network/API keys
+```
+
+### External Test Suite (Network/API Tests)
+```bash
+cargo test -p llmspell-testing --features external-tests -- --ignored
+# Requires environment variables for API keys (OPENAI_API_KEY, etc.)
+# Run manually or in nightly CI builds
+```
+
+### All Tests (Complete Suite)
+```bash
+cargo test -p llmspell-testing --features all-tests -- --include-ignored
+# Runs everything including external tests
+# Use for release validation
+```
+
+### Benchmark Tests
+```bash
+cargo bench -p llmspell-testing --features benchmark-tests
+# Performance measurement, not pass/fail tests
 # Run in isolated environment for accurate results
 ```
 
 ### Component-Specific Tests
 ```bash
-cargo test --features tool-tests
-cargo test --features agent-tests
-cargo test --features workflow-tests
+cargo test -p llmspell-testing --features tool-tests
+cargo test -p llmspell-testing --features agent-tests  
+cargo test -p llmspell-testing --features workflow-tests
+cargo test -p llmspell-testing --features bridge-tests
 ```
 
-### External Tests (Manual Trigger)
+### Security/Performance Tests
 ```bash
-cargo test --features external-tests -- --ignored
-# Requires environment variables for API keys
-```
-
-### All Tests
-```bash
-cargo test --features all-tests -- --include-ignored
+cargo test -p llmspell-testing --features security-tests
+cargo test -p llmspell-testing --features performance-tests
 ```
 
 ## Migration Guidelines

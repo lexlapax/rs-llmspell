@@ -220,6 +220,7 @@ impl Clone for RetentionStatistics {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "hook")]
 mod tests {
     use super::*;
 

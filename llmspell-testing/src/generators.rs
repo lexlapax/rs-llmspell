@@ -359,6 +359,7 @@ pub fn file_content_strategy() -> impl Strategy<Value = String> {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "testing")]
 mod tests {
     use super::*;
 

@@ -11,6 +11,7 @@ use tokio;
 
 /// Test artifact storage and retrieval
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "bridge")]
 #[tokio::test]
 async fn test_artifact_storage_and_retrieval() {
     TestLogger::init();
@@ -62,6 +63,7 @@ async fn test_artifact_storage_and_retrieval() {
 
 /// Test artifact listing and querying
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "bridge")]
 #[tokio::test]
 async fn test_artifact_listing_and_query() {
     TestLogger::init();
@@ -130,6 +132,7 @@ async fn test_artifact_listing_and_query() {
 
 /// Test artifact file storage
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "bridge")]
 #[tokio::test]
 async fn test_artifact_file_storage() {
     TestLogger::init();
@@ -179,6 +182,7 @@ async fn test_artifact_file_storage() {
 
 /// Test artifact deletion
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "bridge")]
 #[tokio::test]
 async fn test_artifact_deletion() {
     TestLogger::init();
@@ -238,6 +242,7 @@ async fn test_artifact_deletion() {
 
 /// Test artifact error conditions
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "bridge")]
 #[tokio::test]
 async fn test_artifact_error_conditions() {
     TestLogger::init();

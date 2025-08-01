@@ -17,6 +17,8 @@ use std::fs;
 use tempfile::TempDir;
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_zip_create_and_extract() -> Result<()> {
     let temp_dir = TempDir::new()?;
@@ -81,6 +83,8 @@ async fn test_zip_create_and_extract() -> Result<()> {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_tar_gz_operations() -> Result<()> {
     let temp_dir = TempDir::new()?;
@@ -126,6 +130,8 @@ async fn test_tar_gz_operations() -> Result<()> {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_single_file_gz() -> Result<()> {
     let temp_dir = TempDir::new()?;
@@ -173,6 +179,8 @@ async fn test_single_file_gz() -> Result<()> {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_archive_size_limits() -> Result<()> {
     let temp_dir = TempDir::new()?;
@@ -202,6 +210,8 @@ async fn test_archive_size_limits() -> Result<()> {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_path_traversal_protection() -> Result<()> {
     let temp_dir = TempDir::new()?;
@@ -241,6 +251,8 @@ async fn test_path_traversal_protection() -> Result<()> {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_with_file_sandbox() -> Result<()> {
     let temp_dir = TempDir::new()?;
@@ -299,6 +311,8 @@ async fn test_with_file_sandbox() -> Result<()> {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_archive_formats() -> Result<()> {
     let temp_dir = TempDir::new()?;
@@ -347,6 +361,8 @@ async fn test_archive_formats() -> Result<()> {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_compression_levels() -> Result<()> {
     let temp_dir = TempDir::new()?;

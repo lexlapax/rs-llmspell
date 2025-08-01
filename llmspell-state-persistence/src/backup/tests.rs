@@ -2,6 +2,7 @@
 // ABOUTME: Tests atomic backup operations, compression, and backup management
 
 #[cfg(test)]
+#[cfg_attr(test_category = "state")]
 mod backup_tests {
     use crate::backup::atomic::{AtomicBackup, BackupOperation, OperationStatus};
     use crate::backup::compression::{BackupCompression, CompressionLevel};
@@ -178,6 +179,7 @@ mod backup_tests {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "state")]
 mod integration_tests {
     use crate::backup::atomic::AtomicBackup;
     use crate::backup::*;

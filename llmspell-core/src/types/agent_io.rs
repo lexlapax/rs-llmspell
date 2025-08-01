@@ -377,6 +377,7 @@ impl Default for AgentOutputBuilder {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "core")]
 mod tests {
     use super::*;
 

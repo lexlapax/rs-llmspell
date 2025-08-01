@@ -476,6 +476,7 @@ pub fn create_pattern_parameter(
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
     use crate::templates::schema::{ComplexityLevel, TemplateCategory, TemplateMetadata};

@@ -1,6 +1,8 @@
 // ABOUTME: Performance test for event system throughput measurement
 // ABOUTME: Validates the event system can handle 100K+ events per second
 
+#![cfg_attr(test_category = "benchmark")]
+
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use llmspell_events::{EventBus, Language, UniversalEvent};
 use std::sync::atomic::{AtomicU64, Ordering};

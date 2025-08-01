@@ -10,6 +10,9 @@ use serde_json::json;
 use std::time::{Duration, Instant};
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_hook_overhead_under_5_percent() {
     // Test configuration
@@ -124,6 +127,9 @@ async fn test_hook_overhead_under_5_percent() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_circuit_breaker_performance() {
     let config = ToolLifecycleConfig {
@@ -170,6 +176,9 @@ async fn test_circuit_breaker_performance() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_resource_tracking_overhead() {
     let config = ToolLifecycleConfig {
@@ -210,6 +219,9 @@ async fn test_resource_tracking_overhead() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_hook_execution_time_limit() {
     let config = ToolLifecycleConfig {
@@ -243,6 +255,9 @@ async fn test_hook_execution_time_limit() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_audit_logging_performance_impact() {
     let iterations = 50;

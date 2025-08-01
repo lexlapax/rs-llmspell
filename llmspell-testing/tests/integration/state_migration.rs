@@ -19,6 +19,8 @@ use std::time::SystemTime;
 
 /// Test complex schema migration with multiple transformations
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "testing")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 // TODO: Add test categorization attributes when macro support is improved
 async fn test_complex_schema_migration() {
@@ -200,6 +202,8 @@ async fn test_complex_schema_migration() {
 
 /// Test large dataset migration performance
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "testing")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_large_dataset_migration_performance() {
     let start_time = std::time::Instant::now();
@@ -279,6 +283,8 @@ async fn test_large_dataset_migration_performance() {
 
 /// Test multi-step migration chain
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "testing")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_multi_step_migration_chain() {
     // Create migration planner
@@ -478,6 +484,8 @@ async fn test_multi_step_migration_chain() {
 
 /// Test migration rollback on error
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "testing")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_migration_rollback_on_error() {
     // Create state manager
@@ -549,6 +557,8 @@ async fn test_migration_rollback_on_error() {
 
 /// Test migration data integrity validation
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "testing")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_migration_data_integrity() {
     // Create test data with various edge cases
@@ -716,6 +726,8 @@ async fn test_migration_data_integrity() {
 
 /// Test concurrent migration operations
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "testing")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_concurrent_migration_safety() {
     use tokio::sync::Mutex;

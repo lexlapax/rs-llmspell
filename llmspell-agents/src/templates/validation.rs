@@ -840,6 +840,7 @@ fn calculate_complexity_score(schema: &TemplateSchema) -> u32 {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
     use crate::templates::schema::{ComplexityLevel, TemplateCategory, TemplateMetadata};

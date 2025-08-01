@@ -390,6 +390,7 @@ where
 
 /// Add jitter for backoff calculations
 #[cfg(test)]
+#[cfg_attr(test_category = "util")]
 #[allow(
     clippy::cast_precision_loss,
     clippy::cast_possible_truncation,
@@ -402,6 +403,7 @@ fn add_jitter(duration: Duration, jitter_fraction: f64) -> Duration {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering};

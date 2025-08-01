@@ -176,6 +176,7 @@ impl HookAdapter for LuaHookAdapter {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "bridge")]
 mod tests {
     use super::*;
     use llmspell_hooks::types::{ComponentId, ComponentType, HookPoint};

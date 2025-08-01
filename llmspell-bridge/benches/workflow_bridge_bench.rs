@@ -1,6 +1,8 @@
 //! ABOUTME: Performance benchmarks for workflow bridge operations
 //! ABOUTME: Measures overhead of bridge operations to ensure <10ms requirement
 
+#![cfg_attr(test_category = "benchmark")]
+
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use llmspell_bridge::{workflows::WorkflowBridge, ComponentRegistry};
 use mlua::Lua;

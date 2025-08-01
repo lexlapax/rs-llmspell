@@ -10,7 +10,8 @@ use std::time::Duration;
 use tokio::time::sleep;
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "util")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_circuit_breaker_basic_flow() {
     let config = CircuitBreakerConfig::new()
@@ -73,7 +74,8 @@ async fn test_circuit_breaker_basic_flow() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "util")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_circuit_breaker_half_open_failure() {
     let config = CircuitBreakerConfig::new()
@@ -102,7 +104,8 @@ async fn test_circuit_breaker_half_open_failure() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "util")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_circuit_breaker_manager() {
     let manager = CircuitBreakerManager::default();
@@ -137,7 +140,8 @@ async fn test_circuit_breaker_manager() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "util")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_circuit_breaker_concurrent_access() {
     let breaker = Arc::new(CircuitBreaker::new(
@@ -196,7 +200,8 @@ async fn test_circuit_breaker_concurrent_access() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "util")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_circuit_breaker_alert_handler() {
     let alerts = Arc::new(RwLock::new(Vec::<String>::new()));
@@ -226,7 +231,8 @@ async fn test_circuit_breaker_alert_handler() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "util")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_service_presets() {
     // Test HTTP API preset
@@ -246,7 +252,8 @@ async fn test_service_presets() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "util")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_circuit_breaker_metrics() {
     let breaker = CircuitBreaker::new(
@@ -284,7 +291,8 @@ async fn test_circuit_breaker_metrics() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "util")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_force_state() {
     let breaker = CircuitBreaker::new(CircuitBreakerConfig::default());
@@ -305,7 +313,8 @@ async fn test_force_state() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "util")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_open_circuits_tracking() {
     let manager = CircuitBreakerManager::default();

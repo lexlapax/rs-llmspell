@@ -9,6 +9,7 @@ use llmspell_tools::UrlAnalyzerTool;
 use serde_json::json;
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
 #[tokio::test]
 async fn test_url_analyzer_basic() {
     let tool = UrlAnalyzerTool::new();
@@ -37,6 +38,7 @@ async fn test_url_analyzer_basic() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
 #[tokio::test]
 async fn test_url_analyzer_simple_url() {
     let tool = UrlAnalyzerTool::new();
@@ -60,6 +62,7 @@ async fn test_url_analyzer_simple_url() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
 #[tokio::test]
 async fn test_url_analyzer_with_port() {
     let tool = UrlAnalyzerTool::new();
@@ -82,6 +85,7 @@ async fn test_url_analyzer_with_port() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
 #[tokio::test]
 async fn test_url_analyzer_with_auth() {
     let tool = UrlAnalyzerTool::new();
@@ -104,6 +108,7 @@ async fn test_url_analyzer_with_auth() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
 #[tokio::test]
 async fn test_url_analyzer_decode_params() {
     let tool = UrlAnalyzerTool::new();
@@ -126,6 +131,7 @@ async fn test_url_analyzer_decode_params() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
 #[tokio::test]
 async fn test_url_analyzer_invalid_url() {
     let tool = UrlAnalyzerTool::new();
@@ -153,6 +159,7 @@ async fn test_url_analyzer_invalid_url() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
 #[tokio::test]
 async fn test_url_analyzer_relative_url() {
     let tool = UrlAnalyzerTool::new();
@@ -191,6 +198,7 @@ async fn test_url_analyzer_relative_url() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
 #[tokio::test]
 async fn test_url_analyzer_special_characters() {
     let tool = UrlAnalyzerTool::new();

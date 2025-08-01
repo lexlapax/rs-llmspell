@@ -12,6 +12,7 @@ use std::sync::Arc;
 use std::time::SystemTime;
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "state")]
 #[tokio::test]
 async fn test_basic_migration_with_defaults() {
     // Create test data
@@ -68,6 +69,7 @@ async fn test_basic_migration_with_defaults() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "state")]
 #[tokio::test]
 async fn test_copy_and_remove_migration() {
     let mut state = SerializableState {
@@ -118,6 +120,7 @@ async fn test_copy_and_remove_migration() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "state")]
 #[tokio::test]
 async fn test_state_persistence_with_migration() {
     // Create state manager

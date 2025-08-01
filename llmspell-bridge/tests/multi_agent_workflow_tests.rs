@@ -7,6 +7,8 @@ use llmspell_bridge::multi_agent::{
 use serde_json::json;
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "bridge")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_pipeline_coordination() {
     // Test sequential agent pipeline
@@ -31,6 +33,8 @@ async fn test_pipeline_coordination() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "bridge")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_fork_join_coordination() {
     // Test parallel agent execution
@@ -65,6 +69,8 @@ async fn test_fork_join_coordination() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "bridge")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_consensus_coordination() {
     // Test consensus evaluation pattern
@@ -93,6 +99,8 @@ async fn test_consensus_coordination() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "bridge")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_multi_agent_integration() {
     use llmspell_bridge::{workflows::WorkflowBridge, ComponentRegistry};
@@ -115,6 +123,8 @@ async fn test_multi_agent_integration() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "bridge")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_coordination_pattern_serialization() {
     use llmspell_bridge::multi_agent::{CoordinationPattern, MultiAgentConfig};
@@ -135,6 +145,8 @@ fn test_coordination_pattern_serialization() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "bridge")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_all_coordination_patterns() {
     use llmspell_bridge::multi_agent::CoordinationPattern;

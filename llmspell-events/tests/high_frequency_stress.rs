@@ -473,6 +473,8 @@ mod stress_tests {
 
 // Integration test for the complete enhanced EventBus
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "event")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_enhanced_eventbus_integration() {
     // Create EventBus with persistence

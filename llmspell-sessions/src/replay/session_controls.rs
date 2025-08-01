@@ -699,6 +699,7 @@ impl SessionReplayControls {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "session")]
 mod tests {
     use super::*;
 

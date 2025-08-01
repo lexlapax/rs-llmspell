@@ -387,6 +387,7 @@ impl Default for ExecutionContextBuilder {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "core")]
 mod tests {
     use super::*;
     use serde_json::json;

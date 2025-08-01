@@ -21,7 +21,7 @@ fn create_test_metadata(service: &str) -> ApiKeyMetadata {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "util")]
 #[test]
 fn test_api_key_manager_basic_operations() {
     let manager = ApiKeyManager::new();
@@ -52,7 +52,7 @@ fn test_api_key_manager_basic_operations() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "util")]
 #[test]
 fn test_api_key_rotation() {
     let manager = ApiKeyManager::new();
@@ -84,7 +84,7 @@ fn test_api_key_rotation() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "util")]
 #[test]
 fn test_environment_variable_loading() {
     let mut manager = ApiKeyManager::new();
@@ -113,7 +113,7 @@ fn test_environment_variable_loading() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "util")]
 #[test]
 fn test_configuration_file_loading() {
     let manager = ApiKeyManager::new();
@@ -140,7 +140,7 @@ fn test_configuration_file_loading() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "util")]
 #[test]
 fn test_persistent_storage_integration() {
     let temp_dir = TempDir::new().expect("Failed to create temp dir");
@@ -191,7 +191,7 @@ fn test_persistent_storage_integration() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "util")]
 #[test]
 fn test_key_expiration() {
     let manager = ApiKeyManager::new();
@@ -222,7 +222,7 @@ fn test_key_expiration() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "util")]
 #[test]
 fn test_audit_log_limits() {
     let manager = ApiKeyManager::new();
@@ -249,7 +249,7 @@ fn test_audit_log_limits() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "util")]
 #[test]
 fn test_key_usage_tracking() {
     let manager = ApiKeyManager::new();
@@ -275,7 +275,7 @@ fn test_key_usage_tracking() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "util")]
 #[test]
 fn test_invalid_operations() {
     let manager = ApiKeyManager::new();

@@ -581,6 +581,7 @@ pub fn format_bytes(bytes: u64) -> String {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
 
@@ -783,6 +784,7 @@ mod tests {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "util")]
 mod property_tests {
     use super::*;
     use proptest::prelude::*;

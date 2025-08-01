@@ -611,6 +611,7 @@ impl NotificationChannel for ConsoleNotificationChannel {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
 

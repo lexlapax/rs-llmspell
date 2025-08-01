@@ -571,6 +571,7 @@ impl Default for TimelineQueryBuilder {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "event")]
 mod tests {
     use super::*;
     use crate::correlation::EventCorrelationTracker;

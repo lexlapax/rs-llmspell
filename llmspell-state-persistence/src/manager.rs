@@ -1713,6 +1713,7 @@ impl StatePersistence for StateManager {}
 impl TypedStatePersistence for StateManager {}
 
 #[cfg(test)]
+#[cfg_attr(test_category = "state")]
 mod tests {
     use super::*;
     use serde_json::json;

@@ -6,6 +6,7 @@ use llmspell_hooks::{ComponentId, ComponentType, HookContext, HookPoint};
 use std::time::Duration;
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "hook")]
 #[tokio::test]
 async fn test_agent_tool_workflow_chain() {
     let coordinator = CrossComponentCoordinator::new();
@@ -59,6 +60,7 @@ async fn test_agent_tool_workflow_chain() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "hook")]
 #[tokio::test]
 async fn test_chain_cleanup() {
     let coordinator = CrossComponentCoordinator::new();
@@ -87,6 +89,7 @@ async fn test_chain_cleanup() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "hook")]
 #[tokio::test]
 async fn test_coordinator_capacity_limits() {
     use llmspell_hooks::coordination::CoordinatorConfig;
@@ -128,6 +131,7 @@ async fn test_coordinator_capacity_limits() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "hook")]
 #[tokio::test]
 async fn test_cross_component_context() {
     use llmspell_hooks::coordination::CrossComponentContext;
@@ -174,6 +178,7 @@ async fn test_cross_component_context() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "hook")]
 #[test]
 fn test_execution_chain_builder() {
     let agent_id = ComponentId::new(ComponentType::Agent, "agent".to_string());

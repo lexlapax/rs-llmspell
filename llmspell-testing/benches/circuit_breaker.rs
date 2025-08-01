@@ -1,6 +1,8 @@
 // ABOUTME: Performance test for circuit breaker effectiveness
 // ABOUTME: Validates circuit breaker triggers correctly under load and protects system performance
 
+#![cfg_attr(test_category = "benchmark")]
+
 use anyhow::anyhow;
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use llmspell_hooks::{

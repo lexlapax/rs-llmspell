@@ -30,6 +30,7 @@ pub fn inject_event_global(_ctx: &mut (), _context: &GlobalContext) -> Result<()
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "bridge")]
 mod tests {
     use super::*;
 

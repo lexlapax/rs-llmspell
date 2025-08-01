@@ -24,6 +24,9 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_tool_executor_basic_execution() {
     let config = ToolLifecycleConfig {
@@ -52,6 +55,9 @@ async fn test_tool_executor_basic_execution() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_security_validation_with_safe_tool() {
     let config = ToolLifecycleConfig {
@@ -81,6 +87,9 @@ async fn test_security_validation_with_safe_tool() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_security_validation_with_restricted_tool() {
     let config = ToolLifecycleConfig {
@@ -115,6 +124,9 @@ async fn test_security_validation_with_restricted_tool() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_audit_logging_enabled() {
     let config = ToolLifecycleConfig {
@@ -145,6 +157,9 @@ async fn test_audit_logging_enabled() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_error_handling_with_invalid_expression() {
     let config = ToolLifecycleConfig {
@@ -175,6 +190,9 @@ async fn test_error_handling_with_invalid_expression() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_resource_tracking_integration() {
     let config = ToolLifecycleConfig {
@@ -206,6 +224,9 @@ async fn test_resource_tracking_integration() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_hook_performance_overhead() {
     // Test with hooks disabled
@@ -271,6 +292,9 @@ async fn test_hook_performance_overhead() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_circuit_breaker_functionality() {
     let config = ToolLifecycleConfig {
@@ -304,6 +328,9 @@ async fn test_circuit_breaker_functionality() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_hook_integration_with_multiple_tool_types() {
     let config = ToolLifecycleConfig {
@@ -355,6 +382,9 @@ async fn test_hook_integration_with_multiple_tool_types() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_tool_registry_with_executor() {
     let config = ToolLifecycleConfig {
@@ -402,6 +432,9 @@ async fn test_tool_registry_with_executor() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_hookable_tool_execution_trait() {
     // Test that tools implement HookableToolExecution trait
@@ -428,6 +461,9 @@ async fn test_hookable_tool_execution_trait() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_different_security_levels() {
     let tools_and_levels = vec![
@@ -455,6 +491,9 @@ async fn test_different_security_levels() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_max_hook_execution_time() {
     let config = ToolLifecycleConfig {
@@ -483,6 +522,9 @@ async fn test_max_hook_execution_time() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_security_level_ordering() {
     // Test that security levels have proper ordering
@@ -500,6 +542,9 @@ async fn test_security_level_ordering() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_tool_execution_phases() {
     // This test verifies that all 8 hook phases are represented in ToolExecutionPhase

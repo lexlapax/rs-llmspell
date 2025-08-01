@@ -32,6 +32,9 @@ fn create_agent_input(params: Value) -> Result<AgentInput, LLMSpellError> {
 
 /// Test path traversal attempts across file system tools
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_path_traversal_prevention() {
     let tools = vec![
@@ -88,6 +91,9 @@ async fn test_path_traversal_prevention() {
 
 /// Test SSRF prevention in web tools
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_ssrf_prevention() {
     let internal_urls = vec![
@@ -145,6 +151,9 @@ async fn test_ssrf_prevention() {
 
 /// Test command injection in process executor
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_command_injection_prevention() {
     let malicious_commands = vec![
@@ -179,6 +188,9 @@ async fn test_command_injection_prevention() {
 
 /// Test SQL injection prevention
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_sql_injection_prevention() {
     let sql_payloads = vec![
@@ -215,6 +227,9 @@ async fn test_sql_injection_prevention() {
 
 /// Test XXE prevention in XML parsing
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_xxe_prevention() {
     let xxe_payloads = vec![
@@ -253,6 +268,9 @@ async fn test_xxe_prevention() {
 
 /// Test resource exhaustion prevention
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_resource_exhaustion_prevention() {
     // Test zip bomb prevention
@@ -300,6 +318,9 @@ async fn test_resource_exhaustion_prevention() {
 
 /// Test template injection prevention
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_template_injection_prevention() {
     let template_payloads = vec![
@@ -331,6 +352,9 @@ async fn test_template_injection_prevention() {
 
 /// Test email header injection
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_email_header_injection() {
     let header_payloads = vec![
@@ -369,6 +393,9 @@ async fn test_email_header_injection() {
 
 /// Test rate limiting effectiveness
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "Makes real web requests - run with --ignored flag"]
 async fn test_rate_limiting() {
@@ -442,6 +469,9 @@ async fn test_rate_limiting() {
 
 /// Test input validation across all tools
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_input_validation() {
     // Test null byte injection
@@ -482,6 +512,9 @@ async fn test_input_validation() {
 
 /// Test secure random number generation
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_secure_randomness() {
     let mut uuids = std::collections::HashSet::new();
@@ -505,6 +538,9 @@ async fn test_secure_randomness() {
 
 /// Test timeout enforcement
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_timeout_enforcement() {
     let result = execute_tool_raw(
@@ -525,6 +561,9 @@ async fn test_timeout_enforcement() {
 
 /// Test error message information disclosure
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_error_message_safety() {
     let result = execute_tool_raw(

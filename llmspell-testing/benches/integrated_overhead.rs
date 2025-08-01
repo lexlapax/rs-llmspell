@@ -1,6 +1,8 @@
 // ABOUTME: System-wide integration overhead benchmarks for state persistence
 // ABOUTME: Measures performance impact when state persistence is integrated with agents, workflows, tools
 
+#![cfg_attr(test_category = "benchmark")]
+
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use llmspell_agents::factory::{AgentFactory, DefaultAgentFactory};
 use llmspell_core::{types::AgentInput, BaseAgent, ExecutionContext};

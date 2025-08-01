@@ -452,6 +452,7 @@ impl Default for SearchBuilder {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
 

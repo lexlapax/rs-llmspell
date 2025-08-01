@@ -12,6 +12,7 @@ use std::time::Duration;
 use tokio::time::sleep;
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "session")]
 #[tokio::test]
 async fn test_session_lifecycle_correlation() -> Result<()> {
     // Create infrastructure
@@ -77,6 +78,7 @@ async fn test_session_lifecycle_correlation() -> Result<()> {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "session")]
 #[tokio::test]
 async fn test_artifact_event_correlation() -> Result<()> {
     // Create infrastructure
@@ -140,6 +142,7 @@ async fn test_artifact_event_correlation() -> Result<()> {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "session")]
 #[tokio::test]
 async fn test_session_lifecycle_with_multiple_operations() -> Result<()> {
     // Create infrastructure
@@ -210,6 +213,7 @@ async fn test_session_lifecycle_with_multiple_operations() -> Result<()> {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "session")]
 #[tokio::test]
 async fn test_multiple_sessions_correlation_isolation() -> Result<()> {
     // Create infrastructure

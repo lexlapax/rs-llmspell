@@ -2,6 +2,7 @@
 // ABOUTME: Validates point-in-time recovery, incremental chains, and error handling
 
 #[cfg(test)]
+#[cfg_attr(test_category = "state")]
 mod tests {
     use crate::{
         backup::{BackupManager, RestoreOptions},

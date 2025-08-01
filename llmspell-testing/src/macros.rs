@@ -117,6 +117,7 @@ macro_rules! categorized_test_module {
         tests $body:tt
     ) => {
         #[cfg(test)]
+#[cfg_attr(test_category = "testing")]
         #[cfg_attr(not(feature = "all-tests"), allow(dead_code))]
         #[cfg_attr(not(feature = concat!(stringify!($category), "-tests")), allow(dead_code))]
         mod $name {
@@ -161,6 +162,7 @@ macro_rules! skip_if {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "testing")]
 mod tests {
     // Test that macros compile correctly
     #[test]

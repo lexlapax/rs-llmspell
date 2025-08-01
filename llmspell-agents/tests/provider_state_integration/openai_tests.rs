@@ -10,7 +10,8 @@ use tokio::time::timeout;
 use tracing::{info, warn};
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "agent")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "requires OPENAI_API_KEY"]
 async fn test_openai_conversation_persistence() -> Result<()> {
@@ -108,7 +109,8 @@ async fn test_openai_conversation_persistence() -> Result<()> {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "agent")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "requires OPENAI_API_KEY"]
 async fn test_openai_token_tracking() -> Result<()> {
@@ -163,7 +165,8 @@ async fn test_openai_token_tracking() -> Result<()> {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "agent")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "requires OPENAI_API_KEY"]
 async fn test_openai_error_recovery() -> Result<()> {
@@ -255,7 +258,8 @@ async fn test_openai_error_recovery() -> Result<()> {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "agent")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "requires OPENAI_API_KEY"]
 async fn test_openai_system_prompt_persistence() -> Result<()> {

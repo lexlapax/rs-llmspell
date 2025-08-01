@@ -12,6 +12,7 @@ pub fn inject_event_global(lua: &mlua::Lua, context: &GlobalContext) -> Result<(
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "bridge")]
 mod tests {
     use super::*;
     use crate::{ComponentRegistry, ProviderManager};

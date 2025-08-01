@@ -8,7 +8,8 @@ use llmspell_core::BaseAgent;
 use llmspell_tools::WebpageMonitorTool;
 use serde_json::json;
 
-#[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "external")]
+#[cfg_attr(test_category = "tool")]
 #[tokio::test]
 async fn test_webpage_monitor_initial_check() {
     let tool = WebpageMonitorTool::new();
@@ -47,7 +48,8 @@ async fn test_webpage_monitor_initial_check() {
     }
 }
 
-#[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "external")]
+#[cfg_attr(test_category = "tool")]
 #[tokio::test]
 async fn test_webpage_monitor_with_selector() {
     let tool = WebpageMonitorTool::new();
@@ -85,7 +87,8 @@ async fn test_webpage_monitor_with_selector() {
     }
 }
 
-#[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "external")]
+#[cfg_attr(test_category = "tool")]
 #[tokio::test]
 async fn test_webpage_monitor_metadata_changes() {
     let tool = WebpageMonitorTool::new();
@@ -118,7 +121,8 @@ async fn test_webpage_monitor_metadata_changes() {
     }
 }
 
-#[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "external")]
+#[cfg_attr(test_category = "tool")]
 #[tokio::test]
 async fn test_webpage_monitor_content_diff() {
     let tool = WebpageMonitorTool::new();
@@ -174,7 +178,8 @@ async fn test_webpage_monitor_content_diff() {
     }
 }
 
-#[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "external")]
+#[cfg_attr(test_category = "tool")]
 #[tokio::test]
 async fn test_webpage_monitor_alert_threshold() {
     let tool = WebpageMonitorTool::new();
@@ -208,7 +213,8 @@ async fn test_webpage_monitor_alert_threshold() {
     }
 }
 
-#[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "external")]
+#[cfg_attr(test_category = "tool")]
 #[tokio::test]
 async fn test_webpage_monitor_invalid_url() {
     let tool = WebpageMonitorTool::new();
@@ -225,7 +231,8 @@ async fn test_webpage_monitor_invalid_url() {
     assert!(error.to_string().contains("URL") || error.to_string().contains("url"));
 }
 
-#[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "external")]
+#[cfg_attr(test_category = "tool")]
 #[tokio::test]
 async fn test_webpage_monitor_network_error() {
     let tool = WebpageMonitorTool::new();

@@ -109,6 +109,7 @@ impl Default for ComponentRegistry {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "bridge")]
 mod tests {
     use super::*;
     use async_trait::async_trait;

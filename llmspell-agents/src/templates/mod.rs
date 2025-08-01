@@ -93,6 +93,7 @@ pub fn create_builtin_templates() -> TemplateFactory {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
 

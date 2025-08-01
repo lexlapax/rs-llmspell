@@ -1,6 +1,8 @@
 // ABOUTME: Performance test for event system throughput measurement
 // ABOUTME: Validates 100K+ events/second capability and event bus performance
 
+#![cfg_attr(test_category = "benchmark")]
+
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use llmspell_events::{EventBus, Language, UniversalEvent};
 use std::sync::Arc;

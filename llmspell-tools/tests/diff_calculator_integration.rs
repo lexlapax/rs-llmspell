@@ -15,6 +15,8 @@ fn extract_result(response_text: &str) -> Value {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_text_diff_formats() {
     let tool = DiffCalculatorTool::new();
@@ -118,6 +120,8 @@ async fn test_text_diff_formats() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_json_diff_simple() {
     let tool = DiffCalculatorTool::new();
@@ -165,6 +169,8 @@ async fn test_json_diff_simple() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_json_diff_nested() {
     let tool = DiffCalculatorTool::new();
@@ -219,6 +225,8 @@ async fn test_json_diff_nested() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_file_diff() {
     let tool = DiffCalculatorTool::new();
@@ -259,6 +267,8 @@ async fn test_file_diff() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_json_file_diff() {
     let tool = DiffCalculatorTool::new();
@@ -305,6 +315,8 @@ async fn test_json_file_diff() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_empty_diff() {
     let tool = DiffCalculatorTool::new();
@@ -332,6 +344,8 @@ async fn test_empty_diff() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_large_text_diff() {
     let tool = DiffCalculatorTool::new();
@@ -376,6 +390,8 @@ async fn test_large_text_diff() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_error_handling() {
     let tool = DiffCalculatorTool::new();
@@ -434,6 +450,8 @@ async fn test_error_handling() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_tool_metadata() {
     use llmspell_core::traits::tool::{SecurityLevel, Tool, ToolCategory};

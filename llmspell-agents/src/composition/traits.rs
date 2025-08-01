@@ -287,6 +287,7 @@ impl From<CompositionError> for LLMSpellError {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
 

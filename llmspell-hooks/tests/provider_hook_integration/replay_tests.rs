@@ -14,6 +14,9 @@ use chrono::{DateTime, Utc};
 use uuid::Uuid;
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "hook")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_replay_single_correlation_id() {
     let fixture = HookTestFixture::new().await;
@@ -55,6 +58,9 @@ async fn test_replay_single_correlation_id() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "hook")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_replay_with_time_range() {
     let fixture = HookTestFixture::new().await;
@@ -127,6 +133,9 @@ async fn test_replay_with_time_range() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "hook")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_replay_with_filtering() {
     let fixture = HookTestFixture::new().await;
@@ -187,6 +196,9 @@ async fn test_replay_with_filtering() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "hook")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_replay_preserves_hook_order() {
     let fixture = HookTestFixture::new().await;
@@ -245,6 +257,9 @@ async fn test_replay_preserves_hook_order() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "hook")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_replay_handles_errors_gracefully() {
     let fixture = HookTestFixture::new().await;
@@ -277,6 +292,9 @@ async fn test_replay_handles_errors_gracefully() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "hook")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_replay_with_modified_context() {
     let fixture = HookTestFixture::new().await;
@@ -319,6 +337,9 @@ async fn test_replay_with_modified_context() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "hook")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_replay_performance_with_many_hooks() {
     let fixture = HookTestFixture::new().await;

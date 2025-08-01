@@ -513,6 +513,7 @@ pub mod param_validators {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
 

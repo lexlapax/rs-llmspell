@@ -258,6 +258,7 @@ pub fn format_duration(duration: &Duration) -> String {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
     use chrono::Timelike;

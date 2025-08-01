@@ -547,6 +547,7 @@ impl ReplayableHook for MetricsHook {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "hook")]
 mod tests {
     use super::*;
     use crate::types::{ComponentId, ComponentType, HookPoint};

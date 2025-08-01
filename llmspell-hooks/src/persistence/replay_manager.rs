@@ -491,6 +491,7 @@ impl Clone for ReplaySession {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "hook")]
 mod tests {
     use super::*;
 

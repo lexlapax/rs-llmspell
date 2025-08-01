@@ -9,7 +9,9 @@ use llmspell_tools::HttpRequestTool;
 use serde_json::json;
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_http_request_tool_creation() {
     let tool = HttpRequestTool::new(Default::default()).unwrap();
@@ -23,7 +25,9 @@ async fn test_http_request_tool_creation() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_http_get_request() {
     let tool = HttpRequestTool::new(Default::default()).unwrap();
@@ -69,7 +73,9 @@ async fn test_http_get_request() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_http_post_request() {
     let tool = HttpRequestTool::new(Default::default()).unwrap();
@@ -98,7 +104,9 @@ async fn test_http_post_request() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_http_basic_auth() {
     let tool = HttpRequestTool::new(Default::default()).unwrap();
@@ -127,7 +135,9 @@ async fn test_http_basic_auth() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_http_bearer_auth() {
     let tool = HttpRequestTool::new(Default::default()).unwrap();
@@ -155,7 +165,9 @@ async fn test_http_bearer_auth() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_http_custom_headers() {
     let tool = HttpRequestTool::new(Default::default()).unwrap();
@@ -192,7 +204,9 @@ async fn test_http_custom_headers() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_http_error_handling() {
     let tool = HttpRequestTool::new(Default::default()).unwrap();
@@ -215,7 +229,9 @@ async fn test_http_error_handling() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_http_retry_logic() {
     let tool = HttpRequestTool::new(Default::default()).unwrap();
@@ -256,7 +272,9 @@ async fn test_http_retry_logic() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_http_json_response_parsing() {
     let tool = HttpRequestTool::new(Default::default()).unwrap();
@@ -280,7 +298,9 @@ async fn test_http_json_response_parsing() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "httpbin.org delay endpoint may not respect long delays"]
 async fn test_http_timeout() {
@@ -307,7 +327,9 @@ async fn test_http_timeout() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_http_put_request() {
     let tool = HttpRequestTool::new(Default::default()).unwrap();
@@ -337,7 +359,9 @@ async fn test_http_put_request() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_http_delete_request() {
     let tool = HttpRequestTool::new(Default::default()).unwrap();
@@ -363,7 +387,9 @@ async fn test_http_delete_request() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "httpbin.org intermittent network issues"]
 async fn test_http_api_key_auth() {
@@ -393,7 +419,9 @@ async fn test_http_api_key_auth() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_invalid_url() {
     let tool = HttpRequestTool::new(Default::default()).unwrap();
@@ -411,7 +439,9 @@ async fn test_invalid_url() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_missing_url() {
     let tool = HttpRequestTool::new(Default::default()).unwrap();

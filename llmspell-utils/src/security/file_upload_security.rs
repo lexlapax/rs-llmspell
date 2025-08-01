@@ -593,6 +593,7 @@ impl Drop for FileProcessingSandbox {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
     use std::io::Write;

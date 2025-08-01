@@ -4,6 +4,7 @@
 use anyhow::Result;
 use llmspell_core::traits::tool::Tool;
 #[cfg(test)]
+#[cfg_attr(test_category = "agent")]
 use llmspell_core::traits::tool::{SecurityLevel, ToolCategory, ToolSchema};
 use std::{
     any::{Any, TypeId},
@@ -193,6 +194,7 @@ impl Default for DIContainerBuilder {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
     use llmspell_core::{

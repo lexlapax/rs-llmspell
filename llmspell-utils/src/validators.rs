@@ -468,6 +468,7 @@ pub fn validate_file_permissions(path: &Path, required_mode: u32) -> LLMResult<(
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
     use std::fs;

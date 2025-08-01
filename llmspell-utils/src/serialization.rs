@@ -493,6 +493,7 @@ pub fn validate_json_fields(json: &str, required_fields: &[&str]) -> Result<()> 
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
     use std::collections::HashMap;
@@ -703,6 +704,7 @@ mod tests {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "util")]
 mod property_tests {
     use super::*;
     use proptest::prelude::*;

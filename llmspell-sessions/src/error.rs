@@ -210,6 +210,7 @@ impl From<bincode::Error> for SessionError {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "session")]
 mod tests {
     use super::*;
     use crate::SessionStatus;

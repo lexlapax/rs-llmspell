@@ -498,6 +498,7 @@ impl TemplateFactory {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
     use crate::templates::schema::{

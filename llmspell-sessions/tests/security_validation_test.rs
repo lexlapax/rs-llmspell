@@ -35,7 +35,6 @@ mod tests {
     }
 
     #[cfg_attr(test_category = "external")]
-    #[ignore]
     #[tokio::test]
     async fn test_path_traversal_prevention() {
         let manager = create_test_manager_with_config(SessionManagerConfig::default()).await;
@@ -88,7 +87,6 @@ mod tests {
     }
 
     #[cfg_attr(test_category = "external")]
-    #[ignore]
     #[tokio::test]
     async fn test_command_injection_prevention() {
         let manager = create_test_manager_with_config(SessionManagerConfig::default()).await;
@@ -123,7 +121,6 @@ mod tests {
     }
 
     #[cfg_attr(test_category = "external")]
-    #[ignore]
     #[tokio::test]
     async fn test_session_id_unpredictability() {
         let manager = create_test_manager_with_config(SessionManagerConfig::default()).await;
@@ -156,7 +153,6 @@ mod tests {
     }
 
     #[cfg_attr(test_category = "external")]
-    #[ignore]
     #[tokio::test]
     async fn test_dos_prevention_max_artifacts() {
         let mut config = SessionManagerConfig::default();
@@ -190,7 +186,6 @@ mod tests {
     }
 
     #[cfg_attr(test_category = "external")]
-    #[ignore]
     #[tokio::test]
     async fn test_dos_prevention_storage_quota() {
         let mut config = SessionManagerConfig::default();
@@ -221,7 +216,6 @@ mod tests {
     }
 
     #[cfg_attr(test_category = "external")]
-    #[ignore]
     #[tokio::test]
     async fn test_dos_prevention_rate_limiting() {
         let manager = create_test_manager_with_config(SessionManagerConfig::default()).await;
@@ -267,7 +261,6 @@ mod tests {
     }
 
     #[cfg_attr(test_category = "external")]
-    #[ignore]
     #[tokio::test]
     async fn test_data_leakage_prevention() {
         let manager = create_test_manager_with_config(SessionManagerConfig::default()).await;
@@ -320,7 +313,6 @@ mod tests {
     }
 
     #[cfg_attr(test_category = "external")]
-    #[ignore]
     #[tokio::test]
     async fn test_sensitive_data_handling() {
         let manager = create_test_manager_with_config(SessionManagerConfig::default()).await;
@@ -362,7 +354,6 @@ mod tests {
     }
 
     #[cfg_attr(test_category = "external")]
-    #[ignore]
     #[tokio::test]
     async fn test_cleanup_verification() {
         let manager = create_test_manager_with_config(SessionManagerConfig::default()).await;
@@ -406,7 +397,6 @@ mod tests {
     }
 
     #[cfg_attr(test_category = "external")]
-    #[ignore]
     #[tokio::test]
     async fn test_metadata_injection_prevention() {
         let manager = create_test_manager_with_config(SessionManagerConfig::default()).await;

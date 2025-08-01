@@ -359,6 +359,7 @@ impl Tool for HashCalculatorTool {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "tool")]
 mod tests {
     use super::*;
     use llmspell_core::LLMSpellError;

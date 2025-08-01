@@ -7,6 +7,8 @@ use llmspell_utils::*;
 use std::path::Path;
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "util")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_string_utils_exports() {
     // Test string manipulation functions
@@ -30,6 +32,8 @@ fn test_string_utils_exports() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "util")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_system_info_exports() {
     // Test system info functions
@@ -48,6 +52,8 @@ fn test_system_info_exports() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "util")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_error_builders_exports() {
     use llmspell_utils::templates;
@@ -68,6 +74,8 @@ fn test_error_builders_exports() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "util")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_id_generator_exports() {
     // Test ID generation
@@ -91,6 +99,8 @@ fn test_id_generator_exports() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "util")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_serialization_exports() {
     use std::collections::HashMap;
@@ -121,6 +131,8 @@ fn test_serialization_exports() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "util")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_file_utils_exports() {
     // Test file_utils functions
@@ -144,6 +156,8 @@ fn test_file_utils_exports() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "util")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_async_utils_exports() {
     use std::time::Duration;

@@ -1,6 +1,8 @@
 // ABOUTME: Performance benchmarks for workflow hook overhead
 // ABOUTME: Validates <3% overhead requirement for hook execution
 
+#![cfg_attr(test_category = "benchmark")]
+
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use llmspell_workflows::{
     conditional::{ConditionalBranch, ConditionalWorkflow},

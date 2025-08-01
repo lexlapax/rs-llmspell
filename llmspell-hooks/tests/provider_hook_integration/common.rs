@@ -415,7 +415,6 @@ mod tests {
     use super::*;
 
     #[cfg_attr(test_category = "external")]
-    #[ignore]
     #[tokio::test]
     async fn test_context_creation() {
         let context = HookTestContext::new().await.unwrap();
@@ -424,7 +423,6 @@ mod tests {
     }
 
     #[cfg_attr(test_category = "external")]
-    #[ignore]
     #[test]
     fn test_api_key_checking() {
         // This will return false unless API keys are actually set

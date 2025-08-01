@@ -888,6 +888,7 @@ pub fn list_dir(path: &Path) -> Result<Vec<DirEntry>> {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
     use std::env;
@@ -1423,6 +1424,7 @@ mod tests {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "util")]
 mod property_tests {
     use super::*;
     use proptest::prelude::*;

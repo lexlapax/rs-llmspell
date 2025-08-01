@@ -168,6 +168,7 @@ pub struct AgentInfo {
 // Removed Default impl - AgentDiscovery now requires provider manager
 
 #[cfg(test)]
+#[cfg_attr(test_category = "bridge")]
 mod tests {
     use super::*;
 

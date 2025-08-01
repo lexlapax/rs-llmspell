@@ -389,6 +389,7 @@ macro_rules! bail_error {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
 
@@ -598,6 +599,7 @@ pub mod llmspell {
     }
 
     #[cfg(test)]
+#[cfg_attr(test_category = "util")]
     mod tests {
         use super::*;
 

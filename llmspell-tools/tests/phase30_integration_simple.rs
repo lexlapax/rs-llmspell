@@ -35,6 +35,9 @@ fn create_test_input(text: &str, params: Value) -> AgentInput {
 
 /// Test that all standardized tools use "input" parameter consistently
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_parameter_standardization_compliance() {
     let test_cases: Vec<(&str, Box<dyn Tool + Send + Sync>, Value)> = vec![
@@ -92,6 +95,9 @@ async fn test_parameter_standardization_compliance() {
 
 /// Test that all main utility tools can be instantiated within performance requirements
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_tool_initialization_performance() {
     let tools = vec![
@@ -159,6 +165,9 @@ async fn test_tool_initialization_performance() {
 
 /// Test calculator DoS protection (security hardening from Phase 3.0.12)
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_security_hardening_compliance() {
     let calculator = CalculatorTool::new();
@@ -203,6 +212,9 @@ async fn test_security_hardening_compliance() {
 
 /// Test ResponseBuilder consistency across tool categories
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_response_builder_consistency() {
     // Test tools that should reliably return valid responses for simple operations
@@ -269,6 +281,9 @@ async fn test_response_builder_consistency() {
 
 /// Test that critical migration requirements are met
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_phase30_migration_compliance() {
     // Test that the key tools migrated in Phase 3.0 work with new parameters

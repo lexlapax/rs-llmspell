@@ -560,6 +560,7 @@ impl Default for PathSecurityValidator {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
     use tempfile::TempDir;

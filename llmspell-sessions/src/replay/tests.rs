@@ -2,6 +2,7 @@
 //! ABOUTME: Tests the ReplayEngine and SessionReplayAdapter with existing infrastructure
 
 #[cfg(test)]
+#[cfg_attr(test_category = "session")]
 mod tests {
     use super::super::{
         session_adapter::{SessionReplayAdapter, SessionReplayConfig, SessionReplayStatus},

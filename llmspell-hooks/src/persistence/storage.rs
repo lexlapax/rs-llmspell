@@ -251,6 +251,7 @@ impl Clone for StorageStatistics {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "hook")]
 mod tests {
     use super::*;
 

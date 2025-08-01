@@ -9,6 +9,8 @@ use llmspell_tools::GraphQLQueryTool;
 use serde_json::json;
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_graphql_tool_creation() {
     let tool = GraphQLQueryTool::default();
@@ -22,6 +24,8 @@ async fn test_graphql_tool_creation() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_graphql_introspection() {
     let tool = GraphQLQueryTool::default();
@@ -48,6 +52,8 @@ async fn test_graphql_introspection() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_graphql_query() {
     let tool = GraphQLQueryTool::default();
@@ -100,6 +106,8 @@ async fn test_graphql_query() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_graphql_query_without_variables() {
     let tool = GraphQLQueryTool::default();
@@ -133,6 +141,8 @@ async fn test_graphql_query_without_variables() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_graphql_with_custom_headers() {
     let tool = GraphQLQueryTool::default();
@@ -158,6 +168,8 @@ async fn test_graphql_with_custom_headers() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_graphql_error_handling() {
     let tool = GraphQLQueryTool::default();
@@ -181,6 +193,8 @@ async fn test_graphql_error_handling() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_graphql_depth_limit() {
     let tool = GraphQLQueryTool::default();
@@ -232,6 +246,8 @@ async fn test_graphql_depth_limit() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_invalid_endpoint() {
     let tool = GraphQLQueryTool::default();
@@ -249,6 +265,8 @@ async fn test_invalid_endpoint() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_missing_endpoint() {
     let tool = GraphQLQueryTool::default();
@@ -271,6 +289,8 @@ async fn test_missing_endpoint() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_missing_query_for_query_operation() {
     let tool = GraphQLQueryTool::default();
@@ -292,6 +312,8 @@ async fn test_missing_query_for_query_operation() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_subscription_not_supported() {
     let tool = GraphQLQueryTool::default();
@@ -314,6 +336,8 @@ async fn test_subscription_not_supported() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_graphql_with_operation_name() {
     let tool = GraphQLQueryTool::default();
@@ -346,6 +370,8 @@ async fn test_graphql_with_operation_name() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_graphql_schema_caching() {
     let tool = GraphQLQueryTool::default();

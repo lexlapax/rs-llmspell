@@ -565,6 +565,7 @@ impl<F: ConnectionFactory> PoolBuilder<F> {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};

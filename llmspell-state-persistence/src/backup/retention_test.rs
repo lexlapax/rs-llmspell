@@ -2,6 +2,7 @@
 // ABOUTME: Isolated test for debugging retention issues
 
 #[cfg(test)]
+#[cfg_attr(test_category = "state")]
 mod test {
     use crate::backup::retention::*;
     use crate::backup::*;

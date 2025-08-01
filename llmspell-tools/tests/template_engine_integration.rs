@@ -17,6 +17,8 @@ fn extract_result(response_text: &str) -> Value {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_tera_simple_variable_substitution() {
     let tool = TemplateEngineTool::new();
@@ -42,6 +44,8 @@ async fn test_tera_simple_variable_substitution() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_tera_loops_and_conditions() {
     let tool = TemplateEngineTool::new();
@@ -77,6 +81,8 @@ No users found.
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_handlebars_block_helpers() {
     let tool = TemplateEngineTool::new();
@@ -113,6 +119,8 @@ Goodbye!
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_handlebars_custom_helpers() {
     let tool = TemplateEngineTool::new();
@@ -137,6 +145,8 @@ async fn test_handlebars_custom_helpers() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_auto_detection() {
     let tool = TemplateEngineTool::new();
@@ -175,6 +185,8 @@ async fn test_auto_detection() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_html_escaping() {
     let tool = TemplateEngineTool::new();
@@ -200,6 +212,8 @@ async fn test_html_escaping() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_complex_data_structures() {
     let tool = TemplateEngineTool::new();
@@ -246,6 +260,8 @@ Employees:
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_error_handling() {
     let tool = TemplateEngineTool::new();
@@ -266,6 +282,8 @@ async fn test_error_handling() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_missing_parameters() {
     let tool = TemplateEngineTool::new();
@@ -290,6 +308,8 @@ async fn test_missing_parameters() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_tool_schema() {
     let tool = TemplateEngineTool::new();
@@ -318,6 +338,8 @@ async fn test_tool_schema() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_metadata_in_output() {
     let tool = TemplateEngineTool::new();

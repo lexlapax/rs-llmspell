@@ -19,7 +19,8 @@ fn create_agent_input(parameters: Value) -> AgentInput {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_web_scraper_tool_basic() {
     let tool = WebScraperTool::default();
@@ -45,7 +46,8 @@ async fn test_web_scraper_tool_basic() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_web_scraper_tool_invalid_url() {
     let tool = WebScraperTool::default();
@@ -62,7 +64,8 @@ async fn test_web_scraper_tool_invalid_url() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_url_analyzer_tool_valid_url() {
     let tool = UrlAnalyzerTool::new();
@@ -95,7 +98,8 @@ async fn test_url_analyzer_tool_valid_url() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_url_analyzer_tool_invalid_url() {
     let tool = UrlAnalyzerTool::new();
@@ -112,7 +116,8 @@ async fn test_url_analyzer_tool_invalid_url() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_api_tester_tool_get_request() {
     let tool = ApiTesterTool::new();
@@ -136,7 +141,8 @@ async fn test_api_tester_tool_get_request() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_api_tester_tool_post_request() {
     let tool = ApiTesterTool::new();
@@ -164,7 +170,8 @@ async fn test_api_tester_tool_post_request() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_api_tester_tool_invalid_method() {
     let tool = ApiTesterTool::new();
@@ -182,7 +189,8 @@ async fn test_api_tester_tool_invalid_method() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_webhook_caller_tool_success() {
     let tool = WebhookCallerTool::new();
@@ -209,7 +217,8 @@ async fn test_webhook_caller_tool_success() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_webhook_caller_tool_invalid_url() {
     let tool = WebhookCallerTool::new();
@@ -226,7 +235,8 @@ async fn test_webhook_caller_tool_invalid_url() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_webpage_monitor_tool_no_previous_content() {
     let tool = WebpageMonitorTool::new();
@@ -255,7 +265,8 @@ async fn test_webpage_monitor_tool_no_previous_content() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_webpage_monitor_tool_with_selector() {
     let tool = WebpageMonitorTool::new();
@@ -281,7 +292,8 @@ async fn test_webpage_monitor_tool_with_selector() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_webpage_monitor_tool_invalid_url() {
     let tool = WebpageMonitorTool::new();
@@ -298,7 +310,8 @@ async fn test_webpage_monitor_tool_invalid_url() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_sitemap_crawler_tool_basic() {
     let tool = SitemapCrawlerTool::new();
@@ -316,7 +329,8 @@ async fn test_sitemap_crawler_tool_basic() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_sitemap_crawler_tool_invalid_url() {
     let tool = SitemapCrawlerTool::new();
@@ -333,7 +347,8 @@ async fn test_sitemap_crawler_tool_invalid_url() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_web_scraper_parameter_consistency() {
     let tool = WebScraperTool::default();
@@ -362,7 +377,8 @@ async fn test_web_scraper_parameter_consistency() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_url_analyzer_parameter_consistency() {
     let tool = UrlAnalyzerTool::new();
@@ -391,7 +407,8 @@ async fn test_url_analyzer_parameter_consistency() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_web_scraper_error_handling() {
     let tool = WebScraperTool::default();
@@ -408,7 +425,8 @@ async fn test_web_scraper_error_handling() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_url_analyzer_error_handling() {
     let tool = UrlAnalyzerTool::new();
@@ -425,7 +443,8 @@ async fn test_url_analyzer_error_handling() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_api_tester_error_handling() {
     let tool = ApiTesterTool::new();
@@ -442,7 +461,8 @@ async fn test_api_tester_error_handling() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_webhook_caller_error_handling() {
     let tool = WebhookCallerTool::new();
@@ -459,7 +479,8 @@ async fn test_webhook_caller_error_handling() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_webpage_monitor_error_handling() {
     let tool = WebpageMonitorTool::new();
@@ -476,7 +497,8 @@ async fn test_webpage_monitor_error_handling() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_sitemap_crawler_error_handling() {
     let tool = SitemapCrawlerTool::new();

@@ -444,6 +444,7 @@ impl Tool for FileWatcherTool {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "tool")]
 mod tests {
     use super::*;
     use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};

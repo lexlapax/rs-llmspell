@@ -1,6 +1,8 @@
 // ABOUTME: Performance test for hook system overhead measurement
 // ABOUTME: Validates <5% overhead requirement across agent operations
 
+#![cfg_attr(test_category = "benchmark")]
+
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use llmspell_agents::testing::mocks::{MockAgent, MockAgentConfig};
 use llmspell_core::{types::AgentInput, BaseAgent, ExecutionContext};

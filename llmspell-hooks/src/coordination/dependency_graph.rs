@@ -512,6 +512,7 @@ impl Default for DependencyGraph {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "hook")]
 mod tests {
     use super::*;
     use crate::{ComponentType, HookPoint};

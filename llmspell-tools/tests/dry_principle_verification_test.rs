@@ -259,6 +259,7 @@ mod dry_principle_tests {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
 #[test]
 fn test_shared_utility_usage() {
     // Verify tools are importing from llmspell_utils

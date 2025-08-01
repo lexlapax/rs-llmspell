@@ -198,6 +198,7 @@ impl AgentFactory for CustomAgentFactory {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
     use crate::factory::DefaultAgentFactory;

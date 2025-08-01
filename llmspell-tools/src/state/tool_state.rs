@@ -455,6 +455,7 @@ macro_rules! impl_tool_state_persistence {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "tool")]
 mod tests {
     use super::*;
     use llmspell_core::types::{AgentInput, AgentOutput};

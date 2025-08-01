@@ -41,6 +41,8 @@ async fn evaluate_expression(
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_complex_arithmetic() {
     // Test order of operations
@@ -61,6 +63,8 @@ async fn test_complex_arithmetic() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_variable_substitution() {
     // Basic variable substitution
@@ -94,6 +98,8 @@ async fn test_variable_substitution() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_comparison_operations() {
     // Test comparison operations - fasteval returns 1.0 for true, 0.0 for false
@@ -113,6 +119,8 @@ async fn test_comparison_operations() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_logical_operations() {
     // Fasteval uses && and || for logical operations with numeric values
@@ -138,6 +146,8 @@ async fn test_logical_operations() {
 // String operations are not supported by fasteval - removed test
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_edge_cases() {
     // Test very large numbers
@@ -158,6 +168,8 @@ async fn test_edge_cases() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_validation_operation() {
     let tool = CalculatorTool::new();
@@ -198,6 +210,8 @@ async fn test_validation_operation() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_error_handling() {
     // Division by zero returns Infinity
@@ -221,6 +235,8 @@ async fn test_error_handling() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_functions_list() {
     let tool = CalculatorTool::new();
@@ -258,6 +274,8 @@ async fn test_functions_list() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_tool_characteristics() {
     let tool = CalculatorTool::new();
@@ -286,6 +304,8 @@ async fn test_tool_characteristics() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_mixed_type_variables() {
     // Test with mixed numeric types

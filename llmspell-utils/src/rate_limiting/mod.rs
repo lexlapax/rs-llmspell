@@ -281,6 +281,7 @@ impl Clone for ProviderRateLimiter {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
     #[cfg(feature = "rate-limiting-http")]

@@ -273,6 +273,7 @@ pub fn extract_direct_parameters(input: &AgentInput) -> &HashMap<String, Value> 
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
     use serde_json::json;

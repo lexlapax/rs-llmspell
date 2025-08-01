@@ -632,6 +632,7 @@ impl ResourceAllocationHook for SecurityResourceHook {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
     use crate::lifecycle::events::EventSystemConfig;

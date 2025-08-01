@@ -171,6 +171,7 @@ impl Default for HookMetadata {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "hook")]
 mod tests {
     use super::*;
 

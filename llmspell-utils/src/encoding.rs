@@ -444,6 +444,7 @@ pub fn remove_bom(data: &[u8]) -> &[u8] {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
 

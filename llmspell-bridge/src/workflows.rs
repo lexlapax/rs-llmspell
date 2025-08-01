@@ -669,6 +669,7 @@ impl WorkflowExecutor for ParallelWorkflowExecutor {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "bridge")]
 mod tests {
     use super::*;
 
@@ -1480,6 +1481,7 @@ impl Default for WorkflowRegistry {
 // =====================================================================
 
 #[cfg(test)]
+#[cfg_attr(test_category = "bridge")]
 mod workflow_bridge_tests {
     use super::*;
 
@@ -1526,6 +1528,7 @@ mod workflow_bridge_tests {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "bridge")]
 mod workflow_registry_tests {
     use super::*;
 

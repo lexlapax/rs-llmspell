@@ -589,6 +589,7 @@ pub fn transform_generic_result(
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "bridge")]
 mod workflow_result_tests {
     use super::*;
 

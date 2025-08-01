@@ -17,7 +17,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "hook")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_tool_execution_hooks() {
     let fixture = HookTestFixture::new().await;
@@ -72,7 +74,9 @@ async fn test_tool_execution_hooks() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "hook")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_tool_security_validation() {
     let fixture = HookTestFixture::new().await;
@@ -153,7 +157,9 @@ async fn test_tool_security_validation() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "hook")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_tool_retry_on_failure() {
     let fixture = HookTestFixture::new().await;
@@ -196,7 +202,9 @@ async fn test_tool_retry_on_failure() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "hook")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_tool_caching_for_deterministic_operations() {
     let fixture = HookTestFixture::new().await;
@@ -260,7 +268,9 @@ async fn test_tool_caching_for_deterministic_operations() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "hook")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_tool_cost_tracking() {
     let fixture = HookTestFixture::new().await;
@@ -322,7 +332,9 @@ async fn test_tool_cost_tracking() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "hook")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_tool_debugging_traces() {
     let fixture = HookTestFixture::new().await;
@@ -383,7 +395,9 @@ async fn test_tool_debugging_traces() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "hook")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_tool_chain_hooks() {
     let fixture = HookTestFixture::new().await;

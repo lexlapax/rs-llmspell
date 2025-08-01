@@ -30,7 +30,8 @@ async fn create_tool_registry() -> Result<Arc<ToolRegistry>> {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "agent")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "requires OPENAI_API_KEY"]
 async fn test_openai_tool_usage_persistence() -> Result<()> {
@@ -144,7 +145,8 @@ async fn test_openai_tool_usage_persistence() -> Result<()> {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "agent")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "requires ANTHROPIC_API_KEY"]
 async fn test_anthropic_tool_usage_persistence() -> Result<()> {
@@ -255,7 +257,6 @@ mod tests {
     use super::*;
 
     #[cfg_attr(test_category = "external")]
-    #[ignore]
     #[tokio::test]
     async fn test_tool_registry_creation() -> Result<()> {
         let registry = create_tool_registry().await?;

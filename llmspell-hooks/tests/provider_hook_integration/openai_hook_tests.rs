@@ -9,7 +9,8 @@ use tracing::{info, warn};
 use tracing_subscriber;
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "hook")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "requires OPENAI_API_KEY"]
 async fn test_openai_hook_execution_and_persistence() -> Result<()> {
@@ -86,7 +87,8 @@ async fn test_openai_hook_execution_and_persistence() -> Result<()> {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "hook")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "requires OPENAI_API_KEY"]
 async fn test_openai_cost_tracking_hook() -> Result<()> {
@@ -134,7 +136,8 @@ async fn test_openai_cost_tracking_hook() -> Result<()> {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "hook")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "requires OPENAI_API_KEY"]
 async fn test_openai_rate_limiting_hook() -> Result<()> {

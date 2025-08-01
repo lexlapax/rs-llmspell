@@ -32,6 +32,9 @@ fn create_file_sandbox() -> Arc<FileSandbox> {
 // ===== Tool Creation Tests =====
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_file_system_tools_creation() {
     let sandbox = create_file_sandbox();
@@ -57,6 +60,9 @@ fn test_file_system_tools_creation() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_system_integration_tools_creation() {
     // EnvironmentReaderTool
@@ -85,6 +91,9 @@ fn test_system_integration_tools_creation() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_media_processing_tools_creation() {
     // AudioProcessorTool
@@ -107,6 +116,9 @@ fn test_media_processing_tools_creation() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_search_tool_creation() {
     let tool = WebSearchTool::new(Default::default()).unwrap();
@@ -116,6 +128,9 @@ fn test_search_tool_creation() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_utility_tools_creation() {
     // HashCalculatorTool
@@ -140,6 +155,9 @@ fn test_utility_tools_creation() {
 // ===== Schema Inspection Tests =====
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_tool_schemas_have_required_fields() {
     let sandbox = create_file_sandbox();
@@ -183,6 +201,9 @@ fn test_tool_schemas_have_required_fields() {
 // ===== Basic Execution Tests =====
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_hash_calculator_basic() {
     let tool = HashCalculatorTool::new(Default::default());
@@ -206,6 +227,9 @@ async fn test_hash_calculator_basic() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_uuid_generator_basic() {
     let tool = UuidGeneratorTool::new(Default::default());
@@ -228,6 +252,9 @@ async fn test_uuid_generator_basic() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_web_search_basic() {
     let tool = WebSearchTool::new(Default::default()).unwrap();
@@ -261,6 +288,9 @@ async fn test_web_search_basic() {
 // ===== Performance Test =====
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[test]
 fn test_tool_creation_performance() {
     use std::time::Instant;

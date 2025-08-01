@@ -306,6 +306,7 @@ impl<P> RetryBuilder<P> {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicU32, Ordering};

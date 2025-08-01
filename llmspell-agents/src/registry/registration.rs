@@ -294,6 +294,7 @@ impl RegistrationHook for CompositeRegistrationHook {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
 

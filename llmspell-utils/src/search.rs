@@ -646,6 +646,7 @@ pub fn should_search_file(file_path: &Path, options: &SearchOptions) -> bool {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
     use std::fs;

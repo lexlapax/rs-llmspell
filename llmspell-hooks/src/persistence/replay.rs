@@ -175,6 +175,7 @@ impl Default for HookReplayEngine {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "hook")]
 mod tests {
     use super::*;
 

@@ -8,6 +8,8 @@ use std::fs;
 use tempfile::TempDir;
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_standard_base64_roundtrip() {
     let tool = Base64EncoderTool::new();
@@ -60,6 +62,8 @@ async fn test_standard_base64_roundtrip() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_url_safe_base64() {
     let tool = Base64EncoderTool::new();
@@ -112,6 +116,8 @@ async fn test_url_safe_base64() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_binary_data_handling() {
     let tool = Base64EncoderTool::new();
@@ -182,6 +188,8 @@ async fn test_binary_data_handling() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_file_operations() {
     let tool = Base64EncoderTool::new();
@@ -239,6 +247,8 @@ async fn test_file_operations() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_large_file_handling() {
     let tool = Base64EncoderTool::new();
@@ -272,6 +282,8 @@ async fn test_large_file_handling() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_error_handling() {
     let tool = Base64EncoderTool::new();
@@ -322,6 +334,8 @@ async fn test_error_handling() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_mixed_variants() {
     let tool = Base64EncoderTool::new();
@@ -397,6 +411,8 @@ async fn test_mixed_variants() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_tool_metadata() {
     use llmspell_core::traits::tool::{SecurityLevel, Tool, ToolCategory};

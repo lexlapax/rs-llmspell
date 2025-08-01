@@ -30,6 +30,8 @@ license = "MIT OR Apache-2.0"
 keywords = ["llm", "ai", "agents", "scripting", "automation"]
 categories = ["text-processing", "api-bindings", "automation"]
 
+# Test categorization managed through features in llmspell-testing crate
+
 [workspace.dependencies]
 # Async runtime and utilities
 tokio = { version = "1.40", features = ["full"] }

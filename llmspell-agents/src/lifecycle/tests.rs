@@ -2,6 +2,7 @@
 //! ABOUTME: Tests the enhanced state machine with hooks, circuit breakers, and cancellation
 
 #[cfg(test)]
+#[cfg_attr(test_category = "agent")]
 mod integration_tests {
     use crate::lifecycle::{AgentState, AgentStateMachine, StateMachineConfig};
     use anyhow::Result;

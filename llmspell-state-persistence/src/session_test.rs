@@ -2,6 +2,7 @@
 // ABOUTME: Ensures session scope isolation and basic operations work correctly
 
 #[cfg(test)]
+#[cfg_attr(test_category = "state")]
 mod session_tests {
     use crate::{StateManager, PersistenceConfig, SerializableState};
     use llmspell_state_traits::StateScope;

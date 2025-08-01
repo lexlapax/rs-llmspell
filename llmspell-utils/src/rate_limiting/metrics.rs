@@ -247,6 +247,7 @@ impl Default for MetricsCollector {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
 

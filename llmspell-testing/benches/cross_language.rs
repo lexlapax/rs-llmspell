@@ -1,6 +1,8 @@
 // ABOUTME: Performance test for cross-language bridge overhead
 // ABOUTME: Validates performance of script runtime and cross-language operations
 
+#![cfg_attr(test_category = "benchmark")]
+
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use llmspell_bridge::{RuntimeConfig, ScriptRuntime};
 use llmspell_events::{Language, UniversalEvent};

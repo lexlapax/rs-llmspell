@@ -201,6 +201,7 @@ fn direct_function_call(input: &str) -> String {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "testing")]
 mod tests {
     use super::*;
 

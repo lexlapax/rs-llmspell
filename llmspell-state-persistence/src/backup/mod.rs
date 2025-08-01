@@ -88,18 +88,23 @@ impl Default for RestoreOptions {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "state")]
 mod tests;
 
 #[cfg(test)]
+#[cfg_attr(test_category = "state")]
 mod retention_test;
 
 #[cfg(test)]
+#[cfg_attr(test_category = "state")]
 mod retention_automatic_test;
 
 #[cfg(test)]
+#[cfg_attr(test_category = "state")]
 mod recovery_tests;
 
 #[cfg(test)]
+#[cfg_attr(test_category = "state")]
 mod simple_tests {
     use super::*;
 

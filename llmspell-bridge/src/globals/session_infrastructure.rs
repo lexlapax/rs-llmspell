@@ -162,6 +162,7 @@ pub struct SessionInfrastructure {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "bridge")]
 mod tests {
     use super::*;
     use crate::{ComponentRegistry, ProviderManager};

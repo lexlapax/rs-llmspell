@@ -909,6 +909,7 @@ impl LoopWorkflowBuilder {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "workflow")]
 mod tests {
     use super::*;
     use crate::traits::StepType;

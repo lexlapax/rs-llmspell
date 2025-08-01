@@ -5,7 +5,7 @@ use llmspell_tools::{search::web_search::WebSearchConfig, ToolRegistry, WebSearc
 use std::collections::HashMap;
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
 #[tokio::test]
 async fn test_web_search_tool_registration() {
     // Create registry
@@ -34,7 +34,7 @@ async fn test_web_search_tool_registration() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
 #[tokio::test]
 #[ignore = "Requires external API keys"]
 async fn test_web_search_tool_execution_through_registry() {

@@ -387,6 +387,7 @@ impl StatePersistence for BasicAgent {
 crate::impl_persistent_agent!(BasicAgent);
 
 #[cfg(test)]
+#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
     use crate::builder::AgentBuilder;

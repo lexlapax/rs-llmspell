@@ -123,6 +123,9 @@ impl Tool for FastMockTool {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "agent")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_tool_discovery_performance() {
     // Setup
@@ -162,6 +165,9 @@ async fn test_tool_discovery_performance() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "agent")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_tool_invocation_overhead() {
     // Setup
@@ -207,6 +213,9 @@ async fn test_tool_invocation_overhead() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "agent")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_agent_wrapping_performance() {
     let agent = Arc::new(PerformanceTestAgent::new(
@@ -229,6 +238,9 @@ async fn test_agent_wrapping_performance() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "agent")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_registry_operations_performance() {
     let registry = ToolRegistry::new();
@@ -268,6 +280,9 @@ async fn test_registry_operations_performance() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "agent")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_composition_setup_performance() {
     // Benchmark composition creation and setup
@@ -295,6 +310,9 @@ async fn test_composition_setup_performance() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "agent")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_tool_manager_performance() {
     let registry = Arc::new(ToolRegistry::new());
@@ -344,6 +362,9 @@ async fn test_tool_manager_performance() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "agent")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_concurrent_tool_operations() {
     let registry = Arc::new(ToolRegistry::new());
@@ -404,6 +425,9 @@ async fn test_concurrent_tool_operations() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "agent")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_memory_efficiency() {
     // Test that we don't have memory leaks in tool operations
@@ -433,6 +457,9 @@ async fn test_memory_efficiency() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "agent")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_error_handling_performance() {
     let registry = Arc::new(ToolRegistry::new());
@@ -463,6 +490,9 @@ async fn test_error_handling_performance() {
 
 /// Integration performance test combining multiple operations
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "agent")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_full_integration_performance() {
     let registry = Arc::new(ToolRegistry::new());

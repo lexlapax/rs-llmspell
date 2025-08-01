@@ -35,6 +35,7 @@ use llmspell_core::{
 };
 
 #[cfg(test)]
+#[cfg_attr(test_category = "testing")]
 use llmspell_core::traits::agent::MessageRole;
 use serde_json::json;
 use std::path::{Path, PathBuf};
@@ -382,6 +383,7 @@ pub fn list_fixture_files(subdir: impl AsRef<Path>) -> Result<Vec<PathBuf>, std:
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "testing")]
 mod tests {
     use super::*;
 

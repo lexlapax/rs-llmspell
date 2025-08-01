@@ -13,6 +13,8 @@ fn extract_result(response_text: &str) -> Value {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_parse_multiple_formats() {
     let tool = DateTimeHandlerTool::new();
@@ -59,6 +61,8 @@ async fn test_parse_multiple_formats() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_timezone_conversion_with_dst() {
     let tool = DateTimeHandlerTool::new();
@@ -105,6 +109,8 @@ async fn test_timezone_conversion_with_dst() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_current_time_operations() {
     let tool = DateTimeHandlerTool::new();
@@ -150,6 +156,8 @@ async fn test_current_time_operations() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_date_arithmetic_operations() {
     let tool = DateTimeHandlerTool::new();
@@ -216,6 +224,8 @@ async fn test_date_arithmetic_operations() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_leap_year_handling() {
     let tool = DateTimeHandlerTool::new();
@@ -277,6 +287,8 @@ async fn test_leap_year_handling() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_date_difference_calculations() {
     let tool = DateTimeHandlerTool::new();
@@ -329,6 +341,8 @@ async fn test_date_difference_calculations() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_date_info_details() {
     let tool = DateTimeHandlerTool::new();
@@ -363,6 +377,8 @@ async fn test_date_info_details() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_format_options() {
     let tool = DateTimeHandlerTool::new();
@@ -413,6 +429,8 @@ async fn test_format_options() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_error_handling() {
     let tool = DateTimeHandlerTool::new();
@@ -467,6 +485,8 @@ async fn test_error_handling() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_edge_cases() {
     let tool = DateTimeHandlerTool::new();
@@ -530,6 +550,8 @@ async fn test_edge_cases() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_tool_metadata() {
     use llmspell_core::traits::tool::{SecurityLevel, Tool, ToolCategory};

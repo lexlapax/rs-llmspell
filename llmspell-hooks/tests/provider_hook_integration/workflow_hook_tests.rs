@@ -18,6 +18,9 @@ use std::time::Duration;
 use uuid::Uuid;
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "hook")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_sequential_workflow_hooks() {
     let fixture = HookTestFixture::new().await;
@@ -110,6 +113,9 @@ async fn test_sequential_workflow_hooks() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "hook")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_parallel_workflow_hooks() {
     let fixture = HookTestFixture::new().await;
@@ -243,6 +249,9 @@ async fn test_parallel_workflow_hooks() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "hook")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_conditional_workflow_hooks() {
     let fixture = HookTestFixture::new().await;
@@ -359,6 +368,9 @@ async fn test_conditional_workflow_hooks() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "hook")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_workflow_error_handling_hooks() {
     let fixture = HookTestFixture::new().await;
@@ -437,6 +449,9 @@ async fn test_workflow_error_handling_hooks() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "hook")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_workflow_rate_limiting() {
     let fixture = HookTestFixture::new().await;
@@ -486,6 +501,9 @@ async fn test_workflow_rate_limiting() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "hook")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_nested_workflow_hooks() {
     let fixture = HookTestFixture::new().await;
@@ -571,6 +589,9 @@ async fn test_nested_workflow_hooks() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "hook")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_workflow_with_llm_and_tools() {
     let fixture = HookTestFixture::new().await;

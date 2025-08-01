@@ -394,6 +394,7 @@ impl Default for ReplayScheduler {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "hook")]
 mod tests {
     use super::*;
 

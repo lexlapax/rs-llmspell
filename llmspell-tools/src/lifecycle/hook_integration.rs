@@ -644,6 +644,7 @@ impl<T: Tool> HookableToolExecution for T {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "tool")]
 mod tests {
     use super::*;
     use llmspell_core::traits::base_agent::BaseAgent;

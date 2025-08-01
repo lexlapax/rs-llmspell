@@ -2,6 +2,7 @@
 // ABOUTME: Tests storage, replay, and inspection capabilities
 
 #[cfg(test)]
+#[cfg_attr(test_category = "hook")]
 mod tests {
     use crate::context::HookContext;
     use crate::persistence::*;

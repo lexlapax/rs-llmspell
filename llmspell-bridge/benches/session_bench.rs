@@ -1,6 +1,8 @@
 //! ABOUTME: Performance benchmarks for Session and Artifact operations
 //! ABOUTME: Validates <50ms session operations target from Phase 6 requirements
 
+#![cfg_attr(test_category = "benchmark")]
+
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use llmspell_bridge::lua::engine::LuaEngine;
 use llmspell_bridge::runtime::GlobalRuntimeConfig;

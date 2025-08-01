@@ -9,7 +9,8 @@ use llmspell_tools::WebScraperTool;
 use serde_json::json;
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "external,tool,integration"]
 async fn test_web_scraper_basic() {
@@ -37,7 +38,8 @@ async fn test_web_scraper_basic() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "external,tool,integration"]
 async fn test_web_scraper_selectors() {
@@ -62,7 +64,8 @@ async fn test_web_scraper_selectors() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "external,tool,integration"]
 async fn test_web_scraper_metadata() {
@@ -87,7 +90,8 @@ async fn test_web_scraper_metadata() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "external,tool,integration"]
 async fn test_web_scraper_httpbin_html() {
@@ -116,7 +120,8 @@ async fn test_web_scraper_httpbin_html() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "external,tool,integration"]
 async fn test_web_scraper_invalid_url() {
@@ -135,7 +140,8 @@ async fn test_web_scraper_invalid_url() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "tool,integration"]
 async fn test_web_scraper_network_error() {
@@ -160,7 +166,8 @@ async fn test_web_scraper_network_error() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "external,tool,integration,slow"]
 async fn test_web_scraper_timeout() {

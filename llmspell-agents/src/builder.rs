@@ -170,6 +170,7 @@ impl AgentBuilder {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
     use serde_json::json;

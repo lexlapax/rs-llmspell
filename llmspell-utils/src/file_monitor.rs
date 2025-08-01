@@ -231,6 +231,7 @@ pub fn debounce_events(events: Vec<FileEvent>, debounce_ms: u64) -> Vec<FileEven
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
     use std::path::PathBuf;

@@ -599,6 +599,7 @@ impl Default for EventCorrelator {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "hook")]
 mod tests {
     use super::*;
     use crate::ComponentType;

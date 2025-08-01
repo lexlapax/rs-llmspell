@@ -211,6 +211,8 @@ impl Tool for TestTool {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "core")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_agent_conversation_flow() {
     let agent = TestAgent::new("conversational-agent");
@@ -255,6 +257,8 @@ async fn test_agent_conversation_flow() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "core")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_tool_execution_and_validation() {
     let tool = TestTool::new("string-tool");
@@ -320,6 +324,8 @@ async fn test_tool_execution_and_validation() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "core")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_error_handling_flow() {
     let agent = TestAgent::new("error-test-agent");
@@ -345,6 +351,8 @@ async fn test_error_handling_flow() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "core")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_component_metadata_updates() {
     let mut metadata =
@@ -368,6 +376,8 @@ async fn test_component_metadata_updates() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "core")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_execution_context_environment() {
     let mut context = ExecutionContext::with_conversation("test-session".to_string());
@@ -387,6 +397,8 @@ async fn test_execution_context_environment() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "core")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_agent_input_context_manipulation() {
     let input = AgentInput::text("test prompt".to_string())
@@ -413,6 +425,8 @@ async fn test_agent_input_context_manipulation() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "core")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_agent_output_metadata() {
     let metadata = llmspell_core::types::OutputMetadata {

@@ -2,6 +2,7 @@
 // ABOUTME: Verifies that max_backups limit is enforced automatically
 
 #[cfg(test)]
+#[cfg_attr(test_category = "state")]
 mod test {
     use crate::backup::*;
     use crate::{

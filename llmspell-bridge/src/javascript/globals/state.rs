@@ -32,6 +32,7 @@ pub fn inject_state_global(
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "bridge")]
 mod tests {
 
     #[cfg_attr(test_category = "unit")]

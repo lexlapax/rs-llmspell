@@ -699,6 +699,7 @@ impl LifecycleEventListener for MetricsEventListener {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
     use std::sync::atomic::{AtomicUsize, Ordering};

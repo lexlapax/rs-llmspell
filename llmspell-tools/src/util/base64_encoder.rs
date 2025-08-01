@@ -299,6 +299,7 @@ impl Tool for Base64EncoderTool {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "tool")]
 mod tests {
     use super::*;
     use serde_json::json;

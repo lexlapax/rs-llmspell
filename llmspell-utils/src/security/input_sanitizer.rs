@@ -491,6 +491,7 @@ pub enum Severity {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
 

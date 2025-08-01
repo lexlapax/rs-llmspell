@@ -186,6 +186,7 @@ pub fn parse_artifact_type(type_str: &str) -> Result<ArtifactType, String> {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "session")]
 mod tests {
     use super::*;
     use serde_json::json;

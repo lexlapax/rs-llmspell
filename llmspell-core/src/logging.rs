@@ -234,6 +234,7 @@ macro_rules! log_execution_end {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "core")]
 mod tests {
     use super::*;
 

@@ -218,6 +218,7 @@ where
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "bridge")]
 mod tests {
     use super::*;
     use tokio::runtime::Runtime;

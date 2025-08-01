@@ -374,6 +374,7 @@ impl MultiAgentExamples {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "bridge")]
 mod tests {
     use super::*;
 

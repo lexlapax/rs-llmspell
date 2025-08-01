@@ -502,6 +502,7 @@ impl ToolManager {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
     use llmspell_core::traits::tool_capable::{ToolComposition, ToolQuery};

@@ -1,6 +1,8 @@
 // ABOUTME: Performance benchmarks for file_utils module
 // ABOUTME: Measures performance of path operations, file I/O, and directory management
 
+#![cfg_attr(test_category = "benchmark")]
+
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use llmspell_utils::file_utils::{
     copy_file, ensure_dir, expand_path, is_absolute_path, join_paths, normalize_path, parent_dir,

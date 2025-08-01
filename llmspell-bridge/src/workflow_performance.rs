@@ -250,6 +250,7 @@ pub async fn get_workflow_info_cached(workflow_type: &str) -> Option<WorkflowTyp
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "bridge")]
 mod tests {
     use super::*;
 

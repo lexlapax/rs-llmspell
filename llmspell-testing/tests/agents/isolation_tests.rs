@@ -15,7 +15,9 @@ use tokio::time::timeout;
 struct MockStateManager;
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "testing")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_strict_isolation_prevents_cross_agent_access() {
     let state_manager = Arc::new(MockStateManager);
@@ -64,7 +66,9 @@ async fn test_strict_isolation_prevents_cross_agent_access() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "testing")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_shared_scope_controlled_access() {
     let state_manager = Arc::new(MockStateManager);
@@ -145,7 +149,9 @@ async fn test_shared_scope_controlled_access() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "testing")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_audit_logging_tracks_access_attempts() {
     let state_manager = Arc::new(MockStateManager);
@@ -179,7 +185,9 @@ async fn test_audit_logging_tracks_access_attempts() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "testing")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_state_leakage_prevention() {
     let state_manager = Arc::new(MockStateManager);
@@ -234,7 +242,9 @@ async fn test_state_leakage_prevention() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "testing")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_performance_isolation_overhead() {
     let state_manager = Arc::new(MockStateManager);
@@ -263,7 +273,9 @@ async fn test_performance_isolation_overhead() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "testing")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_permission_revocation() {
     let state_manager = Arc::new(MockStateManager);
@@ -289,7 +301,9 @@ async fn test_permission_revocation() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "testing")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_broadcast_channel_isolation() {
     let state_manager = Arc::new(MockStateManager);
@@ -339,7 +353,9 @@ async fn test_broadcast_channel_isolation() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "testing")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_pipeline_ordered_access() {
     let state_manager = Arc::new(MockStateManager);
@@ -376,7 +392,9 @@ async fn test_pipeline_ordered_access() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "testing")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_concurrent_access_safety() {
     let state_manager = Arc::new(MockStateManager);
@@ -447,7 +465,9 @@ async fn test_concurrent_access_safety() {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "testing")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_custom_isolation_policy() {
     let state_manager = Arc::new(MockStateManager);

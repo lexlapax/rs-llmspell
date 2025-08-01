@@ -6,6 +6,7 @@ use llmspell_bridge::ComponentRegistry;
 use std::sync::Arc;
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "bridge")]
 #[tokio::test]
 async fn test_workflow_bridge_creation() {
     let registry = Arc::new(ComponentRegistry::new());
@@ -21,6 +22,7 @@ async fn test_workflow_bridge_creation() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "bridge")]
 #[tokio::test]
 async fn test_workflow_info_retrieval() {
     let registry = Arc::new(ComponentRegistry::new());
@@ -38,6 +40,7 @@ async fn test_workflow_info_retrieval() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "bridge")]
 #[tokio::test]
 async fn test_sequential_workflow_creation() {
     let registry = Arc::new(ComponentRegistry::new());
@@ -58,6 +61,7 @@ async fn test_sequential_workflow_creation() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "bridge")]
 #[tokio::test]
 async fn test_workflow_metrics() {
     let registry = Arc::new(ComponentRegistry::new());
@@ -82,6 +86,7 @@ async fn test_workflow_metrics() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "bridge")]
 #[tokio::test]
 async fn test_workflow_removal() {
     let registry = Arc::new(ComponentRegistry::new());
@@ -110,6 +115,7 @@ async fn test_workflow_removal() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "bridge")]
 #[tokio::test]
 async fn test_workflow_discovery() {
     let registry = Arc::new(ComponentRegistry::new());
@@ -127,6 +133,7 @@ async fn test_workflow_discovery() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "bridge")]
 #[tokio::test]
 async fn test_parallel_workflow_creation() {
     let registry = Arc::new(ComponentRegistry::new());
@@ -146,6 +153,7 @@ async fn test_parallel_workflow_creation() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "bridge")]
 #[tokio::test]
 async fn test_conditional_workflow_creation() {
     let registry = Arc::new(ComponentRegistry::new());
@@ -163,6 +171,7 @@ async fn test_conditional_workflow_creation() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "bridge")]
 #[tokio::test]
 async fn test_loop_workflow_creation() {
     let registry = Arc::new(ComponentRegistry::new());

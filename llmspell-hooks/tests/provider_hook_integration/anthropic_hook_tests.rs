@@ -8,7 +8,9 @@ use tokio::time::timeout;
 use tracing::{info, warn};
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "hook")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "requires ANTHROPIC_API_KEY"]
 async fn test_anthropic_hook_execution_and_persistence() -> Result<()> {
@@ -80,7 +82,9 @@ async fn test_anthropic_hook_execution_and_persistence() -> Result<()> {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "hook")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "requires ANTHROPIC_API_KEY"]
 async fn test_anthropic_security_hook() -> Result<()> {
@@ -128,7 +132,9 @@ async fn test_anthropic_security_hook() -> Result<()> {
 }
 
 #[cfg_attr(test_category = "external")]
-#[ignore]
+#[cfg_attr(test_category = "hook")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 #[ignore = "requires ANTHROPIC_API_KEY"]
 async fn test_anthropic_conversation_tracking() -> Result<()> {

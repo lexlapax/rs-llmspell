@@ -15,6 +15,8 @@ use tokio::sync::{broadcast, mpsc, RwLock};
 
 /// Test basic agent-to-agent communication
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "agent")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_agent_to_agent_communication() {
     // Create two mock agents
@@ -50,6 +52,8 @@ async fn test_agent_to_agent_communication() {
 
 /// Test agent tool invocation patterns
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "agent")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_agent_tool_invocation() {
     // Create agent with tool capability
@@ -89,6 +93,8 @@ async fn test_agent_tool_invocation() {
 
 /// Test broadcast communication pattern
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "agent")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_broadcast_communication() {
     let (tx, _) = broadcast::channel(100);
@@ -128,6 +134,8 @@ async fn test_broadcast_communication() {
 
 /// Test request-response communication pattern
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "agent")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_request_response_pattern() {
     let (tx, mut rx) = mpsc::channel::<(String, mpsc::Sender<String>)>(10);
@@ -164,6 +172,8 @@ async fn test_request_response_pattern() {
 
 /// Test pipeline communication pattern
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "agent")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_pipeline_communication() {
     // Create pipeline stages
@@ -203,6 +213,8 @@ async fn test_pipeline_communication() {
 
 /// Test error propagation in communication
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "agent")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_error_propagation() {
     // Create failing agent
@@ -222,6 +234,8 @@ async fn test_error_propagation() {
 
 /// Test timeout handling in communication
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "agent")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_communication_timeout() {
     let slow_agent = TestDoubles::slow_agent("slow_agent", Duration::from_secs(2));
@@ -235,6 +249,8 @@ async fn test_communication_timeout() {
 
 /// Test concurrent communication
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "agent")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_concurrent_communication() {
     let agent = Arc::new(
@@ -271,6 +287,8 @@ async fn test_concurrent_communication() {
 
 /// Test hierarchical communication pattern
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "agent")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_hierarchical_communication() {
     // Create supervisor agent
@@ -320,6 +338,8 @@ async fn test_hierarchical_communication() {
 
 /// Test event-driven communication
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "agent")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_event_driven_communication() {
     let (event_tx, mut event_rx) = broadcast::channel(100);
@@ -360,6 +380,8 @@ async fn test_event_driven_communication() {
 
 /// Test shared state communication
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "agent")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_shared_state_communication() {
     let shared_state = Arc::new(RwLock::new(HashMap::<String, String>::new()));
@@ -389,6 +411,8 @@ async fn test_shared_state_communication() {
 
 /// Test communication resilience
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "agent")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_communication_resilience() {
     // Create agent that fails intermittently
@@ -421,6 +445,8 @@ async fn test_communication_resilience() {
 
 /// Test communication with context propagation
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "agent")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_context_propagation() {
     let agent = MockAgentBuilder::new("context_agent")

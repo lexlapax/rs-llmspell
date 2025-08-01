@@ -540,6 +540,7 @@ impl Tool for AgentWrappedTool {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
     use llmspell_core::ComponentMetadata;

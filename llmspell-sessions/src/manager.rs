@@ -1615,6 +1615,7 @@ impl SessionManager {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "session")]
 mod tests {
     use super::*;
     use crate::SessionStatus;

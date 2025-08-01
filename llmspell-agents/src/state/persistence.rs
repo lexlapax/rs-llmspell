@@ -175,6 +175,7 @@ macro_rules! impl_persistent_agent {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
     use llmspell_core::traits::agent::AgentConfig;

@@ -49,6 +49,9 @@ async fn try_evaluate(expression: &str) -> Result<Value, String> {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_basic_complexity_limits() {
     // Test expression length limit
@@ -71,6 +74,9 @@ async fn test_basic_complexity_limits() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_enhanced_pattern_detection() {
     // Test banned patterns - very large nested power
@@ -104,6 +110,9 @@ async fn test_enhanced_pattern_detection() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_exponential_growth_prevention() {
     // Test large exponents
@@ -135,6 +144,9 @@ async fn test_exponential_growth_prevention() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_memory_limits() {
     // Test with way too many variables
@@ -167,6 +179,9 @@ async fn test_memory_limits() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_recursive_depth_limits() {
     // Test deeply nested function calls
@@ -187,6 +202,9 @@ async fn test_recursive_depth_limits() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_timeout_enforcement() {
     // This is actually safe and should pass
@@ -208,6 +226,9 @@ async fn test_timeout_enforcement() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_safe_expressions_still_work() {
     // Ensure legitimate expressions still work
@@ -239,6 +260,9 @@ async fn test_safe_expressions_still_work() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_variable_limit_enforcement() {
     // Test too many unique variables in expression
@@ -257,6 +281,9 @@ async fn test_variable_limit_enforcement() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_dos_attack_patterns() {
     // Pattern 1: Very deep nesting
@@ -285,6 +312,9 @@ async fn test_dos_attack_patterns() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_edge_cases() {
     // Empty expression
@@ -308,6 +338,9 @@ async fn test_edge_cases() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_performance_consistency() {
     // Run multiple safe expressions and ensure consistent performance

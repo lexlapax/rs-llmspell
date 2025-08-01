@@ -581,6 +581,7 @@ impl SharedStateAccessor {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "agent")]
 mod tests {
     use super::*;
     use std::sync::Once;

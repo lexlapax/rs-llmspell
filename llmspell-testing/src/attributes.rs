@@ -397,6 +397,7 @@ impl fmt::Display for Component {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "testing")]
 mod tests {
     use super::*;
 

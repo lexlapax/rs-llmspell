@@ -7,6 +7,9 @@ authors.workspace = true
 repository.workspace = true
 license.workspace = true
 
+[lints]
+workspace = true
+
 [dependencies]
 llmspell-core = { path = "../llmspell-core" }
 llmspell-providers = { path = "../llmspell-providers" }

@@ -239,6 +239,7 @@ impl WorkflowErrorAnalysis {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "workflow")]
 mod tests {
     use super::*;
     use llmspell_core::ComponentId;

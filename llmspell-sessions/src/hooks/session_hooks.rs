@@ -560,6 +560,7 @@ impl SessionHookRegistry {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "session")]
 mod tests {
     use super::*;
     use llmspell_hooks::{

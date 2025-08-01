@@ -28,6 +28,8 @@ fn cleanup_test_dir(path: &PathBuf) {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_file_operations_basic() {
     let test_dir = create_test_dir();
@@ -141,6 +143,8 @@ async fn test_file_operations_basic() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_directory_operations() {
     let test_base = create_test_dir();
@@ -193,6 +197,8 @@ async fn test_directory_operations() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_copy_move_operations() {
     let test_dir = create_test_dir();
@@ -264,6 +270,8 @@ async fn test_copy_move_operations() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_security_sandbox() {
     let tool = FileOperationsTool::default();
@@ -296,6 +304,8 @@ async fn test_security_sandbox() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_tool_metadata() {
     let tool = FileOperationsTool::default();
@@ -327,6 +337,8 @@ async fn test_tool_metadata() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_error_handling() {
     let tool = FileOperationsTool::default();
@@ -369,6 +381,8 @@ async fn test_error_handling() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_recursive_directory_creation() {
     let test_dir = create_test_dir();
@@ -399,6 +413,8 @@ async fn test_recursive_directory_creation() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_file_size_limits() {
     let test_dir = create_test_dir();
@@ -430,6 +446,8 @@ async fn test_file_size_limits() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
 #[tokio::test]
 async fn test_atomic_writes() {
     let test_dir = create_test_dir();

@@ -291,6 +291,7 @@ impl UniversalEventBuilder {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "event")]
 mod tests {
     use super::*;
 

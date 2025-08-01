@@ -26,6 +26,7 @@ pub fn inject_streaming_global(_ctx: &(), _context: &GlobalContext) -> Result<()
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "bridge")]
 mod tests {
     #[cfg_attr(test_category = "unit")]
     #[test]

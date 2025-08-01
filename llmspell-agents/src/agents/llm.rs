@@ -491,6 +491,7 @@ impl StatePersistence for LLMAgent {
 crate::impl_persistent_agent!(LLMAgent);
 
 #[cfg(test)]
+#[cfg_attr(test_category = "agent")]
 mod tests {
     use crate::builder::AgentBuilder;
 

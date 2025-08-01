@@ -324,6 +324,7 @@ impl EventMetadata {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "core")]
 mod tests {
     use super::*;
 

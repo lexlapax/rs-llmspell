@@ -151,6 +151,7 @@ impl HookContext {
 
     /// Create a minimal context for testing
     #[cfg(test)]
+#[cfg_attr(test_category = "hook")]
     pub fn test_context() -> Self {
         use crate::types::ComponentType;
 
@@ -209,6 +210,7 @@ impl HookContextBuilder {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "hook")]
 mod tests {
     use super::*;
     use crate::types::ComponentType;

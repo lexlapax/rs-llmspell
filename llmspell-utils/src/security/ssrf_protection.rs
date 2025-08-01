@@ -548,6 +548,7 @@ impl std::fmt::Display for SsrfError {
 impl std::error::Error for SsrfError {}
 
 #[cfg(test)]
+#[cfg_attr(test_category = "util")]
 mod tests {
     use super::*;
 

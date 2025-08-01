@@ -811,6 +811,7 @@ impl Tool for ImageProcessorTool {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "tool")]
 mod tests {
     use super::*;
     use std::collections::HashMap;

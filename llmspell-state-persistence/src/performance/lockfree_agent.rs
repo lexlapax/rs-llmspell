@@ -298,6 +298,7 @@ impl Default for FastAgentStateOps {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "state")]
 mod tests {
     use super::*;
     use crate::agent_state::{AgentMetadata, AgentStateData, ExecutionState, ToolUsageStats};

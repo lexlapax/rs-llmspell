@@ -304,6 +304,7 @@ impl HookBatcher {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "state")]
 mod tests {
     use super::*;
     use llmspell_hooks::{ComponentId, ComponentType, HookPoint};

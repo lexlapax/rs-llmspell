@@ -361,6 +361,7 @@ pub fn safe_serialize_with_redaction<T: Serialize + Clone>(
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "state")]
 mod tests {
     use super::*;
     use serde_json::json;

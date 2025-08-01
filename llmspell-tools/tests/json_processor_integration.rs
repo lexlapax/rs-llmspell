@@ -9,6 +9,9 @@ use llmspell_tools::JsonProcessorTool;
 use serde_json::json;
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_json_processor_complex_workflow() {
     let tool = JsonProcessorTool::default();
@@ -64,6 +67,9 @@ async fn test_json_processor_complex_workflow() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_json_processor_schema_validation_complex() {
     let tool = JsonProcessorTool::default();
@@ -147,6 +153,9 @@ async fn test_json_processor_schema_validation_complex() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_json_processor_array_filtering() {
     let tool = JsonProcessorTool::default();
@@ -179,6 +188,9 @@ async fn test_json_processor_array_filtering() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_json_processor_merge_complex() {
     let tool = JsonProcessorTool::default();
@@ -237,6 +249,9 @@ async fn test_json_processor_merge_complex() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_json_processor_tool_metadata() {
     let tool = JsonProcessorTool::default();
@@ -264,6 +279,9 @@ async fn test_json_processor_tool_metadata() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_json_processor_error_handling() {
     let tool = JsonProcessorTool::default();
@@ -306,6 +324,9 @@ async fn test_json_processor_error_handling() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_enhanced_jq_complex_workflow() {
     let tool = JsonProcessorTool::default();
@@ -394,6 +415,9 @@ async fn test_enhanced_jq_complex_workflow() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_streaming_json_lines() {
     let tool = JsonProcessorTool::default();
@@ -445,6 +469,9 @@ async fn test_streaming_json_lines() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
+#[cfg_attr(test_category = "security")]
+#[cfg_attr(test_category = "performance")]
 #[tokio::test]
 async fn test_advanced_array_operations() {
     let tool = JsonProcessorTool::default();

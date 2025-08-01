@@ -178,6 +178,7 @@ impl StateClassConfig {
 }
 
 #[cfg(test)]
+#[cfg_attr(test_category = "state")]
 mod tests {
     use super::*;
 

@@ -176,6 +176,7 @@ pub trait HookExt: Hook {
 impl<H: Hook + ?Sized> HookExt for H {}
 
 #[cfg(test)]
+#[cfg_attr(test_category = "hook")]
 mod tests {
     use super::*;
     use crate::types::{ComponentId, ComponentType, HookPoint};

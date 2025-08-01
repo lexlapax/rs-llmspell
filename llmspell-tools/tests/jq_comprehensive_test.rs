@@ -5,6 +5,7 @@ use llmspell_tools::JsonProcessorTool;
 use serde_json::json;
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
 #[tokio::test]
 async fn test_comprehensive_jq_syntax() {
     let tool = JsonProcessorTool::default();
@@ -194,6 +195,7 @@ async fn test_comprehensive_jq_syntax() {
 }
 
 #[cfg_attr(test_category = "integration")]
+#[cfg_attr(test_category = "tool")]
 #[tokio::test]
 async fn test_streaming_json_lines() {
     let tool = JsonProcessorTool::default();
