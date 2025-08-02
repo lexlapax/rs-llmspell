@@ -107,36 +107,203 @@ let config = SessionManagerConfig::builder()
 
 ### 1.2 Workflow-Agent Integration
 
-**Following Google Agent Development Kit (ADK) Pattern:**
+**Following Google Agent Development Kit (ADK) Pattern - Core Paradigm Shift:**
+
+**🚨 BREAKING CHANGE**: Workflows transform from "pre-configured batch jobs" to "function-like agents" with no backward compatibility. Current workflows execute `async fn execute(&self) -> Result<WorkflowResult>` but must become agents with `async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput>`.
+
+**Workflow Composition & Recursive Patterns:**
 ```rust
-// All workflow patterns MUST implement BaseAgent trait
+// KEY PATTERN: Workflows can contain other workflows as steps
+let complex_workflow = SequentialWorkflow::builder()
+    .add_step_tool("file_reader", tool_params)
+    .add_step_agent(analysis_agent)           // Agent as step
+    .add_step_workflow(preprocessing_workflow) // Workflow as step ← CORE ADK PATTERN
+    .add_step_tool("file_writer", output_params)
+    .build();
+
+// Workflows are first-class agents
+let agent_pool: Vec<Arc<dyn BaseAgent>> = vec![
+    Arc::new(chatbot_agent),
+    Arc::new(sequential_workflow),  // Workflow IS an agent
+    Arc::new(data_analysis_tool),
+];
+```
+
+**Input/Output Adapter Architecture (Task 7.1.7 Step 4):**
+```rust
+// Critical adapter layer for type unification
 impl BaseAgent for SequentialWorkflow {
-    fn metadata(&self) -> &ComponentMetadata { ... }
-    
-    async fn execute(
-        &mut self,
-        input: AgentInput,
-        context: &mut ExecutionContext,
-    ) -> Result<AgentOutput> {
-        // Workflow execution as agent
+    async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput> {
+        // 1. Convert AgentInput → WorkflowInput
+        let workflow_input = WorkflowInputAdapter::from_agent_input(input)?;
+        
+        // 2. Execute workflow-specific logic  
+        let workflow_output = self.execute_internal(workflow_input).await?;
+        
+        // 3. Convert WorkflowOutput → AgentOutput
+        let agent_output = AgentOutputAdapter::from_workflow_output(workflow_output)?;
+        Ok(agent_output)
     }
 }
 
-// Workflows are agents that coordinate other agents
-pub struct WorkflowAgent {
-    base: BaseAgentImpl,
-    workflow: Box<dyn Workflow>,
+// Input adapter handles parameter extraction
+struct WorkflowInputAdapter;
+impl WorkflowInputAdapter {
+    fn from_agent_input(input: AgentInput) -> Result<WorkflowInput> {
+        let workflow_params = input.parameters.get("workflow_config")
+            .and_then(|v| serde_json::from_value(v).ok())
+            .unwrap_or_default();
+        
+        Ok(WorkflowInput::new(input.text)
+            .with_context("agent_input", serde_json::to_value(input.parameters)?)
+            .with_workflow_params(workflow_params))
+    }
 }
 
-// Unified type system
-enum AgentType {
-    Simple(Box<dyn Agent>),
-    Workflow(Box<dyn WorkflowAgent>),
-    Composite(Vec<Box<dyn BaseAgent>>),
+// Output adapter preserves workflow execution details
+struct AgentOutputAdapter;
+impl AgentOutputAdapter {
+    fn from_workflow_output(output: WorkflowOutput) -> Result<AgentOutput> {
+        let mut agent_output = AgentOutput::text(
+            serde_json::to_string_pretty(&output.output)?
+        );
+        
+        // Preserve workflow execution metadata
+        agent_output = agent_output
+            .add_metadata("workflow_duration", output.duration.as_millis())
+            .add_metadata("steps_executed", output.steps_executed)
+            .add_metadata("workflow_success", output.success);
+            
+        Ok(agent_output)
+    }
 }
 ```
 
-### 1.3 Discovery Pattern Unification
+**Unified Type System:**
+```rust
+// All workflow patterns implement both BaseAgent AND Workflow traits
+impl BaseAgent for SequentialWorkflow { /* agent interface */ }
+impl Workflow for SequentialWorkflow { /* workflow-specific methods */ }
+
+// Workflows are fully interchangeable with agents
+enum ComponentType {
+    Agent(Arc<dyn BaseAgent>),
+    Tool(Arc<dyn Tool>),        // Tool also implements BaseAgent
+    Workflow(Arc<dyn Workflow>), // Workflow also implements BaseAgent  
+}
+```
+
+### 1.3 Workflow Factory Standardization (Task 7.1.8)
+
+**Unified Workflow Creation Patterns:**
+```rust
+// Standardized workflow factory interface
+pub trait WorkflowFactory {
+    /// Create workflow from type string and configuration
+    fn create_workflow(workflow_type: &str, config: WorkflowConfig) -> Result<Arc<dyn Workflow>>;
+    
+    /// List all available workflow types
+    fn list_workflow_types() -> Vec<String>;
+    
+    /// Create workflow from predefined template
+    fn create_from_template(template_name: &str) -> Result<Arc<dyn Workflow>>;
+    
+    /// Register custom workflow patterns
+    fn register_workflow_type<T: Workflow + 'static>(type_name: &str);
+}
+
+// Default implementation for all standard patterns
+pub struct DefaultWorkflowFactory;
+impl WorkflowFactory for DefaultWorkflowFactory {
+    fn create_workflow(workflow_type: &str, config: WorkflowConfig) -> Result<Arc<dyn Workflow>> {
+        match workflow_type {
+            "sequential" => Ok(Arc::new(SequentialWorkflow::new("default".to_string(), config))),
+            "parallel" => Ok(Arc::new(ParallelWorkflow::new("default".to_string(), config))),
+            "conditional" => Ok(Arc::new(ConditionalWorkflow::new("default".to_string(), config))),
+            "loop" => Ok(Arc::new(LoopWorkflow::new("default".to_string(), config))),
+            _ => Err(LLMSpellError::Component { 
+                message: format!("Unknown workflow type: {}", workflow_type) 
+            })
+        }
+    }
+}
+
+// Workflow executor for execution management
+pub trait WorkflowExecutor {
+    /// Execute workflow with input and return output
+    async fn execute_workflow(
+        &self, 
+        workflow: Arc<dyn Workflow>, 
+        input: WorkflowInput
+    ) -> Result<WorkflowOutput>;
+    
+    /// Execute with cancellation support
+    async fn execute_with_cancellation(
+        &self,
+        workflow: Arc<dyn Workflow>,
+        input: WorkflowInput,
+        cancellation_token: CancellationToken,
+    ) -> Result<WorkflowOutput>;
+    
+    /// Get execution metrics and monitoring
+    fn get_execution_metrics(&self) -> ExecutionMetrics;
+}
+```
+
+### 1.4 Pattern-Specific Config Builders (Task 7.1.9)
+
+**All Workflow Configurations MUST Use Builder Pattern:**
+```rust
+// Core WorkflowConfig builder (enhanced)
+let base_config = WorkflowConfig::builder()
+    .max_execution_time(Duration::from_secs(300))
+    .default_step_timeout(Duration::from_secs(30))
+    .max_retry_attempts(3)
+    .retry_delay_ms(1000)
+    .exponential_backoff(true)
+    .error_strategy(ErrorStrategy::FailFast)
+    .build()?;
+
+// Pattern-specific config builders
+let parallel_config = ParallelConfig::builder()
+    .max_concurrency(4)
+    .fail_fast(true)
+    .timeout(Duration::from_secs(60))
+    .continue_on_optional_failure(true)
+    .build()?;
+
+let conditional_config = ConditionalConfig::builder()
+    .execute_all_matching(false)
+    .execute_default_on_no_match(true)
+    .max_branches_to_evaluate(100)
+    .condition_evaluation_timeout_ms(1000)
+    .short_circuit_evaluation(true)
+    .build()?;
+
+let loop_config = LoopConfig::builder()
+    .max_iterations(1000)
+    .break_on_error(true)
+    .iteration_delay_ms(0)
+    .result_aggregation(ResultAggregation::CollectAll)
+    .build()?;
+
+let sequential_config = SequentialConfig::builder()
+    .continue_on_step_failure(false)
+    .step_isolation_level(IsolationLevel::Shared)
+    .checkpoint_frequency(CheckpointFrequency::EveryStep)
+    .build()?;
+
+// Preset configurations for common use cases
+let fast_config = WorkflowConfig::fast()      // Optimized for speed
+    .with_parallel_config(ParallelConfig::max_throughput())
+    .build()?;
+    
+let robust_config = WorkflowConfig::robust()  // Optimized for reliability
+    .with_retry_strategy(RetryStrategy::ExponentialBackoff { max_attempts: 5 })
+    .build()?;
+```
+
+### 1.5 Discovery Pattern Unification
 
 **Unified Discovery Trait:**
 ```rust
@@ -546,10 +713,14 @@ let config = SessionManagerConfig::builder()
    - Establish CI integration
 
 **Phase 2: Core Standardization (Weeks 2-3)**
-2. Tasks 1.7-1.11: Workflow Standardization
-   - Implement BaseAgent for workflows
-   - Standardize factories and configs
-   - Fix discovery patterns
+2. Tasks 1.7-1.12: Workflow-Agent Integration (BREAKING PARADIGM SHIFT)
+   - **7.1.7**: Workflow-Agent Trait Integration (8 hours) - Core BaseAgent implementation
+   - **7.1.8**: Workflow Factory Standardization (4.5 hours) - WorkflowFactory/WorkflowExecutor
+   - **7.1.9**: Workflow Config Builder Standardization (3.5 hours) - Pattern-specific builders  
+   - **7.1.10**: Workflow Bridge API Standardization (4 hours) - Bridge method consistency
+   - **7.1.11**: Workflow Script API Naming (3 hours) - snake_case conversion
+   - **7.1.12**: Factory Method Standardization (2.58 hours) - Non-workflow factory methods
+   - **Total**: 25.58 hours of workflow transformation work
    
 3. Tasks 1.12-1.24: Bridge API Standardization  
    - Factory method naming
@@ -620,14 +791,24 @@ let config = SessionManagerConfig::builder()
 - Enable selective test execution
 **Consequences**: Initial time investment, but faster development
 
-### Decision 3: Workflow as Agent
-**Context**: Workflows were separate from agents
-**Decision**: Follow Google ADK pattern - workflows implement BaseAgent
+### Decision 3: Workflow as Agent (BREAKING PARADIGM SHIFT)
+**Context**: Workflows were "batch job" style components separate from agents
+**Decision**: Follow Google ADK pattern - workflows implement BaseAgent and become function-like agents
 **Rationale**:
-- Unified type system
-- Composability improvements
-- Consistent lifecycle management
-**Consequences**: More trait implementations, but better integration
+- **Unified Type System**: Workflows can be used anywhere agents are expected
+- **Recursive Composition**: Workflows can contain other workflows as steps (Google ADK core pattern)
+- **Consistent Execution Interface**: All components use AgentInput/AgentOutput (no more workflow-specific types)
+- **Factory Standardization**: Workflows created through same patterns as agents and tools
+- **Script API Unification**: Same interface in Lua/JavaScript regardless of component type
+**Breaking Changes**:
+- Workflow execution: `execute() -> WorkflowResult` → `execute(AgentInput, ExecutionContext) -> AgentOutput`
+- No backward compatibility for existing workflow APIs
+- Input/output adapter layer required for type conversion
+- All workflow configs must use builder patterns
+**Consequences**: 
+- Major implementation effort across 6 tasks (7.1.7-7.1.12)
+- Complete re-architecture of workflow execution paradigm
+- Enables powerful composition patterns unavailable in current architecture
 
 ### Decision 4: Audience-Based Examples
 **Context**: 156+ examples mixed together
