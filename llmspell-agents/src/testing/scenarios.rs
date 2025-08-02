@@ -12,6 +12,7 @@ pub struct TestScenarios;
 
 impl TestScenarios {
     /// Simple echo scenario
+    #[must_use]
     pub fn echo_scenario() -> ScenarioConfig {
         ScenarioConfig {
             name: "Echo Scenario".to_string(),
@@ -29,6 +30,7 @@ impl TestScenarios {
     }
 
     /// Tool invocation scenario
+    #[must_use]
     pub fn tool_scenario() -> ScenarioConfig {
         ScenarioConfig {
             name: "Tool Scenario".to_string(),
@@ -46,6 +48,7 @@ impl TestScenarios {
     }
 
     /// Error handling scenario
+    #[must_use]
     pub fn error_scenario() -> ScenarioConfig {
         ScenarioConfig {
             name: "Error Scenario".to_string(),
@@ -60,12 +63,13 @@ impl TestScenarios {
     }
 
     /// Performance scenario
+    #[must_use]
     pub fn performance_scenario() -> ScenarioConfig {
         ScenarioConfig {
             name: "Performance Scenario".to_string(),
             description: "Tests agent performance under load".to_string(),
             inputs: (0..100)
-                .map(|i| AgentInput::text(format!("Request {}", i)))
+                .map(|i| AgentInput::text(format!("Request {i}")))
                 .collect(),
             expected_outputs: (0..100).map(|_| ExpectedOutput::Success).collect(),
             timeout: Duration::from_secs(30),
@@ -73,6 +77,7 @@ impl TestScenarios {
     }
 
     /// State transition scenario
+    #[must_use]
     pub fn state_transition_scenario() -> ScenarioConfig {
         ScenarioConfig {
             name: "State Transition Scenario".to_string(),
@@ -125,13 +130,14 @@ pub enum ExpectedOutput {
 
 impl ExpectedOutput {
     /// Validate output against expectation
+    #[must_use]
     pub fn validate(&self, output: &Result<AgentOutput, llmspell_core::LLMSpellError>) -> bool {
         match (self, output) {
-            (ExpectedOutput::Error, Err(_)) => true,
-            (ExpectedOutput::Success, Ok(_)) => true,
-            (ExpectedOutput::Contains(text), Ok(output)) => output.text.contains(text),
-            (ExpectedOutput::Exact(text), Ok(output)) => output.text == *text,
-            (ExpectedOutput::ToolCalled(tool), Ok(output)) => {
+            (Self::Error, Err(_)) => true,
+            (Self::Success, Ok(_)) => true,
+            (Self::Contains(text), Ok(output)) => output.text.contains(text),
+            (Self::Exact(text), Ok(output)) => output.text == *text,
+            (Self::ToolCalled(tool), Ok(output)) => {
                 output.tool_calls.iter().any(|call| call.tool_name == *tool)
             }
             _ => false,

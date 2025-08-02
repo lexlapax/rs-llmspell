@@ -14,6 +14,7 @@ pub struct ComponentRegistry {
 
 impl ComponentRegistry {
     /// Create a new empty registry
+    #[must_use]
     pub fn new() -> Self {
         Self {
             agents: Arc::new(RwLock::new(HashMap::new())),
@@ -28,7 +29,7 @@ impl ComponentRegistry {
         if agents.contains_key(&name) {
             return Err(LLMSpellError::Validation {
                 field: Some("agent_name".to_string()),
-                message: format!("Agent '{}' already registered", name),
+                message: format!("Agent '{name}' already registered"),
             });
         }
         agents.insert(name, agent);
@@ -36,12 +37,14 @@ impl ComponentRegistry {
     }
 
     /// Get an agent by name
+    #[must_use]
     pub fn get_agent(&self, name: &str) -> Option<Arc<dyn Agent>> {
         let agents = self.agents.read().unwrap();
         agents.get(name).cloned()
     }
 
     /// List all registered agents
+    #[must_use]
     pub fn list_agents(&self) -> Vec<String> {
         let agents = self.agents.read().unwrap();
         agents.keys().cloned().collect()
@@ -53,7 +56,7 @@ impl ComponentRegistry {
         if tools.contains_key(&name) {
             return Err(LLMSpellError::Validation {
                 field: Some("tool_name".to_string()),
-                message: format!("Tool '{}' already registered", name),
+                message: format!("Tool '{name}' already registered"),
             });
         }
         tools.insert(name, tool);
@@ -61,12 +64,14 @@ impl ComponentRegistry {
     }
 
     /// Get a tool by name
+    #[must_use]
     pub fn get_tool(&self, name: &str) -> Option<Arc<dyn Tool>> {
         let tools = self.tools.read().unwrap();
         tools.get(name).cloned()
     }
 
     /// List all registered tools
+    #[must_use]
     pub fn list_tools(&self) -> Vec<String> {
         let tools = self.tools.read().unwrap();
         tools.keys().cloned().collect()
@@ -82,7 +87,7 @@ impl ComponentRegistry {
         if workflows.contains_key(&name) {
             return Err(LLMSpellError::Validation {
                 field: Some("workflow_name".to_string()),
-                message: format!("Workflow '{}' already registered", name),
+                message: format!("Workflow '{name}' already registered"),
             });
         }
         workflows.insert(name, workflow);
@@ -90,12 +95,14 @@ impl ComponentRegistry {
     }
 
     /// Get a workflow by name
+    #[must_use]
     pub fn get_workflow(&self, name: &str) -> Option<Arc<dyn Workflow>> {
         let workflows = self.workflows.read().unwrap();
         workflows.get(name).cloned()
     }
 
     /// List all registered workflows
+    #[must_use]
     pub fn list_workflows(&self) -> Vec<String> {
         let workflows = self.workflows.read().unwrap();
         workflows.keys().cloned().collect()

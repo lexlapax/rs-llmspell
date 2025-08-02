@@ -52,56 +52,56 @@ fn test_json_parse_performance() {
     let iterations = 1000;
     for _ in 0..iterations {
         lua.load(format!(
-            r#"
+            r"
             local parsed = JSON.parse('{}')
             assert(parsed.success == true)
-        "#,
+        ",
             small_json.replace('\\', "\\\\").replace('"', r#"\""#)
         ))
         .exec()
         .unwrap();
     }
     let small_duration = start.elapsed();
-    let small_per_op = small_duration.as_micros() as f64 / iterations as f64;
+    let small_per_op = small_duration.as_micros() as f64 / f64::from(iterations);
 
     // Benchmark medium JSON parsing
     let start = Instant::now();
     let iterations = 100;
     for _ in 0..iterations {
         lua.load(format!(
-            r#"
+            r"
             local parsed = JSON.parse('{}')
             assert(parsed.success == true)
-        "#,
+        ",
             medium_json.replace('\n', "").replace('"', r#"\""#)
         ))
         .exec()
         .unwrap();
     }
     let medium_duration = start.elapsed();
-    let medium_per_op = medium_duration.as_micros() as f64 / iterations as f64;
+    let medium_per_op = medium_duration.as_micros() as f64 / f64::from(iterations);
 
     // Benchmark large JSON parsing
     let start = Instant::now();
     let iterations = 10;
     for _ in 0..iterations {
         lua.load(format!(
-            r#"
+            r"
             local parsed = JSON.parse('{}')
             assert(parsed.success == true)
-        "#,
+        ",
             large_json.replace('\\', "\\\\").replace('"', r#"\""#)
         ))
         .exec()
         .unwrap();
     }
     let large_duration = start.elapsed();
-    let large_per_op = large_duration.as_micros() as f64 / iterations as f64;
+    let large_per_op = large_duration.as_micros() as f64 / f64::from(iterations);
 
     println!("JSON Parse Performance:");
-    println!("  Small JSON (~100 bytes):  {:.2} μs/op", small_per_op);
-    println!("  Medium JSON (~300 bytes): {:.2} μs/op", medium_per_op);
-    println!("  Large JSON (~5KB):        {:.2} μs/op", large_per_op);
+    println!("  Small JSON (~100 bytes):  {small_per_op:.2} μs/op");
+    println!("  Medium JSON (~300 bytes): {medium_per_op:.2} μs/op");
+    println!("  Large JSON (~5KB):        {large_per_op:.2} μs/op");
 
     // Assert performance requirements (<1ms for typical operations)
     assert!(small_per_op < 1000.0, "Small JSON parsing should be <1ms");
@@ -140,53 +140,53 @@ fn test_json_stringify_performance() {
     let iterations = 1000;
     for _ in 0..iterations {
         lua.load(
-            r#"
+            r"
             local json_str = JSON.stringify(small_data)
             assert(json_str ~= nil)
-        "#,
+        ",
         )
         .exec()
         .unwrap();
     }
     let small_duration = start.elapsed();
-    let small_per_op = small_duration.as_micros() as f64 / iterations as f64;
+    let small_per_op = small_duration.as_micros() as f64 / f64::from(iterations);
 
     // Benchmark medium data stringify
     let start = Instant::now();
     let iterations = 100;
     for _ in 0..iterations {
         lua.load(
-            r#"
+            r"
             local json_str = JSON.stringify(medium_data)
             assert(json_str ~= nil)
-        "#,
+        ",
         )
         .exec()
         .unwrap();
     }
     let medium_duration = start.elapsed();
-    let medium_per_op = medium_duration.as_micros() as f64 / iterations as f64;
+    let medium_per_op = medium_duration.as_micros() as f64 / f64::from(iterations);
 
     // Benchmark large data stringify
     let start = Instant::now();
     let iterations = 10;
     for _ in 0..iterations {
         lua.load(
-            r#"
+            r"
             local json_str = JSON.stringify(large_data)
             assert(json_str ~= nil)
-        "#,
+        ",
         )
         .exec()
         .unwrap();
     }
     let large_duration = start.elapsed();
-    let large_per_op = large_duration.as_micros() as f64 / iterations as f64;
+    let large_per_op = large_duration.as_micros() as f64 / f64::from(iterations);
 
     println!("\nJSON Stringify Performance:");
-    println!("  Small data:  {:.2} μs/op", small_per_op);
-    println!("  Medium data: {:.2} μs/op", medium_per_op);
-    println!("  Large data:  {:.2} μs/op", large_per_op);
+    println!("  Small data:  {small_per_op:.2} μs/op");
+    println!("  Medium data: {medium_per_op:.2} μs/op");
+    println!("  Large data:  {large_per_op:.2} μs/op");
 
     // Assert performance requirements (<1ms for typical operations)
     assert!(small_per_op < 1000.0, "Small data stringify should be <1ms");
@@ -209,14 +209,14 @@ fn test_json_roundtrip_performance() {
 
     for _ in 0..iterations {
         lua.load(format!(
-            r#"
+            r"
             local original = '{}'
             local parsed = JSON.parse(original)
             local stringified = JSON.stringify(parsed)
             local reparsed = JSON.parse(stringified)
             assert(reparsed.success == parsed.success)
             assert(reparsed.result.operation == parsed.result.operation)
-        "#,
+        ",
             tool_output.replace('\\', "\\\\").replace('"', r#"\""#)
         ))
         .exec()
@@ -224,10 +224,10 @@ fn test_json_roundtrip_performance() {
     }
 
     let duration = start.elapsed();
-    let per_op = duration.as_micros() as f64 / iterations as f64;
+    let per_op = duration.as_micros() as f64 / f64::from(iterations);
 
     println!("\nJSON Roundtrip Performance:");
-    println!("  Parse->Stringify->Parse: {:.2} μs/op", per_op);
+    println!("  Parse->Stringify->Parse: {per_op:.2} μs/op");
 
     // Assert performance requirement
     assert!(per_op < 1000.0, "Roundtrip should be <1ms");

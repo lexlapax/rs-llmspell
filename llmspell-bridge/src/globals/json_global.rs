@@ -9,7 +9,8 @@ pub struct JsonGlobal {}
 
 impl JsonGlobal {
     /// Create a new JSON global
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self {}
     }
 }

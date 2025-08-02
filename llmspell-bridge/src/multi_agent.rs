@@ -85,9 +85,9 @@ pub fn create_fork_join_workflow(
     // Create parallel branches for each agent task
     for (agent_id, task_name, input) in agent_tasks {
         let branch = ParallelBranch::new(task_name.clone())
-            .with_description(format!("Task handled by agent: {}", agent_id))
+            .with_description(format!("Task handled by agent: {agent_id}"))
             .add_step(WorkflowStep::new(
-                format!("{}_execution", task_name),
+                format!("{task_name}_execution"),
                 StepType::Agent {
                     agent_id: ComponentId::from_name(&agent_id),
                     input: input.to_string(),
@@ -115,10 +115,10 @@ pub fn create_consensus_workflow(
 
     // Each agent evaluates options in parallel
     for agent_id in evaluator_agents {
-        let branch = ParallelBranch::new(format!("{}_evaluation", agent_id))
-            .with_description(format!("Evaluation by agent: {}", agent_id))
+        let branch = ParallelBranch::new(format!("{agent_id}_evaluation"))
+            .with_description(format!("Evaluation by agent: {agent_id}"))
             .add_step(WorkflowStep::new(
-                format!("{}_vote", agent_id),
+                format!("{agent_id}_vote"),
                 StepType::Agent {
                     agent_id: ComponentId::from_name(&agent_id),
                     input: serde_json::json!({
@@ -208,7 +208,7 @@ pub fn create_collaboration_workflow(
     // Each round, agents collaborate
     for (i, agent_id) in collaborating_agents.iter().enumerate() {
         builder = builder.add_step(WorkflowStep::new(
-            format!("collaborate_agent_{}", i),
+            format!("collaborate_agent_{i}"),
             StepType::Agent {
                 agent_id: ComponentId::from_name(agent_id),
                 input: serde_json::json!({

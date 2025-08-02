@@ -145,15 +145,14 @@ async fn test_hook_list_enhanced_filtering() {
     match result {
         Ok((success, debug_info)) => {
             if !success {
-                println!("Debug info: {}", debug_info);
+                println!("Debug info: {debug_info}");
             }
             assert!(
                 success,
-                "Should filter hooks using enhanced filtering options. Debug: {}",
-                debug_info
+                "Should filter hooks using enhanced filtering options. Debug: {debug_info}"
             );
         }
-        Err(e) => panic!("Test failed with error: {}", e),
+        Err(e) => panic!("Test failed with error: {e}"),
     }
 }
 

@@ -7,7 +7,13 @@ use super::state::{ExecutionStats, StateManager};
 use super::step_executor::StepExecutor;
 use super::traits::{ErrorStrategy, StepResult, WorkflowStatus, WorkflowStep};
 use super::types::{StepExecutionContext, WorkflowConfig};
-use llmspell_core::{ComponentMetadata, Result};
+use async_trait::async_trait;
+use llmspell_core::{
+    execution_context::ExecutionContext,
+    traits::base_agent::BaseAgent,
+    types::{AgentInput, AgentOutput},
+    ComponentMetadata, LLMSpellError, Result,
+};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tracing::{debug, error, info, warn};
@@ -100,7 +106,7 @@ impl SequentialWorkflow {
     }
 
     /// Execute the workflow
-    pub async fn execute(&self) -> Result<SequentialWorkflowResult> {
+    pub async fn execute_workflow(&self) -> Result<SequentialWorkflowResult> {
         let start_time = Instant::now();
         info!("Starting sequential workflow: {}", self.name);
 
@@ -301,6 +307,131 @@ impl SequentialWorkflow {
     /// Set shared data value
     pub async fn set_shared_data(&self, key: String, value: serde_json::Value) -> Result<()> {
         self.state_manager.set_shared_data(key, value).await
+    }
+}
+
+#[async_trait]
+impl BaseAgent for SequentialWorkflow {
+    fn metadata(&self) -> &ComponentMetadata {
+        &self.metadata
+    }
+
+    async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+        // Convert AgentInput to workflow execution
+        // The workflow will use the input text as an execution trigger
+        // and parameters for workflow configuration
+
+        // Validate input first
+        self.validate_input(&input).await?;
+
+        // Execute the workflow using existing implementation
+        let workflow_result = self.execute_workflow().await?;
+
+        // Convert SequentialWorkflowResult to AgentOutput
+        let output_text = if workflow_result.success {
+            format!(
+                "Sequential workflow '{}' completed successfully. {} steps succeeded, {} steps failed. Duration: {:?}",
+                workflow_result.workflow_name,
+                workflow_result.successful_steps.len(),
+                workflow_result.failed_steps.len(),
+                workflow_result.duration
+            )
+        } else {
+            format!(
+                "Sequential workflow '{}' failed: {}. {} steps succeeded, {} steps failed. Duration: {:?}",
+                workflow_result.workflow_name,
+                workflow_result.error_message.as_deref().unwrap_or("Unknown error"),
+                workflow_result.successful_steps.len(),
+                workflow_result.failed_steps.len(),
+                workflow_result.duration
+            )
+        };
+
+        // Build AgentOutput with execution metadata
+        let mut metadata = llmspell_core::types::OutputMetadata {
+            execution_time_ms: Some(workflow_result.duration.as_millis() as u64),
+            ..Default::default()
+        };
+        metadata
+            .extra
+            .insert("workflow_type".to_string(), serde_json::json!("sequential"));
+        metadata.extra.insert(
+            "workflow_name".to_string(),
+            serde_json::json!(workflow_result.workflow_name),
+        );
+        metadata.extra.insert(
+            "total_steps".to_string(),
+            serde_json::json!(workflow_result.total_steps()),
+        );
+        metadata.extra.insert(
+            "successful_steps".to_string(),
+            serde_json::json!(workflow_result.successful_steps.len()),
+        );
+        metadata.extra.insert(
+            "failed_steps".to_string(),
+            serde_json::json!(workflow_result.failed_steps.len()),
+        );
+        metadata.extra.insert(
+            "success_rate".to_string(),
+            serde_json::json!(workflow_result.success_rate()),
+        );
+
+        Ok(AgentOutput::text(output_text).with_metadata(metadata))
+    }
+
+    async fn validate_input(&self, input: &AgentInput) -> Result<()> {
+        // Basic validation - workflow can accept any non-empty text input
+        if input.text.is_empty() {
+            return Err(LLMSpellError::Validation {
+                message: "Workflow input text cannot be empty".to_string(),
+                field: Some("text".to_string()),
+            });
+        }
+
+        // Validate that we have steps to execute
+        if self.steps.is_empty() {
+            return Err(LLMSpellError::Validation {
+                message: "Cannot execute workflow without steps".to_string(),
+                field: Some("steps".to_string()),
+            });
+        }
+
+        Ok(())
+    }
+
+    async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
+        // Handle workflow-specific errors gracefully
+        let error_text = match &error {
+            LLMSpellError::Workflow { message, step, .. } => {
+                if let Some(step_name) = step {
+                    format!("Workflow error in step '{}': {}", step_name, message)
+                } else {
+                    format!("Workflow error: {}", message)
+                }
+            }
+            LLMSpellError::Validation { message, field } => {
+                if let Some(field_name) = field {
+                    format!("Validation error in field '{}': {}", field_name, message)
+                } else {
+                    format!("Validation error: {}", message)
+                }
+            }
+            _ => format!("Sequential workflow error: {}", error),
+        };
+
+        let mut metadata = llmspell_core::types::OutputMetadata::default();
+        metadata.extra.insert(
+            "error_type".to_string(),
+            serde_json::json!("workflow_error"),
+        );
+        metadata
+            .extra
+            .insert("workflow_type".to_string(), serde_json::json!("sequential"));
+        metadata
+            .extra
+            .insert("workflow_name".to_string(), serde_json::json!(self.name));
+
+        Ok(AgentOutput::text(error_text).with_metadata(metadata))
     }
 }
 
@@ -525,7 +656,7 @@ mod tests {
             .add_step(step2)
             .build();
 
-        let result = workflow.execute().await.unwrap();
+        let result = workflow.execute_workflow().await.unwrap();
         assert!(result.success);
         assert_eq!(result.successful_steps.len(), 2);
         assert_eq!(result.failed_steps.len(), 0);
@@ -557,7 +688,7 @@ mod tests {
             .with_error_strategy(ErrorStrategy::FailFast)
             .build();
 
-        let result = workflow.execute().await.unwrap();
+        let result = workflow.execute_workflow().await.unwrap();
         assert!(!result.success);
         assert_eq!(result.successful_steps.len(), 1);
         assert_eq!(result.failed_steps.len(), 1);
@@ -597,7 +728,7 @@ mod tests {
             .with_error_strategy(ErrorStrategy::Continue)
             .build();
 
-        let result = workflow.execute().await.unwrap();
+        let result = workflow.execute_workflow().await.unwrap();
         assert!(result.success); // Should succeed because we continue on error
         assert_eq!(result.successful_steps.len(), 2);
         assert_eq!(result.failed_steps.len(), 1);

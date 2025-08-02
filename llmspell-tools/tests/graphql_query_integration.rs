@@ -1,4 +1,4 @@
-//! Integration tests for GraphQLQueryTool
+//! Integration tests for `GraphQLQueryTool`
 
 use llmspell_core::{
     traits::{base_agent::BaseAgent, tool::Tool},
@@ -52,7 +52,7 @@ async fn test_graphql_query() {
         json!({
             "operation": "query",
             "endpoint": "https://countries.trevorblades.com/",
-            "input": r#"
+            "input": r"
                 query GetCountry($code: ID!) {
                     country(code: $code) {
                         name
@@ -61,7 +61,7 @@ async fn test_graphql_query() {
                         emoji
                     }
                 }
-            "#,
+            ",
             "variables": {
                 "code": "US"
             }
@@ -101,14 +101,14 @@ async fn test_graphql_query_without_variables() {
         "parameters".to_string(),
         json!({
             "endpoint": "https://countries.trevorblades.com/",
-            "input": r#"
+            "input": r"
                 {
                     continents {
                         code
                         name
                     }
                 }
-            "#
+            "
         }),
     );
 
@@ -172,7 +172,7 @@ async fn test_graphql_depth_limit() {
     let tool = GraphQLQueryTool::default();
 
     // Very deeply nested query
-    let deep_query = r#"
+    let deep_query = r"
         {
             continents {
                 countries {
@@ -198,7 +198,7 @@ async fn test_graphql_depth_limit() {
                 }
             }
         }
-    "#;
+    ";
 
     let input = AgentInput::text("deep query").with_parameter(
         "parameters".to_string(),

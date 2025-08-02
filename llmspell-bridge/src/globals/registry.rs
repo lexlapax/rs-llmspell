@@ -28,11 +28,13 @@ impl std::fmt::Debug for GlobalRegistry {
 
 impl GlobalRegistry {
     /// Get a global by name
+    #[must_use]
     pub fn get(&self, name: &str) -> Option<Arc<dyn GlobalObject>> {
         self.globals.get(name).cloned()
     }
 
     /// Get all registered globals in injection order
+    #[must_use]
     pub fn get_all_ordered(&self) -> Vec<Arc<dyn GlobalObject>> {
         self.injection_order
             .iter()
@@ -41,11 +43,13 @@ impl GlobalRegistry {
     }
 
     /// Get injection metrics
-    pub fn metrics(&self) -> &InjectionMetrics {
+    #[must_use]
+    pub const fn metrics(&self) -> &InjectionMetrics {
         &self.metrics
     }
 
     /// Get metadata for all registered globals
+    #[must_use]
     pub fn list_globals(&self) -> Vec<GlobalMetadata> {
         self.injection_order
             .iter()
@@ -54,13 +58,14 @@ impl GlobalRegistry {
     }
 }
 
-/// Builder for creating a GlobalRegistry with dependency resolution
+/// Builder for creating a `GlobalRegistry` with dependency resolution
 pub struct GlobalRegistryBuilder {
     globals: HashMap<String, Arc<dyn GlobalObject>>,
 }
 
 impl GlobalRegistryBuilder {
     /// Create a new builder
+    #[must_use]
     pub fn new() -> Self {
         Self {
             globals: HashMap::new(),
@@ -70,7 +75,7 @@ impl GlobalRegistryBuilder {
     /// Register a global object
     pub fn register(&mut self, global: Arc<dyn GlobalObject>) -> &mut Self {
         let metadata = global.metadata();
-        self.globals.insert(metadata.name.clone(), global);
+        self.globals.insert(metadata.name, global);
         self
     }
 
@@ -110,7 +115,7 @@ impl GlobalRegistryBuilder {
     ) -> Result<()> {
         if visiting.contains(name) {
             return Err(LLMSpellError::Component {
-                message: format!("Circular dependency detected involving global: {}", name),
+                message: format!("Circular dependency detected involving global: {name}"),
                 source: None,
             });
         }
@@ -133,8 +138,7 @@ impl GlobalRegistryBuilder {
                     }
                     return Err(LLMSpellError::Component {
                         message: format!(
-                            "Global '{}' depends on '{}' which is not registered",
-                            name, dep
+                            "Global '{name}' depends on '{dep}' which is not registered"
                         ),
                         source: None,
                     });

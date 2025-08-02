@@ -51,6 +51,7 @@ pub struct AgentBridge {
 
 impl AgentBridge {
     /// Create a new agent bridge with provider manager
+    #[must_use]
     pub fn new(
         registry: Arc<ComponentRegistry>,
         provider_manager: Arc<llmspell_providers::ProviderManager>,
@@ -129,7 +130,7 @@ impl AgentBridge {
             if agents.contains_key(instance_name) {
                 return Err(LLMSpellError::Validation {
                     field: Some("instance_name".to_string()),
-                    message: format!("Agent instance '{}' already exists", instance_name),
+                    message: format!("Agent instance '{instance_name}' already exists"),
                 });
             }
         }
@@ -172,7 +173,7 @@ impl AgentBridge {
             if agents.contains_key(instance_name) {
                 return Err(LLMSpellError::Validation {
                     field: Some("instance_name".to_string()),
-                    message: format!("Agent instance '{}' already exists", instance_name),
+                    message: format!("Agent instance '{instance_name}' already exists"),
                 });
             }
         }
@@ -216,7 +217,7 @@ impl AgentBridge {
         };
 
         let agent = agent.ok_or_else(|| LLMSpellError::Component {
-            message: format!("Agent instance '{}' not found", instance_name),
+            message: format!("Agent instance '{instance_name}' not found"),
             source: None,
         })?;
 
@@ -248,7 +249,7 @@ impl AgentBridge {
 
         if removed.is_none() {
             return Err(LLMSpellError::Component {
-                message: format!("Agent instance '{}' not found", instance_name),
+                message: format!("Agent instance '{instance_name}' not found"),
                 source: None,
             });
         }
@@ -271,7 +272,7 @@ impl AgentBridge {
             self.get_agent(instance_name)
                 .await
                 .ok_or_else(|| LLMSpellError::Component {
-                    message: format!("Agent instance '{}' not found", instance_name),
+                    message: format!("Agent instance '{instance_name}' not found"),
                     source: None,
                 })?;
 
@@ -297,11 +298,13 @@ impl AgentBridge {
     // Tool Integration Methods
 
     /// List available tools
+    #[must_use]
     pub fn list_tools(&self) -> Vec<String> {
         self.registry.list_tools()
     }
 
     /// Get tool information
+    #[must_use]
     pub fn get_tool(&self, tool_name: &str) -> Option<Arc<dyn Tool>> {
         self.registry.get_tool(tool_name)
     }
@@ -319,7 +322,7 @@ impl AgentBridge {
             self.get_agent(agent_instance)
                 .await
                 .ok_or_else(|| LLMSpellError::Component {
-                    message: format!("Agent instance '{}' not found", agent_instance),
+                    message: format!("Agent instance '{agent_instance}' not found"),
                     source: None,
                 })?;
 
@@ -328,7 +331,7 @@ impl AgentBridge {
             .registry
             .get_tool(tool_name)
             .ok_or_else(|| LLMSpellError::Component {
-                message: format!("Tool '{}' not found", tool_name),
+                message: format!("Tool '{tool_name}' not found"),
                 source: None,
             })?;
 
@@ -340,11 +343,13 @@ impl AgentBridge {
     }
 
     /// Check if a tool is available
+    #[must_use]
     pub fn has_tool(&self, tool_name: &str) -> bool {
         self.registry.get_tool(tool_name).is_some()
     }
 
     /// Get tool metadata for discovery
+    #[must_use]
     pub fn get_tool_metadata(&self, tool_name: &str) -> Option<serde_json::Value> {
         if let Some(tool) = self.registry.get_tool(tool_name) {
             let metadata = tool.metadata();
@@ -359,6 +364,7 @@ impl AgentBridge {
     }
 
     /// Get all tool metadata for bulk discovery
+    #[must_use]
     pub fn get_all_tool_metadata(&self) -> HashMap<String, serde_json::Value> {
         let mut metadata_map = HashMap::new();
         for tool_name in self.list_tools() {
@@ -378,7 +384,7 @@ impl AgentBridge {
             self.get_agent(agent_instance)
                 .await
                 .ok_or_else(|| LLMSpellError::Component {
-                    message: format!("Agent instance '{}' not found", agent_instance),
+                    message: format!("Agent instance '{agent_instance}' not found"),
                     source: None,
                 })?;
 
@@ -389,6 +395,7 @@ impl AgentBridge {
     }
 
     /// Get overall bridge metrics
+    #[must_use]
     pub fn get_bridge_metrics(&self) -> HashMap<String, serde_json::Value> {
         let mut metrics = HashMap::new();
 
@@ -423,7 +430,7 @@ impl AgentBridge {
             self.get_agent(agent_instance)
                 .await
                 .ok_or_else(|| LLMSpellError::Component {
-                    message: format!("Agent instance '{}' not found", agent_instance),
+                    message: format!("Agent instance '{agent_instance}' not found"),
                     source: None,
                 })?;
 
@@ -446,7 +453,7 @@ impl AgentBridge {
             self.get_agent(agent_instance)
                 .await
                 .ok_or_else(|| LLMSpellError::Component {
-                    message: format!("Agent instance '{}' not found", agent_instance),
+                    message: format!("Agent instance '{agent_instance}' not found"),
                     source: None,
                 })?;
 
@@ -486,7 +493,7 @@ impl AgentBridge {
             self.get_agent(agent_instance)
                 .await
                 .ok_or_else(|| LLMSpellError::Component {
-                    message: format!("Agent instance '{}' not found", agent_instance),
+                    message: format!("Agent instance '{agent_instance}' not found"),
                     source: None,
                 })?;
 
@@ -496,7 +503,7 @@ impl AgentBridge {
             id: uuid::Uuid::new_v4().to_string(),
             timestamp: chrono::Utc::now(),
             level: LogLevel::Info,
-            message: format!("{}: {}", event_type, message),
+            message: format!("{event_type}: {message}"),
             agent_id: agent_instance.to_string(),
             component: "bridge".to_string(),
             fields: std::collections::HashMap::new(),
@@ -519,7 +526,7 @@ impl AgentBridge {
             self.get_agent(agent_instance)
                 .await
                 .ok_or_else(|| LLMSpellError::Component {
-                    message: format!("Agent instance '{}' not found", agent_instance),
+                    message: format!("Agent instance '{agent_instance}' not found"),
                     source: None,
                 })?;
 
@@ -534,7 +541,7 @@ impl AgentBridge {
             self.get_agent(agent_instance)
                 .await
                 .ok_or_else(|| LLMSpellError::Component {
-                    message: format!("Agent instance '{}' not found", agent_instance),
+                    message: format!("Agent instance '{agent_instance}' not found"),
                     source: None,
                 })?;
 
@@ -551,7 +558,7 @@ impl AgentBridge {
             machines
                 .get(agent_instance)
                 .ok_or_else(|| LLMSpellError::Component {
-                    message: format!("State machine for agent '{}' not found", agent_instance),
+                    message: format!("State machine for agent '{agent_instance}' not found"),
                     source: None,
                 })?;
 
@@ -565,7 +572,7 @@ impl AgentBridge {
             machines
                 .get(agent_instance)
                 .ok_or_else(|| LLMSpellError::Component {
-                    message: format!("State machine for agent '{}' not found", agent_instance),
+                    message: format!("State machine for agent '{agent_instance}' not found"),
                     source: None,
                 })?;
 
@@ -573,7 +580,7 @@ impl AgentBridge {
             .initialize()
             .await
             .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to initialize agent: {}", e),
+                message: format!("Failed to initialize agent: {e}"),
                 source: None,
             })
     }
@@ -585,7 +592,7 @@ impl AgentBridge {
             machines
                 .get(agent_instance)
                 .ok_or_else(|| LLMSpellError::Component {
-                    message: format!("State machine for agent '{}' not found", agent_instance),
+                    message: format!("State machine for agent '{agent_instance}' not found"),
                     source: None,
                 })?;
 
@@ -593,7 +600,7 @@ impl AgentBridge {
             .start()
             .await
             .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to start agent: {}", e),
+                message: format!("Failed to start agent: {e}"),
                 source: None,
             })
     }
@@ -605,7 +612,7 @@ impl AgentBridge {
             machines
                 .get(agent_instance)
                 .ok_or_else(|| LLMSpellError::Component {
-                    message: format!("State machine for agent '{}' not found", agent_instance),
+                    message: format!("State machine for agent '{agent_instance}' not found"),
                     source: None,
                 })?;
 
@@ -613,7 +620,7 @@ impl AgentBridge {
             .pause()
             .await
             .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to pause agent: {}", e),
+                message: format!("Failed to pause agent: {e}"),
                 source: None,
             })
     }
@@ -625,7 +632,7 @@ impl AgentBridge {
             machines
                 .get(agent_instance)
                 .ok_or_else(|| LLMSpellError::Component {
-                    message: format!("State machine for agent '{}' not found", agent_instance),
+                    message: format!("State machine for agent '{agent_instance}' not found"),
                     source: None,
                 })?;
 
@@ -633,7 +640,7 @@ impl AgentBridge {
             .resume()
             .await
             .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to resume agent: {}", e),
+                message: format!("Failed to resume agent: {e}"),
                 source: None,
             })
     }
@@ -645,7 +652,7 @@ impl AgentBridge {
             machines
                 .get(agent_instance)
                 .ok_or_else(|| LLMSpellError::Component {
-                    message: format!("State machine for agent '{}' not found", agent_instance),
+                    message: format!("State machine for agent '{agent_instance}' not found"),
                     source: None,
                 })?;
 
@@ -653,7 +660,7 @@ impl AgentBridge {
             .stop()
             .await
             .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to stop agent: {}", e),
+                message: format!("Failed to stop agent: {e}"),
                 source: None,
             })
     }
@@ -665,7 +672,7 @@ impl AgentBridge {
             machines
                 .get(agent_instance)
                 .ok_or_else(|| LLMSpellError::Component {
-                    message: format!("State machine for agent '{}' not found", agent_instance),
+                    message: format!("State machine for agent '{agent_instance}' not found"),
                     source: None,
                 })?;
 
@@ -673,7 +680,7 @@ impl AgentBridge {
             .terminate()
             .await
             .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to terminate agent: {}", e),
+                message: format!("Failed to terminate agent: {e}"),
                 source: None,
             })
     }
@@ -685,7 +692,7 @@ impl AgentBridge {
             machines
                 .get(agent_instance)
                 .ok_or_else(|| LLMSpellError::Component {
-                    message: format!("State machine for agent '{}' not found", agent_instance),
+                    message: format!("State machine for agent '{agent_instance}' not found"),
                     source: None,
                 })?;
 
@@ -693,7 +700,7 @@ impl AgentBridge {
             .error(error_message)
             .await
             .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to put agent in error state: {}", e),
+                message: format!("Failed to put agent in error state: {e}"),
                 source: None,
             })
     }
@@ -705,7 +712,7 @@ impl AgentBridge {
             machines
                 .get(agent_instance)
                 .ok_or_else(|| LLMSpellError::Component {
-                    message: format!("State machine for agent '{}' not found", agent_instance),
+                    message: format!("State machine for agent '{agent_instance}' not found"),
                     source: None,
                 })?;
 
@@ -713,7 +720,7 @@ impl AgentBridge {
             .recover()
             .await
             .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to recover agent: {}", e),
+                message: format!("Failed to recover agent: {e}"),
                 source: None,
             })
     }
@@ -728,7 +735,7 @@ impl AgentBridge {
             machines
                 .get(agent_instance)
                 .ok_or_else(|| LLMSpellError::Component {
-                    message: format!("State machine for agent '{}' not found", agent_instance),
+                    message: format!("State machine for agent '{agent_instance}' not found"),
                     source: None,
                 })?;
 
@@ -741,7 +748,7 @@ impl AgentBridge {
                     "from": format!("{:?}", transition.from),
                     "to": format!("{:?}", transition.to),
                     "timestamp": datetime.to_rfc3339(),
-                    "elapsed": transition.duration.map(|d| d.as_secs_f64()).unwrap_or(0.0),
+                    "elapsed": transition.duration.map_or(0.0, |d| d.as_secs_f64()),
                     "reason": transition.reason,
                     "metadata": transition.metadata,
                 })
@@ -756,7 +763,7 @@ impl AgentBridge {
             machines
                 .get(agent_instance)
                 .ok_or_else(|| LLMSpellError::Component {
-                    message: format!("State machine for agent '{}' not found", agent_instance),
+                    message: format!("State machine for agent '{agent_instance}' not found"),
                     source: None,
                 })?;
 
@@ -770,7 +777,7 @@ impl AgentBridge {
             machines
                 .get(agent_instance)
                 .ok_or_else(|| LLMSpellError::Component {
-                    message: format!("State machine for agent '{}' not found", agent_instance),
+                    message: format!("State machine for agent '{agent_instance}' not found"),
                     source: None,
                 })?;
 
@@ -784,7 +791,7 @@ impl AgentBridge {
             machines
                 .get(agent_instance)
                 .ok_or_else(|| LLMSpellError::Component {
-                    message: format!("State machine for agent '{}' not found", agent_instance),
+                    message: format!("State machine for agent '{agent_instance}' not found"),
                     source: None,
                 })?;
 
@@ -798,7 +805,7 @@ impl AgentBridge {
             machines
                 .get(agent_instance)
                 .ok_or_else(|| LLMSpellError::Component {
-                    message: format!("State machine for agent '{}' not found", agent_instance),
+                    message: format!("State machine for agent '{agent_instance}' not found"),
                     source: None,
                 })?;
 
@@ -910,7 +917,7 @@ impl AgentBridge {
             .get_context(parent_id)
             .await
             .ok_or_else(|| LLMSpellError::Component {
-                message: format!("Parent context '{}' not found", parent_id),
+                message: format!("Parent context '{parent_id}' not found"),
                 source: None,
             })?;
 
@@ -946,7 +953,7 @@ impl AgentBridge {
         let context = contexts
             .get(context_id)
             .ok_or_else(|| LLMSpellError::Component {
-                message: format!("Context '{}' not found", context_id),
+                message: format!("Context '{context_id}' not found"),
                 source: None,
             })?;
 
@@ -967,7 +974,7 @@ impl AgentBridge {
         let context = contexts
             .get(context_id)
             .ok_or_else(|| LLMSpellError::Component {
-                message: format!("Context '{}' not found", context_id),
+                message: format!("Context '{context_id}' not found"),
                 source: None,
             })?;
 
@@ -1007,7 +1014,7 @@ impl AgentBridge {
             self.get_context(context_id)
                 .await
                 .ok_or_else(|| LLMSpellError::Component {
-                    message: format!("Context '{}' not found", context_id),
+                    message: format!("Context '{context_id}' not found"),
                     source: None,
                 })?;
 
@@ -1037,7 +1044,7 @@ impl AgentBridge {
             self.get_agent(instance_name)
                 .await
                 .ok_or_else(|| LLMSpellError::Component {
-                    message: format!("Agent instance '{}' not found", instance_name),
+                    message: format!("Agent instance '{instance_name}' not found"),
                     source: None,
                 })?;
 
@@ -1054,7 +1061,7 @@ impl AgentBridge {
                 }
                 Err(e) => {
                     // Send error as output
-                    let error_output = AgentOutput::text(format!("Error: {}", e));
+                    let error_output = AgentOutput::text(format!("Error: {e}"));
                     let _ = tx.send(error_output).await;
                 }
             }
@@ -1114,7 +1121,7 @@ impl AgentBridge {
                 }
                 _ => Err(LLMSpellError::Validation {
                     field: Some("scope.type".to_string()),
-                    message: format!("Unknown scope type: {}", scope_type),
+                    message: format!("Unknown scope type: {scope_type}"),
                 }),
             }
         } else {
@@ -1128,7 +1135,7 @@ impl AgentBridge {
         contexts
             .remove(context_id)
             .ok_or_else(|| LLMSpellError::Component {
-                message: format!("Context '{}' not found", context_id),
+                message: format!("Context '{context_id}' not found"),
                 source: None,
             })?;
         Ok(())
@@ -1147,7 +1154,7 @@ impl AgentBridge {
             .get_agent(agent_name)
             .await
             .ok_or_else(|| LLMSpellError::Component {
-                message: format!("Agent '{}' not found", agent_name),
+                message: format!("Agent '{agent_name}' not found"),
                 source: None,
             })?;
 
@@ -1155,7 +1162,7 @@ impl AgentBridge {
         let tool_name = wrapper_config
             .get("tool_name")
             .and_then(|v| v.as_str())
-            .unwrap_or(&format!("{}_tool", agent_name))
+            .unwrap_or(&format!("{agent_name}_tool"))
             .to_string();
 
         // Create the agent-wrapped tool
@@ -1209,7 +1216,7 @@ impl AgentBridge {
             .get_agent(agent_name)
             .await
             .ok_or_else(|| LLMSpellError::Component {
-                message: format!("Agent '{}' not found", agent_name),
+                message: format!("Agent '{agent_name}' not found"),
                 source: None,
             })?;
 
@@ -1218,7 +1225,7 @@ impl AgentBridge {
             let machines = self.state_machines.read().await;
             if let Some(machine) = machines.get(agent_name) {
                 let current_state = machine.current_state().await;
-                Some(format!("{:?}", current_state))
+                Some(format!("{current_state:?}"))
             } else {
                 None
             }
@@ -1273,7 +1280,7 @@ impl AgentBridge {
         for agent_name in &delegate_agents {
             if !agents.contains_key(agent_name) {
                 return Err(LLMSpellError::Component {
-                    message: format!("Delegate agent '{}' not found", agent_name),
+                    message: format!("Delegate agent '{agent_name}' not found"),
                     source: None,
                 });
             }
@@ -1357,7 +1364,7 @@ impl AgentBridge {
             .get_agent(agent_name)
             .await
             .ok_or_else(|| LLMSpellError::Component {
-                message: format!("Agent '{}' not found", agent_name),
+                message: format!("Agent '{agent_name}' not found"),
                 source: None,
             })?;
 
@@ -1394,7 +1401,7 @@ impl AgentBridge {
         let agent = agents
             .get(agent_name)
             .ok_or_else(|| LLMSpellError::Component {
-                message: format!("Agent '{}' not found", agent_name),
+                message: format!("Agent '{agent_name}' not found"),
                 source: None,
             })?;
 
@@ -1412,7 +1419,7 @@ impl AgentBridge {
             .set(scope.clone(), "metadata", agent_meta)
             .await
             .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to save agent metadata: {}", e),
+                message: format!("Failed to save agent metadata: {e}"),
                 source: None,
             })?;
 
@@ -1420,14 +1427,14 @@ impl AgentBridge {
         if let Ok(conversation) = agent.get_conversation().await {
             let conv_json =
                 serde_json::to_value(&conversation).map_err(|e| LLMSpellError::Component {
-                    message: format!("Failed to serialize conversation: {}", e),
+                    message: format!("Failed to serialize conversation: {e}"),
                     source: None,
                 })?;
             state_manager
                 .set(scope.clone(), "conversation", conv_json)
                 .await
                 .map_err(|e| LLMSpellError::Component {
-                    message: format!("Failed to save conversation: {}", e),
+                    message: format!("Failed to save conversation: {e}"),
                     source: None,
                 })?;
         }
@@ -1444,7 +1451,7 @@ impl AgentBridge {
             .set(scope.clone(), "config", config_json)
             .await
             .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to save config: {}", e),
+                message: format!("Failed to save config: {e}"),
                 source: None,
             })?;
 
@@ -1473,7 +1480,7 @@ impl AgentBridge {
         let agent = agents
             .get(agent_name)
             .ok_or_else(|| LLMSpellError::Component {
-                message: format!("Agent '{}' not found", agent_name),
+                message: format!("Agent '{agent_name}' not found"),
                 source: None,
             })?;
 
@@ -1485,7 +1492,7 @@ impl AgentBridge {
             .get(scope.clone(), "metadata")
             .await
             .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to check agent state: {}", e),
+                message: format!("Failed to check agent state: {e}"),
                 source: None,
             })?;
 
@@ -1526,7 +1533,7 @@ impl AgentBridge {
             .clear_scope(StateScope::Agent(agent_id))
             .await
             .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to delete agent state: {}", e),
+                message: format!("Failed to delete agent state: {e}"),
                 source: None,
             })?;
 
@@ -1551,7 +1558,7 @@ impl AgentBridge {
             .get(StateScope::Global, "saved_agents_registry")
             .await
             .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to get saved agents registry: {}", e),
+                message: format!("Failed to get saved agents registry: {e}"),
                 source: None,
             })?;
 
@@ -1613,7 +1620,7 @@ impl AgentBridge {
             )
             .await
             .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to update saved agents registry: {}", e),
+                message: format!("Failed to update saved agents registry: {e}"),
                 source: None,
             })?;
 
@@ -1658,7 +1665,7 @@ impl AgentBridge {
             )
             .await
             .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to update saved agents registry: {}", e),
+                message: format!("Failed to update saved agents registry: {e}"),
                 source: None,
             })?;
 

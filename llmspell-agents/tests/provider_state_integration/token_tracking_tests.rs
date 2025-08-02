@@ -32,7 +32,7 @@ async fn test_openai_token_count_persistence() -> Result<()> {
     agent.start().await?;
 
     // Have multiple conversations to accumulate token usage
-    let inputs = vec![
+    let inputs = [
         "Hello! Please write a short poem about coding.",
         "Now write a haiku about Rust programming.",
         "Can you explain what makes Rust memory-safe in 2 sentences?",

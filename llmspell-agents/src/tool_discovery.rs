@@ -16,7 +16,7 @@ use std::sync::Arc;
 /// High-level tool discovery that provides convenient APIs
 /// for finding and filtering tools based on various criteria.
 ///
-/// This wraps the lower-level ToolRegistry to provide
+/// This wraps the lower-level `ToolRegistry` to provide
 /// more ergonomic APIs for agent developers.
 ///
 /// # Examples
@@ -47,7 +47,8 @@ pub struct ToolDiscovery {
 
 impl ToolDiscovery {
     /// Create a new tool discovery instance
-    pub fn new(registry: Arc<ToolRegistry>) -> Self {
+    #[must_use]
+    pub const fn new(registry: Arc<ToolRegistry>) -> Self {
         Self { registry }
     }
 
@@ -188,7 +189,7 @@ impl ToolDiscovery {
         self.find_by_criteria(&criteria).await
     }
 
-    /// Internal method to discover tools using ToolQuery
+    /// Internal method to discover tools using `ToolQuery`
     async fn discover_tools(&self, query: &ToolQuery) -> Result<Vec<ToolInfo>> {
         // Convert ToolQuery to CapabilityMatcher
         let mut matcher = CapabilityMatcher::new();
@@ -252,7 +253,7 @@ impl ToolDiscovery {
         Ok(tools)
     }
 
-    /// Convert registry ToolInfo to our ToolInfo format
+    /// Convert registry `ToolInfo` to our `ToolInfo` format
     fn convert_registry_info(
         &self,
         registry_info: &llmspell_tools::registry::ToolInfo,
@@ -275,7 +276,7 @@ impl ToolDiscovery {
         }
     }
 
-    /// Convert string to ToolCategory
+    /// Convert string to `ToolCategory`
     fn string_to_tool_category(&self, category_str: &str) -> Option<ToolCategory> {
         match category_str.to_lowercase().as_str() {
             "filesystem" => Some(ToolCategory::Filesystem),
@@ -290,7 +291,7 @@ impl ToolDiscovery {
         }
     }
 
-    /// Convert string to SecurityLevel
+    /// Convert string to `SecurityLevel`
     fn string_to_security_level(&self, level_str: &str) -> Option<SecurityLevel> {
         match level_str.to_lowercase().as_str() {
             "safe" => Some(SecurityLevel::Safe),
@@ -320,6 +321,7 @@ pub struct ToolSearchCriteria {
 
 impl ToolSearchCriteria {
     /// Create new empty search criteria
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -378,6 +380,7 @@ pub struct RecommendationContext {
 
 impl RecommendationContext {
     /// Create new recommendation context
+    #[must_use]
     pub fn new() -> Self {
         Self {
             task_type: None,
@@ -401,7 +404,8 @@ impl RecommendationContext {
     }
 
     /// Mark as performance critical
-    pub fn performance_critical(mut self) -> Self {
+    #[must_use]
+    pub const fn performance_critical(mut self) -> Self {
         self.performance_critical = true;
         self
     }
@@ -413,6 +417,7 @@ impl RecommendationContext {
     }
 
     /// Add usage history
+    #[must_use]
     pub fn with_usage_history(mut self, tools: Vec<String>) -> Self {
         self.usage_history = tools;
         self

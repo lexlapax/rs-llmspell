@@ -29,6 +29,7 @@ pub struct StandardCategories;
 
 impl StandardCategories {
     /// Tool-using agents
+    #[must_use]
     pub fn tool_agents() -> AgentCategory {
         AgentCategory {
             id: "tool-agents".to_string(),
@@ -40,6 +41,7 @@ impl StandardCategories {
     }
 
     /// LLM-based agents
+    #[must_use]
     pub fn llm_agents() -> AgentCategory {
         AgentCategory {
             id: "llm-agents".to_string(),
@@ -51,6 +53,7 @@ impl StandardCategories {
     }
 
     /// Workflow orchestration agents
+    #[must_use]
     pub fn workflow_agents() -> AgentCategory {
         AgentCategory {
             id: "workflow-agents".to_string(),
@@ -62,6 +65,7 @@ impl StandardCategories {
     }
 
     /// Monitoring agents
+    #[must_use]
     pub fn monitoring_agents() -> AgentCategory {
         AgentCategory {
             id: "monitoring-agents".to_string(),
@@ -73,6 +77,7 @@ impl StandardCategories {
     }
 
     /// Security agents
+    #[must_use]
     pub fn security_agents() -> AgentCategory {
         AgentCategory {
             id: "security-agents".to_string(),
@@ -84,6 +89,7 @@ impl StandardCategories {
     }
 
     /// Data processing agents
+    #[must_use]
     pub fn data_agents() -> AgentCategory {
         AgentCategory {
             id: "data-agents".to_string(),
@@ -95,6 +101,7 @@ impl StandardCategories {
     }
 
     /// Research agents
+    #[must_use]
     pub fn research_agents() -> AgentCategory {
         AgentCategory {
             id: "research-agents".to_string(),
@@ -106,6 +113,7 @@ impl StandardCategories {
     }
 
     /// Communication agents
+    #[must_use]
     pub fn communication_agents() -> AgentCategory {
         AgentCategory {
             id: "communication-agents".to_string(),
@@ -117,6 +125,7 @@ impl StandardCategories {
     }
 
     /// Get all standard categories
+    #[must_use]
     pub fn all() -> Vec<AgentCategory> {
         vec![
             Self::tool_agents(),
@@ -172,6 +181,7 @@ pub struct CategoryManager {
 
 impl CategoryManager {
     /// Create new category manager
+    #[must_use]
     pub fn new() -> Self {
         let mut manager = Self {
             categories: HashMap::new(),
@@ -205,16 +215,19 @@ impl CategoryManager {
     }
 
     /// Get category by ID
+    #[must_use]
     pub fn get_category(&self, id: &str) -> Option<&AgentCategory> {
         self.categories.get(id)
     }
 
     /// List all categories
+    #[must_use]
     pub fn list_categories(&self) -> Vec<&AgentCategory> {
         self.categories.values().collect()
     }
 
     /// Get category hierarchy
+    #[must_use]
     pub fn get_hierarchy(&self, category_id: &str) -> Vec<String> {
         let mut hierarchy = Vec::new();
         let mut current_id = Some(category_id.to_string());
@@ -251,14 +264,16 @@ impl CategoryManager {
     }
 
     /// Get agent categories
+    #[must_use]
     pub fn get_agent_categories(&self, agent_id: &str) -> Vec<&str> {
         self.agent_categories
             .get(agent_id)
-            .map(|cats| cats.iter().map(|s| s.as_str()).collect())
+            .map(|cats| cats.iter().map(std::string::String::as_str).collect())
             .unwrap_or_default()
     }
 
     /// Find agents in category
+    #[must_use]
     pub fn find_agents_in_category(&self, category_id: &str) -> Vec<&str> {
         self.agent_categories
             .iter()
@@ -293,6 +308,7 @@ impl CategoryManager {
     }
 
     /// Get agent tags
+    #[must_use]
     pub fn get_agent_tags(&self, agent_id: &str) -> Vec<&AgentTag> {
         self.agent_tags
             .get(agent_id)
@@ -301,6 +317,7 @@ impl CategoryManager {
     }
 
     /// Find agents by tag
+    #[must_use]
     pub fn find_agents_by_tag(&self, tag_name: &str) -> Vec<&str> {
         self.agent_tags
             .iter()
@@ -332,6 +349,7 @@ pub struct CategoryBuilder {
 
 impl CategoryBuilder {
     /// Create new category builder
+    #[must_use]
     pub fn new(id: String) -> Self {
         Self {
             id: id.clone(),
@@ -343,30 +361,35 @@ impl CategoryBuilder {
     }
 
     /// Set name
+    #[must_use]
     pub fn name(mut self, name: String) -> Self {
         self.name = name;
         self
     }
 
     /// Set description
+    #[must_use]
     pub fn description(mut self, description: String) -> Self {
         self.description = description;
         self
     }
 
     /// Set parent category
+    #[must_use]
     pub fn parent(mut self, parent_id: String) -> Self {
         self.parent_id = Some(parent_id);
         self
     }
 
     /// Add metadata
+    #[must_use]
     pub fn metadata(mut self, key: String, value: serde_json::Value) -> Self {
         self.metadata.insert(key, value);
         self
     }
 
     /// Build category
+    #[must_use]
     pub fn build(self) -> AgentCategory {
         AgentCategory {
             id: self.id,

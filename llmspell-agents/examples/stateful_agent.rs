@@ -83,7 +83,7 @@ async fn main() -> Result<()> {
     // Load the saved state
     println!("\n--- Loading State ---");
     let loaded = agent.load_state().await?;
-    println!("State loaded: {}", loaded);
+    println!("State loaded: {loaded}");
 
     // Check restored conversation
     let restored_history = agent.get_conversation().await?;

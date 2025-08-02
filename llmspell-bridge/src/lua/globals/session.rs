@@ -59,7 +59,7 @@ pub fn inject_session_global(
     let get_bridge = session_bridge.clone();
     let get_fn = lua.create_function(move |lua, session_id: String| {
         let session_id = SessionId::from_str(&session_id)
-            .map_err(|e| LuaError::RuntimeError(format!("Invalid session ID: {}", e)))?;
+            .map_err(|e| LuaError::RuntimeError(format!("Invalid session ID: {e}")))?;
 
         let bridge = get_bridge.clone();
         let result = block_on_async(
@@ -120,7 +120,7 @@ pub fn inject_session_global(
     let save_bridge = session_bridge.clone();
     let save_fn = lua.create_function(move |_lua, session_id: String| {
         let session_id = SessionId::from_str(&session_id)
-            .map_err(|e| LuaError::RuntimeError(format!("Invalid session ID: {}", e)))?;
+            .map_err(|e| LuaError::RuntimeError(format!("Invalid session ID: {e}")))?;
 
         // First get the session, then save it
         let bridge = save_bridge.clone();
@@ -141,7 +141,7 @@ pub fn inject_session_global(
     let load_bridge = session_bridge.clone();
     let load_fn = lua.create_function(move |_lua, session_id: String| {
         let session_id = SessionId::from_str(&session_id)
-            .map_err(|e| LuaError::RuntimeError(format!("Invalid session ID: {}", e)))?;
+            .map_err(|e| LuaError::RuntimeError(format!("Invalid session ID: {e}")))?;
 
         let bridge = load_bridge.clone();
         block_on_async(
@@ -158,7 +158,7 @@ pub fn inject_session_global(
     let complete_bridge = session_bridge.clone();
     let complete_fn = lua.create_function(move |_lua, session_id: String| {
         let session_id = SessionId::from_str(&session_id)
-            .map_err(|e| LuaError::RuntimeError(format!("Invalid session ID: {}", e)))?;
+            .map_err(|e| LuaError::RuntimeError(format!("Invalid session ID: {e}")))?;
 
         let bridge = complete_bridge.clone();
         block_on_async(
@@ -175,7 +175,7 @@ pub fn inject_session_global(
     let suspend_bridge = session_bridge.clone();
     let suspend_fn = lua.create_function(move |_lua, session_id: String| {
         let session_id = SessionId::from_str(&session_id)
-            .map_err(|e| LuaError::RuntimeError(format!("Invalid session ID: {}", e)))?;
+            .map_err(|e| LuaError::RuntimeError(format!("Invalid session ID: {e}")))?;
 
         let bridge = suspend_bridge.clone();
         block_on_async(
@@ -192,7 +192,7 @@ pub fn inject_session_global(
     let resume_bridge = session_bridge.clone();
     let resume_fn = lua.create_function(move |_lua, session_id: String| {
         let session_id = SessionId::from_str(&session_id)
-            .map_err(|e| LuaError::RuntimeError(format!("Invalid session ID: {}", e)))?;
+            .map_err(|e| LuaError::RuntimeError(format!("Invalid session ID: {e}")))?;
 
         let bridge = resume_bridge.clone();
         block_on_async(
@@ -209,7 +209,7 @@ pub fn inject_session_global(
     let delete_bridge = session_bridge.clone();
     let delete_fn = lua.create_function(move |_lua, session_id: String| {
         let session_id = SessionId::from_str(&session_id)
-            .map_err(|e| LuaError::RuntimeError(format!("Invalid session ID: {}", e)))?;
+            .map_err(|e| LuaError::RuntimeError(format!("Invalid session ID: {e}")))?;
 
         let bridge = delete_bridge.clone();
         block_on_async(
@@ -235,7 +235,7 @@ pub fn inject_session_global(
         let session_id = match session_id {
             Some(id) => Some(
                 SessionId::from_str(&id)
-                    .map_err(|e| LuaError::RuntimeError(format!("Invalid session ID: {}", e)))?,
+                    .map_err(|e| LuaError::RuntimeError(format!("Invalid session ID: {e}")))?,
             ),
             None => None,
         };
@@ -250,7 +250,7 @@ pub fn inject_session_global(
     let can_replay_bridge = session_bridge.clone();
     let can_replay_fn = lua.create_function(move |_lua, session_id: String| {
         let session_id = SessionId::from_str(&session_id)
-            .map_err(|e| LuaError::RuntimeError(format!("Invalid session ID: {}", e)))?;
+            .map_err(|e| LuaError::RuntimeError(format!("Invalid session ID: {e}")))?;
 
         let bridge = can_replay_bridge.clone();
         block_on_async(
@@ -266,7 +266,7 @@ pub fn inject_session_global(
     let replay_fn = lua.create_function(move |lua, args: (String, Option<Table>)| {
         let (session_id_str, config_table) = args;
         let session_id = SessionId::from_str(&session_id_str)
-            .map_err(|e| LuaError::RuntimeError(format!("Invalid session ID: {}", e)))?;
+            .map_err(|e| LuaError::RuntimeError(format!("Invalid session ID: {e}")))?;
 
         // Convert config table to JSON (SessionBridge handles the conversion)
         let config_json = if let Some(config) = config_table {
@@ -298,7 +298,7 @@ pub fn inject_session_global(
     let metadata_bridge = session_bridge.clone();
     let metadata_fn = lua.create_function(move |lua, session_id: String| {
         let session_id = SessionId::from_str(&session_id)
-            .map_err(|e| LuaError::RuntimeError(format!("Invalid session ID: {}", e)))?;
+            .map_err(|e| LuaError::RuntimeError(format!("Invalid session ID: {e}")))?;
 
         let bridge = metadata_bridge.clone();
         let result = block_on_async(
@@ -313,7 +313,7 @@ pub fn inject_session_global(
     session_table.set("getReplayMetadata", metadata_fn)?;
 
     // listReplayable method - list all sessions that can be replayed
-    let list_replayable_bridge = session_bridge.clone();
+    let list_replayable_bridge = session_bridge;
     let list_replayable_fn = lua.create_function(move |lua, ()| {
         let bridge = list_replayable_bridge.clone();
         let result = block_on_async(

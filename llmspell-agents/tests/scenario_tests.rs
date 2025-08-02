@@ -208,9 +208,9 @@ async fn test_scenario_with_harness() {
 
     if !test_result.passed {
         if let Some(error) = &test_result.error {
-            println!("Test failed with error: {}", error);
+            println!("Test failed with error: {error}");
         }
-        println!("Test result: {:?}", test_result);
+        println!("Test result: {test_result:?}");
     }
     assert!(test_result.passed);
     // Note: Interactions might be empty depending on harness implementation
@@ -261,6 +261,6 @@ async fn test_custom_scenario() {
 
     // All tests should pass
     for (i, test_result) in result.results.iter().enumerate() {
-        assert!(test_result.passed, "Test {} failed", i);
+        assert!(test_result.passed, "Test {i} failed");
     }
 }

@@ -82,6 +82,7 @@ pub struct UuidGeneratorTool {
 
 impl UuidGeneratorTool {
     /// Create a new UUID generator tool
+    #[must_use]
     pub fn new(config: UuidGeneratorConfig) -> Self {
         Self {
             metadata: ComponentMetadata::new(
@@ -118,7 +119,7 @@ impl UuidGeneratorTool {
                         // Try to parse as UUID
                         Uuid::parse_str(custom).map_err(|_| {
                             validation_error(
-                                format!("Invalid namespace UUID: {}", custom),
+                                format!("Invalid namespace UUID: {custom}"),
                                 Some("namespace".to_string()),
                             )
                         })?
@@ -219,14 +220,15 @@ impl BaseAgent for UuidGeneratorTool {
         match operation {
             "generate" => {
                 // Extract version
-                let version = extract_optional_string(params, "version")
-                    .map(|v| match v {
+                let version = extract_optional_string(params, "version").map_or(
+                    self.config.default_version,
+                    |v| match v {
                         "v1" | "1" => UuidVersion::V1,
                         "v4" | "4" => UuidVersion::V4,
                         "v5" | "5" => UuidVersion::V5,
                         _ => self.config.default_version,
-                    })
-                    .unwrap_or(self.config.default_version);
+                    },
+                );
 
                 // Extract namespace and name for v5
                 let namespace = extract_optional_string(params, "namespace");
@@ -236,15 +238,16 @@ impl BaseAgent for UuidGeneratorTool {
                 let uuid = self.generate_uuid(version, namespace, name)?;
 
                 // Extract format
-                let format = extract_optional_string(params, "format")
-                    .map(|f| match f {
+                let format = extract_optional_string(params, "format").map_or(
+                    self.config.default_format,
+                    |f| match f {
                         "standard" | "hyphenated" => UuidFormat::Hyphenated,
                         "simple" => UuidFormat::Simple,
                         "urn" => UuidFormat::Urn,
                         "braced" => UuidFormat::Braced,
                         _ => self.config.default_format,
-                    })
-                    .unwrap_or(self.config.default_format);
+                    },
+                );
 
                 let formatted = self.format_uuid(uuid, &format);
                 let response = ResponseBuilder::success("generate")
@@ -347,27 +350,24 @@ impl BaseAgent for UuidGeneratorTool {
                 // Validate a UUID
                 let uuid_str = extract_required_string(params, "uuid")?;
 
-                match Uuid::parse_str(uuid_str) {
-                    Ok(uuid) => {
-                        let result = json!({
-                            "valid": true,
-                            "uuid": uuid.to_string(),
-                            "version": uuid.get_version().map(|v| format!("v{}", v as u8)),
-                            "variant": format!("{:?}", uuid.get_variant()),
-                        });
-                        Ok(AgentOutput::text(serde_json::to_string_pretty(&result)?))
-                    }
-                    Err(_) => {
-                        let result = json!({
-                            "valid": false,
-                            "error": "Invalid UUID format"
-                        });
-                        Ok(AgentOutput::text(serde_json::to_string_pretty(&result)?))
-                    }
+                if let Ok(uuid) = Uuid::parse_str(uuid_str) {
+                    let result = json!({
+                        "valid": true,
+                        "uuid": uuid.to_string(),
+                        "version": uuid.get_version().map(|v| format!("v{}", v as u8)),
+                        "variant": format!("{:?}", uuid.get_variant()),
+                    });
+                    Ok(AgentOutput::text(serde_json::to_string_pretty(&result)?))
+                } else {
+                    let result = json!({
+                        "valid": false,
+                        "error": "Invalid UUID format"
+                    });
+                    Ok(AgentOutput::text(serde_json::to_string_pretty(&result)?))
                 }
             }
             _ => Err(validation_error(
-                format!("Unknown operation: {}", operation),
+                format!("Unknown operation: {operation}"),
                 Some("operation".to_string()),
             )),
         }
@@ -384,10 +384,7 @@ impl BaseAgent for UuidGeneratorTool {
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
-        Ok(AgentOutput::text(format!(
-            "UUID generation error: {}",
-            error
-        )))
+        Ok(AgentOutput::text(format!("UUID generation error: {error}")))
     }
 }
 

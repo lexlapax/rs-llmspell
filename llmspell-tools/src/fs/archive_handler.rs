@@ -63,22 +63,22 @@ pub struct ArchiveHandlerConfig {
     pub preserve_permissions: bool,
 }
 
-fn default_max_file_size() -> u64 {
+const fn default_max_file_size() -> u64 {
     100 * 1024 * 1024
 } // 100MB
-fn default_max_total_size() -> u64 {
+const fn default_max_total_size() -> u64 {
     1024 * 1024 * 1024
 } // 1GB
-fn default_max_files() -> usize {
+const fn default_max_files() -> usize {
     10000
 }
-fn default_max_depth() -> u32 {
+const fn default_max_depth() -> u32 {
     3
 }
-fn default_compression_level() -> u32 {
+const fn default_compression_level() -> u32 {
     6
 }
-fn default_preserve_permissions() -> bool {
+const fn default_preserve_permissions() -> bool {
     false
 }
 
@@ -104,6 +104,7 @@ pub struct ArchiveHandlerTool {
 
 impl ArchiveHandlerTool {
     /// Create a new archive handler with default configuration
+    #[must_use]
     pub fn new() -> Self {
         Self {
             metadata: ComponentMetadata::new(
@@ -116,6 +117,7 @@ impl ArchiveHandlerTool {
     }
 
     /// Create with custom configuration
+    #[must_use]
     pub fn with_config(config: ArchiveHandlerConfig) -> Self {
         Self {
             metadata: ComponentMetadata::new(
@@ -128,6 +130,7 @@ impl ArchiveHandlerTool {
     }
 
     /// Set file sandbox for security
+    #[must_use]
     pub fn with_sandbox(mut self, sandbox: FileSandbox) -> Self {
         self.file_sandbox = Some(sandbox);
         self
@@ -155,7 +158,7 @@ impl ArchiveHandlerTool {
                 }
             }
             _ => Err(LLMSpellError::Validation {
-                message: format!("Unsupported archive format: {}", ext),
+                message: format!("Unsupported archive format: {ext}"),
                 field: Some("archive_path".to_string()),
             }),
         }
@@ -203,13 +206,13 @@ impl ArchiveHandlerTool {
             sandbox
                 .validate_path(&archive_path)
                 .map_err(|e| LLMSpellError::Security {
-                    message: format!("Archive path validation failed: {}", e),
+                    message: format!("Archive path validation failed: {e}"),
                     violation_type: Some("file_access".to_string()),
                 })?;
             sandbox
                 .validate_path(&output_dir)
                 .map_err(|e| LLMSpellError::Security {
-                    message: format!("Output directory validation failed: {}", e),
+                    message: format!("Output directory validation failed: {e}"),
                     violation_type: Some("file_access".to_string()),
                 })?;
         }
@@ -291,7 +294,7 @@ impl ArchiveHandlerTool {
             format!("Failed to open archive: {}", archive_path.display())
         )?;
         let mut archive = ZipArchive::new(file).map_err(|e| LLMSpellError::Validation {
-            message: format!("Invalid ZIP archive: {}", e),
+            message: format!("Invalid ZIP archive: {e}"),
             field: Some("archive_path".to_string()),
         })?;
 
@@ -302,7 +305,7 @@ impl ArchiveHandlerTool {
             }
 
             let mut file = archive.by_index(i).map_err(|e| LLMSpellError::Storage {
-                message: format!("Failed to read file at index {}", i),
+                message: format!("Failed to read file at index {i}"),
                 operation: Some("read_zip_entry".to_string()),
                 source: Some(Box::new(e)),
             })?;
@@ -561,7 +564,7 @@ impl ArchiveHandlerTool {
 
     /// Create archive
     async fn create_archive(&self, params: &Value) -> Result<Value> {
-        eprintln!("DEBUG create_archive: params = {:?}", params);
+        eprintln!("DEBUG create_archive: params = {params:?}");
         let archive_path = params.get("path").and_then(|v| v.as_str()).ok_or_else(|| {
             LLMSpellError::Validation {
                 message: "Missing 'path' parameter".to_string(),
@@ -584,14 +587,14 @@ impl ArchiveHandlerTool {
             sandbox
                 .validate_path(&archive_path)
                 .map_err(|e| LLMSpellError::Security {
-                    message: format!("Archive path validation failed: {}", e),
+                    message: format!("Archive path validation failed: {e}"),
                     violation_type: Some("file_access".to_string()),
                 })?;
             for file in files {
                 if let Some(path) = file.as_str() {
                     sandbox.validate_path(Path::new(path)).map_err(|e| {
                         LLMSpellError::Security {
-                            message: format!("Input file path validation failed: {}", e),
+                            message: format!("Input file path validation failed: {e}"),
                             violation_type: Some("file_access".to_string()),
                         }
                     })?;
@@ -683,7 +686,7 @@ impl ArchiveHandlerTool {
 
                     zip.start_file(file_name.as_ref(), options).map_err(|e| {
                         LLMSpellError::Storage {
-                            message: format!("Failed to start ZIP entry: {}", file_name),
+                            message: format!("Failed to start ZIP entry: {file_name}"),
                             operation: Some("zip_start_file".to_string()),
                             source: Some(Box::new(e)),
                         }
@@ -857,7 +860,7 @@ impl ArchiveHandlerTool {
             let path = Path::new(&file_path);
             if !path.exists() {
                 return Err(LLMSpellError::Validation {
-                    message: format!("File not found: {}", file_path),
+                    message: format!("File not found: {file_path}"),
                     field: Some("files".to_string()),
                 });
             }
@@ -923,7 +926,7 @@ impl ArchiveHandlerTool {
             sandbox
                 .validate_path(&archive_path)
                 .map_err(|e| LLMSpellError::Security {
-                    message: format!("Archive path validation failed: {}", e),
+                    message: format!("Archive path validation failed: {e}"),
                     violation_type: Some("file_access".to_string()),
                 })?;
         }
@@ -938,13 +941,13 @@ impl ArchiveHandlerTool {
                     format!("Failed to open archive: {}", archive_path.display())
                 )?;
                 let mut archive = ZipArchive::new(file).map_err(|e| LLMSpellError::Validation {
-                    message: format!("Invalid ZIP archive: {}", e),
+                    message: format!("Invalid ZIP archive: {e}"),
                     field: Some("path".to_string()),
                 })?;
 
                 for i in 0..archive.len() {
                     let file = archive.by_index(i).map_err(|e| LLMSpellError::Storage {
-                        message: format!("Failed to read file at index {}", i),
+                        message: format!("Failed to read file at index {i}"),
                         operation: Some("zip_list_entry".to_string()),
                         source: Some(Box::new(e)),
                     })?;
@@ -1070,10 +1073,10 @@ enum ArchiveFormat {
 impl std::fmt::Display for ArchiveFormat {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ArchiveFormat::Zip => write!(f, "ZIP"),
-            ArchiveFormat::Tar => write!(f, "TAR"),
-            ArchiveFormat::TarGz => write!(f, "TAR.GZ"),
-            ArchiveFormat::Gz => write!(f, "GZ"),
+            Self::Zip => write!(f, "ZIP"),
+            Self::Tar => write!(f, "TAR"),
+            Self::TarGz => write!(f, "TAR.GZ"),
+            Self::Gz => write!(f, "GZ"),
         }
     }
 }
@@ -1099,7 +1102,7 @@ impl BaseAgent for ArchiveHandlerTool {
             "list" => self.list_archive(params).await?,
             _ => {
                 return Err(LLMSpellError::Validation {
-                    message: format!("Unknown operation: {}", operation),
+                    message: format!("Unknown operation: {operation}"),
                     field: Some("operation".to_string()),
                 })
             }
@@ -1133,10 +1136,7 @@ impl BaseAgent for ArchiveHandlerTool {
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> llmspell_core::Result<AgentOutput> {
-        Ok(AgentOutput::text(format!(
-            "Archive handler error: {}",
-            error
-        )))
+        Ok(AgentOutput::text(format!("Archive handler error: {error}")))
     }
 }
 

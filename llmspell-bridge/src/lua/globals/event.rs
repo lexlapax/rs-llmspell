@@ -1,4 +1,4 @@
-//! ABOUTME: Lua-specific event global bindings with EventBridge integration
+//! ABOUTME: Lua-specific event global bindings with `EventBridge` integration
 //! ABOUTME: Provides Lua-native event publishing, subscription, and management
 
 use crate::globals::event_global::EventGlobal;
@@ -141,10 +141,10 @@ mod tests {
 
         let result: mlua::Result<bool> = lua
             .load(
-                r#"
+                r"
             local stats = Event.get_stats()
             return stats ~= nil and stats.event_bus_stats ~= nil and stats.bridge_stats ~= nil
-        "#,
+        ",
             )
             .eval();
 

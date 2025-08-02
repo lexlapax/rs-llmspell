@@ -36,7 +36,7 @@ impl PerformanceTestAgent {
         Self {
             metadata: ComponentMetadata::new(
                 name.to_string(),
-                format!("Performance test agent: {}", name),
+                format!("Performance test agent: {name}"),
             ),
             execution_time,
         }
@@ -60,7 +60,7 @@ impl BaseAgent for PerformanceTestAgent {
     }
 
     async fn handle_error(&self, error: llmspell_core::LLMSpellError) -> Result<AgentOutput> {
-        Ok(AgentOutput::text(format!("Error: {}", error)))
+        Ok(AgentOutput::text(format!("Error: {error}")))
     }
 }
 
@@ -72,7 +72,7 @@ struct FastMockTool {
 impl FastMockTool {
     fn new(name: &str) -> Self {
         Self {
-            metadata: ComponentMetadata::new(name.to_string(), format!("Fast mock tool: {}", name)),
+            metadata: ComponentMetadata::new(name.to_string(), format!("Fast mock tool: {name}")),
         }
     }
 }
@@ -93,7 +93,7 @@ impl BaseAgent for FastMockTool {
     }
 
     async fn handle_error(&self, error: llmspell_core::LLMSpellError) -> Result<AgentOutput> {
-        Ok(AgentOutput::text(format!("Error: {}", error)))
+        Ok(AgentOutput::text(format!("Error: {error}")))
     }
 }
 
@@ -129,11 +129,8 @@ async fn test_tool_discovery_performance() {
 
     // Register some tools for discovery
     for i in 0..100 {
-        let tool = FastMockTool::new(&format!("tool_{}", i));
-        registry
-            .register(format!("tool_{}", i), tool)
-            .await
-            .unwrap();
+        let tool = FastMockTool::new(&format!("tool_{i}"));
+        registry.register(format!("tool_{i}"), tool).await.unwrap();
     }
 
     // Benchmark tool discovery
@@ -152,9 +149,7 @@ async fn test_tool_discovery_performance() {
     );
     assert!(
         discovery_time < MAX_TOOL_DISCOVERY_TIME,
-        "Tool discovery took {:?}, expected < {:?}",
-        discovery_time,
-        MAX_TOOL_DISCOVERY_TIME
+        "Tool discovery took {discovery_time:?}, expected < {MAX_TOOL_DISCOVERY_TIME:?}"
     );
     assert!(!tools.is_empty(), "Should discover some tools");
 }
@@ -190,15 +185,13 @@ async fn test_tool_invocation_overhead() {
 
     let overhead = invocation_time.saturating_sub(baseline_time);
 
-    println!("Baseline execution: {:?}", baseline_time);
-    println!("Tool invocation time: {:?}", invocation_time);
-    println!("Invocation overhead: {:?}", overhead);
+    println!("Baseline execution: {baseline_time:?}");
+    println!("Tool invocation time: {invocation_time:?}");
+    println!("Invocation overhead: {overhead:?}");
 
     assert!(
         overhead < MAX_TOOL_INVOCATION_OVERHEAD,
-        "Tool invocation overhead was {:?}, expected < {:?}",
-        overhead,
-        MAX_TOOL_INVOCATION_OVERHEAD
+        "Tool invocation overhead was {overhead:?}, expected < {MAX_TOOL_INVOCATION_OVERHEAD:?}"
     );
 }
 #[tokio::test]
@@ -213,12 +206,10 @@ async fn test_agent_wrapping_performance() {
     let _wrapped_tool = AgentWrappedTool::new(agent, ToolCategory::Utility, SecurityLevel::Safe);
     let wrapping_time = start.elapsed();
 
-    println!("Agent wrapping time: {:?}", wrapping_time);
+    println!("Agent wrapping time: {wrapping_time:?}");
     assert!(
         wrapping_time < MAX_AGENT_WRAPPING_TIME,
-        "Agent wrapping took {:?}, expected < {:?}",
-        wrapping_time,
-        MAX_AGENT_WRAPPING_TIME
+        "Agent wrapping took {wrapping_time:?}, expected < {MAX_AGENT_WRAPPING_TIME:?}"
     );
 }
 #[tokio::test]
@@ -246,16 +237,14 @@ async fn test_registry_operations_performance() {
 
     let total_time = registration_time + lookup_time + info_time;
 
-    println!("Registry registration: {:?}", registration_time);
-    println!("Registry lookup: {:?}", lookup_time);
-    println!("Registry info retrieval: {:?}", info_time);
-    println!("Total registry operations: {:?}", total_time);
+    println!("Registry registration: {registration_time:?}");
+    println!("Registry lookup: {lookup_time:?}");
+    println!("Registry info retrieval: {info_time:?}");
+    println!("Total registry operations: {total_time:?}");
 
     assert!(
         total_time < MAX_REGISTRY_OPERATIONS_TIME,
-        "Registry operations took {:?}, expected < {:?}",
-        total_time,
-        MAX_REGISTRY_OPERATIONS_TIME
+        "Registry operations took {total_time:?}, expected < {MAX_REGISTRY_OPERATIONS_TIME:?}"
     );
 }
 #[tokio::test]
@@ -268,19 +257,17 @@ async fn test_composition_setup_performance() {
     // Add multiple steps
     for i in 0..5 {
         composition.add_step(
-            CompositionStep::new(format!("step_{}", i), format!("tool_{}", i))
+            CompositionStep::new(format!("step_{i}"), format!("tool_{i}"))
                 .with_input_mapping("input", DataFlow::Parameter("data".to_string())),
         );
     }
 
     let setup_time = setup_start.elapsed();
 
-    println!("Composition setup time: {:?}", setup_time);
+    println!("Composition setup time: {setup_time:?}");
     assert!(
         setup_time < MAX_COMPOSITION_SETUP_TIME,
-        "Composition setup took {:?}, expected < {:?}",
-        setup_time,
-        MAX_COMPOSITION_SETUP_TIME
+        "Composition setup took {setup_time:?}, expected < {MAX_COMPOSITION_SETUP_TIME:?}"
     );
 }
 #[tokio::test]
@@ -312,20 +299,17 @@ async fn test_tool_manager_performance() {
         .unwrap();
     let invocation_time = invocation_start.elapsed();
 
-    println!("Manager discovery time: {:?}", discovery_time);
-    println!("Manager invocation time: {:?}", invocation_time);
+    println!("Manager discovery time: {discovery_time:?}");
+    println!("Manager invocation time: {invocation_time:?}");
 
     assert!(
         discovery_time < MAX_TOOL_DISCOVERY_TIME,
-        "Manager discovery took {:?}, expected < {:?}",
-        discovery_time,
-        MAX_TOOL_DISCOVERY_TIME
+        "Manager discovery took {discovery_time:?}, expected < {MAX_TOOL_DISCOVERY_TIME:?}"
     );
 
     assert!(
         invocation_time < Duration::from_millis(50), // More lenient for actual tool execution
-        "Manager invocation took {:?}, expected < 50ms",
-        invocation_time
+        "Manager invocation took {invocation_time:?}, expected < 50ms"
     );
 
     assert!(!tools.is_empty(), "Should discover tools");
@@ -339,9 +323,9 @@ async fn test_concurrent_tool_operations() {
     for i in 0..10 {
         let registry = registry.clone();
         let handle = tokio::spawn(async move {
-            let tool = FastMockTool::new(&format!("concurrent_tool_{}", i));
+            let tool = FastMockTool::new(&format!("concurrent_tool_{i}"));
             registry
-                .register(format!("concurrent_tool_{}", i), tool)
+                .register(format!("concurrent_tool_{i}"), tool)
                 .await
                 .unwrap();
         });
@@ -359,7 +343,7 @@ async fn test_concurrent_tool_operations() {
     for i in 0..10 {
         let registry = registry.clone();
         let handle =
-            tokio::spawn(async move { registry.get_tool(&format!("concurrent_tool_{}", i)).await });
+            tokio::spawn(async move { registry.get_tool(&format!("concurrent_tool_{i}")).await });
         lookup_handles.push(handle);
     }
 
@@ -369,23 +353,18 @@ async fn test_concurrent_tool_operations() {
     }
     let concurrent_lookup_time = lookup_start.elapsed();
 
-    println!(
-        "Concurrent registration time: {:?}",
-        concurrent_registration_time
-    );
-    println!("Concurrent lookup time: {:?}", concurrent_lookup_time);
+    println!("Concurrent registration time: {concurrent_registration_time:?}");
+    println!("Concurrent lookup time: {concurrent_lookup_time:?}");
 
     // More lenient timing for concurrent operations
     assert!(
         concurrent_registration_time < Duration::from_millis(50),
-        "Concurrent registration took {:?}, expected < 50ms",
-        concurrent_registration_time
+        "Concurrent registration took {concurrent_registration_time:?}, expected < 50ms"
     );
 
     assert!(
         concurrent_lookup_time < Duration::from_millis(20),
-        "Concurrent lookup took {:?}, expected < 20ms",
-        concurrent_lookup_time
+        "Concurrent lookup took {concurrent_lookup_time:?}, expected < 20ms"
     );
 }
 #[tokio::test]
@@ -395,15 +374,15 @@ async fn test_memory_efficiency() {
 
     // Register and unregister tools multiple times
     for iteration in 0..100 {
-        let tool = FastMockTool::new(&format!("memory_test_{}", iteration));
+        let tool = FastMockTool::new(&format!("memory_test_{iteration}"));
         registry
-            .register(format!("memory_test_{}", iteration), tool)
+            .register(format!("memory_test_{iteration}"), tool)
             .await
             .unwrap();
 
         // Immediately unregister to test cleanup
         registry
-            .unregister_tool(&format!("memory_test_{}", iteration))
+            .unregister_tool(&format!("memory_test_{iteration}"))
             .await
             .unwrap();
     }
@@ -430,13 +409,12 @@ async fn test_error_handling_performance() {
         .await;
     let error_time = error_start.elapsed();
 
-    println!("Error handling time: {:?}", error_time);
+    println!("Error handling time: {error_time:?}");
 
     // Error handling should be fast
     assert!(
         error_time < Duration::from_millis(5),
-        "Error handling took {:?}, expected < 5ms",
-        error_time
+        "Error handling took {error_time:?}, expected < 5ms"
     );
 
     // Should return an error
@@ -496,7 +474,7 @@ async fn test_full_integration_performance() {
 
     let total_integration_time = integration_start.elapsed();
 
-    println!("Full integration time: {:?}", total_integration_time);
+    println!("Full integration time: {total_integration_time:?}");
     println!("Discovered {} tools", tools.len());
     println!("Calculator result: {}", calc_result.text);
     println!("Agent result: {}", agent_result.text);
@@ -504,8 +482,7 @@ async fn test_full_integration_performance() {
     // Full integration should complete quickly
     assert!(
         total_integration_time < Duration::from_millis(100),
-        "Full integration took {:?}, expected < 100ms",
-        total_integration_time
+        "Full integration took {total_integration_time:?}, expected < 100ms"
     );
 
     assert_eq!(tools.len(), 2, "Should discover both tools");

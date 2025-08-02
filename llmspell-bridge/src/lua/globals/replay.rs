@@ -11,14 +11,14 @@ use mlua::{
 use serde_json;
 use std::time::Duration;
 
-/// Lua wrapper for ReplayMode
+/// Lua wrapper for `ReplayMode`
 #[derive(Debug, Clone)]
 pub struct LuaReplayMode(pub ReplayMode);
 
 impl<'lua> FromLua<'lua> for LuaReplayMode {
     fn from_lua(value: Value<'lua>, _lua: &'lua Lua) -> LuaResult<Self> {
         match value {
-            Value::UserData(ud) => Ok(ud.borrow::<LuaReplayMode>()?.clone()),
+            Value::UserData(ud) => Ok(ud.borrow::<Self>()?.clone()),
             _ => Err(LuaError::FromLuaConversionError {
                 from: value.type_name(),
                 to: "LuaReplayMode",
@@ -39,7 +39,7 @@ impl UserData for LuaReplayMode {
     }
 }
 
-/// Lua wrapper for ParameterModification
+/// Lua wrapper for `ParameterModification`
 #[derive(Debug, Clone)]
 pub struct LuaParameterModification(pub ParameterModification);
 
@@ -61,7 +61,7 @@ impl UserData for LuaParameterModification {
     }
 }
 
-/// Lua wrapper for ReplayConfig
+/// Lua wrapper for `ReplayConfig`
 #[derive(Debug, Clone)]
 pub struct LuaReplayConfig(pub ReplayConfig);
 
@@ -106,7 +106,7 @@ impl UserData for LuaReplayConfig {
     }
 }
 
-/// Lua wrapper for ReplaySchedule
+/// Lua wrapper for `ReplaySchedule`
 #[derive(Debug, Clone)]
 pub struct LuaReplaySchedule(pub ReplaySchedule);
 
@@ -203,7 +203,7 @@ pub fn create_replay_api(lua: &Lua) -> LuaResult<Table> {
         "create_config",
         lua.create_function(|_, mode: Option<LuaReplayMode>| {
             let config = ReplayConfig {
-                mode: mode.map(|m| m.0).unwrap_or(ReplayMode::Exact),
+                mode: mode.map_or(ReplayMode::Exact, |m| m.0),
                 ..Default::default()
             };
             Ok(LuaReplayConfig(config))
@@ -268,7 +268,7 @@ pub fn create_replay_api(lua: &Lua) -> LuaResult<Table> {
     Ok(replay)
 }
 
-/// Lua wrapper for HookResultComparator
+/// Lua wrapper for `HookResultComparator`
 #[derive(Debug)]
 pub struct LuaHookResultComparator;
 

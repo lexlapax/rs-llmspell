@@ -11,6 +11,7 @@ pub struct PersistenceConfigBuilder {
 
 impl PersistenceConfigBuilder {
     /// Create a new builder with default settings
+    #[must_use]
     pub fn new() -> Self {
         Self {
             config: PersistenceConfig::default(),
@@ -18,55 +19,64 @@ impl PersistenceConfigBuilder {
     }
 
     /// Enable auto-save with specified interval
-    pub fn with_auto_save(mut self, interval: Duration) -> Self {
+    #[must_use]
+    pub const fn with_auto_save(mut self, interval: Duration) -> Self {
         self.config.auto_save_interval = Some(interval);
         self
     }
 
     /// Set maximum retry attempts
-    pub fn with_max_retries(mut self, retries: u32) -> Self {
+    #[must_use]
+    pub const fn with_max_retries(mut self, retries: u32) -> Self {
         self.config.max_retries = retries;
         self
     }
 
     /// Set backoff multiplier for retries
-    pub fn with_backoff_multiplier(mut self, multiplier: f64) -> Self {
+    #[must_use]
+    pub const fn with_backoff_multiplier(mut self, multiplier: f64) -> Self {
         self.config.backoff_multiplier = multiplier;
         self
     }
 
     /// Set failure threshold for circuit breaker
-    pub fn with_failure_threshold(mut self, threshold: u32) -> Self {
+    #[must_use]
+    pub const fn with_failure_threshold(mut self, threshold: u32) -> Self {
         self.config.failure_threshold = threshold;
         self
     }
 
     /// Configure whether to save on pause
-    pub fn save_on_pause(mut self, enabled: bool) -> Self {
+    #[must_use]
+    pub const fn save_on_pause(mut self, enabled: bool) -> Self {
         self.config.save_on_pause = enabled;
         self
     }
 
     /// Configure whether to save on stop
-    pub fn save_on_stop(mut self, enabled: bool) -> Self {
+    #[must_use]
+    pub const fn save_on_stop(mut self, enabled: bool) -> Self {
         self.config.save_on_stop = enabled;
         self
     }
 
     /// Configure whether to restore on resume
-    pub fn restore_on_resume(mut self, enabled: bool) -> Self {
+    #[must_use]
+    pub const fn restore_on_resume(mut self, enabled: bool) -> Self {
         self.config.restore_on_resume = enabled;
         self
     }
 
     /// Configure whether saves should be non-blocking
-    pub fn non_blocking(mut self, enabled: bool) -> Self {
+    #[must_use]
+    pub const fn non_blocking(mut self, enabled: bool) -> Self {
         self.config.non_blocking = enabled;
         self
     }
 
     /// Build the configuration
-    pub fn build(self) -> PersistenceConfig {
+    #[must_use]
+    pub const fn build(self) -> PersistenceConfig {
         self.config
     }
 }
@@ -79,9 +89,10 @@ impl Default for PersistenceConfigBuilder {
 
 /// Preset configurations for common use cases
 pub mod presets {
-    use super::*;
+    use super::{Duration, PersistenceConfig, PersistenceConfigBuilder};
 
     /// Configuration for development environments
+    #[must_use]
     pub fn development() -> PersistenceConfig {
         PersistenceConfigBuilder::new()
             .with_auto_save(Duration::from_secs(60)) // Save every minute
@@ -94,6 +105,7 @@ pub mod presets {
     }
 
     /// Configuration for production environments
+    #[must_use]
     pub fn production() -> PersistenceConfig {
         PersistenceConfigBuilder::new()
             .with_auto_save(Duration::from_secs(300)) // Save every 5 minutes
@@ -108,6 +120,7 @@ pub mod presets {
     }
 
     /// Configuration for testing
+    #[must_use]
     pub fn testing() -> PersistenceConfig {
         PersistenceConfigBuilder::new()
             .with_auto_save(Duration::from_millis(100)) // Fast auto-save for tests
@@ -120,6 +133,7 @@ pub mod presets {
     }
 
     /// Minimal configuration (only save on stop)
+    #[must_use]
     pub fn minimal() -> PersistenceConfig {
         PersistenceConfigBuilder::new()
             .save_on_pause(false)

@@ -27,7 +27,8 @@ pub struct ResourceUsage {
 
 impl ResourceUsage {
     /// Create a resource usage snapshot
-    pub fn snapshot() -> Self {
+    #[must_use]
+    pub const fn snapshot() -> Self {
         // In a real implementation, this would use system APIs
         // For now, we'll return mock data
         Self {
@@ -93,6 +94,7 @@ pub struct PerformanceReport {
 
 impl PerformanceReport {
     /// Generate a report from snapshots
+    #[must_use]
     pub fn from_snapshots(snapshots: &[PerformanceSnapshot]) -> Self {
         if snapshots.is_empty() {
             return Self::empty();
@@ -123,15 +125,17 @@ impl PerformanceReport {
 
         let count = snapshots.len() as f64;
         let avg_cpu_percent = total_cpu / count;
-        let avg_memory_bytes = (total_memory as f64 / count) as u64;
+        let avg_memory_bytes = (total_memory as f64 / count).round() as u64;
         let avg_response_time = total_response_time / count;
 
         // Calculate percentiles
         response_times.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        let p95_index =
-            ((response_times.len() as f64 * 0.95) as usize).min(response_times.len() - 1);
-        let p99_index =
-            ((response_times.len() as f64 * 0.99) as usize).min(response_times.len() - 1);
+        let p95_index = usize::try_from((response_times.len() as f64 * 0.95).round() as u64)
+            .unwrap_or(0)
+            .min(response_times.len() - 1);
+        let p99_index = usize::try_from((response_times.len() as f64 * 0.99).round() as u64)
+            .unwrap_or(0)
+            .min(response_times.len() - 1);
         let p95_response_time = response_times[p95_index];
         let p99_response_time = response_times[p99_index];
 
@@ -192,6 +196,7 @@ impl PerformanceReport {
     }
 
     /// Generate a summary string
+    #[must_use]
     pub fn summary(&self) -> String {
         let duration = (self.end_time - self.start_time)
             .to_std()
@@ -211,7 +216,8 @@ impl PerformanceReport {
             self.peak_memory_bytes as f64 / (1024.0 * 1024.0),
             self.total_requests,
             self.failed_requests,
-            100.0 - (self.failed_requests as f64 / self.total_requests.max(1) as f64 * 100.0),
+            (self.failed_requests as f64 / self.total_requests.max(1) as f64)
+                .mul_add(-100.0, 100.0),
             self.avg_response_time,
             self.p95_response_time,
             self.p99_response_time,
@@ -266,6 +272,7 @@ impl Default for PerformanceThresholds {
 
 impl PerformanceMonitor {
     /// Create a new performance monitor
+    #[must_use]
     pub fn new(
         agent_id: String,
         metrics: Arc<AgentMetrics>,
@@ -283,12 +290,14 @@ impl PerformanceMonitor {
     }
 
     /// Set custom thresholds
-    pub fn with_thresholds(mut self, thresholds: PerformanceThresholds) -> Self {
+    #[must_use]
+    pub const fn with_thresholds(mut self, thresholds: PerformanceThresholds) -> Self {
         self.thresholds = thresholds;
         self
     }
 
     /// Take a performance snapshot
+    #[must_use]
     pub fn take_snapshot(&self) -> PerformanceSnapshot {
         let resources = ResourceUsage::snapshot();
 
@@ -340,6 +349,7 @@ impl PerformanceMonitor {
     }
 
     /// Generate a performance report
+    #[must_use]
     pub fn generate_report(&self) -> PerformanceReport {
         let snapshots = self.snapshots.read().unwrap();
         let snapshots_vec: Vec<_> = snapshots.iter().cloned().collect();
@@ -347,6 +357,7 @@ impl PerformanceMonitor {
     }
 
     /// Check if performance is within thresholds
+    #[must_use]
     pub fn check_thresholds(&self, snapshot: &PerformanceSnapshot) -> Vec<PerformanceViolation> {
         let mut violations = Vec::new();
 
@@ -391,7 +402,7 @@ impl PerformanceMonitor {
 
     /// Start performance monitoring
     pub async fn start_monitoring(self: Arc<Self>) {
-        let monitor = self.clone();
+        let monitor = self;
         tokio::spawn(async move {
             let mut interval = tokio::time::interval(monitor.snapshot_interval);
 

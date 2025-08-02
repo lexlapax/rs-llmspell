@@ -128,7 +128,7 @@ impl DelegatingAgent {
     /// Create a new delegating agent
     pub fn new(name: impl Into<String>, config: DelegationConfig) -> Self {
         let name = name.into();
-        let description = format!("Delegating agent: {}", name);
+        let description = format!("Delegating agent: {name}");
         Self {
             metadata: ComponentMetadata::new(name, description),
             agents: TokioRwLock::new(HashMap::new()),
@@ -303,7 +303,7 @@ impl DelegatingAgent {
         let agent = agents
             .get(&selected_agent)
             .ok_or_else(|| LLMSpellError::Component {
-                message: format!("Agent not found: {}", selected_agent),
+                message: format!("Agent not found: {selected_agent}"),
                 source: None,
             })?;
 
@@ -396,7 +396,7 @@ impl BaseAgent for DelegatingAgent {
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
-        Ok(AgentOutput::text(format!("Delegation error: {}", error)))
+        Ok(AgentOutput::text(format!("Delegation error: {error}")))
     }
 }
 
@@ -474,12 +474,14 @@ impl DelegatingAgentBuilder {
     }
 
     /// Set the configuration
-    pub fn config(mut self, config: DelegationConfig) -> Self {
+    #[must_use]
+    pub const fn config(mut self, config: DelegationConfig) -> Self {
         self.config = config;
         self
     }
 
     /// Set the delegation strategy
+    #[must_use]
     pub fn strategy(mut self, strategy: DelegationStrategy) -> Self {
         self.strategy = strategy;
         self

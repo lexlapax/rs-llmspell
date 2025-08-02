@@ -32,7 +32,7 @@ use std::sync::Arc;
 use tracing::debug;
 
 /// Image format types
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum ImageFormat {
     Png,
@@ -47,26 +47,28 @@ pub enum ImageFormat {
 
 impl ImageFormat {
     /// Detect format from file extension
+    #[must_use]
     pub fn from_extension(path: &Path) -> Self {
         match path
             .extension()
             .and_then(|ext| ext.to_str())
-            .map(|s| s.to_lowercase())
+            .map(str::to_lowercase)
             .as_deref()
         {
             Some("png") => Self::Png,
-            Some("jpg") | Some("jpeg") => Self::Jpeg,
+            Some("jpg" | "jpeg") => Self::Jpeg,
             Some("gif") => Self::Gif,
             Some("webp") => Self::Webp,
             Some("bmp") => Self::Bmp,
-            Some("tiff") | Some("tif") => Self::Tiff,
+            Some("tiff" | "tif") => Self::Tiff,
             Some("ico") => Self::Ico,
             _ => Self::Unknown,
         }
     }
 
     /// Get MIME type for the format
-    pub fn mime_type(&self) -> &'static str {
+    #[must_use]
+    pub const fn mime_type(&self) -> &'static str {
         match self {
             Self::Png => "image/png",
             Self::Jpeg => "image/jpeg",
@@ -89,11 +91,13 @@ pub struct ImageDimensions {
 
 impl ImageDimensions {
     /// Calculate aspect ratio
+    #[must_use]
     pub fn aspect_ratio(&self) -> f64 {
-        self.width as f64 / self.height as f64
+        f64::from(self.width) / f64::from(self.height)
     }
 
     /// Get orientation
+    #[must_use]
     pub fn orientation(&self) -> &'static str {
         match self.aspect_ratio() {
             r if r > 1.2 => "landscape",
@@ -170,6 +174,7 @@ pub struct ImageProcessorTool {
 
 impl ImageProcessorTool {
     /// Create a new image processor tool
+    #[must_use]
     pub fn new(config: ImageProcessorConfig) -> Self {
         Self {
             metadata: ComponentMetadata::new(
@@ -183,6 +188,7 @@ impl ImageProcessorTool {
     }
 
     /// Create a new image processor tool with sandbox context
+    #[must_use]
     pub fn with_sandbox(
         config: ImageProcessorConfig,
         sandbox_context: Arc<SandboxContext>,
@@ -222,7 +228,7 @@ impl ImageProcessorTool {
     async fn extract_metadata(&self, file_path: &Path) -> LLMResult<ImageMetadata> {
         // Get file size
         let file_metadata = std::fs::metadata(file_path).map_err(|e| LLMSpellError::Tool {
-            message: format!("Failed to read file metadata: {}", e),
+            message: format!("Failed to read file metadata: {e}"),
             tool_name: Some("image_processor".to_string()),
             source: None,
         })?;
@@ -246,7 +252,7 @@ impl ImageProcessorTool {
 
         // Create basic metadata
         let metadata = ImageMetadata {
-            format: format.clone(),
+            format,
             dimensions: None,
             color_mode: None,
             bit_depth: None,
@@ -295,7 +301,7 @@ impl ImageProcessorTool {
         // Check if conversion is supported
         if !self.config.supported_formats.contains(&target_format) {
             return Err(LLMSpellError::Tool {
-                message: format!("Conversion to {:?} format is not supported", target_format),
+                message: format!("Conversion to {target_format:?} format is not supported"),
                 tool_name: Some("image_processor".to_string()),
                 source: None,
             });
@@ -374,8 +380,7 @@ impl ImageProcessorTool {
                 _ => {
                     return Err(LLMSpellError::Validation {
                         message: format!(
-                            "Invalid operation: {}. Supported operations: detect, metadata, resize, convert, crop, rotate, thumbnail",
-                            operation
+                            "Invalid operation: {operation}. Supported operations: detect, metadata, resize, convert, crop, rotate, thumbnail"
                         ),
                         field: Some("operation".to_string()),
                     });
@@ -409,7 +414,7 @@ impl ImageProcessorTool {
             for field in ["x", "y", "width", "height"] {
                 if params.get(field).is_none() {
                     return Err(LLMSpellError::Validation {
-                        message: format!("{} is required for crop operation", field),
+                        message: format!("{field} is required for crop operation"),
                         field: Some(field.to_string()),
                     });
                 }
@@ -446,7 +451,7 @@ impl BaseAgent for ImageProcessorTool {
                 let format = self.detect_format(path).await?;
 
                 let response = ResponseBuilder::success("detect")
-                    .with_message(format!("Detected image format: {:?}", format))
+                    .with_message(format!("Detected image format: {format:?}"))
                     .with_result(json!({
                         "file_path": file_path,
                         "format": format,
@@ -506,10 +511,7 @@ impl BaseAgent for ImageProcessorTool {
                 .await?;
 
                 let response = ResponseBuilder::success("resize")
-                    .with_message(format!(
-                        "Resized image from {} to {}",
-                        input_path, output_path
-                    ))
+                    .with_message(format!("Resized image from {input_path} to {output_path}"))
                     .with_result(json!({
                         "source_path": input_path,
                         "target_path": output_path,
@@ -544,8 +546,7 @@ impl BaseAgent for ImageProcessorTool {
 
                 let response = ResponseBuilder::success("convert")
                     .with_message(format!(
-                        "Converted image from {} to {} ({:?} format)",
-                        input_path, output_path, target_format
+                        "Converted image from {input_path} to {output_path} ({target_format:?} format)"
                     ))
                     .with_result(json!({
                         "source_path": input_path,
@@ -561,23 +562,25 @@ impl BaseAgent for ImageProcessorTool {
                 let input_path = extract_required_string(params, "source_path")?;
                 let output_path = extract_required_string(params, "target_path")?;
 
-                let x = params.get("x").and_then(|v| v.as_u64()).ok_or_else(|| {
-                    LLMSpellError::Validation {
+                let x = params
+                    .get("x")
+                    .and_then(serde_json::Value::as_u64)
+                    .ok_or_else(|| LLMSpellError::Validation {
                         message: "x is required".to_string(),
                         field: Some("x".to_string()),
-                    }
-                })? as u32;
+                    })? as u32;
 
-                let y = params.get("y").and_then(|v| v.as_u64()).ok_or_else(|| {
-                    LLMSpellError::Validation {
+                let y = params
+                    .get("y")
+                    .and_then(serde_json::Value::as_u64)
+                    .ok_or_else(|| LLMSpellError::Validation {
                         message: "y is required".to_string(),
                         field: Some("y".to_string()),
-                    }
-                })? as u32;
+                    })? as u32;
 
                 let width = params
                     .get("width")
-                    .and_then(|v| v.as_u64())
+                    .and_then(serde_json::Value::as_u64)
                     .ok_or_else(|| LLMSpellError::Validation {
                         message: "width is required".to_string(),
                         field: Some("width".to_string()),
@@ -585,7 +588,7 @@ impl BaseAgent for ImageProcessorTool {
 
                 let height = params
                     .get("height")
-                    .and_then(|v| v.as_u64())
+                    .and_then(serde_json::Value::as_u64)
                     .ok_or_else(|| LLMSpellError::Validation {
                         message: "height is required".to_string(),
                         field: Some("height".to_string()),
@@ -603,8 +606,7 @@ impl BaseAgent for ImageProcessorTool {
 
                 let response = ResponseBuilder::success("crop")
                     .with_message(format!(
-                        "Cropped image from {} to {} ({}x{} at {}, {})",
-                        input_path, output_path, width, height, x, y
+                        "Cropped image from {input_path} to {output_path} ({width}x{height} at {x}, {y})"
                     ))
                     .with_result(json!({
                         "source_path": input_path,
@@ -622,15 +624,17 @@ impl BaseAgent for ImageProcessorTool {
             "rotate" => {
                 let input_path = extract_required_string(params, "source_path")?;
                 let output_path = extract_required_string(params, "target_path")?;
-                let degrees = params.get("degrees").and_then(|v| v.as_i64()).unwrap_or(90) as i32;
+                let degrees = params
+                    .get("degrees")
+                    .and_then(serde_json::Value::as_i64)
+                    .unwrap_or(90) as i32;
 
                 self.rotate_image(Path::new(input_path), Path::new(output_path), degrees)
                     .await?;
 
                 let response = ResponseBuilder::success("rotate")
                     .with_message(format!(
-                        "Rotated image {} degrees from {} to {}",
-                        degrees, input_path, output_path
+                        "Rotated image {degrees} degrees from {input_path} to {output_path}"
                     ))
                     .with_result(json!({
                         "source_path": input_path,
@@ -645,12 +649,9 @@ impl BaseAgent for ImageProcessorTool {
             "thumbnail" => {
                 let input_path = extract_required_string(params, "source_path")?;
                 let output_path = extract_required_string(params, "target_path")?;
-                let max_width = extract_optional_u64(params, "max_width")
-                    .map(|w| w as u32)
-                    .unwrap_or(200);
-                let max_height = extract_optional_u64(params, "max_height")
-                    .map(|h| h as u32)
-                    .unwrap_or(200);
+                let max_width = extract_optional_u64(params, "max_width").map_or(200, |w| w as u32);
+                let max_height =
+                    extract_optional_u64(params, "max_height").map_or(200, |h| h as u32);
 
                 self.generate_thumbnail(
                     Path::new(input_path),
@@ -662,8 +663,7 @@ impl BaseAgent for ImageProcessorTool {
 
                 let response = ResponseBuilder::success("thumbnail")
                     .with_message(format!(
-                        "Generated thumbnail from {} to {} (max {}x{})",
-                        input_path, output_path, max_width, max_height
+                        "Generated thumbnail from {input_path} to {output_path} (max {max_width}x{max_height})"
                     ))
                     .with_result(json!({
                         "source_path": input_path,
@@ -691,10 +691,7 @@ impl BaseAgent for ImageProcessorTool {
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> LLMResult<AgentOutput> {
-        Ok(AgentOutput::text(format!(
-            "Image processor error: {}",
-            error
-        )))
+        Ok(AgentOutput::text(format!("Image processor error: {error}")))
     }
 }
 

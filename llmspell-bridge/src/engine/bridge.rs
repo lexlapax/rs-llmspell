@@ -1,4 +1,4 @@
-//! ABOUTME: ScriptEngineBridge trait defining language-agnostic script engine interface
+//! ABOUTME: `ScriptEngineBridge` trait defining language-agnostic script engine interface
 //! ABOUTME: Foundation for multi-language script execution (Lua, JavaScript, Python, etc.)
 
 use async_trait::async_trait;

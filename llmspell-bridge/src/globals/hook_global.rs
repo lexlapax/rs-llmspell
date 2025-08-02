@@ -13,7 +13,8 @@ pub struct HookGlobal {
 
 impl HookGlobal {
     /// Create a new Hook global with the bridge
-    pub fn new(hook_bridge: Arc<HookBridge>) -> Self {
+    #[must_use]
+    pub const fn new(hook_bridge: Arc<HookBridge>) -> Self {
         Self { hook_bridge }
     }
 }

@@ -44,8 +44,7 @@ async fn test_anthropic_conversation_persistence() -> Result<()> {
     for (i, response) in responses.iter().enumerate() {
         assert!(
             !response.text.is_empty(),
-            "Response {} should not be empty",
-            i
+            "Response {i} should not be empty"
         );
         info!("Response {}: {}", i + 1, response.text);
     }

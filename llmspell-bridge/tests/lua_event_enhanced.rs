@@ -177,14 +177,14 @@ async fn test_event_stats() {
 
     let result: mlua::Result<bool> = lua
         .load(
-            r#"
+            r"
         local stats = Event.get_stats()
         
         -- Verify stats structure
         return stats ~= nil and 
                stats.event_bus_stats ~= nil and 
                stats.bridge_stats ~= nil
-    "#,
+    ",
         )
         .eval();
 

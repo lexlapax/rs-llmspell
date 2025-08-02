@@ -1,7 +1,7 @@
 //! Example demonstrating state persistence with real AI providers
 //!
-//! This example shows how to use state persistence with actual OpenAI or Anthropic APIs.
-//! It requires either OPENAI_API_KEY or ANTHROPIC_API_KEY environment variables.
+//! This example shows how to use state persistence with actual `OpenAI` or Anthropic APIs.
+//! It requires either `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` environment variables.
 //!
 //! Usage:
 //! ```bash
@@ -83,7 +83,7 @@ async fn main() -> Result<()> {
 
     let agent_id = "persistent-example-agent";
     let config = AgentBuilder::new(agent_id, "llm")
-        .description(&format!("Example agent using {} provider", provider))
+        .description(format!("Example agent using {provider} provider"))
         .with_model(provider, model)
         .temperature(0.7)
         .max_tokens(500)
@@ -124,7 +124,7 @@ async fn main() -> Result<()> {
     info!("\n=== Session 2: State Restoration ===");
 
     let config2 = AgentBuilder::new(agent_id, "llm") // Same ID for state restoration
-        .description(&format!("Restored {} agent", provider))
+        .description(format!("Restored {provider} agent"))
         .with_model(provider, model)
         .temperature(0.7)
         .max_tokens(500)

@@ -44,31 +44,33 @@ pub enum AgentState {
 
 impl AgentState {
     /// Check if state allows execution
-    pub fn can_execute(&self) -> bool {
-        matches!(self, AgentState::Ready | AgentState::Running)
+    #[must_use]
+    pub const fn can_execute(&self) -> bool {
+        matches!(self, Self::Ready | Self::Running)
     }
 
     /// Check if state allows pausing
-    pub fn can_pause(&self) -> bool {
-        matches!(self, AgentState::Running)
+    #[must_use]
+    pub const fn can_pause(&self) -> bool {
+        matches!(self, Self::Running)
     }
 
     /// Check if state allows termination
-    pub fn can_terminate(&self) -> bool {
-        !matches!(self, AgentState::Terminated | AgentState::Terminating)
+    #[must_use]
+    pub const fn can_terminate(&self) -> bool {
+        !matches!(self, Self::Terminated | Self::Terminating)
     }
 
     /// Check if state indicates healthy operation
-    pub fn is_healthy(&self) -> bool {
-        matches!(
-            self,
-            AgentState::Ready | AgentState::Running | AgentState::Paused
-        )
+    #[must_use]
+    pub const fn is_healthy(&self) -> bool {
+        matches!(self, Self::Ready | Self::Running | Self::Paused)
     }
 
     /// Check if state indicates error condition
-    pub fn is_error(&self) -> bool {
-        matches!(self, AgentState::Error | AgentState::Recovering)
+    #[must_use]
+    pub const fn is_error(&self) -> bool {
+        matches!(self, Self::Error | Self::Recovering)
     }
 }
 
@@ -151,6 +153,7 @@ impl Default for StateMachineConfig {
 
 impl StateMachineConfig {
     /// Create config with hooks enabled
+    #[must_use]
     pub fn with_hooks(_hook_registry: Arc<HookRegistry>) -> Self {
         Self {
             enable_hooks: true,
@@ -160,6 +163,7 @@ impl StateMachineConfig {
     }
 
     /// Create config with custom hook executor configuration
+    #[must_use]
     pub fn with_hook_config(hook_config: HookExecutorConfig) -> Self {
         Self {
             enable_hooks: true,
@@ -180,6 +184,7 @@ pub struct StateContext {
 }
 
 impl StateContext {
+    #[must_use]
     pub fn new(agent_id: String, current: AgentState, target: AgentState) -> Self {
         Self {
             agent_id,
@@ -190,11 +195,13 @@ impl StateContext {
         }
     }
 
+    #[must_use]
     pub fn with_metadata(mut self, key: &str, value: &str) -> Self {
         self.metadata.insert(key.to_string(), value.to_string());
         self
     }
 
+    #[must_use]
     pub fn elapsed(&self) -> Duration {
         self.transition_start.elapsed().unwrap_or_default()
     }
@@ -227,7 +234,8 @@ pub struct DefaultStateHandler {
 }
 
 impl DefaultStateHandler {
-    pub fn new(state: AgentState) -> Self {
+    #[must_use]
+    pub const fn new(state: AgentState) -> Self {
         Self { state }
     }
 }
@@ -250,7 +258,10 @@ impl StateHandler for DefaultStateHandler {
     }
 
     async fn can_transition_to(&self, target: AgentState) -> bool {
-        use AgentState::*;
+        use AgentState::{
+            Error, Initializing, Paused, Ready, Recovering, Running, Terminated, Terminating,
+            Uninitialized,
+        };
 
         match (self.state, target) {
             // From Uninitialized
@@ -322,10 +333,11 @@ pub struct AgentStateMachine {
 
 impl AgentStateMachine {
     /// Create new state machine for agent
+    #[must_use]
     pub fn new(agent_id: String, config: StateMachineConfig) -> Self {
         let transition_circuit_breaker = if config.enable_circuit_breaker {
             Some(Arc::new(CircuitBreaker::with_config(
-                format!("{}-state-transitions", agent_id),
+                format!("{agent_id}-state-transitions"),
                 config.circuit_breaker_config.clone(),
             )))
         } else {
@@ -352,6 +364,7 @@ impl AgentStateMachine {
     }
 
     /// Create new state machine with hook support
+    #[must_use]
     pub fn with_hooks(
         agent_id: String,
         config: StateMachineConfig,
@@ -366,7 +379,7 @@ impl AgentStateMachine {
 
         let transition_circuit_breaker = if config.enable_circuit_breaker {
             Some(Arc::new(CircuitBreaker::with_config(
-                format!("{}-state-transitions", agent_id),
+                format!("{agent_id}-state-transitions"),
                 config.circuit_breaker_config.clone(),
             )))
         } else {
@@ -393,6 +406,7 @@ impl AgentStateMachine {
     }
 
     /// Create state machine with default configuration
+    #[must_use]
     pub fn default(agent_id: String) -> Self {
         Self::new(agent_id, StateMachineConfig::default())
     }
@@ -492,7 +506,7 @@ impl AgentStateMachine {
                 // Check results for any that should block the transition
                 for result in hook_results {
                     match result {
-                        HookResult::Continue | HookResult::Skipped(_) => continue,
+                        HookResult::Continue | HookResult::Skipped(_) => {}
                         HookResult::Retry {
                             delay: _,
                             max_attempts: _,
@@ -631,7 +645,7 @@ impl AgentStateMachine {
             let duration = start_time_cb.elapsed();
 
             match &result {
-                Ok(_) => circuit_breaker.record_success(duration),
+                Ok(()) => circuit_breaker.record_success(duration),
                 Err(e) => circuit_breaker.record_failure(e),
             }
 
@@ -695,7 +709,7 @@ impl AgentStateMachine {
                     target_state,
                     reason
                         .as_ref()
-                        .map(|r| format!(" ({})", r))
+                        .map(|r| format!(" ({r})"))
                         .unwrap_or_default()
                 );
             }
@@ -941,7 +955,7 @@ impl AgentStateMachine {
 
         self.transition_to_with_reason(
             AgentState::Error,
-            Some(format!("Error occurred: {}", error_message)),
+            Some(format!("Error occurred: {error_message}")),
         )
         .await
     }
@@ -967,7 +981,7 @@ impl AgentStateMachine {
         // Start recovery
         self.transition_to_with_reason(
             AgentState::Recovering,
-            Some(format!("Recovery attempt {}", attempt_count)),
+            Some(format!("Recovery attempt {attempt_count}")),
         )
         .await?;
 
@@ -1022,7 +1036,8 @@ impl AgentStateMachine {
     }
 
     /// Check if hooks are enabled
-    pub fn has_hooks(&self) -> bool {
+    #[must_use]
+    pub const fn has_hooks(&self) -> bool {
         self.config.enable_hooks && self.hook_executor.is_some() && self.hook_registry.is_some()
     }
 

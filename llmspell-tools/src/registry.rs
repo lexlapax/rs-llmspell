@@ -55,35 +55,41 @@ pub struct CapabilityMatcher {
 
 impl CapabilityMatcher {
     /// Create a new capability matcher
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Match tools by category
+    #[must_use]
     pub fn with_categories(mut self, categories: Vec<ToolCategory>) -> Self {
         self.categories = Some(categories);
         self
     }
 
     /// Set maximum security level
-    pub fn with_max_security_level(mut self, level: SecurityLevel) -> Self {
+    #[must_use]
+    pub const fn with_max_security_level(mut self, level: SecurityLevel) -> Self {
         self.max_security_level = Some(level);
         self
     }
 
     /// Add capability requirement
+    #[must_use]
     pub fn with_capability(mut self, key: String, value: serde_json::Value) -> Self {
         self.capabilities.insert(key, value);
         self
     }
 
     /// Add search terms
+    #[must_use]
     pub fn with_search_terms(mut self, terms: Vec<String>) -> Self {
         self.search_terms = terms;
         self
     }
 
     /// Check if a tool matches this capability matcher
+    #[must_use]
     pub fn matches(&self, tool_info: &ToolInfo) -> bool {
         // Check category match
         if let Some(ref categories) = self.categories {
@@ -141,6 +147,7 @@ pub struct ToolRegistry {
 
 impl ToolRegistry {
     /// Create a new tool registry
+    #[must_use]
     pub fn new() -> Self {
         Self {
             tools: Arc::new(RwLock::new(HashMap::new())),
@@ -152,6 +159,7 @@ impl ToolRegistry {
     }
 
     /// Create a new tool registry with hook support
+    #[must_use]
     pub fn with_hooks(
         hook_executor: Option<Arc<HookExecutor>>,
         hook_registry: Option<Arc<HookRegistry>>,
@@ -386,7 +394,7 @@ impl ToolRegistry {
             .get_tool(tool_name)
             .await
             .ok_or_else(|| LLMSpellError::Component {
-                message: format!("Tool '{}' not found in registry", tool_name),
+                message: format!("Tool '{tool_name}' not found in registry"),
                 source: None,
             })?;
 
@@ -413,28 +421,32 @@ impl ToolRegistry {
     }
 
     /// Check if hook integration is enabled
-    pub fn has_hook_integration(&self) -> bool {
+    #[must_use]
+    pub const fn has_hook_integration(&self) -> bool {
         self.tool_executor.is_some()
     }
 
     /// Get the tool executor (if hook integration is enabled)
+    #[must_use]
     pub fn get_tool_executor(&self) -> Option<Arc<ToolExecutor>> {
         self.tool_executor.clone()
     }
 
     /// Get hook configuration
-    pub fn get_hook_config(&self) -> &ToolLifecycleConfig {
+    #[must_use]
+    pub const fn get_hook_config(&self) -> &ToolLifecycleConfig {
         &self.hook_config
     }
 
     /// Enable or disable hook integration
-    pub fn set_hook_integration_enabled(&mut self, enabled: bool) {
+    pub const fn set_hook_integration_enabled(&mut self, enabled: bool) {
         self.hook_config.enable_hooks = enabled;
         // Note: This only changes the config - to create/destroy the ToolExecutor
         // would require recreating the registry with the new configuration
     }
 
     /// Get execution metrics from the tool executor
+    #[must_use]
     pub fn get_execution_metrics(&self) -> Option<ExecutionMetrics> {
         self.tool_executor
             .as_ref()

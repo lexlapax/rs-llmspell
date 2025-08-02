@@ -288,7 +288,7 @@ impl AgentAssertions {
             .collect();
 
         for expected_tool in expected_tools {
-            if !actual_tools.contains(&expected_tool.to_string()) {
+            if !actual_tools.contains(&(*expected_tool).to_string()) {
                 return Err(anyhow::anyhow!(
                     "Expected tool '{}' was not called",
                     expected_tool
@@ -397,12 +397,14 @@ impl TestScenarioBuilder {
     }
 
     /// Set agent configuration
+    #[must_use]
     pub fn with_agent_config(mut self, config: AgentConfig) -> Self {
         self.agent_config = Some(config);
         self
     }
 
     /// Add test input
+    #[must_use]
     pub fn with_input(mut self, input: AgentInput, context: ExecutionContext) -> Self {
         self.inputs.push((input, context));
         self
@@ -482,6 +484,7 @@ pub struct LifecycleEventRecorder {
 
 impl LifecycleEventRecorder {
     /// Create new event recorder
+    #[must_use]
     pub fn new(receiver: broadcast::Receiver<LifecycleEvent>) -> Self {
         let events = Arc::new(Mutex::new(Vec::new()));
         let events_clone = events.clone();
@@ -503,6 +506,7 @@ impl LifecycleEventRecorder {
     }
 
     /// Get recorded events
+    #[must_use]
     pub fn get_events(&self) -> Vec<LifecycleEvent> {
         self.events.lock().unwrap().clone()
     }
@@ -513,6 +517,7 @@ impl LifecycleEventRecorder {
     }
 
     /// Find events of specific type
+    #[must_use]
     pub fn find_events(&self, event_type: LifecycleEventType) -> Vec<LifecycleEvent> {
         self.events
             .lock()

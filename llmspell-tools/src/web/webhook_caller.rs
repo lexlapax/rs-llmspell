@@ -36,6 +36,7 @@ impl Default for WebhookCallerTool {
 }
 
 impl WebhookCallerTool {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             metadata: ComponentMetadata::new(
@@ -117,7 +118,7 @@ impl BaseAgent for WebhookCallerTool {
     }
 
     async fn handle_error(&self, error: llmspell_core::LLMSpellError) -> Result<AgentOutput> {
-        Ok(AgentOutput::text(format!("WebhookCaller error: {}", error)))
+        Ok(AgentOutput::text(format!("WebhookCaller error: {error}")))
     }
 
     async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
@@ -135,7 +136,7 @@ impl BaseAgent for WebhookCallerTool {
         let ssrf_protector = SsrfProtector::new();
         if let Err(e) = ssrf_protector.validate_url(url) {
             return Err(validation_error(
-                format!("URL validation failed: {}", e),
+                format!("URL validation failed: {e}"),
                 Some("input".to_string()),
             ));
         }
@@ -211,7 +212,7 @@ impl BaseAgent for WebhookCallerTool {
                     let body_json: Option<Value> = serde_json::from_str(&body_text).ok();
 
                     let mut headers_map = serde_json::Map::new();
-                    for (name, value) in response_headers.iter() {
+                    for (name, value) in &response_headers {
                         if let Ok(val) = value.to_str() {
                             headers_map.insert(name.to_string(), json!(val));
                         }
@@ -252,8 +253,8 @@ impl BaseAgent for WebhookCallerTool {
                         break;
                     }
 
-                    if attempt < max_retries {
-                        continue;
+                    if attempt >= max_retries {
+                        break;
                     }
                 }
             }

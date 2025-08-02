@@ -95,6 +95,7 @@ pub enum ToolExecutionPhase {
 
 impl ToolHookContext {
     /// Create a new tool hook context
+    #[must_use]
     pub fn new(
         component_id: ComponentId,
         tool_metadata: ComponentMetadata,
@@ -135,31 +136,35 @@ impl ToolHookContext {
     }
 
     /// Set input parameters (for pre-execution hooks)
+    #[must_use]
     pub fn with_input_parameters(mut self, parameters: JsonValue) -> Self {
         self.input_parameters = Some(parameters);
         self
     }
 
     /// Set execution success flag (for post-execution hooks)
-    pub fn with_execution_success(mut self, success: bool) -> Self {
+    #[must_use]
+    pub const fn with_execution_success(mut self, success: bool) -> Self {
         self.execution_success = Some(success);
         self
     }
 
     /// Add resource metrics
+    #[must_use]
     pub fn with_resource_metrics(mut self, metrics: HashMap<String, JsonValue>) -> Self {
         self.resource_metrics = metrics;
         self
     }
 
-    /// Add resource metrics from ResourceTracker
+    /// Add resource metrics from `ResourceTracker`
+    #[must_use]
     pub fn with_resource_tracker_metrics(mut self, tracker: &ResourceTracker) -> Self {
         let metrics = tracker.get_metrics();
         self.resource_metrics = Self::convert_resource_metrics_to_json(&metrics);
         self
     }
 
-    /// Convert ResourceMetrics to JSON HashMap for hook context
+    /// Convert `ResourceMetrics` to JSON `HashMap` for hook context
     fn convert_resource_metrics_to_json(metrics: &ResourceMetrics) -> HashMap<String, JsonValue> {
         let mut resource_metrics = HashMap::new();
         resource_metrics.insert(
@@ -182,6 +187,7 @@ impl ToolHookContext {
     }
 
     /// Get hook point for this execution phase
+    #[must_use]
     pub fn get_hook_point(&self) -> HookPoint {
         match self.execution_phase {
             ToolExecutionPhase::PreExecution => HookPoint::BeforeToolExecution,
@@ -220,6 +226,7 @@ pub struct ToolExecutor {
 
 impl ToolExecutor {
     /// Create a new tool executor with hook integration
+    #[must_use]
     pub fn new(
         config: ToolLifecycleConfig,
         hook_executor: Option<Arc<HookExecutor>>,
@@ -309,7 +316,7 @@ impl ToolExecutor {
                 .with_timeout(async { tool.execute(final_input.clone(), context.clone()).await })
                 .await
                 .map_err(|timeout_error| LLMSpellError::Component {
-                    message: format!("Tool execution timed out: {}", timeout_error),
+                    message: format!("Tool execution timed out: {timeout_error}"),
                     source: Some(Box::new(timeout_error)),
                 })
         } else {
@@ -318,7 +325,7 @@ impl ToolExecutor {
                 .with_timeout(async { tool.execute(final_input.clone(), context.clone()).await })
                 .await
                 .map_err(|timeout_error| LLMSpellError::Component {
-                    message: format!("Tool execution timed out: {}", timeout_error),
+                    message: format!("Tool execution timed out: {timeout_error}"),
                     source: Some(Box::new(timeout_error)),
                 })
         };
@@ -409,7 +416,8 @@ impl ToolExecutor {
     }
 
     /// Get resource metrics from all tool executions
-    pub fn get_execution_metrics(&self) -> ExecutionMetrics {
+    #[must_use]
+    pub const fn get_execution_metrics(&self) -> ExecutionMetrics {
         ExecutionMetrics {
             total_executions: 0,     // TODO: Track this across executions
             hook_overhead_ms: 0,     // TODO: Track hook execution time
@@ -562,13 +570,13 @@ impl ToolExecutor {
             entry
                 .resource_metrics
                 .get("memory_bytes")
-                .and_then(|v| v.as_u64())
+                .and_then(serde_json::Value::as_u64)
                 .unwrap_or(0)
                 / (1024 * 1024),
             entry
                 .resource_metrics
                 .get("cpu_time_ms")
-                .and_then(|v| v.as_u64())
+                .and_then(serde_json::Value::as_u64)
                 .unwrap_or(0)
         );
 

@@ -84,7 +84,7 @@ pub struct MemoryChange {
 }
 
 /// Type of memory change
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ChangeType {
     /// Value was created
     Created,
@@ -96,6 +96,7 @@ pub enum ChangeType {
 
 impl MemoryRegion {
     /// Create a new memory region
+    #[must_use]
     pub fn new(id: String, scope: ContextScope) -> Self {
         let (change_tx, _) = broadcast::channel(100);
 
@@ -128,6 +129,7 @@ impl MemoryRegion {
     }
 
     /// Check if component has permission
+    #[must_use]
     pub fn has_permission(&self, component: &ComponentId, required: MemoryPermission) -> bool {
         let acl = self.acl.read().unwrap();
         match acl.get(component) {
@@ -222,6 +224,7 @@ impl MemoryRegion {
     }
 
     /// Subscribe to change notifications
+    #[must_use]
     pub fn subscribe(&self) -> broadcast::Receiver<MemoryChange> {
         self.change_tx.subscribe()
     }
@@ -329,6 +332,7 @@ impl Default for MemoryLimits {
 
 impl SharedMemoryManager {
     /// Create a new shared memory manager
+    #[must_use]
     pub fn new() -> Self {
         Self {
             regions: Arc::new(RwLock::new(HashMap::new())),
@@ -352,7 +356,7 @@ impl SharedMemoryManager {
 
         if regions.contains_key(&id) {
             return Err(LLMSpellError::Component {
-                message: format!("Memory region already exists: {}", id),
+                message: format!("Memory region already exists: {id}"),
                 source: None,
             });
         }
@@ -365,6 +369,7 @@ impl SharedMemoryManager {
     }
 
     /// Get a memory region
+    #[must_use]
     pub fn get_region(&self, id: &str) -> Option<MemoryRegion> {
         let regions = self.regions.read().unwrap();
         regions.get(id).cloned()
@@ -378,14 +383,14 @@ impl SharedMemoryManager {
             // Only owner can delete (simplified check)
             if !region.has_permission(requester, MemoryPermission::ReadWrite) {
                 return Err(LLMSpellError::Security {
-                    message: format!("Permission denied: delete access to memory region {}", id),
+                    message: format!("Permission denied: delete access to memory region {id}"),
                     violation_type: Some("access_control".to_string()),
                 });
             }
         }
 
         regions.remove(id).ok_or_else(|| LLMSpellError::Component {
-            message: format!("Memory region not found: {}", id),
+            message: format!("Memory region not found: {id}"),
             source: None,
         })?;
 
@@ -393,6 +398,7 @@ impl SharedMemoryManager {
     }
 
     /// List all regions accessible by a component
+    #[must_use]
     pub fn list_regions(&self, accessor: &ComponentId) -> Vec<String> {
         let regions = self.regions.read().unwrap();
         regions
@@ -403,6 +409,7 @@ impl SharedMemoryManager {
     }
 
     /// Get memory usage statistics
+    #[must_use]
     pub fn stats(&self) -> MemoryStats {
         let regions = self.regions.read().unwrap();
 

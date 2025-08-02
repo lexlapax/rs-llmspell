@@ -5,7 +5,16 @@ use crate::ComponentRegistry;
 use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
 use llmspell_core::Tool;
 use llmspell_security::sandbox::{file_sandbox::FileSandbox, SandboxContext};
-use llmspell_tools::*;
+use llmspell_tools::{
+    ApiTesterTool, ArchiveHandlerTool, AudioProcessorTool, Base64EncoderTool, CalculatorTool,
+    CsvAnalyzerTool, DataValidationTool, DatabaseConnectorTool, DateTimeHandlerTool,
+    DiffCalculatorTool, EmailSenderTool, EnvironmentReaderTool, FileConverterTool,
+    FileOperationsTool, FileSearchTool, FileWatcherTool, GraphQLQueryTool, HashCalculatorTool,
+    HttpRequestTool, ImageProcessorTool, JsonProcessorTool, ProcessExecutorTool,
+    ServiceCheckerTool, SitemapCrawlerTool, SystemMonitorTool, TemplateEngineTool,
+    TextManipulatorTool, UrlAnalyzerTool, UuidGeneratorTool, VideoProcessorTool, WebScraperTool,
+    WebSearchTool, WebhookCallerTool, WebpageMonitorTool,
+};
 use std::sync::Arc;
 
 /// Initialize and register all Phase 2 tools with the bridge registry
@@ -82,7 +91,7 @@ pub fn register_all_tools(
     )?;
 
     // File watcher with sandbox
-    let file_sandbox_watcher = file_sandbox.clone();
+    let file_sandbox_watcher = file_sandbox;
     register_tool_with_sandbox(
         registry.clone(),
         "file_watcher",
@@ -134,7 +143,7 @@ pub fn register_all_tools(
     register_tool_result(registry.clone(), "email-sender", || {
         EmailSenderTool::new(Default::default())
     })?;
-    register_tool_result(registry.clone(), "database-connector", || {
+    register_tool_result(registry, "database-connector", || {
         DatabaseConnectorTool::new(Default::default())
     })?;
 
@@ -194,11 +203,13 @@ where
 }
 
 /// Get all registered tool names
+#[must_use]
 pub fn get_all_tool_names(registry: Arc<ComponentRegistry>) -> Vec<String> {
     registry.list_tools()
 }
 
 /// Get a tool by name from the registry
+#[must_use]
 pub fn get_tool_by_name(registry: Arc<ComponentRegistry>, name: &str) -> Option<Arc<dyn Tool>> {
     registry.get_tool(name)
 }

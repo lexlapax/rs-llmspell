@@ -86,13 +86,13 @@ async fn setup_metrics(agent: &Arc<BasicAgent>) -> Result<(), Box<dyn std::error
     // Collect and display metrics
     let collected = registry.collect();
     println!("📊 Collected Metrics:");
-    for (name, value) in collected.iter() {
+    for (name, value) in &collected {
         match value {
             llmspell_agents::MetricValue::Counter(v) => {
-                println!("   {} = {} (counter)", name, v);
+                println!("   {name} = {v} (counter)");
             }
             llmspell_agents::MetricValue::Gauge(v) => {
-                println!("   {} = {:.2} (gauge)", name, v);
+                println!("   {name} = {v:.2} (gauge)");
             }
             _ => {}
         }
@@ -161,8 +161,8 @@ async fn setup_performance_tracking(
         metrics.requests_total.inc_by(20 + i * 5);
         metrics.requests_failed.inc_by(i);
         metrics.update_resources(
-            (100.0 + (i as f64 * 10.0)) * 1024.0 * 1024.0, // Memory
-            20.0 + (i as f64 * 5.0),                       // CPU
+            (i as f64).mul_add(10.0, 100.0) * 1024.0 * 1024.0, // Memory
+            (i as f64).mul_add(5.0, 20.0),                     // CPU
         );
 
         let snapshot = monitor.take_snapshot();
@@ -273,7 +273,7 @@ async fn setup_logging(agent: &Arc<BasicAgent>) -> Result<(), Box<dyn std::error
     println!("   Buffer Utilization: {:.1}%", stats.buffer_utilization);
     println!("   Events by Level:");
     for (level, count) in &stats.level_counts {
-        println!("      {:?}: {}", level, count);
+        println!("      {level:?}: {count}");
     }
 
     Ok(())
@@ -371,11 +371,11 @@ async fn integrated_example(agent: &Arc<BasicAgent>) -> Result<(), Box<dyn std::
     // Simulate agent activity with full monitoring
     for i in 0..3 {
         // Start trace
-        let span = TraceSpan::new_root(format!("request-{}", i), agent.metadata().id.to_string());
+        let span = TraceSpan::new_root(format!("request-{i}"), agent.metadata().id.to_string());
         let span_handle = collector.start_span(span);
 
         // Log start
-        logger.info("request", &format!("Processing request {}", i))?;
+        logger.info("request", &format!("Processing request {i}"))?;
 
         // Update metrics
         let timer = metrics.start_request();
@@ -389,10 +389,10 @@ async fn integrated_example(agent: &Arc<BasicAgent>) -> Result<(), Box<dyn std::
 
         if success {
             span_handle.complete_ok();
-            logger.info("request", &format!("Request {} completed successfully", i))?;
+            logger.info("request", &format!("Request {i} completed successfully"))?;
         } else {
             span_handle.complete_error();
-            logger.error("request", &format!("Request {} failed", i), None)?;
+            logger.error("request", &format!("Request {i} failed"), None)?;
         }
     }
 

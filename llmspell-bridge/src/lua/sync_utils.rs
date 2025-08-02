@@ -12,16 +12,16 @@ use tracing::{debug, error, trace};
 ///
 /// This function provides a consistent way to execute async Rust code from synchronous
 /// Lua contexts. It handles:
-/// - Proper tokio runtime integration using block_in_place
-/// - Panic safety with catch_unwind
-/// - Error transformation from any error type to mlua::Error
+/// - Proper tokio runtime integration using `block_in_place`
+/// - Panic safety with `catch_unwind`
+/// - Error transformation from any error type to `mlua::Error`
 /// - Optional timeout support
 /// - Tracing/logging for debugging
 ///
 /// # Type Parameters
 /// - `F`: The future type to execute
 /// - `T`: The success value type (must be convertible to Lua)
-/// - `E`: The error type (must implement std::error::Error)
+/// - `E`: The error type (must implement `std::error::Error`)
 ///
 /// # Arguments
 /// - `operation_name`: Name of the operation for logging/debugging
@@ -73,8 +73,7 @@ where
                 Err(e) => {
                     error!("No tokio runtime available for {}: {}", op_name, e);
                     return Err(mlua::Error::RuntimeError(format!(
-                        "No async runtime available for {}: {}",
-                        op_name, e
+                        "No async runtime available for {op_name}: {e}"
                     )));
                 }
             };
@@ -104,8 +103,7 @@ where
                 Err(_timeout_err) => {
                     error!("{} timed out after {:?}", op_name, timeout);
                     Err(mlua::Error::RuntimeError(format!(
-                        "{} timed out after {:?}",
-                        op_name, timeout
+                        "{op_name} timed out after {timeout:?}"
                     )))
                 }
             }
@@ -119,8 +117,7 @@ where
         Err(panic_err) => {
             error!("{} panicked: {:?}", operation_name, panic_err);
             Err(mlua::Error::RuntimeError(format!(
-                "Runtime panic in {}: operation failed unexpectedly",
-                operation_name
+                "Runtime panic in {operation_name}: operation failed unexpectedly"
             )))
         }
     }
@@ -170,8 +167,7 @@ where
                 Err(e) => {
                     error!("No tokio runtime available for {}: {}", op_name, e);
                     return Err(mlua::Error::RuntimeError(format!(
-                        "No async runtime available for {}: {}",
-                        op_name, e
+                        "No async runtime available for {op_name}: {e}"
                     )));
                 }
             };
@@ -182,8 +178,7 @@ where
                     match tokio::time::timeout(duration, future).await {
                         Ok(result) => result,
                         Err(_) => Err(mlua::Error::RuntimeError(format!(
-                            "{} timed out after {:?}",
-                            op_name, duration
+                            "{op_name} timed out after {duration:?}"
                         ))),
                     }
                 })
@@ -210,8 +205,7 @@ where
         Err(panic_err) => {
             error!("{} panicked: {:?}", operation_name, panic_err);
             Err(mlua::Error::RuntimeError(format!(
-                "Runtime panic in {}: operation failed unexpectedly",
-                operation_name
+                "Runtime panic in {operation_name}: operation failed unexpectedly"
             )))
         }
     }

@@ -158,6 +158,7 @@ pub struct ProcessExecutorTool {
 
 impl ProcessExecutorTool {
     /// Create a new process executor tool
+    #[must_use]
     pub fn new(config: ProcessExecutorConfig) -> Self {
         // Determine if in production mode based on config
         let is_production = !cfg!(debug_assertions);
@@ -174,6 +175,7 @@ impl ProcessExecutorTool {
     }
 
     /// Create a new process executor tool with sandbox context
+    #[must_use]
     pub fn with_sandbox(
         config: ProcessExecutorConfig,
         sandbox_context: Arc<SandboxContext>,
@@ -195,7 +197,7 @@ impl ProcessExecutorTool {
     fn is_executable_allowed(&self, executable: &str) -> LLMResult<bool> {
         // Check blocked executables first (takes precedence)
         for blocked in &self.config.blocked_executables {
-            if executable == blocked || executable.ends_with(&format!("/{}", blocked)) {
+            if executable == blocked || executable.ends_with(&format!("/{blocked}")) {
                 debug!("Executable '{}' is blocked", executable);
                 return Ok(false);
             }
@@ -208,7 +210,7 @@ impl ProcessExecutorTool {
 
         // Check allowed executables
         for allowed in &self.config.allowed_executables {
-            if executable == allowed || executable.ends_with(&format!("/{}", allowed)) {
+            if executable == allowed || executable.ends_with(&format!("/{allowed}")) {
                 debug!("Executable '{}' is allowed", executable);
                 return Ok(true);
             }
@@ -225,12 +227,11 @@ impl ProcessExecutorTool {
         if exe_path.is_absolute() {
             if exe_path.exists() {
                 return Ok(exe_path.to_path_buf());
-            } else {
-                return Err(LLMSpellError::Validation {
-                    message: format!("Executable not found: {}", executable),
-                    field: Some("executable".to_string()),
-                });
             }
+            return Err(LLMSpellError::Validation {
+                message: format!("Executable not found: {executable}"),
+                field: Some("executable".to_string()),
+            });
         }
 
         // Try to find in PATH
@@ -238,7 +239,7 @@ impl ProcessExecutorTool {
             Ok(path)
         } else {
             Err(LLMSpellError::Validation {
-                message: format!("Executable not found in PATH: {}", executable),
+                message: format!("Executable not found in PATH: {executable}"),
                 field: Some("executable".to_string()),
             })
         }
@@ -260,7 +261,7 @@ impl ProcessExecutorTool {
         // Check if executable is allowed
         if !self.is_executable_allowed(exe_path.to_str().unwrap_or(executable))? {
             return Err(LLMSpellError::Security {
-                message: format!("Execution of '{}' is not permitted", executable),
+                message: format!("Execution of '{executable}' is not permitted"),
                 violation_type: Some("executable_blocked".to_string()),
             });
         }
@@ -363,7 +364,7 @@ impl ProcessExecutorTool {
             }
             Ok(Err(e)) => {
                 return Err(LLMSpellError::Tool {
-                    message: format!("Failed to execute process: {}", e),
+                    message: format!("Failed to execute process: {e}"),
                     tool_name: Some("process_executor".to_string()),
                     source: None,
                 });
@@ -436,13 +437,13 @@ impl ProcessExecutorTool {
             let dir_path = Path::new(work_dir);
             if !dir_path.exists() {
                 return Err(LLMSpellError::Validation {
-                    message: format!("Working directory does not exist: {}", work_dir),
+                    message: format!("Working directory does not exist: {work_dir}"),
                     field: Some("working_directory".to_string()),
                 });
             }
             if !dir_path.is_dir() {
                 return Err(LLMSpellError::Validation {
-                    message: format!("Working directory is not a directory: {}", work_dir),
+                    message: format!("Working directory is not a directory: {work_dir}"),
                     field: Some("working_directory".to_string()),
                 });
             }
@@ -492,12 +493,11 @@ impl BaseAgent for ProcessExecutorTool {
         let working_dir_str = extract_optional_string(params, "working_directory");
         let working_dir = if let Some(dir) = working_dir_str.as_ref() {
             // Sanitize path to prevent directory traversal
-            match sanitizer.sanitize_path(dir) {
-                Ok(safe_path) => Some(safe_path),
-                Err(_) => {
-                    warn!("Invalid working directory path detected: {}", dir);
-                    None
-                }
+            if let Ok(safe_path) = sanitizer.sanitize_path(dir) {
+                Some(safe_path)
+            } else {
+                warn!("Invalid working directory path detected: {}", dir);
+                None
             }
         } else {
             None
@@ -581,7 +581,7 @@ impl BaseAgent for ProcessExecutorTool {
 
         Ok(AgentOutput::text(
             serde_json::to_string_pretty(&safe_response)
-                .unwrap_or_else(|_| format!("{:?}", safe_response)),
+                .unwrap_or_else(|_| format!("{safe_response:?}")),
         ))
     }
 }
@@ -634,11 +634,13 @@ impl Tool for ProcessExecutorTool {
 
 impl ProcessExecutorTool {
     /// Check if this tool supports hook integration
-    pub fn supports_hooks(&self) -> bool {
+    #[must_use]
+    pub const fn supports_hooks(&self) -> bool {
         true // All tools that implement Tool automatically support hooks
     }
 
     /// Get hook integration metadata for this tool
+    #[must_use]
     pub fn hook_metadata(&self) -> serde_json::Value {
         json!({
             "tool_name": self.metadata().name,

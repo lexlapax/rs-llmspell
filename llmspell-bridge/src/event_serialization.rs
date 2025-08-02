@@ -9,7 +9,7 @@ use serde_json::Value as JsonValue;
 pub struct EventSerialization;
 
 impl EventSerialization {
-    /// Convert UniversalEvent to JSON representation suitable for cross-language transfer
+    /// Convert `UniversalEvent` to JSON representation suitable for cross-language transfer
     pub fn universal_event_to_json(event: &UniversalEvent) -> Result<JsonValue> {
         let json = serde_json::json!({
             "id": event.id,
@@ -26,7 +26,7 @@ impl EventSerialization {
         Ok(json)
     }
 
-    /// Convert JSON representation back to UniversalEvent
+    /// Convert JSON representation back to `UniversalEvent`
     pub fn json_to_universal_event(json: &JsonValue) -> Result<UniversalEvent> {
         let event_type = json["event_type"]
             .as_str()
@@ -94,7 +94,7 @@ impl EventSerialization {
         let mut serialized = Self::universal_event_to_json(event)?;
 
         // Add language-specific hints
-        serialized["target_language"] = JsonValue::String(format!("{:?}", target_language));
+        serialized["target_language"] = JsonValue::String(format!("{target_language:?}"));
         serialized["serialization_version"] = JsonValue::String("1.0".to_string());
 
         // Language-specific data transformations
@@ -141,7 +141,7 @@ impl EventSerialization {
                         let mut array_items = Vec::new();
                         let mut indices: Vec<usize> =
                             data_obj.keys().filter_map(|k| k.parse().ok()).collect();
-                        indices.sort();
+                        indices.sort_unstable();
 
                         for index in indices {
                             if let Some(value) = data_obj.get(&index.to_string()) {
@@ -181,7 +181,7 @@ impl EventSerialization {
             return false;
         }
 
-        indices.sort();
+        indices.sort_unstable();
         indices[0] == 1 && indices == (1..=indices.len()).collect::<Vec<_>>()
     }
 
@@ -253,10 +253,10 @@ impl EventSerialization {
     ) -> Result<()> {
         // Try round-trip serialization
         let serialized = Self::serialize_for_language(event, target_language)
-            .with_context(|| format!("Failed to serialize event for {:?}", target_language))?;
+            .with_context(|| format!("Failed to serialize event for {target_language:?}"))?;
 
         let _deserialized = Self::deserialize_from_language(&serialized, target_language)
-            .with_context(|| format!("Failed to deserialize event from {:?}", target_language))?;
+            .with_context(|| format!("Failed to deserialize event from {target_language:?}"))?;
 
         Ok(())
     }

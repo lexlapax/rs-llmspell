@@ -198,7 +198,7 @@ impl StatePersistenceHook {
 
             while attempts < self.config.max_retries {
                 match self.try_save_state(&agent, agent_id).await {
-                    Ok(_) => {
+                    Ok(()) => {
                         // Reset failure count on success
                         let mut counts = self.failure_counts.write().await;
                         counts.remove(agent_id);
@@ -307,6 +307,7 @@ impl StatePersistenceHook {
     }
 
     /// Get persistence metrics
+    #[must_use]
     pub fn metrics(&self) -> PersistenceMetrics {
         PersistenceMetrics {
             saves_attempted: AtomicU32::new(self.metrics.saves_attempted.load(Ordering::Relaxed)),

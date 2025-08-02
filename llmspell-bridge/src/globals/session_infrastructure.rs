@@ -12,7 +12,7 @@ use llmspell_storage::{MemoryBackend, SledBackend, StorageBackend};
 use std::sync::Arc;
 use tracing::{debug, info, warn};
 
-/// Helper function to get or create session infrastructure from GlobalContext
+/// Helper function to get or create session infrastructure from `GlobalContext`
 pub async fn get_or_create_session_infrastructure(
     context: &GlobalContext,
     config: &SessionConfig,
@@ -63,7 +63,7 @@ pub async fn get_or_create_session_infrastructure(
             session_config,
         )
         .map_err(|e| LLMSpellError::Component {
-            message: format!("Failed to create SessionManager: {}", e),
+            message: format!("Failed to create SessionManager: {e}"),
             source: None,
         })?,
     );
@@ -74,7 +74,7 @@ pub async fn get_or_create_session_infrastructure(
     Ok(SessionInfrastructure { session_manager })
 }
 
-/// Get or create StateManager
+/// Get or create `StateManager`
 async fn get_or_create_state_manager(context: &GlobalContext) -> Result<Arc<StateManager>> {
     if let Some(state_manager) = context.get_bridge::<StateManager>("state_manager") {
         return Ok(state_manager);
@@ -87,7 +87,7 @@ async fn get_or_create_state_manager(context: &GlobalContext) -> Result<Arc<Stat
             StateManager::new()
                 .await
                 .map_err(|e| LLMSpellError::Component {
-                    message: format!("Failed to create StateManager: {}", e),
+                    message: format!("Failed to create StateManager: {e}"),
                     source: None,
                 })?,
         );
@@ -96,7 +96,7 @@ async fn get_or_create_state_manager(context: &GlobalContext) -> Result<Arc<Stat
     Ok(state_manager)
 }
 
-/// Get or create HookRegistry
+/// Get or create `HookRegistry`
 fn get_or_create_hook_registry(context: &GlobalContext) -> Result<Arc<HookRegistry>> {
     if let Some(registry) = context.get_bridge::<HookRegistry>("hook_registry") {
         return Ok(registry);
@@ -108,7 +108,7 @@ fn get_or_create_hook_registry(context: &GlobalContext) -> Result<Arc<HookRegist
     Ok(registry)
 }
 
-/// Get or create HookExecutor
+/// Get or create `HookExecutor`
 fn get_or_create_hook_executor(context: &GlobalContext) -> Result<Arc<HookExecutor>> {
     if let Some(executor) = context.get_bridge::<HookExecutor>("hook_executor") {
         return Ok(executor);
@@ -120,7 +120,7 @@ fn get_or_create_hook_executor(context: &GlobalContext) -> Result<Arc<HookExecut
     Ok(executor)
 }
 
-/// Get or create EventBus
+/// Get or create `EventBus`
 async fn get_or_create_event_bus(context: &GlobalContext) -> Result<Arc<EventBus>> {
     if let Some(event_bus) = context.get_bridge::<EventBus>("event_bus") {
         return Ok(event_bus);
@@ -144,7 +144,7 @@ async fn create_storage_backend(backend_type: &str) -> Result<Arc<dyn StorageBac
             let _path = std::env::var("LLMSPELL_SESSION_PATH")
                 .unwrap_or_else(|_| "./llmspell_sessions".to_string());
             let backend = SledBackend::new().map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to create sled backend: {}", e),
+                message: format!("Failed to create sled backend: {e}"),
                 source: None,
             })?;
             Ok(Arc::new(backend))

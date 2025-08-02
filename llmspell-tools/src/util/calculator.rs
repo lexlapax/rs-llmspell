@@ -45,9 +45,9 @@ use std::collections::BTreeMap;
 pub struct CalculatorTool {
     /// Tool metadata
     metadata: ComponentMetadata,
-    /// Basic expression analyzer for DoS protection
+    /// Basic expression analyzer for `DoS` protection
     analyzer: ExpressionAnalyzer,
-    /// Enhanced analyzer for advanced DoS protection
+    /// Enhanced analyzer for advanced `DoS` protection
     enhanced_analyzer: EnhancedExpressionAnalyzer,
 }
 
@@ -74,7 +74,7 @@ impl CalculatorTool {
         Self::default()
     }
 
-    /// Convert fasteval error to LLMSpellError
+    /// Convert fasteval error to `LLMSpellError`
     fn convert_error(&self, error: FastevalError) -> LLMSpellError {
         tool_error(error.to_string(), Some(self.metadata.name.clone()))
     }
@@ -127,7 +127,7 @@ impl CalculatorTool {
         let expr_memory = processed_expr.len() * 8 + variables.len() * 64;
         if let Err(e) = memory_tracker.allocate(expr_memory) {
             return Err(validation_error(
-                format!("Expression requires too much memory: {}", e),
+                format!("Expression requires too much memory: {e}"),
                 Some("input".to_string()),
             ));
         }
@@ -145,7 +145,7 @@ impl CalculatorTool {
             Ok(Ok(result)) => Ok(result),
             Ok(Err(e)) => Err(self.convert_error(e)),
             Err(_) => Err(validation_error(
-                format!("Expression evaluation timed out after {:?}", max_eval_time),
+                format!("Expression evaluation timed out after {max_eval_time:?}"),
                 Some("input".to_string()),
             )),
         };
@@ -436,11 +436,13 @@ impl ResourceLimited for CalculatorTool {
 // This is provided by the blanket implementation in the lifecycle module
 impl CalculatorTool {
     /// Helper method to show hook integration capabilities
-    pub fn supports_hooks(&self) -> bool {
+    #[must_use]
+    pub const fn supports_hooks(&self) -> bool {
         true // All tools that implement Tool automatically support hooks
     }
 
     /// Get hook integration metadata for this tool
+    #[must_use]
     pub fn hook_metadata(&self) -> serde_json::Value {
         json!({
             "tool_name": self.metadata().name,

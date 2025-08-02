@@ -355,10 +355,10 @@ async fn test_shutdown_coordinator_integration() {
     ];
 
     for (agent_id, _priority) in &priorities {
-        let state_machine = Arc::new(AgentStateMachine::default(agent_id.to_string()));
+        let state_machine = Arc::new(AgentStateMachine::default((*agent_id).to_string()));
         state_machine.initialize().await.unwrap();
         state_machine.start().await.unwrap();
-        agents.insert(agent_id.to_string(), state_machine);
+        agents.insert((*agent_id).to_string(), state_machine);
     }
 
     // Create shutdown requests
@@ -543,7 +543,7 @@ async fn test_concurrent_operations() {
     // Test concurrent resource allocations
     let mut handles = Vec::new();
     for i in 0..10 {
-        let agent_id = format!("concurrent-agent-{}", i);
+        let agent_id = format!("concurrent-agent-{i}");
         let resource_manager = resource_manager.clone();
 
         let handle = tokio::spawn(async move {
@@ -570,7 +570,7 @@ async fn test_concurrent_operations() {
     // Test concurrent state machine operations
     let mut state_handles = Vec::new();
     for i in 0..5 {
-        let agent_id = format!("state-agent-{}", i);
+        let agent_id = format!("state-agent-{i}");
         let state_machine = Arc::new(AgentStateMachine::default(agent_id));
 
         let handle = tokio::spawn(async move {
@@ -604,8 +604,7 @@ async fn test_performance_requirements() {
     let initialization_time = start.elapsed();
     assert!(
         initialization_time < Duration::from_millis(10),
-        "Initialization took {:?}, expected < 10ms",
-        initialization_time
+        "Initialization took {initialization_time:?}, expected < 10ms"
     );
 
     // Test resource allocation performance
@@ -619,8 +618,7 @@ async fn test_performance_requirements() {
     let allocation_time = start.elapsed();
     assert!(
         allocation_time < Duration::from_millis(50),
-        "Resource allocation took {:?}, expected < 50ms",
-        allocation_time
+        "Resource allocation took {allocation_time:?}, expected < 50ms"
     );
 
     // Test health check performance
@@ -643,8 +641,7 @@ async fn test_performance_requirements() {
     let health_check_time = start.elapsed();
     assert!(
         health_check_time < Duration::from_millis(100),
-        "Health check took {:?}, expected < 100ms",
-        health_check_time
+        "Health check took {health_check_time:?}, expected < 100ms"
     );
 }
 

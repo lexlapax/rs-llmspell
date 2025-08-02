@@ -33,6 +33,7 @@ pub struct MiddlewareContext {
 }
 
 impl MiddlewareContext {
+    #[must_use]
     pub fn new(agent_id: String, phase: LifecyclePhase) -> Self {
         Self {
             request_id: Uuid::new_v4().to_string(),
@@ -44,16 +45,19 @@ impl MiddlewareContext {
         }
     }
 
+    #[must_use]
     pub fn with_state_context(mut self, context: StateContext) -> Self {
         self.state_context = Some(context);
         self
     }
 
+    #[must_use]
     pub fn with_data(mut self, key: &str, value: &str) -> Self {
         self.data.insert(key.to_string(), value.to_string());
         self
     }
 
+    #[must_use]
     pub fn get_data(&self, key: &str) -> Option<&String> {
         self.data.get(key)
     }
@@ -62,6 +66,7 @@ impl MiddlewareContext {
         self.data.insert(key.to_string(), value.to_string());
     }
 
+    #[must_use]
     pub fn elapsed(&self) -> Duration {
         self.start_time.elapsed()
     }
@@ -91,17 +96,18 @@ pub enum LifecyclePhase {
 }
 
 impl LifecyclePhase {
+    #[must_use]
     pub fn name(&self) -> String {
         match self {
-            LifecyclePhase::Initialization => "initialization".to_string(),
-            LifecyclePhase::StateTransition => "state_transition".to_string(),
-            LifecyclePhase::TaskExecution => "task_execution".to_string(),
-            LifecyclePhase::ResourceAllocation => "resource_allocation".to_string(),
-            LifecyclePhase::ResourceDeallocation => "resource_deallocation".to_string(),
-            LifecyclePhase::HealthCheck => "health_check".to_string(),
-            LifecyclePhase::Shutdown => "shutdown".to_string(),
-            LifecyclePhase::ErrorHandling => "error_handling".to_string(),
-            LifecyclePhase::Custom(name) => name.clone(),
+            Self::Initialization => "initialization".to_string(),
+            Self::StateTransition => "state_transition".to_string(),
+            Self::TaskExecution => "task_execution".to_string(),
+            Self::ResourceAllocation => "resource_allocation".to_string(),
+            Self::ResourceDeallocation => "resource_deallocation".to_string(),
+            Self::HealthCheck => "health_check".to_string(),
+            Self::Shutdown => "shutdown".to_string(),
+            Self::ErrorHandling => "error_handling".to_string(),
+            Self::Custom(name) => name.clone(),
         }
     }
 }
@@ -196,6 +202,7 @@ impl Default for MiddlewareConfig {
 
 impl LifecycleMiddlewareChain {
     /// Create new middleware chain
+    #[must_use]
     pub fn new(event_system: Arc<LifecycleEventSystem>, config: MiddlewareConfig) -> Self {
         Self {
             middleware: Arc::new(RwLock::new(Vec::new())),
@@ -366,7 +373,7 @@ impl LifecycleMiddlewareChain {
                 }
             }
             Err(_) => {
-                let error_msg = format!("Middleware '{}' before hook timed out", middleware_name);
+                let error_msg = format!("Middleware '{middleware_name}' before hook timed out");
                 if self.config.enable_logging {
                     error!("{}", error_msg);
                 }
@@ -416,7 +423,7 @@ impl LifecycleMiddlewareChain {
                 }
             }
             Err(_) => {
-                let error_msg = format!("Middleware '{}' after hook timed out", middleware_name);
+                let error_msg = format!("Middleware '{middleware_name}' after hook timed out");
                 if self.config.enable_logging {
                     error!("{}", error_msg);
                 }
@@ -470,7 +477,7 @@ impl LifecycleMiddlewareChain {
                 }
             }
             Err(_) => {
-                let error_msg = format!("Middleware '{}' error hook timed out", middleware_name);
+                let error_msg = format!("Middleware '{middleware_name}' error hook timed out");
                 if self.config.enable_logging {
                     error!("{}", error_msg);
                 }
@@ -528,13 +535,15 @@ impl Default for LoggingMiddleware {
 }
 
 impl LoggingMiddleware {
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self {
             log_level: tracing::Level::DEBUG,
         }
     }
 
-    pub fn with_level(mut self, level: tracing::Level) -> Self {
+    #[must_use]
+    pub const fn with_level(mut self, level: tracing::Level) -> Self {
         self.log_level = level;
         self
     }
@@ -612,6 +621,7 @@ impl Default for MetricsMiddleware {
 }
 
 impl MetricsMiddleware {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             metrics: Arc::new(RwLock::new(HashMap::new())),
@@ -680,6 +690,7 @@ impl Default for SecurityMiddleware {
 }
 
 impl SecurityMiddleware {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             trusted_agents: Vec::new(),
@@ -687,11 +698,13 @@ impl SecurityMiddleware {
         }
     }
 
+    #[must_use]
     pub fn with_trusted_agents(mut self, agents: Vec<String>) -> Self {
         self.trusted_agents = agents;
         self
     }
 
+    #[must_use]
     pub fn with_policy(mut self, phase: LifecyclePhase, policies: Vec<String>) -> Self {
         self.security_policies.insert(phase, policies);
         self

@@ -1,5 +1,5 @@
 //! Integration tests for web scraping tools suite
-//! Tests all 6 tools: WebScraper, UrlAnalyzer, ApiTester, WebhookCaller, WebpageMonitor, SitemapCrawler
+//! Tests all 6 tools: `WebScraper`, `UrlAnalyzer`, `ApiTester`, `WebhookCaller`, `WebpageMonitor`, `SitemapCrawler`
 
 use llmspell_core::traits::base_agent::BaseAgent;
 use llmspell_core::types::AgentInput;
@@ -28,7 +28,7 @@ async fn test_web_scraper_tool_basic() {
 
     let result = tool.execute(input, context).await;
     if let Err(ref e) = result {
-        eprintln!("WebScraperTool failed with error: {}", e);
+        eprintln!("WebScraperTool failed with error: {e}");
     }
     assert!(result.is_ok(), "WebScraperTool should execute successfully");
 

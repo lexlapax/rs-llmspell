@@ -28,18 +28,18 @@ pub fn inject_state_global(
                 let scope = StateGlobal::parse_scope(&scope_str);
                 let runtime = tokio::runtime::Handle::try_current()
                     .or_else(|_| tokio::runtime::Runtime::new().map(|rt| rt.handle().clone()))
-                    .map_err(|e| LuaError::RuntimeError(format!("No tokio runtime: {}", e)))?;
+                    .map_err(|e| LuaError::RuntimeError(format!("No tokio runtime: {e}")))?;
 
                 let result =
                     runtime.block_on(async { state_mgr.set(scope, &key, json_value).await });
 
                 match result {
                     Ok(()) => Ok(()),
-                    Err(e) => Err(LuaError::RuntimeError(format!("State save error: {}", e))),
+                    Err(e) => Err(LuaError::RuntimeError(format!("State save error: {e}"))),
                 }
             } else {
                 // Fallback to in-memory storage
-                let full_key = format!("{}:{}", scope_str, key);
+                let full_key = format!("{scope_str}:{key}");
                 let mut state = save_fallback_state.write();
                 state.insert(full_key, json_value);
                 Ok(())
@@ -55,7 +55,7 @@ pub fn inject_state_global(
             let scope = StateGlobal::parse_scope(&scope_str);
             let runtime = tokio::runtime::Handle::try_current()
                 .or_else(|_| tokio::runtime::Runtime::new().map(|rt| rt.handle().clone()))
-                .map_err(|e| LuaError::RuntimeError(format!("No tokio runtime: {}", e)))?;
+                .map_err(|e| LuaError::RuntimeError(format!("No tokio runtime: {e}")))?;
 
             let result = runtime.block_on(async { state_mgr.get(scope, &key).await });
 
@@ -65,11 +65,11 @@ pub fn inject_state_global(
                     Ok(lua_value)
                 }
                 Ok(None) => Ok(Value::Nil),
-                Err(e) => Err(LuaError::RuntimeError(format!("State load error: {}", e))),
+                Err(e) => Err(LuaError::RuntimeError(format!("State load error: {e}"))),
             }
         } else {
             // Fallback to in-memory storage
-            let full_key = format!("{}:{}", scope_str, key);
+            let full_key = format!("{scope_str}:{key}");
             let state = load_fallback_state.read();
             match state.get(&full_key) {
                 Some(value) => {
@@ -90,17 +90,17 @@ pub fn inject_state_global(
             let scope = StateGlobal::parse_scope(&scope_str);
             let runtime = tokio::runtime::Handle::try_current()
                 .or_else(|_| tokio::runtime::Runtime::new().map(|rt| rt.handle().clone()))
-                .map_err(|e| LuaError::RuntimeError(format!("No tokio runtime: {}", e)))?;
+                .map_err(|e| LuaError::RuntimeError(format!("No tokio runtime: {e}")))?;
 
             let result = runtime.block_on(async { state_mgr.delete(scope, &key).await });
 
             match result {
                 Ok(_) => Ok(()),
-                Err(e) => Err(LuaError::RuntimeError(format!("State delete error: {}", e))),
+                Err(e) => Err(LuaError::RuntimeError(format!("State delete error: {e}"))),
             }
         } else {
             // Fallback to in-memory storage
-            let full_key = format!("{}:{}", scope_str, key);
+            let full_key = format!("{scope_str}:{key}");
             let mut state = delete_fallback_state.write();
             state.remove(&full_key);
             Ok(())
@@ -109,14 +109,14 @@ pub fn inject_state_global(
     state_table.set("delete", delete_fn)?;
 
     // list_keys(scope) - List all keys in a scope
-    let list_state_manager = state_manager.clone();
-    let list_fallback_state = fallback_state.clone();
+    let list_state_manager = state_manager;
+    let list_fallback_state = fallback_state;
     let list_fn = lua.create_function(move |lua, scope_str: String| {
         if let Some(state_mgr) = &list_state_manager {
             let scope = StateGlobal::parse_scope(&scope_str);
             let runtime = tokio::runtime::Handle::try_current()
                 .or_else(|_| tokio::runtime::Runtime::new().map(|rt| rt.handle().clone()))
-                .map_err(|e| LuaError::RuntimeError(format!("No tokio runtime: {}", e)))?;
+                .map_err(|e| LuaError::RuntimeError(format!("No tokio runtime: {e}")))?;
 
             let result = runtime.block_on(async { state_mgr.list_keys(scope).await });
 
@@ -128,12 +128,12 @@ pub fn inject_state_global(
                     }
                     Ok(table)
                 }
-                Err(e) => Err(LuaError::RuntimeError(format!("State list error: {}", e))),
+                Err(e) => Err(LuaError::RuntimeError(format!("State list error: {e}"))),
             }
         } else {
             // Fallback to in-memory storage
             let state = list_fallback_state.read();
-            let prefix = format!("{}:", scope_str);
+            let prefix = format!("{scope_str}:");
             let keys: Vec<String> = state
                 .keys()
                 .filter(|k| k.starts_with(&prefix))
@@ -160,15 +160,12 @@ pub fn inject_state_global(
         let migrate_fn = lua.create_function(move |lua, target_version: String| {
             let runtime = tokio::runtime::Handle::try_current()
                 .or_else(|_| tokio::runtime::Runtime::new().map(|rt| rt.handle().clone()))
-                .map_err(|e| mlua::Error::RuntimeError(format!("No tokio runtime: {}", e)))?;
+                .map_err(|e| mlua::Error::RuntimeError(format!("No tokio runtime: {e}")))?;
 
             // Parse semantic version
             let target_ver: llmspell_state_persistence::schema::SemanticVersion =
                 target_version.parse().map_err(|e| {
-                    mlua::Error::RuntimeError(format!(
-                        "Invalid version '{}': {}",
-                        target_version, e
-                    ))
+                    mlua::Error::RuntimeError(format!("Invalid version '{target_version}': {e}"))
                 })?;
 
             // Get current version
@@ -238,7 +235,7 @@ pub fn inject_state_global(
                 Err(e) => {
                     let result_table = lua.create_table()?;
                     result_table.set("success", false)?;
-                    result_table.set("error", format!("Migration failed: {}", e))?;
+                    result_table.set("error", format!("Migration failed: {e}"))?;
                     result_table.set("from_version", current_ver.to_string())?;
                     result_table.set("target_version", target_ver.to_string())?;
                     Ok(result_table)
@@ -249,7 +246,7 @@ pub fn inject_state_global(
 
         // migration_status() - Get migration status information
         let status_registry = schema_registry.clone();
-        let status_fn = lua.create_function(move |lua, _: ()| {
+        let status_fn = lua.create_function(move |lua, (): ()| {
             let status_table = lua.create_table()?;
 
             if let Some(current_schema) = status_registry.get_current_schema() {
@@ -283,7 +280,7 @@ pub fn inject_state_global(
 
         // schema_versions() - List all available schema versions
         let versions_registry = schema_registry.clone();
-        let versions_fn = lua.create_function(move |lua, _: ()| {
+        let versions_fn = lua.create_function(move |lua, (): ()| {
             let versions = versions_registry.list_versions();
             let versions_table = lua.create_table()?;
 
@@ -314,7 +311,7 @@ pub fn inject_state_global(
         state_table.set("create_backup", create_backup_fn)?;
 
         // list_backups() - List available backups
-        let list_backups_fn = lua.create_function(move |lua, _: ()| {
+        let list_backups_fn = lua.create_function(move |lua, (): ()| {
             // TODO: Implement actual backup listing
             let backups_table = lua.create_table()?;
 
@@ -348,7 +345,7 @@ pub fn inject_state_global(
         state_table.set("validate_backup", validate_backup_fn)?;
 
         // get_storage_usage() - Get backup storage usage information
-        let get_storage_usage_fn = lua.create_function(move |lua, _: ()| {
+        let get_storage_usage_fn = lua.create_function(move |lua, (): ()| {
             // TODO: Implement actual storage usage calculation
             let usage_table = lua.create_table()?;
             usage_table.set("total_backups", 0)?;

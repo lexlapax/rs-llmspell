@@ -1,5 +1,5 @@
 //! ABOUTME: State global object providing persistent state management
-//! ABOUTME: Integrates with StateManager for full persistent state functionality
+//! ABOUTME: Integrates with `StateManager` for full persistent state functionality
 
 use crate::globals::types::{GlobalContext, GlobalMetadata, GlobalObject};
 use llmspell_core::error::LLMSpellError;
@@ -14,12 +14,12 @@ use std::sync::Arc;
 
 /// State global object providing persistent state management
 ///
-/// Integrates with StateManager for full persistent state functionality.
-/// Falls back to in-memory storage when StateManager is not available.
+/// Integrates with `StateManager` for full persistent state functionality.
+/// Falls back to in-memory storage when `StateManager` is not available.
 pub struct StateGlobal {
-    /// StateManager for persistent storage (optional for backward compatibility)
+    /// `StateManager` for persistent storage (optional for backward compatibility)
     pub state_manager: Option<Arc<StateManager>>,
-    /// Fallback in-memory state storage (when StateManager is not available)
+    /// Fallback in-memory state storage (when `StateManager` is not available)
     pub fallback_state: Arc<RwLock<HashMap<String, serde_json::Value>>>,
     /// Migration engine for schema transitions (optional)
     pub migration_engine: Option<Arc<MigrationEngine>>,
@@ -30,7 +30,8 @@ pub struct StateGlobal {
 }
 
 impl StateGlobal {
-    /// Create a new State global without StateManager (fallback mode)
+    /// Create a new State global without `StateManager` (fallback mode)
+    #[must_use]
     pub fn new() -> Self {
         Self {
             state_manager: None,
@@ -41,7 +42,7 @@ impl StateGlobal {
         }
     }
 
-    /// Create a new State global with StateManager integration
+    /// Create a new State global with `StateManager` integration
     pub fn with_state_manager(state_manager: Arc<StateManager>) -> Self {
         Self {
             state_manager: Some(state_manager),
@@ -83,7 +84,8 @@ impl StateGlobal {
         }
     }
 
-    /// Helper method to parse scope string to StateScope enum
+    /// Helper method to parse scope string to `StateScope` enum
+    #[must_use]
     pub fn parse_scope(scope_str: &str) -> StateScope {
         if scope_str.starts_with("agent:") {
             StateScope::Agent(
@@ -145,7 +147,7 @@ impl GlobalObject for StateGlobal {
 
         // Create State table
         let state_table = lua.create_table().map_err(|e| LLMSpellError::Component {
-            message: format!("Failed to create State table: {}", e),
+            message: format!("Failed to create State table: {e}"),
             source: None,
         })?;
 
@@ -186,7 +188,7 @@ impl GlobalObject for StateGlobal {
                     }
                 } else {
                     // Fallback to in-memory storage
-                    let full_key = format!("{}:{}", scope_str, key);
+                    let full_key = format!("{scope_str}:{key}");
                     let state = get_fallback_state.read();
                     match state.get(&full_key) {
                         Some(value) => {
@@ -198,14 +200,14 @@ impl GlobalObject for StateGlobal {
                 }
             })
             .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to create State.get: {}", e),
+                message: format!("Failed to create State.get: {e}"),
                 source: None,
             })?;
 
         state_table
             .set("get", get_fn.clone())
             .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to set State.get: {}", e),
+                message: format!("Failed to set State.get: {e}"),
                 source: None,
             })?;
 
@@ -213,7 +215,7 @@ impl GlobalObject for StateGlobal {
         state_table
             .set("load", get_fn)
             .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to set State.load: {}", e),
+                message: format!("Failed to set State.load: {e}"),
                 source: None,
             })?;
 
@@ -262,7 +264,7 @@ impl GlobalObject for StateGlobal {
                         }
                     } else {
                         // Fallback to in-memory storage
-                        let full_key = format!("{}:{}", scope_str, key);
+                        let full_key = format!("{scope_str}:{key}");
                         let mut state = set_fallback_state.write();
                         state.insert(full_key, json_value);
                         Ok(())
@@ -270,14 +272,14 @@ impl GlobalObject for StateGlobal {
                 },
             )
             .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to create State.set: {}", e),
+                message: format!("Failed to create State.set: {e}"),
                 source: None,
             })?;
 
         state_table
             .set("set", set_fn.clone())
             .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to set State.set: {}", e),
+                message: format!("Failed to set State.set: {e}"),
                 source: None,
             })?;
 
@@ -285,7 +287,7 @@ impl GlobalObject for StateGlobal {
         state_table
             .set("save", set_fn)
             .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to set State.save: {}", e),
+                message: format!("Failed to set State.save: {e}"),
                 source: None,
             })?;
 
@@ -318,27 +320,27 @@ impl GlobalObject for StateGlobal {
                     }
                 } else {
                     // Fallback to in-memory storage
-                    let full_key = format!("{}:{}", scope_str, key);
+                    let full_key = format!("{scope_str}:{key}");
                     let mut state = delete_fallback_state.write();
                     state.remove(&full_key);
                     Ok(())
                 }
             })
             .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to create State.delete: {}", e),
+                message: format!("Failed to create State.delete: {e}"),
                 source: None,
             })?;
 
         state_table
             .set("delete", delete_fn)
             .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to set State.delete: {}", e),
+                message: format!("Failed to set State.delete: {e}"),
                 source: None,
             })?;
 
         // List method - get all keys for a scope
-        let list_state_manager = state_manager.clone();
-        let list_fallback_state = fallback_state.clone();
+        let list_state_manager = state_manager;
+        let list_fallback_state = fallback_state;
         let list_fn = lua
             .create_function(move |lua, scope_str: Option<String>| {
                 let scope_str = scope_str.unwrap_or_else(|| "Global".to_string());
@@ -366,7 +368,7 @@ impl GlobalObject for StateGlobal {
                 } else {
                     // Fallback to in-memory storage
                     let state = list_fallback_state.read();
-                    let prefix = format!("{}:", scope_str);
+                    let prefix = format!("{scope_str}:");
                     let keys: Vec<String> = state
                         .keys()
                         .filter(|k| k.starts_with(&prefix))
@@ -381,14 +383,14 @@ impl GlobalObject for StateGlobal {
                 }
             })
             .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to create State.list: {}", e),
+                message: format!("Failed to create State.list: {e}"),
                 source: None,
             })?;
 
         state_table
             .set("list", list_fn)
             .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to set State.list: {}", e),
+                message: format!("Failed to set State.list: {e}"),
                 source: None,
             })?;
 
@@ -407,8 +409,7 @@ impl GlobalObject for StateGlobal {
                     // Parse target version
                     let target_ver: SemanticVersion = target_version.parse().map_err(|e| {
                         mlua::Error::RuntimeError(format!(
-                            "Invalid version format '{}': {}",
-                            target_version, e
+                            "Invalid version format '{target_version}': {e}"
                         ))
                     })?;
 
@@ -484,7 +485,7 @@ impl GlobalObject for StateGlobal {
                         Err(e) => {
                             let result_table = lua.create_table()?;
                             result_table.set("success", false)?;
-                            result_table.set("error", format!("Migration failed: {}", e))?;
+                            result_table.set("error", format!("Migration failed: {e}"))?;
                             result_table.set("from_version", current_ver.to_string())?;
                             result_table.set("to_version", target_ver.to_string())?;
                             Ok(result_table)
@@ -492,21 +493,21 @@ impl GlobalObject for StateGlobal {
                     }
                 })
                 .map_err(|e| LLMSpellError::Component {
-                    message: format!("Failed to create State.migrate_to_version: {}", e),
+                    message: format!("Failed to create State.migrate_to_version: {e}"),
                     source: None,
                 })?;
 
             state_table
                 .set("migrate_to_version", migrate_fn)
                 .map_err(|e| LLMSpellError::Component {
-                    message: format!("Failed to set State.migrate_to_version: {}", e),
+                    message: format!("Failed to set State.migrate_to_version: {e}"),
                     source: None,
                 })?;
 
             // get_migration_status() - Get current migration information
             let status_registry = schema_registry.clone();
             let status_fn = lua
-                .create_function(move |lua, _: ()| {
+                .create_function(move |lua, (): ()| {
                     let status_table = lua.create_table()?;
 
                     if let Some(current_schema) = status_registry.get_current_schema() {
@@ -551,21 +552,21 @@ impl GlobalObject for StateGlobal {
                     Ok(status_table)
                 })
                 .map_err(|e| LLMSpellError::Component {
-                    message: format!("Failed to create State.get_migration_status: {}", e),
+                    message: format!("Failed to create State.get_migration_status: {e}"),
                     source: None,
                 })?;
 
             state_table
                 .set("get_migration_status", status_fn)
                 .map_err(|e| LLMSpellError::Component {
-                    message: format!("Failed to set State.get_migration_status: {}", e),
+                    message: format!("Failed to set State.get_migration_status: {e}"),
                     source: None,
                 })?;
 
             // list_schema_versions() - List all available schema versions
             let list_registry = schema_registry.clone();
             let list_versions_fn = lua
-                .create_function(move |lua, _: ()| {
+                .create_function(move |lua, (): ()| {
                     let versions = list_registry.list_versions();
                     let versions_table = lua.create_table()?;
 
@@ -576,14 +577,14 @@ impl GlobalObject for StateGlobal {
                     Ok(versions_table)
                 })
                 .map_err(|e| LLMSpellError::Component {
-                    message: format!("Failed to create State.list_schema_versions: {}", e),
+                    message: format!("Failed to create State.list_schema_versions: {e}"),
                     source: None,
                 })?;
 
             state_table
                 .set("list_schema_versions", list_versions_fn)
                 .map_err(|e| LLMSpellError::Component {
-                    message: format!("Failed to set State.list_schema_versions: {}", e),
+                    message: format!("Failed to set State.list_schema_versions: {e}"),
                     source: None,
                 })?;
         }
@@ -620,28 +621,28 @@ impl GlobalObject for StateGlobal {
                         Err(e) => {
                             let result_table = lua.create_table()?;
                             result_table.set("success", false)?;
-                            result_table.set("error", format!("Backup failed: {}", e))?;
+                            result_table.set("error", format!("Backup failed: {e}"))?;
                             result_table.set("incremental", incremental)?;
                             Ok(result_table)
                         }
                     }
                 })
                 .map_err(|e| LLMSpellError::Component {
-                    message: format!("Failed to create State.create_backup: {}", e),
+                    message: format!("Failed to create State.create_backup: {e}"),
                     source: None,
                 })?;
 
             state_table
                 .set("create_backup", create_backup_fn)
                 .map_err(|e| LLMSpellError::Component {
-                    message: format!("Failed to set State.create_backup: {}", e),
+                    message: format!("Failed to set State.create_backup: {e}"),
                     source: None,
                 })?;
 
             // list_backups() - List available backups
             let list_backup_mgr = backup_mgr.clone();
             let list_backups_fn = lua
-                .create_function(move |lua, _: ()| {
+                .create_function(move |lua, (): ()| {
                     use crate::lua::sync_utils::block_on_async;
 
                     let backup_mgr = list_backup_mgr.clone();
@@ -675,20 +676,19 @@ impl GlobalObject for StateGlobal {
                             Ok(backups_table)
                         }
                         Err(e) => Err(mlua::Error::RuntimeError(format!(
-                            "Failed to list backups: {}",
-                            e
+                            "Failed to list backups: {e}"
                         ))),
                     }
                 })
                 .map_err(|e| LLMSpellError::Component {
-                    message: format!("Failed to create State.list_backups: {}", e),
+                    message: format!("Failed to create State.list_backups: {e}"),
                     source: None,
                 })?;
 
             state_table
                 .set("list_backups", list_backups_fn)
                 .map_err(|e| LLMSpellError::Component {
-                    message: format!("Failed to set State.list_backups: {}", e),
+                    message: format!("Failed to set State.list_backups: {e}"),
                     source: None,
                 })?;
 
@@ -721,21 +721,21 @@ impl GlobalObject for StateGlobal {
                         }
                         Err(e) => {
                             result_table.set("success", false)?;
-                            result_table.set("error", format!("Restore failed: {}", e))?;
+                            result_table.set("error", format!("Restore failed: {e}"))?;
                             result_table.set("backup_id", backup_id)?;
                         }
                     }
                     Ok(result_table)
                 })
                 .map_err(|e| LLMSpellError::Component {
-                    message: format!("Failed to create State.restore_backup: {}", e),
+                    message: format!("Failed to create State.restore_backup: {e}"),
                     source: None,
                 })?;
 
             state_table
                 .set("restore_backup", restore_backup_fn)
                 .map_err(|e| LLMSpellError::Component {
-                    message: format!("Failed to set State.restore_backup: {}", e),
+                    message: format!("Failed to set State.restore_backup: {e}"),
                     source: None,
                 })?;
 
@@ -772,21 +772,21 @@ impl GlobalObject for StateGlobal {
                         Err(e) => {
                             let result_table = lua.create_table()?;
                             result_table.set("is_valid", false)?;
-                            result_table.set("error", format!("Validation failed: {}", e))?;
+                            result_table.set("error", format!("Validation failed: {e}"))?;
                             result_table.set("backup_id", backup_id)?;
                             Ok(result_table)
                         }
                     }
                 })
                 .map_err(|e| LLMSpellError::Component {
-                    message: format!("Failed to create State.validate_backup: {}", e),
+                    message: format!("Failed to create State.validate_backup: {e}"),
                     source: None,
                 })?;
 
             state_table
                 .set("validate_backup", validate_backup_fn)
                 .map_err(|e| LLMSpellError::Component {
-                    message: format!("Failed to set State.validate_backup: {}", e),
+                    message: format!("Failed to set State.validate_backup: {e}"),
                     source: None,
                 })?;
         }
@@ -794,7 +794,7 @@ impl GlobalObject for StateGlobal {
         lua.globals()
             .set("State", state_table)
             .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to set State global: {}", e),
+                message: format!("Failed to set State global: {e}"),
                 source: None,
             })?;
 

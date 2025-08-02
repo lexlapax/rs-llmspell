@@ -35,8 +35,8 @@ pub enum TemplateEngine {
 impl std::fmt::Display for TemplateEngine {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TemplateEngine::Tera => write!(f, "tera"),
-            TemplateEngine::Handlebars => write!(f, "handlebars"),
+            Self::Tera => write!(f, "tera"),
+            Self::Handlebars => write!(f, "handlebars"),
         }
     }
 }
@@ -46,10 +46,10 @@ impl std::str::FromStr for TemplateEngine {
 
     fn from_str(s: &str) -> Result<Self> {
         match s.to_lowercase().as_str() {
-            "tera" => Ok(TemplateEngine::Tera),
-            "handlebars" | "hbs" => Ok(TemplateEngine::Handlebars),
+            "tera" => Ok(Self::Tera),
+            "handlebars" | "hbs" => Ok(Self::Handlebars),
             _ => Err(validation_error(
-                format!("Unknown template engine: {}", s),
+                format!("Unknown template engine: {s}"),
                 Some("engine".to_string()),
             )),
         }
@@ -84,22 +84,22 @@ pub struct TemplateEngineConfig {
     pub allow_custom_filters: bool,
 }
 
-fn default_engine() -> TemplateEngine {
+const fn default_engine() -> TemplateEngine {
     TemplateEngine::Tera
 }
-fn default_auto_escape() -> bool {
+const fn default_auto_escape() -> bool {
     true
 }
-fn default_max_template_size() -> usize {
+const fn default_max_template_size() -> usize {
     1024 * 1024
 } // 1MB
-fn default_max_context_size() -> usize {
+const fn default_max_context_size() -> usize {
     10 * 1024 * 1024
 } // 10MB
-fn default_max_render_time_ms() -> u64 {
+const fn default_max_render_time_ms() -> u64 {
     5000
 } // 5 seconds
-fn default_allow_custom_filters() -> bool {
+const fn default_allow_custom_filters() -> bool {
     true
 }
 
@@ -124,11 +124,13 @@ pub struct TemplateEngineTool {
 
 impl TemplateEngineTool {
     /// Create a new template engine tool
+    #[must_use]
     pub fn new() -> Self {
         Self::with_config(TemplateEngineConfig::default())
     }
 
     /// Create with custom configuration
+    #[must_use]
     pub fn with_config(config: TemplateEngineConfig) -> Self {
         Self {
             metadata: ComponentMetadata::new(
@@ -221,7 +223,7 @@ impl TemplateEngineTool {
         tera.add_raw_template(template_name, template)
             .map_err(|e| {
                 validation_error(
-                    format!("Invalid Tera template: {}", e),
+                    format!("Invalid Tera template: {e}"),
                     Some("template".to_string()),
                 )
             })?;
@@ -229,7 +231,7 @@ impl TemplateEngineTool {
         // Convert JSON context to Tera context
         let tera_context = TeraContext::from_value(context.clone()).map_err(|e| {
             validation_error(
-                format!("Invalid context for Tera: {}", e),
+                format!("Invalid context for Tera: {e}"),
                 Some("context".to_string()),
             )
         })?;
@@ -237,7 +239,7 @@ impl TemplateEngineTool {
         // Render the template
         tera.render(template_name, &tera_context).map_err(|e| {
             tool_error(
-                format!("Template rendering failed: {}", e),
+                format!("Template rendering failed: {e}"),
                 Some("template_engine".to_string()),
             )
         })
@@ -259,7 +261,7 @@ impl TemplateEngineTool {
         // Render the template directly
         handlebars.render_template(template, context).map_err(|e| {
             tool_error(
-                format!("Template rendering failed: {}", e),
+                format!("Template rendering failed: {e}"),
                 Some("template_engine".to_string()),
             )
         })
@@ -295,7 +297,7 @@ impl TemplateEngineTool {
         for pattern in &dangerous_patterns {
             if template.contains(pattern) {
                 return Err(LLMSpellError::Security {
-                    message: format!("Potentially dangerous pattern detected: {}", pattern),
+                    message: format!("Potentially dangerous pattern detected: {pattern}"),
                     violation_type: Some("template_injection".to_string()),
                 });
             }
@@ -323,9 +325,10 @@ impl BaseAgent for TemplateEngineTool {
 
         // Extract parameters
         let template = extract_required_string(params, "input")?;
-        let context = extract_optional_object(params, "context")
-            .map(|obj| Value::Object(obj.clone()))
-            .unwrap_or_else(|| Value::Object(serde_json::Map::new()));
+        let context = extract_optional_object(params, "context").map_or_else(
+            || Value::Object(serde_json::Map::new()),
+            |obj| Value::Object(obj.clone()),
+        );
         let auto_detect = extract_bool_with_default(params, "auto_detect", true);
 
         let engine = if let Some(engine_str) = extract_optional_string(params, "engine") {
@@ -353,8 +356,7 @@ impl BaseAgent for TemplateEngineTool {
         // Create response using ResponseBuilder
         let response = ResponseBuilder::success("render_template")
             .with_message(format!(
-                "Template rendered successfully using {} engine",
-                engine
+                "Template rendered successfully using {engine} engine"
             ))
             .with_result(json!({
                 "rendered": rendered,
@@ -381,8 +383,7 @@ impl BaseAgent for TemplateEngineTool {
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
         Ok(AgentOutput::text(format!(
-            "Template rendering error: {}",
-            error
+            "Template rendering error: {error}"
         )))
     }
 }

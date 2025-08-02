@@ -160,8 +160,8 @@ mod tests {
         // Create multiple agents that can read/write shared state
         let mut agents = vec![];
         for i in 0..3 {
-            let config = AgentBuilder::basic(&format!("collaborator-{}", i))
-                .description(&format!("Collaborative agent {}", i))
+            let config = AgentBuilder::basic(format!("collaborator-{i}"))
+                .description(format!("Collaborative agent {i}"))
                 .build()?;
             let agent = BasicAgent::new(config)?;
             agent.set_state_manager(state_manager.clone());
@@ -333,7 +333,7 @@ mod tests {
             let queue = task_queue.clone();
 
             let handle = tokio::spawn(async move {
-                let agent_id = format!("worker-{}", worker_id);
+                let agent_id = format!("worker-{worker_id}");
 
                 loop {
                     // Try to claim a task
@@ -347,7 +347,7 @@ mod tests {
                     // Process task
                     sm.set(
                         StateScope::Agent(agent_id.clone()),
-                        &format!("processed_{}", task),
+                        &format!("processed_{task}"),
                         serde_json::json!({
                             "task": task,
                             "processed_at": "2024-01-01T00:00:00Z",
@@ -397,12 +397,11 @@ mod tests {
         // Verify each worker has processed some tasks
         for worker_id in 0..5 {
             let worker_keys = state_manager
-                .list_keys(StateScope::Agent(format!("worker-{}", worker_id)))
+                .list_keys(StateScope::Agent(format!("worker-{worker_id}")))
                 .await?;
             assert!(
                 !worker_keys.is_empty(),
-                "Worker {} should have processed tasks",
-                worker_id
+                "Worker {worker_id} should have processed tasks"
             );
         }
 

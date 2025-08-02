@@ -85,6 +85,7 @@ pub struct CachedResult {
 
 impl ToolState {
     /// Create new tool state
+    #[must_use]
     pub fn new(tool_id: String, metadata: ComponentMetadata) -> Self {
         Self {
             tool_id,
@@ -140,6 +141,7 @@ impl ToolState {
     }
 
     /// Get cached result if valid
+    #[must_use]
     pub fn get_cached_result(&self, input_hash: &str) -> Option<&CachedResult> {
         if let Some(cached) = self.result_cache.get(input_hash) {
             // Check if cache entry is still valid
@@ -190,6 +192,7 @@ impl ToolState {
     }
 
     /// Get custom state value
+    #[must_use]
     pub fn get_custom_state(&self, key: &str) -> Option<&Value> {
         self.custom_state.get(key)
     }
@@ -226,7 +229,7 @@ pub trait ToolStatePersistence: Tool {
     async fn load_state(&self) -> Result<bool> {
         if let Some(state_manager) = self.state_manager() {
             let tool_id = self.metadata().id.to_string();
-            let state_scope = StateScope::Custom(format!("tool_{}", tool_id));
+            let state_scope = StateScope::Custom(format!("tool_{tool_id}"));
 
             match state_manager.get(state_scope, "state").await {
                 Ok(Some(state_value)) => {
@@ -365,18 +368,18 @@ impl ToolStateRegistry {
     /// Save state for all registered tools
     pub async fn save_all_states(&self) -> Result<()> {
         for (tool_id, tool_state) in &self.tool_states {
-            let state_scope = StateScope::Custom(format!("tool_{}", tool_id));
+            let state_scope = StateScope::Custom(format!("tool_{tool_id}"));
             self.state_manager
                 .set(state_scope, "state", serde_json::to_value(tool_state)?)
                 .await
-                .context(format!("Failed to save state for tool {}", tool_id))?;
+                .context(format!("Failed to save state for tool {tool_id}"))?;
         }
         Ok(())
     }
 
     /// Load state for a specific tool
     pub async fn load_tool_state(&self, tool_id: &str) -> Result<Option<ToolState>> {
-        let state_scope = StateScope::Custom(format!("tool_{}", tool_id));
+        let state_scope = StateScope::Custom(format!("tool_{tool_id}"));
 
         match self.state_manager.get(state_scope, "state").await {
             Ok(Some(state_value)) => {
@@ -404,14 +407,14 @@ impl ToolStateRegistry {
             .map(|state| state.execution_stats.total_executions)
             .sum();
 
-        let average_cache_hit_ratio: f64 = if !self.tool_states.is_empty() {
+        let average_cache_hit_ratio: f64 = if self.tool_states.is_empty() {
+            0.0
+        } else {
             self.tool_states
                 .values()
                 .map(|state| state.execution_stats.cache_hit_ratio)
                 .sum::<f64>()
                 / self.tool_states.len() as f64
-        } else {
-            0.0
         };
 
         RegistryStatistics {
@@ -432,7 +435,7 @@ pub struct RegistryStatistics {
     pub average_cache_hit_ratio: f64,
 }
 
-/// Macro to implement ToolStatePersistence trait for types that implement Tool + ToolStateManagerHolder
+/// Macro to implement `ToolStatePersistence` trait for types that implement Tool + `ToolStateManagerHolder`
 #[macro_export]
 macro_rules! impl_tool_state_persistence {
     ($tool_type:ty) => {

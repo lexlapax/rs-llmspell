@@ -9,7 +9,13 @@ use crate::{
     traits::{ErrorStrategy, StepResult, WorkflowStep as TraitWorkflowStep},
     types::{StepExecutionContext, WorkflowConfig, WorkflowState},
 };
-use llmspell_core::{ComponentId, ComponentMetadata, Result};
+use async_trait::async_trait;
+use llmspell_core::{
+    execution_context::ExecutionContext,
+    traits::base_agent::BaseAgent,
+    types::{AgentInput, AgentOutput},
+    ComponentId, ComponentMetadata, LLMSpellError, Result,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{
@@ -505,7 +511,7 @@ impl LoopWorkflow {
     }
 
     /// Execute the loop workflow
-    pub async fn execute(&self) -> Result<LoopWorkflowResult> {
+    pub async fn execute_workflow(&self) -> Result<LoopWorkflowResult> {
         let start_time = Instant::now();
         info!("Starting loop workflow: {}", self.name);
 
@@ -738,6 +744,238 @@ impl LoopWorkflow {
             break_reason,
             start_time.elapsed(),
         ))
+    }
+}
+
+#[async_trait]
+impl BaseAgent for LoopWorkflow {
+    fn metadata(&self) -> &ComponentMetadata {
+        &self.metadata
+    }
+
+    async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+        // Convert AgentInput to workflow execution
+        // The workflow will use the input text as an execution trigger
+
+        // Validate input first
+        self.validate_input(&input).await?;
+
+        // Execute the workflow using existing implementation
+        let workflow_result = self.execute_workflow().await?;
+
+        // Convert LoopWorkflowResult to AgentOutput
+        let output_text = if workflow_result.success {
+            let break_info = if let Some(reason) = &workflow_result.break_reason {
+                format!(" (broke early: {})", reason)
+            } else {
+                String::new()
+            };
+
+            format!(
+                "Loop workflow '{}' completed successfully. {} of {} iterations completed{}. Duration: {:?}",
+                workflow_result.workflow_name,
+                workflow_result.completed_iterations,
+                workflow_result.total_iterations,
+                break_info,
+                workflow_result.duration
+            )
+        } else {
+            format!(
+                "Loop workflow '{}' failed: {}. {} of {} iterations completed. Duration: {:?}",
+                workflow_result.workflow_name,
+                workflow_result.error.as_deref().unwrap_or("Unknown error"),
+                workflow_result.completed_iterations,
+                workflow_result.total_iterations,
+                workflow_result.duration
+            )
+        };
+
+        // Build AgentOutput with execution metadata
+        let mut metadata = llmspell_core::types::OutputMetadata {
+            execution_time_ms: Some(workflow_result.duration.as_millis() as u64),
+            ..Default::default()
+        };
+        metadata
+            .extra
+            .insert("workflow_type".to_string(), serde_json::json!("loop"));
+        metadata.extra.insert(
+            "workflow_name".to_string(),
+            serde_json::json!(workflow_result.workflow_name),
+        );
+        metadata.extra.insert(
+            "total_iterations".to_string(),
+            serde_json::json!(workflow_result.total_iterations),
+        );
+        metadata.extra.insert(
+            "completed_iterations".to_string(),
+            serde_json::json!(workflow_result.completed_iterations),
+        );
+        metadata.extra.insert(
+            "break_reason".to_string(),
+            serde_json::json!(workflow_result.break_reason),
+        );
+        metadata.extra.insert(
+            "aggregated_results_count".to_string(),
+            serde_json::json!(workflow_result.aggregated_results.len()),
+        );
+
+        // Add iterator type information
+        let iterator_type = match &self.config.iterator {
+            LoopIterator::Collection { values } => {
+                metadata
+                    .extra
+                    .insert("iterator_type".to_string(), serde_json::json!("collection"));
+                metadata.extra.insert(
+                    "collection_size".to_string(),
+                    serde_json::json!(values.len()),
+                );
+                "collection"
+            }
+            LoopIterator::Range { start, end, step } => {
+                metadata
+                    .extra
+                    .insert("iterator_type".to_string(), serde_json::json!("range"));
+                metadata
+                    .extra
+                    .insert("range_start".to_string(), serde_json::json!(start));
+                metadata
+                    .extra
+                    .insert("range_end".to_string(), serde_json::json!(end));
+                metadata
+                    .extra
+                    .insert("range_step".to_string(), serde_json::json!(step));
+                "range"
+            }
+            LoopIterator::WhileCondition {
+                condition,
+                max_iterations,
+            } => {
+                metadata.extra.insert(
+                    "iterator_type".to_string(),
+                    serde_json::json!("while_condition"),
+                );
+                metadata
+                    .extra
+                    .insert("condition".to_string(), serde_json::json!(condition));
+                metadata.extra.insert(
+                    "max_iterations".to_string(),
+                    serde_json::json!(max_iterations),
+                );
+                "while_condition"
+            }
+        };
+        metadata.extra.insert(
+            "iterator_type".to_string(),
+            serde_json::json!(iterator_type),
+        );
+        metadata.extra.insert(
+            "continue_on_error".to_string(),
+            serde_json::json!(self.config.continue_on_error),
+        );
+
+        Ok(AgentOutput::text(output_text).with_metadata(metadata))
+    }
+
+    async fn validate_input(&self, input: &AgentInput) -> Result<()> {
+        // Basic validation - workflow can accept any non-empty text input
+        if input.text.is_empty() {
+            return Err(LLMSpellError::Validation {
+                message: "Workflow input text cannot be empty".to_string(),
+                field: Some("text".to_string()),
+            });
+        }
+
+        // Validate that we have steps to execute in the loop body
+        if self.config.body.is_empty() {
+            return Err(LLMSpellError::Validation {
+                message: "Cannot execute loop workflow without steps in body".to_string(),
+                field: Some("body".to_string()),
+            });
+        }
+
+        // Validate iterator configuration
+        match &self.config.iterator {
+            LoopIterator::Collection { values } => {
+                if values.is_empty() {
+                    return Err(LLMSpellError::Validation {
+                        message: "Collection iterator cannot be empty".to_string(),
+                        field: Some("iterator.values".to_string()),
+                    });
+                }
+            }
+            LoopIterator::Range { start, end, step } => {
+                if *step == 0 {
+                    return Err(LLMSpellError::Validation {
+                        message: "Range step cannot be zero".to_string(),
+                        field: Some("iterator.step".to_string()),
+                    });
+                }
+                if (*step > 0 && start >= end) || (*step < 0 && start <= end) {
+                    return Err(LLMSpellError::Validation {
+                        message: "Range configuration will not iterate".to_string(),
+                        field: Some("iterator".to_string()),
+                    });
+                }
+            }
+            LoopIterator::WhileCondition {
+                condition,
+                max_iterations,
+            } => {
+                if condition.is_empty() {
+                    return Err(LLMSpellError::Validation {
+                        message: "While condition cannot be empty".to_string(),
+                        field: Some("iterator.condition".to_string()),
+                    });
+                }
+                if *max_iterations == 0 {
+                    return Err(LLMSpellError::Validation {
+                        message: "Max iterations must be at least 1".to_string(),
+                        field: Some("iterator.max_iterations".to_string()),
+                    });
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
+        // Handle workflow-specific errors gracefully
+        let error_text = match &error {
+            LLMSpellError::Workflow { message, step, .. } => {
+                if let Some(step_name) = step {
+                    format!("Loop workflow error in step '{}': {}", step_name, message)
+                } else {
+                    format!("Loop workflow error: {}", message)
+                }
+            }
+            LLMSpellError::Validation { message, field } => {
+                if let Some(field_name) = field {
+                    format!("Validation error in field '{}': {}", field_name, message)
+                } else {
+                    format!("Validation error: {}", message)
+                }
+            }
+            _ => format!("Loop workflow error: {}", error),
+        };
+
+        let mut metadata = llmspell_core::types::OutputMetadata::default();
+        metadata.extra.insert(
+            "error_type".to_string(),
+            serde_json::json!("workflow_error"),
+        );
+        metadata
+            .extra
+            .insert("workflow_type".to_string(), serde_json::json!("loop"));
+        metadata
+            .extra
+            .insert("workflow_name".to_string(), serde_json::json!(self.name));
+        metadata.extra.insert(
+            "body_steps_count".to_string(),
+            serde_json::json!(self.config.body.len()),
+        );
+
+        Ok(AgentOutput::text(error_text).with_metadata(metadata))
     }
 }
 

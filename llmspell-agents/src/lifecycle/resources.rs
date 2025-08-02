@@ -37,17 +37,18 @@ pub enum ResourceType {
 
 impl ResourceType {
     /// Get resource type name
+    #[must_use]
     pub fn name(&self) -> String {
         match self {
-            ResourceType::Memory => "memory".to_string(),
-            ResourceType::Cpu => "cpu".to_string(),
-            ResourceType::Disk => "disk".to_string(),
-            ResourceType::Network => "network".to_string(),
-            ResourceType::ToolAccess => "tool_access".to_string(),
-            ResourceType::LlmConnection => "llm_connection".to_string(),
-            ResourceType::FileHandles => "file_handles".to_string(),
-            ResourceType::ThreadPool => "thread_pool".to_string(),
-            ResourceType::Custom(name) => name.clone(),
+            Self::Memory => "memory".to_string(),
+            Self::Cpu => "cpu".to_string(),
+            Self::Disk => "disk".to_string(),
+            Self::Network => "network".to_string(),
+            Self::ToolAccess => "tool_access".to_string(),
+            Self::LlmConnection => "llm_connection".to_string(),
+            Self::FileHandles => "file_handles".to_string(),
+            Self::ThreadPool => "thread_pool".to_string(),
+            Self::Custom(name) => name.clone(),
         }
     }
 }
@@ -72,6 +73,7 @@ pub struct ResourceRequest {
 }
 
 impl ResourceRequest {
+    #[must_use]
     pub fn new(agent_id: String, resource_type: ResourceType, amount: u64) -> Self {
         Self {
             id: Uuid::new_v4().to_string(),
@@ -84,16 +86,19 @@ impl ResourceRequest {
         }
     }
 
+    #[must_use]
     pub fn with_priority(mut self, priority: u8) -> Self {
         self.priority = priority.min(10);
         self
     }
 
-    pub fn with_timeout(mut self, timeout: Duration) -> Self {
+    #[must_use]
+    pub const fn with_timeout(mut self, timeout: Duration) -> Self {
         self.timeout = timeout;
         self
     }
 
+    #[must_use]
     pub fn with_metadata(mut self, key: &str, value: &str) -> Self {
         self.metadata.insert(key.to_string(), value.to_string());
         self
@@ -118,6 +123,7 @@ pub struct ResourceAllocation {
 }
 
 impl ResourceAllocation {
+    #[must_use]
     pub fn new(agent_id: String, resource_type: ResourceType, amount: u64) -> Self {
         Self {
             id: Uuid::new_v4().to_string(),
@@ -129,6 +135,7 @@ impl ResourceAllocation {
         }
     }
 
+    #[must_use]
     pub fn age(&self) -> Duration {
         self.allocated_at.elapsed().unwrap_or_default()
     }
@@ -175,7 +182,8 @@ impl Default for ResourceLimits {
 
 impl ResourceLimits {
     /// Get limit for specific resource type per agent
-    pub fn get_per_agent_limit(&self, resource_type: &ResourceType) -> Option<u64> {
+    #[must_use]
+    pub const fn get_per_agent_limit(&self, resource_type: &ResourceType) -> Option<u64> {
         match resource_type {
             ResourceType::Memory => Some(self.max_memory_per_agent),
             ResourceType::Cpu => Some(self.max_cpu_per_agent),
@@ -190,6 +198,7 @@ impl ResourceLimits {
     }
 
     /// Get global limit for resource type
+    #[must_use]
     pub fn get_global_limit(&self, resource_type: &ResourceType) -> Option<u64> {
         self.global_limits.get(resource_type).copied()
     }
@@ -239,6 +248,7 @@ pub struct ResourceUsageStats {
 
 impl ResourceManager {
     /// Create new resource manager
+    #[must_use]
     pub fn new(limits: ResourceLimits, event_system: Arc<LifecycleEventSystem>) -> Self {
         Self {
             allocations: Arc::new(RwLock::new(HashMap::new())),
@@ -521,7 +531,7 @@ impl ResourceManager {
     /// Get total number of allocations
     pub async fn get_allocation_count(&self) -> usize {
         let allocations = self.allocations.read().await;
-        allocations.values().map(|v| v.len()).sum()
+        allocations.values().map(std::vec::Vec::len).sum()
     }
 }
 
@@ -587,13 +597,15 @@ impl Default for SecurityResourceHook {
 }
 
 impl SecurityResourceHook {
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self {
             max_memory_per_untrusted_agent: 512 * 1024 * 1024, // 512MB
             trusted_agents: Vec::new(),
         }
     }
 
+    #[must_use]
     pub fn with_trusted_agents(mut self, agents: Vec<String>) -> Self {
         self.trusted_agents = agents;
         self

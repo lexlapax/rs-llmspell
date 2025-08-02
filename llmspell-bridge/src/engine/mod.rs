@@ -1,5 +1,5 @@
 //! ABOUTME: Language abstraction layer for script engines
-//! ABOUTME: Provides ScriptEngineBridge trait and factory pattern for multi-language support
+//! ABOUTME: Provides `ScriptEngineBridge` trait and factory pattern for multi-language support
 
 pub mod bridge;
 pub mod factory;

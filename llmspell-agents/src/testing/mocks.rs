@@ -40,7 +40,7 @@ pub struct MockAgentConfig {
     pub delay: Option<Duration>,
     /// Whether to simulate failures
     pub should_fail: bool,
-    /// Failure message if should_fail is true
+    /// Failure message if `should_fail` is true
     pub failure_message: String,
     /// Tool calls to simulate
     pub tool_calls: Vec<ToolCall>,
@@ -103,6 +103,7 @@ pub struct MockAgent {
 
 impl MockAgent {
     /// Create new mock agent
+    #[must_use]
     pub fn new(config: MockAgentConfig) -> Self {
         let metadata = ComponentMetadata {
             id: ComponentId::from_name(&config.agent_config.name),
@@ -146,16 +147,19 @@ impl MockAgent {
     }
 
     /// Get execution count
+    #[must_use]
     pub fn execution_count(&self) -> usize {
         *self.execution_count.lock().unwrap()
     }
 
     /// Get last input
+    #[must_use]
     pub fn last_input(&self) -> Option<AgentInput> {
         self.last_input.lock().unwrap().clone()
     }
 
     /// Get last context
+    #[must_use]
     pub fn last_context(&self) -> Option<ExecutionContext> {
         self.last_context.lock().unwrap().clone()
     }
@@ -349,7 +353,7 @@ impl BaseAgent for MockAgent {
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput, LLMSpellError> {
         Ok(AgentOutput {
-            text: format!("Mock error handling: {}", error),
+            text: format!("Mock error handling: {error}"),
             media: vec![],
             tool_calls: vec![],
             metadata: OutputMetadata::default(),
@@ -417,7 +421,7 @@ impl StatePersistence for MockAgent {
     }
 
     fn set_state_manager(&self, state_manager: Arc<StateManager>) {
-        StateManagerHolder::set_state_manager(self, state_manager)
+        StateManagerHolder::set_state_manager(self, state_manager);
     }
 
     async fn save_state(&self) -> Result<()> {
@@ -550,12 +554,13 @@ pub struct MockTool {
 
 impl MockTool {
     /// Create new mock tool
+    #[must_use]
     pub fn new(name: &str) -> Self {
         let metadata = ComponentMetadata {
             id: ComponentId::from_name(name),
             name: name.to_string(),
             version: Version::new(1, 0, 0),
-            description: format!("Mock tool: {}", name),
+            description: format!("Mock tool: {name}"),
             created_at: chrono::Utc::now(),
             updated_at: chrono::Utc::now(),
         };
@@ -578,16 +583,17 @@ impl MockTool {
     }
 
     /// Set execution delay
-    pub fn set_delay(&mut self, delay: Duration) {
+    pub const fn set_delay(&mut self, delay: Duration) {
         self.delay = Some(delay);
     }
 
     /// Set failure mode
-    pub fn set_failure(&mut self, should_fail: bool) {
+    pub const fn set_failure(&mut self, should_fail: bool) {
         self.should_fail = should_fail;
     }
 
     /// Get execution count
+    #[must_use]
     pub fn execution_count(&self) -> usize {
         *self.execution_count.lock().unwrap()
     }
@@ -659,7 +665,7 @@ impl BaseAgent for MockTool {
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput, LLMSpellError> {
-        Ok(AgentOutput::text(format!("Tool error: {}", error)))
+        Ok(AgentOutput::text(format!("Tool error: {error}")))
     }
 }
 
@@ -695,6 +701,7 @@ pub struct MockAgentBuilder {
 
 impl MockAgentBuilder {
     /// Create new mock agent builder
+    #[must_use]
     pub fn new(name: &str) -> Self {
         let mut config = MockAgentConfig::default();
         config.agent_config.name = name.to_string();
@@ -703,12 +710,14 @@ impl MockAgentBuilder {
     }
 
     /// Set agent type
+    #[must_use]
     pub fn agent_type(mut self, agent_type: &str) -> Self {
         self.config.agent_config.agent_type = agent_type.to_string();
         self
     }
 
     /// Add allowed tool
+    #[must_use]
     pub fn with_tool(mut self, tool_name: &str) -> Self {
         self.config
             .agent_config
@@ -718,6 +727,7 @@ impl MockAgentBuilder {
     }
 
     /// Add response
+    #[must_use]
     pub fn with_response(mut self, pattern: Option<String>, text: &str) -> Self {
         self.config.responses.push(MockResponse {
             input_pattern: pattern,
@@ -729,6 +739,7 @@ impl MockAgentBuilder {
     }
 
     /// Add response with tool calls
+    #[must_use]
     pub fn with_tool_response(
         mut self,
         pattern: Option<String>,
@@ -745,12 +756,14 @@ impl MockAgentBuilder {
     }
 
     /// Set delay
-    pub fn with_delay(mut self, delay: Duration) -> Self {
+    #[must_use]
+    pub const fn with_delay(mut self, delay: Duration) -> Self {
         self.config.delay = Some(delay);
         self
     }
 
     /// Set failure mode
+    #[must_use]
     pub fn will_fail(mut self, message: &str) -> Self {
         self.config.should_fail = true;
         self.config.failure_message = message.to_string();
@@ -758,18 +771,21 @@ impl MockAgentBuilder {
     }
 
     /// Add state transition
+    #[must_use]
     pub fn with_state_transition(mut self, state: AgentState) -> Self {
         self.config.state_transitions.push(state);
         self
     }
 
     /// Set resource limits
-    pub fn with_resource_limits(mut self, limits: ResourceLimits) -> Self {
+    #[must_use]
+    pub const fn with_resource_limits(mut self, limits: ResourceLimits) -> Self {
         self.config.agent_config.resource_limits = limits;
         self
     }
 
     /// Build the mock agent
+    #[must_use]
     pub fn build(self) -> MockAgent {
         MockAgent::new(self.config)
     }
@@ -780,6 +796,7 @@ pub struct TestDoubles;
 
 impl TestDoubles {
     /// Create a simple echo agent
+    #[must_use]
     pub fn echo_agent(name: &str) -> MockAgent {
         MockAgentBuilder::new(name)
             .agent_type("echo")
@@ -788,6 +805,7 @@ impl TestDoubles {
     }
 
     /// Create an agent that always fails
+    #[must_use]
     pub fn failing_agent(name: &str, error_message: &str) -> MockAgent {
         MockAgentBuilder::new(name)
             .agent_type("failing")
@@ -796,6 +814,7 @@ impl TestDoubles {
     }
 
     /// Create an agent with tool capabilities
+    #[must_use]
     pub fn tool_agent(name: &str, tools: Vec<&str>) -> MockAgent {
         let mut builder = MockAgentBuilder::new(name).agent_type("tool_capable");
 
@@ -807,6 +826,7 @@ impl TestDoubles {
     }
 
     /// Create a slow agent
+    #[must_use]
     pub fn slow_agent(name: &str, delay: Duration) -> MockAgent {
         MockAgentBuilder::new(name)
             .agent_type("slow")
@@ -816,6 +836,7 @@ impl TestDoubles {
     }
 
     /// Create a stateful agent
+    #[must_use]
     pub fn stateful_agent(name: &str, states: Vec<AgentState>) -> MockAgent {
         let mut builder = MockAgentBuilder::new(name).agent_type("stateful");
 

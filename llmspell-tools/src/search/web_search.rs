@@ -1,5 +1,5 @@
 //! ABOUTME: Enhanced web search tool implementation with multiple provider support
-//! ABOUTME: Supports DuckDuckGo, Google, Brave, SerpApi, and SerperDev with rate limiting
+//! ABOUTME: Supports `DuckDuckGo`, Google, Brave, `SerpApi`, and `SerperDev` with rate limiting
 
 use async_trait::async_trait;
 use llmspell_core::{
@@ -70,6 +70,7 @@ impl Default for WebSearchConfig {
 
 impl WebSearchConfig {
     /// Load configuration from environment variables
+    #[must_use]
     pub fn from_env() -> Self {
         let mut config = Self::default();
         let mut providers = HashMap::new();
@@ -196,7 +197,7 @@ impl WebSearchTool {
                                     .sliding_window()
                                     .build()
                                     .map_err(|e| LLMSpellError::Internal {
-                                        message: format!("Failed to create rate limiter: {}", e),
+                                        message: format!("Failed to create rate limiter: {e}"),
                                         source: None,
                                     })?,
                             ),
@@ -216,7 +217,7 @@ impl WebSearchTool {
                                     .sliding_window()
                                     .build()
                                     .map_err(|e| LLMSpellError::Internal {
-                                        message: format!("Failed to create rate limiter: {}", e),
+                                        message: format!("Failed to create rate limiter: {e}"),
                                         source: None,
                                     })?,
                             ),
@@ -236,7 +237,7 @@ impl WebSearchTool {
                                     .sliding_window()
                                     .build()
                                     .map_err(|e| LLMSpellError::Internal {
-                                        message: format!("Failed to create rate limiter: {}", e),
+                                        message: format!("Failed to create rate limiter: {e}"),
                                         source: None,
                                     })?,
                             ),
@@ -256,7 +257,7 @@ impl WebSearchTool {
                                     .sliding_window()
                                     .build()
                                     .map_err(|e| LLMSpellError::Internal {
-                                        message: format!("Failed to create rate limiter: {}", e),
+                                        message: format!("Failed to create rate limiter: {e}"),
                                         source: None,
                                     })?,
                             ),
@@ -330,7 +331,7 @@ impl WebSearchTool {
                 // Check rate limit if applicable
                 if let Some(rate_limiter) = &wrapper.rate_limiter {
                     match rate_limiter.try_acquire().await {
-                        Ok(_) => {}
+                        Ok(()) => {}
                         Err(e) => {
                             warn!("Rate limit exceeded for {}: {}", provider_name, e);
                             continue;
@@ -342,10 +343,10 @@ impl WebSearchTool {
                 info!("Searching with provider: {}", provider_name);
                 match wrapper.provider.search(query, &options).await {
                     Ok(results) => {
-                        if !results.is_empty() {
-                            return Ok(results);
-                        } else {
+                        if results.is_empty() {
                             warn!("Provider {} returned no results", provider_name);
+                        } else {
+                            return Ok(results);
                         }
                     }
                     Err(e) => {
@@ -457,16 +458,15 @@ impl BaseAgent for WebSearchTool {
         let provider = extract_optional_string(params, "provider");
         let max_results = params
             .get("max_results")
-            .and_then(|v| v.as_u64())
-            .map(|n| n as usize)
-            .unwrap_or(self.config.max_results);
+            .and_then(serde_json::Value::as_u64)
+            .map_or(self.config.max_results, |n| n as usize);
         let search_type = Self::parse_search_type(extract_optional_string(params, "search_type"));
         let safe_search = params
             .get("safe_search")
-            .and_then(|v| v.as_bool())
+            .and_then(serde_json::Value::as_bool)
             .unwrap_or(self.config.safe_search);
         let language = extract_optional_string(params, "language")
-            .map(|s| s.to_string())
+            .map(std::string::ToString::to_string)
             .or_else(|| self.config.language.clone());
 
         debug!(
@@ -488,8 +488,7 @@ impl BaseAgent for WebSearchTool {
         // Create response
         let provider_used = results
             .first()
-            .map(|r| r.provider.clone())
-            .unwrap_or_else(|| "unknown".to_string());
+            .map_or_else(|| "unknown".to_string(), |r| r.provider.clone());
 
         let message = format!(
             "Found {} results for '{}' using {}",

@@ -1703,7 +1703,7 @@ mod tests {
         let session_id = SessionId::new();
 
         // Store artifacts of different types
-        let types = vec![
+        let types = [
             (ArtifactType::UserInput, "input1.txt"),
             (ArtifactType::UserInput, "input2.txt"),
             (ArtifactType::ToolResult, "result.json"),
@@ -1715,7 +1715,7 @@ mod tests {
                 session_id,
                 i as u64 + 1,
                 artifact_type.clone(),
-                name.to_string(),
+                (*name).to_string(),
                 format!("content {}", i).into_bytes(),
             )
             .unwrap();
@@ -1743,7 +1743,7 @@ mod tests {
         let session_id = SessionId::new();
 
         // Store artifacts with different names
-        let names = vec![
+        let names = [
             "test_file.txt",
             "config.json",
             "test_output.log",
@@ -1755,7 +1755,7 @@ mod tests {
                 session_id,
                 i as u64 + 1,
                 ArtifactType::UserInput,
-                name.to_string(),
+                (*name).to_string(),
                 format!("content {}", i).into_bytes(),
             )
             .unwrap();
@@ -1840,7 +1840,7 @@ mod tests {
         let session_id = SessionId::new();
 
         // Store artifacts of different sizes
-        let sizes = vec![
+        let sizes = [
             ("small.txt", 100),
             ("medium.txt", 1000),
             ("large.txt", 5000),
@@ -1853,7 +1853,7 @@ mod tests {
                 session_id,
                 i as u64 + 1,
                 ArtifactType::UserInput,
-                name.to_string(),
+                (*name).to_string(),
                 content.into_bytes(),
             )
             .unwrap();

@@ -32,6 +32,7 @@ pub struct NodeMetadata {
 }
 
 impl NodeMetadata {
+    #[must_use]
     pub fn new() -> Self {
         let now = chrono::Utc::now();
         Self {
@@ -45,6 +46,7 @@ impl NodeMetadata {
 
 impl ContextNode {
     /// Create a new context node
+    #[must_use]
     pub fn new(context: ExecutionContext) -> Self {
         Self {
             context,
@@ -54,14 +56,15 @@ impl ContextNode {
     }
 
     /// Add a child node
-    pub fn add_child(&mut self, child: ContextNode) -> Arc<RwLock<ContextNode>> {
+    pub fn add_child(&mut self, child: Self) -> Arc<RwLock<Self>> {
         let child_arc = Arc::new(RwLock::new(child));
         self.children.push(child_arc.clone());
         child_arc
     }
 
     /// Find a node by context ID
-    pub fn find_by_id(&self, id: &str) -> Option<Arc<RwLock<ContextNode>>> {
+    #[must_use]
+    pub fn find_by_id(&self, id: &str) -> Option<Arc<RwLock<Self>>> {
         // Check self
         if self.context.id == id {
             return None; // Would need to return self somehow
@@ -83,7 +86,8 @@ impl ContextNode {
     }
 
     /// Get all descendant nodes
-    pub fn descendants(&self) -> Vec<Arc<RwLock<ContextNode>>> {
+    #[must_use]
+    pub fn descendants(&self) -> Vec<Arc<RwLock<Self>>> {
         let mut result = Vec::new();
 
         for child in &self.children {
@@ -113,6 +117,7 @@ pub struct HierarchicalContext {
 
 impl HierarchicalContext {
     /// Create a new hierarchical context manager
+    #[must_use]
     pub fn new() -> Self {
         Self {
             roots: HashMap::new(),
@@ -125,7 +130,7 @@ impl HierarchicalContext {
         let node = ContextNode::new(context.clone());
         let node_arc = Arc::new(RwLock::new(node));
 
-        self.roots.insert(name.clone(), node_arc.clone());
+        self.roots.insert(name, node_arc.clone());
         self.index
             .write()
             .unwrap()
@@ -147,7 +152,7 @@ impl HierarchicalContext {
             index
                 .get(parent_id)
                 .ok_or_else(|| LLMSpellError::Component {
-                    message: format!("Context not found: {}", parent_id),
+                    message: format!("Context not found: {parent_id}"),
                     source: None,
                 })?
                 .clone()
@@ -169,6 +174,7 @@ impl HierarchicalContext {
     }
 
     /// Get a context by ID
+    #[must_use]
     pub fn get(&self, id: &str) -> Option<ExecutionContext> {
         let index = self.index.read().unwrap();
         index.get(id).map(|node| {
@@ -200,13 +206,14 @@ impl HierarchicalContext {
             Ok(())
         } else {
             Err(LLMSpellError::Component {
-                message: format!("Context not found: {}", id),
+                message: format!("Context not found: {id}"),
                 source: None,
             })
         }
     }
 
     /// Get all root contexts
+    #[must_use]
     pub fn roots(&self) -> HashMap<String, ExecutionContext> {
         self.roots
             .iter()
@@ -219,6 +226,7 @@ impl HierarchicalContext {
     }
 
     /// Get context statistics
+    #[must_use]
     pub fn stats(&self) -> ContextStats {
         let index = self.index.read().unwrap();
         let total_contexts = index.len();

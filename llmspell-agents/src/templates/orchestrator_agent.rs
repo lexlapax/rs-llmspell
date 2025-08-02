@@ -34,14 +34,15 @@ pub enum OrchestrationStrategy {
 }
 
 impl OrchestrationStrategy {
+    #[must_use]
     pub fn name(&self) -> String {
         match self {
-            OrchestrationStrategy::Sequential => "sequential".to_string(),
-            OrchestrationStrategy::Parallel => "parallel".to_string(),
-            OrchestrationStrategy::Conditional => "conditional".to_string(),
-            OrchestrationStrategy::Pipeline => "pipeline".to_string(),
-            OrchestrationStrategy::EventDriven => "event_driven".to_string(),
-            OrchestrationStrategy::Custom(name) => name.clone(),
+            Self::Sequential => "sequential".to_string(),
+            Self::Parallel => "parallel".to_string(),
+            Self::Conditional => "conditional".to_string(),
+            Self::Pipeline => "pipeline".to_string(),
+            Self::EventDriven => "event_driven".to_string(),
+            Self::Custom(name) => name.clone(),
         }
     }
 }
@@ -99,6 +100,7 @@ pub struct OrchestratorAgentTemplate {
 
 impl OrchestratorAgentTemplate {
     /// Create new Orchestrator Agent template
+    #[must_use]
     pub fn new() -> Self {
         let metadata = TemplateMetadata {
             id: "orchestrator_agent".to_string(),
@@ -342,12 +344,14 @@ impl OrchestratorAgentTemplate {
     }
 
     /// Create Orchestrator Agent template with custom configuration
+    #[must_use]
     pub fn with_config(mut self, config: OrchestratorAgentConfig) -> Self {
         self.config = config;
         self
     }
 
     /// Create simple orchestrator template for basic workflow coordination
+    #[must_use]
     pub fn simple() -> Self {
         let mut template = Self::new();
 
@@ -380,6 +384,7 @@ impl OrchestratorAgentTemplate {
     }
 
     /// Create enterprise orchestrator template for complex orchestration scenarios
+    #[must_use]
     pub fn enterprise() -> Self {
         let mut template = Self::new();
 
@@ -422,6 +427,7 @@ impl OrchestratorAgentTemplate {
     }
 
     /// Create event-driven orchestrator template
+    #[must_use]
     pub fn event_driven() -> Self {
         let mut template = Self::new();
 
@@ -594,7 +600,7 @@ impl AgentTemplate for OrchestratorAgentTemplate {
         );
         final_config.insert(
             "max_retries".to_string(),
-            (agent_config.max_retries as u64).into(),
+            u64::from(agent_config.max_retries).into(),
         );
 
         if let Some(templates_dir) = &agent_config.workflow_templates_dir {
@@ -636,7 +642,7 @@ impl AgentTemplate for OrchestratorAgentTemplate {
     }
 
     fn clone_template(&self) -> Box<dyn AgentTemplate> {
-        Box::new(OrchestratorAgentTemplate {
+        Box::new(Self {
             schema: self.schema.clone(),
             config: self.config.clone(),
         })
@@ -697,7 +703,7 @@ impl BaseAgent for MockOrchestratorAgent {
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput, LLMSpellError> {
         Ok(AgentOutput {
-            text: format!("Orchestrator error handled: {}", error),
+            text: format!("Orchestrator error handled: {error}"),
             media: vec![],
             tool_calls: vec![],
             metadata: OutputMetadata::default(),

@@ -1,5 +1,5 @@
 //! ABOUTME: Core types and traits for the global object injection system
-//! ABOUTME: Defines GlobalObject trait and supporting types
+//! ABOUTME: Defines `GlobalObject` trait and supporting types
 
 use crate::{ComponentRegistry, ProviderManager};
 use llmspell_core::Result;
@@ -41,6 +41,7 @@ pub struct GlobalContext {
 
 impl GlobalContext {
     /// Create a new global context
+    #[must_use]
     pub fn new(registry: Arc<ComponentRegistry>, providers: Arc<ProviderManager>) -> Self {
         Self {
             registry,
@@ -56,6 +57,7 @@ impl GlobalContext {
     }
 
     /// Get a bridge reference
+    #[must_use]
     pub fn get_bridge<T: Any + Send + Sync + 'static>(&self, name: &str) -> Option<Arc<T>> {
         let refs = self.bridge_refs.read();
         refs.get(name)
@@ -102,12 +104,14 @@ pub struct InjectionMetrics {
 
 impl InjectionMetrics {
     /// Check if injection meets performance requirements (<5ms)
-    pub fn is_within_bounds(&self) -> bool {
+    #[must_use]
+    pub const fn is_within_bounds(&self) -> bool {
         self.total_injection_time_us < 5000 // 5ms in microseconds
     }
 
     /// Get average injection time per global
-    pub fn average_time_us(&self) -> u64 {
+    #[must_use]
+    pub const fn average_time_us(&self) -> u64 {
         if self.globals_injected == 0 {
             0
         } else {

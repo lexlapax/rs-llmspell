@@ -36,6 +36,7 @@ impl Default for SitemapCrawlerTool {
 }
 
 impl SitemapCrawlerTool {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             metadata: ComponentMetadata::new(
@@ -103,10 +104,7 @@ impl BaseAgent for SitemapCrawlerTool {
     }
 
     async fn handle_error(&self, error: llmspell_core::LLMSpellError) -> Result<AgentOutput> {
-        Ok(AgentOutput::text(format!(
-            "SitemapCrawler error: {}",
-            error
-        )))
+        Ok(AgentOutput::text(format!("SitemapCrawler error: {error}")))
     }
 
     async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
@@ -181,7 +179,7 @@ struct SitemapStats {
 }
 
 impl SitemapStats {
-    fn new() -> Self {
+    const fn new() -> Self {
         Self {
             sitemaps_processed: 0,
             index_files_found: 0,
@@ -229,7 +227,7 @@ impl SitemapCrawlerTool {
                 .get(url)
                 .send()
                 .await
-                .map_err(|e| component_error(format!("Failed to fetch sitemap: {}", e)))?;
+                .map_err(|e| component_error(format!("Failed to fetch sitemap: {e}")))?;
 
             if !response.status().is_success() {
                 return Err(component_error(format!(
@@ -242,7 +240,7 @@ impl SitemapCrawlerTool {
             let xml_content = response
                 .text()
                 .await
-                .map_err(|e| component_error(format!("Failed to read sitemap content: {}", e)))?;
+                .map_err(|e| component_error(format!("Failed to read sitemap content: {e}")))?;
 
             stats.sitemaps_processed += 1;
 
@@ -280,7 +278,7 @@ impl SitemapCrawlerTool {
                 }
                 if url_entry
                     .get("has_metadata")
-                    .and_then(|m| m.as_bool())
+                    .and_then(serde_json::Value::as_bool)
                     .unwrap_or(false)
                 {
                     stats.urls_with_metadata += 1;

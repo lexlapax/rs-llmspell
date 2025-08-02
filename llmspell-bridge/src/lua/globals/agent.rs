@@ -96,7 +96,7 @@ impl UserData for LuaAgentInstance {
                 async move { bridge.get_agent_state(&agent_name).await },
                 None,
             )?;
-            Ok(format!("{:?}", state))
+            Ok(format!("{state:?}"))
         });
 
         // getConfig method
@@ -196,7 +196,7 @@ impl UserData for LuaAgentInstance {
                 wrapped_params.insert("parameters".to_string(), tool_input_json);
 
                 let agent_input = llmspell_core::types::AgentInput {
-                    text: format!("Invoking tool: {}", tool_name),
+                    text: format!("Invoking tool: {tool_name}"),
                     media: vec![],
                     context: None,
                     parameters: wrapped_params,
@@ -322,23 +322,28 @@ impl UserData for LuaAgentInstance {
             match perf_result {
                 Ok(perf_json) => {
                     let perf_table = lua.create_table()?;
-                    if let Some(total_executions) =
-                        perf_json.get("total_executions").and_then(|v| v.as_u64())
+                    if let Some(total_executions) = perf_json
+                        .get("total_executions")
+                        .and_then(serde_json::Value::as_u64)
                     {
                         perf_table.set("total_executions", total_executions as f64)?;
                     }
                     if let Some(avg_time) = perf_json
                         .get("avg_execution_time_ms")
-                        .and_then(|v| v.as_f64())
+                        .and_then(serde_json::Value::as_f64)
                     {
                         perf_table.set("avg_execution_time_ms", avg_time)?;
                     }
-                    if let Some(success_rate) =
-                        perf_json.get("success_rate").and_then(|v| v.as_f64())
+                    if let Some(success_rate) = perf_json
+                        .get("success_rate")
+                        .and_then(serde_json::Value::as_f64)
                     {
                         perf_table.set("success_rate", success_rate)?;
                     }
-                    if let Some(error_rate) = perf_json.get("error_rate").and_then(|v| v.as_f64()) {
+                    if let Some(error_rate) = perf_json
+                        .get("error_rate")
+                        .and_then(serde_json::Value::as_f64)
+                    {
                         perf_table.set("error_rate", error_rate)?;
                     }
                     Ok(Some(perf_table))
@@ -464,7 +469,7 @@ impl UserData for LuaAgentInstance {
                 async move { bridge.get_agent_state(&agent_name).await },
                 None,
             )?;
-            Ok(format!("{:?}", state))
+            Ok(format!("{state:?}"))
         });
 
         // initialize method - synchronous wrapper
@@ -598,7 +603,10 @@ impl UserData for LuaAgentInstance {
                         {
                             transition_table.set("timestamp", timestamp)?;
                         }
-                        if let Some(elapsed) = transition.get("elapsed").and_then(|v| v.as_f64()) {
+                        if let Some(elapsed) = transition
+                            .get("elapsed")
+                            .and_then(serde_json::Value::as_f64)
+                        {
                             transition_table.set("elapsed", elapsed)?;
                         }
                         if let Some(reason) = transition.get("reason").and_then(|v| v.as_str()) {
@@ -683,20 +691,26 @@ impl UserData for LuaAgentInstance {
                     }
                     if let Some(transitions) = metrics_json
                         .get("total_transitions")
-                        .and_then(|v| v.as_u64())
+                        .and_then(serde_json::Value::as_u64)
                     {
                         metrics_table.set("total_transitions", transitions as f64)?;
                     }
-                    if let Some(errors) = metrics_json.get("error_count").and_then(|v| v.as_u64()) {
+                    if let Some(errors) = metrics_json
+                        .get("error_count")
+                        .and_then(serde_json::Value::as_u64)
+                    {
                         metrics_table.set("error_count", errors as f64)?;
                     }
                     if let Some(attempts) = metrics_json
                         .get("recovery_attempts")
-                        .and_then(|v| v.as_u64())
+                        .and_then(serde_json::Value::as_u64)
                     {
                         metrics_table.set("recovery_attempts", attempts as f64)?;
                     }
-                    if let Some(uptime) = metrics_json.get("uptime").and_then(|v| v.as_f64()) {
+                    if let Some(uptime) = metrics_json
+                        .get("uptime")
+                        .and_then(serde_json::Value::as_f64)
+                    {
                         metrics_table.set("uptime", uptime)?;
                     }
                     if let Some(last_transition) =
@@ -849,7 +863,7 @@ pub fn inject_agent_global(
 
         // Create full agent configuration
         let agent_config = serde_json::json!({
-            "name": name.clone(),
+            "name": name,
             "description": description,
             "agent_type": "llm",  // Default to LLM agent type
             "model": model_config,
@@ -881,7 +895,7 @@ pub fn inject_agent_global(
                     .create_agent(&name, "llm", config_map)
                     .await
                     .map_err(|e| {
-                        mlua::Error::RuntimeError(format!("Failed to create agent: {}", e))
+                        mlua::Error::RuntimeError(format!("Failed to create agent: {e}"))
                     })?;
 
                 // Create Lua agent instance
@@ -933,7 +947,7 @@ pub fn inject_agent_global(
 
         // Convert Lua table to JSON
         let config_value = lua_table_to_json(config)
-            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert config: {}", e)))?;
+            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert config: {e}")))?;
 
         // Use sync wrapper to call async method
         let tool_name = block_on_async(
@@ -941,7 +955,7 @@ pub fn inject_agent_global(
             bridge.wrap_agent_as_tool(&agent_name, config_value),
             None,
         )
-        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to wrap agent as tool: {}", e)))?;
+        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to wrap agent as tool: {e}")))?;
 
         Ok(tool_name)
     })?;
@@ -953,11 +967,11 @@ pub fn inject_agent_global(
 
         // Use sync wrapper to call async method
         let agent_info = block_on_async("agent_getInfo", bridge.get_agent_info(&agent_name), None)
-            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to get agent info: {}", e)))?;
+            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to get agent info: {e}")))?;
 
         // Convert AgentInfo to JSON, then to Lua table
         let info_json = serde_json::to_value(&agent_info).map_err(|e| {
-            mlua::Error::RuntimeError(format!("Failed to serialize agent info: {}", e))
+            mlua::Error::RuntimeError(format!("Failed to serialize agent info: {e}"))
         })?;
         let info_table = json_to_lua_value(lua, &info_json)?;
         match info_table {
@@ -979,7 +993,7 @@ pub fn inject_agent_global(
             bridge.list_agent_capabilities(),
             None,
         )
-        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to list capabilities: {}", e)))?;
+        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to list capabilities: {e}")))?;
 
         // Convert JSON to Lua table
         let capabilities_table = json_to_lua_value(lua, &capabilities_json)?;
@@ -1006,7 +1020,7 @@ pub fn inject_agent_global(
 
         // Convert config to JSON
         let config_json = lua_table_to_json(config)
-            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert config: {}", e)))?;
+            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert config: {e}")))?;
 
         // Use sync wrapper to call async method
         block_on_async(
@@ -1014,7 +1028,7 @@ pub fn inject_agent_global(
             bridge.create_composite_agent(name, agents, config_json),
             None,
         )
-        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to create composite: {}", e)))?;
+        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to create composite: {e}")))?;
 
         Ok(())
     })?;
@@ -1030,7 +1044,7 @@ pub fn inject_agent_global(
             bridge.discover_agents_by_capability(&capability),
             None,
         )
-        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to discover agents: {}", e)))?;
+        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to discover agents: {e}")))?;
 
         // Convert to Lua table
         let agents_table = lua.create_table()?;
@@ -1062,7 +1076,7 @@ pub fn inject_agent_global(
 
         // Convert entire args table to JSON for config
         let mut config_json = lua_table_to_json(args)
-            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert config: {}", e)))?;
+            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert config: {e}")))?;
 
         // Fix empty objects that should be arrays
         if let serde_json::Value::Object(ref mut map) = config_json {
@@ -1093,7 +1107,7 @@ pub fn inject_agent_global(
             bridge.create_agent(&name, &agent_type, config_map),
             None,
         )
-        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to register agent: {}", e)))?;
+        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to register agent: {e}")))?;
 
         // Return the agent name
         Ok(name)
@@ -1115,7 +1129,7 @@ pub fn inject_agent_global(
             // Create Lua agent instance
             let agent_instance = LuaAgentInstance {
                 agent_instance_name: agent_name,
-                bridge: bridge.clone(),
+                bridge,
             };
             Ok(Some(agent_instance))
         } else {
@@ -1159,13 +1173,13 @@ pub fn inject_agent_global(
                 None,
             )
             .map_err(|e| {
-                mlua::Error::RuntimeError(format!("Failed to create from template: {}", e))
+                mlua::Error::RuntimeError(format!("Failed to create from template: {e}"))
             })?;
 
             // Return the created agent instance
             let agent_instance = LuaAgentInstance {
-                agent_instance_name: instance_name.clone(),
-                bridge: bridge.clone(),
+                agent_instance_name: instance_name,
+                bridge,
             };
             Ok(agent_instance)
         })?;
@@ -1190,14 +1204,14 @@ pub fn inject_agent_global(
     let create_context_fn = lua.create_function(move |_lua, config: Table| {
         let bridge = bridge_clone.clone();
         let config_json = lua_table_to_json(config)
-            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert config: {}", e)))?;
+            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert config: {e}")))?;
 
         let context_id = block_on_async(
             "agent_createContext",
             bridge.create_context(config_json),
             None,
         )
-        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to create context: {}", e)))?;
+        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to create context: {e}")))?;
 
         Ok(context_id)
     })?;
@@ -1208,9 +1222,8 @@ pub fn inject_agent_global(
         lua.create_function(move |_lua, args: (String, Table, String)| {
             let (parent_id, scope, inheritance) = args;
             let bridge = bridge_clone.clone();
-            let scope_json = lua_table_to_json(scope).map_err(|e| {
-                mlua::Error::RuntimeError(format!("Failed to convert scope: {}", e))
-            })?;
+            let scope_json = lua_table_to_json(scope)
+                .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert scope: {e}")))?;
 
             let child_id = block_on_async(
                 "agent_createChildContext",
@@ -1218,7 +1231,7 @@ pub fn inject_agent_global(
                 None,
             )
             .map_err(|e| {
-                mlua::Error::RuntimeError(format!("Failed to create child context: {}", e))
+                mlua::Error::RuntimeError(format!("Failed to create child context: {e}"))
             })?;
 
             Ok(child_id)
@@ -1230,14 +1243,14 @@ pub fn inject_agent_global(
         let (context_id, key, value) = args;
         let bridge = bridge_clone.clone();
         let value_json = crate::lua::conversion::lua_value_to_json(value)
-            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert value: {}", e)))?;
+            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert value: {e}")))?;
 
         block_on_async(
             "agent_updateContext",
             bridge.update_context(&context_id, key, value_json),
             None,
         )
-        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to update context: {}", e)))?;
+        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to update context: {e}")))?;
 
         Ok(())
     })?;
@@ -1253,7 +1266,7 @@ pub fn inject_agent_global(
             bridge.get_context_data(&context_id, &key),
             None,
         )
-        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to get context data: {}", e)))?;
+        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to get context data: {e}")))?;
 
         match result {
             Some(value) => json_to_lua_value(lua, &value),
@@ -1271,7 +1284,7 @@ pub fn inject_agent_global(
             bridge.remove_context(&context_id),
             None,
         )
-        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to remove context: {}", e)))?;
+        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to remove context: {e}")))?;
 
         Ok(())
     })?;
@@ -1284,16 +1297,16 @@ pub fn inject_agent_global(
         let (scope, key, value) = args;
         let bridge = bridge_clone.clone();
         let scope_json = lua_table_to_json(scope)
-            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert scope: {}", e)))?;
+            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert scope: {e}")))?;
         let value_json = crate::lua::conversion::lua_value_to_json(value)
-            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert value: {}", e)))?;
+            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert value: {e}")))?;
 
         block_on_async(
             "agent_setSharedMemory",
             bridge.set_shared_memory(scope_json, key, value_json),
             None,
         )
-        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to set shared memory: {}", e)))?;
+        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to set shared memory: {e}")))?;
 
         Ok(())
     })?;
@@ -1304,14 +1317,14 @@ pub fn inject_agent_global(
         let (scope, key) = args;
         let bridge = bridge_clone.clone();
         let scope_json = lua_table_to_json(scope)
-            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert scope: {}", e)))?;
+            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert scope: {e}")))?;
 
         let result = block_on_async(
             "agent_getSharedMemory",
             bridge.get_shared_memory(scope_json, &key),
             None,
         )
-        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to get shared memory: {}", e)))?;
+        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to get shared memory: {e}")))?;
 
         match result {
             Some(value) => json_to_lua_value(lua, &value),
@@ -1329,13 +1342,13 @@ pub fn inject_agent_global(
             bridge.get_composition_hierarchy(&agent_name),
             None,
         )
-        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to get hierarchy: {}", e)))?;
+        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to get hierarchy: {e}")))?;
 
         json_to_lua_value(lua, &hierarchy)
     })?;
 
     // Create Agent.getDetails() function (alias for getInfo with different return format)
-    let bridge_clone = bridge.clone();
+    let bridge_clone = bridge;
     let get_details_fn = lua.create_function(move |lua, agent_name: String| {
         let bridge = bridge_clone.clone();
 
@@ -1344,7 +1357,7 @@ pub fn inject_agent_global(
             bridge.get_agent_details(&agent_name),
             None,
         )
-        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to get agent details: {}", e)))?;
+        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to get agent details: {e}")))?;
 
         json_to_lua_value(lua, &details)
     })?;

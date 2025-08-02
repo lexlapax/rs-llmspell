@@ -4,13 +4,12 @@
 
 use chrono::Utc;
 use llmspell_utils::api_key_manager::{ApiKeyManager, ApiKeyMetadata};
-use once_cell::sync::Lazy;
 use parking_lot::RwLock;
 use std::sync::Arc;
 
 /// Global API key manager instance
-static API_KEY_MANAGER: Lazy<Arc<RwLock<ApiKeyManager>>> =
-    Lazy::new(|| Arc::new(RwLock::new(ApiKeyManager::new())));
+static API_KEY_MANAGER: std::sync::LazyLock<Arc<RwLock<ApiKeyManager>>> =
+    std::sync::LazyLock::new(|| Arc::new(RwLock::new(ApiKeyManager::new())));
 
 use std::sync::Once;
 
@@ -26,6 +25,7 @@ fn ensure_initialized() {
 }
 
 /// Get the global API key manager
+#[must_use]
 pub fn get_api_key_manager() -> Arc<RwLock<ApiKeyManager>> {
     ensure_initialized();
     Arc::clone(&API_KEY_MANAGER)
@@ -49,11 +49,15 @@ pub fn get_api_key(service: &str) -> Option<String> {
 }
 
 /// Add an API key programmatically
+///
+/// # Errors
+///
+/// Returns an error if storing the API key fails
 pub fn add_api_key(service: &str, key: &str) -> Result<(), String> {
     ensure_initialized();
     let manager = API_KEY_MANAGER.read();
     let metadata = ApiKeyMetadata {
-        key_id: format!("tool_{}", service),
+        key_id: format!("tool_{service}"),
         service: service.to_string(),
         created_at: Utc::now(),
         last_used: None,
@@ -67,7 +71,7 @@ pub fn add_api_key(service: &str, key: &str) -> Result<(), String> {
 
 /// Configuration helper for tools that need API keys
 pub struct ApiKeyConfig {
-    /// Service name (e.g., "google_search", "sendgrid")
+    /// Service name (e.g., "`google_search`", "sendgrid")
     pub service: String,
     /// Whether the API key is required
     pub required: bool,
@@ -86,7 +90,8 @@ impl ApiKeyConfig {
     }
 
     /// Set whether the key is required
-    pub fn required(mut self, required: bool) -> Self {
+    #[must_use]
+    pub const fn required(mut self, required: bool) -> Self {
         self.required = required;
         self
     }
@@ -99,20 +104,23 @@ impl ApiKeyConfig {
 
     /// Get the API key
     pub fn get_key(&self) -> Result<Option<String>, String> {
-        if let Some(key) = get_api_key(&self.service) {
-            Ok(Some(key))
-        } else if let Some(default) = &self.default {
-            Ok(Some(default.clone()))
-        } else if self.required {
-            Err(format!(
-                "API key for service '{}' is required but not found. \
-                Set the environment variable LLMSPELL_API_KEY_{} or configure it using the CLI.",
-                self.service,
-                self.service.to_uppercase()
-            ))
-        } else {
-            Ok(None)
-        }
+        get_api_key(&self.service).map_or_else(
+            || {
+                if let Some(default) = &self.default {
+                    Ok(Some(default.clone()))
+                } else if self.required {
+                    Err(format!(
+                        "API key for service '{}' is required but not found. \
+                        Set the environment variable LLMSPELL_API_KEY_{} or configure it using the CLI.",
+                        self.service,
+                        self.service.to_uppercase()
+                    ))
+                } else {
+                    Ok(None)
+                }
+            },
+            |key| Ok(Some(key)),
+        )
     }
 }
 

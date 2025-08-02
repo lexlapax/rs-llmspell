@@ -23,6 +23,7 @@ pub struct ValidationResult {
 
 impl ValidationResult {
     /// Create a successful validation result
+    #[must_use]
     pub fn success() -> Self {
         Self {
             is_valid: true,
@@ -49,6 +50,7 @@ impl ValidationResult {
     }
 
     /// Check if there are any issues (errors or warnings)
+    #[must_use]
     pub fn has_issues(&self) -> bool {
         !self.errors.is_empty() || !self.warnings.is_empty()
     }
@@ -94,63 +96,59 @@ pub enum ValidationError {
 impl std::fmt::Display for ValidationError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ValidationError::MissingRequired { field, context } => {
-                write!(f, "Missing required field '{}' in {}", field, context)
+            Self::MissingRequired { field, context } => {
+                write!(f, "Missing required field '{field}' in {context}")
             }
-            ValidationError::InvalidValue {
+            Self::InvalidValue {
                 field,
                 value,
                 expected,
             } => {
                 write!(
                     f,
-                    "Invalid value '{}' for field '{}', expected: {}",
-                    value, field, expected
+                    "Invalid value '{value}' for field '{field}', expected: {expected}"
                 )
             }
-            ValidationError::ConstraintViolation {
+            Self::ConstraintViolation {
                 field,
                 constraint,
                 value,
             } => {
                 write!(
                     f,
-                    "Constraint violation for field '{}': {} (value: {})",
-                    field, constraint, value
+                    "Constraint violation for field '{field}': {constraint} (value: {value})"
                 )
             }
-            ValidationError::DependencyNotFound {
+            Self::DependencyNotFound {
                 dependency,
                 context,
             } => {
-                write!(f, "Dependency '{}' not found in {}", dependency, context)
+                write!(f, "Dependency '{dependency}' not found in {context}")
             }
-            ValidationError::CircularDependency { items } => {
+            Self::CircularDependency { items } => {
                 write!(f, "Circular dependency detected: {}", items.join(" -> "))
             }
-            ValidationError::ResourceLimitExceeded {
+            Self::ResourceLimitExceeded {
                 resource,
                 requested,
                 limit,
             } => {
                 write!(
                     f,
-                    "Resource limit exceeded for {}: requested {}, limit {}",
-                    resource, requested, limit
+                    "Resource limit exceeded for {resource}: requested {requested}, limit {limit}"
                 )
             }
-            ValidationError::IncompatibleConfig {
+            Self::IncompatibleConfig {
                 field1,
                 field2,
                 reason,
             } => {
                 write!(
                     f,
-                    "Incompatible configuration between '{}' and '{}': {}",
-                    field1, field2, reason
+                    "Incompatible configuration between '{field1}' and '{field2}': {reason}"
                 )
             }
-            ValidationError::Custom { message } => write!(f, "{}", message),
+            Self::Custom { message } => write!(f, "{message}"),
         }
     }
 }
@@ -181,36 +179,32 @@ pub enum ValidationWarning {
 impl std::fmt::Display for ValidationWarning {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ValidationWarning::Deprecated {
+            Self::Deprecated {
                 feature,
                 alternative,
             } => {
-                write!(f, "Deprecated feature '{}' used", feature)?;
+                write!(f, "Deprecated feature '{feature}' used")?;
                 if let Some(alt) = alternative {
-                    write!(f, ", consider using '{}'", alt)?;
+                    write!(f, ", consider using '{alt}'")?;
                 }
                 Ok(())
             }
-            ValidationWarning::SuboptimalConfig { field, suggestion } => {
-                write!(
-                    f,
-                    "Suboptimal configuration for '{}': {}",
-                    field, suggestion
-                )
+            Self::SuboptimalConfig { field, suggestion } => {
+                write!(f, "Suboptimal configuration for '{field}': {suggestion}")
             }
-            ValidationWarning::MissingOptional { feature, impact } => {
-                write!(f, "Missing optional feature '{}': {}", feature, impact)
+            Self::MissingOptional { feature, impact } => {
+                write!(f, "Missing optional feature '{feature}': {impact}")
             }
-            ValidationWarning::PerformanceConcern { area, details } => {
-                write!(f, "Performance concern in {}: {}", area, details)
+            Self::PerformanceConcern { area, details } => {
+                write!(f, "Performance concern in {area}: {details}")
             }
-            ValidationWarning::SecurityConsideration {
+            Self::SecurityConsideration {
                 area,
                 recommendation,
             } => {
-                write!(f, "Security consideration for {}: {}", area, recommendation)
+                write!(f, "Security consideration for {area}: {recommendation}")
             }
-            ValidationWarning::Custom { message } => write!(f, "{}", message),
+            Self::Custom { message } => write!(f, "{message}"),
         }
     }
 }
@@ -233,6 +227,7 @@ impl Default for TemplateValidator {
 
 impl TemplateValidator {
     /// Create new validator
+    #[must_use]
     pub fn new() -> Self {
         Self {
             available_tools: HashSet::new(),
@@ -266,7 +261,7 @@ impl TemplateValidator {
     }
 
     /// Set system resource limits
-    pub fn set_system_limits(&mut self, limits: ResourceRequirements) {
+    pub const fn set_system_limits(&mut self, limits: ResourceRequirements) {
         self.system_limits = limits;
     }
 
@@ -276,6 +271,7 @@ impl TemplateValidator {
     }
 
     /// Validate template schema
+    #[must_use]
     pub fn validate_schema(&self, schema: &TemplateSchema) -> ValidationResult {
         let mut result = ValidationResult::success();
 
@@ -293,6 +289,7 @@ impl TemplateValidator {
     }
 
     /// Validate template instantiation parameters
+    #[must_use]
     pub fn validate_instantiation(
         &self,
         schema: &TemplateSchema,
@@ -316,7 +313,7 @@ impl TemplateValidator {
                 self.validate_parameter_value(param_def, value, &mut result);
             } else {
                 result.add_warning(ValidationWarning::Custom {
-                    message: format!("Unknown parameter '{}' provided", name),
+                    message: format!("Unknown parameter '{name}' provided"),
                 });
             }
         }
@@ -411,7 +408,7 @@ impl TemplateValidator {
                         result.add_error(ValidationError::InvalidValue {
                             field: param_def.name.clone(),
                             value: str_val.to_string(),
-                            expected: format!("one of: {:?}", allowed),
+                            expected: format!("one of: {allowed:?}"),
                         });
                     }
                 } else {
@@ -445,7 +442,7 @@ impl TemplateValidator {
                     if num < *min {
                         result.add_error(ValidationError::ConstraintViolation {
                             field: param_name.to_string(),
-                            constraint: format!("minimum value {}", min),
+                            constraint: format!("minimum value {min}"),
                             value: num.to_string(),
                         });
                     }
@@ -456,7 +453,7 @@ impl TemplateValidator {
                     if num > *max {
                         result.add_error(ValidationError::ConstraintViolation {
                             field: param_name.to_string(),
-                            constraint: format!("maximum value {}", max),
+                            constraint: format!("maximum value {max}"),
                             value: num.to_string(),
                         });
                     }
@@ -473,7 +470,7 @@ impl TemplateValidator {
                 if length < *min_len {
                     result.add_error(ValidationError::ConstraintViolation {
                         field: param_name.to_string(),
-                        constraint: format!("minimum length {}", min_len),
+                        constraint: format!("minimum length {min_len}"),
                         value: length.to_string(),
                     });
                 }
@@ -489,7 +486,7 @@ impl TemplateValidator {
                 if length > *max_len {
                     result.add_error(ValidationError::ConstraintViolation {
                         field: param_name.to_string(),
-                        constraint: format!("maximum length {}", max_len),
+                        constraint: format!("maximum length {max_len}"),
                         value: length.to_string(),
                     });
                 }
@@ -500,23 +497,20 @@ impl TemplateValidator {
                         if !regex.is_match(s) {
                             result.add_error(ValidationError::ConstraintViolation {
                                 field: param_name.to_string(),
-                                constraint: format!("pattern {}", pattern),
+                                constraint: format!("pattern {pattern}"),
                                 value: s.to_string(),
                             });
                         }
                     } else {
                         result.add_error(ValidationError::Custom {
-                            message: format!(
-                                "Invalid regex pattern for parameter '{}'",
-                                param_name
-                            ),
+                            message: format!("Invalid regex pattern for parameter '{param_name}'"),
                         });
                     }
                 }
             }
             ParameterConstraint::Custom(rule) => {
                 // Custom constraints would need specific handling
-                result.add_metadata(&format!("custom_constraint_{}", param_name), rule);
+                result.add_metadata(&format!("custom_constraint_{param_name}"), rule);
             }
         }
     }

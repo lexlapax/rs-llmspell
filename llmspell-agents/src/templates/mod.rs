@@ -47,6 +47,7 @@ pub mod prelude {
 }
 
 /// Create and register all built-in templates
+#[must_use]
 pub fn create_builtin_templates() -> TemplateFactory {
     let mut factory = TemplateFactory::new();
 

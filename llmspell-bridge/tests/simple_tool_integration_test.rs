@@ -114,7 +114,7 @@ async fn test_simple_tool_integration() {
             );
             println!("✅ Base64 encoder test passed");
         }
-        Err(e) => panic!("Base64 test failed: {}", e),
+        Err(e) => panic!("Base64 test failed: {e}"),
     }
 
     // Test 2: Calculator tool
@@ -161,7 +161,7 @@ async fn test_simple_tool_integration() {
             assert_eq!(obj.get("result").unwrap().as_f64().unwrap(), 14.0);
             println!("✅ Calculator test passed");
         }
-        Err(e) => panic!("Calculator test failed: {}", e),
+        Err(e) => panic!("Calculator test failed: {e}"),
     }
 
     // Test 3: Tool chaining
@@ -254,11 +254,11 @@ async fn test_simple_tool_integration() {
             assert!(obj.get("hash").unwrap().as_str().unwrap().len() == 32);
             println!("✅ Tool chaining test passed");
         }
-        Err(e) => panic!("Tool chaining test failed: {}", e),
+        Err(e) => panic!("Tool chaining test failed: {e}"),
     }
 
     // Test 4: List all available tools
-    let list_tools_test = r#"
+    let list_tools_test = r"
         local tools = Tool.list()
         local count = 0
         local tool_names = {}
@@ -274,16 +274,16 @@ async fn test_simple_tool_integration() {
             has_calculator = false,
             has_base64 = false
         }
-    "#;
+    ";
 
     match engine.execute_script(list_tools_test).await {
         Ok(result) => {
             let obj = result.output.as_object().expect("Expected object");
             let count = obj.get("count").unwrap().as_i64().unwrap();
-            println!("✅ Found {} tools registered", count);
-            assert!(count >= 25, "Expected at least 25 tools, found {}", count);
+            println!("✅ Found {count} tools registered");
+            assert!(count >= 25, "Expected at least 25 tools, found {count}");
         }
-        Err(e) => panic!("Tool listing test failed: {}", e),
+        Err(e) => panic!("Tool listing test failed: {e}"),
     }
 
     // Test 5: System → Data → Utility chain (Env → JSON → Template)
@@ -433,7 +433,7 @@ async fn test_simple_tool_integration() {
             assert!(obj.get("template_rendered").unwrap().as_bool().unwrap());
             println!("✅ System → Data → Utility chain test passed");
         }
-        Err(e) => panic!("System chain test failed: {}", e),
+        Err(e) => panic!("System chain test failed: {e}"),
     }
 
     // Test 6: File → Data → File chain (Write → CSV → Read)
@@ -585,7 +585,7 @@ async fn test_simple_tool_integration() {
             assert!(obj.get("analysis_written").unwrap().as_bool().unwrap());
             println!("✅ File → Data → File chain test passed");
         }
-        Err(e) => panic!("File chain test failed: {}", e),
+        Err(e) => panic!("File chain test failed: {e}"),
     }
 
     // Test 7: Data → System → File chain (HTTP simulation → Process → Save)
@@ -734,7 +734,7 @@ async fn test_simple_tool_integration() {
             assert!(obj.get("file_saved").unwrap().as_bool().unwrap());
             println!("✅ Data → System → File chain test passed");
         }
-        Err(e) => panic!("Data → System → File chain test failed: {}", e),
+        Err(e) => panic!("Data → System → File chain test failed: {e}"),
     }
 
     // Test 8: Error propagation through chains
@@ -869,7 +869,7 @@ async fn test_simple_tool_integration() {
             assert!(obj.get("chain_failure_caught").unwrap().as_bool().unwrap());
             println!("✅ Error propagation test passed");
         }
-        Err(e) => panic!("Error propagation test failed: {}", e),
+        Err(e) => panic!("Error propagation test failed: {e}"),
     }
 
     println!("\n✅ All integration tests passed!");
@@ -927,7 +927,7 @@ async fn test_tool_performance() {
     println!("\n=== Tool Performance Benchmarks ===");
 
     for (name, script) in benchmarks {
-        let full_script = format!("return {}", script);
+        let full_script = format!("return {script}");
         let iterations = 50;
 
         let start = Instant::now();
@@ -936,9 +936,9 @@ async fn test_tool_performance() {
         }
         let elapsed = start.elapsed();
 
-        let per_op_ms = elapsed.as_micros() as f64 / iterations as f64 / 1000.0;
+        let per_op_ms = elapsed.as_micros() as f64 / f64::from(iterations) / 1000.0;
 
-        println!("{:<20} {:>8.3} ms/op", name, per_op_ms);
+        println!("{name:<20} {per_op_ms:>8.3} ms/op");
 
         // Check <10ms requirement
         if per_op_ms > 10.0 {

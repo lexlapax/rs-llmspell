@@ -1,4 +1,4 @@
-//! ABOUTME: Integration tests for ArtifactGlobal functionality
+//! ABOUTME: Integration tests for `ArtifactGlobal` functionality
 //! ABOUTME: Tests artifact CRUD, binary data, metadata, and large file handling
 
 #[cfg(feature = "lua")]

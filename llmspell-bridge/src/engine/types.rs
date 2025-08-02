@@ -43,12 +43,10 @@ pub enum ScriptEngineError {
 impl From<ScriptEngineError> for llmspell_core::error::LLMSpellError {
     fn from(err: ScriptEngineError) -> Self {
         match err {
-            ScriptEngineError::ExecutionError { engine, details } => {
-                llmspell_core::error::LLMSpellError::Component {
-                    message: format!("{} engine execution error: {}", engine, details),
-                    source: None,
-                }
-            }
+            ScriptEngineError::ExecutionError { engine, details } => Self::Component {
+                message: format!("{engine} engine execution error: {details}"),
+                source: None,
+            },
             ScriptEngineError::SyntaxError {
                 engine,
                 message,
@@ -56,23 +54,21 @@ impl From<ScriptEngineError> for llmspell_core::error::LLMSpellError {
                 ..
             } => {
                 let detail = if let Some(l) = line {
-                    format!("{} at line {}", message, l)
+                    format!("{message} at line {l}")
                 } else {
                     message
                 };
-                llmspell_core::error::LLMSpellError::Validation {
+                Self::Validation {
                     field: Some("script".to_string()),
-                    message: format!("{} syntax error: {}", engine, detail),
+                    message: format!("{engine} syntax error: {detail}"),
                 }
             }
-            ScriptEngineError::UnsupportedFeature { engine, feature } => {
-                llmspell_core::error::LLMSpellError::Component {
-                    message: format!("Feature '{}' not supported by {} engine", feature, engine),
-                    source: None,
-                }
-            }
-            _ => llmspell_core::error::LLMSpellError::Component {
-                message: format!("Script engine error: {:?}", err),
+            ScriptEngineError::UnsupportedFeature { engine, feature } => Self::Component {
+                message: format!("Feature '{feature}' not supported by {engine} engine"),
+                source: None,
+            },
+            _ => Self::Component {
+                message: format!("Script engine error: {err:?}"),
                 source: None,
             },
         }

@@ -1,4 +1,4 @@
-//! ABOUTME: LuaEngine implementation of ScriptEngineBridge trait
+//! ABOUTME: `LuaEngine` implementation of `ScriptEngineBridge` trait
 //! ABOUTME: Provides Lua 5.4 script execution with coroutine-based streaming
 
 use crate::engine::types::ScriptEngineError;
@@ -61,7 +61,8 @@ impl LuaEngine {
     }
 
     /// Get the supported features for Lua
-    pub fn engine_features() -> EngineFeatures {
+    #[must_use]
+    pub const fn engine_features() -> EngineFeatures {
         EngineFeatures {
             async_execution: true, // Via coroutines
             streaming: true,
@@ -162,7 +163,7 @@ impl ScriptEngineBridge for LuaEngine {
                     chunk_index: 0,
                     content: llmspell_core::types::ChunkContent::Control(
                         llmspell_core::types::ControlMessage::StreamCancelled {
-                            reason: format!("Script execution failed: {}", e),
+                            reason: format!("Script execution failed: {e}"),
                         },
                     ),
                     metadata: Default::default(),
@@ -237,7 +238,7 @@ impl ScriptEngineBridge for LuaEngine {
             let global_registry =
                 futures::executor::block_on(create_standard_registry(global_context.clone()))
                     .map_err(|e| LLMSpellError::Component {
-                        message: format!("Failed to create global registry: {}", e),
+                        message: format!("Failed to create global registry: {e}"),
                         source: None,
                     })?;
             let injector = GlobalInjector::new(Arc::new(global_registry));
@@ -284,7 +285,7 @@ fn lua_value_to_json(_lua: &mlua::Lua, value: mlua::Value) -> Result<Value, LLMS
         LuaValue::Number(n) => Ok(Value::from(n)),
         LuaValue::String(s) => {
             let str = s.to_str().map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to convert Lua string: {}", e),
+                message: format!("Failed to convert Lua string: {e}"),
                 source: None,
             })?;
             Ok(Value::String(str.to_string()))
@@ -294,11 +295,11 @@ fn lua_value_to_json(_lua: &mlua::Lua, value: mlua::Value) -> Result<Value, LLMS
             if is_lua_array(&table) {
                 let mut array = Vec::new();
                 for i in 1..=table.len().map_err(|e| LLMSpellError::Component {
-                    message: format!("Failed to get table length: {}", e),
+                    message: format!("Failed to get table length: {e}"),
                     source: None,
                 })? {
                     let value: LuaValue = table.get(i).map_err(|e| LLMSpellError::Component {
-                        message: format!("Failed to get table value: {}", e),
+                        message: format!("Failed to get table value: {e}"),
                         source: None,
                     })?;
                     array.push(lua_value_to_json(_lua, value)?);
@@ -309,13 +310,13 @@ fn lua_value_to_json(_lua: &mlua::Lua, value: mlua::Value) -> Result<Value, LLMS
                 let mut map = serde_json::Map::new();
                 for pair in table.pairs::<LuaValue, LuaValue>() {
                     let (k, v) = pair.map_err(|e| LLMSpellError::Component {
-                        message: format!("Failed to iterate table: {}", e),
+                        message: format!("Failed to iterate table: {e}"),
                         source: None,
                     })?;
 
                     if let LuaValue::String(key_str) = k {
                         let key = key_str.to_str().map_err(|e| LLMSpellError::Component {
-                            message: format!("Failed to convert table key: {}", e),
+                            message: format!("Failed to convert table key: {e}"),
                             source: None,
                         })?;
                         map.insert(key.to_string(), lua_value_to_json(_lua, v)?);
@@ -324,7 +325,7 @@ fn lua_value_to_json(_lua: &mlua::Lua, value: mlua::Value) -> Result<Value, LLMS
                 Ok(Value::Object(map))
             }
         }
-        _ => Ok(Value::String(format!("<{:?}>", value))),
+        _ => Ok(Value::String(format!("<{value:?}>"))),
     }
 }
 

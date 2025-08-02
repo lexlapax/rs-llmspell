@@ -37,7 +37,7 @@ async fn test_basic_tool_execution() {
     let result = runtime.execute_script(script).await;
     match result {
         Ok(_) => {}
-        Err(e) => panic!("Tool execution failed: {}", e),
+        Err(e) => panic!("Tool execution failed: {e}"),
     }
 }
 
@@ -217,7 +217,7 @@ async fn test_tool_error_handling() {
     let result = runtime.execute_script(script).await;
     match result {
         Ok(_) => {}
-        Err(e) => panic!("Error handling test failed: {}", e),
+        Err(e) => panic!("Error handling test failed: {e}"),
     }
 }
 
@@ -272,7 +272,7 @@ async fn test_file_operations() {
     let result = runtime.execute_script(script).await;
     match result {
         Ok(_) => {}
-        Err(e) => panic!("File operations failed: {}", e),
+        Err(e) => panic!("File operations failed: {e}"),
     }
 }
 
@@ -349,8 +349,11 @@ async fn test_tool_execution_performance() {
 
     if let Ok(output) = result {
         if let Some(obj) = output.output.as_object() {
-            if let Some(elapsed) = obj.get("elapsed").and_then(|v| v.as_f64()) {
-                println!("10 tool operations completed in {:.3}s", elapsed);
+            if let Some(elapsed) = obj
+                .get("elapsed")
+                .and_then(serde_json::value::Value::as_f64)
+            {
+                println!("10 tool operations completed in {elapsed:.3}s");
             }
         }
     }

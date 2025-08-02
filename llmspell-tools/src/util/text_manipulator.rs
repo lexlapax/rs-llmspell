@@ -90,6 +90,7 @@ pub struct TextManipulatorTool {
 
 impl TextManipulatorTool {
     /// Create a new text manipulator tool
+    #[must_use]
     pub fn new(config: TextManipulatorConfig) -> Self {
         Self {
             metadata: ComponentMetadata::new(
@@ -141,7 +142,7 @@ impl TextManipulatorTool {
                     .unwrap_or(" ");
                 let parts = string_utils::split_by(text, delimiter);
                 Ok(serde_json::to_string(&parts).map_err(|e| {
-                    component_error(format!("Failed to serialize split result: {}", e))
+                    component_error(format!("Failed to serialize split result: {e}"))
                 })?)
             }
             TextOperation::Join => {
@@ -157,7 +158,7 @@ impl TextManipulatorTool {
                     .and_then(|v| v.get("delimiter"))
                     .and_then(|v| v.as_str())
                     .unwrap_or(" ");
-                let parts_refs: Vec<&str> = parts.iter().map(|s| s.as_str()).collect();
+                let parts_refs: Vec<&str> = parts.iter().map(std::string::String::as_str).collect();
                 Ok(string_utils::join_with(&parts_refs, delimiter))
             }
             TextOperation::SnakeCase => Ok(string_utils::to_snake_case(text)),
@@ -168,16 +169,14 @@ impl TextManipulatorTool {
                 let max_len = options
                     .as_ref()
                     .and_then(|v| extract_optional_u64(v, "max_length"))
-                    .map(|v| v as usize)
-                    .unwrap_or(self.config.default_truncate_length);
+                    .map_or(self.config.default_truncate_length, |v| v as usize);
                 Ok(string_utils::truncate(text, max_len))
             }
             TextOperation::Indent => {
                 let spaces = options
                     .as_ref()
                     .and_then(|v| extract_optional_u64(v, "spaces"))
-                    .map(|v| v as usize)
-                    .unwrap_or(self.config.default_indent_spaces);
+                    .map_or(self.config.default_indent_spaces, |v| v as usize);
                 Ok(string_utils::indent(text, spaces))
             }
             TextOperation::Dedent => Ok(string_utils::dedent(text)),
@@ -186,8 +185,7 @@ impl TextManipulatorTool {
                 let width = options
                     .as_ref()
                     .and_then(|v| extract_optional_u64(v, "width"))
-                    .map(|v| v as usize)
-                    .unwrap_or(self.config.default_wrap_width);
+                    .map_or(self.config.default_wrap_width, |v| v as usize);
                 let lines = string_utils::word_wrap(text, width);
                 Ok(lines.join("\n"))
             }
@@ -248,13 +246,16 @@ impl TextManipulatorTool {
                 "substring" => {
                     options
                         .get("start")
-                        .and_then(|v| v.as_u64())
+                        .and_then(serde_json::Value::as_u64)
                         .ok_or_else(|| {
                             validation_error("Missing 'start' parameter", Some("start".to_string()))
                         })?;
-                    options.get("end").and_then(|v| v.as_u64()).ok_or_else(|| {
-                        validation_error("Missing 'end' parameter", Some("end".to_string()))
-                    })?;
+                    options
+                        .get("end")
+                        .and_then(serde_json::Value::as_u64)
+                        .ok_or_else(|| {
+                            validation_error("Missing 'end' parameter", Some("end".to_string()))
+                        })?;
                 }
                 _ => {} // Other operations have optional parameters
             }
@@ -307,7 +308,7 @@ impl BaseAgent for TextManipulatorTool {
         let operation: TextOperation =
             serde_json::from_value(json!(operation_str)).map_err(|_| {
                 validation_error(
-                    format!("Invalid operation: {}", operation_str),
+                    format!("Invalid operation: {operation_str}"),
                     Some("operation".to_string()),
                 )
             })?;
@@ -320,7 +321,7 @@ impl BaseAgent for TextManipulatorTool {
 
         // Build response using ResponseBuilder
         let response = ResponseBuilder::success(operation_str)
-            .with_message(format!("Text {} operation completed", operation_str))
+            .with_message(format!("Text {operation_str} operation completed"))
             .with_result(json!({
                 "result": result,
                 "operation": operation_str,
@@ -344,8 +345,7 @@ impl BaseAgent for TextManipulatorTool {
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
         Ok(AgentOutput::text(format!(
-            "Text manipulation error: {}",
-            error
+            "Text manipulation error: {error}"
         )))
     }
 }

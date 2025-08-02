@@ -75,8 +75,7 @@ fn _parse_workflow_step(_lua: &Lua, step_table: Table) -> mlua::Result<WorkflowS
         }
         _ => {
             return Err(mlua::Error::RuntimeError(format!(
-                "Unknown step type: {}",
-                step_type
+                "Unknown step type: {step_type}"
             )))
         }
     };
@@ -132,8 +131,7 @@ fn _parse_condition(_lua: &Lua, condition_value: Value) -> mlua::Result<Conditio
                         }
                     } else {
                         Err(mlua::Error::RuntimeError(format!(
-                            "Unknown condition: {}",
-                            condition_str
+                            "Unknown condition: {condition_str}"
                         )))
                     }
                 }
@@ -206,8 +204,7 @@ fn _parse_condition(_lua: &Lua, condition_value: Value) -> mlua::Result<Conditio
                     })
                 }
                 _ => Err(mlua::Error::RuntimeError(format!(
-                    "Unknown condition type: {}",
-                    condition_type
+                    "Unknown condition type: {condition_type}"
                 ))),
             }
         }
@@ -217,7 +214,7 @@ fn _parse_condition(_lua: &Lua, condition_value: Value) -> mlua::Result<Conditio
     }
 }
 
-/// Workflow instance that wraps WorkflowBridge
+/// Workflow instance that wraps `WorkflowBridge`
 struct WorkflowInstance {
     bridge: Arc<WorkflowBridge>,
     workflow_id: String,
@@ -452,14 +449,14 @@ pub fn inject_workflow_global(
             "workflow_create_sequential",
             async move {
                 let name: String = config.get("name").map_err(|e| LLMSpellError::Script {
-                    message: format!("Failed to get workflow name: {}", e),
+                    message: format!("Failed to get workflow name: {e}"),
                     language: Some("lua".to_string()),
                     line: None,
                     source: None,
                 })?;
                 let description: Option<String> = config.get("description").ok();
                 let steps: Table = config.get("steps").map_err(|e| LLMSpellError::Script {
-                    message: format!("Failed to get workflow steps: {}", e),
+                    message: format!("Failed to get workflow steps: {e}"),
                     language: Some("lua".to_string()),
                     line: None,
                     source: None,
@@ -489,14 +486,14 @@ pub fn inject_workflow_global(
                 let steps_array = params["steps"].as_array_mut().unwrap();
                 for pair in steps.pairs::<i32, Table>() {
                     let (_, step_table) = pair.map_err(|e| LLMSpellError::Script {
-                        message: format!("Failed to iterate workflow steps: {}", e),
+                        message: format!("Failed to iterate workflow steps: {e}"),
                         language: Some("lua".to_string()),
                         line: None,
                         source: None,
                     })?;
                     let step_json = lua_value_to_json(Value::Table(step_table)).map_err(|e| {
                         LLMSpellError::Script {
-                            message: format!("Failed to convert step to JSON: {}", e),
+                            message: format!("Failed to convert step to JSON: {e}"),
                             language: Some("lua".to_string()),
                             line: None,
                             source: None,
@@ -536,7 +533,7 @@ pub fn inject_workflow_global(
             "workflow_create_conditional",
             async move {
                 let name: String = config.get("name").map_err(|e| LLMSpellError::Script {
-                    message: format!("Failed to get workflow name: {}", e),
+                    message: format!("Failed to get workflow name: {e}"),
                     language: Some("lua".to_string()),
                     line: None,
                     source: None,
@@ -544,7 +541,7 @@ pub fn inject_workflow_global(
                 let description: Option<String> = config.get("description").ok();
                 let branches: Table =
                     config.get("branches").map_err(|e| LLMSpellError::Script {
-                        message: format!("Failed to get workflow branches: {}", e),
+                        message: format!("Failed to get workflow branches: {e}"),
                         language: Some("lua".to_string()),
                         line: None,
                         source: None,
@@ -570,7 +567,7 @@ pub fn inject_workflow_global(
                 let branches_array = params["branches"].as_array_mut().unwrap();
                 for pair in branches.pairs::<i32, Table>() {
                     let (_, branch_table) = pair.map_err(|e| LLMSpellError::Script {
-                        message: format!("Failed to iterate workflow branches: {}", e),
+                        message: format!("Failed to iterate workflow branches: {e}"),
                         language: Some("lua".to_string()),
                         line: None,
                         source: None,
@@ -578,7 +575,7 @@ pub fn inject_workflow_global(
                     let branch_json =
                         lua_value_to_json(Value::Table(branch_table)).map_err(|e| {
                             LLMSpellError::Script {
-                                message: format!("Failed to convert branch to JSON: {}", e),
+                                message: format!("Failed to convert branch to JSON: {e}"),
                                 language: Some("lua".to_string()),
                                 line: None,
                                 source: None,
@@ -592,7 +589,7 @@ pub fn inject_workflow_global(
                     let default_json =
                         lua_value_to_json(Value::Table(default_table)).map_err(|e| {
                             LLMSpellError::Script {
-                                message: format!("Failed to convert default branch to JSON: {}", e),
+                                message: format!("Failed to convert default branch to JSON: {e}"),
                                 language: Some("lua".to_string()),
                                 line: None,
                                 source: None,
@@ -632,7 +629,7 @@ pub fn inject_workflow_global(
             "workflow_create_loop",
             async move {
                 let name: String = config.get("name").map_err(|e| LLMSpellError::Script {
-                    message: format!("Failed to get workflow name: {}", e),
+                    message: format!("Failed to get workflow name: {e}"),
                     language: Some("lua".to_string()),
                     line: None,
                     source: None,
@@ -640,13 +637,13 @@ pub fn inject_workflow_global(
                 let description: Option<String> = config.get("description").ok();
                 let iterator_table: Table =
                     config.get("iterator").map_err(|e| LLMSpellError::Script {
-                        message: format!("Failed to get iterator configuration: {}", e),
+                        message: format!("Failed to get iterator configuration: {e}"),
                         language: Some("lua".to_string()),
                         line: None,
                         source: None,
                     })?;
                 let body: Table = config.get("body").map_err(|e| LLMSpellError::Script {
-                    message: format!("Failed to get loop body: {}", e),
+                    message: format!("Failed to get loop body: {e}"),
                     language: Some("lua".to_string()),
                     line: None,
                     source: None,
@@ -675,7 +672,7 @@ pub fn inject_workflow_global(
                     let end = range
                         .get::<_, i32>("end")
                         .map_err(|e| LLMSpellError::Script {
-                            message: format!("Failed to get range end: {}", e),
+                            message: format!("Failed to get range end: {e}"),
                             language: Some("lua".to_string()),
                             line: None,
                             source: None,
@@ -694,17 +691,14 @@ pub fn inject_workflow_global(
                     let mut collection_vec = Vec::new();
                     for pair in collection.pairs::<i32, Value>() {
                         let (_, value) = pair.map_err(|e| LLMSpellError::Script {
-                            message: format!("Failed to iterate collection: {}", e),
+                            message: format!("Failed to iterate collection: {e}"),
                             language: Some("lua".to_string()),
                             line: None,
                             source: None,
                         })?;
                         collection_vec.push(lua_value_to_json(value).map_err(|e| {
                             LLMSpellError::Script {
-                                message: format!(
-                                    "Failed to convert collection item to JSON: {}",
-                                    e
-                                ),
+                                message: format!("Failed to convert collection item to JSON: {e}"),
                                 language: Some("lua".to_string()),
                                 line: None,
                                 source: None,
@@ -743,14 +737,14 @@ pub fn inject_workflow_global(
                 let body_array = params["body"].as_array_mut().unwrap();
                 for pair in body.pairs::<i32, Table>() {
                     let (_, step_table) = pair.map_err(|e| LLMSpellError::Script {
-                        message: format!("Failed to iterate body steps: {}", e),
+                        message: format!("Failed to iterate body steps: {e}"),
                         language: Some("lua".to_string()),
                         line: None,
                         source: None,
                     })?;
                     let step_json = lua_value_to_json(Value::Table(step_table)).map_err(|e| {
                         LLMSpellError::Script {
-                            message: format!("Failed to convert body step to JSON: {}", e),
+                            message: format!("Failed to convert body step to JSON: {e}"),
                             language: Some("lua".to_string()),
                             line: None,
                             source: None,
@@ -764,17 +758,14 @@ pub fn inject_workflow_global(
                     let mut break_conditions_array = Vec::new();
                     for pair in conditions_table.pairs::<i32, Value>() {
                         let (_, condition_value) = pair.map_err(|e| LLMSpellError::Script {
-                            message: format!("Failed to iterate break conditions: {}", e),
+                            message: format!("Failed to iterate break conditions: {e}"),
                             language: Some("lua".to_string()),
                             line: None,
                             source: None,
                         })?;
                         let condition_json = lua_value_to_json(condition_value).map_err(|e| {
                             LLMSpellError::Script {
-                                message: format!(
-                                    "Failed to convert break condition to JSON: {}",
-                                    e
-                                ),
+                                message: format!("Failed to convert break condition to JSON: {e}"),
                                 language: Some("lua".to_string()),
                                 line: None,
                                 source: None,
@@ -816,7 +807,7 @@ pub fn inject_workflow_global(
             "workflow_create_parallel",
             async move {
                 let name: String = config.get("name").map_err(|e| LLMSpellError::Script {
-                    message: format!("Failed to get workflow name: {}", e),
+                    message: format!("Failed to get workflow name: {e}"),
                     language: Some("lua".to_string()),
                     line: None,
                     source: None,
@@ -867,7 +858,7 @@ pub fn inject_workflow_global(
                 let branches_array = params["branches"].as_array_mut().unwrap();
                 for pair in branches.pairs::<i32, Table>() {
                     let (_, branch_table) = pair.map_err(|e| LLMSpellError::Script {
-                        message: format!("Failed to iterate workflow branches: {}", e),
+                        message: format!("Failed to iterate workflow branches: {e}"),
                         language: Some("lua".to_string()),
                         line: None,
                         source: None,
@@ -875,7 +866,7 @@ pub fn inject_workflow_global(
                     let branch_json =
                         lua_value_to_json(Value::Table(branch_table)).map_err(|e| {
                             LLMSpellError::Script {
-                                message: format!("Failed to convert branch to JSON: {}", e),
+                                message: format!("Failed to convert branch to JSON: {e}"),
                                 language: Some("lua".to_string()),
                                 line: None,
                                 source: None,
@@ -1012,7 +1003,7 @@ pub fn inject_workflow_global(
                     Ok(WorkflowInstance {
                         bridge: bridge_clone.clone(),
                         workflow_id: workflow_id.clone(),
-                        name: workflow_id.clone(), // Use workflow_id as name for now
+                        name: workflow_id, // Use workflow_id as name for now
                         workflow_type: workflow_info.workflow_type,
                     })
                 } else {
@@ -1031,7 +1022,7 @@ pub fn inject_workflow_global(
 
             // Use shared sync utility for async operation
             block_on_async::<_, (), LLMSpellError>(
-                &format!("workflow_remove_{}", workflow_id),
+                &format!("workflow_remove_{workflow_id}"),
                 async move { bridge.remove_workflow(&workflow_id).await },
                 None,
             )?;
@@ -1048,13 +1039,12 @@ pub fn inject_workflow_global(
             let bridge = bridge_clone.clone();
 
             // Convert Lua table to JSON
-            let params_json = lua_value_to_json(Value::Table(params)).map_err(|e| {
-                mlua::Error::RuntimeError(format!("Failed to convert params: {}", e))
-            })?;
+            let params_json = lua_value_to_json(Value::Table(params))
+                .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert params: {e}")))?;
 
             // Use shared sync utility for async operation
             let workflow_id = block_on_async::<_, String, LLMSpellError>(
-                &format!("workflow_register_{}", workflow_type),
+                &format!("workflow_register_{workflow_type}"),
                 async move { bridge.create_workflow(&workflow_type, params_json).await },
                 None,
             )?;
@@ -1064,7 +1054,7 @@ pub fn inject_workflow_global(
     )?;
 
     // Workflow.clear() - remove all workflows
-    let bridge_clone = workflow_bridge.clone();
+    let bridge_clone = workflow_bridge;
     workflow_table.set(
         "clear",
         lua.create_function(move |_lua, ()| {
@@ -1086,7 +1076,7 @@ pub fn inject_workflow_global(
             for (workflow_id, _) in workflows {
                 let bridge = bridge.clone();
                 let _ = block_on_async::<_, (), LLMSpellError>(
-                    &format!("workflow_clear_remove_{}", workflow_id),
+                    &format!("workflow_clear_remove_{workflow_id}"),
                     async move { bridge.remove_workflow(&workflow_id).await },
                     None,
                 );

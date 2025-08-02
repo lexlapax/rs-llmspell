@@ -41,7 +41,7 @@ use tempfile::TempDir;
 
 /// Test environment manager
 pub struct TestEnvironment {
-    name: String,
+    _name: String,
     temp_dir: TempDir,
     original_env: HashMap<String, Option<String>>,
     test_data_dir: PathBuf,
@@ -55,7 +55,7 @@ impl TestEnvironment {
         std::fs::create_dir_all(&test_data_dir).expect("Failed to create test data dir");
 
         Self {
-            name: name.to_string(),
+            _name: name.to_string(),
             temp_dir,
             original_env: HashMap::new(),
             test_data_dir,

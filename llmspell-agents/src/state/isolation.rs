@@ -24,33 +24,33 @@ pub enum StateScope {
 }
 
 impl StateScope {
-    pub fn parent(&self) -> Option<StateScope> {
+    #[must_use]
+    pub fn parent(&self) -> Option<Self> {
         match self {
-            StateScope::Step { workflow_id, .. } => Some(StateScope::Workflow(workflow_id.clone())),
-            StateScope::Workflow(_) | StateScope::Agent(_) | StateScope::Session(_) => {
-                Some(StateScope::Global)
-            }
-            StateScope::Global | StateScope::Custom(_) => None,
+            Self::Step { workflow_id, .. } => Some(Self::Workflow(workflow_id.clone())),
+            Self::Workflow(_) | Self::Agent(_) | Self::Session(_) => Some(Self::Global),
+            Self::Global | Self::Custom(_) => None,
         }
     }
 
+    #[must_use]
     pub fn prefix(&self) -> String {
         match self {
-            StateScope::Global => String::new(),
-            StateScope::Agent(id) => format!("agent:{}:", id),
-            StateScope::Workflow(id) => format!("workflow:{}:", id),
-            StateScope::Step {
+            Self::Global => String::new(),
+            Self::Agent(id) => format!("agent:{id}:"),
+            Self::Workflow(id) => format!("workflow:{id}:"),
+            Self::Step {
                 workflow_id,
                 step_name,
-            } => format!("workflow:{}:step:{}:", workflow_id, step_name),
-            StateScope::Session(id) => format!("session:{}:", id),
-            StateScope::Custom(prefix) => format!("{}:", prefix),
+            } => format!("workflow:{workflow_id}:step:{step_name}:"),
+            Self::Session(id) => format!("session:{id}:"),
+            Self::Custom(prefix) => format!("{prefix}:"),
         }
     }
 }
 
 /// State permission types
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum StatePermission {
     Read,
     Write,
@@ -98,6 +98,7 @@ pub struct StateAccessControl {
 }
 
 impl StateAccessControl {
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -115,6 +116,7 @@ impl StateAccessControl {
         }
     }
 
+    #[must_use]
     pub fn has_permission(
         &self,
         agent_id: &str,
@@ -294,7 +296,7 @@ impl StateIsolationManager {
                 for permission in permissions {
                     access_control.grant_permission(
                         agent_id,
-                        StateScope::Custom(format!("shared:{}", scope_id)),
+                        StateScope::Custom(format!("shared:{scope_id}")),
                         permission.clone(),
                     );
                 }
@@ -318,10 +320,8 @@ impl StateIsolationManager {
             // Revoke permissions from all agents
             let mut access_control = self.access_control.write();
             for agent_id in &config.allowed_agents {
-                access_control.revoke_permissions(
-                    agent_id,
-                    StateScope::Custom(format!("shared:{}", scope_id)),
-                );
+                access_control
+                    .revoke_permissions(agent_id, StateScope::Custom(format!("shared:{scope_id}")));
             }
             debug!("Removed shared scope {}", scope_id);
             Ok(())
@@ -353,6 +353,7 @@ impl StateIsolationManager {
     }
 
     /// Get audit log entries
+    #[must_use]
     pub fn get_audit_log(&self, limit: Option<usize>) -> Vec<StateAccessAudit> {
         let audit_log = self.audit_log.read();
         match limit {
@@ -373,7 +374,7 @@ impl StateIsolationManager {
     fn agent_owns_scope(&self, agent_id: &str, scope: &StateScope) -> bool {
         match scope {
             StateScope::Agent(id) => id == agent_id,
-            StateScope::Custom(s) if s.starts_with(&format!("agent:{}:", agent_id)) => true,
+            StateScope::Custom(s) if s.starts_with(&format!("agent:{agent_id}:")) => true,
             _ => false,
         }
     }

@@ -1,5 +1,5 @@
-//! ABOUTME: ToolManager for managing tool discovery, invocation, and composition
-//! ABOUTME: Core implementation that enables ToolCapable components to interact with tools
+//! ABOUTME: `ToolManager` for managing tool discovery, invocation, and composition
+//! ABOUTME: Core implementation that enables `ToolCapable` components to interact with tools
 
 use llmspell_core::traits::tool::{SecurityLevel, ToolCategory};
 use llmspell_core::{
@@ -17,7 +17,7 @@ use tokio::sync::RwLock;
 
 /// Tool manager that provides concrete implementation of tool integration capabilities.
 ///
-/// This component bridges the gap between ToolCapable components and the actual tool
+/// This component bridges the gap between `ToolCapable` components and the actual tool
 /// ecosystem. It handles tool discovery, invocation, validation, and composition.
 ///
 /// # Architecture
@@ -65,7 +65,7 @@ pub struct ToolManager {
     config: ToolManagerConfig,
 }
 
-/// Configuration for ToolManager behavior
+/// Configuration for `ToolManager` behavior
 #[derive(Debug, Clone)]
 pub struct ToolManagerConfig {
     /// Maximum execution time for tool invocation (milliseconds)
@@ -93,7 +93,8 @@ impl Default for ToolManagerConfig {
 }
 
 impl ToolManager {
-    /// Create a new ToolManager with the given registry
+    /// Create a new `ToolManager` with the given registry
+    #[must_use]
     pub fn new(registry: Arc<ToolRegistry>) -> Self {
         Self {
             registry,
@@ -103,7 +104,8 @@ impl ToolManager {
         }
     }
 
-    /// Create a new ToolManager with custom configuration
+    /// Create a new `ToolManager` with custom configuration
+    #[must_use]
     pub fn with_config(registry: Arc<ToolRegistry>, config: ToolManagerConfig) -> Self {
         Self {
             registry,
@@ -190,7 +192,7 @@ impl ToolManager {
         // Check if tool is available
         if !self.tool_available(tool_name).await {
             return Err(LLMSpellError::Component {
-                message: format!("Tool '{}' not found or not available", tool_name),
+                message: format!("Tool '{tool_name}' not found or not available"),
                 source: None,
             });
         }
@@ -201,7 +203,7 @@ impl ToolManager {
                 .get_tool(tool_name)
                 .await
                 .ok_or_else(|| LLMSpellError::Component {
-                    message: format!("Tool '{}' not found in registry", tool_name),
+                    message: format!("Tool '{tool_name}' not found in registry"),
                     source: None,
                 })?;
 
@@ -222,7 +224,7 @@ impl ToolManager {
         )
         .await
         .map_err(|_| LLMSpellError::Component {
-            message: format!("Tool '{}' execution timed out", tool_name),
+            message: format!("Tool '{tool_name}' execution timed out"),
             source: None,
         })??;
 
@@ -310,7 +312,7 @@ impl ToolManager {
                         ErrorStrategy::Continue => {
                             // Use a default output and continue
                             let default_output =
-                                AgentOutput::text(format!("Step {} failed: {}", step_index, error));
+                                AgentOutput::text(format!("Step {step_index} failed: {error}"));
                             previous_output = Some(default_output.clone());
                             results.push(default_output);
                         }
@@ -346,7 +348,6 @@ impl ToolManager {
                         }
                         ErrorStrategy::Skip => {
                             // Skip this step and continue with previous output
-                            continue;
                         }
                     }
                 }
@@ -434,7 +435,7 @@ impl ToolManager {
         Ok(parameters)
     }
 
-    /// Convert registry ToolInfo to our ToolInfo format
+    /// Convert registry `ToolInfo` to our `ToolInfo` format
     fn registry_info_to_tool_info(&self, registry_info: &RegistryToolInfo) -> ToolInfo {
         // Convert SecurityLevel to string
         let security_level_str = match registry_info.security_level {
@@ -455,7 +456,7 @@ impl ToolManager {
         }
     }
 
-    /// Convert string to ToolCategory
+    /// Convert string to `ToolCategory`
     fn string_to_tool_category(&self, category_str: &str) -> Option<ToolCategory> {
         match category_str.to_lowercase().as_str() {
             "filesystem" => Some(ToolCategory::Filesystem),
@@ -470,7 +471,7 @@ impl ToolManager {
         }
     }
 
-    /// Convert string to SecurityLevel
+    /// Convert string to `SecurityLevel`
     fn string_to_security_level(&self, level_str: &str) -> Option<SecurityLevel> {
         match level_str.to_lowercase().as_str() {
             "safe" => Some(SecurityLevel::Safe),
@@ -491,12 +492,13 @@ impl ToolManager {
     }
 
     /// Get configuration
-    pub fn config(&self) -> &ToolManagerConfig {
+    #[must_use]
+    pub const fn config(&self) -> &ToolManagerConfig {
         &self.config
     }
 
     /// Update configuration
-    pub fn update_config(&mut self, config: ToolManagerConfig) {
+    pub const fn update_config(&mut self, config: ToolManagerConfig) {
         self.config = config;
     }
 }

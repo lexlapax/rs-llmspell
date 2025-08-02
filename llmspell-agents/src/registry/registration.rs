@@ -46,6 +46,7 @@ pub struct RegistrationBuilder {
 
 impl RegistrationBuilder {
     /// Create new registration builder
+    #[must_use]
     pub fn new() -> Self {
         Self {
             options: RegistrationOptions::default(),
@@ -53,42 +54,49 @@ impl RegistrationBuilder {
     }
 
     /// Set custom agent ID
+    #[must_use]
     pub fn with_id(mut self, id: String) -> Self {
         self.options.agent_id = Some(id);
         self
     }
 
     /// Add categories
+    #[must_use]
     pub fn with_categories(mut self, categories: Vec<String>) -> Self {
         self.options.categories = categories;
         self
     }
 
     /// Add a single category
+    #[must_use]
     pub fn add_category(mut self, category: String) -> Self {
         self.options.categories.push(category);
         self
     }
 
     /// Add custom metadata
+    #[must_use]
     pub fn with_metadata(mut self, key: String, value: serde_json::Value) -> Self {
         self.options.custom_metadata.insert(key, value);
         self
     }
 
     /// Set auto-start behavior
-    pub fn auto_start(mut self, enabled: bool) -> Self {
+    #[must_use]
+    pub const fn auto_start(mut self, enabled: bool) -> Self {
         self.options.auto_start = enabled;
         self
     }
 
     /// Set heartbeat monitoring
-    pub fn enable_heartbeat(mut self, enabled: bool) -> Self {
+    #[must_use]
+    pub const fn enable_heartbeat(mut self, enabled: bool) -> Self {
         self.options.enable_heartbeat = enabled;
         self
     }
 
     /// Build registration options
+    #[must_use]
     pub fn build(self) -> RegistrationOptions {
         self.options
     }
@@ -107,7 +115,7 @@ pub struct AgentRegistrar<R: AgentRegistry> {
 
 impl<R: AgentRegistry> AgentRegistrar<R> {
     /// Create new registrar
-    pub fn new(registry: Arc<R>) -> Self {
+    pub const fn new(registry: Arc<R>) -> Self {
         Self { registry }
     }
 
@@ -252,6 +260,7 @@ pub struct CompositeRegistrationHook {
 
 impl CompositeRegistrationHook {
     /// Create new composite hook
+    #[must_use]
     pub fn new() -> Self {
         Self { hooks: Vec::new() }
     }

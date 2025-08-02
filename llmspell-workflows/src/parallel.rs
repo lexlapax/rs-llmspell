@@ -9,7 +9,13 @@ use crate::{
     traits::{StepResult, WorkflowStep as TraitWorkflowStep},
     types::{StepExecutionContext, WorkflowConfig, WorkflowState},
 };
-use llmspell_core::{ComponentMetadata, Result};
+use async_trait::async_trait;
+use llmspell_core::{
+    execution_context::ExecutionContext,
+    traits::base_agent::BaseAgent,
+    types::{AgentInput, AgentOutput},
+    ComponentMetadata, LLMSpellError, Result,
+};
 use serde::{Deserialize, Serialize};
 use std::{
     sync::Arc,
@@ -473,7 +479,7 @@ impl ParallelWorkflow {
     }
 
     /// Execute the parallel workflow
-    pub async fn execute(&self) -> Result<ParallelWorkflowResult> {
+    pub async fn execute_workflow(&self) -> Result<ParallelWorkflowResult> {
         let start_time = Instant::now();
         info!(
             "Starting parallel workflow: {} with {} branches",
@@ -717,6 +723,155 @@ impl ParallelWorkflow {
         );
 
         Ok(result)
+    }
+}
+
+#[async_trait]
+impl BaseAgent for ParallelWorkflow {
+    fn metadata(&self) -> &ComponentMetadata {
+        &self.metadata
+    }
+
+    async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+        // Convert AgentInput to workflow execution
+        // The workflow will use the input text as an execution trigger
+
+        // Validate input first
+        self.validate_input(&input).await?;
+
+        // Execute the workflow using existing implementation
+        let workflow_result = self.execute_workflow().await?;
+
+        // Convert ParallelWorkflowResult to AgentOutput
+        let output_text = if workflow_result.success {
+            format!(
+                "Parallel workflow '{}' completed successfully. {} branches executed, {} succeeded, {} failed. Duration: {:?}",
+                workflow_result.workflow_name,
+                workflow_result.branch_results.len(),
+                workflow_result.successful_branches,
+                workflow_result.failed_branches,
+                workflow_result.duration
+            )
+        } else {
+            format!(
+                "Parallel workflow '{}' failed: {}. {} branches executed, {} succeeded, {} failed. Duration: {:?}",
+                workflow_result.workflow_name,
+                workflow_result.error.as_deref().unwrap_or("Unknown error"),
+                workflow_result.branch_results.len(),
+                workflow_result.successful_branches,
+                workflow_result.failed_branches,
+                workflow_result.duration
+            )
+        };
+
+        // Build AgentOutput with execution metadata
+        let mut metadata = llmspell_core::types::OutputMetadata {
+            execution_time_ms: Some(workflow_result.duration.as_millis() as u64),
+            ..Default::default()
+        };
+        metadata
+            .extra
+            .insert("workflow_type".to_string(), serde_json::json!("parallel"));
+        metadata.extra.insert(
+            "workflow_name".to_string(),
+            serde_json::json!(workflow_result.workflow_name),
+        );
+        metadata.extra.insert(
+            "total_branches".to_string(),
+            serde_json::json!(workflow_result.branch_results.len()),
+        );
+        metadata.extra.insert(
+            "successful_branches".to_string(),
+            serde_json::json!(workflow_result.successful_branches),
+        );
+        metadata.extra.insert(
+            "failed_branches".to_string(),
+            serde_json::json!(workflow_result.failed_branches),
+        );
+        metadata.extra.insert(
+            "stopped_early".to_string(),
+            serde_json::json!(workflow_result.stopped_early),
+        );
+        metadata.extra.insert(
+            "max_concurrency".to_string(),
+            serde_json::json!(self.config.max_concurrency),
+        );
+        metadata.extra.insert(
+            "fail_fast".to_string(),
+            serde_json::json!(self.config.fail_fast),
+        );
+
+        Ok(AgentOutput::text(output_text).with_metadata(metadata))
+    }
+
+    async fn validate_input(&self, input: &AgentInput) -> Result<()> {
+        // Basic validation - workflow can accept any non-empty text input
+        if input.text.is_empty() {
+            return Err(LLMSpellError::Validation {
+                message: "Workflow input text cannot be empty".to_string(),
+                field: Some("text".to_string()),
+            });
+        }
+
+        // Validate that we have branches to execute
+        if self.branches.is_empty() {
+            return Err(LLMSpellError::Validation {
+                message: "Cannot execute parallel workflow without branches".to_string(),
+                field: Some("branches".to_string()),
+            });
+        }
+
+        // Validate max concurrency
+        if self.config.max_concurrency == 0 {
+            return Err(LLMSpellError::Validation {
+                message: "Max concurrency must be at least 1".to_string(),
+                field: Some("max_concurrency".to_string()),
+            });
+        }
+
+        Ok(())
+    }
+
+    async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
+        // Handle workflow-specific errors gracefully
+        let error_text = match &error {
+            LLMSpellError::Workflow { message, step, .. } => {
+                if let Some(step_name) = step {
+                    format!(
+                        "Parallel workflow error in step '{}': {}",
+                        step_name, message
+                    )
+                } else {
+                    format!("Parallel workflow error: {}", message)
+                }
+            }
+            LLMSpellError::Validation { message, field } => {
+                if let Some(field_name) = field {
+                    format!("Validation error in field '{}': {}", field_name, message)
+                } else {
+                    format!("Validation error: {}", message)
+                }
+            }
+            _ => format!("Parallel workflow error: {}", error),
+        };
+
+        let mut metadata = llmspell_core::types::OutputMetadata::default();
+        metadata.extra.insert(
+            "error_type".to_string(),
+            serde_json::json!("workflow_error"),
+        );
+        metadata
+            .extra
+            .insert("workflow_type".to_string(), serde_json::json!("parallel"));
+        metadata
+            .extra
+            .insert("workflow_name".to_string(), serde_json::json!(self.name));
+        metadata.extra.insert(
+            "branch_count".to_string(),
+            serde_json::json!(self.branches.len()),
+        );
+
+        Ok(AgentOutput::text(error_text).with_metadata(metadata))
     }
 }
 

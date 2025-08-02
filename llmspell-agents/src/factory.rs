@@ -36,7 +36,7 @@ pub struct AgentConfig {
 }
 
 impl AgentConfig {
-    /// Create a new builder for AgentConfig
+    /// Create a new builder for `AgentConfig`
     pub fn builder(name: impl Into<String>) -> AgentConfigBuilder {
         AgentConfigBuilder::new(name)
     }
@@ -88,7 +88,7 @@ impl Default for ResourceLimits {
     }
 }
 
-/// Builder for AgentConfig
+/// Builder for `AgentConfig`
 #[derive(Debug, Clone)]
 pub struct AgentConfigBuilder {
     name: String,
@@ -127,6 +127,7 @@ impl AgentConfigBuilder {
     }
 
     /// Set the model configuration
+    #[must_use]
     pub fn model(mut self, model: ModelConfig) -> Self {
         self.model = Some(model);
         self
@@ -139,6 +140,7 @@ impl AgentConfigBuilder {
     }
 
     /// Set allowed tools
+    #[must_use]
     pub fn allowed_tools(mut self, tools: Vec<String>) -> Self {
         self.allowed_tools = tools;
         self
@@ -151,36 +153,42 @@ impl AgentConfigBuilder {
     }
 
     /// Set custom configuration
+    #[must_use]
     pub fn custom_config(mut self, config: serde_json::Map<String, serde_json::Value>) -> Self {
         self.custom_config = config;
         self
     }
 
     /// Set resource limits
-    pub fn resource_limits(mut self, limits: ResourceLimits) -> Self {
+    #[must_use]
+    pub const fn resource_limits(mut self, limits: ResourceLimits) -> Self {
         self.resource_limits = limits;
         self
     }
 
     /// Set maximum execution time
-    pub fn max_execution_time_secs(mut self, secs: u64) -> Self {
+    #[must_use]
+    pub const fn max_execution_time_secs(mut self, secs: u64) -> Self {
         self.resource_limits.max_execution_time_secs = secs;
         self
     }
 
     /// Set maximum memory usage
-    pub fn max_memory_mb(mut self, mb: u64) -> Self {
+    #[must_use]
+    pub const fn max_memory_mb(mut self, mb: u64) -> Self {
         self.resource_limits.max_memory_mb = mb;
         self
     }
 
     /// Set maximum tool calls
-    pub fn max_tool_calls(mut self, calls: u32) -> Self {
+    #[must_use]
+    pub const fn max_tool_calls(mut self, calls: u32) -> Self {
         self.resource_limits.max_tool_calls = calls;
         self
     }
 
-    /// Build the final AgentConfig
+    /// Build the final `AgentConfig`
+    #[must_use]
     pub fn build(self) -> AgentConfig {
         AgentConfig {
             name: self.name,
@@ -210,7 +218,7 @@ pub trait AgentFactory: Send + Sync {
     fn validate_config(&self, config: &AgentConfig) -> Result<()>;
 }
 
-/// Default implementation of AgentFactory
+/// Default implementation of `AgentFactory`
 pub struct DefaultAgentFactory {
     /// Template registry
     templates: std::collections::HashMap<String, AgentConfig>,
@@ -240,6 +248,7 @@ pub trait CreationHook: Send + Sync {
 
 impl DefaultAgentFactory {
     /// Create a new agent factory with provider manager
+    #[must_use]
     pub fn new(provider_manager: Arc<llmspell_providers::ProviderManager>) -> Self {
         let mut templates = std::collections::HashMap::new();
 
@@ -316,18 +325,21 @@ impl DefaultAgentFactory {
     }
 
     /// Set hook registry for state machine integration
+    #[must_use]
     pub fn with_hook_registry(mut self, hook_registry: Arc<HookRegistry>) -> Self {
         self.hook_registry = Some(hook_registry);
         self
     }
 
     /// Configure default state machine settings
-    pub fn with_state_config(mut self, state_config: StateMachineConfig) -> Self {
+    #[must_use]
+    pub const fn with_state_config(mut self, state_config: StateMachineConfig) -> Self {
         self.default_state_config = state_config;
         self
     }
 
     /// Enable hooks and circuit breaker by default
+    #[must_use]
     pub fn with_enhanced_lifecycle(mut self) -> Self {
         self.default_state_config = StateMachineConfig {
             enable_logging: true,
@@ -422,7 +434,10 @@ impl AgentFactory for DefaultAgentFactory {
     }
 
     fn list_templates(&self) -> Vec<&str> {
-        self.templates.keys().map(|s| s.as_str()).collect()
+        self.templates
+            .keys()
+            .map(std::string::String::as_str)
+            .collect()
     }
 
     fn validate_config(&self, config: &AgentConfig) -> Result<()> {

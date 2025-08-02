@@ -53,7 +53,7 @@ async fn test_standard_base64_roundtrip() {
         assert!(output["success"].as_bool().unwrap());
         let decoded = output["result"]["output"].as_str().unwrap();
 
-        assert_eq!(decoded, test_text, "Failed to roundtrip: {}", test_text);
+        assert_eq!(decoded, test_text, "Failed to roundtrip: {test_text}");
     }
 }
 #[tokio::test]
@@ -140,8 +140,7 @@ async fn test_binary_data_handling() {
         // Verify the encoding is correct
         assert_eq!(
             encoded, expected_base64,
-            "Encoding mismatch for {}",
-            hex_input
+            "Encoding mismatch for {hex_input}"
         );
 
         // Decode back
@@ -162,15 +161,14 @@ async fn test_binary_data_handling() {
         // The decoded hex might not have leading zeros, so we compare the actual bytes
         let original_bytes = hex::decode(hex_input).unwrap();
         let decoded_hex_padded = if decoded_hex.len() % 2 == 1 {
-            format!("0{}", decoded_hex)
+            format!("0{decoded_hex}")
         } else {
             decoded_hex.to_string()
         };
         let decoded_bytes = hex::decode(&decoded_hex_padded).unwrap();
         assert_eq!(
             decoded_bytes, original_bytes,
-            "Failed for input: {}",
-            hex_input
+            "Failed for input: {hex_input}"
         );
     }
 }

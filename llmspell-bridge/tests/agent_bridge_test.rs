@@ -193,7 +193,7 @@ async fn test_agent_tool_integration() {
             assert!(output.metadata.warnings.is_empty());
         }
         Err(e) => {
-            println!("Test failed with error: {:?}", e);
+            println!("Test failed with error: {e:?}");
             // For now, we'll allow the test to fail since we don't have tools registered
             // This shows that our API is working but no tools are available
             // Test passes - we're testing API availability, not tool presence

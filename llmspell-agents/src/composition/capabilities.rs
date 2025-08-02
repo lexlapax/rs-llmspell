@@ -91,7 +91,9 @@ impl CapabilityScorer for DefaultCapabilityScorer {
         };
 
         // Weighted average of success rate and recency
-        (success_rate * 0.7 + recency_score * 0.3).clamp(0.0, 1.0)
+        success_rate
+            .mul_add(0.7, recency_score * 0.3)
+            .clamp(0.0, 1.0)
     }
 }
 
@@ -110,6 +112,7 @@ pub struct CapabilityMatch {
 
 impl CapabilityAggregator {
     /// Create a new capability aggregator
+    #[must_use]
     pub fn new() -> Self {
         Self::with_scorer(Arc::new(DefaultCapabilityScorer))
     }
@@ -153,7 +156,7 @@ impl CapabilityAggregator {
         // Update category index
         let mut index = self.category_index.write().unwrap();
         index
-            .entry(capability.category.clone())
+            .entry(capability.category)
             .or_default()
             .insert(capability_id);
 
@@ -162,7 +165,7 @@ impl CapabilityAggregator {
 
     /// Unregister a capability
     pub fn unregister_capability(&self, provider_id: &str, capability_name: &str) -> Result<()> {
-        let capability_id = format!("{}::{}", provider_id, capability_name);
+        let capability_id = format!("{provider_id}::{capability_name}");
 
         let mut capabilities = self.capabilities.write().unwrap();
         if let Some(entry) = capabilities.remove(&capability_id) {
@@ -205,7 +208,7 @@ impl CapabilityAggregator {
 
             for (idx, req) in requirements.iter().enumerate() {
                 if self.matches_requirement(&entry.capability, req) {
-                    satisfied.push(format!("req-{}", idx));
+                    satisfied.push(format!("req-{idx}"));
                     total_score += entry.score;
                     requirement_count += 1;
                 }
@@ -213,7 +216,7 @@ impl CapabilityAggregator {
 
             if !satisfied.is_empty() {
                 let avg_score = if requirement_count > 0 {
-                    total_score / requirement_count as f64
+                    total_score / f64::from(requirement_count)
                 } else {
                     entry.score
                 };
@@ -328,7 +331,7 @@ impl CapabilityAggregator {
         success: bool,
         duration: std::time::Duration,
     ) -> Result<()> {
-        let capability_id = format!("{}::{}", provider_id, capability_name);
+        let capability_id = format!("{provider_id}::{capability_name}");
 
         let mut capabilities = self.capabilities.write().unwrap();
         if let Some(entry) = capabilities.get_mut(&capability_id) {
@@ -354,7 +357,7 @@ impl CapabilityAggregator {
             Ok(())
         } else {
             Err(LLMSpellError::Component {
-                message: format!("Capability not found: {}", capability_id),
+                message: format!("Capability not found: {capability_id}"),
                 source: None,
             })
         }
@@ -393,7 +396,7 @@ impl CapabilityAggregator {
         capability_name: &str,
         available: bool,
     ) -> Result<()> {
-        let capability_id = format!("{}::{}", provider_id, capability_name);
+        let capability_id = format!("{provider_id}::{capability_name}");
 
         let mut capabilities = self.capabilities.write().unwrap();
         if let Some(entry) = capabilities.get_mut(&capability_id) {
@@ -401,7 +404,7 @@ impl CapabilityAggregator {
             Ok(())
         } else {
             Err(LLMSpellError::Component {
-                message: format!("Capability not found: {}", capability_id),
+                message: format!("Capability not found: {capability_id}"),
                 source: None,
             })
         }
@@ -475,6 +478,7 @@ impl CapabilityRequirementBuilder {
     }
 
     /// Set the category requirement
+    #[must_use]
     pub fn category(mut self, category: CapabilityCategory) -> Self {
         self.requirement.category = Some(category);
         self
@@ -495,18 +499,21 @@ impl CapabilityRequirementBuilder {
     }
 
     /// Set as mandatory
-    pub fn mandatory(mut self) -> Self {
+    #[must_use]
+    pub const fn mandatory(mut self) -> Self {
         self.requirement.mandatory = true;
         self
     }
 
     /// Set minimum score
-    pub fn min_score(mut self, score: f64) -> Self {
+    #[must_use]
+    pub const fn min_score(mut self, score: f64) -> Self {
         self.requirement.min_score = Some(score);
         self
     }
 
     /// Build the requirement
+    #[must_use]
     pub fn build(self) -> CapabilityRequirement {
         self.requirement
     }

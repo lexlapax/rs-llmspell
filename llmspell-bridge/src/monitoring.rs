@@ -9,12 +9,13 @@ use llmspell_core::{ComponentMetadata, Result};
 use std::collections::HashMap;
 use std::time::Duration;
 
-/// Concrete implementation of HealthCheck trait
+/// Concrete implementation of `HealthCheck` trait
 pub struct HealthCheckImpl {
     metadata: ComponentMetadata,
 }
 
 impl HealthCheckImpl {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             metadata: ComponentMetadata::new(

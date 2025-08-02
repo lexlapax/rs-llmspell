@@ -20,7 +20,7 @@ fn bench_session_creation(c: &mut Criterion) {
     runtime_config.runtime.sessions.max_sessions = 1000;
 
     let registry = Arc::new(ComponentRegistry::new());
-    let engine = rt.block_on(async { LuaEngine::new(registry, runtime_config).await.unwrap() });
+    let engine = rt.block_on(async { LuaEngine::new(registry, runtime_config).unwrap() });
 
     let lua_code = r#"
         return Session.create({
@@ -46,7 +46,7 @@ fn bench_session_persistence(c: &mut Criterion) {
     runtime_config.runtime.sessions.storage_backend = "memory".to_string();
 
     let registry = Arc::new(ComponentRegistry::new());
-    let mut engine = rt.block_on(async { LuaEngine::new(registry, runtime_config).await.unwrap() });
+    let mut engine = rt.block_on(async { LuaEngine::new(registry, runtime_config).unwrap() });
 
     // Pre-create session
     let session_id = rt.block_on(async {
@@ -97,7 +97,7 @@ fn bench_artifact_operations(c: &mut Criterion) {
     runtime_config.runtime.sessions.storage_backend = "memory".to_string();
 
     let registry = Arc::new(ComponentRegistry::new());
-    let mut engine = rt.block_on(async { LuaEngine::new(registry, runtime_config).await.unwrap() });
+    let mut engine = rt.block_on(async { LuaEngine::new(registry, runtime_config).unwrap() });
 
     // Pre-create session
     let session_id = rt.block_on(async {
@@ -174,11 +174,8 @@ fn bench_batch_operations(c: &mut Criterion) {
     let registry = Arc::new(ComponentRegistry::new());
 
     for batch_size in [1, 10, 50, 100].iter() {
-        let mut engine = rt.block_on(async {
-            LuaEngine::new(registry.clone(), runtime_config.clone())
-                .await
-                .unwrap()
-        });
+        let mut engine = rt
+            .block_on(async { LuaEngine::new(registry.clone(), runtime_config.clone()).unwrap() });
 
         let lua_code = format!(
             r#"

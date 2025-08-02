@@ -172,7 +172,7 @@ pub struct HealthStatus {
 }
 
 /// Health state enumeration
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum HealthState {
     /// Healthy and operational
     Healthy,
@@ -245,6 +245,7 @@ pub struct MetadataManager {
 
 impl MetadataManager {
     /// Create new metadata manager
+    #[must_use]
     pub fn new() -> Self {
         Self {
             storage: HashMap::new(),
@@ -258,6 +259,7 @@ impl MetadataManager {
     }
 
     /// Retrieve extended metadata
+    #[must_use]
     pub fn get(&self, id: &str) -> Option<&ExtendedAgentMetadata> {
         self.storage.get(id)
     }
@@ -299,6 +301,7 @@ impl MetadataManager {
     }
 
     /// Find agents by capability
+    #[must_use]
     pub fn find_by_capability(
         &self,
         capability_type: &CapabilityType,
@@ -317,6 +320,7 @@ impl MetadataManager {
     }
 
     /// Find dependent agents
+    #[must_use]
     pub fn find_dependents(&self, agent_id: &str) -> Vec<&ExtendedAgentMetadata> {
         self.storage
             .values()
@@ -349,6 +353,7 @@ pub struct ExtendedMetadataBuilder {
 
 impl ExtendedMetadataBuilder {
     /// Create new builder from core metadata
+    #[must_use]
     pub fn from_core(core: super::AgentMetadata) -> Self {
         Self {
             core,
@@ -379,36 +384,42 @@ impl ExtendedMetadataBuilder {
     }
 
     /// Set version info
+    #[must_use]
     pub fn version(mut self, version: VersionInfo) -> Self {
         self.version = version;
         self
     }
 
     /// Add dependency
+    #[must_use]
     pub fn add_dependency(mut self, dependency: AgentDependency) -> Self {
         self.dependencies.push(dependency);
         self
     }
 
     /// Add capability
+    #[must_use]
     pub fn add_capability(mut self, capability: AgentCapability) -> Self {
         self.capabilities.push(capability);
         self
     }
 
     /// Set resource requirements
-    pub fn resource_requirements(mut self, requirements: ResourceRequirements) -> Self {
+    #[must_use]
+    pub const fn resource_requirements(mut self, requirements: ResourceRequirements) -> Self {
         self.resource_requirements = requirements;
         self
     }
 
     /// Set deployment info
+    #[must_use]
     pub fn deployment(mut self, deployment: DeploymentInfo) -> Self {
         self.deployment = Some(deployment);
         self
     }
 
     /// Build extended metadata
+    #[must_use]
     pub fn build(self) -> ExtendedAgentMetadata {
         ExtendedAgentMetadata {
             core: self.core,

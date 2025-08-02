@@ -14,7 +14,7 @@ use tokio::time::timeout;
 /// Tool invocation wrapper that provides validation, error handling,
 /// and execution tracking for tool calls.
 ///
-/// This wrapper sits between ToolCapable components and the actual tools,
+/// This wrapper sits between `ToolCapable` components and the actual tools,
 /// providing additional safety, monitoring, and debugging capabilities.
 ///
 /// # Examples
@@ -75,42 +75,49 @@ impl Default for InvocationConfig {
 
 impl InvocationConfig {
     /// Create a new configuration with default values
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
 
     /// Set maximum execution time
-    pub fn with_max_execution_time(mut self, duration: Duration) -> Self {
+    #[must_use]
+    pub const fn with_max_execution_time(mut self, duration: Duration) -> Self {
         self.max_execution_time = duration;
         self
     }
 
     /// Enable or disable parameter validation
-    pub fn with_parameter_validation(mut self, enabled: bool) -> Self {
+    #[must_use]
+    pub const fn with_parameter_validation(mut self, enabled: bool) -> Self {
         self.validate_parameters = enabled;
         self
     }
 
     /// Enable or disable metrics tracking
-    pub fn with_metrics_tracking(mut self, enabled: bool) -> Self {
+    #[must_use]
+    pub const fn with_metrics_tracking(mut self, enabled: bool) -> Self {
         self.track_metrics = enabled;
         self
     }
 
     /// Enable or disable debug logging
-    pub fn with_debug_logging(mut self, enabled: bool) -> Self {
+    #[must_use]
+    pub const fn with_debug_logging(mut self, enabled: bool) -> Self {
         self.debug_logging = enabled;
         self
     }
 
     /// Set maximum memory usage
-    pub fn with_max_memory(mut self, bytes: u64) -> Self {
+    #[must_use]
+    pub const fn with_max_memory(mut self, bytes: u64) -> Self {
         self.max_memory_bytes = Some(bytes);
         self
     }
 
     /// Enable or disable sandboxing
-    pub fn with_sandboxing(mut self, enabled: bool) -> Self {
+    #[must_use]
+    pub const fn with_sandboxing(mut self, enabled: bool) -> Self {
         self.enable_sandboxing = enabled;
         self
     }
@@ -190,6 +197,7 @@ impl ValidationError {
     }
 
     /// Add actual value information
+    #[must_use]
     pub fn with_actual(mut self, actual: JsonValue) -> Self {
         self.actual = Some(actual);
         self
@@ -198,7 +206,8 @@ impl ValidationError {
 
 impl ToolInvoker {
     /// Create a new tool invoker with the given configuration
-    pub fn new(config: InvocationConfig) -> Self {
+    #[must_use]
+    pub const fn new(config: InvocationConfig) -> Self {
         Self { config }
     }
 
@@ -235,7 +244,7 @@ impl ToolInvoker {
                     metrics.validation_errors += 1;
                     metrics.execution_time = start_time.elapsed();
                     return Ok(InvocationResult {
-                        output: AgentOutput::text(format!("Validation failed: {}", e)),
+                        output: AgentOutput::text(format!("Validation failed: {e}")),
                         metrics,
                         warnings,
                         success: false,
@@ -258,7 +267,7 @@ impl ToolInvoker {
             Ok(Err(e)) => {
                 metrics.execution_time = start_time.elapsed();
                 return Ok(InvocationResult {
-                    output: AgentOutput::text(format!("Tool execution failed: {}", e)),
+                    output: AgentOutput::text(format!("Tool execution failed: {e}")),
                     metrics,
                     warnings,
                     success: false,
@@ -337,7 +346,7 @@ impl ToolInvoker {
         for required in schema.required_parameters() {
             if !params_map.contains_key(&required) {
                 return Err(LLMSpellError::Validation {
-                    message: format!("Missing required parameter: {}", required),
+                    message: format!("Missing required parameter: {required}"),
                     field: Some(required),
                 });
             }
@@ -399,7 +408,7 @@ impl ToolInvoker {
         // Check for unexpected parameters
         for key in params_map.keys() {
             if !schema.parameters.iter().any(|p| &p.name == key) {
-                warnings.push(format!("Unexpected parameter '{}' will be ignored", key));
+                warnings.push(format!("Unexpected parameter '{key}' will be ignored"));
             }
         }
 
@@ -407,7 +416,8 @@ impl ToolInvoker {
     }
 
     /// Get configuration
-    pub fn config(&self) -> &InvocationConfig {
+    #[must_use]
+    pub const fn config(&self) -> &InvocationConfig {
         &self.config
     }
 

@@ -51,7 +51,8 @@ impl AgentGlobal {
     }
 
     /// Get the agent bridge
-    pub fn bridge(&self) -> &Arc<AgentBridge> {
+    #[must_use]
+    pub const fn bridge(&self) -> &Arc<AgentBridge> {
         &self.bridge
     }
 }
@@ -71,7 +72,7 @@ impl GlobalObject for AgentGlobal {
     fn inject_lua(&self, lua: &mlua::Lua, context: &GlobalContext) -> Result<()> {
         crate::lua::globals::agent::inject_agent_global(lua, context, self.bridge.clone()).map_err(
             |e| llmspell_core::LLMSpellError::Component {
-                message: format!("Failed to inject Agent global: {}", e),
+                message: format!("Failed to inject Agent global: {e}"),
                 source: None,
             },
         )

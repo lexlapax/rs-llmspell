@@ -16,7 +16,7 @@ use llmspell_state_persistence::{
 use std::sync::Arc;
 use tracing::{debug, info, warn};
 
-/// Helper function to get or create state infrastructure from GlobalContext
+/// Helper function to get or create state infrastructure from `GlobalContext`
 pub async fn get_or_create_state_infrastructure(
     context: &GlobalContext,
     config: &StatePersistenceConfig,
@@ -56,7 +56,7 @@ pub async fn get_or_create_state_infrastructure(
         StateManager::with_backend(backend_type.clone(), persistence_config.clone())
             .await
             .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to create StateManager: {}", e),
+                message: format!("Failed to create StateManager: {e}"),
                 source: None,
             })?,
     );
@@ -81,7 +81,7 @@ pub async fn get_or_create_state_infrastructure(
             )
             .await
             .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to create migration backend: {}", e),
+                message: format!("Failed to create migration backend: {e}"),
                 source: None,
             })?;
 
@@ -202,7 +202,7 @@ fn create_backend_type(config: &StatePersistenceConfig) -> Result<StorageBackend
     }
 }
 
-/// Get or create EventBus
+/// Get or create `EventBus`
 async fn get_or_create_event_bus(context: &GlobalContext) -> Result<Arc<EventBus>> {
     if let Some(event_bus) = context.get_bridge::<EventBus>("event_bus") {
         return Ok(event_bus);
@@ -214,7 +214,7 @@ async fn get_or_create_event_bus(context: &GlobalContext) -> Result<Arc<EventBus
     Ok(event_bus)
 }
 
-/// Get or create EventCorrelationTracker
+/// Get or create `EventCorrelationTracker`
 fn get_or_create_correlation_tracker(
     context: &GlobalContext,
 ) -> Result<Arc<EventCorrelationTracker>> {
@@ -228,7 +228,7 @@ fn get_or_create_correlation_tracker(
     Ok(tracker)
 }
 
-/// Get or create HookExecutor
+/// Get or create `HookExecutor`
 fn get_or_create_hook_executor(context: &GlobalContext) -> Result<Arc<HookExecutor>> {
     if let Some(executor) = context.get_bridge::<HookExecutor>("hook_executor") {
         return Ok(executor);

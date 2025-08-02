@@ -1,5 +1,5 @@
 //! ABOUTME: Integration tests for session replay functionality
-//! ABOUTME: Tests the ReplayEngine and SessionReplayAdapter with existing infrastructure
+//! ABOUTME: Tests the `ReplayEngine` and `SessionReplayAdapter` with existing infrastructure
 
 #[cfg(test)]
 mod tests {
@@ -151,32 +151,26 @@ mod tests {
 
         // Test can_replay_session - expecting false or error since session format mismatch
         let can_replay_result = manager.can_replay_session(&session_id).await;
-        match can_replay_result {
-            Ok(can_replay) => {
-                // Should be false since no hooks have been executed yet
-                assert!(
-                    !can_replay,
-                    "New session should not be replayable without hook executions"
-                );
-            }
-            Err(_) => {
-                // Expected for now due to format mismatch between session storage
-                // and replay adapter expectations. This will be fixed in later tasks.
-            }
+        if let Ok(can_replay) = can_replay_result {
+            // Should be false since no hooks have been executed yet
+            assert!(
+                !can_replay,
+                "New session should not be replayable without hook executions"
+            );
+        } else {
+            // Expected for now due to format mismatch between session storage
+            // and replay adapter expectations. This will be fixed in later tasks.
         }
 
         // Test get_session_timeline - expecting empty timeline or error
         let timeline_result = manager.get_session_timeline(&session_id).await;
-        match timeline_result {
-            Ok(timeline) => {
-                assert!(
-                    timeline.is_empty(),
-                    "New session should have empty timeline"
-                );
-            }
-            Err(_) => {
-                // Expected for now due to format mismatch
-            }
+        if let Ok(timeline) = timeline_result {
+            assert!(
+                timeline.is_empty(),
+                "New session should have empty timeline"
+            );
+        } else {
+            // Expected for now due to format mismatch
         }
     }
     #[tokio::test]

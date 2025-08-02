@@ -14,7 +14,7 @@ use tokio::sync::{mpsc, Mutex};
 pub fn inject_streaming_global(lua: &Lua, _context: &GlobalContext) -> Result<(), LLMSpellError> {
     // Create the streaming utilities table
     let streaming_table = lua.create_table().map_err(|e| LLMSpellError::Component {
-        message: format!("Failed to create streaming table: {}", e),
+        message: format!("Failed to create streaming table: {e}"),
         source: None,
     })?;
 
@@ -88,7 +88,7 @@ pub fn inject_streaming_global(lua: &Lua, _context: &GlobalContext) -> Result<()
             Ok(stream)
         })
         .map_err(|e| LLMSpellError::Component {
-            message: format!("Failed to create stream constructor: {}", e),
+            message: format!("Failed to create stream constructor: {e}"),
             source: None,
         })?;
 
@@ -96,7 +96,7 @@ pub fn inject_streaming_global(lua: &Lua, _context: &GlobalContext) -> Result<()
     streaming_table
         .set("create", create_stream_fn)
         .map_err(|e| LLMSpellError::Component {
-            message: format!("Failed to set streaming.create: {}", e),
+            message: format!("Failed to set streaming.create: {e}"),
             source: None,
         })?;
 
@@ -105,18 +105,18 @@ pub fn inject_streaming_global(lua: &Lua, _context: &GlobalContext) -> Result<()
         .create_function(|_lua, value: Value| -> LuaResult<()> {
             // In a real coroutine context, this would yield the value
             // For now, this is a placeholder
-            mlua::Error::external(format!("Yield called with: {:?}", value));
+            mlua::Error::external(format!("Yield called with: {value:?}"));
             Ok(())
         })
         .map_err(|e| LLMSpellError::Component {
-            message: format!("Failed to create yield function: {}", e),
+            message: format!("Failed to create yield function: {e}"),
             source: None,
         })?;
 
     streaming_table
         .set("yield", yield_fn)
         .map_err(|e| LLMSpellError::Component {
-            message: format!("Failed to set streaming.yield: {}", e),
+            message: format!("Failed to set streaming.yield: {e}"),
             source: None,
         })?;
 
@@ -124,7 +124,7 @@ pub fn inject_streaming_global(lua: &Lua, _context: &GlobalContext) -> Result<()
     lua.globals()
         .set("Streaming", streaming_table)
         .map_err(|e| LLMSpellError::Component {
-            message: format!("Failed to set Streaming global: {}", e),
+            message: format!("Failed to set Streaming global: {e}"),
             source: None,
         })?;
 

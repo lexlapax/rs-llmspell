@@ -31,6 +31,7 @@ pub struct ContextEvent {
 
 impl ContextEvent {
     /// Create a new context event
+    #[must_use]
     pub fn new(event_type: String, payload: Value, source: ContextScope) -> Self {
         Self {
             id: uuid::Uuid::new_v4().to_string(),
@@ -44,18 +45,21 @@ impl ContextEvent {
     }
 
     /// Add target context
+    #[must_use]
     pub fn with_target(mut self, target: ContextScope) -> Self {
         self.target_contexts.push(target);
         self
     }
 
     /// Set correlation ID
+    #[must_use]
     pub fn with_correlation(mut self, correlation_id: String) -> Self {
         self.correlation_id = Some(correlation_id);
         self
     }
 
     /// Check if event is targeted to a specific context
+    #[must_use]
     pub fn is_targeted_to(&self, context: &ContextScope) -> bool {
         if self.target_contexts.is_empty() {
             // Broadcast event
@@ -148,7 +152,7 @@ impl EventHistory {
         self.by_context
             .entry(event.source_context.to_string())
             .or_default()
-            .push(event.id.clone());
+            .push(event.id);
 
         // Trim if needed
         if self.events.len() > max_size {
@@ -192,6 +196,7 @@ impl EventHistory {
 
 impl ContextEventBus {
     /// Create a new event bus
+    #[must_use]
     pub fn new() -> Self {
         let (event_tx, _) = broadcast::channel(1000);
 
@@ -204,6 +209,7 @@ impl ContextEventBus {
     }
 
     /// Create with custom configuration
+    #[must_use]
     pub fn with_config(config: EventBusConfig) -> Self {
         let (event_tx, _) = broadcast::channel(1000);
 
@@ -262,6 +268,7 @@ impl ContextEventBus {
     }
 
     /// Get event receiver for raw event stream
+    #[must_use]
     pub fn receiver(&self) -> broadcast::Receiver<ContextEvent> {
         self.event_tx.subscribe()
     }
@@ -335,7 +342,7 @@ impl ContextEventBus {
         // Wait for all handlers to complete
         for task in tasks {
             if let Err(e) = task.await {
-                eprintln!("Handler task failed: {:?}", e);
+                eprintln!("Handler task failed: {e:?}");
             }
         }
 

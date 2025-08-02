@@ -1,5 +1,5 @@
 //! ABOUTME: Resource-limited tool execution wrapper
-//! ABOUTME: Provides ResourceLimitedTool trait and implementation for enforcing resource limits
+//! ABOUTME: Provides `ResourceLimitedTool` trait and implementation for enforcing resource limits
 
 use async_trait::async_trait;
 use llmspell_core::{
@@ -38,7 +38,7 @@ pub struct ResourceLimitedTool<T: Tool> {
 
 impl<T: Tool> ResourceLimitedTool<T> {
     /// Create a new resource-limited tool
-    pub fn new(tool: T, limits: ResourceLimits) -> Self {
+    pub const fn new(tool: T, limits: ResourceLimits) -> Self {
         Self {
             inner: tool,
             limits,

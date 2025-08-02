@@ -77,7 +77,7 @@ impl Base64EncoderTool {
             // Read from file
             fs::read(file_path).map_err(|e| {
                 storage_error(
-                    format!("Failed to read input file: {}", e),
+                    format!("Failed to read input file: {e}"),
                     Some("read_file".to_string()),
                 )
             })?
@@ -86,7 +86,7 @@ impl Base64EncoderTool {
                 // Parse hex string as binary
                 hex::decode(input).map_err(|e| {
                     validation_error(
-                        format!("Failed to parse hex input: {}", e),
+                        format!("Failed to parse hex input: {e}"),
                         Some("input".to_string()),
                     )
                 })?
@@ -117,10 +117,7 @@ impl Base64EncoderTool {
                     // Convert file data to string for decoding
                     String::from_utf8(input_data).map_err(|e| {
                         validation_error(
-                            format!(
-                                "Input file contains invalid UTF-8 for Base64 decoding: {}",
-                                e
-                            ),
+                            format!("Input file contains invalid UTF-8 for Base64 decoding: {e}"),
                             Some("input_file".to_string()),
                         )
                     })?
@@ -133,7 +130,7 @@ impl Base64EncoderTool {
 
                 decoded.map_err(|e| {
                     validation_error(
-                        format!("Base64 decode error: {}", e),
+                        format!("Base64 decode error: {e}"),
                         Some("input".to_string()),
                     )
                 })?
@@ -148,7 +145,7 @@ impl Base64EncoderTool {
             // Write to file
             fs::write(path, &result_data).map_err(|e| {
                 storage_error(
-                    format!("Failed to write output file: {}", e),
+                    format!("Failed to write output file: {e}"),
                     Some("write_file".to_string()),
                 )
             })?;
@@ -161,7 +158,7 @@ impl Base64EncoderTool {
             );
 
             Ok(ResponseBuilder::success(operation)
-                .with_message(format!("Base64 {} completed successfully", operation))
+                .with_message(format!("Base64 {operation} completed successfully"))
                 .with_metadata("variant", json!(variant))
                 .with_file_info(path, Some(result_data.len() as u64))
                 .build())
@@ -180,7 +177,7 @@ impl Base64EncoderTool {
             };
 
             Ok(ResponseBuilder::success(operation)
-                .with_message(format!("Base64 {} completed", operation))
+                .with_message(format!("Base64 {operation} completed"))
                 .with_result(json!({
                     "output": output,
                     "variant": variant,
@@ -219,10 +216,7 @@ impl BaseAgent for Base64EncoderTool {
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
-        Ok(AgentOutput::text(format!(
-            "Base64 encoding error: {}",
-            error
-        )))
+        Ok(AgentOutput::text(format!("Base64 encoding error: {error}")))
     }
 }
 

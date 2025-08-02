@@ -62,6 +62,7 @@ pub struct FileConverterTool {
 
 impl FileConverterTool {
     /// Create a new file converter tool
+    #[must_use]
     pub fn new(config: FileConverterConfig, sandbox: Arc<FileSandbox>) -> Self {
         Self {
             metadata: ComponentMetadata::new(
@@ -187,25 +188,26 @@ impl FileConverterTool {
 
     /// Determine output path
     fn get_output_path(&self, input_path: &Path, operation: &str) -> PathBuf {
-        if let Some(output_dir) = &self.config.output_dir {
-            let stem = input_path.file_stem().unwrap_or_default();
-            let extension = input_path.extension().unwrap_or_default();
+        self.config.output_dir.as_ref().map_or_else(
+            || input_path.to_path_buf(),
+            |output_dir| {
+                let stem = input_path.file_stem().unwrap_or_default();
+                let extension = input_path.extension().unwrap_or_default();
 
-            let new_filename = format!(
-                "{}_{}{}",
-                stem.to_string_lossy(),
-                operation,
-                if extension.is_empty() {
-                    String::new()
-                } else {
-                    format!(".{}", extension.to_string_lossy())
-                }
-            );
+                let new_filename = format!(
+                    "{}_{}{}",
+                    stem.to_string_lossy(),
+                    operation,
+                    if extension.is_empty() {
+                        String::new()
+                    } else {
+                        format!(".{}", extension.to_string_lossy())
+                    }
+                );
 
-            output_dir.join(new_filename)
-        } else {
-            input_path.to_path_buf()
-        }
+                output_dir.join(new_filename)
+            },
+        )
     }
 
     /// Validate parameters for file conversion operations
@@ -214,7 +216,7 @@ impl FileConverterTool {
         if let Some(operation) = params.get("operation").and_then(|v| v.as_str()) {
             if !matches!(operation, "encoding" | "line_endings" | "indentation") {
                 return Err(LLMSpellError::Validation {
-                    message: format!("Invalid operation: {}", operation),
+                    message: format!("Invalid operation: {operation}"),
                     field: Some("operation".to_string()),
                 });
             }
@@ -251,7 +253,7 @@ impl BaseAgent for FileConverterTool {
         self.sandbox
             .validate_path(&path)
             .map_err(|e| LLMSpellError::Security {
-                message: format!("Path validation failed: {}", e),
+                message: format!("Path validation failed: {e}"),
                 violation_type: Some("path_validation".to_string()),
             })?;
 
@@ -266,7 +268,7 @@ impl BaseAgent for FileConverterTool {
         let metadata = fs::metadata(&path)
             .await
             .map_err(|e| LLMSpellError::Storage {
-                message: format!("Failed to read file metadata: {}", e),
+                message: format!("Failed to read file metadata: {e}"),
                 operation: Some("metadata".to_string()),
                 source: Some(Box::new(e)),
             })?;
@@ -283,18 +285,16 @@ impl BaseAgent for FileConverterTool {
         }
 
         // Determine output path
-        let target_path = if let Some(target_path) = extract_optional_string(params, "target_path")
-        {
-            PathBuf::from(target_path)
-        } else {
-            self.get_output_path(&path, operation)
-        };
+        let target_path = extract_optional_string(params, "target_path").map_or_else(
+            || self.get_output_path(&path, operation),
+            PathBuf::from,
+        );
 
         // Validate output path
         self.sandbox
             .validate_path(&target_path)
             .map_err(|e| LLMSpellError::Security {
-                message: format!("Output path validation failed: {}", e),
+                message: format!("Output path validation failed: {e}"),
                 violation_type: Some("path_validation".to_string()),
             })?;
 
@@ -303,7 +303,7 @@ impl BaseAgent for FileConverterTool {
             self.create_backup(&path)
                 .await
                 .map_err(|e| LLMSpellError::Storage {
-                    message: format!("Failed to create backup: {}", e),
+                    message: format!("Failed to create backup: {e}"),
                     operation: Some("backup".to_string()),
                     source: None,
                 })?;
@@ -334,7 +334,7 @@ impl BaseAgent for FileConverterTool {
                         "iso88591" | "iso-8859-1" => Ok(TextEncoding::Iso88591),
                         "ascii" => Ok(TextEncoding::Ascii),
                         _ => Err(LLMSpellError::Validation {
-                            message: format!("Invalid encoding: {}", s),
+                            message: format!("Invalid encoding: {s}"),
                             field: Some("to_encoding".to_string()),
                         }),
                     }
@@ -343,7 +343,7 @@ impl BaseAgent for FileConverterTool {
                 self.convert_encoding(&path, &target_path, from_encoding, to_encoding)
                     .await
                     .map_err(|e| LLMSpellError::Tool {
-                        message: format!("Encoding conversion failed: {}", e),
+                        message: format!("Encoding conversion failed: {e}"),
                         tool_name: Some("file_converter".to_string()),
                         source: None,
                     })?;
@@ -356,7 +356,7 @@ impl BaseAgent for FileConverterTool {
                         "crlf" => Ok(LineEnding::Crlf),
                         "cr" => Ok(LineEnding::Cr),
                         _ => Err(LLMSpellError::Validation {
-                            message: format!("Invalid line ending: {}", s),
+                            message: format!("Invalid line ending: {s}"),
                             field: Some("line_ending".to_string()),
                         }),
                     }
@@ -365,7 +365,7 @@ impl BaseAgent for FileConverterTool {
                 self.convert_line_endings(&path, &target_path, line_ending)
                     .await
                     .map_err(|e| LLMSpellError::Tool {
-                        message: format!("Line ending conversion failed: {}", e),
+                        message: format!("Line ending conversion failed: {e}"),
                         tool_name: Some("file_converter".to_string()),
                         source: None,
                     })?;
@@ -380,7 +380,7 @@ impl BaseAgent for FileConverterTool {
                 self.convert_indentation(&path, &target_path, convert_to_spaces, tab_size)
                     .await
                     .map_err(|e| LLMSpellError::Tool {
-                        message: format!("Indentation conversion failed: {}", e),
+                        message: format!("Indentation conversion failed: {e}"),
                         tool_name: Some("file_converter".to_string()),
                         source: None,
                     })?;
@@ -388,7 +388,7 @@ impl BaseAgent for FileConverterTool {
 
             _ => {
                 return Err(LLMSpellError::Validation {
-                    message: format!("Unknown operation: {}", operation),
+                    message: format!("Unknown operation: {operation}"),
                     field: Some("operation".to_string()),
                 });
             }
@@ -400,7 +400,7 @@ impl BaseAgent for FileConverterTool {
                 fs::metadata(&path)
                     .await
                     .map_err(|e| LLMSpellError::Storage {
-                        message: format!("Failed to read original metadata: {}", e),
+                        message: format!("Failed to read original metadata: {e}"),
                         operation: Some("metadata".to_string()),
                         source: None,
                     })?;
@@ -441,10 +441,7 @@ impl BaseAgent for FileConverterTool {
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> LLMResult<AgentOutput> {
-        Ok(AgentOutput::text(format!(
-            "File converter error: {}",
-            error
-        )))
+        Ok(AgentOutput::text(format!("File converter error: {error}")))
     }
 }
 

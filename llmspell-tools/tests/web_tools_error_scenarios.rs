@@ -27,7 +27,7 @@ mod timeout_tests {
 
         match tool.execute(input, context).await {
             Ok(output) => {
-                println!("{} timeout test: Got response", tool_name);
+                println!("{tool_name} timeout test: Got response");
                 // When using unreachable IPs, we might get "error sending request" instead of "timeout"
                 let output_value: serde_json::Value = serde_json::from_str(&output.text).unwrap();
                 assert!(!output_value["success"].as_bool().unwrap_or(true));
@@ -47,10 +47,10 @@ mod timeout_tests {
                     if let Some(err) = result.get("error").and_then(|e| e.as_str()) {
                         err.to_lowercase()
                     } else {
-                        "".to_string()
+                        String::new()
                     }
                 } else {
-                    "".to_string()
+                    String::new()
                 };
 
                 assert!(
@@ -59,12 +59,11 @@ mod timeout_tests {
                         || error_msg.contains("error sending request")
                         || error_msg.contains("connection")
                         || error_msg.contains("failed to fetch"),
-                    "Expected timeout-related error, got: '{}'",
-                    error_msg
+                    "Expected timeout-related error, got: '{error_msg}'"
                 );
             }
             Err(e) => {
-                println!("{} timeout test: Got error: {}", tool_name, e);
+                println!("{tool_name} timeout test: Got error: {e}");
                 let err_str = e.to_string().to_lowercase();
                 assert!(
                     err_str.contains("timeout")
@@ -115,11 +114,13 @@ mod invalid_url_tests {
 
             match tool.execute(input, context.clone()).await {
                 Ok(output) => {
-                    println!("{} {} test: Got response", tool_name, case_name);
+                    println!("{tool_name} {case_name} test: Got response");
                     // Check if it's an error response
                     let output_value: serde_json::Value =
                         serde_json::from_str(&output.text).unwrap();
-                    if !output_value["success"].as_bool().unwrap_or(true) {
+                    if output_value["success"].as_bool().unwrap_or(true) {
+                        panic!("Expected error response, got success: {output_value}");
+                    } else {
                         // It's an error response - check error message
                         let error_msg = if let Some(error_str) = output_value["error"].as_str() {
                             error_str.to_lowercase()
@@ -132,7 +133,7 @@ mod invalid_url_tests {
                                     .to_lowercase()
                             }
                         } else {
-                            "".to_string()
+                            String::new()
                         };
 
                         assert!(
@@ -141,12 +142,10 @@ mod invalid_url_tests {
                                 || error_msg.contains("request failed")
                                 || error_msg.contains("builder error")
                         );
-                    } else {
-                        panic!("Expected error response, got success: {}", output_value);
                     }
                 }
                 Err(e) => {
-                    println!("{} {} test: Got error: {}", tool_name, case_name, e);
+                    println!("{tool_name} {case_name} test: Got error: {e}");
                     let err_str = e.to_string().to_lowercase();
                     assert!(
                         err_str.contains("url")
@@ -192,7 +191,7 @@ mod network_failure_tests {
                     assert_error_output(&output, "error");
                 }
                 Err(e) => {
-                    println!("{} DNS failure: {}", name, e);
+                    println!("{name} DNS failure: {e}");
                     let err_str = e.to_string().to_lowercase();
                     assert!(
                         err_str.contains("error")
@@ -256,12 +255,12 @@ mod http_status_tests {
                     if e.to_string().contains("error sending request")
                         || e.to_string().contains("Connection refused")
                     {
-                        eprintln!("Warning: Network error testing status {}: {}", status, e);
+                        eprintln!("Warning: Network error testing status {status}: {e}");
                         eprintln!("This indicates httpbin.org is temporarily unavailable - skipping this status code");
                         continue;
                     }
                     // If it's not a network error, still fail the test
-                    panic!("Unexpected error testing status {}: {}", status, e);
+                    panic!("Unexpected error testing status {status}: {e}");
                 }
             };
 
@@ -276,7 +275,7 @@ mod http_status_tests {
 
             // If we get 503, it means httpbin.org is down/overloaded - skip the specific assertion
             if actual_status == 503 {
-                eprintln!("Warning: httpbin.org returned 503 (Service Unavailable) instead of expected {}", status);
+                eprintln!("Warning: httpbin.org returned 503 (Service Unavailable) instead of expected {status}");
                 eprintln!("This indicates the external service is temporarily unavailable - skipping specific status assertion");
                 continue; // Skip to next status code
             }

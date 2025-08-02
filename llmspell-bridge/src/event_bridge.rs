@@ -18,7 +18,7 @@ pub struct SubscriptionHandle {
     pub language: EventLanguage,
 }
 
-/// EventBridge for cross-language event communication
+/// `EventBridge` for cross-language event communication
 pub struct EventBridge {
     /// Underlying event bus
     event_bus: Arc<EventBus>,
@@ -30,7 +30,7 @@ pub struct EventBridge {
 }
 
 impl EventBridge {
-    /// Create a new EventBridge with default EventBus
+    /// Create a new `EventBridge` with default `EventBus`
     pub async fn new(context: Arc<GlobalContext>) -> Result<Self> {
         let event_bus = Arc::new(EventBus::new());
 
@@ -41,7 +41,8 @@ impl EventBridge {
         })
     }
 
-    /// Create a new EventBridge with custom EventBus
+    /// Create a new `EventBridge` with custom `EventBus`
+    #[must_use]
     pub fn with_event_bus(context: Arc<GlobalContext>, event_bus: Arc<EventBus>) -> Self {
         Self {
             event_bus,
@@ -71,7 +72,7 @@ impl EventBridge {
             .event_bus
             .subscribe(pattern)
             .await
-            .with_context(|| format!("Failed to subscribe to pattern: {}", pattern))?;
+            .with_context(|| format!("Failed to subscribe to pattern: {pattern}"))?;
 
         // Store subscription metadata
         let handle = SubscriptionHandle {
@@ -102,19 +103,22 @@ impl EventBridge {
     }
 
     /// List active subscriptions
+    #[must_use]
     pub fn list_subscriptions(&self) -> Vec<SubscriptionHandle> {
         let subscriptions = self.subscriptions.read();
         subscriptions.values().cloned().collect()
     }
 
     /// Get subscription count
+    #[must_use]
     pub fn subscription_count(&self) -> usize {
         let subscriptions = self.subscriptions.read();
         subscriptions.len()
     }
 
     /// Get the underlying event bus reference
-    pub fn event_bus(&self) -> &Arc<EventBus> {
+    #[must_use]
+    pub const fn event_bus(&self) -> &Arc<EventBus> {
         &self.event_bus
     }
 

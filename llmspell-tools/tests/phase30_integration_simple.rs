@@ -4,7 +4,7 @@
 //! Phase 3.0 Integration Test Suite - Simplified
 //!
 //! This test validates the core Phase 3.0 achievements:
-//! 1. All tools use ResponseBuilder pattern (consistent JSON responses)
+//! 1. All tools use `ResponseBuilder` pattern (consistent JSON responses)
 //! 2. Parameter standardization for key tools (calculator, hash, etc.)
 //! 3. Tool initialization performance (<10ms)
 //! 4. Security hardening is in place
@@ -65,27 +65,24 @@ async fn test_parameter_standardization_compliance() {
         let result = tool.execute(test_input, ExecutionContext::default()).await;
         assert!(
             result.is_ok(),
-            "Tool {} should execute without panicking",
-            name
+            "Tool {name} should execute without panicking"
         );
 
         let output = result.unwrap();
-        let error_msg = format!("Tool {} should return valid JSON", name);
+        let error_msg = format!("Tool {name} should return valid JSON");
         let parsed: Value = serde_json::from_str(&output.text).expect(&error_msg);
 
         // Validate ResponseBuilder pattern
         assert!(
             parsed.get("success").is_some(),
-            "Tool {} missing 'success' field",
-            name
+            "Tool {name} missing 'success' field"
         );
         assert!(
             parsed.get("operation").is_some(),
-            "Tool {} missing 'operation' field",
-            name
+            "Tool {name} missing 'operation' field"
         );
 
-        println!("✅ Tool {} uses consistent ResponseBuilder pattern", name);
+        println!("✅ Tool {name} uses consistent ResponseBuilder pattern");
     }
 }
 
@@ -224,41 +221,32 @@ async fn test_response_builder_consistency() {
         let test_input = create_test_input("test", params);
 
         let result = tool.execute(test_input, ExecutionContext::default()).await;
-        assert!(result.is_ok(), "Tool {} should execute successfully", name);
+        assert!(result.is_ok(), "Tool {name} should execute successfully");
 
         let output = result.unwrap();
-        let error_msg = format!("Tool {} should return valid JSON", name);
+        let error_msg = format!("Tool {name} should return valid JSON");
         let parsed: Value = serde_json::from_str(&output.text).expect(&error_msg);
 
         // Validate consistent ResponseBuilder structure
         assert!(
             parsed.get("success").is_some(),
-            "Tool {} missing 'success' field",
-            name
+            "Tool {name} missing 'success' field"
         );
         assert!(
             parsed.get("operation").is_some(),
-            "Tool {} missing 'operation' field",
-            name
+            "Tool {name} missing 'operation' field"
         );
 
         // Check if operation succeeded
         if parsed["success"].as_bool().unwrap_or(false) {
-            println!(
-                "✅ Tool {} returned successful response with consistent format",
-                name
-            );
+            println!("✅ Tool {name} returned successful response with consistent format");
         } else {
             // Even error responses should be consistent
             assert!(
                 parsed.get("error").is_some(),
-                "Tool {} error response missing 'error' field",
-                name
+                "Tool {name} error response missing 'error' field"
             );
-            println!(
-                "✅ Tool {} returned error response with consistent format",
-                name
-            );
+            println!("✅ Tool {name} returned error response with consistent format");
         }
     }
 }

@@ -1,4 +1,4 @@
-//! ABOUTME: Example demonstrating enhanced ExecutionContext usage
+//! ABOUTME: Example demonstrating enhanced `ExecutionContext` usage
 //! ABOUTME: Shows hierarchical contexts, inheritance, shared memory, and event integration
 
 use async_trait::async_trait;
@@ -103,7 +103,7 @@ async fn hierarchical_context_example() -> Result<()> {
         .with_data("max_retries".to_string(), json!(3));
 
     let workflow_id = hierarchy.create_root("main_workflow".to_string(), workflow_ctx)?;
-    println!("  Created workflow context: {}", workflow_id);
+    println!("  Created workflow context: {workflow_id}");
 
     // Create child contexts for agents
     let agent1_ctx = hierarchy.create_child(
@@ -207,7 +207,7 @@ async fn shared_memory_example() -> Result<()> {
 
         // Agent2 reads data
         let current_step = region.get("current_step", &agent2)?;
-        println!("  Agent2 read current_step: {:?}", current_step);
+        println!("  Agent2 read current_step: {current_step:?}");
 
         // Subscribe to changes
         let mut receiver = region.subscribe();
@@ -353,7 +353,7 @@ async fn complete_workflow_example() -> Result<()> {
     }
 
     println!("  Pipeline initialized with contexts:");
-    println!("    - Workflow: {}", workflow_id);
+    println!("    - Workflow: {workflow_id}");
     println!("    - Extractor: {}", extractor_ctx.id);
     println!("    - Transformer: {}", transformer_ctx.id);
 

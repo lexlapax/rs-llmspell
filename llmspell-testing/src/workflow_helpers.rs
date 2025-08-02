@@ -2,16 +2,15 @@
 // ABOUTME: Provides reusable helpers for workflow unit and integration tests
 
 use llmspell_workflows::{
-    conditional::{ConditionalWorkflow, ConditionalWorkflowBuilder},
+    conditional::ConditionalWorkflow,
     conditions::Condition,
     parallel::{ParallelWorkflow, ParallelWorkflowBuilder},
     r#loop::{LoopWorkflow, LoopWorkflowBuilder},
-    sequential::{SequentialWorkflow, SequentialWorkflowBuilder},
+    sequential::SequentialWorkflow,
     traits::{ErrorStrategy, StepType, WorkflowStep},
     types::WorkflowConfig,
 };
 use serde_json::Value;
-use std::time::Duration;
 
 /// Create a test workflow step
 pub fn create_test_workflow_step(name: &str) -> WorkflowStep {
@@ -111,18 +110,20 @@ pub fn create_test_workflow_config() -> WorkflowConfig {
 
 /// Create a test workflow config with retry
 pub fn create_test_workflow_config_with_retry(max_retries: u32) -> WorkflowConfig {
-    let mut config = WorkflowConfig::default();
-    config.max_retry_attempts = max_retries;
-    config.exponential_backoff = true;
-    config.retry_delay_ms = 100;
-    config
+    WorkflowConfig {
+        max_retry_attempts: max_retries,
+        exponential_backoff: true,
+        retry_delay_ms: 100,
+        ..Default::default()
+    }
 }
 
 /// Create a test workflow config with error strategy
 pub fn create_test_workflow_config_with_error_strategy(strategy: ErrorStrategy) -> WorkflowConfig {
-    let mut config = WorkflowConfig::default();
-    config.default_error_strategy = strategy;
-    config
+    WorkflowConfig {
+        default_error_strategy: strategy,
+        ..Default::default()
+    }
 }
 
 /// Create multiple test steps

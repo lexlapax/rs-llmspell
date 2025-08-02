@@ -105,6 +105,7 @@ pub struct FileSearchTool {
 
 impl FileSearchTool {
     /// Create a new file search tool
+    #[must_use]
     pub fn new(config: FileSearchConfig, sandbox: Arc<FileSandbox>) -> Self {
         Self {
             metadata: ComponentMetadata::new(
@@ -233,7 +234,7 @@ impl FileSearchTool {
         if let Some(include_exts) = extract_optional_array(params, "include_extensions") {
             let extensions: Vec<String> = include_exts
                 .iter()
-                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .filter_map(|v| v.as_str().map(std::string::ToString::to_string))
                 .collect();
             options = options.with_include_extensions(extensions);
         } else if let Some(ext_str) = extract_optional_string(params, "include_extensions") {
@@ -249,7 +250,7 @@ impl FileSearchTool {
         if let Some(exclude_exts) = extract_optional_array(params, "exclude_extensions") {
             let extensions: Vec<String> = exclude_exts
                 .iter()
-                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .filter_map(|v| v.as_str().map(std::string::ToString::to_string))
                 .collect();
             options = options.with_exclude_extensions(extensions);
         } else if let Some(ext_str) = extract_optional_string(params, "exclude_extensions") {
@@ -266,7 +267,7 @@ impl FileSearchTool {
         if let Some(dirs_array) = extract_optional_array(params, "exclude_dirs") {
             let directories: Vec<String> = dirs_array
                 .iter()
-                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .filter_map(|v| v.as_str().map(std::string::ToString::to_string))
                 .collect();
             options = options.with_exclude_dirs(directories);
         } else if let Some(dirs_str) = extract_optional_string(params, "exclude_dirs") {
@@ -402,7 +403,7 @@ impl BaseAgent for FileSearchTool {
             self.search_file(&search_path, pattern, &options)
                 .await
                 .map_err(|e| LLMSpellError::Tool {
-                    message: format!("File search failed: {}", e),
+                    message: format!("File search failed: {e}"),
                     tool_name: Some("file_search".to_string()),
                     source: None,
                 })?
@@ -410,7 +411,7 @@ impl BaseAgent for FileSearchTool {
             self.search_directory(&search_path, pattern, &options)
                 .await
                 .map_err(|e| LLMSpellError::Tool {
-                    message: format!("Directory search failed: {}", e),
+                    message: format!("Directory search failed: {e}"),
                     tool_name: Some("file_search".to_string()),
                     source: None,
                 })?
@@ -465,7 +466,7 @@ impl BaseAgent for FileSearchTool {
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> LLMResult<AgentOutput> {
-        Ok(AgentOutput::text(format!("File search error: {}", error)))
+        Ok(AgentOutput::text(format!("File search error: {error}")))
     }
 }
 
@@ -552,7 +553,7 @@ impl Tool for FileSearchTool {
             param_type: ParameterType::Number,
             description: "Maximum file size to search (bytes)".to_string(),
             required: false,
-            default: Some(json!(10485760)), // 10MB
+            default: Some(json!(10_485_760)), // 10MB
         })
         .with_parameter(ParameterDef {
             name: "max_matches_per_file".to_string(),

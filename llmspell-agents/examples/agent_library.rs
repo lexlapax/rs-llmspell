@@ -243,8 +243,8 @@ async fn main() -> anyhow::Result<()> {
     // Catalog Summary
     println!("\n=== Catalog Summary ===");
     println!("Total Templates: {}", agent_catalog.len());
-    for (category, _) in agent_catalog.iter() {
-        println!("- {}", category);
+    for (category, _) in &agent_catalog {
+        println!("- {category}");
     }
 
     Ok(())

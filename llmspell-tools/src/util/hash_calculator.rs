@@ -70,6 +70,7 @@ pub struct HashCalculatorTool {
 
 impl HashCalculatorTool {
     /// Create a new hash calculator tool
+    #[must_use]
     pub fn new(config: HashCalculatorConfig) -> Self {
         Self {
             metadata: ComponentMetadata::new(
@@ -83,9 +84,9 @@ impl HashCalculatorTool {
     fn parse_algorithm(&self, algorithm: Option<&str>) -> HashAlgorithm {
         match algorithm {
             Some("md5") => HashAlgorithm::Md5,
-            Some("sha1") | Some("sha-1") => HashAlgorithm::Sha1,
-            Some("sha256") | Some("sha-256") => HashAlgorithm::Sha256,
-            Some("sha512") | Some("sha-512") => HashAlgorithm::Sha512,
+            Some("sha1" | "sha-1") => HashAlgorithm::Sha1,
+            Some("sha256" | "sha-256") => HashAlgorithm::Sha256,
+            Some("sha512" | "sha-512") => HashAlgorithm::Sha512,
             _ => self.config.default_algorithm,
         }
     }
@@ -108,7 +109,7 @@ impl HashCalculatorTool {
     async fn check_file_size(&self, path: &Path) -> Result<u64> {
         let metadata = tokio::fs::metadata(path).await.map_err(|e| {
             storage_error(
-                format!("Failed to read file metadata: {}", e),
+                format!("Failed to read file metadata: {e}"),
                 Some("read_metadata".to_string()),
             )
         })?;
@@ -151,8 +152,8 @@ impl BaseAgent for HashCalculatorTool {
 
                         hash_file(path, algorithm).map_err(|e| {
                             storage_error(
-                                format!("Failed to hash file: {}", e),
-                                Some(format!("hash file {}", file_path)),
+                                format!("Failed to hash file: {e}"),
+                                Some(format!("hash file {file_path}")),
                             )
                         })?
                     }
@@ -216,8 +217,8 @@ impl BaseAgent for HashCalculatorTool {
 
                         hash_file(path, algorithm).map_err(|e| {
                             storage_error(
-                                format!("Failed to hash file for verification: {}", e),
-                                Some(format!("hash file {}", file_path)),
+                                format!("Failed to hash file for verification: {e}"),
+                                Some(format!("hash file {file_path}")),
                             )
                         })?
                     }
@@ -249,7 +250,7 @@ impl BaseAgent for HashCalculatorTool {
                 Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
             }
             _ => Err(validation_error(
-                format!("Invalid operation: {}", operation),
+                format!("Invalid operation: {operation}"),
                 Some("operation".to_string()),
             )),
         }
@@ -266,10 +267,7 @@ impl BaseAgent for HashCalculatorTool {
     }
 
     async fn handle_error(&self, error: llmspell_core::LLMSpellError) -> Result<AgentOutput> {
-        Ok(AgentOutput::text(format!(
-            "Hash calculator error: {}",
-            error
-        )))
+        Ok(AgentOutput::text(format!("Hash calculator error: {error}")))
     }
 }
 

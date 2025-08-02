@@ -81,11 +81,13 @@ pub struct ValidationRules {
 
 impl ValidationRules {
     /// Create a new set of validation rules
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self { rules: Vec::new() }
     }
 
     /// Add a rule to the collection
+    #[must_use]
     pub fn add_rule(mut self, rule: ValidationRule) -> Self {
         self.rules.push(rule);
         self
@@ -128,13 +130,13 @@ pub struct DataValidationConfig {
     pub custom_messages: HashMap<String, String>,
 }
 
-fn default_fail_fast() -> bool {
+const fn default_fail_fast() -> bool {
     false
 }
-fn default_max_errors() -> usize {
+const fn default_max_errors() -> usize {
     100
 }
-fn default_validate_nested() -> bool {
+const fn default_validate_nested() -> bool {
     true
 }
 
@@ -161,11 +163,13 @@ pub struct DataValidationTool {
 
 impl DataValidationTool {
     /// Create a new data validation tool
+    #[must_use]
     pub fn new() -> Self {
         Self::with_config(DataValidationConfig::default())
     }
 
     /// Create with custom configuration
+    #[must_use]
     pub fn with_config(config: DataValidationConfig) -> Self {
         let mut tool = Self {
             metadata: ComponentMetadata::new(
@@ -278,7 +282,7 @@ impl DataValidationTool {
                 errors.push(ValidationError {
                     field: field.to_string(),
                     value: value.clone(),
-                    rule: format!("{:?}", rule),
+                    rule: format!("{rule:?}"),
                     message: e.to_string(),
                 });
 
@@ -320,7 +324,7 @@ impl DataValidationTool {
 
                 if actual_type != expected {
                     return Err(validation_error(
-                        format!("Expected type '{}', got '{}'", expected, actual_type),
+                        format!("Expected type '{expected}', got '{actual_type}'"),
                         Some(field.to_string()),
                     ));
                 }
@@ -332,7 +336,7 @@ impl DataValidationTool {
                     if let Some(min_len) = min {
                         if len < *min_len {
                             return Err(validation_error(
-                                format!("Length must be at least {}", min_len),
+                                format!("Length must be at least {min_len}"),
                                 Some(field.to_string()),
                             ));
                         }
@@ -340,7 +344,7 @@ impl DataValidationTool {
                     if let Some(max_len) = max {
                         if len > *max_len {
                             return Err(validation_error(
-                                format!("Length must be at most {}", max_len),
+                                format!("Length must be at most {max_len}"),
                                 Some(field.to_string()),
                             ));
                         }
@@ -350,7 +354,7 @@ impl DataValidationTool {
                     if let Some(min_len) = min {
                         if len < *min_len {
                             return Err(validation_error(
-                                format!("Array must have at least {} items", min_len),
+                                format!("Array must have at least {min_len} items"),
                                 Some(field.to_string()),
                             ));
                         }
@@ -358,7 +362,7 @@ impl DataValidationTool {
                     if let Some(max_len) = max {
                         if len > *max_len {
                             return Err(validation_error(
-                                format!("Array must have at most {} items", max_len),
+                                format!("Array must have at most {max_len} items"),
                                 Some(field.to_string()),
                             ));
                         }
@@ -371,7 +375,7 @@ impl DataValidationTool {
                     if let Some(min_val) = min {
                         if n < *min_val {
                             return Err(validation_error(
-                                format!("Value must be at least {}", min_val),
+                                format!("Value must be at least {min_val}"),
                                 Some(field.to_string()),
                             ));
                         }
@@ -379,7 +383,7 @@ impl DataValidationTool {
                     if let Some(max_val) = max {
                         if n > *max_val {
                             return Err(validation_error(
-                                format!("Value must be at most {}", max_val),
+                                format!("Value must be at most {max_val}"),
                                 Some(field.to_string()),
                             ));
                         }
@@ -391,14 +395,14 @@ impl DataValidationTool {
                 if let Some(s) = value.as_str() {
                     let re = Regex::new(regex).map_err(|e| {
                         validation_error(
-                            format!("Invalid regex pattern: {}", e),
+                            format!("Invalid regex pattern: {e}"),
                             Some(field.to_string()),
                         )
                     })?;
 
                     if !re.is_match(s) {
                         return Err(validation_error(
-                            format!("Value does not match pattern: {}", regex),
+                            format!("Value does not match pattern: {regex}"),
                             Some(field.to_string()),
                         ));
                     }
@@ -408,7 +412,7 @@ impl DataValidationTool {
             ValidationRule::Enum { values } => {
                 if !values.contains(value) {
                     return Err(validation_error(
-                        format!("Value must be one of: {:?}", values),
+                        format!("Value must be one of: {values:?}"),
                         Some(field.to_string()),
                     ));
                 }
@@ -442,7 +446,7 @@ impl DataValidationTool {
                 if let Some(s) = value.as_str() {
                     if chrono::NaiveDateTime::parse_from_str(s, format).is_err() {
                         return Err(validation_error(
-                            format!("Invalid date format. Expected: {}", format),
+                            format!("Invalid date format. Expected: {format}"),
                             Some(field.to_string()),
                         ));
                     }
@@ -454,7 +458,7 @@ impl DataValidationTool {
                     validator(value)?;
                 } else {
                     return Err(validation_error(
-                        format!("Unknown custom validator: {}", name),
+                        format!("Unknown custom validator: {name}"),
                         Some(field.to_string()),
                     ));
                 }
@@ -471,7 +475,7 @@ impl DataValidationTool {
                     if let Some(min) = min_items {
                         if arr.len() < *min {
                             return Err(validation_error(
-                                format!("Array must have at least {} items", min),
+                                format!("Array must have at least {min} items"),
                                 Some(field.to_string()),
                             ));
                         }
@@ -479,7 +483,7 @@ impl DataValidationTool {
                     if let Some(max) = max_items {
                         if arr.len() > *max {
                             return Err(validation_error(
-                                format!("Array must have at most {} items", max),
+                                format!("Array must have at most {max} items"),
                                 Some(field.to_string()),
                             ));
                         }
@@ -503,7 +507,7 @@ impl DataValidationTool {
                     if self.config.validate_nested {
                         if let Some(rules) = item_rules {
                             for (i, item) in arr.iter().enumerate() {
-                                let item_field = format!("{}[{}]", field, i);
+                                let item_field = format!("{field}[{i}]");
                                 self.validate_value(&item_field, item, rules, errors)?;
                             }
                         }
@@ -521,8 +525,8 @@ impl DataValidationTool {
                     for req_field in required {
                         if !obj.contains_key(req_field) {
                             return Err(validation_error(
-                                format!("Missing required field: {}", req_field),
-                                Some(format!("{}.{}", field, req_field)),
+                                format!("Missing required field: {req_field}"),
+                                Some(format!("{field}.{req_field}")),
                             ));
                         }
                     }
@@ -532,8 +536,8 @@ impl DataValidationTool {
                         for key in obj.keys() {
                             if !properties.contains_key(key) {
                                 return Err(validation_error(
-                                    format!("Additional property not allowed: {}", key),
-                                    Some(format!("{}.{}", field, key)),
+                                    format!("Additional property not allowed: {key}"),
+                                    Some(format!("{field}.{key}")),
                                 ));
                             }
                         }
@@ -543,7 +547,7 @@ impl DataValidationTool {
                     if self.config.validate_nested {
                         for (prop, rules) in properties {
                             if let Some(prop_value) = obj.get(prop) {
-                                let prop_field = format!("{}.{}", field, prop);
+                                let prop_field = format!("{field}.{prop}");
                                 self.validate_value(&prop_field, prop_value, rules, errors)?;
                             }
                         }
@@ -561,8 +565,8 @@ impl DataValidationTool {
             msg.replace("{field}", field)
         } else {
             match key {
-                "required" => format!("{} is required", field),
-                _ => format!("Validation failed for {}", field),
+                "required" => format!("{field} is required"),
+                _ => format!("Validation failed for {field}"),
             }
         }
     }
@@ -597,7 +601,7 @@ impl BaseAgent for DataValidationTool {
         let validation_rules: ValidationRules =
             serde_json::from_value(rules.clone()).map_err(|e| {
                 validation_error(
-                    format!("Invalid rules format: {}", e),
+                    format!("Invalid rules format: {e}"),
                     Some("rules".to_string()),
                 )
             })?;
@@ -642,7 +646,7 @@ impl BaseAgent for DataValidationTool {
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
-        Ok(AgentOutput::text(format!("Validation error: {}", error)))
+        Ok(AgentOutput::text(format!("Validation error: {error}")))
     }
 }
 

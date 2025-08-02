@@ -96,7 +96,7 @@ impl HierarchicalCompositeAgent {
     /// Create a new hierarchical composite agent
     pub fn new(name: impl Into<String>, config: HierarchicalConfig) -> Self {
         let name = name.into();
-        let description = format!("Hierarchical composite agent: {}", name);
+        let description = format!("Hierarchical composite agent: {name}");
         Self {
             metadata: ComponentMetadata::new(name, description),
             parent: RwLock::new(None),
@@ -213,8 +213,7 @@ impl BaseAgent for HierarchicalCompositeAgent {
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
         Ok(AgentOutput::text(format!(
-            "Hierarchical agent error: {}",
-            error
+            "Hierarchical agent error: {error}"
         )))
     }
 }
@@ -257,7 +256,7 @@ impl ToolCapable for HierarchicalCompositeAgent {
             tool.execute(input, context).await
         } else {
             Err(LLMSpellError::Component {
-                message: format!("Tool not found: {}", tool_name),
+                message: format!("Tool not found: {tool_name}"),
                 source: None,
             })
         }
@@ -315,7 +314,7 @@ impl CompositeAgent for HierarchicalCompositeAgent {
         components
             .remove(component_id)
             .ok_or_else(|| LLMSpellError::Component {
-                message: format!("Component not found: {}", component_id),
+                message: format!("Component not found: {component_id}"),
                 source: None,
             })?;
         Ok(())
@@ -410,7 +409,7 @@ impl CompositeAgent for HierarchicalCompositeAgent {
                 let mut results = Vec::new();
                 for handle in handles {
                     results.push(handle.await.map_err(|e| LLMSpellError::Component {
-                        message: format!("Parallel execution failed: {}", e),
+                        message: format!("Parallel execution failed: {e}"),
                         source: None,
                     })??);
                 }
@@ -429,7 +428,7 @@ impl CompositeAgent for HierarchicalCompositeAgent {
 impl HierarchicalAgent for HierarchicalCompositeAgent {
     fn parent(&self) -> Option<Arc<dyn HierarchicalAgent>> {
         let parent_guard = self.parent.read().unwrap();
-        parent_guard.as_ref().and_then(|weak| weak.upgrade())
+        parent_guard.as_ref().and_then(std::sync::Weak::upgrade)
     }
 
     fn children(&self) -> Vec<Arc<dyn HierarchicalAgent>> {
@@ -443,7 +442,7 @@ impl HierarchicalAgent for HierarchicalCompositeAgent {
             let children = self.children.read().await;
             if children.len() >= max {
                 return Err(LLMSpellError::Component {
-                    message: format!("Maximum children limit ({}) reached", max),
+                    message: format!("Maximum children limit ({max}) reached"),
                     source: None,
                 });
             }
@@ -542,24 +541,28 @@ impl HierarchicalAgentBuilder {
     }
 
     /// Set the configuration
-    pub fn config(mut self, config: HierarchicalConfig) -> Self {
+    #[must_use]
+    pub const fn config(mut self, config: HierarchicalConfig) -> Self {
         self.config = config;
         self
     }
 
     /// Add a capability
+    #[must_use]
     pub fn add_capability(mut self, capability: Capability) -> Self {
         self.capabilities.push(capability);
         self
     }
 
     /// Set the initial execution pattern
+    #[must_use]
     pub fn execution_pattern(mut self, pattern: ExecutionPattern) -> Self {
         self.initial_pattern = pattern;
         self
     }
 
     /// Build the hierarchical agent
+    #[must_use]
     pub fn build(self) -> HierarchicalCompositeAgent {
         let name = self.name.clone();
         let mut agent = HierarchicalCompositeAgent::new(self.name, self.config);

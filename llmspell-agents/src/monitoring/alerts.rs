@@ -27,12 +27,13 @@ pub enum AlertSeverity {
 
 impl AlertSeverity {
     /// Get color code for severity
-    pub fn color(&self) -> &'static str {
+    #[must_use]
+    pub const fn color(&self) -> &'static str {
         match self {
-            AlertSeverity::Info => "🟢",
-            AlertSeverity::Warning => "🟡",
-            AlertSeverity::Critical => "🟠",
-            AlertSeverity::Emergency => "🔴",
+            Self::Info => "🟢",
+            Self::Warning => "🟡",
+            Self::Critical => "🟠",
+            Self::Emergency => "🔴",
         }
     }
 }
@@ -40,10 +41,10 @@ impl AlertSeverity {
 impl std::fmt::Display for AlertSeverity {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            AlertSeverity::Info => write!(f, "Info"),
-            AlertSeverity::Warning => write!(f, "Warning"),
-            AlertSeverity::Critical => write!(f, "Critical"),
-            AlertSeverity::Emergency => write!(f, "Emergency"),
+            Self::Info => write!(f, "Info"),
+            Self::Warning => write!(f, "Warning"),
+            Self::Critical => write!(f, "Critical"),
+            Self::Emergency => write!(f, "Emergency"),
         }
     }
 }
@@ -90,6 +91,7 @@ pub struct Alert {
 
 impl Alert {
     /// Create a new alert
+    #[must_use]
     pub fn new(
         rule_id: String,
         severity: AlertSeverity,
@@ -114,6 +116,7 @@ impl Alert {
     }
 
     /// Add detail to the alert
+    #[must_use]
     pub fn with_detail(mut self, key: String, value: serde_json::Value) -> Self {
         self.details.insert(key, value);
         self
@@ -139,6 +142,7 @@ impl Alert {
     }
 
     /// Get alert duration
+    #[must_use]
     pub fn duration(&self) -> Duration {
         if let Some(resolved_at) = self.resolved_at {
             (resolved_at - self.triggered_at)
@@ -200,7 +204,7 @@ pub enum AlertCondition {
 impl std::fmt::Debug for AlertCondition {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            AlertCondition::MetricThreshold {
+            Self::MetricThreshold {
                 metric_name,
                 operator,
                 threshold,
@@ -212,12 +216,12 @@ impl std::fmt::Debug for AlertCondition {
                 .field("threshold", threshold)
                 .field("duration", duration)
                 .finish(),
-            AlertCondition::HealthStatus { status, duration } => f
+            Self::HealthStatus { status, duration } => f
                 .debug_struct("HealthStatus")
                 .field("status", status)
                 .field("duration", duration)
                 .finish(),
-            AlertCondition::ErrorRate {
+            Self::ErrorRate {
                 rate_percent,
                 duration,
             } => f
@@ -225,7 +229,7 @@ impl std::fmt::Debug for AlertCondition {
                 .field("rate_percent", rate_percent)
                 .field("duration", duration)
                 .finish(),
-            AlertCondition::Custom(_) => f.write_str("Custom(AlertEvaluator)"),
+            Self::Custom(_) => f.write_str("Custom(AlertEvaluator)"),
         }
     }
 }
@@ -249,14 +253,15 @@ pub enum ThresholdOperator {
 
 impl ThresholdOperator {
     /// Evaluate a value against a threshold
+    #[must_use]
     pub fn evaluate(&self, value: f64, threshold: f64) -> bool {
         match self {
-            ThresholdOperator::GreaterThan => value > threshold,
-            ThresholdOperator::GreaterThanOrEqual => value >= threshold,
-            ThresholdOperator::LessThan => value < threshold,
-            ThresholdOperator::LessThanOrEqual => value <= threshold,
-            ThresholdOperator::Equal => (value - threshold).abs() < f64::EPSILON,
-            ThresholdOperator::NotEqual => (value - threshold).abs() >= f64::EPSILON,
+            Self::GreaterThan => value > threshold,
+            Self::GreaterThanOrEqual => value >= threshold,
+            Self::LessThan => value < threshold,
+            Self::LessThanOrEqual => value <= threshold,
+            Self::Equal => (value - threshold).abs() < f64::EPSILON,
+            Self::NotEqual => (value - threshold).abs() >= f64::EPSILON,
         }
     }
 }
@@ -322,6 +327,7 @@ pub struct AlertManager {
 
 impl AlertManager {
     /// Create a new alert manager
+    #[must_use]
     pub fn new(config: AlertConfig) -> Self {
         Self {
             config,
@@ -500,6 +506,7 @@ impl AlertManager {
     }
 
     /// Get active alerts
+    #[must_use]
     pub fn get_active_alerts(&self) -> Vec<Alert> {
         self.active_alerts
             .read()
@@ -516,7 +523,7 @@ impl AlertManager {
             Ok(())
         } else {
             Err(llmspell_core::LLMSpellError::Component {
-                message: format!("Alert {} not found", alert_id),
+                message: format!("Alert {alert_id} not found"),
                 source: None,
             })
         }
@@ -530,13 +537,14 @@ impl AlertManager {
             Ok(())
         } else {
             Err(llmspell_core::LLMSpellError::Component {
-                message: format!("Alert {} not found", alert_id),
+                message: format!("Alert {alert_id} not found"),
                 source: None,
             })
         }
     }
 
     /// Get alert statistics
+    #[must_use]
     pub fn get_statistics(&self) -> AlertStatistics {
         let active = self.active_alerts.read().unwrap();
         let history = self.history.read().unwrap();
@@ -546,21 +554,21 @@ impl AlertManager {
             *severity_counts.entry(alert.severity).or_insert(0) += 1;
         }
 
-        let avg_resolution_time = if !history.is_empty() {
+        let avg_resolution_time = if history.is_empty() {
+            None
+        } else {
             let total_duration: Duration = history
                 .iter()
                 .filter(|a| a.resolved_at.is_some())
-                .map(|a| a.duration())
+                .map(Alert::duration)
                 .sum();
             let resolved_count = history.iter().filter(|a| a.resolved_at.is_some()).count();
 
             if resolved_count > 0 {
-                Some(total_duration / resolved_count as u32)
+                Some(total_duration / u32::try_from(resolved_count).unwrap_or(1))
             } else {
                 None
             }
-        } else {
-            None
         };
 
         AlertStatistics {

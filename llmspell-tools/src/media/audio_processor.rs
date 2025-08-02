@@ -29,7 +29,7 @@ use std::sync::Arc;
 use tracing::{debug, info};
 
 /// Audio format types
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum AudioFormat {
     Wav,
@@ -42,11 +42,12 @@ pub enum AudioFormat {
 
 impl AudioFormat {
     /// Detect format from file extension
+    #[must_use]
     pub fn from_extension(path: &Path) -> Self {
         match path
             .extension()
             .and_then(|ext| ext.to_str())
-            .map(|s| s.to_lowercase())
+            .map(str::to_lowercase)
             .as_deref()
         {
             Some("wav") => Self::Wav,
@@ -122,6 +123,7 @@ pub struct AudioProcessorTool {
 
 impl AudioProcessorTool {
     /// Create a new audio processor tool
+    #[must_use]
     pub fn new(config: AudioProcessorConfig) -> Self {
         Self {
             metadata: ComponentMetadata::new(
@@ -135,6 +137,7 @@ impl AudioProcessorTool {
     }
 
     /// Create a new audio processor tool with sandbox context
+    #[must_use]
     pub fn with_sandbox(
         config: AudioProcessorConfig,
         sandbox_context: Arc<SandboxContext>,
@@ -170,7 +173,7 @@ impl AudioProcessorTool {
     async fn extract_metadata(&self, file_path: &Path) -> LLMResult<AudioMetadata> {
         // Get file size
         let file_metadata = std::fs::metadata(file_path).map_err(|e| LLMSpellError::Tool {
-            message: format!("Failed to read file metadata: {}", e),
+            message: format!("Failed to read file metadata: {e}"),
             tool_name: Some("audio_processor".to_string()),
             source: None,
         })?;
@@ -239,7 +242,7 @@ impl AudioProcessorTool {
         use std::io::{Read, Seek, SeekFrom};
 
         let mut file = File::open(file_path).map_err(|e| LLMSpellError::Tool {
-            message: format!("Failed to open WAV file: {}", e),
+            message: format!("Failed to open WAV file: {e}"),
             tool_name: Some("audio_processor".to_string()),
             source: None,
         })?;
@@ -248,7 +251,7 @@ impl AudioProcessorTool {
         let mut riff_header = [0u8; 12];
         file.read_exact(&mut riff_header)
             .map_err(|e| LLMSpellError::Tool {
-                message: format!("Failed to read RIFF header: {}", e),
+                message: format!("Failed to read RIFF header: {e}"),
                 tool_name: Some("audio_processor".to_string()),
                 source: None,
             })?;
@@ -281,7 +284,7 @@ impl AudioProcessorTool {
                 let mut fmt_data = vec![0u8; 16.min(chunk_size as usize)];
                 file.read_exact(&mut fmt_data)
                     .map_err(|e| LLMSpellError::Tool {
-                        message: format!("Failed to read fmt chunk: {}", e),
+                        message: format!("Failed to read fmt chunk: {e}"),
                         tool_name: Some("audio_processor".to_string()),
                         source: None,
                     })?;
@@ -319,13 +322,13 @@ impl AudioProcessorTool {
                     }
 
                     // Skip this chunk
-                    if file.seek(SeekFrom::Current(size as i64)).is_err() {
+                    if file.seek(SeekFrom::Current(i64::from(size))).is_err() {
                         break;
                     }
                 }
 
                 let duration_seconds = if byte_rate > 0 {
-                    Some(data_size as f64 / byte_rate as f64)
+                    Some(f64::from(data_size) / f64::from(byte_rate))
                 } else {
                     None
                 };
@@ -342,7 +345,7 @@ impl AudioProcessorTool {
             }
 
             // Skip to next chunk
-            if file.seek(SeekFrom::Current(chunk_size as i64)).is_err() {
+            if file.seek(SeekFrom::Current(i64::from(chunk_size))).is_err() {
                 break;
             }
         }
@@ -364,7 +367,7 @@ impl AudioProcessorTool {
         // Check if conversion is supported
         if !self.config.supported_formats.contains(&target_format) {
             return Err(LLMSpellError::Tool {
-                message: format!("Conversion to {:?} format is not supported", target_format),
+                message: format!("Conversion to {target_format:?} format is not supported"),
                 tool_name: Some("audio_processor".to_string()),
                 source: None,
             });
@@ -384,7 +387,7 @@ impl AudioProcessorTool {
         if source_format == AudioFormat::Wav && target_format == AudioFormat::Wav {
             // Simple file copy for same format
             std::fs::copy(source_path, target_path).map_err(|e| LLMSpellError::Tool {
-                message: format!("Failed to copy audio file: {}", e),
+                message: format!("Failed to copy audio file: {e}"),
                 tool_name: Some("audio_processor".to_string()),
                 source: None,
             })?;
@@ -397,8 +400,7 @@ impl AudioProcessorTool {
         } else {
             Err(LLMSpellError::Tool {
                 message: format!(
-                    "Conversion from {:?} to {:?} is not implemented in this basic version. Advanced audio processing will be added in Phase 3+",
-                    source_format, target_format
+                    "Conversion from {source_format:?} to {target_format:?} is not implemented in this basic version. Advanced audio processing will be added in Phase 3+"
                 ),
                 tool_name: Some("audio_processor".to_string()),
                 source: None,
@@ -415,8 +417,7 @@ impl AudioProcessorTool {
                 _ => {
                     return Err(LLMSpellError::Validation {
                         message: format!(
-                            "Invalid operation: {}. Supported operations: detect, metadata, convert",
-                            operation
+                            "Invalid operation: {operation}. Supported operations: detect, metadata, convert"
                         ),
                         field: Some("operation".to_string()),
                     });
@@ -496,7 +497,7 @@ impl BaseAgent for AudioProcessorTool {
                 let format = self.detect_format(path).await?;
 
                 let response = ResponseBuilder::success("detect")
-                    .with_message(format!("Detected audio format: {:?}", format))
+                    .with_message(format!("Detected audio format: {format:?}"))
                     .with_result(json!({
                         "file_path": file_path,
                         "format": format,
@@ -520,11 +521,11 @@ impl BaseAgent for AudioProcessorTool {
                 );
 
                 if let Some(duration) = metadata.duration_seconds {
-                    message.push_str(&format!(", Duration: {:.1}s", duration));
+                    message.push_str(&format!(", Duration: {duration:.1}s"));
                 }
 
                 if let Some(sample_rate) = metadata.sample_rate {
-                    message.push_str(&format!(", Sample rate: {}Hz", sample_rate));
+                    message.push_str(&format!(", Sample rate: {sample_rate}Hz"));
                 }
 
                 let response = ResponseBuilder::success("metadata")
@@ -558,8 +559,7 @@ impl BaseAgent for AudioProcessorTool {
 
                 let response = ResponseBuilder::success("convert")
                     .with_message(format!(
-                        "Converted audio from {} to {} ({:?} format)",
-                        source_path, target_path, target_format
+                        "Converted audio from {source_path} to {target_path} ({target_format:?} format)"
                     ))
                     .with_result(json!({
                         "source_path": source_path,
@@ -587,10 +587,7 @@ impl BaseAgent for AudioProcessorTool {
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> LLMResult<AgentOutput> {
-        Ok(AgentOutput::text(format!(
-            "Audio processor error: {}",
-            error
-        )))
+        Ok(AgentOutput::text(format!("Audio processor error: {error}")))
     }
 }
 

@@ -1,5 +1,5 @@
 //! ABOUTME: Core session bridge providing language-agnostic session operations
-//! ABOUTME: Wraps SessionManager for script access with async operations
+//! ABOUTME: Wraps `SessionManager` for script access with async operations
 
 use llmspell_core::{error::LLMSpellError, Result};
 use llmspell_sessions::{
@@ -10,7 +10,7 @@ use llmspell_sessions::{
 };
 use std::sync::Arc;
 
-/// Helper macro to convert SessionError to LLMSpellError
+/// Helper macro to convert `SessionError` to `LLMSpellError`
 macro_rules! convert_err {
     ($expr:expr) => {
         $expr.map_err(|e| LLMSpellError::Component {
@@ -22,8 +22,8 @@ macro_rules! convert_err {
 
 /// Core session bridge for language-agnostic session operations
 ///
-/// This bridge wraps the SessionManager and provides async interfaces
-/// for script languages, following the pattern established by HookBridge.
+/// This bridge wraps the `SessionManager` and provides async interfaces
+/// for script languages, following the pattern established by `HookBridge`.
 pub struct SessionBridge {
     /// Reference to the session manager
     session_manager: Arc<SessionManager>,
@@ -31,7 +31,8 @@ pub struct SessionBridge {
 
 impl SessionBridge {
     /// Create a new session bridge
-    pub fn new(session_manager: Arc<SessionManager>) -> Self {
+    #[must_use]
+    pub const fn new(session_manager: Arc<SessionManager>) -> Self {
         Self { session_manager }
     }
 
@@ -215,6 +216,7 @@ thread_local! {
 /// Session context management
 impl SessionBridge {
     /// Get the current session ID
+    #[must_use]
     pub fn get_current_session() -> Option<SessionId> {
         CURRENT_SESSION.with(|current| *current.borrow())
     }

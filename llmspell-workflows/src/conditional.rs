@@ -10,7 +10,13 @@ use super::state::{ExecutionStats, StateManager};
 use super::step_executor::StepExecutor;
 use super::traits::{ErrorStrategy, StepResult, WorkflowStatus, WorkflowStep};
 use super::types::{StepExecutionContext, WorkflowConfig};
-use llmspell_core::{ComponentId, ComponentMetadata, Result};
+use async_trait::async_trait;
+use llmspell_core::{
+    execution_context::ExecutionContext,
+    traits::base_agent::BaseAgent,
+    types::{AgentInput, AgentOutput},
+    ComponentId, ComponentMetadata, LLMSpellError, Result,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -237,7 +243,7 @@ impl ConditionalWorkflow {
     }
 
     /// Execute the workflow
-    pub async fn execute(&self) -> Result<ConditionalWorkflowResult> {
+    pub async fn execute_workflow(&self) -> Result<ConditionalWorkflowResult> {
         let start_time = Instant::now();
         info!("Starting conditional workflow: {}", self.name);
 
@@ -584,6 +590,176 @@ impl ConditionalWorkflow {
     }
 }
 
+#[async_trait]
+impl BaseAgent for ConditionalWorkflow {
+    fn metadata(&self) -> &ComponentMetadata {
+        &self.metadata
+    }
+
+    async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
+        // Convert AgentInput to workflow execution
+        // The workflow will use the input text as an execution trigger
+        // and parameters for condition evaluation context
+
+        // Validate input first
+        self.validate_input(&input).await?;
+
+        // Execute the workflow using existing implementation
+        let workflow_result = self.execute_workflow().await?;
+
+        // Convert ConditionalWorkflowResult to AgentOutput
+        let output_text = if workflow_result.success {
+            format!(
+                "Conditional workflow '{}' completed successfully. {} branches matched out of {}, {} executed. {} steps total, {} succeeded, {} failed. Duration: {:?}",
+                workflow_result.workflow_name,
+                workflow_result.matched_branches,
+                workflow_result.total_branches,
+                workflow_result.executed_branches.len(),
+                workflow_result.total_steps(),
+                workflow_result.successful_steps(),
+                workflow_result.failed_steps(),
+                workflow_result.duration
+            )
+        } else {
+            format!(
+                "Conditional workflow '{}' failed: {}. {} branches matched out of {}, {} executed. {} steps total, {} succeeded, {} failed. Duration: {:?}",
+                workflow_result.workflow_name,
+                workflow_result.error_message.as_deref().unwrap_or("Unknown error"),
+                workflow_result.matched_branches,
+                workflow_result.total_branches,
+                workflow_result.executed_branches.len(),
+                workflow_result.total_steps(),
+                workflow_result.successful_steps(),
+                workflow_result.failed_steps(),
+                workflow_result.duration
+            )
+        };
+
+        // Build AgentOutput with execution metadata
+        let mut metadata = llmspell_core::types::OutputMetadata {
+            execution_time_ms: Some(workflow_result.duration.as_millis() as u64),
+            ..Default::default()
+        };
+        metadata.extra.insert(
+            "workflow_type".to_string(),
+            serde_json::json!("conditional"),
+        );
+        metadata.extra.insert(
+            "workflow_name".to_string(),
+            serde_json::json!(workflow_result.workflow_name),
+        );
+        metadata.extra.insert(
+            "total_branches".to_string(),
+            serde_json::json!(workflow_result.total_branches),
+        );
+        metadata.extra.insert(
+            "matched_branches".to_string(),
+            serde_json::json!(workflow_result.matched_branches),
+        );
+        metadata.extra.insert(
+            "executed_branches".to_string(),
+            serde_json::json!(workflow_result.executed_branches.len()),
+        );
+        metadata.extra.insert(
+            "total_steps".to_string(),
+            serde_json::json!(workflow_result.total_steps()),
+        );
+        metadata.extra.insert(
+            "successful_steps".to_string(),
+            serde_json::json!(workflow_result.successful_steps()),
+        );
+        metadata.extra.insert(
+            "failed_steps".to_string(),
+            serde_json::json!(workflow_result.failed_steps()),
+        );
+        metadata.extra.insert(
+            "success_rate".to_string(),
+            serde_json::json!(workflow_result.success_rate()),
+        );
+        metadata.extra.insert(
+            "execute_all_matching".to_string(),
+            serde_json::json!(self.config.execute_all_matching),
+        );
+        metadata.extra.insert(
+            "short_circuit_evaluation".to_string(),
+            serde_json::json!(self.config.short_circuit_evaluation),
+        );
+
+        Ok(AgentOutput::text(output_text).with_metadata(metadata))
+    }
+
+    async fn validate_input(&self, input: &AgentInput) -> Result<()> {
+        // Basic validation - workflow can accept any non-empty text input
+        if input.text.is_empty() {
+            return Err(LLMSpellError::Validation {
+                message: "Workflow input text cannot be empty".to_string(),
+                field: Some("text".to_string()),
+            });
+        }
+
+        // Validate that we have branches to execute
+        if self.branches.is_empty() {
+            return Err(LLMSpellError::Validation {
+                message: "Cannot execute conditional workflow without branches".to_string(),
+                field: Some("branches".to_string()),
+            });
+        }
+
+        // Validate that branch evaluation limit is reasonable
+        if self.config.max_branches_to_evaluate == 0 {
+            return Err(LLMSpellError::Validation {
+                message: "Max branches to evaluate must be at least 1".to_string(),
+                field: Some("max_branches_to_evaluate".to_string()),
+            });
+        }
+
+        Ok(())
+    }
+
+    async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
+        // Handle workflow-specific errors gracefully
+        let error_text = match &error {
+            LLMSpellError::Workflow { message, step, .. } => {
+                if let Some(step_name) = step {
+                    format!(
+                        "Conditional workflow error in step '{}': {}",
+                        step_name, message
+                    )
+                } else {
+                    format!("Conditional workflow error: {}", message)
+                }
+            }
+            LLMSpellError::Validation { message, field } => {
+                if let Some(field_name) = field {
+                    format!("Validation error in field '{}': {}", field_name, message)
+                } else {
+                    format!("Validation error: {}", message)
+                }
+            }
+            _ => format!("Conditional workflow error: {}", error),
+        };
+
+        let mut metadata = llmspell_core::types::OutputMetadata::default();
+        metadata.extra.insert(
+            "error_type".to_string(),
+            serde_json::json!("workflow_error"),
+        );
+        metadata.extra.insert(
+            "workflow_type".to_string(),
+            serde_json::json!("conditional"),
+        );
+        metadata
+            .extra
+            .insert("workflow_name".to_string(), serde_json::json!(self.name));
+        metadata.extra.insert(
+            "branch_count".to_string(),
+            serde_json::json!(self.branches.len()),
+        );
+
+        Ok(AgentOutput::text(error_text).with_metadata(metadata))
+    }
+}
+
 /// Builder for creating conditional workflows
 pub struct ConditionalWorkflowBuilder {
     name: String,
@@ -816,7 +992,7 @@ mod tests {
             .add_branch(branch)
             .build();
 
-        let result = workflow.execute().await.unwrap();
+        let result = workflow.execute_workflow().await.unwrap();
         assert!(result.success);
         assert_eq!(result.executed_branches.len(), 1);
         assert_eq!(result.matched_branches, 1);
@@ -840,7 +1016,7 @@ mod tests {
             .add_branch(branch)
             .build();
 
-        let result = workflow.execute().await.unwrap();
+        let result = workflow.execute_workflow().await.unwrap();
         // Should fail because no branches executed and no default branch
         assert!(!result.success);
         assert_eq!(result.executed_branches.len(), 0);
@@ -877,7 +1053,7 @@ mod tests {
             .add_branch(default_branch)
             .build();
 
-        let result = workflow.execute().await.unwrap();
+        let result = workflow.execute_workflow().await.unwrap();
         assert!(result.success);
         assert_eq!(result.executed_branches.len(), 1);
         assert_eq!(result.executed_branches[0].branch_name, "default_branch");
@@ -920,7 +1096,7 @@ mod tests {
             .await
             .unwrap();
 
-        let result = workflow.execute().await.unwrap();
+        let result = workflow.execute_workflow().await.unwrap();
         assert!(result.success);
         assert_eq!(result.executed_branches.len(), 1);
         assert_eq!(result.total_steps(), 1);

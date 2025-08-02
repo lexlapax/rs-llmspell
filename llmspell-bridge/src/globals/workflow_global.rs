@@ -15,18 +15,21 @@ pub struct WorkflowGlobal {
 
 impl WorkflowGlobal {
     /// Create a new Workflow global
+    #[must_use]
     pub fn new(registry: Arc<ComponentRegistry>) -> Self {
         let bridge = Arc::new(WorkflowBridge::new(registry.clone()));
         Self { registry, bridge }
     }
 
     /// Get the component registry
-    pub fn registry(&self) -> &Arc<ComponentRegistry> {
+    #[must_use]
+    pub const fn registry(&self) -> &Arc<ComponentRegistry> {
         &self.registry
     }
 
     /// Get the workflow bridge
-    pub fn bridge(&self) -> &Arc<WorkflowBridge> {
+    #[must_use]
+    pub const fn bridge(&self) -> &Arc<WorkflowBridge> {
         &self.bridge
     }
 }
@@ -46,7 +49,7 @@ impl GlobalObject for WorkflowGlobal {
     fn inject_lua(&self, lua: &mlua::Lua, context: &GlobalContext) -> Result<()> {
         crate::lua::globals::workflow::inject_workflow_global(lua, context, self.bridge.clone())
             .map_err(|e| llmspell_core::LLMSpellError::Component {
-                message: format!("Failed to inject Workflow global: {}", e),
+                message: format!("Failed to inject Workflow global: {e}"),
                 source: None,
             })
     }

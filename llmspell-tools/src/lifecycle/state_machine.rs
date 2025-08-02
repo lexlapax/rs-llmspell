@@ -31,23 +31,21 @@ pub enum ToolExecutionState {
 
 impl ToolExecutionState {
     /// Check if tool can start execution
-    pub fn can_execute(&self) -> bool {
-        matches!(self, ToolExecutionState::Ready)
+    #[must_use]
+    pub const fn can_execute(&self) -> bool {
+        matches!(self, Self::Ready)
     }
 
     /// Check if tool is in a final state
-    pub fn is_terminal(&self) -> bool {
-        matches!(self, ToolExecutionState::Terminated)
+    #[must_use]
+    pub const fn is_terminal(&self) -> bool {
+        matches!(self, Self::Terminated)
     }
 
     /// Check if tool is healthy
-    pub fn is_healthy(&self) -> bool {
-        matches!(
-            self,
-            ToolExecutionState::Ready
-                | ToolExecutionState::Executing
-                | ToolExecutionState::Completed
-        )
+    #[must_use]
+    pub const fn is_healthy(&self) -> bool {
+        matches!(self, Self::Ready | Self::Executing | Self::Completed)
     }
 }
 
@@ -74,6 +72,7 @@ pub struct StateTransition {
 
 impl ToolStateMachine {
     /// Create a new tool state machine
+    #[must_use]
     pub fn new(tool_name: String) -> Self {
         Self {
             state: Arc::new(RwLock::new(ToolExecutionState::Uninitialized)),
@@ -212,8 +211,11 @@ impl ToolStateMachine {
     }
 
     /// Validate if a state transition is allowed
-    fn is_valid_transition(&self, from: ToolExecutionState, to: ToolExecutionState) -> bool {
-        use ToolExecutionState::*;
+    const fn is_valid_transition(&self, from: ToolExecutionState, to: ToolExecutionState) -> bool {
+        use ToolExecutionState::{
+            CleaningUp, Completed, Executing, Failed, Initializing, Ready, Terminated,
+            Uninitialized,
+        };
 
         match (from, to) {
             // From Uninitialized
@@ -267,6 +269,7 @@ pub struct ExecutionStats {
 
 impl ExecutionStats {
     /// Get time spent in a specific state
+    #[must_use]
     pub fn time_in_state(&self, state: ToolExecutionState) -> Duration {
         self.state_durations
             .get(&state)
@@ -275,6 +278,7 @@ impl ExecutionStats {
     }
 
     /// Get percentage of time spent in a specific state
+    #[must_use]
     pub fn state_percentage(&self, state: ToolExecutionState) -> f64 {
         if self.execution_time.is_zero() {
             return 0.0;

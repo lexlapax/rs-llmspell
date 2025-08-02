@@ -27,7 +27,7 @@ pub struct NodeInfo {
 }
 
 /// Node status
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum NodeStatus {
     /// Node is healthy and accepting requests
     Healthy,
@@ -55,7 +55,7 @@ pub struct DistributedContext {
 }
 
 /// Context replication strategy
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ReplicationStrategy {
     /// No replication
     None,
@@ -121,7 +121,7 @@ pub trait NodeDiscovery: Send + Sync {
 }
 
 /// Consistency level for distributed operations
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ConsistencyLevel {
     /// Eventually consistent
     Eventual,
@@ -145,7 +145,7 @@ struct ConsistencyManager {
 }
 
 /// Conflict resolution strategy
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ConflictResolution {
     /// Last write wins
     LastWriteWins,
@@ -428,7 +428,7 @@ impl DistributedContext {
             Ok(())
         } else {
             Err(LLMSpellError::Component {
-                message: format!("Node not found: {}", node_id),
+                message: format!("Node not found: {node_id}"),
                 source: None,
             })
         }
@@ -489,7 +489,11 @@ pub struct ContextSync {
 
 impl ContextSync {
     /// Create new sync service
-    pub fn new(distributed: Arc<DistributedContext>, sync_rx: mpsc::Receiver<SyncMessage>) -> Self {
+    #[must_use]
+    pub const fn new(
+        distributed: Arc<DistributedContext>,
+        sync_rx: mpsc::Receiver<SyncMessage>,
+    ) -> Self {
         Self {
             distributed,
             sync_rx,
@@ -512,6 +516,7 @@ pub struct MockNodeDiscovery {
 }
 
 impl MockNodeDiscovery {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             nodes: Arc::new(RwLock::new(Vec::new())),

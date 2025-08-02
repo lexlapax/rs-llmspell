@@ -46,11 +46,14 @@ use llmspell_core::{
 use serde_json::json;
 use std::collections::HashMap;
 
+/// Type alias for test tool handler function
+type TestToolHandler = Box<dyn Fn(&AgentInput) -> Result<ToolOutput, LLMSpellError> + Send + Sync>;
+
 /// A simple test tool implementation
 pub struct TestTool {
     metadata: ComponentMetadata,
     schema: ToolSchema,
-    handler: Option<Box<dyn Fn(&AgentInput) -> Result<ToolOutput, LLMSpellError> + Send + Sync>>,
+    handler: Option<TestToolHandler>,
 }
 
 impl TestTool {

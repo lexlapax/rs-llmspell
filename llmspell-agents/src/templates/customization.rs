@@ -48,6 +48,7 @@ pub struct TemplateCustomizer {
 
 impl TemplateCustomizer {
     /// Create new customizer for a template
+    #[must_use]
     pub fn new(template: Box<dyn AgentTemplate>) -> Self {
         Self {
             base_template: template,
@@ -56,12 +57,14 @@ impl TemplateCustomizer {
     }
 
     /// Add a parameter to the template
+    #[must_use]
     pub fn add_parameter(mut self, param: ParameterDefinition) -> Self {
         self.customization.additional_parameters.push(param);
         self
     }
 
     /// Override an existing parameter
+    #[must_use]
     pub fn override_parameter(mut self, name: &str, param: ParameterDefinition) -> Self {
         self.customization
             .parameter_overrides
@@ -70,12 +73,14 @@ impl TemplateCustomizer {
     }
 
     /// Add a tool dependency
+    #[must_use]
     pub fn add_tool_dependency(mut self, tool: ToolDependency) -> Self {
         self.customization.additional_tools.push(tool);
         self
     }
 
     /// Override a tool dependency
+    #[must_use]
     pub fn override_tool(mut self, name: &str, tool: ToolDependency) -> Self {
         self.customization
             .tool_overrides
@@ -84,18 +89,21 @@ impl TemplateCustomizer {
     }
 
     /// Add a capability requirement
+    #[must_use]
     pub fn add_capability(mut self, capability: CapabilityRequirement) -> Self {
         self.customization.additional_capabilities.push(capability);
         self
     }
 
     /// Override resource requirements
-    pub fn override_resources(mut self, resources: ResourceRequirements) -> Self {
+    #[must_use]
+    pub const fn override_resources(mut self, resources: ResourceRequirements) -> Self {
         self.customization.resource_overrides = Some(resources);
         self
     }
 
     /// Add configuration
+    #[must_use]
     pub fn add_config(mut self, key: &str, value: serde_json::Value) -> Self {
         self.customization
             .config_additions
@@ -104,6 +112,7 @@ impl TemplateCustomizer {
     }
 
     /// Override metadata
+    #[must_use]
     pub fn override_metadata(mut self, key: &str, value: &str) -> Self {
         self.customization
             .metadata_overrides
@@ -112,6 +121,7 @@ impl TemplateCustomizer {
     }
 
     /// Build the customized template
+    #[must_use]
     pub fn build(self) -> Box<dyn AgentTemplate> {
         Box::new(CustomizedTemplate {
             base_template: self.base_template,
@@ -168,7 +178,7 @@ impl AgentTemplate for CustomizedTemplate {
     }
 
     fn clone_template(&self) -> Box<dyn AgentTemplate> {
-        Box::new(CustomizedTemplate {
+        Box::new(Self {
             base_template: self.base_template.clone_template(),
             customization: self.customization.clone(),
         })
@@ -266,6 +276,7 @@ pub struct TemplateBuilder {
 
 impl TemplateBuilder {
     /// Create new template builder
+    #[must_use]
     pub fn new(metadata: super::schema::TemplateMetadata) -> Self {
         Self {
             schema: TemplateSchema::new(metadata),
@@ -273,12 +284,14 @@ impl TemplateBuilder {
     }
 
     /// Add parameter
+    #[must_use]
     pub fn parameter(mut self, param: ParameterDefinition) -> Self {
         self.schema = self.schema.with_parameter(param);
         self
     }
 
     /// Add required string parameter
+    #[must_use]
     pub fn string_param(self, name: &str, description: &str) -> Self {
         self.parameter(ParameterDefinition {
             name: name.to_string(),
@@ -292,6 +305,7 @@ impl TemplateBuilder {
     }
 
     /// Add optional integer parameter with default
+    #[must_use]
     pub fn int_param(self, name: &str, description: &str, default: i64) -> Self {
         self.parameter(ParameterDefinition {
             name: name.to_string(),
@@ -305,6 +319,7 @@ impl TemplateBuilder {
     }
 
     /// Add optional boolean parameter with default
+    #[must_use]
     pub fn bool_param(self, name: &str, description: &str, default: bool) -> Self {
         self.parameter(ParameterDefinition {
             name: name.to_string(),
@@ -318,6 +333,7 @@ impl TemplateBuilder {
     }
 
     /// Add enum parameter
+    #[must_use]
     pub fn enum_param(
         self,
         name: &str,
@@ -330,13 +346,14 @@ impl TemplateBuilder {
             description: description.to_string(),
             param_type: ParameterType::Enum(values),
             required: default.is_none(),
-            default_value: default.map(|v| v.into()),
+            default_value: default.map(std::convert::Into::into),
             constraints: vec![],
             examples: vec![],
         })
     }
 
     /// Add tool dependency
+    #[must_use]
     pub fn tool(mut self, name: &str, required: bool) -> Self {
         self.schema = self.schema.with_tool_dependency(ToolDependency {
             name: name.to_string(),
@@ -349,6 +366,7 @@ impl TemplateBuilder {
     }
 
     /// Add capability
+    #[must_use]
     pub fn capability(mut self, name: &str, min_level: u8, critical: bool) -> Self {
         self.schema = self
             .schema
@@ -356,12 +374,13 @@ impl TemplateBuilder {
                 name: name.to_string(),
                 min_level,
                 critical,
-                usage_description: format!("Capability for {}", name),
+                usage_description: format!("Capability for {name}"),
             });
         self
     }
 
     /// Set resource requirements
+    #[must_use]
     pub fn resources(mut self, memory_mb: u64, cpu_percent: u8) -> Self {
         self.schema = self
             .schema
@@ -376,6 +395,7 @@ impl TemplateBuilder {
     }
 
     /// Add configuration
+    #[must_use]
     pub fn config(mut self, key: &str, value: serde_json::Value) -> Self {
         self.schema = self.schema.with_config(key, value);
         self
@@ -411,13 +431,14 @@ impl AgentTemplate for BasicTemplate {
     }
 
     fn clone_template(&self) -> Box<dyn AgentTemplate> {
-        Box::new(BasicTemplate {
+        Box::new(Self {
             schema: self.schema.clone(),
         })
     }
 }
 
 /// Create a custom parameter with validation
+#[must_use]
 pub fn create_validated_parameter(
     name: &str,
     description: &str,
@@ -436,6 +457,7 @@ pub fn create_validated_parameter(
 }
 
 /// Create a range-constrained numeric parameter
+#[must_use]
 pub fn create_range_parameter(
     name: &str,
     description: &str,
@@ -448,7 +470,7 @@ pub fn create_range_parameter(
         description: description.to_string(),
         param_type: ParameterType::Float,
         required: default.is_none(),
-        default_value: default.map(|v| v.into()),
+        default_value: default.map(std::convert::Into::into),
         constraints: vec![
             ParameterConstraint::MinValue(min),
             ParameterConstraint::MaxValue(max),
@@ -458,6 +480,7 @@ pub fn create_range_parameter(
 }
 
 /// Create a pattern-validated string parameter
+#[must_use]
 pub fn create_pattern_parameter(
     name: &str,
     description: &str,
@@ -471,7 +494,7 @@ pub fn create_pattern_parameter(
         required: true,
         default_value: None,
         constraints: vec![ParameterConstraint::Pattern(pattern.to_string())],
-        examples: examples.into_iter().map(|e| e.into()).collect(),
+        examples: examples.into_iter().map(std::convert::Into::into).collect(),
     }
 }
 

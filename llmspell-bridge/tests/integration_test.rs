@@ -110,7 +110,7 @@ async fn test_streaming_through_bridge() {
     match result {
         Err(e) => {
             // Expected for now - streaming not fully implemented
-            println!("Streaming returned error as expected: {}", e);
+            println!("Streaming returned error as expected: {e}");
         }
         Ok(stream) => {
             // If it succeeds, it should return a valid stream
@@ -157,10 +157,10 @@ async fn test_provider_integration() {
     engine.inject_apis(&registry, &providers).unwrap();
 
     // Test that we can access provider functionality
-    let script = r#"
+    let script = r"
         -- Test that Agent API is available
         return Agent ~= nil and type(Agent.create) == 'function'
-    "#;
+    ";
 
     let output = engine.execute_script(script).await.unwrap();
     assert_eq!(output.output.as_bool(), Some(true));
@@ -188,10 +188,10 @@ async fn test_error_propagation() {
 
     for (script, error_type) in error_cases {
         let result = engine.execute_script(script).await;
-        assert!(result.is_err(), "Script '{}' should fail", script);
+        assert!(result.is_err(), "Script '{script}' should fail");
 
         let error_msg = result.unwrap_err().to_string();
-        println!("Error for {}: {}", error_type, error_msg);
+        println!("Error for {error_type}: {error_msg}");
     }
 }
 
@@ -213,14 +213,14 @@ async fn test_multimodal_types_access() {
     engine.inject_apis(&registry, &providers).unwrap();
 
     // Test creating multimodal content (when API is available)
-    let script = r#"
+    let script = r"
         -- For now, just verify APIs are injected
         return {
             agent_available = Agent ~= nil,
             tool_available = Tool ~= nil,
             workflow_available = Workflow ~= nil
         }
-    "#;
+    ";
 
     let output = engine.execute_script(script).await.unwrap();
     let result = output.output.as_object().unwrap();
@@ -291,7 +291,7 @@ async fn test_bridge_performance_overhead() {
     let duration = start.elapsed();
 
     let avg_time = duration.as_micros() / iterations;
-    println!("Average execution time: {}μs", avg_time);
+    println!("Average execution time: {avg_time}μs");
 
     // Bridge overhead should be minimal (< 1ms per execution)
     assert!(avg_time < 1000, "Bridge overhead should be < 1ms");
@@ -331,7 +331,7 @@ async fn test_component_registration_integration() {
         }
 
         async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput, LLMSpellError> {
-            Ok(AgentOutput::text(format!("Error: {}", error)))
+            Ok(AgentOutput::text(format!("Error: {error}")))
         }
     }
 

@@ -42,7 +42,7 @@ async fn test_hook_overhead_under_5_percent() {
     ];
 
     for (name, params) in test_cases {
-        println!("\nTesting hook overhead for: {}", name);
+        println!("\nTesting hook overhead for: {name}");
 
         // Create executors
         let config_no_hooks = ToolLifecycleConfig {
@@ -106,17 +106,13 @@ async fn test_hook_overhead_under_5_percent() {
         };
 
         println!(
-            "  No hooks: {:?}, With hooks: {:?}, Overhead: {:.2}%",
-            avg_no_hooks, avg_with_hooks, overhead_percent
+            "  No hooks: {avg_no_hooks:?}, With hooks: {avg_with_hooks:?}, Overhead: {overhead_percent:.2}%"
         );
 
         // Assert overhead is under threshold
         assert!(
             overhead_percent < MAX_OVERHEAD_PERCENT,
-            "Hook overhead {:.2}% exceeds {}% threshold for test case: {}",
-            overhead_percent,
-            MAX_OVERHEAD_PERCENT,
-            name
+            "Hook overhead {overhead_percent:.2}% exceeds {MAX_OVERHEAD_PERCENT}% threshold for test case: {name}"
         );
     }
 }
@@ -151,17 +147,13 @@ async fn test_circuit_breaker_performance() {
     let avg_duration = total_duration / iterations as u32;
 
     println!("\nCircuit breaker performance:");
-    println!("  Average execution time: {:?}", avg_duration);
-    println!(
-        "  Total time for {} requests: {:?}",
-        iterations, total_duration
-    );
+    println!("  Average execution time: {avg_duration:?}");
+    println!("  Total time for {iterations} requests: {total_duration:?}");
 
     // Ensure circuit breaker doesn't add significant overhead
     assert!(
         avg_duration < Duration::from_millis(10),
-        "Circuit breaker adds too much overhead: {:?}",
-        avg_duration
+        "Circuit breaker adds too much overhead: {avg_duration:?}"
     );
 }
 #[tokio::test]
@@ -193,13 +185,12 @@ async fn test_resource_tracking_overhead() {
     let avg_duration = total_duration / iterations as u32;
 
     println!("\nResource tracking performance:");
-    println!("  Average execution time: {:?}", avg_duration);
+    println!("  Average execution time: {avg_duration:?}");
 
     // Resource tracking should have minimal overhead
     assert!(
         avg_duration < Duration::from_millis(5),
-        "Resource tracking adds too much overhead: {:?}",
-        avg_duration
+        "Resource tracking adds too much overhead: {avg_duration:?}"
     );
 }
 #[tokio::test]
@@ -229,8 +220,7 @@ async fn test_hook_execution_time_limit() {
     // Total execution should not be significantly impacted by hook timeout
     assert!(
         duration < Duration::from_millis(100),
-        "Hook timeout handling takes too long: {:?}",
-        duration
+        "Hook timeout handling takes too long: {duration:?}"
     );
 }
 #[tokio::test]
@@ -294,14 +284,13 @@ async fn test_audit_logging_performance_impact() {
     };
 
     println!("\nAudit logging performance:");
-    println!("  Without audit: {:?}", duration_no_audit);
-    println!("  With audit: {:?}", duration_with_audit);
-    println!("  Overhead: {:.2}%", overhead_percent);
+    println!("  Without audit: {duration_no_audit:?}");
+    println!("  With audit: {duration_with_audit:?}");
+    println!("  Overhead: {overhead_percent:.2}%");
 
     // Audit logging should have minimal impact
     assert!(
         overhead_percent < 5.0,
-        "Audit logging overhead {:.2}% exceeds 5% threshold",
-        overhead_percent
+        "Audit logging overhead {overhead_percent:.2}% exceeds 5% threshold"
     );
 }

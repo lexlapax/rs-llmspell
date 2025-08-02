@@ -44,6 +44,7 @@ impl std::fmt::Debug for TemplateInstantiationParams {
 
 impl TemplateInstantiationParams {
     /// Create new instantiation parameters
+    #[must_use]
     pub fn new(agent_id: String) -> Self {
         Self {
             agent_id,
@@ -56,30 +57,35 @@ impl TemplateInstantiationParams {
     }
 
     /// Add parameter value
+    #[must_use]
     pub fn with_parameter(mut self, name: &str, value: serde_json::Value) -> Self {
         self.parameters.insert(name.to_string(), value);
         self
     }
 
     /// Set resource manager
+    #[must_use]
     pub fn with_resource_manager(mut self, resource_manager: Arc<ResourceManager>) -> Self {
         self.resource_manager = Some(resource_manager);
         self
     }
 
     /// Set event system
+    #[must_use]
     pub fn with_event_system(mut self, event_system: Arc<LifecycleEventSystem>) -> Self {
         self.event_system = Some(event_system);
         self
     }
 
     /// Add config override
+    #[must_use]
     pub fn with_config_override(mut self, key: &str, value: serde_json::Value) -> Self {
         self.config_overrides.insert(key.to_string(), value);
         self
     }
 
     /// Add environment variable
+    #[must_use]
     pub fn with_environment(mut self, key: &str, value: &str) -> Self {
         self.environment.insert(key.to_string(), value.to_string());
         self
@@ -359,6 +365,7 @@ pub struct TemplateFactory {
 
 impl TemplateFactory {
     /// Create new template factory
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -389,11 +396,15 @@ impl TemplateFactory {
     }
 
     /// Get template by ID
+    #[must_use]
     pub fn get_template(&self, template_id: &str) -> Option<&dyn AgentTemplate> {
-        self.templates.get(template_id).map(|t| t.as_ref())
+        self.templates
+            .get(template_id)
+            .map(std::convert::AsRef::as_ref)
     }
 
     /// Get all templates in category
+    #[must_use]
     pub fn get_templates_by_category(
         &self,
         category: &super::schema::TemplateCategory,
@@ -409,16 +420,19 @@ impl TemplateFactory {
     }
 
     /// Get all template IDs
+    #[must_use]
     pub fn list_templates(&self) -> Vec<String> {
         self.templates.keys().cloned().collect()
     }
 
     /// Get template schemas
+    #[must_use]
     pub fn get_template_schemas(&self) -> Vec<&TemplateSchema> {
         self.templates.values().map(|t| t.schema()).collect()
     }
 
     /// Find templates by keyword
+    #[must_use]
     pub fn find_templates(&self, keyword: &str) -> Vec<&dyn AgentTemplate> {
         let keyword_lower = keyword.to_lowercase();
         self.templates
@@ -437,7 +451,7 @@ impl TemplateFactory {
                         .iter()
                         .any(|k| k.to_lowercase().contains(&keyword_lower))
             })
-            .map(|t| t.as_ref())
+            .map(std::convert::AsRef::as_ref)
             .collect()
     }
 
@@ -468,11 +482,13 @@ impl TemplateFactory {
     }
 
     /// Get template count
+    #[must_use]
     pub fn template_count(&self) -> usize {
         self.templates.len()
     }
 
     /// Check if template exists
+    #[must_use]
     pub fn has_template(&self, template_id: &str) -> bool {
         self.templates.contains_key(template_id)
     }

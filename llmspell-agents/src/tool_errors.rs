@@ -190,64 +190,67 @@ pub struct ToolErrorHandler {
 
 impl ToolIntegrationError {
     /// Get error severity level
-    pub fn severity(&self) -> ErrorSeverity {
+    #[must_use]
+    pub const fn severity(&self) -> ErrorSeverity {
         match self {
-            ToolIntegrationError::ToolNotFound { .. } => ErrorSeverity::High,
-            ToolIntegrationError::RegistrationFailed { .. } => ErrorSeverity::Medium,
-            ToolIntegrationError::DiscoveryFailed { .. } => ErrorSeverity::Low,
-            ToolIntegrationError::InvocationFailed { .. } => ErrorSeverity::High,
-            ToolIntegrationError::ParameterValidation { .. } => ErrorSeverity::Medium,
-            ToolIntegrationError::Timeout { .. } => ErrorSeverity::Medium,
-            ToolIntegrationError::CompositionFailed { .. } => ErrorSeverity::High,
-            ToolIntegrationError::AgentWrappingFailed { .. } => ErrorSeverity::Medium,
-            ToolIntegrationError::ContextPropagationFailed { .. } => ErrorSeverity::Low,
-            ToolIntegrationError::ResourceLimitExceeded { .. } => ErrorSeverity::High,
-            ToolIntegrationError::SecurityViolation { .. } => ErrorSeverity::Critical,
-            ToolIntegrationError::DependencyResolution { .. } => ErrorSeverity::High,
-            ToolIntegrationError::StateCorruption { .. } => ErrorSeverity::Critical,
+            Self::ToolNotFound { .. } => ErrorSeverity::High,
+            Self::RegistrationFailed { .. } => ErrorSeverity::Medium,
+            Self::DiscoveryFailed { .. } => ErrorSeverity::Low,
+            Self::InvocationFailed { .. } => ErrorSeverity::High,
+            Self::ParameterValidation { .. } => ErrorSeverity::Medium,
+            Self::Timeout { .. } => ErrorSeverity::Medium,
+            Self::CompositionFailed { .. } => ErrorSeverity::High,
+            Self::AgentWrappingFailed { .. } => ErrorSeverity::Medium,
+            Self::ContextPropagationFailed { .. } => ErrorSeverity::Low,
+            Self::ResourceLimitExceeded { .. } => ErrorSeverity::High,
+            Self::SecurityViolation { .. } => ErrorSeverity::Critical,
+            Self::DependencyResolution { .. } => ErrorSeverity::High,
+            Self::StateCorruption { .. } => ErrorSeverity::Critical,
         }
     }
 
     /// Check if error is recoverable
+    #[must_use]
     pub fn is_recoverable(&self) -> bool {
         match self {
-            ToolIntegrationError::ToolNotFound { .. } => false,
-            ToolIntegrationError::RegistrationFailed { .. } => false,
-            ToolIntegrationError::DiscoveryFailed { .. } => true,
-            ToolIntegrationError::InvocationFailed { .. } => true,
-            ToolIntegrationError::ParameterValidation { .. } => true,
-            ToolIntegrationError::Timeout { .. } => true,
-            ToolIntegrationError::CompositionFailed { .. } => true,
-            ToolIntegrationError::AgentWrappingFailed { .. } => false,
-            ToolIntegrationError::ContextPropagationFailed { .. } => true,
-            ToolIntegrationError::ResourceLimitExceeded { .. } => true,
-            ToolIntegrationError::SecurityViolation { .. } => false,
-            ToolIntegrationError::DependencyResolution { .. } => true,
-            ToolIntegrationError::StateCorruption {
+            Self::ToolNotFound { .. } => false,
+            Self::RegistrationFailed { .. } => false,
+            Self::DiscoveryFailed { .. } => true,
+            Self::InvocationFailed { .. } => true,
+            Self::ParameterValidation { .. } => true,
+            Self::Timeout { .. } => true,
+            Self::CompositionFailed { .. } => true,
+            Self::AgentWrappingFailed { .. } => false,
+            Self::ContextPropagationFailed { .. } => true,
+            Self::ResourceLimitExceeded { .. } => true,
+            Self::SecurityViolation { .. } => false,
+            Self::DependencyResolution { .. } => true,
+            Self::StateCorruption {
                 recovery_attempted, ..
             } => !recovery_attempted,
         }
     }
 
     /// Get suggested recovery actions
+    #[must_use]
     pub fn suggested_recovery_actions(&self) -> Vec<RecoveryAction> {
         match self {
-            ToolIntegrationError::ToolNotFound {
+            Self::ToolNotFound {
                 available_tools, ..
             } => {
-                if !available_tools.is_empty() {
+                if available_tools.is_empty() {
+                    vec![RecoveryAction::Abort]
+                } else {
                     vec![RecoveryAction::UseFallback {
                         fallback_tool: available_tools[0].clone(),
                     }]
-                } else {
-                    vec![RecoveryAction::Abort]
                 }
             }
-            ToolIntegrationError::InvocationFailed { retry_count, .. } => {
+            Self::InvocationFailed { retry_count, .. } => {
                 if *retry_count < 3 {
                     vec![RecoveryAction::Retry {
                         max_attempts: 3,
-                        delay: Duration::from_millis(1000 * (retry_count + 1) as u64),
+                        delay: Duration::from_millis(1000 * u64::from(retry_count + 1)),
                     }]
                 } else {
                     vec![RecoveryAction::RequestUserIntervention {
@@ -256,19 +259,19 @@ impl ToolIntegrationError {
                     }]
                 }
             }
-            ToolIntegrationError::ParameterValidation { .. } => {
+            Self::ParameterValidation { .. } => {
                 vec![RecoveryAction::RequestUserIntervention {
                     intervention_type: "parameter_correction".to_string(),
                     message: "Parameter validation failed, manual correction needed".to_string(),
                 }]
             }
-            ToolIntegrationError::Timeout { .. } => {
+            Self::Timeout { .. } => {
                 vec![RecoveryAction::Retry {
                     max_attempts: 2,
                     delay: Duration::from_secs(1),
                 }]
             }
-            ToolIntegrationError::CompositionFailed { .. } => {
+            Self::CompositionFailed { .. } => {
                 vec![
                     RecoveryAction::Skip,
                     RecoveryAction::UseDefault {
@@ -276,16 +279,16 @@ impl ToolIntegrationError {
                     },
                 ]
             }
-            ToolIntegrationError::ResourceLimitExceeded { .. } => {
+            Self::ResourceLimitExceeded { .. } => {
                 vec![RecoveryAction::RequestUserIntervention {
                     intervention_type: "resource_limit_adjustment".to_string(),
                     message: "Resource limits exceeded, consider increasing limits".to_string(),
                 }]
             }
-            ToolIntegrationError::SecurityViolation { .. } => {
+            Self::SecurityViolation { .. } => {
                 vec![RecoveryAction::Abort]
             }
-            ToolIntegrationError::DependencyResolution {
+            Self::DependencyResolution {
                 missing_dependencies,
                 ..
             } => {
@@ -298,42 +301,39 @@ impl ToolIntegrationError {
         }
     }
 
-    /// Convert to LLMSpellError
+    /// Convert to `LLMSpellError`
+    #[must_use]
     pub fn into_llmspell_error(self) -> LLMSpellError {
         match self {
-            ToolIntegrationError::ToolNotFound { tool_name, .. } => LLMSpellError::Component {
-                message: format!("Tool not found: {}", tool_name),
+            Self::ToolNotFound { tool_name, .. } => LLMSpellError::Component {
+                message: format!("Tool not found: {tool_name}"),
                 source: None,
             },
-            ToolIntegrationError::ParameterValidation {
+            Self::ParameterValidation {
                 parameter_name,
                 expected_type,
                 ..
             } => LLMSpellError::Validation {
                 message: format!(
-                    "Parameter '{}' validation failed, expected {}",
-                    parameter_name, expected_type
+                    "Parameter '{parameter_name}' validation failed, expected {expected_type}"
                 ),
                 field: Some(parameter_name),
             },
-            ToolIntegrationError::Timeout {
+            Self::Timeout {
                 tool_name,
                 duration,
                 ..
             } => LLMSpellError::Timeout {
-                message: format!("Tool execution: {} timed out", tool_name),
+                message: format!("Tool execution: {tool_name} timed out"),
                 duration_ms: Some(duration.as_millis() as u64),
             },
-            ToolIntegrationError::SecurityViolation {
+            Self::SecurityViolation {
                 tool_name,
                 violation_type,
                 details,
                 ..
             } => LLMSpellError::Security {
-                message: format!(
-                    "Security violation in {}: {} - {}",
-                    tool_name, violation_type, details
-                ),
+                message: format!("Security violation in {tool_name}: {violation_type} - {details}"),
                 violation_type: Some(violation_type),
             },
             _ => LLMSpellError::Component {
@@ -356,7 +356,7 @@ pub enum ErrorSeverity {
 impl fmt::Display for ToolIntegrationError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            ToolIntegrationError::ToolNotFound {
+            Self::ToolNotFound {
                 tool_name,
                 available_tools,
             } => {
@@ -367,13 +367,13 @@ impl fmt::Display for ToolIntegrationError {
                     available_tools.join(", ")
                 )
             }
-            ToolIntegrationError::RegistrationFailed { tool_name, reason } => {
-                write!(f, "Failed to register tool '{}': {}", tool_name, reason)
+            Self::RegistrationFailed { tool_name, reason } => {
+                write!(f, "Failed to register tool '{tool_name}': {reason}")
             }
-            ToolIntegrationError::DiscoveryFailed { query, reason } => {
-                write!(f, "Tool discovery failed for query '{}': {}", query, reason)
+            Self::DiscoveryFailed { query, reason } => {
+                write!(f, "Tool discovery failed for query '{query}': {reason}")
             }
-            ToolIntegrationError::InvocationFailed {
+            Self::InvocationFailed {
                 tool_name,
                 error,
                 retry_count,
@@ -387,7 +387,7 @@ impl fmt::Display for ToolIntegrationError {
                     error
                 )
             }
-            ToolIntegrationError::ParameterValidation {
+            Self::ParameterValidation {
                 tool_name,
                 parameter_name,
                 expected_type,
@@ -395,51 +395,43 @@ impl fmt::Display for ToolIntegrationError {
             } => {
                 write!(
                     f,
-                    "Parameter validation failed for tool '{}': parameter '{}' should be {}",
-                    tool_name, parameter_name, expected_type
+                    "Parameter validation failed for tool '{tool_name}': parameter '{parameter_name}' should be {expected_type}"
                 )
             }
-            ToolIntegrationError::Timeout {
+            Self::Timeout {
                 tool_name,
                 duration,
                 max_allowed,
             } => {
                 write!(
                     f,
-                    "Tool '{}' execution timed out after {:?} (max allowed: {:?})",
-                    tool_name, duration, max_allowed
+                    "Tool '{tool_name}' execution timed out after {duration:?} (max allowed: {max_allowed:?})"
                 )
             }
-            ToolIntegrationError::CompositionFailed {
+            Self::CompositionFailed {
                 composition_id,
                 failed_step,
                 ..
             } => {
                 write!(
                     f,
-                    "Composition '{}' failed at step '{}'",
-                    composition_id, failed_step
+                    "Composition '{composition_id}' failed at step '{failed_step}'"
                 )
             }
-            ToolIntegrationError::AgentWrappingFailed { agent_name, reason } => {
-                write!(
-                    f,
-                    "Failed to wrap agent '{}' as tool: {}",
-                    agent_name, reason
-                )
+            Self::AgentWrappingFailed { agent_name, reason } => {
+                write!(f, "Failed to wrap agent '{agent_name}' as tool: {reason}")
             }
-            ToolIntegrationError::ContextPropagationFailed {
+            Self::ContextPropagationFailed {
                 context_id,
                 propagation_type,
                 reason,
             } => {
                 write!(
                     f,
-                    "Context propagation failed for '{}' (type: {}): {}",
-                    context_id, propagation_type, reason
+                    "Context propagation failed for '{context_id}' (type: {propagation_type}): {reason}"
                 )
             }
-            ToolIntegrationError::ResourceLimitExceeded {
+            Self::ResourceLimitExceeded {
                 tool_name,
                 resource_type,
                 limit,
@@ -447,11 +439,10 @@ impl fmt::Display for ToolIntegrationError {
             } => {
                 write!(
                     f,
-                    "Tool '{}' exceeded {} limit: {} > {}",
-                    tool_name, resource_type, actual, limit
+                    "Tool '{tool_name}' exceeded {resource_type} limit: {actual} > {limit}"
                 )
             }
-            ToolIntegrationError::SecurityViolation {
+            Self::SecurityViolation {
                 tool_name,
                 violation_type,
                 details,
@@ -459,11 +450,10 @@ impl fmt::Display for ToolIntegrationError {
             } => {
                 write!(
                     f,
-                    "Security violation in tool '{}': {} - {}",
-                    tool_name, violation_type, details
+                    "Security violation in tool '{tool_name}': {violation_type} - {details}"
                 )
             }
-            ToolIntegrationError::DependencyResolution {
+            Self::DependencyResolution {
                 tool_name,
                 missing_dependencies,
                 ..
@@ -475,15 +465,14 @@ impl fmt::Display for ToolIntegrationError {
                     missing_dependencies.join(", ")
                 )
             }
-            ToolIntegrationError::StateCorruption {
+            Self::StateCorruption {
                 tool_name,
                 state_type,
                 recovery_attempted,
             } => {
                 write!(
                     f,
-                    "Tool '{}' state corruption detected in {} (recovery attempted: {})",
-                    tool_name, state_type, recovery_attempted
+                    "Tool '{tool_name}' state corruption detected in {state_type} (recovery attempted: {recovery_attempted})"
                 )
             }
         }
@@ -506,6 +495,7 @@ impl ErrorContext {
     }
 
     /// Set recovery strategy
+    #[must_use]
     pub fn with_recovery_strategy(mut self, strategy: ErrorRecoveryStrategy) -> Self {
         self.recovery_strategy = strategy;
         self
@@ -533,11 +523,13 @@ impl ErrorContext {
     }
 
     /// Get error count for this context
+    #[must_use]
     pub fn error_count(&self) -> usize {
         self.error_history.len()
     }
 
     /// Get successful recovery count
+    #[must_use]
     pub fn successful_recovery_count(&self) -> usize {
         self.error_history
             .iter()
@@ -548,6 +540,7 @@ impl ErrorContext {
 
 impl ToolErrorHandler {
     /// Create new error handler
+    #[must_use]
     pub fn new() -> Self {
         Self {
             default_strategy: ErrorRecoveryStrategy::FailFast,
@@ -558,6 +551,7 @@ impl ToolErrorHandler {
     }
 
     /// Set default recovery strategy
+    #[must_use]
     pub fn with_default_strategy(mut self, strategy: ErrorRecoveryStrategy) -> Self {
         self.default_strategy = strategy;
         self
@@ -654,7 +648,6 @@ impl ToolErrorHandler {
                 Err(recovery_error) => {
                     context.record_error(error.clone(), Some(action.clone()), false);
                     tracing::warn!("Recovery action failed: {}", recovery_error);
-                    continue;
                 }
             }
         }
@@ -679,7 +672,7 @@ impl ToolErrorHandler {
             RecoveryAction::Skip => Ok(JsonValue::String("skipped".to_string())),
             RecoveryAction::UseDefault { default_value } => Ok(default_value.clone()),
             RecoveryAction::UseFallback { fallback_tool } => {
-                Ok(JsonValue::String(format!("fallback:{}", fallback_tool)))
+                Ok(JsonValue::String(format!("fallback:{fallback_tool}")))
             }
             RecoveryAction::RetryWithModifiedParams {
                 parameter_modifications,
@@ -692,7 +685,7 @@ impl ToolErrorHandler {
             RecoveryAction::RequestUserIntervention { message, .. } => {
                 tracing::warn!("User intervention requested: {}", message);
                 Err(LLMSpellError::Component {
-                    message: format!("User intervention required: {}", message),
+                    message: format!("User intervention required: {message}"),
                     source: None,
                 })
             }

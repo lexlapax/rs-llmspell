@@ -34,6 +34,7 @@ pub struct WorkflowDiscovery {
 
 impl WorkflowDiscovery {
     /// Create a new workflow discovery service
+    #[must_use]
     pub fn new() -> Self {
         let mut workflow_types = HashMap::new();
 
@@ -128,26 +129,31 @@ impl WorkflowDiscovery {
     }
 
     /// List all available workflow types
+    #[must_use]
     pub fn list_workflow_types(&self) -> Vec<String> {
         self.workflow_types.keys().cloned().collect()
     }
 
     /// Get information about a specific workflow type
+    #[must_use]
     pub fn get_workflow_info(&self, workflow_type: &str) -> Option<&WorkflowInfo> {
         self.workflow_types.get(workflow_type)
     }
 
     /// Check if a workflow type is available
+    #[must_use]
     pub fn has_workflow_type(&self, workflow_type: &str) -> bool {
         self.workflow_types.contains_key(workflow_type)
     }
 
     /// Get all workflow type information
+    #[must_use]
     pub fn get_all_workflow_info(&self) -> Vec<WorkflowInfo> {
         self.workflow_types.values().cloned().collect()
     }
 
     /// Get all workflow types with their info
+    #[must_use]
     pub fn get_workflow_types(&self) -> Vec<(String, WorkflowInfo)> {
         self.workflow_types
             .iter()
@@ -189,7 +195,7 @@ impl WorkflowFactory {
                 Ok(Box::new(workflow))
             }
             _ => Err(llmspell_core::LLMSpellError::Configuration {
-                message: format!("Unknown workflow type: {}", workflow_type),
+                message: format!("Unknown workflow type: {workflow_type}"),
                 source: None,
             }),
         }
@@ -275,7 +281,7 @@ async fn create_conditional_workflow(params: serde_json::Value) -> Result<impl W
                     .get("steps")
                     .and_then(|v| v.as_array())
                     .ok_or_else(|| llmspell_core::LLMSpellError::Configuration {
-                        message: format!("Branch '{}' requires 'steps' array", branch_name),
+                        message: format!("Branch '{branch_name}' requires 'steps' array"),
                         source: None,
                     })?;
 
@@ -303,7 +309,7 @@ async fn create_conditional_workflow(params: serde_json::Value) -> Result<impl W
                     .get("steps")
                     .and_then(|v| v.as_array())
                     .ok_or_else(|| llmspell_core::LLMSpellError::Configuration {
-                        message: format!("Branch '{}' requires 'steps' array", branch_name),
+                        message: format!("Branch '{branch_name}' requires 'steps' array"),
                         source: None,
                     })?;
 
@@ -430,7 +436,10 @@ async fn create_parallel_workflow(params: serde_json::Value) -> Result<impl Work
             branch = branch.with_description(desc.to_string());
         }
 
-        if let Some(optional) = branch_json.get("optional").and_then(|v| v.as_bool()) {
+        if let Some(optional) = branch_json
+            .get("optional")
+            .and_then(serde_json::Value::as_bool)
+        {
             if optional {
                 branch = branch.optional();
             }
@@ -447,11 +456,14 @@ async fn create_parallel_workflow(params: serde_json::Value) -> Result<impl Work
     }
 
     // Parse config options
-    if let Some(max_concurrency) = params.get("max_concurrency").and_then(|v| v.as_u64()) {
+    if let Some(max_concurrency) = params
+        .get("max_concurrency")
+        .and_then(serde_json::Value::as_u64)
+    {
         builder = builder.with_max_concurrency(max_concurrency as usize);
     }
 
-    if let Some(fail_fast) = params.get("fail_fast").and_then(|v| v.as_bool()) {
+    if let Some(fail_fast) = params.get("fail_fast").and_then(serde_json::Value::as_bool) {
         builder = builder.fail_fast(fail_fast);
     }
 
@@ -555,19 +567,28 @@ fn parse_loop_iterator(config: &serde_json::Value) -> Result<llmspell_workflows:
 
     if let Some(collection) = config.get("collection").and_then(|v| v.as_array()) {
         Ok(LoopIterator::Collection {
-            values: collection.to_vec(),
+            values: collection.clone(),
         })
     } else if let Some(range) = config.get("range").and_then(|v| v.as_object()) {
-        let start = range.get("start").and_then(|v| v.as_i64()).unwrap_or(0);
-        let end = range.get("end").and_then(|v| v.as_i64()).unwrap_or(10);
-        let step = range.get("step").and_then(|v| v.as_i64()).unwrap_or(1);
+        let start = range
+            .get("start")
+            .and_then(serde_json::Value::as_i64)
+            .unwrap_or(0);
+        let end = range
+            .get("end")
+            .and_then(serde_json::Value::as_i64)
+            .unwrap_or(10);
+        let step = range
+            .get("step")
+            .and_then(serde_json::Value::as_i64)
+            .unwrap_or(1);
         Ok(LoopIterator::Range { start, end, step })
     } else if let Some(condition) = config.get("while_condition").and_then(|v| v.as_str()) {
         Ok(LoopIterator::WhileCondition {
             condition: condition.to_string(),
             max_iterations: config
                 .get("max_iterations")
-                .and_then(|v| v.as_u64())
+                .and_then(serde_json::Value::as_u64)
                 .unwrap_or(100) as usize,
         })
     } else {
@@ -588,7 +609,7 @@ struct SequentialWorkflowExecutor {
 #[async_trait::async_trait]
 impl WorkflowExecutor for SequentialWorkflowExecutor {
     async fn execute(&self, _input: serde_json::Value) -> Result<serde_json::Value> {
-        let result = self.workflow.execute().await?;
+        let result = self.workflow.execute_workflow().await?;
         let script_result = crate::conversion::transform_sequential_result(&result);
         Ok(serde_json::to_value(&script_result)?)
     }
@@ -597,7 +618,7 @@ impl WorkflowExecutor for SequentialWorkflowExecutor {
         &self.name
     }
 
-    fn workflow_type(&self) -> &str {
+    fn workflow_type(&self) -> &'static str {
         "sequential"
     }
 }
@@ -610,7 +631,7 @@ struct ConditionalWorkflowExecutor {
 #[async_trait::async_trait]
 impl WorkflowExecutor for ConditionalWorkflowExecutor {
     async fn execute(&self, _input: serde_json::Value) -> Result<serde_json::Value> {
-        let result = self.workflow.execute().await?;
+        let result = self.workflow.execute_workflow().await?;
         let script_result = crate::conversion::transform_conditional_result(&result);
         Ok(serde_json::to_value(&script_result)?)
     }
@@ -619,7 +640,7 @@ impl WorkflowExecutor for ConditionalWorkflowExecutor {
         &self.name
     }
 
-    fn workflow_type(&self) -> &str {
+    fn workflow_type(&self) -> &'static str {
         "conditional"
     }
 }
@@ -632,7 +653,7 @@ struct LoopWorkflowExecutor {
 #[async_trait::async_trait]
 impl WorkflowExecutor for LoopWorkflowExecutor {
     async fn execute(&self, _input: serde_json::Value) -> Result<serde_json::Value> {
-        let result = self.workflow.execute().await?;
+        let result = self.workflow.execute_workflow().await?;
         let script_result = crate::conversion::transform_loop_result(&result);
         Ok(serde_json::to_value(&script_result)?)
     }
@@ -641,7 +662,7 @@ impl WorkflowExecutor for LoopWorkflowExecutor {
         &self.name
     }
 
-    fn workflow_type(&self) -> &str {
+    fn workflow_type(&self) -> &'static str {
         "loop"
     }
 }
@@ -654,7 +675,7 @@ struct ParallelWorkflowExecutor {
 #[async_trait::async_trait]
 impl WorkflowExecutor for ParallelWorkflowExecutor {
     async fn execute(&self, _input: serde_json::Value) -> Result<serde_json::Value> {
-        let result = self.workflow.execute().await?;
+        let result = self.workflow.execute_workflow().await?;
         let script_result = crate::conversion::transform_parallel_result(&result);
         Ok(serde_json::to_value(&script_result)?)
     }
@@ -663,7 +684,7 @@ impl WorkflowExecutor for ParallelWorkflowExecutor {
         &self.name
     }
 
-    fn workflow_type(&self) -> &str {
+    fn workflow_type(&self) -> &'static str {
         "parallel"
     }
 }
@@ -755,6 +776,7 @@ pub struct BridgeMetrics {
 
 impl WorkflowBridge {
     /// Create a new workflow bridge
+    #[must_use]
     pub fn new(registry: Arc<ComponentRegistry>) -> Self {
         Self {
             discovery: Arc::new(WorkflowDiscovery::new()),
@@ -829,7 +851,7 @@ impl WorkflowBridge {
                 .get(workflow_id)
                 .cloned()
                 .ok_or_else(|| LLMSpellError::Component {
-                    message: format!("No active workflow with ID: {}", workflow_id),
+                    message: format!("No active workflow with ID: {workflow_id}"),
                     source: None,
                 })?
         };
@@ -922,7 +944,7 @@ impl WorkflowBridge {
         workflows
             .remove(workflow_id)
             .ok_or_else(|| LLMSpellError::Component {
-                message: format!("No active workflow with ID: {}", workflow_id),
+                message: format!("No active workflow with ID: {workflow_id}"),
                 source: None,
             })?;
 
@@ -986,6 +1008,7 @@ impl WorkflowBridge {
     }
 
     /// Get performance metrics
+    #[must_use]
     pub fn get_performance_metrics(&self) -> serde_json::Value {
         serde_json::json!({
             "average_duration_ms": self.perf_metrics.average_duration_ms(),
@@ -1137,6 +1160,7 @@ struct RegistryMetrics {
 
 impl WorkflowRegistry {
     /// Create a new workflow registry
+    #[must_use]
     pub fn new() -> Self {
         let mut registry = Self {
             workflows: Arc::new(RwLock::new(HashMap::new())),
@@ -1167,7 +1191,7 @@ impl WorkflowRegistry {
         let mut workflows = self.workflows.write().await;
         if workflows.contains_key(&id) {
             return Err(LLMSpellError::Configuration {
-                message: format!("Workflow '{}' already registered", id),
+                message: format!("Workflow '{id}' already registered"),
                 source: None,
             });
         }
@@ -1186,7 +1210,7 @@ impl WorkflowRegistry {
         workflows
             .remove(id)
             .ok_or_else(|| LLMSpellError::Component {
-                message: format!("No workflow registered with ID: {}", id),
+                message: format!("No workflow registered with ID: {id}"),
                 source: None,
             })?;
 
@@ -1200,7 +1224,7 @@ impl WorkflowRegistry {
             .get(id)
             .map(|reg| reg.workflow.clone())
             .ok_or_else(|| LLMSpellError::Component {
-                message: format!("No workflow found with ID: {}", id),
+                message: format!("No workflow found with ID: {id}"),
                 source: None,
             })
     }
@@ -1238,7 +1262,7 @@ impl WorkflowRegistry {
         let registration = workflows
             .get_mut(id)
             .ok_or_else(|| LLMSpellError::Component {
-                message: format!("No workflow registration found with ID: {}", id),
+                message: format!("No workflow registration found with ID: {id}"),
                 source: None,
             })?;
 
@@ -1270,7 +1294,7 @@ impl WorkflowRegistry {
             .get(id)
             .map(|reg| reg.usage_stats.clone())
             .ok_or_else(|| LLMSpellError::Component {
-                message: format!("No workflow found with ID: {}", id),
+                message: format!("No workflow found with ID: {id}"),
                 source: None,
             })
     }
@@ -1290,7 +1314,7 @@ impl WorkflowRegistry {
             .get(template_id)
             .cloned()
             .ok_or_else(|| LLMSpellError::Component {
-                message: format!("No workflow template found with ID: {}", template_id),
+                message: format!("No workflow template found with ID: {template_id}"),
                 source: None,
             })
     }

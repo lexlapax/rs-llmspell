@@ -3,13 +3,13 @@
 
 use llmspell_core::{
     types::{AgentInput, AgentOutput},
-    ExecutionContext, LLMSpellError,
+    LLMSpellError,
 };
 use serde_json::{json, Value};
 
 // Re-export consolidated test helpers
 pub use llmspell_testing::environment_helpers::create_test_context;
-pub use llmspell_testing::tool_helpers::{create_test_tool_input, create_test_tool_input_json};
+pub use llmspell_testing::tool_helpers::create_test_tool_input_json;
 
 // create_test_context is now re-exported from llmspell_testing::environment_helpers
 
@@ -39,16 +39,13 @@ pub fn assert_success_output(output: &AgentOutput, expected_fields: &[&str]) {
 
     assert!(
         output_value["success"].as_bool().unwrap_or(false),
-        "Expected success=true, got: {}",
-        output_value
+        "Expected success=true, got: {output_value}"
     );
 
     for field in expected_fields {
         assert!(
             output_value.get(field).is_some(),
-            "Expected field '{}' in output, got: {}",
-            field,
-            output_value
+            "Expected field '{field}' in output, got: {output_value}"
         );
     }
 }
@@ -60,8 +57,7 @@ pub fn assert_error_output(output: &AgentOutput, error_pattern: &str) {
 
     assert!(
         !output_value["success"].as_bool().unwrap_or(true),
-        "Expected success=false, got: {}",
-        output_value
+        "Expected success=false, got: {output_value}"
     );
 
     // Try different error message formats
@@ -74,19 +70,17 @@ pub fn assert_error_output(output: &AgentOutput, error_pattern: &str) {
             msg.to_string()
         } else {
             // Fallback to serializing the entire error object
-            serde_json::to_string(error_obj).unwrap_or_else(|_| format!("{:?}", error_obj))
+            serde_json::to_string(error_obj).unwrap_or_else(|_| format!("{error_obj:?}"))
         }
     } else {
-        panic!("Expected error field in output, got: {}", output_value);
+        panic!("Expected error field in output, got: {output_value}");
     };
 
     assert!(
         error_msg
             .to_lowercase()
             .contains(&error_pattern.to_lowercase()),
-        "Expected error to contain '{}', got: '{}'",
-        error_pattern,
-        error_msg
+        "Expected error to contain '{error_pattern}', got: '{error_msg}'"
     );
 }
 
@@ -118,7 +112,7 @@ pub mod fixtures {
         })
     }
 
-    pub fn sample_html() -> &'static str {
+    pub const fn sample_html() -> &'static str {
         r#"<!DOCTYPE html>
         <html>
         <head><title>Test Page</title></head>
@@ -131,7 +125,7 @@ pub mod fixtures {
         </html>"#
     }
 
-    pub fn sample_api_key() -> &'static str {
+    pub const fn sample_api_key() -> &'static str {
         "test_api_key_12345"
     }
 }
@@ -153,8 +147,7 @@ pub fn assert_json_contains(actual: &Value, expected: &Value) {
             for (key, expected_value) in expected_map {
                 assert!(
                     actual_map.contains_key(key),
-                    "Expected key '{}' not found in actual JSON",
-                    key
+                    "Expected key '{key}' not found in actual JSON"
                 );
                 assert_json_contains(&actual_map[key], expected_value);
             }

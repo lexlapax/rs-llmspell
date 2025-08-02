@@ -274,13 +274,11 @@ mod workflow_tool_tests {
         // Conditional workflows might have a different result structure
         let has_success = result
             .get("success")
-            .map(|v| v.as_bool().unwrap_or(false))
-            .unwrap_or(false);
+            .is_some_and(|v| v.as_bool().unwrap_or(false));
         let has_executed_branches = result.get("executed_branches").is_some();
         assert!(
             has_success || has_executed_branches,
-            "Conditional workflow execution failed: {:?}",
-            result
+            "Conditional workflow execution failed: {result:?}"
         );
 
         Ok(())
@@ -364,7 +362,7 @@ mod workflow_tool_tests {
         assert!(
             result
                 .get("success")
-                .and_then(|v| v.as_bool())
+                .and_then(serde_json::Value::as_bool)
                 .unwrap_or(false),
             "Workflow should succeed with continue strategy"
         );
@@ -407,13 +405,11 @@ mod workflow_tool_tests {
                 // Check if execution failed due to timeout
                 let success = res
                     .get("success")
-                    .map(|v| v.as_bool().unwrap_or(true))
-                    .unwrap_or(true);
+                    .map_or(true, |v| v.as_bool().unwrap_or(true));
                 let has_error = res.get("error").is_some() || res.get("error_message").is_some();
                 assert!(
                     !success || has_error,
-                    "Expected workflow to fail due to timeout, but got: {:?}",
-                    res
+                    "Expected workflow to fail due to timeout, but got: {res:?}"
                 );
             }
         }
@@ -488,7 +484,7 @@ mod workflow_tool_tests {
                 .await?;
             let result = bridge.execute_workflow(&workflow_id, json!({})).await;
 
-            assert!(result.is_ok(), "Tool {} failed in workflow", tool_name);
+            assert!(result.is_ok(), "Tool {tool_name} failed in workflow");
         }
 
         Ok(())
@@ -533,8 +529,7 @@ mod workflow_tool_tests {
         for tool_name in expected_tools {
             assert!(
                 registry.get_tool(tool_name).is_some(),
-                "Tool {} not found in registry",
-                tool_name
+                "Tool {tool_name} not found in registry"
             );
         }
     }

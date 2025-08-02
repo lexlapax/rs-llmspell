@@ -387,10 +387,10 @@ impl DataTransformer {
 
             FieldTransform::Default { field, value } => {
                 // Check if the field already exists (handling nested paths)
-                if Self::get_nested_field(target, field).is_none() {
-                    if Self::set_nested_field(target, field, value.clone()) {
-                        return Ok(true);
-                    }
+                if Self::get_nested_field(target, field).is_none()
+                    && Self::set_nested_field(target, field, value.clone())
+                {
+                    return Ok(true);
                 }
                 Ok(false)
             }

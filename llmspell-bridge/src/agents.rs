@@ -16,6 +16,7 @@ pub struct AgentDiscovery {
 
 impl AgentDiscovery {
     /// Create a new agent discovery service with provider manager
+    #[must_use]
     pub fn new(provider_manager: Arc<llmspell_providers::ProviderManager>) -> Self {
         Self {
             factory: Arc::new(DefaultAgentFactory::new(provider_manager)),
@@ -37,7 +38,7 @@ impl AgentDiscovery {
         self.factory
             .list_templates()
             .into_iter()
-            .map(|s| s.to_string())
+            .map(std::string::ToString::to_string)
             .collect()
     }
 
@@ -47,7 +48,7 @@ impl AgentDiscovery {
         self.factory
             .list_templates()
             .into_iter()
-            .map(|s| s.to_string())
+            .map(std::string::ToString::to_string)
             .collect()
     }
 
@@ -61,13 +62,13 @@ impl AgentDiscovery {
         let agent_config: AgentConfig =
             serde_json::from_value(config).map_err(|e| LLMSpellError::Validation {
                 field: Some("config".to_string()),
-                message: format!("Invalid agent configuration: {}", e),
+                message: format!("Invalid agent configuration: {e}"),
             })?;
 
         // Create the agent using the factory
         let agent = self.factory.create_agent(agent_config).await.map_err(|e| {
             LLMSpellError::Component {
-                message: format!("Failed to create agent: {}", e),
+                message: format!("Failed to create agent: {e}"),
                 source: None,
             }
         })?;
@@ -86,7 +87,7 @@ impl AgentDiscovery {
             .create_from_template(template_name)
             .await
             .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to create agent from template: {}", e),
+                message: format!("Failed to create agent from template: {e}"),
                 source: None,
             })
     }
@@ -135,7 +136,7 @@ impl AgentDiscovery {
         // For now, return basic info since we don't have template details
         Ok(AgentInfo {
             name: agent_type.to_string(),
-            description: format!("Agent type: {}", agent_type),
+            description: format!("Agent type: {agent_type}"),
             category: "agent".to_string(),
             complexity: "standard".to_string(),
             required_parameters: vec!["name".to_string()],

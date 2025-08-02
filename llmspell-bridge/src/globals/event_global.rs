@@ -1,5 +1,5 @@
 //! ABOUTME: Event global object providing cross-language event bus functionality
-//! ABOUTME: Full implementation with EventBridge integration for Phase 4
+//! ABOUTME: Full implementation with `EventBridge` integration for Phase 4
 
 use crate::event_bridge::EventBridge;
 use crate::event_serialization::EventSerialization;
@@ -14,12 +14,13 @@ pub struct EventGlobal;
 
 impl EventGlobal {
     /// Create a new Event global
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self
     }
 }
 
-/// Helper function to get or create an EventBridge from GlobalContext
+/// Helper function to get or create an `EventBridge` from `GlobalContext`
 async fn get_or_create_event_bridge(
     context: &GlobalContext,
 ) -> Result<Arc<EventBridge>, LLMSpellError> {
@@ -33,7 +34,7 @@ async fn get_or_create_event_bridge(
         EventBridge::new(Arc::new(context.clone()))
             .await
             .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to initialize EventBridge: {}", e),
+                message: format!("Failed to initialize EventBridge: {e}"),
                 source: None,
             })?,
     );
@@ -60,7 +61,7 @@ impl GlobalObject for EventGlobal {
         use std::time::Duration;
 
         let event_table = lua.create_table().map_err(|e| LLMSpellError::Component {
-            message: format!("Failed to create Event table: {}", e),
+            message: format!("Failed to create Event table: {e}"),
             source: None,
         })?;
 
@@ -88,30 +89,25 @@ impl GlobalObject for EventGlobal {
                                 // Convert Lua data to JSON
                                 let data_json = crate::lua::conversion::lua_value_to_json(data)
                                     .map_err(|e| LLMSpellError::Component {
-                                        message: format!(
-                                            "Failed to convert Lua data to JSON: {}",
-                                            e
-                                        ),
+                                        message: format!("Failed to convert Lua data to JSON: {e}"),
                                         source: None,
                                     })?;
 
                                 // Extract language and optional fields
-                                let language = options
-                                    .as_ref()
-                                    .map(|opts| {
-                                        opts.get::<&str, Option<String>>("language")
-                                            .unwrap_or(None)
-                                            .map(|s| match s.to_lowercase().as_str() {
+                                let language = options.as_ref().map_or(Language::Lua, |opts| {
+                                    opts.get::<&str, Option<String>>("language")
+                                        .unwrap_or(None)
+                                        .map_or(Language::Lua, |s| {
+                                            match s.to_lowercase().as_str() {
                                                 "lua" => Language::Lua,
                                                 "javascript" | "js" => Language::JavaScript,
                                                 "python" | "py" => Language::Python,
                                                 "unknown" => Language::Unknown,
                                                 "rust" => Language::Rust,
                                                 _ => Language::Lua,
-                                            })
-                                            .unwrap_or(Language::Lua)
-                                    })
-                                    .unwrap_or(Language::Lua);
+                                            }
+                                        })
+                                });
 
                                 let mut event =
                                     UniversalEvent::new(&event_type, data_json, language);
@@ -137,7 +133,7 @@ impl GlobalObject for EventGlobal {
 
                                 bridge.publish_event(event).await.map_err(|e| {
                                     LLMSpellError::Component {
-                                        message: format!("Failed to publish event: {}", e),
+                                        message: format!("Failed to publish event: {e}"),
                                         source: None,
                                     }
                                 })?;
@@ -149,14 +145,14 @@ impl GlobalObject for EventGlobal {
                     },
                 )
                 .map_err(|e| LLMSpellError::Component {
-                    message: format!("Failed to create Event.publish: {}", e),
+                    message: format!("Failed to create Event.publish: {e}"),
                     source: None,
                 })?;
 
         event_table
             .set("publish", publish_fn)
             .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to set Event.publish: {}", e),
+                message: format!("Failed to set Event.publish: {e}"),
                 source: None,
             })?;
 
@@ -172,34 +168,30 @@ impl GlobalObject for EventGlobal {
                         async move {
                             let bridge = get_or_create_event_bridge(&context).await?;
 
-                            let language = options
-                                .as_ref()
-                                .map(|opts| {
-                                    opts.get::<&str, Option<String>>("language")
-                                        .unwrap_or(None)
-                                        .map(|s| match s.to_lowercase().as_str() {
-                                            "lua" => Language::Lua,
-                                            "javascript" | "js" => Language::JavaScript,
-                                            "python" | "py" => Language::Python,
-                                            "unknown" => Language::Unknown,
-                                            "rust" => Language::Rust,
-                                            _ => Language::Lua,
-                                        })
-                                        .unwrap_or(Language::Lua)
-                                })
-                                .unwrap_or(Language::Lua);
+                            let language = options.as_ref().map_or(Language::Lua, |opts| {
+                                opts.get::<&str, Option<String>>("language")
+                                    .unwrap_or(None)
+                                    .map_or(Language::Lua, |s| match s.to_lowercase().as_str() {
+                                        "lua" => Language::Lua,
+                                        "javascript" | "js" => Language::JavaScript,
+                                        "python" | "py" => Language::Python,
+                                        "unknown" => Language::Unknown,
+                                        "rust" => Language::Rust,
+                                        _ => Language::Lua,
+                                    })
+                            });
 
                             let (subscription_id, receiver) = bridge
                                 .subscribe_pattern(&pattern, language)
                                 .await
                                 .map_err(|e| LLMSpellError::Component {
-                                    message: format!("Failed to subscribe to pattern: {}", e),
+                                    message: format!("Failed to subscribe to pattern: {e}"),
                                     source: None,
                                 })?;
 
                             // Store the receiver for receive() calls in GlobalContext
                             context.set_bridge(
-                                &format!("event_receiver_{}", subscription_id),
+                                &format!("event_receiver_{subscription_id}"),
                                 Arc::new(tokio::sync::RwLock::new(receiver)),
                             );
 
@@ -210,14 +202,14 @@ impl GlobalObject for EventGlobal {
                 },
             )
             .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to create Event.subscribe: {}", e),
+                message: format!("Failed to create Event.subscribe: {e}"),
                 source: None,
             })?;
 
         event_table
             .set("subscribe", subscribe_fn)
             .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to set Event.subscribe: {}", e),
+                message: format!("Failed to set Event.subscribe: {e}"),
                 source: None,
             })?;
 
@@ -231,10 +223,10 @@ impl GlobalObject for EventGlobal {
                     "event_receive",
                     async move {
                         // Get the receiver from GlobalContext
-                        let receiver_key = format!("event_receiver_{}", subscription_id);
+                        let receiver_key = format!("event_receiver_{subscription_id}");
                         let receiver_arc = context.get_bridge::<tokio::sync::RwLock<UnboundedReceiver<UniversalEvent>>>(&receiver_key)
                             .ok_or_else(|| LLMSpellError::Component {
-                                message: format!("No active subscription found: {}", subscription_id),
+                                message: format!("No active subscription found: {subscription_id}"),
                                 source: None,
                             })?;
 
@@ -249,14 +241,14 @@ impl GlobalObject for EventGlobal {
                                 // Serialize the event for Lua
                                 let serialized = EventSerialization::serialize_for_language(&event, Language::Lua)
                                     .map_err(|e| LLMSpellError::Component {
-                                        message: format!("Failed to serialize event: {}", e),
+                                        message: format!("Failed to serialize event: {e}"),
                                         source: None,
                                     })?;
 
                                 // Convert JSON to Lua value
                                 crate::lua::conversion::json_to_lua_value(lua, &serialized)
                                     .map_err(|e| LLMSpellError::Component {
-                                        message: format!("Failed to convert event to Lua: {}", e),
+                                        message: format!("Failed to convert event to Lua: {e}"),
                                         source: None,
                                     })
                             }
@@ -274,14 +266,14 @@ impl GlobalObject for EventGlobal {
                 )
             })
             .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to create Event.receive: {}", e),
+                message: format!("Failed to create Event.receive: {e}"),
                 source: None,
             })?;
 
         event_table
             .set("receive", receive_fn)
             .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to set Event.receive: {}", e),
+                message: format!("Failed to set Event.receive: {e}"),
                 source: None,
             })?;
 
@@ -298,7 +290,7 @@ impl GlobalObject for EventGlobal {
 
                         // Remove the receiver from GlobalContext (we can't easily remove from GlobalContext,
                         // so we'll just check if it exists)
-                        let receiver_key = format!("event_receiver_{}", subscription_id);
+                        let receiver_key = format!("event_receiver_{subscription_id}");
                         let had_receiver = context
                             .get_bridge::<tokio::sync::RwLock<UnboundedReceiver<UniversalEvent>>>(
                                 &receiver_key,
@@ -309,7 +301,7 @@ impl GlobalObject for EventGlobal {
                         let unsubscribed =
                             bridge.unsubscribe(&subscription_id).await.map_err(|e| {
                                 LLMSpellError::Component {
-                                    message: format!("Failed to unsubscribe: {}", e),
+                                    message: format!("Failed to unsubscribe: {e}"),
                                     source: None,
                                 }
                             })?;
@@ -320,14 +312,14 @@ impl GlobalObject for EventGlobal {
                 )
             })
             .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to create Event.unsubscribe: {}", e),
+                message: format!("Failed to create Event.unsubscribe: {e}"),
                 source: None,
             })?;
 
         event_table
             .set("unsubscribe", unsubscribe_fn)
             .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to set Event.unsubscribe: {}", e),
+                message: format!("Failed to set Event.unsubscribe: {e}"),
                 source: None,
             })?;
 
@@ -361,7 +353,7 @@ impl GlobalObject for EventGlobal {
                             &serde_json::Value::Array(lua_subscriptions),
                         )
                         .map_err(|e| LLMSpellError::Component {
-                            message: format!("Failed to convert subscriptions to Lua: {}", e),
+                            message: format!("Failed to convert subscriptions to Lua: {e}"),
                             source: None,
                         })
                     },
@@ -369,19 +361,19 @@ impl GlobalObject for EventGlobal {
                 )
             })
             .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to create Event.list_subscriptions: {}", e),
+                message: format!("Failed to create Event.list_subscriptions: {e}"),
                 source: None,
             })?;
 
         event_table
             .set("list_subscriptions", list_fn)
             .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to set Event.list_subscriptions: {}", e),
+                message: format!("Failed to set Event.list_subscriptions: {e}"),
                 source: None,
             })?;
 
         // Event.get_stats()
-        let context_stats = global_context.clone();
+        let context_stats = global_context;
         let stats_fn = lua
             .create_function(move |lua, ()| {
                 let context = context_stats.clone();
@@ -395,7 +387,7 @@ impl GlobalObject for EventGlobal {
                         // Convert JSON stats to Lua value
                         crate::lua::conversion::json_to_lua_value(lua, &stats).map_err(|e| {
                             LLMSpellError::Component {
-                                message: format!("Failed to convert stats to Lua: {}", e),
+                                message: format!("Failed to convert stats to Lua: {e}"),
                                 source: None,
                             }
                         })
@@ -404,21 +396,21 @@ impl GlobalObject for EventGlobal {
                 )
             })
             .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to create Event.get_stats: {}", e),
+                message: format!("Failed to create Event.get_stats: {e}"),
                 source: None,
             })?;
 
         event_table
             .set("get_stats", stats_fn)
             .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to set Event.get_stats: {}", e),
+                message: format!("Failed to set Event.get_stats: {e}"),
                 source: None,
             })?;
 
         lua.globals()
             .set("Event", event_table)
             .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to set Event global: {}", e),
+                message: format!("Failed to set Event global: {e}"),
                 source: None,
             })?;
 

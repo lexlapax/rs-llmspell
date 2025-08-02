@@ -137,7 +137,7 @@ pub trait StateManagerHolder {
     fn set_state_manager(&self, state_manager: Arc<StateManager>);
 }
 
-/// Macro to implement PersistentAgent trait for types that implement Agent + StatePersistence
+/// Macro to implement `PersistentAgent` trait for types that implement Agent + `StatePersistence`
 #[macro_export]
 macro_rules! impl_persistent_agent {
     ($agent_type:ty) => {

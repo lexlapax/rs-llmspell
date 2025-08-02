@@ -10,7 +10,7 @@ use tokio::sync::RwLock;
 /// Enhanced execution context for tool operations that provides
 /// additional tool-specific context, inheritance, and state management.
 ///
-/// This wraps the base ExecutionContext to provide tool-aware
+/// This wraps the base `ExecutionContext` to provide tool-aware
 /// context propagation and management.
 ///
 /// # Examples
@@ -115,6 +115,7 @@ impl Default for ContextEnhancementOptions {
 
 impl ToolExecutionContext {
     /// Create a new tool execution context
+    #[must_use]
     pub fn new(base_context: ExecutionContext) -> Self {
         Self {
             base_context,
@@ -128,6 +129,7 @@ impl ToolExecutionContext {
     }
 
     /// Create a new tool execution context with options
+    #[must_use]
     pub fn with_options(
         base_context: ExecutionContext,
         _options: ContextEnhancementOptions,
@@ -137,7 +139,8 @@ impl ToolExecutionContext {
     }
 
     /// Get the base execution context
-    pub fn base_context(&self) -> &ExecutionContext {
+    #[must_use]
+    pub const fn base_context(&self) -> &ExecutionContext {
         &self.base_context
     }
 
@@ -186,10 +189,7 @@ impl ToolExecutionContext {
     }
 
     /// Create a child context for nested tool execution
-    pub async fn create_child_context(
-        &self,
-        child_id: impl Into<String>,
-    ) -> Result<ToolExecutionContext> {
+    pub async fn create_child_context(&self, child_id: impl Into<String>) -> Result<Self> {
         // Collect inheritance data first
         let parent_data = self.tool_data.read().await;
         let parent_rules = self.inheritance_rules.read().await;
@@ -222,7 +222,7 @@ impl ToolExecutionContext {
         drop(parent_data);
         drop(parent_rules);
 
-        let child = ToolExecutionContext {
+        let child = Self {
             base_context: self.base_context.clone(),
             tool_data: Arc::new(RwLock::new(inherited_data)),
             shared_data: self.shared_data.clone(), // Share with parent
@@ -292,7 +292,7 @@ impl ToolExecutionContext {
         // Add shared data
         let shared_data = self.shared_data.read().await;
         for (key, value) in shared_data.iter() {
-            all_data.insert(format!("shared::{}", key), value.clone());
+            all_data.insert(format!("shared::{key}"), value.clone());
         }
 
         all_data
@@ -334,7 +334,8 @@ impl ToolExecutionContext {
         Ok(())
     }
 
-    /// Convert to base ExecutionContext for tool invocation
+    /// Convert to base `ExecutionContext` for tool invocation
+    #[must_use]
     pub fn to_execution_context(&self) -> ExecutionContext {
         self.base_context.clone()
     }
@@ -372,6 +373,7 @@ pub struct ToolContextManager {
 
 impl ToolContextManager {
     /// Create a new context manager
+    #[must_use]
     pub fn new() -> Self {
         Self {
             contexts: Arc::new(RwLock::new(HashMap::new())),
@@ -380,6 +382,7 @@ impl ToolContextManager {
     }
 
     /// Create a new context manager with options
+    #[must_use]
     pub fn with_options(options: ContextEnhancementOptions) -> Self {
         Self {
             contexts: Arc::new(RwLock::new(HashMap::new())),
@@ -443,11 +446,11 @@ impl serde::Serialize for ContextInheritanceRule {
         S: serde::Serializer,
     {
         match self {
-            ContextInheritanceRule::Inherit => serializer.serialize_str("inherit"),
-            ContextInheritanceRule::Isolate => serializer.serialize_str("isolate"),
-            ContextInheritanceRule::Copy => serializer.serialize_str("copy"),
-            ContextInheritanceRule::Share => serializer.serialize_str("share"),
-            ContextInheritanceRule::Custom(s) => serializer.serialize_str(&format!("custom:{}", s)),
+            Self::Inherit => serializer.serialize_str("inherit"),
+            Self::Isolate => serializer.serialize_str("isolate"),
+            Self::Copy => serializer.serialize_str("copy"),
+            Self::Share => serializer.serialize_str("share"),
+            Self::Custom(s) => serializer.serialize_str(&format!("custom:{s}")),
         }
     }
 }
@@ -459,11 +462,11 @@ impl<'de> serde::Deserialize<'de> for ContextInheritanceRule {
     {
         let s = String::deserialize(deserializer)?;
         match s.as_str() {
-            "inherit" => Ok(ContextInheritanceRule::Inherit),
-            "isolate" => Ok(ContextInheritanceRule::Isolate),
-            "copy" => Ok(ContextInheritanceRule::Copy),
-            "share" => Ok(ContextInheritanceRule::Share),
-            s if s.starts_with("custom:") => Ok(ContextInheritanceRule::Custom(s[7..].to_string())),
+            "inherit" => Ok(Self::Inherit),
+            "isolate" => Ok(Self::Isolate),
+            "copy" => Ok(Self::Copy),
+            "share" => Ok(Self::Share),
+            s if s.starts_with("custom:") => Ok(Self::Custom(s[7..].to_string())),
             _ => Err(serde::de::Error::custom("Invalid inheritance rule")),
         }
     }

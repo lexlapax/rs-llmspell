@@ -37,7 +37,7 @@ async fn test_concurrent_openai_agents_shared_state() -> Result<()> {
     for i in 0..num_agents {
         let context = Arc::clone(&context);
         let barrier = Arc::clone(&barrier);
-        let agent_id = format!("{}-{}", agent_base_id, i);
+        let agent_id = format!("{agent_base_id}-{i}");
 
         let handle = tokio::spawn(async move {
             // Create agent with unique ID
@@ -130,8 +130,7 @@ async fn test_concurrent_openai_agents_shared_state() -> Result<()> {
             assert_eq!(
                 state.state.conversation_history.len(),
                 4, // 2 messages * 2 (user + assistant)
-                "Agent {} should have correct message count",
-                i
+                "Agent {i} should have correct message count"
             );
 
             // Verify agent-specific content
@@ -150,7 +149,7 @@ async fn test_concurrent_openai_agents_shared_state() -> Result<()> {
                 _ => {}
             }
         } else {
-            panic!("Agent {} state not found", i);
+            panic!("Agent {i} state not found");
         }
     }
 
@@ -228,7 +227,7 @@ async fn test_concurrent_anthropic_agents_race_conditions() -> Result<()> {
             info!("Worker {} attempting concurrent update", i);
 
             // Each worker adds their number
-            let input = AgentInput::text(&format!("Add {} to our count.", i + 2));
+            let input = AgentInput::text(format!("Add {} to our count.", i + 2));
             let exec_context = ExecutionContext::new();
 
             // Small random delay to increase chance of race conditions
@@ -241,7 +240,7 @@ async fn test_concurrent_anthropic_agents_race_conditions() -> Result<()> {
 
             // Attempt to save - this tests concurrent write handling
             match agent.save_state().await {
-                Ok(_) => info!("Worker {} successfully saved state", i),
+                Ok(()) => info!("Worker {} successfully saved state", i),
                 Err(e) => warn!("Worker {} failed to save: {}", i, e),
             }
 
@@ -498,7 +497,7 @@ async fn test_concurrent_state_conflict_resolution() -> Result<()> {
     }
 
     // Simulate conflicting updates
-    let update_tasks = vec![
+    let update_tasks = [
         ("The number is now 100", 50),
         ("Actually, the number is 200", 100),
         ("Let me correct that - it's 300", 150),
@@ -506,12 +505,12 @@ async fn test_concurrent_state_conflict_resolution() -> Result<()> {
 
     let mut handles: Vec<tokio::task::JoinHandle<Result<bool>>> = vec![];
 
-    for (update_msg, delay_ms) in update_tasks.iter() {
+    for (update_msg, delay_ms) in &update_tasks {
         let context = Arc::clone(&context);
         let conflict_agent_id = conflict_agent_id.to_string();
         let provider = provider.to_string();
         let model = model.to_string();
-        let update_msg = update_msg.to_string();
+        let update_msg = (*update_msg).to_string();
         let delay_ms = *delay_ms;
 
         let handle = tokio::spawn(async move {
@@ -539,7 +538,7 @@ async fn test_concurrent_state_conflict_resolution() -> Result<()> {
 
             // Try to save - last write wins
             match agent.save_state().await {
-                Ok(_) => {
+                Ok(()) => {
                     info!("Successfully saved: '{}'", update_msg);
                     Ok(true)
                 }
@@ -591,7 +590,7 @@ async fn test_concurrent_state_conflict_resolution() -> Result<()> {
             .conversation_history
             .iter()
             .filter(|msg| matches!(msg.role, llmspell_state_persistence::MessageRole::User))
-            .last()
+            .next_back()
             .map(|msg| msg.content.clone())
             .unwrap_or_default();
 

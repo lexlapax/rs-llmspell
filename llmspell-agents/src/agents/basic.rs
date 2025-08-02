@@ -67,12 +67,14 @@ impl BasicAgent {
     }
 
     /// Get configuration
-    pub fn get_config(&self) -> &AgentConfig {
+    #[must_use]
+    pub const fn get_config(&self) -> &AgentConfig {
         &self.config
     }
 
     /// Get state machine for lifecycle management
-    pub fn state_machine(&self) -> &Arc<AgentStateMachine> {
+    #[must_use]
+    pub const fn state_machine(&self) -> &Arc<AgentStateMachine> {
         &self.state_machine
     }
 
@@ -280,7 +282,10 @@ impl BaseAgent for BasicAgent {
         }
 
         // Check resource limits
-        if input.text.len() > (self.config.resource_limits.max_memory_mb as usize * 1024) {
+        if input.text.len()
+            > (usize::try_from(self.config.resource_limits.max_memory_mb).unwrap_or(usize::MAX)
+                * 1024)
+        {
             return Err(LLMSpellError::Validation {
                 message: "Input text exceeds memory limit".to_string(),
                 field: Some("text".to_string()),
@@ -301,7 +306,7 @@ impl BaseAgent for BasicAgent {
             LLMSpellError::Component { .. } | LLMSpellError::Provider { .. } => {
                 if let Err(state_error) = self
                     .state_machine
-                    .error(format!("Agent error: {}", error))
+                    .error(format!("Agent error: {error}"))
                     .await
                 {
                     warn!(
@@ -379,7 +384,7 @@ impl StatePersistence for BasicAgent {
     }
 
     fn set_state_manager(&self, state_manager: Arc<StateManager>) {
-        StateManagerHolder::set_state_manager(self, state_manager)
+        StateManagerHolder::set_state_manager(self, state_manager);
     }
 }
 

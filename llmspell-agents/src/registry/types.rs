@@ -42,7 +42,7 @@ pub struct AgentMetadata {
 }
 
 /// Agent status in the registry
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum AgentStatus {
     /// Agent is active and ready
     Active,
@@ -171,6 +171,7 @@ pub struct InMemoryAgentRegistry {
 
 impl InMemoryAgentRegistry {
     /// Create new in-memory registry
+    #[must_use]
     pub fn new() -> Self {
         Self {
             agents: Arc::new(tokio::sync::RwLock::new(HashMap::new())),

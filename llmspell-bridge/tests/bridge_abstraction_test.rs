@@ -1,4 +1,4 @@
-//! ABOUTME: Comprehensive tests for ScriptEngineBridge abstraction
+//! ABOUTME: Comprehensive tests for `ScriptEngineBridge` abstraction
 //! ABOUTME: Validates language-agnostic bridge pattern and engine compliance
 
 use llmspell_bridge::{
@@ -182,8 +182,7 @@ async fn test_output_format_consistency() {
         let output = engine.execute_script(script).await.unwrap();
         assert_eq!(
             output.output, expected,
-            "Output mismatch for script: {}",
-            script
+            "Output mismatch for script: {script}"
         );
     }
 }
@@ -361,12 +360,11 @@ async fn test_streaming_execution_stub() {
         }
         Err(e) => {
             // If streaming is still not fully implemented, that's OK for now
-            eprintln!("Streaming not fully implemented yet: {:?}", e);
+            eprintln!("Streaming not fully implemented yet: {e:?}");
             // But we should document this properly
             assert!(
                 e.to_string().contains("not implemented") || e.to_string().contains("streaming"),
-                "Error should indicate streaming is not implemented: {:?}",
-                e
+                "Error should indicate streaming is not implemented: {e:?}"
             );
         }
     }

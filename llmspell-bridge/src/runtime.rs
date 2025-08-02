@@ -1,4 +1,4 @@
-//! ABOUTME: Language-agnostic script runtime using ScriptEngineBridge abstraction
+//! ABOUTME: Language-agnostic script runtime using `ScriptEngineBridge` abstraction
 //! ABOUTME: Central execution orchestrator supporting multiple script engines
 
 use crate::{
@@ -11,9 +11,9 @@ use llmspell_core::error::LLMSpellError;
 use serde::{Deserialize, Serialize};
 use std::sync::{Arc, RwLock};
 
-/// Central script runtime that uses ScriptEngineBridge abstraction
+/// Central script runtime that uses `ScriptEngineBridge` abstraction
 ///
-/// The `ScriptRuntime` is the main entry point for executing scripts in LLMSpell.
+/// The `ScriptRuntime` is the main entry point for executing scripts in `LLMSpell`.
 /// It provides a language-agnostic interface that can work with multiple script
 /// engines (Lua, JavaScript, Python, etc.) through the `ScriptEngineBridge` trait.
 ///
@@ -150,7 +150,7 @@ impl ScriptRuntime {
 
         // Register all Phase 2 tools with the registry
         register_all_tools(registry.clone()).map_err(|e| LLMSpellError::Component {
-            message: format!("Failed to register tools: {}", e),
+            message: format!("Failed to register tools: {e}"),
             source: None,
         })?;
 
@@ -204,36 +204,43 @@ impl ScriptRuntime {
     }
 
     /// Get the name of the current engine
+    #[must_use]
     pub fn get_engine_name(&self) -> &'static str {
         self.engine.get_engine_name()
     }
 
     /// Check if the engine supports streaming
+    #[must_use]
     pub fn supports_streaming(&self) -> bool {
         self.engine.supports_streaming()
     }
 
     /// Check if the engine supports multimodal content
+    #[must_use]
     pub fn supports_multimodal(&self) -> bool {
         self.engine.supports_multimodal()
     }
 
     /// Get the engine's supported features
+    #[must_use]
     pub fn get_engine_features(&self) -> crate::engine::EngineFeatures {
         self.engine.supported_features()
     }
 
     /// Get the component registry
-    pub fn registry(&self) -> &Arc<ComponentRegistry> {
+    #[must_use]
+    pub const fn registry(&self) -> &Arc<ComponentRegistry> {
         &self.registry
     }
 
     /// Get the provider manager
-    pub fn provider_manager(&self) -> &Arc<ProviderManager> {
+    #[must_use]
+    pub const fn provider_manager(&self) -> &Arc<ProviderManager> {
         &self.provider_manager
     }
 
     /// Get the current execution context
+    #[must_use]
     pub fn get_execution_context(&self) -> crate::engine::ExecutionContext {
         self.execution_context.read().unwrap().clone()
     }
@@ -286,13 +293,14 @@ impl RuntimeConfig {
                     .cloned()
                     .ok_or_else(|| LLMSpellError::Validation {
                         field: Some("engine".to_string()),
-                        message: format!("Engine configuration not found for '{}'", custom),
+                        message: format!("Engine configuration not found for '{custom}'"),
                     })
             }
         }
     }
 
     /// Check if an engine is configured
+    #[must_use]
     pub fn supports_engine(&self, engine_name: &str) -> bool {
         match engine_name {
             "lua" | "javascript" | "js" => true,
@@ -434,7 +442,7 @@ impl Default for BackupConfig {
             compression_level: 3,
             incremental_enabled: true,
             max_backups: Some(10),
-            max_backup_age: Some(2592000), // 30 days
+            max_backup_age: Some(2_592_000), // 30 days
         }
     }
 }

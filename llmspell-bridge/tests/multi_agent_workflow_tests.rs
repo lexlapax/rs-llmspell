@@ -20,8 +20,7 @@ async fn test_pipeline_coordination() {
     });
 
     let workflow =
-        create_pipeline_workflow("test_pipeline".to_string(), agents.clone(), initial_input)
-            .unwrap();
+        create_pipeline_workflow("test_pipeline".to_string(), agents, initial_input).unwrap();
 
     // Verify workflow was created successfully
     assert_eq!(workflow.name(), "test_pipeline");
@@ -50,7 +49,7 @@ async fn test_fork_join_coordination() {
 
     let workflow = create_fork_join_workflow(
         "test_fork_join".to_string(),
-        agent_tasks.clone(),
+        agent_tasks,
         Some("coordinator_agent".to_string()),
     )
     .unwrap();
@@ -75,7 +74,7 @@ async fn test_consensus_coordination() {
 
     let workflow = create_consensus_workflow(
         "test_consensus".to_string(),
-        evaluators.clone(),
+        evaluators,
         0.7, // 70% consensus threshold
         options,
     )

@@ -1,4 +1,4 @@
-//! ABOUTME: Database connector tool with support for PostgreSQL, MySQL, and SQLite
+//! ABOUTME: Database connector tool with support for `PostgreSQL`, `MySQL`, and `SQLite`
 //! ABOUTME: Provides secure database operations with connection pooling and query building
 
 use async_trait::async_trait;
@@ -119,6 +119,7 @@ impl Default for DatabaseConnectorConfig {
 
 impl DatabaseConnectorConfig {
     /// Create configuration from environment variables
+    #[must_use]
     pub fn from_env() -> Self {
         let mut config = Self::default();
         let mut databases = HashMap::new();
@@ -225,7 +226,7 @@ impl DatabaseConnectorTool {
 
         let db_config = self.config.databases.get(database).ok_or_else(|| {
             tool_error(
-                format!("Database '{}' not configured", database),
+                format!("Database '{database}' not configured"),
                 Some("database".to_string()),
             )
         })?;
@@ -256,7 +257,7 @@ impl DatabaseConnectorTool {
             .contains(&operation_upper)
         {
             return Err(validation_error(
-                format!("Database operation '{}' is not allowed", operation),
+                format!("Database operation '{operation}' is not allowed"),
                 Some("operation".to_string()),
             ));
         }
@@ -322,7 +323,7 @@ impl DatabaseConnectorTool {
             .any(|pattern| query_lower.contains(pattern))
     }
 
-    /// Execute PostgreSQL query
+    /// Execute `PostgreSQL` query
     async fn execute_postgresql_query(
         &self,
         #[allow(unused_variables)] config: &DatabaseConfig,
@@ -343,7 +344,7 @@ impl DatabaseConnectorTool {
                 .acquire_timeout(Duration::from_secs(config.pool_settings.connect_timeout))
                 .connect(url)
                 .await
-                .map_err(|e| tool_error(format!("Failed to connect to PostgreSQL: {}", e), None))?;
+                .map_err(|e| tool_error(format!("Failed to connect to PostgreSQL: {e}"), None))?;
 
             let start = std::time::Instant::now();
 
@@ -386,7 +387,7 @@ impl DatabaseConnectorTool {
                         "timestamp": chrono::Utc::now().to_rfc3339()
                     }))
                 }
-                Err(e) => Err(tool_error(format!("PostgreSQL query failed: {}", e), None)),
+                Err(e) => Err(tool_error(format!("PostgreSQL query failed: {e}"), None)),
             }
         }
 
@@ -406,7 +407,7 @@ impl DatabaseConnectorTool {
         }
     }
 
-    /// Execute MySQL query
+    /// Execute `MySQL` query
     async fn execute_mysql_query(
         &self,
         _config: &DatabaseConfig,
@@ -427,7 +428,7 @@ impl DatabaseConnectorTool {
         }))
     }
 
-    /// Execute SQLite query
+    /// Execute `SQLite` query
     async fn execute_sqlite_query(
         &self,
         _config: &DatabaseConfig,
@@ -454,7 +455,7 @@ impl DatabaseConnectorTool {
 
         let db_config = self.config.databases.get(database).ok_or_else(|| {
             tool_error(
-                format!("Database '{}' not configured", database),
+                format!("Database '{database}' not configured"),
                 Some("database".to_string()),
             )
         })?;
@@ -534,8 +535,7 @@ impl BaseAgent for DatabaseConnectorTool {
 
                         let response = ResponseBuilder::success("query")
                             .with_message(format!(
-                                "Query executed successfully on database '{}'",
-                                database
+                                "Query executed successfully on database '{database}'"
                             ))
                             .with_result(result)
                             .build();
@@ -545,11 +545,9 @@ impl BaseAgent for DatabaseConnectorTool {
                     Err(e) => {
                         error!("Database query failed: {}", e);
 
-                        let response = ResponseBuilder::error(
-                            "query",
-                            format!("Database query failed: {}", e),
-                        )
-                        .build();
+                        let response =
+                            ResponseBuilder::error("query", format!("Database query failed: {e}"))
+                                .build();
 
                         Ok(AgentOutput::text(serde_json::to_string(&response)?))
                     }
@@ -560,7 +558,7 @@ impl BaseAgent for DatabaseConnectorTool {
                     info!("Database schema retrieved for '{}'", database);
 
                     let response = ResponseBuilder::success("schema")
-                        .with_message(format!("Schema retrieved for database '{}'", database))
+                        .with_message(format!("Schema retrieved for database '{database}'"))
                         .with_result(schema)
                         .build();
 
@@ -571,7 +569,7 @@ impl BaseAgent for DatabaseConnectorTool {
 
                     let response = ResponseBuilder::error(
                         "schema",
-                        format!("Failed to get database schema: {}", e),
+                        format!("Failed to get database schema: {e}"),
                     )
                     .build();
 
@@ -581,7 +579,7 @@ impl BaseAgent for DatabaseConnectorTool {
             _ => {
                 let response = ResponseBuilder::error(
                     "unknown_operation",
-                    format!("Unknown operation: {}", operation),
+                    format!("Unknown operation: {operation}"),
                 )
                 .build();
 
@@ -606,7 +604,7 @@ impl BaseAgent for DatabaseConnectorTool {
             }
             _ => {
                 return Err(validation_error(
-                    format!("Invalid operation: {}", operation),
+                    format!("Invalid operation: {operation}"),
                     Some("operation".to_string()),
                 ));
             }
@@ -616,7 +614,7 @@ impl BaseAgent for DatabaseConnectorTool {
         if let Some(database) = extract_optional_string(params, "database") {
             if !self.config.databases.contains_key(database) {
                 return Err(validation_error(
-                    format!("Database '{}' is not configured", database),
+                    format!("Database '{database}' is not configured"),
                     Some("database".to_string()),
                 ));
             }
@@ -635,7 +633,7 @@ impl BaseAgent for DatabaseConnectorTool {
 
         Ok(AgentOutput::text(
             serde_json::to_string_pretty(&safe_response)
-                .unwrap_or_else(|_| format!("{:?}", safe_response)),
+                .unwrap_or_else(|_| format!("{safe_response:?}")),
         ))
     }
 }

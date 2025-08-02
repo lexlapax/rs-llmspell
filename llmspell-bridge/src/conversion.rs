@@ -40,21 +40,20 @@ pub enum ScriptValue {
 
 impl ScriptValue {
     /// Convert to JSON value
+    #[must_use]
     pub fn to_json(&self) -> serde_json::Value {
         match self {
-            ScriptValue::Null => serde_json::Value::Null,
-            ScriptValue::Bool(b) => serde_json::Value::Bool(*b),
-            ScriptValue::Number(n) => serde_json::json!(n),
-            ScriptValue::String(s) => serde_json::Value::String(s.clone()),
-            ScriptValue::Array(arr) => {
-                serde_json::Value::Array(arr.iter().map(|v| v.to_json()).collect())
-            }
-            ScriptValue::Object(obj) => {
+            Self::Null => serde_json::Value::Null,
+            Self::Bool(b) => serde_json::Value::Bool(*b),
+            Self::Number(n) => serde_json::json!(n),
+            Self::String(s) => serde_json::Value::String(s.clone()),
+            Self::Array(arr) => serde_json::Value::Array(arr.iter().map(Self::to_json).collect()),
+            Self::Object(obj) => {
                 let map: serde_json::Map<String, serde_json::Value> =
                     obj.iter().map(|(k, v)| (k.clone(), v.to_json())).collect();
                 serde_json::Value::Object(map)
             }
-            ScriptValue::Bytes(bytes) => {
+            Self::Bytes(bytes) => {
                 // Encode bytes as base64 string
                 serde_json::Value::String(base64::Engine::encode(
                     &base64::engine::general_purpose::STANDARD,
@@ -67,19 +66,17 @@ impl ScriptValue {
     /// Convert from JSON value
     pub fn from_json(value: &serde_json::Value) -> Self {
         match value {
-            serde_json::Value::Null => ScriptValue::Null,
-            serde_json::Value::Bool(b) => ScriptValue::Bool(*b),
-            serde_json::Value::Number(n) => ScriptValue::Number(n.as_f64().unwrap_or(0.0)),
-            serde_json::Value::String(s) => ScriptValue::String(s.clone()),
-            serde_json::Value::Array(arr) => {
-                ScriptValue::Array(arr.iter().map(Self::from_json).collect())
-            }
+            serde_json::Value::Null => Self::Null,
+            serde_json::Value::Bool(b) => Self::Bool(*b),
+            serde_json::Value::Number(n) => Self::Number(n.as_f64().unwrap_or(0.0)),
+            serde_json::Value::String(s) => Self::String(s.clone()),
+            serde_json::Value::Array(arr) => Self::Array(arr.iter().map(Self::from_json).collect()),
             serde_json::Value::Object(obj) => {
                 let map = obj
                     .iter()
                     .map(|(k, v)| (k.clone(), Self::from_json(v)))
                     .collect();
-                ScriptValue::Object(map)
+                Self::Object(map)
             }
         }
     }
@@ -88,70 +85,70 @@ impl ScriptValue {
 // Implement conversions for primitive types
 impl From<bool> for ScriptValue {
     fn from(b: bool) -> Self {
-        ScriptValue::Bool(b)
+        Self::Bool(b)
     }
 }
 
 impl From<i32> for ScriptValue {
     fn from(n: i32) -> Self {
-        ScriptValue::Number(n as f64)
+        Self::Number(f64::from(n))
     }
 }
 
 impl From<i64> for ScriptValue {
     fn from(n: i64) -> Self {
-        ScriptValue::Number(n as f64)
+        Self::Number(n as f64)
     }
 }
 
 impl From<f32> for ScriptValue {
     fn from(n: f32) -> Self {
-        ScriptValue::Number(n as f64)
+        Self::Number(f64::from(n))
     }
 }
 
 impl From<f64> for ScriptValue {
     fn from(n: f64) -> Self {
-        ScriptValue::Number(n)
+        Self::Number(n)
     }
 }
 
 impl From<String> for ScriptValue {
     fn from(s: String) -> Self {
-        ScriptValue::String(s)
+        Self::String(s)
     }
 }
 
 impl From<&str> for ScriptValue {
     fn from(s: &str) -> Self {
-        ScriptValue::String(s.to_string())
+        Self::String(s.to_string())
     }
 }
 
 impl<T> From<Option<T>> for ScriptValue
 where
-    T: Into<ScriptValue>,
+    T: Into<Self>,
 {
     fn from(opt: Option<T>) -> Self {
         match opt {
             Some(val) => val.into(),
-            None => ScriptValue::Null,
+            None => Self::Null,
         }
     }
 }
 
 impl<T> From<Vec<T>> for ScriptValue
 where
-    T: Into<ScriptValue>,
+    T: Into<Self>,
 {
     fn from(vec: Vec<T>) -> Self {
-        ScriptValue::Array(vec.into_iter().map(|v| v.into()).collect())
+        Self::Array(vec.into_iter().map(std::convert::Into::into).collect())
     }
 }
 
 impl From<Vec<u8>> for ScriptValue {
     fn from(bytes: Vec<u8>) -> Self {
-        ScriptValue::Bytes(bytes)
+        Self::Bytes(bytes)
     }
 }
 
@@ -159,7 +156,8 @@ impl From<Vec<u8>> for ScriptValue {
 pub struct ConversionUtils;
 
 impl ConversionUtils {
-    /// Check if a ScriptValue is truthy (for conditional evaluation)
+    /// Check if a `ScriptValue` is truthy (for conditional evaluation)
+    #[must_use]
     pub fn is_truthy(value: &ScriptValue) -> bool {
         match value {
             ScriptValue::Null => false,
@@ -173,6 +171,7 @@ impl ConversionUtils {
     }
 
     /// Get a nested value from an object by dot-separated path
+    #[must_use]
     pub fn get_nested<'a>(value: &'a ScriptValue, path: &str) -> Option<&'a ScriptValue> {
         let parts: Vec<&str> = path.split('.').collect();
         let mut current = value;
@@ -193,6 +192,7 @@ impl ConversionUtils {
 // ===== Workflow conversions =====
 
 /// Convert error strategy from string
+#[must_use]
 pub fn parse_error_strategy(strategy: &str) -> ErrorStrategy {
     match strategy.to_lowercase().as_str() {
         "stop" | "fail_fast" => ErrorStrategy::FailFast,
@@ -302,6 +302,7 @@ pub struct WorkflowMetadata {
 }
 
 /// Transform sequential workflow result
+#[must_use]
 pub fn transform_sequential_result(
     result: &llmspell_workflows::SequentialWorkflowResult,
 ) -> ScriptWorkflowResult {
@@ -324,22 +325,22 @@ pub fn transform_sequential_result(
         })),
     };
 
-    let error = if !result.success {
+    let error = if result.success {
+        None
+    } else {
         result.error_message.as_ref().map(|e| WorkflowError {
             error_type: "SequentialExecutionError".to_string(),
             message: e.clone(),
             location: result.failed_steps.first().map(|sr| sr.step_name.clone()),
             details: None,
         })
-    } else {
-        None
     };
 
     ScriptWorkflowResult {
         success: result.success,
         workflow_type: "sequential".to_string(),
         workflow_name: result.workflow_name.clone(),
-        duration_ms: result.duration.as_millis() as u64,
+        duration_ms: u64::try_from(result.duration.as_millis()).unwrap_or(0),
         data: serde_json::json!({
             "steps_executed": result.successful_steps.len() + result.failed_steps.len(),
             "successful_steps": result.successful_steps.len(),
@@ -354,6 +355,7 @@ pub fn transform_sequential_result(
 }
 
 /// Transform conditional workflow result
+#[must_use]
 pub fn transform_conditional_result(
     result: &llmspell_workflows::ConditionalWorkflowResult,
 ) -> ScriptWorkflowResult {
@@ -377,7 +379,9 @@ pub fn transform_conditional_result(
         })),
     };
 
-    let error = if !result.success {
+    let error = if result.success {
+        None
+    } else {
         result.error_message.as_ref().map(|e| WorkflowError {
             error_type: "ConditionalExecutionError".to_string(),
             message: e.clone(),
@@ -387,15 +391,13 @@ pub fn transform_conditional_result(
                 .map(|br| br.branch_name.clone()),
             details: None,
         })
-    } else {
-        None
     };
 
     ScriptWorkflowResult {
         success: result.success,
         workflow_type: "conditional".to_string(),
         workflow_name: result.workflow_name.clone(),
-        duration_ms: result.duration.as_millis() as u64,
+        duration_ms: u64::try_from(result.duration.as_millis()).unwrap_or(0),
         data: serde_json::json!({
             "executed_branches": result.executed_branches.len(),
             "matched_branches": result.matched_branches,
@@ -411,6 +413,7 @@ pub fn transform_conditional_result(
 }
 
 /// Transform loop workflow result
+#[must_use]
 pub fn transform_loop_result(
     result: &llmspell_workflows::LoopWorkflowResult,
 ) -> ScriptWorkflowResult {
@@ -427,22 +430,22 @@ pub fn transform_loop_result(
         })),
     };
 
-    let error = if !result.success {
+    let error = if result.success {
+        None
+    } else {
         result.error.as_ref().map(|e| WorkflowError {
             error_type: "LoopExecutionError".to_string(),
             message: e.clone(),
             location: Some(format!("iteration {}", result.completed_iterations)),
             details: None,
         })
-    } else {
-        None
     };
 
     ScriptWorkflowResult {
         success: result.success,
         workflow_type: "loop".to_string(),
         workflow_name: result.workflow_name.clone(),
-        duration_ms: result.duration.as_millis() as u64,
+        duration_ms: u64::try_from(result.duration.as_millis()).unwrap_or(0),
         data: serde_json::json!({
             "total_iterations": result.total_iterations,
             "completed_iterations": result.completed_iterations,
@@ -455,6 +458,7 @@ pub fn transform_loop_result(
 }
 
 /// Transform parallel workflow result
+#[must_use]
 pub fn transform_parallel_result(
     result: &llmspell_workflows::ParallelWorkflowResult,
 ) -> ScriptWorkflowResult {
@@ -487,7 +491,9 @@ pub fn transform_parallel_result(
         })),
     };
 
-    let error = if !result.success {
+    let error = if result.success {
+        None
+    } else {
         result.error.as_ref().map(|e| WorkflowError {
             error_type: "ParallelExecutionError".to_string(),
             message: e.clone(),
@@ -503,8 +509,6 @@ pub fn transform_parallel_result(
                     .collect::<Vec<_>>(),
             })),
         })
-    } else {
-        None
     };
 
     // Collect all branch outputs
@@ -525,7 +529,7 @@ pub fn transform_parallel_result(
         success: result.success,
         workflow_type: "parallel".to_string(),
         workflow_name: result.workflow_name.clone(),
-        duration_ms: result.duration.as_millis() as u64,
+        duration_ms: u64::try_from(result.duration.as_millis()).unwrap_or(0),
         data: serde_json::json!({
             "successful_branches": result.successful_branches,
             "failed_branches": result.failed_branches,
@@ -545,27 +549,31 @@ pub fn transform_generic_result(
     // Try to extract common fields
     let success = result
         .get("success")
-        .and_then(|v| v.as_bool())
+        .and_then(serde_json::Value::as_bool)
         .unwrap_or(false);
 
     let duration_ms = result
         .get("duration")
-        .and_then(|v| v.as_u64())
-        .or_else(|| result.get("duration_ms").and_then(|v| v.as_u64()))
+        .and_then(serde_json::Value::as_u64)
+        .or_else(|| {
+            result
+                .get("duration_ms")
+                .and_then(serde_json::Value::as_u64)
+        })
         .unwrap_or(0);
 
-    let error = if !success {
+    let error = if success {
+        None
+    } else {
         result
             .get("error")
             .and_then(|v| v.as_str())
             .map(|e| WorkflowError {
-                error_type: format!("{}Error", workflow_type),
+                error_type: format!("{workflow_type}Error"),
                 message: e.to_string(),
                 location: None,
                 details: None,
             })
-    } else {
-        None
     };
 
     let metadata = WorkflowMetadata {

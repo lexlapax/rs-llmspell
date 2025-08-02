@@ -68,6 +68,7 @@ pub struct LifecycleEvent {
 
 impl LifecycleEvent {
     /// Create new lifecycle event
+    #[must_use]
     pub fn new(
         event_type: LifecycleEventType,
         agent_id: String,
@@ -86,12 +87,14 @@ impl LifecycleEvent {
     }
 
     /// Add metadata to event
+    #[must_use]
     pub fn with_metadata(mut self, key: &str, value: &str) -> Self {
         self.metadata.insert(key.to_string(), value.to_string());
         self
     }
 
     /// Get event age
+    #[must_use]
     pub fn age(&self) -> Duration {
         self.timestamp
             .elapsed()
@@ -171,16 +174,19 @@ impl EventSubscription {
         }
     }
 
+    #[must_use]
     pub fn for_agent(mut self, agent_id: String) -> Self {
         self.agent_id = Some(agent_id);
         self
     }
 
+    #[must_use]
     pub fn for_event_types(mut self, event_types: Vec<LifecycleEventType>) -> Self {
         self.event_types = event_types;
         self
     }
 
+    #[must_use]
     pub fn matches(&self, event: &LifecycleEvent) -> bool {
         if !self.active {
             return false;
@@ -263,6 +269,7 @@ impl Default for LifecycleEventSystem {
 
 impl LifecycleEventSystem {
     /// Create new event system
+    #[must_use]
     pub fn new(config: EventSystemConfig) -> Self {
         let (broadcaster, _) = broadcast::channel(1000);
 
@@ -399,8 +406,10 @@ impl LifecycleEventSystem {
             stats.average_processing_time = if stats.total_events == 1 {
                 processing_time
             } else {
-                (stats.average_processing_time * (stats.total_events - 1) as u32 + processing_time)
-                    / stats.total_events as u32
+                (stats.average_processing_time
+                    * u32::try_from(stats.total_events - 1).unwrap_or(u32::MAX)
+                    + processing_time)
+                    / u32::try_from(stats.total_events).unwrap_or(1)
             };
         }
 
@@ -529,6 +538,7 @@ impl LifecycleEventSystem {
     }
 
     /// Get event receiver for custom processing
+    #[must_use]
     pub fn subscribe_to_broadcast(&self) -> broadcast::Receiver<LifecycleEvent> {
         self.broadcaster.subscribe()
     }
@@ -594,13 +604,15 @@ impl Default for LoggingEventListener {
 }
 
 impl LoggingEventListener {
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self {
             log_level: tracing::Level::INFO,
         }
     }
 
-    pub fn with_level(mut self, level: tracing::Level) -> Self {
+    #[must_use]
+    pub const fn with_level(mut self, level: tracing::Level) -> Self {
         self.log_level = level;
         self
     }
@@ -672,6 +684,7 @@ impl Default for MetricsEventListener {
 }
 
 impl MetricsEventListener {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             metrics: Arc::new(Mutex::new(HashMap::new())),

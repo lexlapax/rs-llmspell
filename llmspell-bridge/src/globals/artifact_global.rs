@@ -1,5 +1,5 @@
 //! ABOUTME: Artifact global object providing artifact management for scripts
-//! ABOUTME: Integrates with SessionManager via ArtifactBridge for language-specific bindings
+//! ABOUTME: Integrates with `SessionManager` via `ArtifactBridge` for language-specific bindings
 
 use crate::artifact_bridge::ArtifactBridge;
 use crate::globals::types::{GlobalContext, GlobalMetadata, GlobalObject};
@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 /// Artifact global object providing artifact management for scripts
 ///
-/// This wraps ArtifactBridge and provides language-specific bindings,
+/// This wraps `ArtifactBridge` and provides language-specific bindings,
 /// converting between async Rust operations and synchronous script calls.
 pub struct ArtifactGlobal {
     /// Artifact bridge for core operations
@@ -17,7 +17,8 @@ pub struct ArtifactGlobal {
 
 impl ArtifactGlobal {
     /// Create a new Artifact global
-    pub fn new(artifact_bridge: Arc<ArtifactBridge>) -> Self {
+    #[must_use]
+    pub const fn new(artifact_bridge: Arc<ArtifactBridge>) -> Self {
         Self { artifact_bridge }
     }
 }
@@ -41,7 +42,7 @@ impl GlobalObject for ArtifactGlobal {
             self.artifact_bridge.clone(),
         )
         .map_err(|e| LLMSpellError::Component {
-            message: format!("Failed to inject Artifact global: {}", e),
+            message: format!("Failed to inject Artifact global: {e}"),
             source: None,
         })
     }

@@ -33,7 +33,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 use tracing::{error, info, warn};
 
-/// Configuration for the FileWatcherTool
+/// Configuration for the `FileWatcherTool`
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileWatcherConfig {
     /// Maximum number of events to buffer
@@ -65,7 +65,8 @@ pub struct FileWatcherTool {
 }
 
 impl FileWatcherTool {
-    /// Create a new FileWatcherTool
+    /// Create a new `FileWatcherTool`
+    #[must_use]
     pub fn new(config: FileWatcherConfig, sandbox: Arc<FileSandbox>) -> Self {
         Self {
             metadata: ComponentMetadata::new(
@@ -146,13 +147,10 @@ impl FileWatcherTool {
                 }
                 Ok(Err(e)) => {
                     warn!("Watch error: {}", e);
-                    continue;
                 }
                 Err(mpsc::RecvTimeoutError::Timeout) => {
                     // Check if we should continue waiting
-                    if events.is_empty() {
-                        continue;
-                    } else {
+                    if !events.is_empty() {
                         // We have some events, check if we should wait for more
                         thread::sleep(Duration::from_millis(watch_config.debounce_ms));
                         break;
@@ -171,7 +169,7 @@ impl FileWatcherTool {
         Ok(debounced_events)
     }
 
-    /// Convert notify event to our FileEvent
+    /// Convert notify event to our `FileEvent`
     fn convert_notify_event(
         &self,
         event: notify::Event,
@@ -224,7 +222,7 @@ impl FileWatcherTool {
         if let Some(op) = operation {
             if !matches!(op, "watch" | "config") {
                 return Err(LLMSpellError::Validation {
-                    message: format!("Invalid operation: {}", op),
+                    message: format!("Invalid operation: {op}"),
                     field: Some("operation".to_string()),
                 });
             }
@@ -286,7 +284,8 @@ impl BaseAgent for FileWatcherTool {
                     .collect::<Result<Vec<_>>>()?;
 
                 let recursive = extract_optional_bool(params, "recursive").unwrap_or(true);
-                let pattern = extract_optional_string(params, "pattern").map(|s| s.to_string());
+                let pattern = extract_optional_string(params, "pattern")
+                    .map(std::string::ToString::to_string);
                 let debounce_ms = extract_optional_u64(params, "debounce_ms")
                     .unwrap_or(self.config.default_debounce_ms);
                 // Support both timeout_ms and timeout_seconds for flexibility
@@ -318,7 +317,7 @@ impl BaseAgent for FileWatcherTool {
                     self.watch_files(watch_config)
                         .await
                         .map_err(|e| LLMSpellError::Tool {
-                            message: format!("File watching failed: {}", e),
+                            message: format!("File watching failed: {e}"),
                             tool_name: Some("file_watcher".to_string()),
                             source: None,
                         })?;
@@ -347,7 +346,7 @@ impl BaseAgent for FileWatcherTool {
                 Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
             }
             _ => Err(LLMSpellError::Validation {
-                message: format!("Unknown operation: {}", operation),
+                message: format!("Unknown operation: {operation}"),
                 field: Some("operation".to_string()),
             }),
         }
@@ -364,7 +363,7 @@ impl BaseAgent for FileWatcherTool {
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
-        Ok(AgentOutput::text(format!("File watcher error: {}", error)))
+        Ok(AgentOutput::text(format!("File watcher error: {error}")))
     }
 }
 

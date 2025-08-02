@@ -36,9 +36,9 @@ pub enum JsonOperation {
 impl std::fmt::Display for JsonOperation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            JsonOperation::Query => write!(f, "query"),
-            JsonOperation::Validate => write!(f, "validate"),
-            JsonOperation::Stream => write!(f, "stream"),
+            Self::Query => write!(f, "query"),
+            Self::Validate => write!(f, "validate"),
+            Self::Stream => write!(f, "stream"),
         }
     }
 }
@@ -48,11 +48,11 @@ impl std::str::FromStr for JsonOperation {
 
     fn from_str(s: &str) -> Result<Self> {
         match s.to_lowercase().as_str() {
-            "query" | "transform" | "jq" => Ok(JsonOperation::Query),
-            "validate" => Ok(JsonOperation::Validate),
-            "stream" => Ok(JsonOperation::Stream),
+            "query" | "transform" | "jq" => Ok(Self::Query),
+            "validate" => Ok(Self::Validate),
+            "stream" => Ok(Self::Stream),
             _ => Err(LLMSpellError::Validation {
-                message: format!("Unknown JSON operation: {}", s),
+                message: format!("Unknown JSON operation: {s}"),
                 field: Some("operation".to_string()),
             }),
         }
@@ -87,6 +87,7 @@ pub struct JsonProcessorTool {
 }
 
 impl JsonProcessorTool {
+    #[must_use]
     pub fn new(config: JsonProcessorConfig) -> Self {
         Self {
             metadata: ComponentMetadata::new(
@@ -120,8 +121,7 @@ impl JsonProcessorTool {
             if query_lower.contains(pattern) {
                 return Err(LLMSpellError::Validation {
                     message: format!(
-                        "Security: JQ query contains potentially dangerous function: {}",
-                        pattern
+                        "Security: JQ query contains potentially dangerous function: {pattern}"
                     ),
                     field: Some("query".to_string()),
                 });
@@ -165,7 +165,7 @@ impl JsonProcessorTool {
                 .collect::<Vec<_>>()
                 .join("; ");
             return Err(LLMSpellError::Validation {
-                message: format!("Invalid jq syntax: {}", error_msg),
+                message: format!("Invalid jq syntax: {error_msg}"),
                 field: Some("query".to_string()),
             });
         }
@@ -207,7 +207,7 @@ impl JsonProcessorTool {
                 }
                 Err(e) => {
                     return Err(LLMSpellError::Tool {
-                        message: format!("jq execution error: {}", e),
+                        message: format!("jq execution error: {e}"),
                         tool_name: Some("json_processor".to_string()),
                         source: None,
                     })
@@ -226,14 +226,14 @@ impl JsonProcessorTool {
             .with_draft(Draft::Draft7)
             .compile(schema)
             .map_err(|e| LLMSpellError::Validation {
-                message: format!("Invalid JSON schema: {}", e),
+                message: format!("Invalid JSON schema: {e}"),
                 field: Some("schema".to_string()),
             })?;
 
         let validation_result = compiled.validate(input);
 
         match validation_result {
-            Ok(_) => Ok(ValidationResult {
+            Ok(()) => Ok(ValidationResult {
                 is_valid: true,
                 errors: vec![],
             }),
@@ -281,7 +281,7 @@ impl JsonProcessorTool {
             // Parse JSON line
             let value: Value =
                 serde_json::from_str(trimmed).map_err(|e| LLMSpellError::Validation {
-                    message: format!("Invalid JSON: {}", e),
+                    message: format!("Invalid JSON: {e}"),
                     field: Some("input".to_string()),
                 })?;
 
@@ -308,19 +308,13 @@ impl JsonProcessorTool {
 
         // Handle input - could be a JSON string or already parsed
         let input = params.get("input").map(|v| {
-            if let Some(s) = v.as_str() {
-                // Try to parse string as JSON
-                match serde_json::from_str(s) {
-                    Ok(parsed) => parsed,
-                    Err(_) => {
-                        // If parsing fails, use the string itself
-                        v.clone()
-                    }
-                }
-            } else {
-                // Already a JSON value
-                v.clone()
-            }
+            v.as_str().map_or_else(
+                || v.clone(),
+                |s| {
+                    // Try to parse string as JSON
+                    serde_json::from_str(s).unwrap_or_else(|_| v.clone())
+                },
+            )
         });
         let query = params
             .get("query")
@@ -479,10 +473,7 @@ impl BaseAgent for JsonProcessorTool {
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
-        Ok(AgentOutput::text(format!(
-            "JSON processing error: {}",
-            error
-        )))
+        Ok(AgentOutput::text(format!("JSON processing error: {error}")))
     }
 }
 
@@ -549,11 +540,13 @@ impl Tool for JsonProcessorTool {
 
 impl JsonProcessorTool {
     /// Check if this tool supports hook integration
-    pub fn supports_hooks(&self) -> bool {
+    #[must_use]
+    pub const fn supports_hooks(&self) -> bool {
         true // All tools that implement Tool automatically support hooks
     }
 
     /// Get hook integration metadata for this tool
+    #[must_use]
     pub fn hook_metadata(&self) -> serde_json::Value {
         use serde_json::json;
         json!({
@@ -618,7 +611,7 @@ impl JsonProcessorTool {
                 "query" => params["query"] = serde_json::json!(query_or_schema),
                 "validate" => params["schema"] = serde_json::json!(query_or_schema),
                 _ => {}
-            };
+            }
         }
 
         let input = AgentInput::text("JSON processing hook demonstration")

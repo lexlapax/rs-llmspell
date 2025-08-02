@@ -52,12 +52,12 @@ pub enum CsvOperation {
 impl std::fmt::Display for CsvOperation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            CsvOperation::Analyze => write!(f, "analyze"),
-            CsvOperation::Convert => write!(f, "convert"),
-            CsvOperation::Filter => write!(f, "filter"),
-            CsvOperation::Transform => write!(f, "transform"),
-            CsvOperation::Validate => write!(f, "validate"),
-            CsvOperation::Sample => write!(f, "sample"),
+            Self::Analyze => write!(f, "analyze"),
+            Self::Convert => write!(f, "convert"),
+            Self::Filter => write!(f, "filter"),
+            Self::Transform => write!(f, "transform"),
+            Self::Validate => write!(f, "validate"),
+            Self::Sample => write!(f, "sample"),
         }
     }
 }
@@ -67,14 +67,14 @@ impl std::str::FromStr for CsvOperation {
 
     fn from_str(s: &str) -> Result<Self> {
         match s.to_lowercase().as_str() {
-            "analyze" => Ok(CsvOperation::Analyze),
-            "convert" => Ok(CsvOperation::Convert),
-            "filter" => Ok(CsvOperation::Filter),
-            "transform" => Ok(CsvOperation::Transform),
-            "validate" => Ok(CsvOperation::Validate),
-            "sample" => Ok(CsvOperation::Sample),
+            "analyze" => Ok(Self::Analyze),
+            "convert" => Ok(Self::Convert),
+            "filter" => Ok(Self::Filter),
+            "transform" => Ok(Self::Transform),
+            "validate" => Ok(Self::Validate),
+            "sample" => Ok(Self::Sample),
             _ => Err(LLMSpellError::Validation {
-                message: format!("Unknown CSV operation: {}", s),
+                message: format!("Unknown CSV operation: {s}"),
                 field: Some("operation".to_string()),
             }),
         }
@@ -191,7 +191,7 @@ impl StreamingColumnStats {
         // Update numeric stats if applicable
         if let Ok(num) = value.parse::<f64>() {
             self.sum = Some(self.sum.unwrap_or(0.0) + num);
-            self.sum_squares = Some(self.sum_squares.unwrap_or(0.0) + num * num);
+            self.sum_squares = Some(num.mul_add(num, self.sum_squares.unwrap_or(0.0)));
         }
 
         // Collect samples
@@ -206,7 +206,7 @@ impl StreamingColumnStats {
         let (mean, std_dev) = if let (Some(sum), Some(sum_squares)) = (self.sum, self.sum_squares) {
             if self.count > 0 {
                 let mean = sum / self.count as f64;
-                let variance = (sum_squares / self.count as f64) - (mean * mean);
+                let variance = mean.mul_add(-mean, sum_squares / self.count as f64);
                 let std_dev = if variance > 0.0 { variance.sqrt() } else { 0.0 };
                 (Some(mean), Some(std_dev))
             } else {
@@ -275,13 +275,13 @@ impl std::str::FromStr for ExportFormat {
 
     fn from_str(s: &str) -> Result<Self> {
         match s.to_lowercase().as_str() {
-            "json" => Ok(ExportFormat::Json),
-            "jsonlines" | "jsonl" => Ok(ExportFormat::JsonLines),
-            "parquet" => Ok(ExportFormat::Parquet),
-            "excel" | "xlsx" => Ok(ExportFormat::Excel),
-            "tsv" => Ok(ExportFormat::Tsv),
+            "json" => Ok(Self::Json),
+            "jsonlines" | "jsonl" => Ok(Self::JsonLines),
+            "parquet" => Ok(Self::Parquet),
+            "excel" | "xlsx" => Ok(Self::Excel),
+            "tsv" => Ok(Self::Tsv),
             _ => Err(LLMSpellError::Validation {
-                message: format!("Unknown export format: {}", s),
+                message: format!("Unknown export format: {s}"),
                 field: Some("format".to_string()),
             }),
         }
@@ -295,6 +295,7 @@ pub struct CsvAnalyzerTool {
 }
 
 impl CsvAnalyzerTool {
+    #[must_use]
     pub fn new(config: CsvAnalyzerConfig) -> Self {
         Self {
             metadata: ComponentMetadata::new(
@@ -400,8 +401,7 @@ impl CsvAnalyzerTool {
         type_counts
             .into_iter()
             .max_by_key(|(_, count)| *count)
-            .map(|(typ, _)| typ)
-            .unwrap_or(ColumnType::String)
+            .map_or(ColumnType::String, |(typ, _)| typ)
     }
 
     /// Analyze CSV content with streaming
@@ -477,11 +477,17 @@ impl CsvAnalyzerTool {
 
         // Infer types and finalize stats
         for (col_idx, stats) in column_stats.iter_mut().enumerate() {
-            let value_refs: Vec<&str> = type_samples[col_idx].iter().map(|s| s.as_str()).collect();
+            let value_refs: Vec<&str> = type_samples[col_idx]
+                .iter()
+                .map(std::string::String::as_str)
+                .collect();
             stats.data_type = self.infer_column_type(&value_refs);
         }
 
-        let columns: Vec<ColumnStats> = column_stats.iter().map(|s| s.finalize()).collect();
+        let columns: Vec<ColumnStats> = column_stats
+            .iter()
+            .map(StreamingColumnStats::finalize)
+            .collect();
 
         Ok(CsvAnalysisResult {
             row_count,
@@ -525,7 +531,10 @@ impl CsvAnalyzerTool {
         let mut column_types = Vec::new();
 
         for (idx, header) in headers.iter().enumerate() {
-            let value_refs: Vec<&str> = type_samples[idx].iter().map(|s| s.as_str()).collect();
+            let value_refs: Vec<&str> = type_samples[idx]
+                .iter()
+                .map(std::string::String::as_str)
+                .collect();
             let col_type = self.infer_column_type(&value_refs);
             column_types.push(col_type);
 
@@ -547,7 +556,7 @@ impl CsvAnalyzerTool {
         let mut writer =
             ArrowWriter::try_new(&mut output, schema.clone(), Some(props)).map_err(|e| {
                 LLMSpellError::Internal {
-                    message: format!("Failed to create Parquet writer: {}", e),
+                    message: format!("Failed to create Parquet writer: {e}"),
                     source: None,
                 }
             })?;
@@ -583,7 +592,7 @@ impl CsvAnalyzerTool {
         }
 
         writer.close().map_err(|e| LLMSpellError::Internal {
-            message: format!("Failed to close Parquet writer: {}", e),
+            message: format!("Failed to close Parquet writer: {e}"),
             source: None,
         })?;
 
@@ -610,7 +619,7 @@ impl CsvAnalyzerTool {
         {
             let workbook =
                 Workbook::new(temp_path.to_str().unwrap()).map_err(|e| LLMSpellError::Tool {
-                    message: format!("Failed to create Excel workbook: {}", e),
+                    message: format!("Failed to create Excel workbook: {e}"),
                     tool_name: Some("csv_analyzer".to_string()),
                     source: None,
                 })?;
@@ -618,7 +627,7 @@ impl CsvAnalyzerTool {
             let mut worksheet = workbook
                 .add_worksheet(None)
                 .map_err(|e| LLMSpellError::Tool {
-                    message: format!("Failed to add worksheet: {}", e),
+                    message: format!("Failed to add worksheet: {e}"),
                     tool_name: Some("csv_analyzer".to_string()),
                     source: None,
                 })?;
@@ -628,7 +637,7 @@ impl CsvAnalyzerTool {
                 worksheet
                     .write_string(0, col as u16, header, None)
                     .map_err(|e| LLMSpellError::Tool {
-                        message: format!("Failed to write header: {}", e),
+                        message: format!("Failed to write header: {e}"),
                         tool_name: Some("csv_analyzer".to_string()),
                         source: None,
                     })?;
@@ -643,7 +652,7 @@ impl CsvAnalyzerTool {
                         worksheet
                             .write_number(row_idx, col_idx as u16, num, None)
                             .map_err(|e| LLMSpellError::Tool {
-                                message: format!("Failed to write number: {}", e),
+                                message: format!("Failed to write number: {e}"),
                                 tool_name: Some("csv_analyzer".to_string()),
                                 source: None,
                             })?;
@@ -651,7 +660,7 @@ impl CsvAnalyzerTool {
                         worksheet
                             .write_string(row_idx, col_idx as u16, field, None)
                             .map_err(|e| LLMSpellError::Tool {
-                                message: format!("Failed to write string: {}", e),
+                                message: format!("Failed to write string: {e}"),
                                 tool_name: Some("csv_analyzer".to_string()),
                                 source: None,
                             })?;
@@ -661,7 +670,7 @@ impl CsvAnalyzerTool {
             }
 
             workbook.close().map_err(|e| LLMSpellError::Tool {
-                message: format!("Failed to close workbook: {}", e),
+                message: format!("Failed to close workbook: {e}"),
                 tool_name: Some("csv_analyzer".to_string()),
                 source: None,
             })?;
@@ -671,7 +680,7 @@ impl CsvAnalyzerTool {
         let output = tokio::fs::read(&temp_path)
             .await
             .map_err(|e| LLMSpellError::Tool {
-                message: format!("Failed to read Excel file: {}", e),
+                message: format!("Failed to read Excel file: {e}"),
                 tool_name: Some("csv_analyzer".to_string()),
                 source: None,
             })?;
@@ -716,13 +725,14 @@ impl CsvAnalyzerTool {
                     for (idx, field) in record.iter().enumerate() {
                         if let Some(header) = headers.get(idx) {
                             // Try to parse as number
-                            let value = if let Ok(num) = field.parse::<f64>() {
-                                Value::Number(serde_json::Number::from_f64(num).unwrap())
-                            } else if let Ok(bool_val) = field.parse::<bool>() {
-                                Value::Bool(bool_val)
-                            } else {
-                                Value::String(field.to_string())
-                            };
+                            let value = field.parse::<f64>().map_or_else(
+                                |_| {
+                                    field
+                                        .parse::<bool>()
+                                        .map_or_else(|_| Value::String(field.to_string()), Value::Bool)
+                                },
+                                |num| Value::Number(serde_json::Number::from_f64(num).unwrap()),
+                            );
                             row_map.insert(header.to_string(), value);
                         }
                     }
@@ -731,7 +741,7 @@ impl CsvAnalyzerTool {
                 }
 
                 serde_json::to_string_pretty(&records).map_err(|e| LLMSpellError::Internal {
-                    message: format!("Failed to serialize to JSON: {}", e),
+                    message: format!("Failed to serialize to JSON: {e}"),
                     source: None,
                 })
             }
@@ -746,20 +756,21 @@ impl CsvAnalyzerTool {
                     for (idx, field) in record.iter().enumerate() {
                         if let Some(header) = headers.get(idx) {
                             // Try to parse as number
-                            let value = if let Ok(num) = field.parse::<f64>() {
-                                Value::Number(serde_json::Number::from_f64(num).unwrap())
-                            } else if let Ok(bool_val) = field.parse::<bool>() {
-                                Value::Bool(bool_val)
-                            } else {
-                                Value::String(field.to_string())
-                            };
+                            let value = field.parse::<f64>().map_or_else(
+                                |_| {
+                                    field
+                                        .parse::<bool>()
+                                        .map_or_else(|_| Value::String(field.to_string()), Value::Bool)
+                                },
+                                |num| Value::Number(serde_json::Number::from_f64(num).unwrap()),
+                            );
                             row_map.insert(header.to_string(), value);
                         }
                     }
 
                     let json_line =
                         serde_json::to_string(&row_map).map_err(|e| LLMSpellError::Internal {
-                            message: format!("Failed to serialize to JSON: {}", e),
+                            message: format!("Failed to serialize to JSON: {e}"),
                             source: None,
                         })?;
                     output.push_str(&json_line);
@@ -786,12 +797,12 @@ impl CsvAnalyzerTool {
                 }
 
                 let data = wtr.into_inner().map_err(|e| LLMSpellError::Internal {
-                    message: format!("Failed to write TSV: {}", e),
+                    message: format!("Failed to write TSV: {e}"),
                     source: None,
                 })?;
 
                 String::from_utf8(data).map_err(|e| LLMSpellError::Internal {
-                    message: format!("Failed to convert TSV to string: {}", e),
+                    message: format!("Failed to convert TSV to string: {e}"),
                     source: None,
                 })
             }
@@ -826,7 +837,7 @@ impl CsvAnalyzerTool {
             .iter()
             .position(|h| h == column_name)
             .ok_or_else(|| LLMSpellError::Validation {
-                message: format!("Column '{}' not found", column_name),
+                message: format!("Column '{column_name}' not found"),
                 field: Some("column".to_string()),
             })?;
 
@@ -877,7 +888,7 @@ impl CsvAnalyzerTool {
                     }
                     _ => {
                         return Err(LLMSpellError::Validation {
-                            message: format!("Unknown operator: {}", operator),
+                            message: format!("Unknown operator: {operator}"),
                             field: Some("operator".to_string()),
                         })
                     }
@@ -890,12 +901,12 @@ impl CsvAnalyzerTool {
         }
 
         let data = wtr.into_inner().map_err(|e| LLMSpellError::Internal {
-            message: format!("Failed to write CSV: {}", e),
+            message: format!("Failed to write CSV: {e}"),
             source: None,
         })?;
 
         String::from_utf8(data).map_err(|e| LLMSpellError::Internal {
-            message: format!("Failed to convert CSV to string: {}", e),
+            message: format!("Failed to convert CSV to string: {e}"),
             source: None,
         })
     }
@@ -923,12 +934,12 @@ impl CsvAnalyzerTool {
         }
 
         let data = wtr.into_inner().map_err(|e| LLMSpellError::Internal {
-            message: format!("Failed to write CSV: {}", e),
+            message: format!("Failed to write CSV: {e}"),
             source: None,
         })?;
 
         String::from_utf8(data).map_err(|e| LLMSpellError::Internal {
-            message: format!("Failed to convert CSV to string: {}", e),
+            message: format!("Failed to convert CSV to string: {e}"),
             source: None,
         })
     }
@@ -950,7 +961,10 @@ impl CsvAnalyzerTool {
 
         // Get headers
         let headers = reader.headers().map_err(Self::csv_error)?.clone();
-        let mut new_headers: Vec<String> = headers.iter().map(|h| h.to_string()).collect();
+        let mut new_headers: Vec<String> = headers
+            .iter()
+            .map(std::string::ToString::to_string)
+            .collect();
 
         // Apply column renames
         if let Some(renames) = rename_columns {
@@ -992,12 +1006,12 @@ impl CsvAnalyzerTool {
                 let mut new_record: Vec<String> = Vec::new();
 
                 // Copy existing fields (with renames applied)
-                for field in record.iter() {
+                for field in &record {
                     new_record.push(field.to_string());
                 }
 
                 // Calculate new columns
-                for expr in new_column_expressions.iter() {
+                for expr in &new_column_expressions {
                     // Simple expression evaluation (supports basic arithmetic)
                     let value = self.evaluate_expression(expr, &headers, &record)?;
                     new_record.push(value);
@@ -1007,13 +1021,13 @@ impl CsvAnalyzerTool {
             }
 
             writer.flush().map_err(|e| LLMSpellError::Internal {
-                message: format!("Failed to flush CSV writer: {}", e),
+                message: format!("Failed to flush CSV writer: {e}"),
                 source: None,
             })?;
         }
 
         String::from_utf8(output).map_err(|e| LLMSpellError::Internal {
-            message: format!("Failed to convert transformed CSV to string: {}", e),
+            message: format!("Failed to convert transformed CSV to string: {e}"),
             source: None,
         })
     }
@@ -1160,10 +1174,10 @@ impl CsvAnalyzerTool {
         None
     }
 
-    /// Convert CSV error to LLMSpellError
+    /// Convert CSV error to `LLMSpellError`
     fn csv_error(e: csv::Error) -> LLMSpellError {
         LLMSpellError::Validation {
-            message: format!("CSV error: {}", e),
+            message: format!("CSV error: {e}"),
             field: None,
         }
     }
@@ -1215,12 +1229,12 @@ fn write_parquet_chunk(
 
     let batch =
         RecordBatch::try_new(schema.clone(), columns).map_err(|e| LLMSpellError::Internal {
-            message: format!("Failed to create record batch: {}", e),
+            message: format!("Failed to create record batch: {e}"),
             source: None,
         })?;
 
     writer.write(&batch).map_err(|e| LLMSpellError::Internal {
-        message: format!("Failed to write Parquet batch: {}", e),
+        message: format!("Failed to write Parquet batch: {e}"),
         source: None,
     })?;
 
@@ -1281,7 +1295,7 @@ impl BaseAgent for CsvAnalyzerTool {
                         // For JSON format, return the parsed JSON directly for backward compatibility
                         let text = String::from_utf8(result_bytes).map_err(|e| {
                             LLMSpellError::Internal {
-                                message: format!("Failed to convert result to string: {}", e),
+                                message: format!("Failed to convert result to string: {e}"),
                                 source: None,
                             }
                         })?;
@@ -1291,7 +1305,7 @@ impl BaseAgent for CsvAnalyzerTool {
                         // Other text formats (TSV, JsonLines)
                         let text = String::from_utf8(result_bytes).map_err(|e| {
                             LLMSpellError::Internal {
-                                message: format!("Failed to convert result to string: {}", e),
+                                message: format!("Failed to convert result to string: {e}"),
                                 source: None,
                             }
                         })?;
@@ -1317,7 +1331,7 @@ impl BaseAgent for CsvAnalyzerTool {
                 let sample_size = options
                     .as_ref()
                     .and_then(|o| o.get("size"))
-                    .and_then(|s| s.as_u64())
+                    .and_then(serde_json::Value::as_u64)
                     .unwrap_or(10) as usize;
 
                 let sampled = self.sample_csv(&content, sample_size).await?;
@@ -1417,10 +1431,7 @@ impl BaseAgent for CsvAnalyzerTool {
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
-        Ok(AgentOutput::text(format!(
-            "CSV processing error: {}",
-            error
-        )))
+        Ok(AgentOutput::text(format!("CSV processing error: {error}")))
     }
 }
 

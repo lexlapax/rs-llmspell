@@ -27,6 +27,7 @@ pub struct InjectionCache {
 
 impl InjectionCache {
     /// Create a new injection cache
+    #[must_use]
     pub fn new() -> Self {
         Self {
             #[cfg(feature = "lua")]
@@ -37,6 +38,7 @@ impl InjectionCache {
     }
 
     /// Get cache hit rate
+    #[must_use]
     pub fn hit_rate(&self) -> f64 {
         let hits = *self.hits.read();
         let misses = *self.misses.read();
@@ -71,6 +73,7 @@ pub struct GlobalInjector {
 
 impl GlobalInjector {
     /// Create a new global injector
+    #[must_use]
     pub fn new(registry: Arc<GlobalRegistry>) -> Self {
         Self {
             registry,
@@ -172,6 +175,7 @@ impl GlobalInjector {
     }
 
     /// Get injection metrics from the last injection
+    #[must_use]
     pub fn get_metrics(&self) -> &InjectionMetrics {
         self.registry.metrics()
     }

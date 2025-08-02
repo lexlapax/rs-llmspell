@@ -1,7 +1,7 @@
 //! ABOUTME: llmspell-bridge - Language-agnostic script runtime with bridge pattern
-//! ABOUTME: Supports multiple script engines (Lua, JavaScript, Python) through ScriptEngineBridge
+//! ABOUTME: Supports multiple script engines (Lua, JavaScript, Python) through `ScriptEngineBridge`
 //!
-//! # LLMSpell Bridge
+//! # `LLMSpell` Bridge
 //!
 //! The bridge crate provides a language-agnostic runtime for executing scripts that
 //! interact with LLM agents, tools, and workflows. It implements the Bridge pattern
@@ -20,9 +20,9 @@
 //!
 //! The bridge uses a three-layer architecture:
 //!
-//! 1. **ScriptEngineBridge Trait**: Defines the common interface for all script engines
+//! 1. **`ScriptEngineBridge` Trait**: Defines the common interface for all script engines
 //! 2. **Language Implementations**: Concrete implementations for each scripting language
-//! 3. **ScriptRuntime**: High-level runtime that manages engines and provides the user API
+//! 3. **`ScriptRuntime`**: High-level runtime that manages engines and provides the user API
 //!
 //! ## Quick Start
 //!

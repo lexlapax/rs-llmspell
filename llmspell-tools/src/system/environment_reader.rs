@@ -97,6 +97,7 @@ pub struct EnvironmentReaderTool {
 
 impl EnvironmentReaderTool {
     /// Create a new environment reader tool
+    #[must_use]
     pub fn new(config: EnvironmentReaderConfig) -> Self {
         Self {
             metadata: ComponentMetadata::new(
@@ -109,6 +110,7 @@ impl EnvironmentReaderTool {
     }
 
     /// Create a new environment reader tool with sandbox context
+    #[must_use]
     pub fn with_sandbox(
         config: EnvironmentReaderConfig,
         sandbox_context: Arc<SandboxContext>,
@@ -139,13 +141,12 @@ impl EnvironmentReaderTool {
                         var_name
                     );
                     return true;
-                } else {
-                    debug!(
-                        "Environment variable '{}' not allowed by sandbox permissions",
-                        var_name
-                    );
-                    return false;
                 }
+                debug!(
+                    "Environment variable '{}' not allowed by sandbox permissions",
+                    var_name
+                );
+                return false;
             }
         }
 
@@ -216,23 +217,17 @@ impl EnvironmentReaderTool {
     async fn get_single_var(&self, var_name: &str) -> LLMResult<Option<String>> {
         if !self.is_var_allowed(var_name) {
             return Err(LLMSpellError::Security {
-                message: format!(
-                    "Access to environment variable '{}' is not permitted",
-                    var_name
-                ),
+                message: format!("Access to environment variable '{var_name}' is not permitted"),
                 violation_type: Some("env_access_denied".to_string()),
             });
         }
 
-        match get_env_var(var_name) {
-            Some(value) => {
-                info!("Retrieved environment variable: {}", var_name);
-                Ok(Some(value))
-            }
-            None => {
-                debug!("Environment variable '{}' not found", var_name);
-                Ok(None)
-            }
+        if let Some(value) = get_env_var(var_name) {
+            info!("Retrieved environment variable: {}", var_name);
+            Ok(Some(value))
+        } else {
+            debug!("Environment variable '{}' not found", var_name);
+            Ok(None)
         }
     }
 
@@ -305,10 +300,7 @@ impl EnvironmentReaderTool {
 
         if !self.is_var_allowed(var_name) {
             return Err(LLMSpellError::Security {
-                message: format!(
-                    "Setting environment variable '{}' is not permitted",
-                    var_name
-                ),
+                message: format!("Setting environment variable '{var_name}' is not permitted"),
                 violation_type: Some("env_set_denied".to_string()),
             });
         }
@@ -319,7 +311,7 @@ impl EnvironmentReaderTool {
                 Ok(())
             }
             Err(e) => Err(LLMSpellError::Tool {
-                message: format!("Failed to set environment variable: {}", e),
+                message: format!("Failed to set environment variable: {e}"),
                 tool_name: Some("environment_reader".to_string()),
                 source: None,
             }),
@@ -346,32 +338,26 @@ impl BaseAgent for EnvironmentReaderTool {
             "get" => {
                 let var_name = extract_required_string(params, "variable_name")?;
 
-                match self.get_single_var(var_name).await? {
-                    Some(value) => {
-                        let response = ResponseBuilder::success("get")
-                            .with_message(format!(
-                                "Environment variable '{}' = '{}'",
-                                var_name, value
-                            ))
-                            .with_result(json!({
-                                "variable_name": var_name,
-                                "value": value,
-                                "found": true
-                            }))
-                            .build();
-                        AgentOutput::text(serde_json::to_string_pretty(&response)?)
-                    }
-                    None => {
-                        let response = ResponseBuilder::success("get")
-                            .with_message(format!("Environment variable '{}' not found", var_name))
-                            .with_result(json!({
-                                "variable_name": var_name,
-                                "value": null,
-                                "found": false
-                            }))
-                            .build();
-                        AgentOutput::text(serde_json::to_string_pretty(&response)?)
-                    }
+                if let Some(value) = self.get_single_var(var_name).await? {
+                    let response = ResponseBuilder::success("get")
+                        .with_message(format!("Environment variable '{var_name}' = '{value}'"))
+                        .with_result(json!({
+                            "variable_name": var_name,
+                            "value": value,
+                            "found": true
+                        }))
+                        .build();
+                    AgentOutput::text(serde_json::to_string_pretty(&response)?)
+                } else {
+                    let response = ResponseBuilder::success("get")
+                        .with_message(format!("Environment variable '{var_name}' not found"))
+                        .with_result(json!({
+                            "variable_name": var_name,
+                            "value": null,
+                            "found": false
+                        }))
+                        .build();
+                    AgentOutput::text(serde_json::to_string_pretty(&response)?)
                 }
             }
             "list" => {
@@ -412,10 +398,7 @@ impl BaseAgent for EnvironmentReaderTool {
 
                 self.set_var(var_name, value).await?;
                 let response = ResponseBuilder::success("set")
-                    .with_message(format!(
-                        "Set environment variable '{}' = '{}'",
-                        var_name, value
-                    ))
+                    .with_message(format!("Set environment variable '{var_name}' = '{value}'"))
                     .with_result(json!({
                         "variable_name": var_name,
                         "value": value,
@@ -427,8 +410,7 @@ impl BaseAgent for EnvironmentReaderTool {
             _ => {
                 return Err(LLMSpellError::Validation {
                     message: format!(
-                        "Unknown operation: '{}'. Supported operations: get, list, pattern, set",
-                        operation
+                        "Unknown operation: '{operation}'. Supported operations: get, list, pattern, set"
                     ),
                     field: Some("operation".to_string()),
                 });
@@ -450,8 +432,7 @@ impl BaseAgent for EnvironmentReaderTool {
 
     async fn handle_error(&self, error: LLMSpellError) -> LLMResult<AgentOutput> {
         Ok(AgentOutput::text(format!(
-            "Environment reader error: {}",
-            error
+            "Environment reader error: {error}"
         )))
     }
 }

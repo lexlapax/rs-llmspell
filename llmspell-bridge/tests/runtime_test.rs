@@ -1,4 +1,4 @@
-//! ABOUTME: Integration tests for ScriptRuntime with multiple engines
+//! ABOUTME: Integration tests for `ScriptRuntime` with multiple engines
 //! ABOUTME: Validates language-agnostic runtime and engine switching
 
 use llmspell_bridge::{
@@ -47,7 +47,7 @@ async fn test_runtime_execute_script() {
         Ok(output) => {
             assert_eq!(output.output.as_i64(), Some(2));
         }
-        Err(e) => panic!("Script execution failed: {:?}", e),
+        Err(e) => panic!("Script execution failed: {e:?}"),
     }
 }
 
@@ -95,10 +95,10 @@ async fn test_runtime_execution_context() {
     assert!(!context.working_directory.is_empty());
 
     // Update context
-    let mut new_context = context.clone();
+    let mut new_context = context;
     new_context.state = serde_json::json!({ "test": "value" });
 
-    runtime.set_execution_context(new_context.clone()).unwrap();
+    runtime.set_execution_context(new_context).unwrap();
 
     // Verify update
     let updated = runtime.get_execution_context();
@@ -133,7 +133,7 @@ async fn test_runtime_engine_switching_placeholder() {
         // When JavaScript feature is not enabled, it should fail
         assert!(js_runtime.is_err());
         if let Err(e) = js_runtime {
-            let error_msg = format!("{:?}", e);
+            let error_msg = format!("{e:?}");
             assert!(error_msg.contains("JavaScript") || error_msg.contains("not enabled"));
         }
     }

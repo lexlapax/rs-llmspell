@@ -15,7 +15,7 @@ fn main() {
         .compression_level(6)
         .build();
 
-    println!("Session config: {:#?}", session_config);
+    println!("Session config: {session_config:#?}");
 
     // Example 2: Building a WorkflowConfig
     let workflow_config = WorkflowConfig::builder()
@@ -27,7 +27,7 @@ fn main() {
         .continue_on_error(false)
         .build();
 
-    println!("\nWorkflow config: {:#?}", workflow_config);
+    println!("\nWorkflow config: {workflow_config:#?}");
 
     // Example 3: Building an AgentConfig
     let agent_config = AgentConfig::builder("my-agent")
@@ -46,17 +46,14 @@ fn main() {
         .max_memory_mb(1024)
         .build();
 
-    println!("\nAgent config: {:#?}", agent_config);
+    println!("\nAgent config: {agent_config:#?}");
 
     // Example 4: Using defaults with minimal configuration
     let minimal_session = SessionManagerConfig::builder()
         .max_active_sessions(100)
         .build();
 
-    println!(
-        "\nMinimal session config uses defaults: {:#?}",
-        minimal_session
-    );
+    println!("\nMinimal session config uses defaults: {minimal_session:#?}");
 
     // Example 5: Chaining multiple configurations
     let workflow = WorkflowConfig::builder()
@@ -70,6 +67,6 @@ fn main() {
         .max_tool_calls(50)
         .build();
 
-    println!("\nResilient workflow: {:#?}", workflow);
-    println!("Resilient agent: {:#?}", agent);
+    println!("\nResilient workflow: {workflow:#?}");
+    println!("Resilient agent: {agent:#?}");
 }

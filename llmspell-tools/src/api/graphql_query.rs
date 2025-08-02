@@ -39,10 +39,10 @@ pub enum GraphQLOperation {
 impl std::fmt::Display for GraphQLOperation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            GraphQLOperation::Query => write!(f, "query"),
-            GraphQLOperation::Mutation => write!(f, "mutation"),
-            GraphQLOperation::Subscription => write!(f, "subscription"),
-            GraphQLOperation::Introspection => write!(f, "introspection"),
+            Self::Query => write!(f, "query"),
+            Self::Mutation => write!(f, "mutation"),
+            Self::Subscription => write!(f, "subscription"),
+            Self::Introspection => write!(f, "introspection"),
         }
     }
 }
@@ -52,12 +52,12 @@ impl std::str::FromStr for GraphQLOperation {
 
     fn from_str(s: &str) -> Result<Self> {
         match s.to_lowercase().as_str() {
-            "query" => Ok(GraphQLOperation::Query),
-            "mutation" => Ok(GraphQLOperation::Mutation),
-            "subscription" => Ok(GraphQLOperation::Subscription),
-            "introspection" => Ok(GraphQLOperation::Introspection),
+            "query" => Ok(Self::Query),
+            "mutation" => Ok(Self::Mutation),
+            "subscription" => Ok(Self::Subscription),
+            "introspection" => Ok(Self::Introspection),
             _ => Err(LLMSpellError::Validation {
-                message: format!("Unknown GraphQL operation: {}", s),
+                message: format!("Unknown GraphQL operation: {s}"),
                 field: Some("operation".to_string()),
             }),
         }
@@ -114,7 +114,7 @@ pub struct SchemaCacheEntry {
 impl SchemaCacheEntry {
     fn is_expired(&self) -> bool {
         let age = Utc::now().signed_duration_since(self.cached_at);
-        age.num_seconds() as u64 > self.ttl_seconds
+        age.num_seconds().max(0) as u64 > self.ttl_seconds
     }
 }
 
@@ -154,13 +154,17 @@ pub struct GraphQLQueryTool {
 }
 
 impl GraphQLQueryTool {
+    /// Creates a new GraphQL query tool with the given configuration.
+    ///
+    /// # Errors
+    /// Returns an error if the HTTP client cannot be created or rate limiter setup fails.
     pub fn new(config: GraphQLConfig) -> Result<Self> {
         let client = Client::builder()
             .timeout(std::time::Duration::from_secs(config.timeout_seconds))
             .user_agent(&config.user_agent)
             .build()
             .map_err(|e| LLMSpellError::Internal {
-                message: format!("Failed to create HTTP client: {}", e),
+                message: format!("Failed to create HTTP client: {e}"),
                 source: None,
             })?;
 
@@ -194,7 +198,7 @@ impl GraphQLQueryTool {
         }
 
         let response = req.send().await.map_err(|e| LLMSpellError::Network {
-            message: format!("GraphQL request failed: {}", e),
+            message: format!("GraphQL request failed: {e}"),
             source: None,
         })?;
 
@@ -208,7 +212,7 @@ impl GraphQLQueryTool {
 
         let graphql_response: GraphQLResponse =
             response.json().await.map_err(|e| LLMSpellError::Tool {
-                message: format!("Failed to parse GraphQL response: {}", e),
+                message: format!("Failed to parse GraphQL response: {e}"),
                 tool_name: Some("graphql_query".to_string()),
                 source: None,
             })?;
@@ -217,7 +221,7 @@ impl GraphQLQueryTool {
         if let Some(errors) = &graphql_response.errors {
             if !errors.is_empty() && graphql_response.data.is_none() {
                 return Err(LLMSpellError::Tool {
-                    message: format!("GraphQL errors: {:?}", errors),
+                    message: format!("GraphQL errors: {errors:?}"),
                     tool_name: Some("graphql_query".to_string()),
                     source: None,
                 });
@@ -275,7 +279,7 @@ impl GraphQLQueryTool {
     ) -> Result<Value> {
         info!("Fetching GraphQL schema from {}", endpoint);
 
-        let introspection_query = r#"
+        let introspection_query = r"
             query IntrospectionQuery {
                 __schema {
                     queryType { name }
@@ -343,7 +347,7 @@ impl GraphQLQueryTool {
                     }
                 }
             }
-        "#;
+        ";
 
         let request = GraphQLRequest {
             query: introspection_query.to_string(),
@@ -361,7 +365,7 @@ impl GraphQLQueryTool {
     }
 
     /// Validate variables against expected types
-    fn validate_variables(&self, variables: &Value) -> Result<()> {
+    fn validate_variables(variables: &Value) -> Result<()> {
         // Basic validation - ensure it's an object
         if !variables.is_object() {
             return Err(LLMSpellError::Validation {
@@ -375,7 +379,7 @@ impl GraphQLQueryTool {
     }
 
     /// Estimate query depth
-    fn estimate_query_depth(&self, query: &str) -> u32 {
+    fn estimate_query_depth(query: &str) -> u32 {
         // Simple depth estimation based on brace nesting
         let mut depth: u32 = 0;
         let mut max_depth = 0;
@@ -397,7 +401,7 @@ impl GraphQLQueryTool {
     }
 
     /// Parse parameters from input
-    fn parse_parameters(&self, params: &Value) -> Result<GraphQLParameters> {
+    fn parse_parameters(params: &Value) -> Result<GraphQLParameters> {
         let operation_str = extract_optional_string(params, "operation").unwrap_or("query");
         let operation: GraphQLOperation = operation_str.parse()?;
 
@@ -458,7 +462,7 @@ impl BaseAgent for GraphQLQueryTool {
         // Get parameters using shared utility
         let params = extract_parameters(&input)?;
 
-        let parameters = self.parse_parameters(params)?;
+        let parameters = Self::parse_parameters(params)?;
 
         info!(
             "Executing GraphQL {} to {}",
@@ -467,13 +471,10 @@ impl BaseAgent for GraphQLQueryTool {
 
         // Validate query depth if configured
         if let Some(max_depth) = self.config.max_query_depth {
-            let depth = self.estimate_query_depth(&parameters.query);
+            let depth = Self::estimate_query_depth(&parameters.query);
             if depth > max_depth {
                 return Err(LLMSpellError::Validation {
-                    message: format!(
-                        "Query depth {} exceeds maximum allowed {}",
-                        depth, max_depth
-                    ),
+                    message: format!("Query depth {depth} exceeds maximum allowed {max_depth}"),
                     field: Some("query".to_string()),
                 });
             }
@@ -481,7 +482,7 @@ impl BaseAgent for GraphQLQueryTool {
 
         // Validate variables if provided
         if let Some(ref vars) = parameters.variables {
-            self.validate_variables(vars)?;
+            Self::validate_variables(vars)?;
         }
 
         let result = match parameters.operation {
@@ -580,7 +581,7 @@ impl BaseAgent for GraphQLQueryTool {
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
-        Ok(AgentOutput::text(format!("GraphQL query error: {}", error)))
+        Ok(AgentOutput::text(format!("GraphQL query error: {error}")))
     }
 }
 

@@ -270,7 +270,7 @@ impl ToolComposition {
         Self {
             id: uuid::Uuid::new_v4().to_string(),
             name: name.clone(),
-            description: format!("Tool composition: {}", name),
+            description: format!("Tool composition: {name}"),
             steps: Vec::new(),
             error_strategy: CompositionErrorStrategy::FailFast,
             max_execution_time: Some(Duration::from_secs(300)), // 5 minutes default
@@ -285,19 +285,22 @@ impl ToolComposition {
     }
 
     /// Set error strategy for the composition
-    pub fn with_error_strategy(mut self, strategy: CompositionErrorStrategy) -> Self {
+    #[must_use]
+    pub const fn with_error_strategy(mut self, strategy: CompositionErrorStrategy) -> Self {
         self.error_strategy = strategy;
         self
     }
 
     /// Set maximum execution time
-    pub fn with_max_execution_time(mut self, duration: Duration) -> Self {
+    #[must_use]
+    pub const fn with_max_execution_time(mut self, duration: Duration) -> Self {
         self.max_execution_time = Some(duration);
         self
     }
 
     /// Enable parallel execution where possible
-    pub fn with_parallel_execution(mut self, enabled: bool) -> Self {
+    #[must_use]
+    pub const fn with_parallel_execution(mut self, enabled: bool) -> Self {
         self.parallel_execution = enabled;
         self
     }
@@ -422,8 +425,7 @@ impl ToolComposition {
         let output = if let Some(last_step) = self.steps.last() {
             step_results
                 .get(&last_step.id)
-                .map(|r| r.output.clone())
-                .unwrap_or(JsonValue::Null)
+                .map_or(JsonValue::Null, |r| r.output.clone())
         } else {
             JsonValue::Null
         };
@@ -574,7 +576,7 @@ impl ToolComposition {
                     JsonValue::Bool(b) => b.to_string(),
                     JsonValue::Null => "null".to_string(),
                     _ => serde_json::to_string(value).map_err(|e| LLMSpellError::Component {
-                        message: format!("Failed to convert to string: {}", e),
+                        message: format!("Failed to convert to string: {e}"),
                         source: Some(Box::new(e)),
                     })?,
                 };
@@ -619,7 +621,7 @@ impl ToolComposition {
     }
 
     /// Handle step error based on strategy
-    fn handle_step_error(&self, step: &CompositionStep, _error: &LLMSpellError) -> bool {
+    const fn handle_step_error(&self, step: &CompositionStep, _error: &LLMSpellError) -> bool {
         match step.error_strategy {
             StepErrorStrategy::Inherit => {
                 matches!(self.error_strategy, CompositionErrorStrategy::FailFast)
@@ -676,25 +678,29 @@ impl CompositionStep {
     }
 
     /// Set error strategy for this step
-    pub fn with_error_strategy(mut self, strategy: StepErrorStrategy) -> Self {
+    #[must_use]
+    pub const fn with_error_strategy(mut self, strategy: StepErrorStrategy) -> Self {
         self.error_strategy = strategy;
         self
     }
 
     /// Mark step as optional
-    pub fn optional(mut self) -> Self {
+    #[must_use]
+    pub const fn optional(mut self) -> Self {
         self.optional = true;
         self
     }
 
     /// Add execution condition
+    #[must_use]
     pub fn with_condition(mut self, condition: ExecutionCondition) -> Self {
         self.conditions.push(condition);
         self
     }
 
     /// Set retry configuration
-    pub fn with_retry(mut self, config: RetryConfig) -> Self {
+    #[must_use]
+    pub const fn with_retry(mut self, config: RetryConfig) -> Self {
         self.retry_config = Some(config);
         self
     }

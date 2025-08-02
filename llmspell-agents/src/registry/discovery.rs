@@ -11,7 +11,7 @@ use std::{collections::HashMap, sync::Arc};
 /// Advanced search criteria
 #[derive(Debug, Clone, Default)]
 pub struct SearchCriteria {
-    /// Basic query from AgentQuery
+    /// Basic query from `AgentQuery`
     pub base_query: AgentQuery,
 
     /// Search by capabilities
@@ -34,7 +34,7 @@ pub struct SearchCriteria {
 }
 
 /// Fields to sort by
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SortField {
     /// Sort by name
     Name,
@@ -56,7 +56,7 @@ pub enum SortField {
 }
 
 /// Sort order
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum SortOrder {
     /// Ascending order
     Ascending,
@@ -370,6 +370,7 @@ pub struct SearchBuilder {
 
 impl SearchBuilder {
     /// Create new search builder
+    #[must_use]
     pub fn new() -> Self {
         Self {
             criteria: SearchCriteria::default(),
@@ -377,18 +378,21 @@ impl SearchBuilder {
     }
 
     /// Filter by name
+    #[must_use]
     pub fn with_name(mut self, name: &str) -> Self {
         self.criteria.base_query.name_filter = Some(name.to_string());
         self
     }
 
     /// Filter by type
+    #[must_use]
     pub fn with_type(mut self, agent_type: &str) -> Self {
         self.criteria.base_query.type_filter = Some(agent_type.to_string());
         self
     }
 
     /// Filter by category
+    #[must_use]
     pub fn in_category(mut self, category: &str) -> Self {
         self.criteria
             .base_query
@@ -398,48 +402,56 @@ impl SearchBuilder {
     }
 
     /// Filter by status
+    #[must_use]
     pub fn with_status(mut self, status: AgentStatus) -> Self {
         self.criteria.base_query.status_filter = Some(status);
         self
     }
 
     /// Require capability
+    #[must_use]
     pub fn with_capability(mut self, capability: CapabilityType) -> Self {
         self.criteria.capabilities.push(capability);
         self
     }
 
     /// Set minimum success rate
-    pub fn min_success_rate(mut self, rate: f64) -> Self {
+    #[must_use]
+    pub const fn min_success_rate(mut self, rate: f64) -> Self {
         self.criteria.min_success_rate = Some(rate);
         self
     }
 
     /// Set maximum execution time
-    pub fn max_execution_time(mut self, ms: f64) -> Self {
+    #[must_use]
+    pub const fn max_execution_time(mut self, ms: f64) -> Self {
         self.criteria.max_execution_time_ms = Some(ms);
         self
     }
 
     /// Set sort field
-    pub fn sort_by(mut self, field: SortField) -> Self {
+    #[must_use]
+    pub const fn sort_by(mut self, field: SortField) -> Self {
         self.criteria.sort_by = Some(field);
         self
     }
 
     /// Set sort order
-    pub fn order(mut self, order: SortOrder) -> Self {
+    #[must_use]
+    pub const fn order(mut self, order: SortOrder) -> Self {
         self.criteria.sort_order = order;
         self
     }
 
     /// Set result limit
-    pub fn limit(mut self, limit: usize) -> Self {
+    #[must_use]
+    pub const fn limit(mut self, limit: usize) -> Self {
         self.criteria.base_query.limit = Some(limit);
         self
     }
 
     /// Build search criteria
+    #[must_use]
     pub fn build(self) -> SearchCriteria {
         self.criteria
     }

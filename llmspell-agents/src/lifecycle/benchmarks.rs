@@ -16,6 +16,7 @@ pub struct ProductionLoggingHook {
 }
 
 impl ProductionLoggingHook {
+    #[must_use]
     pub fn new(name: String) -> Self {
         Self {
             log_count: Arc::new(Mutex::new(0)),
@@ -23,6 +24,7 @@ impl ProductionLoggingHook {
         }
     }
 
+    #[must_use]
     pub fn get_log_count(&self) -> u64 {
         *self.log_count.lock().unwrap()
     }
@@ -66,6 +68,7 @@ pub struct ProductionMetricsHook {
 }
 
 impl ProductionMetricsHook {
+    #[must_use]
     pub fn new(name: String) -> Self {
         Self {
             metrics: Arc::new(Mutex::new(Vec::new())),
@@ -73,6 +76,7 @@ impl ProductionMetricsHook {
         }
     }
 
+    #[must_use]
     pub fn get_metrics_count(&self) -> usize {
         self.metrics.lock().unwrap().len()
     }
@@ -145,10 +149,12 @@ pub struct BenchmarkResults {
 }
 
 impl BenchmarkResults {
+    #[must_use]
     pub fn meets_target(&self) -> bool {
         self.overhead_percentage < 1.0
     }
 
+    #[must_use]
     pub fn summary(&self) -> String {
         format!(
             "Performance Results:\n\
@@ -181,7 +187,8 @@ pub struct PerformanceBenchmark {
 }
 
 impl PerformanceBenchmark {
-    pub fn new(config: BenchmarkConfig) -> Self {
+    #[must_use]
+    pub const fn new(config: BenchmarkConfig) -> Self {
         Self { config }
     }
 
@@ -201,7 +208,7 @@ impl PerformanceBenchmark {
                     let mut local_transitions = 0;
 
                     let state_machine = AgentStateMachine::new(
-                        format!("baseline-{}-{}", iteration, agent_id),
+                        format!("baseline-{iteration}-{agent_id}"),
                         StateMachineConfig {
                             enable_hooks: false,
                             enable_circuit_breaker: false,
@@ -253,8 +260,8 @@ impl PerformanceBenchmark {
 
         // Register multiple hooks per point (realistic production scenario)
         for i in 0..self.config.hooks_per_point {
-            let logging_hook = Arc::new(ProductionLoggingHook::new(format!("logging_hook_{}", i)));
-            let metrics_hook = Arc::new(ProductionMetricsHook::new(format!("metrics_hook_{}", i)));
+            let logging_hook = Arc::new(ProductionLoggingHook::new(format!("logging_hook_{i}")));
+            let metrics_hook = Arc::new(ProductionMetricsHook::new(format!("metrics_hook_{i}")));
 
             hook_instances.push((logging_hook.clone(), metrics_hook.clone()));
 
@@ -280,7 +287,7 @@ impl PerformanceBenchmark {
                     let mut local_transitions = 0;
 
                     let state_machine = AgentStateMachine::with_hooks(
-                        format!("with-hooks-{}-{}", iteration, agent_id),
+                        format!("with-hooks-{iteration}-{agent_id}"),
                         StateMachineConfig {
                             enable_hooks: true,
                             enable_circuit_breaker: true,
@@ -349,7 +356,7 @@ impl PerformanceBenchmark {
         let mut warm_config = self.config.clone();
         warm_config.iterations = 1;
         warm_config.concurrent_agents = 5;
-        let warmup_bench = PerformanceBenchmark::new(warm_config);
+        let warmup_bench = Self::new(warm_config);
         warmup_bench.run_baseline().await?;
         warmup_bench.run_with_hooks().await?;
 

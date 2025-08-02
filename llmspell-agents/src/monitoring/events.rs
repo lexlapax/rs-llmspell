@@ -26,19 +26,21 @@ pub enum LogLevel {
 
 impl LogLevel {
     /// Check if this level should be logged given a minimum level
-    pub fn should_log(&self, min_level: LogLevel) -> bool {
+    #[must_use]
+    pub fn should_log(&self, min_level: Self) -> bool {
         *self >= min_level
     }
 
     /// Convert to string representation
-    pub fn as_str(&self) -> &'static str {
+    #[must_use]
+    pub const fn as_str(&self) -> &'static str {
         match self {
-            LogLevel::Trace => "TRACE",
-            LogLevel::Debug => "DEBUG",
-            LogLevel::Info => "INFO",
-            LogLevel::Warn => "WARN",
-            LogLevel::Error => "ERROR",
-            LogLevel::Fatal => "FATAL",
+            Self::Trace => "TRACE",
+            Self::Debug => "DEBUG",
+            Self::Info => "INFO",
+            Self::Warn => "WARN",
+            Self::Error => "ERROR",
+            Self::Fatal => "FATAL",
         }
     }
 }
@@ -70,6 +72,7 @@ pub struct LogEvent {
 
 impl LogEvent {
     /// Create a new log event
+    #[must_use]
     pub fn new(level: LogLevel, agent_id: String, component: String, message: String) -> Self {
         Self {
             id: uuid::Uuid::new_v4().to_string(),
@@ -86,12 +89,14 @@ impl LogEvent {
     }
 
     /// Add a field
+    #[must_use]
     pub fn with_field(mut self, key: String, value: serde_json::Value) -> Self {
         self.fields.insert(key, value);
         self
     }
 
     /// Add trace context
+    #[must_use]
     pub fn with_trace(mut self, trace_id: String, span_id: String) -> Self {
         self.trace_id = Some(trace_id);
         self.span_id = Some(span_id);
@@ -99,12 +104,14 @@ impl LogEvent {
     }
 
     /// Add error details
+    #[must_use]
     pub fn with_error(mut self, error: ErrorDetails) -> Self {
         self.error = Some(error);
         self
     }
 
     /// Format as a log line
+    #[must_use]
     pub fn format(&self) -> String {
         let mut parts = vec![
             format!("[{}]", self.level.as_str()),
@@ -117,13 +124,13 @@ impl LogEvent {
             let fields: Vec<String> = self
                 .fields
                 .iter()
-                .map(|(k, v)| format!("{}={}", k, v))
+                .map(|(k, v)| format!("{k}={v}"))
                 .collect();
             parts.push(format!("fields={{{}}}", fields.join(", ")));
         }
 
         if let Some(trace_id) = &self.trace_id {
-            parts.push(format!("trace_id={}", trace_id));
+            parts.push(format!("trace_id={trace_id}"));
         }
 
         if let Some(error) = &self.error {
@@ -177,6 +184,7 @@ impl std::fmt::Debug for EventLogger {
 
 impl EventLogger {
     /// Create a new event logger
+    #[must_use]
     pub fn new(agent_id: String, max_buffer_size: usize) -> Self {
         Self {
             agent_id,
@@ -418,7 +426,8 @@ pub struct ComponentFilter {
 
 impl ComponentFilter {
     /// Create a new component filter
-    pub fn new(allowed_components: Vec<String>) -> Self {
+    #[must_use]
+    pub const fn new(allowed_components: Vec<String>) -> Self {
         Self { allowed_components }
     }
 }
@@ -438,7 +447,8 @@ pub struct LevelFilter {
 
 impl LevelFilter {
     /// Create a new level filter
-    pub fn new(min_level: LogLevel) -> Self {
+    #[must_use]
+    pub const fn new(min_level: LogLevel) -> Self {
         Self { min_level }
     }
 }
@@ -460,7 +470,8 @@ pub struct RateLimitFilter {
 
 impl RateLimitFilter {
     /// Create a new rate limit filter
-    pub fn new(max_per_second: usize) -> Self {
+    #[must_use]
+    pub const fn new(max_per_second: usize) -> Self {
         Self {
             max_per_second,
             counts: RwLock::new(VecDeque::new()),

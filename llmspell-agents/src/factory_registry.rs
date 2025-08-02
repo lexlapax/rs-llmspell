@@ -16,6 +16,7 @@ pub struct FactoryRegistry {
 
 impl FactoryRegistry {
     /// Create a new factory registry
+    #[must_use]
     pub fn new() -> Self {
         Self {
             factories: Arc::new(RwLock::new(HashMap::new())),
@@ -134,10 +135,11 @@ impl Default for FactoryRegistry {
 }
 
 /// Global factory registry instance
-static GLOBAL_REGISTRY: once_cell::sync::Lazy<FactoryRegistry> =
-    once_cell::sync::Lazy::new(FactoryRegistry::new);
+static GLOBAL_REGISTRY: std::sync::LazyLock<FactoryRegistry> =
+    std::sync::LazyLock::new(FactoryRegistry::new);
 
 /// Get the global factory registry
+#[must_use]
 pub fn global_registry() -> &'static FactoryRegistry {
     &GLOBAL_REGISTRY
 }

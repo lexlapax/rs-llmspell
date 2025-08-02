@@ -111,6 +111,7 @@ pub struct ServiceCheckerTool {
 
 impl ServiceCheckerTool {
     /// Create a new service checker tool
+    #[must_use]
     pub fn new(config: ServiceCheckerConfig) -> Self {
         Self {
             metadata: ComponentMetadata::new(
@@ -124,6 +125,7 @@ impl ServiceCheckerTool {
     }
 
     /// Create a new service checker tool with sandbox context
+    #[must_use]
     pub fn with_sandbox(
         config: ServiceCheckerConfig,
         sandbox_context: Arc<SandboxContext>,
@@ -171,7 +173,7 @@ impl ServiceCheckerTool {
 
         // Check allowed domains
         for allowed in &self.config.allowed_domains {
-            if domain == allowed || domain.ends_with(&format!(".{}", allowed)) {
+            if domain == allowed || domain.ends_with(&format!(".{allowed}")) {
                 debug!("Domain '{}' is allowed", domain);
                 return true;
             }
@@ -189,7 +191,7 @@ impl ServiceCheckerTool {
             let port = port_str
                 .parse::<u16>()
                 .map_err(|_| LLMSpellError::Validation {
-                    message: format!("Invalid port number: {}", port_str),
+                    message: format!("Invalid port number: {port_str}"),
                     field: Some("target".to_string()),
                 })?;
 
@@ -209,7 +211,7 @@ impl ServiceCheckerTool {
         port: u16,
         timeout_duration: Duration,
     ) -> ServiceCheckResult {
-        let target = format!("{}:{}", host, port);
+        let target = format!("{host}:{port}");
         let start_time = Instant::now();
 
         debug!("Checking TCP port: {}", target);
@@ -221,7 +223,7 @@ impl ServiceCheckerTool {
                 available: false,
                 response_time_ms: 0,
                 status: "Port check not allowed".to_string(),
-                error: Some(format!("Port {} is not allowed", port)),
+                error: Some(format!("Port {port} is not allowed")),
                 metadata: HashMap::new(),
             };
         }
@@ -233,7 +235,7 @@ impl ServiceCheckerTool {
                 available: false,
                 response_time_ms: 0,
                 status: "Domain check not allowed".to_string(),
-                error: Some(format!("Domain '{}' is not allowed", host)),
+                error: Some(format!("Domain '{host}' is not allowed")),
                 metadata: HashMap::new(),
             };
         }
@@ -373,7 +375,7 @@ impl ServiceCheckerTool {
                 available: false,
                 response_time_ms: 0,
                 status: "Domain check not allowed".to_string(),
-                error: Some(format!("Domain '{}' is not allowed", domain)),
+                error: Some(format!("Domain '{domain}' is not allowed")),
                 metadata: HashMap::new(),
             };
         }
@@ -383,7 +385,7 @@ impl ServiceCheckerTool {
             .timeout(timeout_duration)
             .build()
             .map_err(|e| LLMSpellError::Tool {
-                message: format!("Failed to create HTTP client: {}", e),
+                message: format!("Failed to create HTTP client: {e}"),
                 tool_name: Some("service_checker".to_string()),
                 source: None,
             })
@@ -406,11 +408,11 @@ impl ServiceCheckerTool {
                     target: url.to_string(),
                     available: is_available,
                     response_time_ms: response_time,
-                    status: format!("HTTP {}", status_code),
+                    status: format!("HTTP {status_code}"),
                     error: if is_available {
                         None
                     } else {
-                        Some(format!("HTTP error {}", status_code))
+                        Some(format!("HTTP error {status_code}"))
                     },
                     metadata: {
                         let mut meta = HashMap::new();
@@ -480,8 +482,7 @@ impl BaseAgent for ServiceCheckerTool {
             _ => {
                 return Err(LLMSpellError::Validation {
                     message: format!(
-                        "Invalid check_type: {}. Supported types: tcp, http, https, dns",
-                        check_type
+                        "Invalid check_type: {check_type}. Supported types: tcp, http, https, dns"
                     ),
                     field: Some("check_type".to_string()),
                 });
@@ -523,7 +524,7 @@ impl BaseAgent for ServiceCheckerTool {
                 let url = if target.starts_with("http://") || target.starts_with("https://") {
                     target.to_string()
                 } else {
-                    format!("http://{}", target)
+                    format!("http://{target}")
                 };
                 self.check_http_service(&url, timeout_duration).await
             }
@@ -533,7 +534,7 @@ impl BaseAgent for ServiceCheckerTool {
                 } else if target.starts_with("http://") {
                     target.replace("http://", "https://")
                 } else {
-                    format!("https://{}", target)
+                    format!("https://{target}")
                 };
                 self.check_http_service(&url, timeout_duration).await
             }
@@ -624,10 +625,7 @@ impl BaseAgent for ServiceCheckerTool {
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> LLMResult<AgentOutput> {
-        Ok(AgentOutput::text(format!(
-            "Service checker error: {}",
-            error
-        )))
+        Ok(AgentOutput::text(format!("Service checker error: {error}")))
     }
 }
 

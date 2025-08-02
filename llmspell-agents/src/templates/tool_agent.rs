@@ -56,6 +56,7 @@ pub struct ToolAgentTemplate {
 
 impl ToolAgentTemplate {
     /// Create new Tool Agent template
+    #[must_use]
     pub fn new() -> Self {
         let metadata = TemplateMetadata {
             id: "tool_agent".to_string(),
@@ -217,18 +218,20 @@ impl ToolAgentTemplate {
     }
 
     /// Create Tool Agent template with custom configuration
+    #[must_use]
     pub fn with_config(mut self, config: ToolAgentConfig) -> Self {
         self.config = config;
         self
     }
 
     /// Create specialized tool agent template
+    #[must_use]
     pub fn specialized(tools: Vec<String>) -> Self {
         let mut template = Self::new();
 
         // Create unique ID based on tools
-        let tools_str = tools.join("_").to_lowercase().replace("-", "_");
-        template.schema.metadata.id = format!("tool_agent_specialized_{}", tools_str);
+        let tools_str = tools.join("_").to_lowercase().replace('-', "_");
+        template.schema.metadata.id = format!("tool_agent_specialized_{tools_str}");
 
         // Update schema for specialized agent
         template.schema.metadata.name = format!("Specialized Tool Agent ({})", tools.join(", "));
@@ -263,6 +266,7 @@ impl ToolAgentTemplate {
     }
 
     /// Create lightweight tool agent template
+    #[must_use]
     pub fn lightweight() -> Self {
         let mut template = Self::new();
 
@@ -293,6 +297,7 @@ impl ToolAgentTemplate {
     }
 
     /// Create batch processing tool agent template
+    #[must_use]
     pub fn batch_processor() -> Self {
         let mut template = Self::new();
 
@@ -364,7 +369,7 @@ impl ToolAgentTemplate {
             if let Some(array) = patterns.as_array() {
                 config.tool_discovery_patterns = array
                     .iter()
-                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .filter_map(|v| v.as_str().map(std::string::ToString::to_string))
                     .collect();
             }
         }
@@ -424,7 +429,7 @@ impl AgentTemplate for ToolAgentTemplate {
             agent_config
                 .tool_discovery_patterns
                 .iter()
-                .map(|s| s.as_str())
+                .map(std::string::String::as_str)
                 .collect::<Vec<_>>()
                 .into(),
         );
@@ -504,7 +509,7 @@ impl AgentTemplate for ToolAgentTemplate {
     }
 
     fn clone_template(&self) -> Box<dyn AgentTemplate> {
-        Box::new(ToolAgentTemplate {
+        Box::new(Self {
             schema: self.schema.clone(),
             config: self.config.clone(),
         })
@@ -565,7 +570,7 @@ impl BaseAgent for MockToolAgent {
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput, LLMSpellError> {
         Ok(AgentOutput {
-            text: format!("Error handled by mock agent: {}", error),
+            text: format!("Error handled by mock agent: {error}"),
             media: vec![],
             tool_calls: vec![],
             metadata: OutputMetadata::default(),

@@ -450,7 +450,7 @@ async fn test_provider_switch_with_context_preservation() -> Result<()> {
 
     // Verify at least some facts are remembered
     let response_lower = recall_response.text.to_lowercase();
-    let remembered_facts = vec![
+    let remembered_facts = [
         response_lower.contains("turquoise"),
         response_lower.contains("hamster") || response_lower.contains("whiskers"),
         response_lower.contains("ukulele"),

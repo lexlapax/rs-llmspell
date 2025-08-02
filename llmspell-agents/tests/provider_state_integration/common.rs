@@ -68,7 +68,7 @@ impl ProviderTestContext {
         })
     }
 
-    /// Create an OpenAI agent if API key is available
+    /// Create an `OpenAI` agent if API key is available
     pub async fn create_openai_agent(&self) -> Result<Option<LLMAgent>> {
         if env::var("OPENAI_API_KEY").is_err() {
             warn!("OPENAI_API_KEY not set, skipping OpenAI tests");
@@ -95,7 +95,7 @@ impl ProviderTestContext {
             return Ok(None);
         }
 
-        let config = AgentBuilder::new(&format!("{}-anthropic", &self.agent_id), "llm")
+        let config = AgentBuilder::new(format!("{}-anthropic", &self.agent_id), "llm")
             .description("Test agent for Anthropic provider integration")
             .with_model("anthropic", "claude-3-5-sonnet-latest")
             .temperature(0.7)
@@ -117,19 +117,16 @@ impl ProviderTestContext {
         // Check if agent state is saved
         let saved_state = self.state_manager.load_agent_state(agent_id).await?;
 
-        match saved_state {
-            Some(state) => {
-                let conversation_count = state.state.conversation_history.len();
-                info!(
-                    "Found {} saved messages for agent {}",
-                    conversation_count, agent_id
-                );
-                Ok(conversation_count >= expected_messages)
-            }
-            None => {
-                warn!("No agent state found for agent {}", agent_id);
-                Ok(false)
-            }
+        if let Some(state) = saved_state {
+            let conversation_count = state.state.conversation_history.len();
+            info!(
+                "Found {} saved messages for agent {}",
+                conversation_count, agent_id
+            );
+            Ok(conversation_count >= expected_messages)
+        } else {
+            warn!("No agent state found for agent {}", agent_id);
+            Ok(false)
         }
     }
 
@@ -154,19 +151,16 @@ impl ProviderTestContext {
     pub async fn verify_provider_metadata(&self, agent_id: &str) -> Result<bool> {
         let saved_state = self.state_manager.load_agent_state(agent_id).await?;
 
-        match saved_state {
-            Some(state) => {
-                info!(
-                    "Found agent state metadata for agent {}: {:?}",
-                    agent_id, state.metadata
-                );
-                // Check if provider config is present
-                Ok(state.metadata.provider_config.is_some())
-            }
-            None => {
-                warn!("No agent state found for agent {}", agent_id);
-                Ok(false)
-            }
+        if let Some(state) = saved_state {
+            info!(
+                "Found agent state metadata for agent {}: {:?}",
+                agent_id, state.metadata
+            );
+            // Check if provider config is present
+            Ok(state.metadata.provider_config.is_some())
+        } else {
+            warn!("No agent state found for agent {}", agent_id);
+            Ok(false)
         }
     }
 
@@ -174,23 +168,20 @@ impl ProviderTestContext {
     pub async fn verify_token_usage(&self, agent_id: &str) -> Result<bool> {
         let saved_state = self.state_manager.load_agent_state(agent_id).await?;
 
-        match saved_state {
-            Some(state) => {
-                // Check if there are any tool usage stats
-                let has_stats = state.state.tool_usage_stats.total_invocations > 0
-                    || state.state.tool_usage_stats.successful_invocations > 0;
-                info!(
-                    "Found agent state with tool usage stats for agent {}: total_invocations={}, successful={}",
-                    agent_id,
-                    state.state.tool_usage_stats.total_invocations,
-                    state.state.tool_usage_stats.successful_invocations
-                );
-                Ok(has_stats)
-            }
-            None => {
-                warn!("No agent state found for agent {}", agent_id);
-                Ok(false)
-            }
+        if let Some(state) = saved_state {
+            // Check if there are any tool usage stats
+            let has_stats = state.state.tool_usage_stats.total_invocations > 0
+                || state.state.tool_usage_stats.successful_invocations > 0;
+            info!(
+                "Found agent state with tool usage stats for agent {}: total_invocations={}, successful={}",
+                agent_id,
+                state.state.tool_usage_stats.total_invocations,
+                state.state.tool_usage_stats.successful_invocations
+            );
+            Ok(has_stats)
+        } else {
+            warn!("No agent state found for agent {}", agent_id);
+            Ok(false)
         }
     }
 
@@ -242,7 +233,7 @@ impl ProviderTestContext {
         }
 
         let config = AgentBuilder::new(agent_id, "llm")
-            .description(format!("Test agent for {} provider integration", provider))
+            .description(format!("Test agent for {provider} provider integration"))
             .with_model(provider, model)
             .temperature(0.7)
             .max_tokens(1000)
@@ -283,7 +274,7 @@ impl ProviderTestContext {
         }
 
         let config = AgentBuilder::new(agent_id, "llm")
-            .description(format!("Restored {} agent", provider))
+            .description(format!("Restored {provider} agent"))
             .with_model(provider, model)
             .temperature(0.7)
             .max_tokens(1000)
@@ -301,6 +292,7 @@ impl ProviderTestContext {
 }
 
 /// Check if a provider API key is available
+#[must_use]
 pub fn check_api_key(provider: &str) -> bool {
     let key_name = match provider {
         "openai" => "OPENAI_API_KEY",
@@ -319,7 +311,7 @@ pub fn skip_if_no_api_key(provider: &str) {
             "anthropic" => "ANTHROPIC_API_KEY",
             _ => "API_KEY",
         };
-        panic!("Test requires {} environment variable", key_name);
+        panic!("Test requires {key_name} environment variable");
     }
 }
 

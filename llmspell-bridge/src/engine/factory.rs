@@ -72,7 +72,7 @@ impl EngineFactory {
                     serde_json::from_value::<LuaConfig>(config.clone()).map_err(|e| {
                         LLMSpellError::Validation {
                             field: Some("config".to_string()),
-                            message: format!("Invalid Lua configuration: {}", e),
+                            message: format!("Invalid Lua configuration: {e}"),
                         }
                     })?;
                 Self::create_lua_engine(&lua_config)
@@ -82,7 +82,7 @@ impl EngineFactory {
                     serde_json::from_value::<JSConfig>(config.clone()).map_err(|e| {
                         LLMSpellError::Validation {
                             field: Some("config".to_string()),
-                            message: format!("Invalid JavaScript configuration: {}", e),
+                            message: format!("Invalid JavaScript configuration: {e}"),
                         }
                     })?;
                 Self::create_javascript_engine(&js_config)
@@ -95,7 +95,7 @@ impl EngineFactory {
                 } else {
                     Err(LLMSpellError::Validation {
                         field: Some("engine".to_string()),
-                        message: format!("Unknown engine: {}. Available: lua, javascript", name),
+                        message: format!("Unknown engine: {name}. Available: lua, javascript"),
                     })
                 }
             }
@@ -103,6 +103,7 @@ impl EngineFactory {
     }
 
     /// List all available engines (built-in and plugins)
+    #[must_use]
     pub fn list_available_engines() -> Vec<EngineInfo> {
         let mut engines = vec![];
 
@@ -252,6 +253,7 @@ pub fn register_engine_plugin<P: ScriptEnginePlugin + 'static>(plugin: P) {
 }
 
 /// Unregister an engine plugin
+#[must_use]
 pub fn unregister_engine_plugin(name: &str) -> bool {
     let mut registry = PLUGIN_REGISTRY.write().unwrap();
     registry.remove(name).is_some()

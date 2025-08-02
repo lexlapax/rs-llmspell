@@ -34,23 +34,26 @@ pub enum HealthStatus {
 
 impl HealthStatus {
     /// Check if status indicates agent is operational
-    pub fn is_operational(&self) -> bool {
-        matches!(self, HealthStatus::Healthy | HealthStatus::Warning)
+    #[must_use]
+    pub const fn is_operational(&self) -> bool {
+        matches!(self, Self::Healthy | Self::Warning)
     }
 
     /// Check if status requires immediate attention
-    pub fn needs_attention(&self) -> bool {
-        matches!(self, HealthStatus::Critical | HealthStatus::Unhealthy)
+    #[must_use]
+    pub const fn needs_attention(&self) -> bool {
+        matches!(self, Self::Critical | Self::Unhealthy)
     }
 
     /// Get numeric severity (higher is worse)
-    pub fn severity(&self) -> u8 {
+    #[must_use]
+    pub const fn severity(&self) -> u8 {
         match self {
-            HealthStatus::Healthy => 0,
-            HealthStatus::Warning => 1,
-            HealthStatus::Critical => 2,
-            HealthStatus::Unhealthy => 3,
-            HealthStatus::Unknown => 4,
+            Self::Healthy => 0,
+            Self::Warning => 1,
+            Self::Critical => 2,
+            Self::Unhealthy => 3,
+            Self::Unknown => 4,
         }
     }
 }
@@ -81,6 +84,7 @@ pub struct HealthCheckResult {
 }
 
 impl HealthCheckResult {
+    #[must_use]
     pub fn new(agent_id: String, check_type: String, status: HealthStatus) -> Self {
         Self {
             id: Uuid::new_v4().to_string(),
@@ -96,26 +100,31 @@ impl HealthCheckResult {
         }
     }
 
+    #[must_use]
     pub fn with_message(mut self, message: String) -> Self {
         self.message = message;
         self
     }
 
-    pub fn with_duration(mut self, duration: Duration) -> Self {
+    #[must_use]
+    pub const fn with_duration(mut self, duration: Duration) -> Self {
         self.duration = duration;
         self
     }
 
+    #[must_use]
     pub fn with_metric(mut self, name: &str, value: f64) -> Self {
         self.metrics.insert(name.to_string(), value);
         self
     }
 
+    #[must_use]
     pub fn with_issue(mut self, issue: HealthIssue) -> Self {
         self.issues.push(issue);
         self
     }
 
+    #[must_use]
     pub fn with_recommendation(mut self, recommendation: String) -> Self {
         self.recommendations.push(recommendation);
         self
@@ -138,7 +147,8 @@ pub struct HealthIssue {
 }
 
 impl HealthIssue {
-    pub fn new(severity: HealthStatus, category: String, description: String) -> Self {
+    #[must_use]
+    pub const fn new(severity: HealthStatus, category: String, description: String) -> Self {
         Self {
             severity,
             category,
@@ -148,11 +158,13 @@ impl HealthIssue {
         }
     }
 
+    #[must_use]
     pub fn with_causes(mut self, causes: Vec<String>) -> Self {
         self.possible_causes = causes;
         self
     }
 
+    #[must_use]
     pub fn with_remediation(mut self, remediation: Vec<String>) -> Self {
         self.remediation = remediation;
         self
@@ -238,6 +250,7 @@ impl Default for HealthMonitorConfig {
 
 impl AgentHealthMonitor {
     /// Create new health monitor for agent
+    #[must_use]
     pub fn new(
         agent_id: String,
         state_machine: Arc<AgentStateMachine>,
@@ -327,7 +340,7 @@ impl AgentHealthMonitor {
 
         // Create overall result
         let overall_message = if check_messages.is_empty() {
-            format!("Health check completed with status: {:?}", overall_status)
+            format!("Health check completed with status: {overall_status:?}")
         } else {
             check_messages.join("; ")
         };
@@ -382,7 +395,7 @@ impl AgentHealthMonitor {
                 self.agent_id.clone(),
                 LifecycleEventData::Health {
                     is_healthy: overall_status.is_operational(),
-                    status: format!("{:?}", overall_status),
+                    status: format!("{overall_status:?}"),
                     metrics: all_metrics
                         .into_iter()
                         .map(|(k, v)| (k, v.to_string()))
@@ -498,7 +511,8 @@ pub struct StateMachineHealthCheck {
 }
 
 impl StateMachineHealthCheck {
-    pub fn new(state_machine: Arc<AgentStateMachine>) -> Self {
+    #[must_use]
+    pub const fn new(state_machine: Arc<AgentStateMachine>) -> Self {
         Self { state_machine }
     }
 }
@@ -527,7 +541,7 @@ impl HealthCheck for StateMachineHealthCheck {
             ),
             _ => (
                 HealthStatus::Unknown,
-                format!("Unknown state: {:?}", current_state),
+                format!("Unknown state: {current_state:?}"),
             ),
         };
 
@@ -558,7 +572,7 @@ impl HealthCheck for StateMachineHealthCheck {
             result = result.with_issue(HealthIssue::new(
                 HealthStatus::Critical,
                 "error".to_string(),
-                format!("Last error: {}", error),
+                format!("Last error: {error}"),
             ));
         }
 
@@ -580,7 +594,8 @@ pub struct ResourceHealthCheck {
 }
 
 impl ResourceHealthCheck {
-    pub fn new(resource_manager: Arc<ResourceManager>) -> Self {
+    #[must_use]
+    pub const fn new(resource_manager: Arc<ResourceManager>) -> Self {
         Self { resource_manager }
     }
 }
@@ -590,7 +605,7 @@ impl HealthCheck for ResourceHealthCheck {
     async fn check(&self, agent_id: &str) -> Result<HealthCheckResult> {
         let start_time = Instant::now();
         let allocations = self.resource_manager.get_agent_allocations(agent_id).await;
-        let stats = self.resource_manager.get_usage_stats().await;
+        let usage_stats = self.resource_manager.get_usage_stats().await;
 
         // Check for resource leaks or excessive usage
         let allocation_count = allocations.len();
@@ -599,17 +614,17 @@ impl HealthCheck for ResourceHealthCheck {
         } else if allocation_count > 50 {
             (
                 HealthStatus::Critical,
-                format!("Excessive resource allocations: {}", allocation_count),
+                format!("Excessive resource allocations: {allocation_count}"),
             )
         } else if allocation_count > 20 {
             (
                 HealthStatus::Warning,
-                format!("High resource allocation count: {}", allocation_count),
+                format!("High resource allocation count: {allocation_count}"),
             )
         } else {
             (
                 HealthStatus::Healthy,
-                format!("Resource allocations: {}", allocation_count),
+                format!("Resource allocations: {allocation_count}"),
             )
         };
 
@@ -618,10 +633,10 @@ impl HealthCheck for ResourceHealthCheck {
                 .with_message(message)
                 .with_duration(start_time.elapsed())
                 .with_metric("allocation_count", allocation_count as f64)
-                .with_metric("total_allocations", stats.total_allocations as f64);
+                .with_metric("total_allocations", usage_stats.total_allocations as f64);
 
         // Add resource-specific metrics
-        for (resource_type, usage) in &stats.current_usage_by_type {
+        for (resource_type, usage) in &usage_stats.current_usage_by_type {
             result = result.with_metric(&format!("usage_{}", resource_type.name()), *usage as f64);
         }
 
@@ -660,17 +675,17 @@ impl HealthCheck for ResponsivenessHealthCheck {
         let (status, message) = if response_ms > 1000.0 {
             (
                 HealthStatus::Critical,
-                format!("Very slow response: {:.1}ms", response_ms),
+                format!("Very slow response: {response_ms:.1}ms"),
             )
         } else if response_ms > 100.0 {
             (
                 HealthStatus::Warning,
-                format!("Slow response: {:.1}ms", response_ms),
+                format!("Slow response: {response_ms:.1}ms"),
             )
         } else {
             (
                 HealthStatus::Healthy,
-                format!("Good response time: {:.1}ms", response_ms),
+                format!("Good response time: {response_ms:.1}ms"),
             )
         };
 

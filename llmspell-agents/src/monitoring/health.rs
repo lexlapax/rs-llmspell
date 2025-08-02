@@ -24,17 +24,19 @@ pub enum HealthStatus {
 
 impl HealthStatus {
     /// Check if the status indicates the component is operational
-    pub fn is_operational(&self) -> bool {
-        matches!(self, HealthStatus::Healthy | HealthStatus::Degraded)
+    #[must_use]
+    pub const fn is_operational(&self) -> bool {
+        matches!(self, Self::Healthy | Self::Degraded)
     }
 
     /// Convert to a numeric score (0-100)
-    pub fn score(&self) -> u8 {
+    #[must_use]
+    pub const fn score(&self) -> u8 {
         match self {
-            HealthStatus::Healthy => 100,
-            HealthStatus::Degraded => 50,
-            HealthStatus::Unhealthy => 0,
-            HealthStatus::Unknown => 25,
+            Self::Healthy => 100,
+            Self::Degraded => 50,
+            Self::Unhealthy => 0,
+            Self::Unknown => 25,
         }
     }
 }
@@ -56,6 +58,7 @@ pub struct HealthIndicator {
 
 impl HealthIndicator {
     /// Create a healthy indicator
+    #[must_use]
     pub fn healthy(name: String) -> Self {
         Self {
             name,
@@ -67,6 +70,7 @@ impl HealthIndicator {
     }
 
     /// Create an unhealthy indicator
+    #[must_use]
     pub fn unhealthy(name: String, message: String) -> Self {
         Self {
             name,
@@ -78,6 +82,7 @@ impl HealthIndicator {
     }
 
     /// Create a degraded indicator
+    #[must_use]
     pub fn degraded(name: String, message: String) -> Self {
         Self {
             name,
@@ -89,6 +94,7 @@ impl HealthIndicator {
     }
 
     /// Add detail to the indicator
+    #[must_use]
     pub fn with_detail(mut self, key: String, value: serde_json::Value) -> Self {
         self.details.insert(key, value);
         self
@@ -112,6 +118,7 @@ pub struct ComponentHealth {
 
 impl ComponentHealth {
     /// Calculate overall status from indicators
+    #[must_use]
     pub fn calculate_status(indicators: &[HealthIndicator]) -> HealthStatus {
         if indicators.is_empty() {
             return HealthStatus::Unknown;
@@ -168,6 +175,7 @@ pub struct HealthCheckResult {
 
 impl HealthCheckResult {
     /// Create a new health check result
+    #[must_use]
     pub fn new(components: HashMap<String, ComponentHealth>) -> Self {
         let overall_status = Self::calculate_overall_status(&components);
 
@@ -209,6 +217,7 @@ impl HealthCheckResult {
     }
 
     /// Get a summary of the health check
+    #[must_use]
     pub fn summary(&self) -> String {
         let healthy_count = self
             .components
@@ -240,6 +249,7 @@ pub struct HealthMonitor {
 
 impl HealthMonitor {
     /// Create a new health monitor
+    #[must_use]
     pub fn new(check_interval: Duration, check_timeout: Duration) -> Self {
         Self {
             checks: Vec::new(),
@@ -267,7 +277,7 @@ impl HealthMonitor {
                     Ok(Ok(indicators)) => indicators,
                     Ok(Err(e)) => vec![HealthIndicator::unhealthy(
                         "check_failed".to_string(),
-                        format!("Health check failed: {}", e),
+                        format!("Health check failed: {e}"),
                     )],
                     Err(_) => vec![HealthIndicator::unhealthy(
                         "check_timeout".to_string(),
@@ -292,7 +302,7 @@ impl HealthMonitor {
 
     /// Start periodic health monitoring
     pub async fn start_monitoring(self: Arc<Self>) {
-        let monitor = self.clone();
+        let monitor = self;
         tokio::spawn(async move {
             let mut interval = tokio::time::interval(monitor.check_interval);
             loop {
@@ -337,7 +347,8 @@ pub struct AgentHealthCheck {
 
 impl AgentHealthCheck {
     /// Create a new agent health check
-    pub fn new(metadata: ComponentMetadata) -> Self {
+    #[must_use]
+    pub const fn new(metadata: ComponentMetadata) -> Self {
         Self {
             metadata,
             min_memory: 100 * 1024 * 1024, // 100MB
@@ -348,25 +359,29 @@ impl AgentHealthCheck {
     }
 
     /// Configure minimum memory requirement
-    pub fn with_min_memory(mut self, bytes: u64) -> Self {
+    #[must_use]
+    pub const fn with_min_memory(mut self, bytes: u64) -> Self {
         self.min_memory = bytes;
         self
     }
 
     /// Configure maximum CPU usage
-    pub fn with_max_cpu(mut self, percent: f64) -> Self {
+    #[must_use]
+    pub const fn with_max_cpu(mut self, percent: f64) -> Self {
         self.max_cpu = percent;
         self
     }
 
     /// Configure maximum response time
-    pub fn with_max_response_time(mut self, millis: u64) -> Self {
+    #[must_use]
+    pub const fn with_max_response_time(mut self, millis: u64) -> Self {
         self.max_response_time = millis;
         self
     }
 
     /// Configure minimum success rate
-    pub fn with_min_success_rate(mut self, percent: f64) -> Self {
+    #[must_use]
+    pub const fn with_min_success_rate(mut self, percent: f64) -> Self {
         self.min_success_rate = percent;
         self
     }
@@ -407,7 +422,7 @@ impl HealthCheck for AgentHealthCheck {
         } else {
             HealthIndicator::degraded(
                 "cpu".to_string(),
-                format!("CPU usage high: {:.1}%", cpu_usage),
+                format!("CPU usage high: {cpu_usage:.1}%"),
             )
         };
         indicators.push(cpu_indicator);
@@ -424,7 +439,7 @@ impl HealthCheck for AgentHealthCheck {
         } else {
             HealthIndicator::degraded(
                 "response_time".to_string(),
-                format!("Response time slow: {}ms", avg_response_time),
+                format!("Response time slow: {avg_response_time}ms"),
             )
         };
         indicators.push(response_indicator);
@@ -441,7 +456,7 @@ impl HealthCheck for AgentHealthCheck {
         } else {
             HealthIndicator::unhealthy(
                 "success_rate".to_string(),
-                format!("Success rate low: {:.1}%", success_rate),
+                format!("Success rate low: {success_rate:.1}%"),
             )
         };
         indicators.push(success_indicator);

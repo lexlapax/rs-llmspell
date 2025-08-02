@@ -26,6 +26,7 @@ pub struct DIContainer {
 
 impl DIContainer {
     /// Create a new dependency injection container
+    #[must_use]
     pub fn new() -> Self {
         Self {
             tools: Arc::new(RwLock::new(HashMap::new())),
@@ -105,6 +106,7 @@ impl DIContainer {
     }
 
     /// Create a scoped container with additional dependencies
+    #[must_use]
     pub fn create_scope(&self) -> ScopedDIContainer {
         ScopedDIContainer {
             parent: self,
@@ -163,6 +165,7 @@ pub struct DIContainerBuilder {
 
 impl DIContainerBuilder {
     /// Create a new builder
+    #[must_use]
     pub fn new() -> Self {
         Self {
             container: DIContainer::new(),
@@ -181,6 +184,7 @@ impl DIContainerBuilder {
     }
 
     /// Build the container
+    #[must_use]
     pub fn build(self) -> DIContainer {
         self.container
     }

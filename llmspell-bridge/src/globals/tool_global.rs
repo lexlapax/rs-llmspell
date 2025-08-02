@@ -13,12 +13,14 @@ pub struct ToolGlobal {
 
 impl ToolGlobal {
     /// Create a new Tool global
-    pub fn new(registry: Arc<ComponentRegistry>) -> Self {
+    #[must_use]
+    pub const fn new(registry: Arc<ComponentRegistry>) -> Self {
         Self { registry }
     }
 
     /// Get the component registry
-    pub fn registry(&self) -> &Arc<ComponentRegistry> {
+    #[must_use]
+    pub const fn registry(&self) -> &Arc<ComponentRegistry> {
         &self.registry
     }
 }
@@ -38,7 +40,7 @@ impl GlobalObject for ToolGlobal {
     fn inject_lua(&self, lua: &mlua::Lua, context: &GlobalContext) -> Result<()> {
         crate::lua::globals::tool::inject_tool_global(lua, context, self.registry.clone()).map_err(
             |e| llmspell_core::LLMSpellError::Component {
-                message: format!("Failed to inject Tool global: {}", e),
+                message: format!("Failed to inject Tool global: {e}"),
                 source: None,
             },
         )

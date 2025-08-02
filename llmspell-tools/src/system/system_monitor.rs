@@ -107,6 +107,7 @@ pub struct SystemMonitorTool {
 
 impl SystemMonitorTool {
     /// Create a new system monitor tool
+    #[must_use]
     pub fn new(config: SystemMonitorConfig) -> Self {
         Self {
             metadata: ComponentMetadata::new(
@@ -119,6 +120,7 @@ impl SystemMonitorTool {
     }
 
     /// Create a new system monitor tool with sandbox context
+    #[must_use]
     pub fn with_sandbox(config: SystemMonitorConfig, sandbox_context: Arc<SandboxContext>) -> Self {
         Self {
             metadata: ComponentMetadata::new(
@@ -133,7 +135,7 @@ impl SystemMonitorTool {
     /// Get basic system information
     async fn get_basic_system_info(&self) -> LLMResult<SystemStats> {
         let system_info = get_system_info().map_err(|e| LLMSpellError::Tool {
-            message: format!("Failed to get system information: {}", e),
+            message: format!("Failed to get system information: {e}"),
             tool_name: Some("system_monitor".to_string()),
             source: None,
         })?;
@@ -205,9 +207,9 @@ impl SystemMonitorTool {
 
         if parts.len() >= 3 {
             let load1 = parts[0].parse::<f64>().unwrap_or(0.0);
-            let load5 = parts[1].parse::<f64>().unwrap_or(0.0);
-            let load15 = parts[2].parse::<f64>().unwrap_or(0.0);
-            Ok([load1, load5, load15])
+            let load5_min = parts[1].parse::<f64>().unwrap_or(0.0);
+            let load15_min = parts[2].parse::<f64>().unwrap_or(0.0);
+            Ok([load1, load5_min, load15_min])
         } else {
             Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
@@ -316,14 +318,16 @@ impl SystemMonitorTool {
             use std::mem;
 
             let path_c = CString::new(path)?;
+            // SAFETY: Creating a zeroed libc::statvfs struct is safe as all fields are scalar types
             let mut statvfs: libc::statvfs = unsafe { mem::zeroed() };
 
+            // SAFETY: path_c is a valid C string and statvfs is a valid mutable reference
             let result = unsafe { libc::statvfs(path_c.as_ptr(), &mut statvfs) };
 
             if result == 0 {
                 let block_size = statvfs.f_bsize;
-                let total_blocks = statvfs.f_blocks as u64;
-                let available_blocks = statvfs.f_bavail as u64;
+                let total_blocks = u64::from(statvfs.f_blocks);
+                let available_blocks = u64::from(statvfs.f_bavail);
 
                 let total_bytes = total_blocks * block_size;
                 let available_bytes = available_blocks * block_size;
@@ -409,7 +413,7 @@ impl SystemMonitorTool {
         {
             if let Ok(entries) = std::fs::read_dir("/proc") {
                 let count = entries
-                    .filter_map(|entry| entry.ok())
+                    .filter_map(std::result::Result::ok)
                     .filter(|entry| {
                         entry
                             .file_name()
@@ -503,8 +507,7 @@ impl SystemMonitorTool {
                 _ => {
                     return Err(LLMSpellError::Validation {
                         message: format!(
-                            "Invalid operation: {}. Supported operations: stats, cpu, memory, disk, all",
-                            operation
+                            "Invalid operation: {operation}. Supported operations: stats, cpu, memory, disk, all"
                         ),
                         field: Some("operation".to_string()),
                     });
@@ -634,10 +637,7 @@ impl BaseAgent for SystemMonitorTool {
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> LLMResult<AgentOutput> {
-        Ok(AgentOutput::text(format!(
-            "System monitor error: {}",
-            error
-        )))
+        Ok(AgentOutput::text(format!("System monitor error: {error}")))
     }
 }
 

@@ -55,7 +55,10 @@ mod tests {
         match output {
             Ok(result) => {
                 let obj = result.output.as_object().expect("Expected object result");
-                assert_eq!(obj.get("count").and_then(|v| v.as_i64()), Some(5));
+                assert_eq!(
+                    obj.get("count").and_then(serde_json::value::Value::as_i64),
+                    Some(5)
+                );
                 assert_eq!(obj.get("first").and_then(|v| v.as_str()), Some("chunk_1"));
                 assert_eq!(obj.get("last").and_then(|v| v.as_str()), Some("chunk_5"));
 
@@ -69,7 +72,7 @@ mod tests {
                     assert_eq!(chunk.as_str(), Some(&expected[..]));
                 }
             }
-            Err(e) => panic!("Script execution failed: {:?}", e),
+            Err(e) => panic!("Script execution failed: {e:?}"),
         }
     }
 
@@ -110,13 +113,16 @@ mod tests {
         match output {
             Ok(result) => {
                 let obj = result.output.as_object().expect("Expected object result");
-                assert_eq!(obj.get("count").and_then(|v| v.as_i64()), Some(4));
+                assert_eq!(
+                    obj.get("count").and_then(serde_json::value::Value::as_i64),
+                    Some(4)
+                );
                 assert_eq!(
                     obj.get("joined").and_then(|v| v.as_str()),
                     Some("hello world from lua")
                 );
             }
-            Err(e) => panic!("Script execution failed: {:?}", e),
+            Err(e) => panic!("Script execution failed: {e:?}"),
         }
     }
 
@@ -165,7 +171,7 @@ mod tests {
                         chunks.push(text.clone());
                     }
                 }
-                Err(e) => panic!("Stream error: {:?}", e),
+                Err(e) => panic!("Stream error: {e:?}"),
             }
         }
 
@@ -177,8 +183,7 @@ mod tests {
         assert!(
             combined.contains("The quick brown fox")
                 || combined.contains("\"The quick brown fox\""),
-            "Expected result to contain 'The quick brown fox', got: {}",
-            combined
+            "Expected result to contain 'The quick brown fox', got: {combined}"
         );
     }
 
@@ -225,7 +230,11 @@ mod tests {
         match output {
             Ok(result) => {
                 let obj = result.output.as_object().expect("Expected object result");
-                assert_eq!(obj.get("success").and_then(|v| v.as_bool()), Some(false));
+                assert_eq!(
+                    obj.get("success")
+                        .and_then(serde_json::value::Value::as_bool),
+                    Some(false)
+                );
 
                 let chunks = obj
                     .get("chunks_before_error")
@@ -235,11 +244,12 @@ mod tests {
                 assert_eq!(chunks[0].as_str(), Some("chunk1"));
 
                 assert_eq!(
-                    obj.get("error_occurred").and_then(|v| v.as_bool()),
+                    obj.get("error_occurred")
+                        .and_then(serde_json::value::Value::as_bool),
                     Some(true)
                 );
             }
-            Err(e) => panic!("Script execution failed: {:?}", e),
+            Err(e) => panic!("Script execution failed: {e:?}"),
         }
     }
 }

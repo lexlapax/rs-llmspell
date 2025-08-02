@@ -53,16 +53,16 @@ pub enum FileOperation {
 impl std::fmt::Display for FileOperation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            FileOperation::Read => write!(f, "read"),
-            FileOperation::Write => write!(f, "write"),
-            FileOperation::Append => write!(f, "append"),
-            FileOperation::Delete => write!(f, "delete"),
-            FileOperation::CreateDir => write!(f, "create_dir"),
-            FileOperation::ListDir => write!(f, "list_dir"),
-            FileOperation::Copy => write!(f, "copy"),
-            FileOperation::Move => write!(f, "move"),
-            FileOperation::Metadata => write!(f, "metadata"),
-            FileOperation::Exists => write!(f, "exists"),
+            Self::Read => write!(f, "read"),
+            Self::Write => write!(f, "write"),
+            Self::Append => write!(f, "append"),
+            Self::Delete => write!(f, "delete"),
+            Self::CreateDir => write!(f, "create_dir"),
+            Self::ListDir => write!(f, "list_dir"),
+            Self::Copy => write!(f, "copy"),
+            Self::Move => write!(f, "move"),
+            Self::Metadata => write!(f, "metadata"),
+            Self::Exists => write!(f, "exists"),
         }
     }
 }
@@ -72,18 +72,18 @@ impl std::str::FromStr for FileOperation {
 
     fn from_str(s: &str) -> Result<Self> {
         match s.to_lowercase().as_str() {
-            "read" => Ok(FileOperation::Read),
-            "write" => Ok(FileOperation::Write),
-            "append" => Ok(FileOperation::Append),
-            "delete" => Ok(FileOperation::Delete),
-            "create_dir" | "mkdir" => Ok(FileOperation::CreateDir),
-            "list_dir" | "ls" | "dir" => Ok(FileOperation::ListDir),
-            "copy" | "cp" => Ok(FileOperation::Copy),
-            "move" | "mv" | "rename" => Ok(FileOperation::Move),
-            "metadata" | "stat" | "info" => Ok(FileOperation::Metadata),
-            "exists" => Ok(FileOperation::Exists),
+            "read" => Ok(Self::Read),
+            "write" => Ok(Self::Write),
+            "append" => Ok(Self::Append),
+            "delete" => Ok(Self::Delete),
+            "create_dir" | "mkdir" => Ok(Self::CreateDir),
+            "list_dir" | "ls" | "dir" => Ok(Self::ListDir),
+            "copy" | "cp" => Ok(Self::Copy),
+            "move" | "mv" | "rename" => Ok(Self::Move),
+            "metadata" | "stat" | "info" => Ok(Self::Metadata),
+            "exists" => Ok(Self::Exists),
             _ => Err(LLMSpellError::Validation {
-                message: format!("Unknown file operation: {}", s),
+                message: format!("Unknown file operation: {s}"),
                 field: Some("operation".to_string()),
             }),
         }
@@ -124,6 +124,7 @@ pub struct FileOperationsTool {
 }
 
 impl FileOperationsTool {
+    #[must_use]
     pub fn new(config: FileOperationsConfig) -> Self {
         Self {
             metadata: ComponentMetadata::new(
@@ -610,38 +611,38 @@ impl BaseAgent for FileOperationsTool {
                     message: "Read operation requires 'path' parameter".to_string(),
                     field: Some("path".to_string()),
                 })?;
-                let content = self.read_file(&path, &sandbox).await?;
+                let file_content = self.read_file(&path, &sandbox).await?;
                 let response = ResponseBuilder::success("read")
                     .with_message(format!(
                         "Read {} bytes from {}",
-                        content.len(),
+                        file_content.len(),
                         path.display()
                     ))
                     .with_result(json!({
-                        "input": &content,
-                        "size": content.len()
+                        "input": &file_content,
+                        "size": file_content.len()
                     }))
-                    .with_file_info(path.to_string_lossy(), Some(content.len() as u64))
+                    .with_file_info(path.to_string_lossy(), Some(file_content.len() as u64))
                     .build();
-                (content, response)
+                (file_content, response)
             }
             FileOperation::Write => {
                 let path = parameters.path.ok_or_else(|| LLMSpellError::Validation {
                     message: "Write operation requires 'path' parameter".to_string(),
                     field: Some("path".to_string()),
                 })?;
-                let content = parameters.input.ok_or_else(|| LLMSpellError::Validation {
+                let write_content = parameters.input.ok_or_else(|| LLMSpellError::Validation {
                     message: "Write operation requires 'input' parameter".to_string(),
                     field: Some("input".to_string()),
                 })?;
-                self.write_file(&path, &content, &sandbox).await?;
+                self.write_file(&path, &write_content, &sandbox).await?;
                 ResponseBuilder::success("write")
                     .with_message(format!(
                         "Wrote {} bytes to {}",
-                        content.len(),
+                        write_content.len(),
                         path.display()
                     ))
-                    .with_file_info(path.to_string_lossy(), Some(content.len() as u64))
+                    .with_file_info(path.to_string_lossy(), Some(write_content.len() as u64))
                     .build_for_output()
             }
             FileOperation::Append => {
@@ -649,19 +650,19 @@ impl BaseAgent for FileOperationsTool {
                     message: "Append operation requires 'path' parameter".to_string(),
                     field: Some("path".to_string()),
                 })?;
-                let content = parameters.input.ok_or_else(|| LLMSpellError::Validation {
+                let append_content = parameters.input.ok_or_else(|| LLMSpellError::Validation {
                     message: "Append operation requires 'input' parameter".to_string(),
                     field: Some("input".to_string()),
                 })?;
-                self.append_file(&path, &content, &sandbox).await?;
+                self.append_file(&path, &append_content, &sandbox).await?;
                 ResponseBuilder::success("append")
                     .with_message(format!(
                         "Appended {} bytes to {}",
-                        content.len(),
+                        append_content.len(),
                         path.display()
                     ))
                     .with_result(json!({
-                        "appended_size": content.len()
+                        "appended_size": append_content.len()
                     }))
                     .with_file_info(path.to_string_lossy(), None)
                     .build_for_output()
@@ -819,10 +820,7 @@ impl BaseAgent for FileOperationsTool {
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
-        Ok(AgentOutput::text(format!(
-            "File operation error: {}",
-            error
-        )))
+        Ok(AgentOutput::text(format!("File operation error: {error}")))
     }
 }
 
@@ -908,11 +906,13 @@ impl Tool for FileOperationsTool {
 
 impl FileOperationsTool {
     /// Check if this tool supports hook integration
-    pub fn supports_hooks(&self) -> bool {
+    #[must_use]
+    pub const fn supports_hooks(&self) -> bool {
         true // All tools that implement Tool automatically support hooks
     }
 
     /// Get hook integration metadata for this tool
+    #[must_use]
     pub fn hook_metadata(&self) -> serde_json::Value {
         json!({
             "tool_name": self.metadata().name,
@@ -956,7 +956,7 @@ impl FileOperationsTool {
         tool_executor: &crate::lifecycle::ToolExecutor,
         operation: &str,
         path: &str,
-        content: Option<&str>,
+        file_content: Option<&str>,
     ) -> Result<AgentOutput> {
         let mut params = json!({
             "operation": operation,
@@ -964,7 +964,7 @@ impl FileOperationsTool {
             "hook_integration": true  // Flag to indicate this is a hook demo
         });
 
-        if let Some(content) = content {
+        if let Some(content) = file_content {
             params["input"] = json!(content);
         }
 

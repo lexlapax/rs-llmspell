@@ -39,6 +39,7 @@ impl Default for OptimizedConverter {
 }
 
 impl OptimizedConverter {
+    #[must_use]
     pub fn new() -> Self {
         let mut validators = HashMap::new();
 
@@ -73,11 +74,11 @@ impl OptimizedConverter {
     }
 
     /// Fast parameter validation without full parsing
+    #[must_use]
     pub fn validate_params(&self, workflow_type: &str, params: &Value) -> bool {
         self.validators
             .get(workflow_type)
-            .map(|validator| validator(params))
-            .unwrap_or(true)
+            .is_none_or(|validator| validator(params))
     }
 }
 
@@ -95,6 +96,7 @@ struct CachedExecution {
 }
 
 impl ExecutionCache {
+    #[must_use]
     pub fn new(capacity: usize) -> Self {
         Self {
             cache: Arc::new(RwLock::new(lru::LruCache::new(
@@ -104,6 +106,7 @@ impl ExecutionCache {
     }
 
     /// Get cached execution if available and fresh
+    #[must_use]
     pub fn get(&self, workflow_id: &str) -> Option<Value> {
         let mut cache = self.cache.write();
         if let Some(cached) = cache.get(workflow_id) {
@@ -148,6 +151,7 @@ impl Default for PerformanceMetrics {
 }
 
 impl PerformanceMetrics {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             metrics: Arc::new(RwLock::new(Metrics::default())),
@@ -168,6 +172,7 @@ impl PerformanceMetrics {
     }
 
     /// Get average operation duration
+    #[must_use]
     pub fn average_duration_ms(&self) -> f64 {
         let metrics = self.metrics.read();
         if metrics.total_operations == 0 {
@@ -178,6 +183,7 @@ impl PerformanceMetrics {
     }
 
     /// Get p99 operation duration
+    #[must_use]
     pub fn p99_duration_ms(&self) -> u64 {
         let metrics = self.metrics.read();
         if metrics.operation_durations.is_empty() {
@@ -191,6 +197,7 @@ impl PerformanceMetrics {
     }
 
     /// Check if performance is within acceptable bounds
+    #[must_use]
     pub fn is_within_bounds(&self) -> bool {
         self.p99_duration_ms() < 10
     }

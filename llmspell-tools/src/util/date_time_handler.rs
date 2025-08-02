@@ -74,7 +74,7 @@ impl DateTimeHandlerTool {
 
                 let dt = parse_datetime(input).map_err(|e| {
                     tool_error(
-                        format!("Failed to parse date: {}", e),
+                        format!("Failed to parse date: {e}"),
                         Some(self.metadata.name.clone()),
                     )
                 })?;
@@ -110,7 +110,7 @@ impl DateTimeHandlerTool {
                     let utc_now = now_utc();
                     let tz_time =
                         convert_timezone(&utc_now, tz).map_err(|e| LLMSpellError::Tool {
-                            message: format!("Invalid timezone: {}", e),
+                            message: format!("Invalid timezone: {e}"),
                             tool_name: Some(self.metadata.name.clone()),
                             source: None,
                         })?;
@@ -143,14 +143,14 @@ impl DateTimeHandlerTool {
 
                 let dt = parse_datetime(input).map_err(|e| {
                     tool_error(
-                        format!("Failed to parse date: {}", e),
+                        format!("Failed to parse date: {e}"),
                         Some(self.metadata.name.clone()),
                     )
                 })?;
 
                 let converted =
                     convert_timezone(&dt, target_tz).map_err(|e| LLMSpellError::Tool {
-                        message: format!("Failed to convert timezone: {}", e),
+                        message: format!("Failed to convert timezone: {e}"),
                         tool_name: Some(self.metadata.name.clone()),
                         source: None,
                     })?;
@@ -185,7 +185,7 @@ impl DateTimeHandlerTool {
 
                 let dt = parse_datetime(input).map_err(|e| {
                     tool_error(
-                        format!("Failed to parse date: {}", e),
+                        format!("Failed to parse date: {e}"),
                         Some(self.metadata.name.clone()),
                     )
                 })?;
@@ -197,7 +197,7 @@ impl DateTimeHandlerTool {
                 }
                 .map_err(|e| {
                     tool_error(
-                        format!("Failed to {} duration: {}", operation, e),
+                        format!("Failed to {operation} duration: {e}"),
                         Some(self.metadata.name.clone()),
                     )
                 })?;
@@ -205,7 +205,7 @@ impl DateTimeHandlerTool {
                 let format = extract_string_with_default(params, "format", "%Y-%m-%dT%H:%M:%S%.fZ");
 
                 let response = ResponseBuilder::success(operation)
-                    .with_message(format!("{} operation completed", operation))
+                    .with_message(format!("{operation} operation completed"))
                     .with_result(json!({
                         "input": input,
                         "amount": amount,
@@ -233,13 +233,13 @@ impl DateTimeHandlerTool {
                 })?;
 
                 let start_dt = parse_datetime(start).map_err(|e| LLMSpellError::Tool {
-                    message: format!("Failed to parse start date: {}", e),
+                    message: format!("Failed to parse start date: {e}"),
                     tool_name: Some(self.metadata.name.clone()),
                     source: None,
                 })?;
 
                 let end_dt = parse_datetime(end).map_err(|e| LLMSpellError::Tool {
-                    message: format!("Failed to parse end date: {}", e),
+                    message: format!("Failed to parse end date: {e}"),
                     tool_name: Some(self.metadata.name.clone()),
                     source: None,
                 })?;
@@ -267,7 +267,7 @@ impl DateTimeHandlerTool {
 
                 let dt = parse_datetime(input).map_err(|e| {
                     tool_error(
-                        format!("Failed to parse date: {}", e),
+                        format!("Failed to parse date: {e}"),
                         Some(self.metadata.name.clone()),
                     )
                 })?;
@@ -320,7 +320,7 @@ impl DateTimeHandlerTool {
                 Ok(response)
             }
             _ => Err(validation_error(
-                format!("Unknown operation: {}", operation),
+                format!("Unknown operation: {operation}"),
                 Some("operation".to_string()),
             )),
         }
@@ -358,8 +358,7 @@ impl BaseAgent for DateTimeHandlerTool {
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
         Ok(AgentOutput::text(format!(
-            "Date/time operation error: {}",
-            error
+            "Date/time operation error: {error}"
         )))
     }
 }

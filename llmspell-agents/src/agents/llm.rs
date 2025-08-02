@@ -73,14 +73,14 @@ impl LLMAgent {
             max_conversation_length: config
                 .custom_config
                 .get("max_conversation_length")
-                .and_then(|v| v.as_u64())
-                .map(|v| v as usize)
+                .and_then(serde_json::Value::as_u64)
+                .and_then(|v| usize::try_from(v).ok())
                 .or(Some(100)),
             system_prompt: config
                 .custom_config
                 .get("system_prompt")
                 .and_then(|v| v.as_str())
-                .map(|s| s.to_string())
+                .map(std::string::ToString::to_string)
                 .or_else(|| {
                     Some(format!(
                         "You are {}, an AI assistant. {}",
@@ -148,7 +148,8 @@ impl LLMAgent {
     }
 
     /// Get state machine for lifecycle management
-    pub fn state_machine(&self) -> &Arc<AgentStateMachine> {
+    #[must_use]
+    pub const fn state_machine(&self) -> &Arc<AgentStateMachine> {
         &self.state_machine
     }
 
@@ -334,7 +335,7 @@ impl BaseAgent for LLMAgent {
         // Create provider input with conversation messages as JSON
         let messages_json =
             serde_json::to_string(&messages).map_err(|e| LLMSpellError::Configuration {
-                message: format!("Failed to serialize messages: {}", e),
+                message: format!("Failed to serialize messages: {e}"),
                 source: None,
             })?;
 
@@ -381,8 +382,7 @@ impl BaseAgent for LLMAgent {
             if estimated_tokens > max_tokens {
                 return Err(LLMSpellError::Validation {
                     message: format!(
-                        "Input text too long. Estimated {} tokens, max {}",
-                        estimated_tokens, max_tokens
+                        "Input text too long. Estimated {estimated_tokens} tokens, max {max_tokens}"
                     ),
                     field: Some("text".to_string()),
                 });
@@ -403,7 +403,7 @@ impl BaseAgent for LLMAgent {
             LLMSpellError::Component { .. } | LLMSpellError::Provider { .. } => {
                 if let Err(state_error) = self
                     .state_machine
-                    .error(format!("LLM Agent error: {}", error))
+                    .error(format!("LLM Agent error: {error}"))
                     .await
                 {
                     warn!(
@@ -421,8 +421,7 @@ impl BaseAgent for LLMAgent {
         // For LLM agents, we might want to use the LLM to generate error responses
         // For now, return a formatted error
         Ok(AgentOutput::text(format!(
-            "I encountered an error while processing your request: {}",
-            error
+            "I encountered an error while processing your request: {error}"
         )))
     }
 }
@@ -483,7 +482,7 @@ impl StatePersistence for LLMAgent {
     }
 
     fn set_state_manager(&self, state_manager: Arc<StateManager>) {
-        StateManagerHolder::set_state_manager(self, state_manager)
+        StateManagerHolder::set_state_manager(self, state_manager);
     }
 }
 

@@ -10,7 +10,8 @@ pub struct ReplayGlobal {
 }
 
 impl ReplayGlobal {
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self {}
     }
 }

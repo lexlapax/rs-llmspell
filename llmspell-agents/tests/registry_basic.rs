@@ -129,16 +129,13 @@ async fn test_registry_query() {
 
     // Register multiple agents
     for i in 1..=3 {
-        let agent = Arc::new(TestAgent::new(
-            &format!("agent-{}", i),
-            &format!("Agent {}", i),
-        ));
+        let agent = Arc::new(TestAgent::new(&format!("agent-{i}"), &format!("Agent {i}")));
 
         let metadata = AgentMetadata {
-            id: format!("agent-{}", i),
-            name: format!("Agent {}", i),
+            id: format!("agent-{i}"),
+            name: format!("Agent {i}"),
             agent_type: if i % 2 == 0 { "even" } else { "odd" }.to_string(),
-            description: format!("Test agent {}", i),
+            description: format!("Test agent {i}"),
             categories: vec![format!("group-{}", if i <= 2 { "a" } else { "b" })],
             custom_metadata: HashMap::new(),
             created_at: chrono::Utc::now(),
@@ -152,7 +149,7 @@ async fn test_registry_query() {
         };
 
         registry
-            .register_agent(format!("agent-{}", i), agent, metadata)
+            .register_agent(format!("agent-{i}"), agent, metadata)
             .await
             .unwrap();
     }

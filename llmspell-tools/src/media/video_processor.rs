@@ -31,7 +31,7 @@ use std::sync::Arc;
 use tracing::debug;
 
 /// Video format types
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum VideoFormat {
     Mp4,
@@ -46,11 +46,12 @@ pub enum VideoFormat {
 
 impl VideoFormat {
     /// Detect format from file extension
+    #[must_use]
     pub fn from_extension(path: &Path) -> Self {
         match path
             .extension()
             .and_then(|ext| ext.to_str())
-            .map(|s| s.to_lowercase())
+            .map(str::to_lowercase)
             .as_deref()
         {
             Some("mp4") => Self::Mp4,
@@ -74,7 +75,8 @@ pub struct VideoResolution {
 
 impl VideoResolution {
     /// Get resolution name (e.g., "1080p", "4K")
-    pub fn name(&self) -> &'static str {
+    #[must_use]
+    pub const fn name(&self) -> &'static str {
         match (self.width, self.height) {
             (w, h) if w >= 7680 && h >= 4320 => "8K",
             (w, h) if w >= 3840 && h >= 2160 => "4K",
@@ -88,14 +90,15 @@ impl VideoResolution {
     }
 
     /// Get aspect ratio as a string
+    #[must_use]
     pub fn aspect_ratio(&self) -> String {
         let gcd = self.gcd(self.width, self.height);
         let w = self.width / gcd;
         let h = self.height / gcd;
-        format!("{}:{}", w, h)
+        format!("{w}:{h}")
     }
 
-    fn gcd(&self, _a: u32, b: u32) -> u32 {
+    const fn gcd(&self, _a: u32, b: u32) -> u32 {
         let mut a = _a;
         let mut b = b;
         while b != 0 {
@@ -176,6 +179,7 @@ pub struct VideoProcessorTool {
 
 impl VideoProcessorTool {
     /// Create a new video processor tool
+    #[must_use]
     pub fn new(config: VideoProcessorConfig) -> Self {
         Self {
             metadata: ComponentMetadata::new(
@@ -189,6 +193,7 @@ impl VideoProcessorTool {
     }
 
     /// Create a new video processor tool with sandbox context
+    #[must_use]
     pub fn with_sandbox(
         config: VideoProcessorConfig,
         sandbox_context: Arc<SandboxContext>,
@@ -224,7 +229,7 @@ impl VideoProcessorTool {
     async fn extract_metadata(&self, file_path: &Path) -> LLMResult<VideoMetadata> {
         // Get file size
         let file_metadata = std::fs::metadata(file_path).map_err(|e| LLMSpellError::Tool {
-            message: format!("Failed to read file metadata: {}", e),
+            message: format!("Failed to read file metadata: {e}"),
             tool_name: Some("video_processor".to_string()),
             source: None,
         })?;
@@ -248,7 +253,7 @@ impl VideoProcessorTool {
 
         // Create basic metadata
         let metadata = VideoMetadata {
-            format: format.clone(),
+            format,
             duration_seconds: None,
             resolution: None,
             fps: None,
@@ -300,8 +305,7 @@ impl VideoProcessorTool {
         // For now, we'll create a placeholder response
         Err(LLMSpellError::Tool {
             message: format!(
-                "Frame extraction at {}s is not implemented in this basic version. Video processing capabilities will be added in Phase 3+",
-                timestamp_seconds
+                "Frame extraction at {timestamp_seconds}s is not implemented in this basic version. Video processing capabilities will be added in Phase 3+"
             ),
             tool_name: Some("video_processor".to_string()),
             source: None,
@@ -317,8 +321,7 @@ impl VideoProcessorTool {
                 _ => {
                     return Err(LLMSpellError::Validation {
                         message: format!(
-                            "Invalid operation: {}. Supported operations: detect, metadata, thumbnail, extract_frame",
-                            operation
+                            "Invalid operation: {operation}. Supported operations: detect, metadata, thumbnail, extract_frame"
                         ),
                         field: Some("operation".to_string()),
                     });
@@ -339,7 +342,7 @@ impl VideoProcessorTool {
         // Validate thumbnail/frame extraction parameters
         if matches!(
             extract_optional_string(params, "operation"),
-            Some("thumbnail") | Some("extract_frame")
+            Some("thumbnail" | "extract_frame")
         ) && params.get("target_path").is_none()
         {
             return Err(LLMSpellError::Validation {
@@ -382,7 +385,7 @@ impl BaseAgent for VideoProcessorTool {
                     && self.config.supported_formats.contains(&format);
 
                 let response = ResponseBuilder::success("detect")
-                    .with_message(format!("Detected video format: {:?}", format))
+                    .with_message(format!("Detected video format: {format:?}"))
                     .with_result(json!({
                         "file_path": file_path,
                         "format": format,
@@ -411,7 +414,7 @@ impl BaseAgent for VideoProcessorTool {
                 }
 
                 if let Some(duration) = metadata.duration_seconds {
-                    message.push_str(&format!(", Duration: {:.1}s", duration));
+                    message.push_str(&format!(", Duration: {duration:.1}s"));
                 }
 
                 message.push_str(&format!(", Size: {} bytes", metadata.file_size));
@@ -439,8 +442,7 @@ impl BaseAgent for VideoProcessorTool {
 
                 let response = ResponseBuilder::success("thumbnail")
                     .with_message(format!(
-                        "Generated thumbnail from {} to {}",
-                        video_path, target_path
+                        "Generated thumbnail from {video_path} to {target_path}"
                     ))
                     .with_result(json!({
                         "video_path": video_path,
@@ -465,8 +467,7 @@ impl BaseAgent for VideoProcessorTool {
 
                 let response = ResponseBuilder::success("extract_frame")
                     .with_message(format!(
-                        "Extracted frame at {}s from {} to {}",
-                        timestamp, video_path, target_path
+                        "Extracted frame at {timestamp}s from {video_path} to {target_path}"
                     ))
                     .with_result(json!({
                         "video_path": video_path,
@@ -494,10 +495,7 @@ impl BaseAgent for VideoProcessorTool {
     }
 
     async fn handle_error(&self, error: LLMSpellError) -> LLMResult<AgentOutput> {
-        Ok(AgentOutput::text(format!(
-            "Video processor error: {}",
-            error
-        )))
+        Ok(AgentOutput::text(format!("Video processor error: {error}")))
     }
 }
 

@@ -1,5 +1,5 @@
 //! ABOUTME: Test the new Agent API methods added in Task 3.3.28
-//! ABOUTME: Verifies Agent.register(), Agent.get() and other new methods work correctly
+//! ABOUTME: Verifies `Agent.register()`, `Agent.get()` and other new methods work correctly
 
 #[cfg(feature = "lua")]
 #[tokio::test(flavor = "multi_thread")]
@@ -52,8 +52,8 @@ async fn test_agent_new_methods() -> Result<(), Box<dyn std::error::Error>> {
         .exec();
 
     match result {
-        Ok(_) => println!("Lua test passed!"),
-        Err(e) => return Err(format!("Lua test failed: {}", e).into()),
+        Ok(()) => println!("Lua test passed!"),
+        Err(e) => return Err(format!("Lua test failed: {e}").into()),
     }
 
     Ok(())

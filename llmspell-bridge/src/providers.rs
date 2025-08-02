@@ -46,7 +46,7 @@ impl ProviderManager {
     async fn initialize_providers(&self) -> Result<(), LLMSpellError> {
         // Initialize each configured provider
         for (name, config) in &self.config.providers {
-            let provider_config = self.create_provider_config(name, config)?;
+            let provider_config = Self::create_provider_config(name, config)?;
             self.core_manager.init_provider(provider_config).await?;
         }
 
@@ -55,7 +55,7 @@ impl ProviderManager {
             if !self.config.providers.contains_key(default) {
                 return Err(LLMSpellError::Validation {
                     field: Some("default_provider".to_string()),
-                    message: format!("Default provider '{}' not found in configuration", default),
+                    message: format!("Default provider '{default}' not found in configuration"),
                 });
             }
             // The default will be set based on the provider:model format
@@ -64,7 +64,7 @@ impl ProviderManager {
                 .as_ref()
                 .ok_or_else(|| LLMSpellError::Validation {
                     field: Some("model".to_string()),
-                    message: format!("Model not specified for provider '{}'", default),
+                    message: format!("Model not specified for provider '{default}'"),
                 })?;
             // Get the provider config to determine the actual provider name
             let provider_config = &self.config.providers[default];
@@ -88,7 +88,6 @@ impl ProviderManager {
 
     /// Create a provider config from our configuration
     fn create_provider_config(
-        &self,
         name: &str,
         config: &ProviderConfig,
     ) -> Result<ProviderInstanceConfig, LLMSpellError> {
@@ -104,7 +103,7 @@ impl ProviderManager {
             .as_ref()
             .ok_or_else(|| LLMSpellError::Validation {
                 field: Some("model".to_string()),
-                message: format!("Model not specified for provider '{}'", name),
+                message: format!("Model not specified for provider '{name}'"),
             })?;
 
         // Use new_with_type to preserve provider_type information
@@ -115,8 +114,7 @@ impl ProviderManager {
         if let Some(ref api_key_env) = config.api_key_env {
             let api_key = std::env::var(api_key_env).map_err(|_| LLMSpellError::Configuration {
                 message: format!(
-                    "Environment variable '{}' not found for provider '{}'",
-                    api_key_env, name
+                    "Environment variable '{api_key_env}' not found for provider '{name}'"
                 ),
                 source: None,
             })?;
@@ -165,10 +163,10 @@ impl ProviderManager {
         self.core_manager.set_default_provider(name).await
     }
 
-    /// Create and initialize a provider from a ModelSpecifier
+    /// Create and initialize a provider from a `ModelSpecifier`
     ///
     /// This is a bridge method that delegates to the core provider manager's
-    /// create_agent_from_spec method. It supports the new "provider/model" syntax.
+    /// `create_agent_from_spec` method. It supports the new "provider/model" syntax.
     pub async fn create_agent_from_spec(
         &self,
         spec: ModelSpecifier,
@@ -219,7 +217,8 @@ impl ProviderManager {
     }
 
     /// Get the core provider manager
-    pub fn core_manager(&self) -> &CoreProviderManager {
+    #[must_use]
+    pub const fn core_manager(&self) -> &CoreProviderManager {
         &self.core_manager
     }
 
@@ -236,7 +235,7 @@ impl ProviderManager {
 
         // Initialize providers from our configuration
         for (name, config) in &self.config.providers {
-            let provider_config = self.create_provider_config(name, config)?;
+            let provider_config = Self::create_provider_config(name, config)?;
             core_manager.init_provider(provider_config).await?;
         }
 
@@ -249,7 +248,7 @@ impl ProviderManager {
                         .as_ref()
                         .ok_or_else(|| LLMSpellError::Validation {
                             field: Some("model".to_string()),
-                            message: format!("Model not specified for provider '{}'", default),
+                            message: format!("Model not specified for provider '{default}'"),
                         })?;
                 let provider_name = match provider_config.provider_type.as_str() {
                     "openai" | "anthropic" | "cohere" => "rig",

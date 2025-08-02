@@ -53,6 +53,7 @@ pub struct ShutdownRequest {
 }
 
 impl ShutdownRequest {
+    #[must_use]
     pub fn new(agent_id: String) -> Self {
         Self {
             id: Uuid::new_v4().to_string(),
@@ -66,31 +67,37 @@ impl ShutdownRequest {
         }
     }
 
-    pub fn with_priority(mut self, priority: ShutdownPriority) -> Self {
+    #[must_use]
+    pub const fn with_priority(mut self, priority: ShutdownPriority) -> Self {
         self.priority = priority;
         self
     }
 
-    pub fn with_timeout(mut self, timeout: Duration) -> Self {
+    #[must_use]
+    pub const fn with_timeout(mut self, timeout: Duration) -> Self {
         self.timeout = timeout;
         self
     }
 
+    #[must_use]
     pub fn with_reason(mut self, reason: String) -> Self {
         self.reason = Some(reason);
         self
     }
 
-    pub fn with_state_preservation(mut self, preserve: bool) -> Self {
+    #[must_use]
+    pub const fn with_state_preservation(mut self, preserve: bool) -> Self {
         self.preserve_state = preserve;
         self
     }
 
-    pub fn force_shutdown(mut self, force: bool) -> Self {
+    #[must_use]
+    pub const fn force_shutdown(mut self, force: bool) -> Self {
         self.force_if_timeout = force;
         self
     }
 
+    #[must_use]
     pub fn with_metadata(mut self, key: &str, value: &str) -> Self {
         self.metadata.insert(key.to_string(), value.to_string());
         self
@@ -183,6 +190,7 @@ impl Default for ShutdownConfig {
 
 impl ShutdownCoordinator {
     /// Create new shutdown coordinator
+    #[must_use]
     pub fn new(
         event_system: Arc<LifecycleEventSystem>,
         resource_manager: Arc<ResourceManager>,
@@ -264,22 +272,21 @@ impl ShutdownCoordinator {
         }
 
         // Perform shutdown with timeout
-        let shutdown_result = match timeout(
+        let shutdown_result = if let Ok(result) = timeout(
             request.timeout,
             self.perform_shutdown(&request, state_machine.clone()),
         )
         .await
         {
-            Ok(result) => result,
-            Err(_) => {
-                warn!("Shutdown timeout for agent {}", agent_id);
+            result
+        } else {
+            warn!("Shutdown timeout for agent {}", agent_id);
 
-                if request.force_if_timeout {
-                    warn!("Forcing shutdown for agent {}", agent_id);
-                    self.force_shutdown(&request, state_machine.clone()).await
-                } else {
-                    Err(anyhow!("Shutdown timeout and force disabled"))
-                }
+            if request.force_if_timeout {
+                warn!("Forcing shutdown for agent {}", agent_id);
+                self.force_shutdown(&request, state_machine.clone()).await
+            } else {
+                Err(anyhow!("Shutdown timeout and force disabled"))
             }
         };
 
@@ -443,7 +450,7 @@ impl ShutdownCoordinator {
         let initial_count = self.resource_manager.get_allocation_count().await;
         self.resource_manager.deallocate_all(agent_id).await?;
         let final_count = self.resource_manager.get_allocation_count().await;
-        let resources_cleaned = (initial_count - final_count) as u32;
+        let resources_cleaned = u32::try_from(initial_count - final_count).unwrap_or(0);
 
         // Complete termination
         state_machine
@@ -477,7 +484,7 @@ impl ShutdownCoordinator {
             .await;
         let final_count = self.resource_manager.get_allocation_count().await;
 
-        Ok((initial_count - final_count) as u32)
+        Ok(u32::try_from(initial_count - final_count).unwrap_or(0))
     }
 
     /// Shutdown multiple agents by priority
@@ -583,6 +590,7 @@ impl ShutdownCoordinator {
     }
 
     /// Get emergency shutdown receiver
+    #[must_use]
     pub fn subscribe_emergency_shutdown(&self) -> broadcast::Receiver<()> {
         self.emergency_shutdown.subscribe()
     }
@@ -612,7 +620,8 @@ pub struct ResourceCleanupHook {
 }
 
 impl ResourceCleanupHook {
-    pub fn new(resource_manager: Arc<ResourceManager>) -> Self {
+    #[must_use]
+    pub const fn new(resource_manager: Arc<ResourceManager>) -> Self {
         Self { resource_manager }
     }
 }

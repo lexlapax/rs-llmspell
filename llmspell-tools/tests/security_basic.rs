@@ -50,7 +50,7 @@ fn test_utility_tools_security_levels() {
     ];
 
     let tool_count = utility_tools.len();
-    println!("🔍 Security Audit: Validating {} utility tools", tool_count);
+    println!("🔍 Security Audit: Validating {tool_count} utility tools");
 
     for (name, tool) in utility_tools {
         let security_level = tool.security_level();
@@ -62,34 +62,26 @@ fn test_utility_tools_security_levels() {
                 security_level,
                 SecurityLevel::Safe | SecurityLevel::Restricted
             ),
-            "Tool {} should have Safe or Restricted security level, got {:?}",
-            name,
-            security_level
+            "Tool {name} should have Safe or Restricted security level, got {security_level:?}"
         );
 
         // Validate resource limits are set
         assert!(
             resource_limits.max_memory_bytes.is_some(),
-            "Tool {} should set memory limits",
-            name
+            "Tool {name} should set memory limits"
         );
 
         if let Some(cpu_limit) = resource_limits.max_cpu_time_ms {
             assert!(
                 cpu_limit > 0,
-                "Tool {} CPU limit should be positive: {}",
-                name,
-                cpu_limit
+                "Tool {name} CPU limit should be positive: {cpu_limit}"
             );
         }
 
-        println!("✅ {} - Security level: {:?}", name, security_level);
+        println!("✅ {name} - Security level: {security_level:?}");
     }
 
-    println!(
-        "🎉 All {} utility tools passed security validation!",
-        tool_count
-    );
+    println!("🎉 All {tool_count} utility tools passed security validation!");
 }
 
 /// Test that tools have reasonable resource limits
@@ -117,9 +109,7 @@ fn test_resource_limits_are_reasonable() {
         if let Some(memory_limit) = resource_limits.max_memory_bytes {
             assert!(
                 memory_limit > 0 && memory_limit <= 1024 * 1024 * 1024, // Max 1GB
-                "{} memory limit should be reasonable: {} bytes",
-                name,
-                memory_limit
+                "{name} memory limit should be reasonable: {memory_limit} bytes"
             );
         }
 
@@ -127,13 +117,11 @@ fn test_resource_limits_are_reasonable() {
         if let Some(cpu_limit) = resource_limits.max_cpu_time_ms {
             assert!(
                 cpu_limit > 0 && cpu_limit <= 300_000, // Max 5 minutes
-                "{} CPU limit should be reasonable: {}ms",
-                name,
-                cpu_limit
+                "{name} CPU limit should be reasonable: {cpu_limit}ms"
             );
         }
 
-        println!("✅ {} - Resource limits validated", name);
+        println!("✅ {name} - Resource limits validated");
     }
 }
 
@@ -164,26 +152,23 @@ fn test_security_requirements_structure() {
         // File permissions should be a vector
         assert!(
             security_reqs.file_permissions.is_empty() || !security_reqs.file_permissions.is_empty(),
-            "{} should have file permissions vector",
-            name
+            "{name} should have file permissions vector"
         );
 
         // Network permissions should be a vector
         assert!(
             security_reqs.network_permissions.is_empty()
                 || !security_reqs.network_permissions.is_empty(),
-            "{} should have network permissions vector",
-            name
+            "{name} should have network permissions vector"
         );
 
         // Environment permissions should be a vector
         assert!(
             security_reqs.env_permissions.is_empty() || !security_reqs.env_permissions.is_empty(),
-            "{} should have environment permissions vector",
-            name
+            "{name} should have environment permissions vector"
         );
 
-        println!("✅ {} - Security requirements validated", name);
+        println!("✅ {name} - Security requirements validated");
     }
 }
 
@@ -233,22 +218,17 @@ fn test_tools_have_metadata() {
         let metadata = tool.metadata();
 
         // Should have a name
-        assert!(!metadata.name.is_empty(), "{} should have a name", name);
+        assert!(!metadata.name.is_empty(), "{name} should have a name");
 
         // Should have a description
         assert!(
             !metadata.description.is_empty(),
-            "{} should have a description",
-            name
+            "{name} should have a description"
         );
 
         // Should have a schema
         let schema = tool.schema();
-        assert!(
-            !schema.name.is_empty(),
-            "{} should have a schema name",
-            name
-        );
+        assert!(!schema.name.is_empty(), "{name} should have a schema name");
 
         println!("✅ {} - Metadata validated: {}", name, metadata.name);
     }
@@ -267,7 +247,7 @@ fn test_basic_security_compliance() {
 
     // Security levels should be appropriate
     println!("🔐 Security compliance check:");
-    println!("  ✅ {} tools tested", total_tools_tested);
+    println!("  ✅ {total_tools_tested} tools tested");
     println!("  ✅ All tools have security levels");
     println!("  ✅ All tools have resource limits");
     println!("  ✅ All tools have security requirements");
@@ -296,15 +276,14 @@ fn test_security_configuration_consistency() {
         // Security level should match requirements level
         assert_eq!(
             security_level, security_reqs.level,
-            "{} security level should match requirements level",
-            name
+            "{name} security level should match requirements level"
         );
 
         // Resource limits should be consistent
         if let Some(memory_limit) = resource_limits.max_memory_bytes {
-            assert!(memory_limit > 0, "{} memory limit should be positive", name);
+            assert!(memory_limit > 0, "{name} memory limit should be positive");
         }
 
-        println!("✅ {} - Security configuration consistent", name);
+        println!("✅ {name} - Security configuration consistent");
     }
 }

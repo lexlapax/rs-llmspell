@@ -1,5 +1,5 @@
-//! ABOUTME: OpenAI provider integration tests for state persistence
-//! ABOUTME: Tests real OpenAI API calls with conversation state persistence and restoration
+//! ABOUTME: `OpenAI` provider integration tests for state persistence
+//! ABOUTME: Tests real `OpenAI` API calls with conversation state persistence and restoration
 
 use super::common::*;
 use anyhow::Result;
@@ -44,8 +44,7 @@ async fn test_openai_conversation_persistence() -> Result<()> {
     for (i, response) in responses.iter().enumerate() {
         assert!(
             !response.text.is_empty(),
-            "Response {} should not be empty",
-            i
+            "Response {i} should not be empty"
         );
         info!("Response {}: {}", i + 1, response.text);
     }

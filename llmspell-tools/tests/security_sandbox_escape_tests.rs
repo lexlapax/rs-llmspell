@@ -37,8 +37,7 @@ async fn test_file_sandbox_path_traversal_prevention() {
         // Should fail with security error
         assert!(
             result.is_err() || (result.is_ok() && result.unwrap().text.contains("error")),
-            "Path traversal not blocked for: {}",
-            attack_path
+            "Path traversal not blocked for: {attack_path}"
         );
     }
 }
@@ -71,15 +70,12 @@ async fn test_file_sandbox_symlink_escape() {
     // TODO: File operations tool should validate symlink targets to prevent escapes
     // Currently symlinks may be followed outside sandbox boundaries
     // This is a known issue documented in security findings
-    match result {
-        Ok(output) => {
-            if !output.text.contains("error") {
-                println!("WARNING: Symlink escape not prevented (known issue)");
-            }
+    if let Ok(output) = result {
+        if !output.text.contains("error") {
+            println!("WARNING: Symlink escape not prevented (known issue)");
         }
-        Err(_) => {
-            // Expected behavior - symlink access blocked
-        }
+    } else {
+        // Expected behavior - symlink access blocked
     }
 }
 #[tokio::test]
@@ -119,8 +115,7 @@ async fn test_process_executor_command_injection() {
                 !response_text.contains("root:")
                     && !response_text.contains("password")
                     && !response_text.contains("shadow"),
-                "Command injection not prevented for: {}",
-                attack
+                "Command injection not prevented for: {attack}"
             );
         }
     }
@@ -168,9 +163,7 @@ async fn test_file_search_directory_traversal() {
                 output.text.contains("error")
                     || output.text.contains("[]")
                     || output.text.contains("no files found"),
-                "Directory traversal not prevented for: {} with pattern {}",
-                dir,
-                pattern
+                "Directory traversal not prevented for: {dir} with pattern {pattern}"
             );
         }
     }
@@ -229,15 +222,14 @@ async fn test_sandbox_resource_exhaustion_prevention() {
     // TODO: File operations tool should implement configurable file size limits
     // Currently accepts very large file writes without size validation
     // This is a known issue documented in security findings
-    match result {
-        Ok(output) => {
-            if !output.text.contains("error") {
-                println!("WARNING: Resource limit not enforced (known issue): Large file write succeeded");
-            }
+    if let Ok(output) = result {
+        if !output.text.contains("error") {
+            println!(
+                "WARNING: Resource limit not enforced (known issue): Large file write succeeded"
+            );
         }
-        Err(_) => {
-            // Expected behavior - large file write blocked
-        }
+    } else {
+        // Expected behavior - large file write blocked
     }
 }
 #[test]

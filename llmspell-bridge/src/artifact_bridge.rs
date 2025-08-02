@@ -1,5 +1,5 @@
 //! ABOUTME: Core artifact bridge providing language-agnostic artifact operations
-//! ABOUTME: Wraps ArtifactStorage for script access with async operations
+//! ABOUTME: Wraps `ArtifactStorage` for script access with async operations
 
 use llmspell_core::{error::LLMSpellError, Result};
 use llmspell_sessions::{
@@ -12,7 +12,7 @@ use llmspell_sessions::{
 use std::path::Path;
 use std::sync::Arc;
 
-/// Helper macro to convert SessionError to LLMSpellError
+/// Helper macro to convert `SessionError` to `LLMSpellError`
 macro_rules! convert_err {
     ($expr:expr) => {
         $expr.map_err(|e| LLMSpellError::Component {
@@ -24,7 +24,7 @@ macro_rules! convert_err {
 
 /// Core artifact bridge for language-agnostic artifact operations
 ///
-/// This bridge wraps artifact operations from SessionManager and provides
+/// This bridge wraps artifact operations from `SessionManager` and provides
 /// async interfaces for script languages.
 pub struct ArtifactBridge {
     /// Reference to the session manager (which contains artifact storage)
@@ -33,7 +33,8 @@ pub struct ArtifactBridge {
 
 impl ArtifactBridge {
     /// Create a new artifact bridge
-    pub fn new(session_manager: Arc<SessionManager>) -> Self {
+    #[must_use]
+    pub const fn new(session_manager: Arc<SessionManager>) -> Self {
         Self { session_manager }
     }
 

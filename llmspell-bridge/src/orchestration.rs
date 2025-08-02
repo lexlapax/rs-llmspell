@@ -187,6 +187,7 @@ struct OrchestrationMetrics {
 
 impl OrchestrationRuntime {
     /// Create new orchestration runtime
+    #[must_use]
     pub fn new(config: OrchestrationConfig) -> Self {
         Self {
             _config: config,
@@ -204,7 +205,7 @@ impl OrchestrationRuntime {
         context.insert("global".to_string(), plan.global_context.clone());
 
         let state = OrchestrationState {
-            plan: plan.clone(),
+            plan,
             _context: context,
             completed_nodes: Vec::new(),
             failed_nodes: Vec::new(),
@@ -286,6 +287,7 @@ pub struct OrchestrationTemplates;
 
 impl OrchestrationTemplates {
     /// Create a data processing pipeline orchestration
+    #[must_use]
     pub fn data_pipeline_orchestration() -> OrchestrationPlan {
         OrchestrationPlan {
             id: uuid::Uuid::new_v4().to_string(),
@@ -382,6 +384,7 @@ impl OrchestrationTemplates {
     }
 
     /// Create a multi-agent research orchestration
+    #[must_use]
     pub fn research_orchestration() -> OrchestrationPlan {
         OrchestrationPlan {
             id: uuid::Uuid::new_v4().to_string(),

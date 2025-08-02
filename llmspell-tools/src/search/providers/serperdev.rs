@@ -131,7 +131,7 @@ struct AnswerBox {
 
 #[async_trait]
 impl SearchProvider for SerperDevProvider {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "serperdev"
     }
 
@@ -183,7 +183,7 @@ impl SearchProvider for SerperDevProvider {
             .send()
             .await
             .map_err(|e| LLMSpellError::Network {
-                message: format!("Serper.dev API request failed: {}", e),
+                message: format!("Serper.dev API request failed: {e}"),
                 source: Some(Box::new(e)),
             })?;
 
@@ -191,14 +191,14 @@ impl SearchProvider for SerperDevProvider {
             let status = response.status();
             let error_body = response.text().await.unwrap_or_default();
             return Err(LLMSpellError::Network {
-                message: format!("Serper.dev API returned status {}: {}", status, error_body),
+                message: format!("Serper.dev API returned status {status}: {error_body}"),
                 source: None,
             });
         }
 
         let serper_response: SerperResponse =
             response.json().await.map_err(|e| LLMSpellError::Network {
-                message: format!("Failed to parse Serper.dev response: {}", e),
+                message: format!("Failed to parse Serper.dev response: {e}"),
                 source: Some(Box::new(e)),
             })?;
 
@@ -244,7 +244,7 @@ impl SearchProvider for SerperDevProvider {
                             .snippet
                             .unwrap_or_else(|| "No description available".to_string());
                         if let Some(source) = &result.source {
-                            snippet = format!("{} - {}", source, snippet);
+                            snippet = format!("{source} - {snippet}");
                         }
 
                         results.push(SearchResult {

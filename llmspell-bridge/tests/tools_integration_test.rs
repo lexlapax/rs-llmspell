@@ -75,19 +75,19 @@ async fn test_all_tools_integration() {
             if let Some(obj) = result.output.as_object() {
                 if let Some(passed) = obj.get("passed") {
                     let passed_count = passed.as_i64().unwrap_or(0);
-                    let failed_count = obj.get("failed").and_then(|f| f.as_i64()).unwrap_or(0);
+                    let failed_count = obj
+                        .get("failed")
+                        .and_then(serde_json::value::Value::as_i64)
+                        .unwrap_or(0);
 
-                    println!(
-                        "Test results: {} passed, {} failed",
-                        passed_count, failed_count
-                    );
+                    println!("Test results: {passed_count} passed, {failed_count} failed");
                     assert!(passed_count >= 6, "Should have at least 6 core tools");
                     assert_eq!(failed_count, 0, "Some core tools are missing");
                 }
             }
         }
         Err(e) => {
-            panic!("Integration test failed: {}", e);
+            panic!("Integration test failed: {e}");
         }
     }
 }
@@ -150,16 +150,14 @@ async fn test_tool_performance_benchmarks() {
         }
 
         let elapsed = start.elapsed();
-        let per_op = elapsed.as_micros() as f64 / iterations as f64 / 1000.0; // Convert to ms
+        let per_op = elapsed.as_micros() as f64 / f64::from(iterations) / 1000.0; // Convert to ms
 
-        println!("{:<20} {:.3}ms/op", tool_name, per_op);
+        println!("{tool_name:<20} {per_op:.3}ms/op");
 
         // Assert <10ms requirement
         assert!(
             per_op < 10.0,
-            "{} exceeds 10ms target: {:.3}ms",
-            tool_name,
-            per_op
+            "{tool_name} exceeds 10ms target: {per_op:.3}ms"
         );
     }
 }

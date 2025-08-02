@@ -34,6 +34,7 @@ impl Default for WebpageMonitorTool {
 }
 
 impl WebpageMonitorTool {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             metadata: ComponentMetadata::new(
@@ -101,10 +102,7 @@ impl BaseAgent for WebpageMonitorTool {
     }
 
     async fn handle_error(&self, error: llmspell_core::LLMSpellError) -> Result<AgentOutput> {
-        Ok(AgentOutput::text(format!(
-            "WebpageMonitor error: {}",
-            error
-        )))
+        Ok(AgentOutput::text(format!("WebpageMonitor error: {error}")))
     }
 
     async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
@@ -115,12 +113,12 @@ impl BaseAgent for WebpageMonitorTool {
         let ignore_whitespace = params
             .get("parameters")
             .and_then(|p| p.get("ignore_whitespace"))
-            .and_then(|w| w.as_bool())
+            .and_then(serde_json::Value::as_bool)
             .unwrap_or(true);
         let timeout = params
             .get("parameters")
             .and_then(|p| p.get("timeout"))
-            .and_then(|t| t.as_u64())
+            .and_then(serde_json::Value::as_u64)
             .unwrap_or(30);
 
         // Validate URL
@@ -194,7 +192,7 @@ impl WebpageMonitorTool {
             .get(url)
             .send()
             .await
-            .map_err(|e| component_error(format!("Failed to fetch URL: {}", e)))?;
+            .map_err(|e| component_error(format!("Failed to fetch URL: {e}")))?;
 
         if !response.status().is_success() {
             return Err(component_error(format!(
@@ -207,7 +205,7 @@ impl WebpageMonitorTool {
         let body = response
             .text()
             .await
-            .map_err(|e| component_error(format!("Failed to read response body: {}", e)))?;
+            .map_err(|e| component_error(format!("Failed to read response body: {e}")))?;
 
         // If selector provided, extract specific content
         if let Some(sel) = selector {
@@ -221,7 +219,7 @@ impl WebpageMonitorTool {
 
                     if elements.is_empty() {
                         return Err(validation_error(
-                            format!("No elements found for selector: {}", sel),
+                            format!("No elements found for selector: {sel}"),
                             Some("selector".to_string()),
                         ));
                     }
@@ -229,7 +227,7 @@ impl WebpageMonitorTool {
                     Ok(elements.join("\n"))
                 }
                 Err(e) => Err(validation_error(
-                    format!("Invalid CSS selector: {}", e),
+                    format!("Invalid CSS selector: {e}"),
                     Some("selector".to_string()),
                 )),
             }

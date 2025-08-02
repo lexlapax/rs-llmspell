@@ -101,8 +101,7 @@ pub fn inject_tool_global(
                                 .await
                                 .map_err(|e| {
                                     mlua::Error::RuntimeError(format!(
-                                        "Tool '{}' execution failed: {}",
-                                        name, e
+                                        "Tool '{name}' execution failed: {e}"
                                     ))
                                 })?;
 
@@ -134,9 +133,9 @@ pub fn inject_tool_global(
             "tool_invoke",
             async move {
                 // Get the tool
-                let tool = registry.get_tool(&name).ok_or_else(|| {
-                    mlua::Error::RuntimeError(format!("Tool '{}' not found", name))
-                })?;
+                let tool = registry
+                    .get_tool(&name)
+                    .ok_or_else(|| mlua::Error::RuntimeError(format!("Tool '{name}' not found")))?;
 
                 // Create AgentInput with parameters wrapped correctly for extract_parameters
                 let params_table = lua.create_table()?;
@@ -154,7 +153,7 @@ pub fn inject_tool_global(
                 // Execute the tool
                 let context = llmspell_core::ExecutionContext::default();
                 let output = tool.execute(agent_input, context).await.map_err(|e| {
-                    mlua::Error::RuntimeError(format!("Tool execution failed: {}", e))
+                    mlua::Error::RuntimeError(format!("Tool execution failed: {e}"))
                 })?;
 
                 // Convert output to Lua table
@@ -257,8 +256,7 @@ pub fn inject_tool_global(
                                 .await
                                 .map_err(|e| {
                                     mlua::Error::RuntimeError(format!(
-                                        "Tool '{}' execution failed: {}",
-                                        name, e
+                                        "Tool '{name}' execution failed: {e}"
                                     ))
                                 })?;
 
@@ -272,7 +270,7 @@ pub fn inject_tool_global(
                 let schema = tool.schema();
                 tool_instance.set(
                     "getSchema",
-                    lua.create_function(move |lua, _: ()| {
+                    lua.create_function(move |lua, (): ()| {
                         let schema_table = lua.create_table()?;
                         schema_table.set("name", schema.name.clone())?;
                         schema_table.set("description", schema.description.clone())?;
@@ -304,7 +302,7 @@ pub fn inject_tool_global(
     tool_table.set_metatable(Some(tool_metatable));
 
     // Add discover function for tool discovery
-    let registry_clone = registry.clone();
+    let registry_clone = registry;
     let discover_fn = lua.create_function(move |lua, filter: Option<Table>| {
         let tools = registry_clone.list_tools();
         let discover_table = lua.create_table()?;

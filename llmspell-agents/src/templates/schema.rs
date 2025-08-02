@@ -17,7 +17,7 @@ pub enum SchemaVersion {
 impl fmt::Display for SchemaVersion {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            SchemaVersion::V1 => write!(f, "v1"),
+            Self::V1 => write!(f, "v1"),
         }
     }
 }
@@ -42,15 +42,16 @@ pub enum TemplateCategory {
 }
 
 impl TemplateCategory {
+    #[must_use]
     pub fn name(&self) -> String {
         match self {
-            TemplateCategory::ToolExecution => "tool_execution".to_string(),
-            TemplateCategory::Orchestration => "orchestration".to_string(),
-            TemplateCategory::Monitoring => "monitoring".to_string(),
-            TemplateCategory::Analytics => "analytics".to_string(),
-            TemplateCategory::Communication => "communication".to_string(),
-            TemplateCategory::Utility => "utility".to_string(),
-            TemplateCategory::Custom(name) => name.clone(),
+            Self::ToolExecution => "tool_execution".to_string(),
+            Self::Orchestration => "orchestration".to_string(),
+            Self::Monitoring => "monitoring".to_string(),
+            Self::Analytics => "analytics".to_string(),
+            Self::Communication => "communication".to_string(),
+            Self::Utility => "utility".to_string(),
+            Self::Custom(name) => name.clone(),
         }
     }
 }
@@ -69,12 +70,13 @@ pub enum ComplexityLevel {
 }
 
 impl ComplexityLevel {
-    pub fn description(&self) -> &'static str {
+    #[must_use]
+    pub const fn description(&self) -> &'static str {
         match self {
-            ComplexityLevel::Basic => "Simple template with minimal configuration required",
-            ComplexityLevel::Intermediate => "Moderate complexity with some customization options",
-            ComplexityLevel::Advanced => "Advanced template with extensive configuration",
-            ComplexityLevel::Expert => "Expert-level template requiring deep understanding",
+            Self::Basic => "Simple template with minimal configuration required",
+            Self::Intermediate => "Moderate complexity with some customization options",
+            Self::Advanced => "Advanced template with extensive configuration",
+            Self::Expert => "Expert-level template requiring deep understanding",
         }
     }
 }
@@ -245,6 +247,7 @@ pub struct TemplateSchema {
 
 impl TemplateSchema {
     /// Create a new template schema
+    #[must_use]
     pub fn new(metadata: TemplateMetadata) -> Self {
         Self {
             schema_version: SchemaVersion::default(),
@@ -259,36 +262,42 @@ impl TemplateSchema {
     }
 
     /// Add a parameter to the template
+    #[must_use]
     pub fn with_parameter(mut self, parameter: ParameterDefinition) -> Self {
         self.parameters.push(parameter);
         self
     }
 
     /// Add a tool dependency
+    #[must_use]
     pub fn with_tool_dependency(mut self, dependency: ToolDependency) -> Self {
         self.tool_dependencies.push(dependency);
         self
     }
 
     /// Add a capability requirement
+    #[must_use]
     pub fn with_capability_requirement(mut self, requirement: CapabilityRequirement) -> Self {
         self.capability_requirements.push(requirement);
         self
     }
 
     /// Set resource requirements
-    pub fn with_resource_requirements(mut self, requirements: ResourceRequirements) -> Self {
+    #[must_use]
+    pub const fn with_resource_requirements(mut self, requirements: ResourceRequirements) -> Self {
         self.resource_requirements = requirements;
         self
     }
 
     /// Add template configuration
+    #[must_use]
     pub fn with_config(mut self, key: &str, value: serde_json::Value) -> Self {
         self.template_config.insert(key.to_string(), value);
         self
     }
 
     /// Add validation rule
+    #[must_use]
     pub fn with_validation_rule(mut self, rule: String) -> Self {
         self.validation_rules.push(rule);
         self
@@ -348,16 +357,19 @@ impl TemplateSchema {
     }
 
     /// Get parameter by name
+    #[must_use]
     pub fn get_parameter(&self, name: &str) -> Option<&ParameterDefinition> {
         self.parameters.iter().find(|p| p.name == name)
     }
 
     /// Get tool dependency by name
+    #[must_use]
     pub fn get_tool_dependency(&self, name: &str) -> Option<&ToolDependency> {
         self.tool_dependencies.iter().find(|t| t.name == name)
     }
 
     /// Check if template has required tool
+    #[must_use]
     pub fn requires_tool(&self, tool_name: &str) -> bool {
         self.tool_dependencies
             .iter()
@@ -365,11 +377,13 @@ impl TemplateSchema {
     }
 
     /// Get all required parameters
+    #[must_use]
     pub fn required_parameters(&self) -> Vec<&ParameterDefinition> {
         self.parameters.iter().filter(|p| p.required).collect()
     }
 
     /// Get all optional parameters with defaults
+    #[must_use]
     pub fn optional_parameters_with_defaults(&self) -> Vec<&ParameterDefinition> {
         self.parameters
             .iter()

@@ -1,5 +1,5 @@
 //! ABOUTME: Lua hook adapter for cross-language hook execution
-//! ABOUTME: Implements HookAdapter trait to convert between Rust and Lua types
+//! ABOUTME: Implements `HookAdapter` trait to convert between Rust and Lua types
 
 use crate::lua::conversion::{json_to_lua_value, lua_table_to_json};
 use llmspell_hooks::{HookAdapter, HookContext, HookResult};
@@ -18,11 +18,12 @@ impl Default for LuaHookAdapter {
 
 impl LuaHookAdapter {
     /// Create a new Lua hook adapter
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self
     }
 
-    /// Convert HookContext to Lua table
+    /// Convert `HookContext` to Lua table
     pub fn hook_context_to_lua_table<'lua>(
         &self,
         lua: &'lua Lua,
@@ -62,7 +63,7 @@ impl LuaHookAdapter {
         Ok(table)
     }
 
-    /// Convert Lua value to HookResult
+    /// Convert Lua value to `HookResult`
     pub fn lua_value_to_hook_result(&self, _lua: &Lua, value: Value) -> mlua::Result<HookResult> {
         match value {
             Value::Nil => Ok(HookResult::Continue),

@@ -2,9 +2,7 @@
 // ABOUTME: Provides reusable helpers for event bus, correlation, and stream tests
 
 use llmspell_events::{
-    bus::EventBus,
-    correlation::{CorrelationContext, EventCorrelationTracker},
-    EventMetadata, Language, UniversalEvent,
+    bus::EventBus, correlation::EventCorrelationTracker, EventMetadata, Language, UniversalEvent,
 };
 use serde_json::Value;
 use std::sync::Arc;

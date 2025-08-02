@@ -17,7 +17,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 
 /// Monitoring scope types
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MonitoringScope {
     /// Monitor system resources (CPU, memory, disk, network)
     System,
@@ -36,15 +36,16 @@ pub enum MonitoringScope {
 }
 
 impl MonitoringScope {
+    #[must_use]
     pub fn name(&self) -> String {
         match self {
-            MonitoringScope::System => "system".to_string(),
-            MonitoringScope::Agent => "agent".to_string(),
-            MonitoringScope::Application => "application".to_string(),
-            MonitoringScope::Network => "network".to_string(),
-            MonitoringScope::Database => "database".to_string(),
-            MonitoringScope::Logs => "logs".to_string(),
-            MonitoringScope::Custom(name) => name.clone(),
+            Self::System => "system".to_string(),
+            Self::Agent => "agent".to_string(),
+            Self::Application => "application".to_string(),
+            Self::Network => "network".to_string(),
+            Self::Database => "database".to_string(),
+            Self::Logs => "logs".to_string(),
+            Self::Custom(name) => name.clone(),
         }
     }
 }
@@ -59,12 +60,13 @@ pub enum AlertSeverity {
 }
 
 impl AlertSeverity {
+    #[must_use]
     pub fn name(&self) -> String {
         match self {
-            AlertSeverity::Info => "info".to_string(),
-            AlertSeverity::Warning => "warning".to_string(),
-            AlertSeverity::Error => "error".to_string(),
-            AlertSeverity::Critical => "critical".to_string(),
+            Self::Info => "info".to_string(),
+            Self::Warning => "warning".to_string(),
+            Self::Error => "error".to_string(),
+            Self::Critical => "critical".to_string(),
         }
     }
 }
@@ -138,6 +140,7 @@ pub struct MonitorAgentTemplate {
 
 impl MonitorAgentTemplate {
     /// Create new Monitor Agent template
+    #[must_use]
     pub fn new() -> Self {
         let metadata = TemplateMetadata {
             id: "monitor_agent".to_string(),
@@ -397,12 +400,14 @@ impl MonitorAgentTemplate {
     }
 
     /// Create Monitor Agent template with custom configuration
+    #[must_use]
     pub fn with_config(mut self, config: MonitorAgentConfig) -> Self {
         self.config = config;
         self
     }
 
     /// Create system monitor template focused on system resources
+    #[must_use]
     pub fn system_monitor() -> Self {
         let mut template = Self::new();
 
@@ -427,6 +432,7 @@ impl MonitorAgentTemplate {
     }
 
     /// Create application monitor template for application monitoring
+    #[must_use]
     pub fn application_monitor() -> Self {
         let mut template = Self::new();
 
@@ -465,6 +471,7 @@ impl MonitorAgentTemplate {
     }
 
     /// Create lightweight monitor template for basic monitoring
+    #[must_use]
     pub fn lightweight() -> Self {
         let mut template = Self::new();
 
@@ -585,7 +592,7 @@ impl MonitorAgentTemplate {
             if let Some(array) = patterns.as_array() {
                 config.log_patterns = array
                     .iter()
-                    .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                    .filter_map(|v| v.as_str().map(std::string::ToString::to_string))
                     .collect();
             }
         }
@@ -628,7 +635,7 @@ impl AgentTemplate for MonitorAgentTemplate {
             agent_config
                 .monitoring_scopes
                 .iter()
-                .map(|s| s.name())
+                .map(MonitoringScope::name)
                 .collect::<Vec<_>>()
                 .into(),
         );
@@ -642,7 +649,7 @@ impl AgentTemplate for MonitorAgentTemplate {
         );
         final_config.insert(
             "max_alerts_per_minute".to_string(),
-            (agent_config.max_alerts_per_minute as u64).into(),
+            u64::from(agent_config.max_alerts_per_minute).into(),
         );
         final_config.insert(
             "enable_metrics_collection".to_string(),
@@ -663,7 +670,7 @@ impl AgentTemplate for MonitorAgentTemplate {
 
         // Add alert thresholds
         for (key, value) in &agent_config.alert_thresholds {
-            final_config.insert(format!("threshold_{}", key), (*value).into());
+            final_config.insert(format!("threshold_{key}"), (*value).into());
         }
 
         // Add log patterns if enabled
@@ -673,7 +680,7 @@ impl AgentTemplate for MonitorAgentTemplate {
                 agent_config
                     .log_patterns
                     .iter()
-                    .map(|s| s.as_str())
+                    .map(std::string::String::as_str)
                     .collect::<Vec<_>>()
                     .into(),
             );
@@ -706,7 +713,7 @@ impl AgentTemplate for MonitorAgentTemplate {
     }
 
     fn clone_template(&self) -> Box<dyn AgentTemplate> {
-        Box::new(MonitorAgentTemplate {
+        Box::new(Self {
             schema: self.schema.clone(),
             config: self.config.clone(),
         })
@@ -767,7 +774,7 @@ impl BaseAgent for MockMonitorAgent {
 
     async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput, LLMSpellError> {
         Ok(AgentOutput {
-            text: format!("Monitor error handled: {}", error),
+            text: format!("Monitor error handled: {error}"),
             media: vec![],
             tool_calls: vec![],
             metadata: OutputMetadata::default(),

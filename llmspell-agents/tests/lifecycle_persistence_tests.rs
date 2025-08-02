@@ -290,7 +290,7 @@ async fn test_circuit_breaker() -> Result<()> {
                 LifecycleEventType::AgentPaused,
                 agent_id.clone(),
                 LifecycleEventData::Generic {
-                    message: format!("Test pause {}", i),
+                    message: format!("Test pause {i}"),
                     details: Default::default(),
                 },
                 "test".to_string(),

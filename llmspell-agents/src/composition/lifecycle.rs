@@ -149,6 +149,7 @@ pub enum ErrorSeverity {
 
 impl CompositeLifecycleManager {
     /// Create a new lifecycle manager
+    #[must_use]
     pub fn new(config: LifecycleConfig) -> Self {
         Self {
             state: RwLock::new(LifecycleState::Initializing),
@@ -303,7 +304,7 @@ impl CompositeLifecycleManager {
         // Validate transition
         if !self.is_valid_transition(&current, &new_state) {
             return Err(LLMSpellError::Component {
-                message: format!("Invalid state transition: {:?} -> {:?}", current, new_state),
+                message: format!("Invalid state transition: {current:?} -> {new_state:?}"),
                 source: None,
             });
         }
@@ -331,16 +332,18 @@ impl CompositeLifecycleManager {
     }
 
     /// Check if a state transition is valid
-    fn is_valid_transition(&self, from: &LifecycleState, to: &LifecycleState) -> bool {
+    const fn is_valid_transition(&self, from: &LifecycleState, to: &LifecycleState) -> bool {
         matches!(
             (from, to),
             (LifecycleState::Initializing, LifecycleState::Ready)
-                | (LifecycleState::Ready, LifecycleState::Active)
-                | (LifecycleState::Active, LifecycleState::Paused)
-                | (LifecycleState::Paused, LifecycleState::Active)
-                | (LifecycleState::Active, LifecycleState::ShuttingDown)
-                | (LifecycleState::Ready, LifecycleState::ShuttingDown)
-                | (LifecycleState::Paused, LifecycleState::ShuttingDown)
+                | (
+                    LifecycleState::Ready | LifecycleState::Paused,
+                    LifecycleState::Active | LifecycleState::ShuttingDown
+                )
+                | (
+                    LifecycleState::Active,
+                    LifecycleState::Paused | LifecycleState::ShuttingDown
+                )
                 | (LifecycleState::ShuttingDown, LifecycleState::Terminated)
         )
     }
@@ -518,6 +521,7 @@ pub struct HierarchicalLifecycleManager {
 
 impl HierarchicalLifecycleManager {
     /// Create a new hierarchical lifecycle manager
+    #[must_use]
     pub fn new(config: LifecycleConfig) -> Self {
         Self {
             base: CompositeLifecycleManager::new(config),

@@ -13,7 +13,7 @@ use tracing::{debug, info, instrument, warn};
 use uuid::Uuid;
 
 /// State sharing patterns
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SharingPattern {
     /// Broadcast - one agent publishes, all subscribed agents receive
     Broadcast,
@@ -525,10 +525,7 @@ pub trait SharedStateAgent: Agent {
     where
         Self: Sized,
     {
-        SharedStateAccessor::new(
-            self.metadata().id.to_string(),
-            self.sharing_manager().clone(),
-        )
+        SharedStateAccessor::new(self.metadata().id.to_string(), self.sharing_manager())
     }
 
     /// Get sharing manager (to be implemented by agent)
@@ -542,7 +539,8 @@ pub struct SharedStateAccessor {
 }
 
 impl SharedStateAccessor {
-    pub fn new(agent_id: String, sharing_manager: Arc<StateSharingManager>) -> Self {
+    #[must_use]
+    pub const fn new(agent_id: String, sharing_manager: Arc<StateSharingManager>) -> Self {
         Self {
             agent_id,
             sharing_manager,

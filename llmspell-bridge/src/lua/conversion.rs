@@ -21,9 +21,7 @@ pub fn lua_value_to_json(value: LuaValue) -> mlua::Result<JsonValue> {
         LuaValue::Integer(i) => Ok(JsonValue::Number(i.into())),
         LuaValue::Number(n) => {
             if n.is_finite() {
-                Ok(serde_json::Number::from_f64(n)
-                    .map(JsonValue::Number)
-                    .unwrap_or(JsonValue::Null))
+                Ok(serde_json::Number::from_f64(n).map_or(JsonValue::Null, JsonValue::Number))
             } else {
                 Ok(JsonValue::Null)
             }
@@ -110,7 +108,7 @@ pub fn json_to_lua_value<'lua>(lua: &'lua Lua, json: &JsonValue) -> mlua::Result
 
 // ===== Agent conversions =====
 
-/// Convert Lua table to AgentInput
+/// Convert Lua table to `AgentInput`
 pub fn lua_table_to_agent_input(lua: &Lua, table: Table) -> mlua::Result<AgentInput> {
     // Extract text (required)
     let text: String = table.get("text").unwrap_or_default();
@@ -173,7 +171,7 @@ pub fn lua_table_to_agent_input(lua: &Lua, table: Table) -> mlua::Result<AgentIn
 fn parse_media_content(_lua: &Lua, table: Table) -> mlua::Result<MediaContent> {
     let base64: String = table.get("base64")?;
     let data = base64::Engine::decode(&base64::engine::general_purpose::STANDARD, &base64)
-        .map_err(|e| LuaError::RuntimeError(format!("Failed to decode base64 image: {}", e)))?;
+        .map_err(|e| LuaError::RuntimeError(format!("Failed to decode base64 image: {e}")))?;
 
     let format = table
         .get::<_, String>("format")
@@ -230,7 +228,7 @@ fn parse_media_content(_lua: &Lua, table: Table) -> mlua::Result<MediaContent> {
     })
 }
 
-/// Convert AgentOutput to Lua table
+/// Convert `AgentOutput` to Lua table
 pub fn agent_output_to_lua_table(lua: &Lua, output: AgentOutput) -> mlua::Result<Table> {
     let table = lua.create_table()?;
 
@@ -342,33 +340,31 @@ pub fn tool_output_to_lua_table(lua: &Lua, output: ToolOutput) -> mlua::Result<T
 /// Convert Lua table to workflow parameters
 pub fn lua_table_to_workflow_params(_lua: &Lua, table: Table) -> Result<JsonValue> {
     lua_table_to_json(table).map_err(|e| LLMSpellError::Component {
-        message: format!("Failed to convert Lua table to workflow params: {}", e),
+        message: format!("Failed to convert Lua table to workflow params: {e}"),
         source: None,
     })
 }
 
 /// Convert workflow result to Lua table  
 pub fn workflow_result_to_lua_table(lua: &Lua, result: serde_json::Value) -> mlua::Result<Table> {
-    match json_to_lua_value(lua, &result)? {
-        LuaValue::Table(table) => Ok(table),
-        _ => {
-            // If it's not a table, wrap it in one
-            let table = lua.create_table()?;
-            table.set("result", json_to_lua_value(lua, &result)?)?;
-            Ok(table)
-        }
+    if let LuaValue::Table(table) = json_to_lua_value(lua, &result)? {
+        Ok(table)
+    } else {
+        // If it's not a table, wrap it in one
+        let table = lua.create_table()?;
+        table.set("result", json_to_lua_value(lua, &result)?)?;
+        Ok(table)
     }
 }
 
-/// Convert ScriptWorkflowResult to Lua table
+/// Convert `ScriptWorkflowResult` to Lua table
 pub fn script_workflow_result_to_lua_table(
     lua: &Lua,
     result: crate::conversion::ScriptWorkflowResult,
 ) -> mlua::Result<Table> {
     // Convert to JSON first, then to Lua
-    let json_value = serde_json::to_value(result).map_err(|e| {
-        LuaError::RuntimeError(format!("Failed to serialize workflow result: {}", e))
-    })?;
+    let json_value = serde_json::to_value(result)
+        .map_err(|e| LuaError::RuntimeError(format!("Failed to serialize workflow result: {e}")))?;
     workflow_result_to_lua_table(lua, json_value)
 }
 
@@ -380,14 +376,14 @@ pub fn script_workflow_result_to_lua_table(
 impl FromScriptValue<LuaValue<'_>> for ScriptValue {
     fn from_script_value(value: LuaValue<'_>) -> Result<Self> {
         match value {
-            LuaValue::Nil => Ok(ScriptValue::Null),
-            LuaValue::Boolean(b) => Ok(ScriptValue::Bool(b)),
-            LuaValue::Integer(i) => Ok(ScriptValue::Number(i as f64)),
-            LuaValue::Number(n) => Ok(ScriptValue::Number(n)),
-            LuaValue::String(s) => Ok(ScriptValue::String(
+            LuaValue::Nil => Ok(Self::Null),
+            LuaValue::Boolean(b) => Ok(Self::Bool(b)),
+            LuaValue::Integer(i) => Ok(Self::Number(i as f64)),
+            LuaValue::Number(n) => Ok(Self::Number(n)),
+            LuaValue::String(s) => Ok(Self::String(
                 s.to_str()
                     .map_err(|e| LLMSpellError::Component {
-                        message: format!("Failed to convert Lua string: {}", e),
+                        message: format!("Failed to convert Lua string: {e}"),
                         source: None,
                     })?
                     .to_string(),

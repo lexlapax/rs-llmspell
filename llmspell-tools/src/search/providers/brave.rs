@@ -117,7 +117,7 @@ struct QueryInfo {
 
 #[async_trait]
 impl SearchProvider for BraveSearchProvider {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "brave"
     }
 
@@ -177,7 +177,7 @@ impl SearchProvider for BraveSearchProvider {
             .send()
             .await
             .map_err(|e| LLMSpellError::Network {
-                message: format!("Brave API request failed: {}", e),
+                message: format!("Brave API request failed: {e}"),
                 source: Some(Box::new(e)),
             })?;
 
@@ -185,14 +185,14 @@ impl SearchProvider for BraveSearchProvider {
             let status = response.status();
             let error_body = response.text().await.unwrap_or_default();
             return Err(LLMSpellError::Network {
-                message: format!("Brave API returned status {}: {}", status, error_body),
+                message: format!("Brave API returned status {status}: {error_body}"),
                 source: None,
             });
         }
 
         let brave_response: BraveSearchResponse =
             response.json().await.map_err(|e| LLMSpellError::Network {
-                message: format!("Failed to parse Brave response: {}", e),
+                message: format!("Failed to parse Brave response: {e}"),
                 source: Some(Box::new(e)),
             })?;
 

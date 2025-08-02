@@ -225,6 +225,7 @@ impl CompositeAgentBuilder {
     }
 
     /// Set the execution pattern
+    #[must_use]
     pub fn execution_pattern(mut self, pattern: ExecutionPattern) -> Self {
         self.execution_pattern = pattern;
         self
@@ -279,7 +280,7 @@ pub enum CompositionError {
 
 impl From<CompositionError> for LLMSpellError {
     fn from(err: CompositionError) -> Self {
-        LLMSpellError::Component {
+        Self::Component {
             message: err.to_string(),
             source: Some(Box::new(err)),
         }

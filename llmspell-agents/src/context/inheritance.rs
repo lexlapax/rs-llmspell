@@ -89,6 +89,7 @@ pub trait InheritanceValidator: Send + Sync {
 
 impl InheritanceRules {
     /// Create new inheritance rules with defaults
+    #[must_use]
     pub fn new() -> Self {
         Self {
             field_rules: FieldInheritance::default(),
@@ -99,42 +100,49 @@ impl InheritanceRules {
     }
 
     /// Add a field that should always be inherited
+    #[must_use]
     pub fn always_inherit(mut self, field: String) -> Self {
         self.field_rules.always_inherit.insert(field);
         self
     }
 
     /// Add a field that should never be inherited
+    #[must_use]
     pub fn never_inherit(mut self, field: String) -> Self {
         self.field_rules.never_inherit.insert(field);
         self
     }
 
     /// Add conditional inheritance for a field
+    #[must_use]
     pub fn conditional_inherit(mut self, field: String, policies: Vec<InheritancePolicy>) -> Self {
         self.field_rules.conditional_inherit.insert(field, policies);
         self
     }
 
     /// Add a field transform
+    #[must_use]
     pub fn with_transform(mut self, field: String, transform: FieldTransform) -> Self {
         self.field_rules.transforms.insert(field, transform);
         self
     }
 
     /// Set maximum inheritance depth
-    pub fn max_depth(mut self, depth: usize) -> Self {
+    #[must_use]
+    pub const fn max_depth(mut self, depth: usize) -> Self {
         self.max_depth = depth;
         self
     }
 
     /// Set conflict resolution strategy
-    pub fn conflict_resolution(mut self, resolution: ConflictResolution) -> Self {
+    #[must_use]
+    pub const fn conflict_resolution(mut self, resolution: ConflictResolution) -> Self {
         self.conflict_resolution = resolution;
         self
     }
 
     /// Add a custom validator
+    #[must_use]
     pub fn add_validator(mut self, validator: Box<dyn InheritanceValidator>) -> Self {
         self.validators.push(validator);
         self
@@ -262,14 +270,14 @@ impl InheritanceRules {
             Some(FieldTransform::Copy) => value.clone(),
             Some(FieldTransform::Prefix(prefix)) => {
                 if let Some(str_val) = value.as_str() {
-                    Value::String(format!("{}{}", prefix, str_val))
+                    Value::String(format!("{prefix}{str_val}"))
                 } else {
                     value.clone()
                 }
             }
             Some(FieldTransform::Suffix(suffix)) => {
                 if let Some(str_val) = value.as_str() {
-                    Value::String(format!("{}{}", str_val, suffix))
+                    Value::String(format!("{str_val}{suffix}"))
                 } else {
                     value.clone()
                 }
@@ -291,7 +299,7 @@ impl InheritanceRules {
         // Validate value
         for validator in &self.validators {
             if !validator.validate_value(&field, &value) {
-                return Err(format!("Validation failed for field: {}", field));
+                return Err(format!("Validation failed for field: {field}"));
             }
         }
 

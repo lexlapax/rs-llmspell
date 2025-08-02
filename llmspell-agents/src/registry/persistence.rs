@@ -64,7 +64,7 @@ impl PersistentAgentRegistry {
 
     /// Get metadata key for agent
     fn metadata_key(agent_id: &str) -> String {
-        format!("{}{}", AGENT_METADATA_PREFIX, agent_id)
+        format!("{AGENT_METADATA_PREFIX}{agent_id}")
     }
 
     /// Persist current state

@@ -24,7 +24,7 @@ struct LanguageHook {
         Arc<dyn HookAdapter<Context = Box<dyn std::any::Any>, Result = Box<dyn std::any::Any>>>,
 }
 
-/// Convert LanguageHook to a Hook trait implementation
+/// Convert `LanguageHook` to a Hook trait implementation
 struct LanguageHookWrapper {
     inner: Arc<LanguageHook>,
 }
@@ -139,7 +139,7 @@ impl HookBridge {
             .execute_hooks(&hooks, context)
             .await
             .map_err(|e| LLMSpellError::Component {
-                message: format!("Hook execution failed for {:?}: {}", hook_point, e),
+                message: format!("Hook execution failed for {hook_point:?}: {e}"),
                 source: None,
             })?;
 
@@ -163,7 +163,7 @@ impl HookBridge {
         let adapter = adapters
             .get(&language)
             .ok_or_else(|| LLMSpellError::Configuration {
-                message: format!("No adapter registered for language: {}", language),
+                message: format!("No adapter registered for language: {language}"),
                 source: None,
             })?
             .clone();
@@ -194,7 +194,7 @@ impl HookBridge {
         self.hook_registry
             .register(hook_point.clone(), wrapper)
             .map_err(|e| LLMSpellError::Configuration {
-                message: format!("Failed to register hook: {}", e),
+                message: format!("Failed to register hook: {e}"),
                 source: None,
             })?;
 
@@ -244,6 +244,7 @@ impl HookBridge {
     }
 
     /// Get metrics from the hook executor
+    #[must_use]
     pub fn get_metrics(
         &self,
     ) -> std::collections::HashMap<String, llmspell_hooks::performance::PerformanceMetrics> {

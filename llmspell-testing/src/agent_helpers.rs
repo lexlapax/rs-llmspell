@@ -32,7 +32,7 @@
 
 use llmspell_core::{
     execution_context::ExecutionContext,
-    traits::agent::{Agent, AgentConfig, ConversationMessage, MessageRole},
+    traits::agent::{Agent, AgentConfig, ConversationMessage},
     types::{AgentInput, AgentOutput},
     ComponentMetadata, LLMSpellError,
 };
@@ -42,8 +42,8 @@ use serde_json::json;
 pub struct TestProviderAgent {
     metadata: ComponentMetadata,
     config: AgentConfig,
-    provider: String,
-    model: String,
+    _provider: String,
+    _model: String,
     responses: Vec<String>,
     response_index: std::sync::Mutex<usize>,
 }
@@ -59,8 +59,8 @@ impl TestProviderAgent {
         Self {
             metadata,
             config: AgentConfig::default(),
-            provider: provider.to_string(),
-            model: model.to_string(),
+            _provider: provider.to_string(),
+            _model: model.to_string(),
             responses: vec!["Test response".to_string()],
             response_index: std::sync::Mutex::new(0),
         }

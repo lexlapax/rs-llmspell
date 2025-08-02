@@ -46,7 +46,8 @@ impl AgentBuilder {
     }
 
     /// Set model temperature
-    pub fn temperature(mut self, temperature: f32) -> Self {
+    #[must_use]
+    pub const fn temperature(mut self, temperature: f32) -> Self {
         if let Some(model) = &mut self.config.model {
             model.temperature = Some(temperature);
         }
@@ -54,7 +55,8 @@ impl AgentBuilder {
     }
 
     /// Set maximum tokens for model
-    pub fn max_tokens(mut self, max_tokens: u32) -> Self {
+    #[must_use]
+    pub const fn max_tokens(mut self, max_tokens: u32) -> Self {
         if let Some(model) = &mut self.config.model {
             model.max_tokens = Some(max_tokens);
         }
@@ -76,12 +78,14 @@ impl AgentBuilder {
     }
 
     /// Allow access to multiple tools
+    #[must_use]
     pub fn allow_tools(mut self, tool_ids: Vec<String>) -> Self {
         self.config.allowed_tools.extend(tool_ids);
         self
     }
 
     /// Allow access to all tools
+    #[must_use]
     pub fn allow_all_tools(mut self) -> Self {
         self.config.allowed_tools = vec!["*".to_string()];
         self
@@ -94,31 +98,36 @@ impl AgentBuilder {
     }
 
     /// Set maximum execution time
-    pub fn max_execution_time_secs(mut self, secs: u64) -> Self {
+    #[must_use]
+    pub const fn max_execution_time_secs(mut self, secs: u64) -> Self {
         self.config.resource_limits.max_execution_time_secs = secs;
         self
     }
 
     /// Set maximum memory usage
-    pub fn max_memory_mb(mut self, mb: u64) -> Self {
+    #[must_use]
+    pub const fn max_memory_mb(mut self, mb: u64) -> Self {
         self.config.resource_limits.max_memory_mb = mb;
         self
     }
 
     /// Set maximum number of tool calls
-    pub fn max_tool_calls(mut self, calls: u32) -> Self {
+    #[must_use]
+    pub const fn max_tool_calls(mut self, calls: u32) -> Self {
         self.config.resource_limits.max_tool_calls = calls;
         self
     }
 
     /// Set maximum recursion depth
-    pub fn max_recursion_depth(mut self, depth: u8) -> Self {
+    #[must_use]
+    pub const fn max_recursion_depth(mut self, depth: u8) -> Self {
         self.config.resource_limits.max_recursion_depth = depth;
         self
     }
 
     /// Set all resource limits at once
-    pub fn resource_limits(mut self, limits: ResourceLimits) -> Self {
+    #[must_use]
+    pub const fn resource_limits(mut self, limits: ResourceLimits) -> Self {
         self.config.resource_limits = limits;
         self
     }

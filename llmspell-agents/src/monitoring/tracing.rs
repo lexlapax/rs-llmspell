@@ -38,12 +38,14 @@ pub struct TraceSpan {
 
 impl TraceSpan {
     /// Create a new root span
+    #[must_use]
     pub fn new_root(operation: String, service: String) -> Self {
         let trace_id = Uuid::new_v4().to_string();
-        Self::new(trace_id.clone(), None, operation, service)
+        Self::new(trace_id, None, operation, service)
     }
 
     /// Create a new child span
+    #[must_use]
     pub fn new_child(&self, operation: String) -> Self {
         Self::new(
             self.trace_id.clone(),
@@ -97,6 +99,7 @@ impl TraceSpan {
     }
 
     /// Get span duration in milliseconds
+    #[must_use]
     pub fn duration_ms(&self) -> Option<f64> {
         self.duration.map(|d| d.as_secs_f64() * 1000.0)
     }
@@ -128,6 +131,7 @@ pub struct TraceEvent {
 
 impl TraceEvent {
     /// Create a new trace event
+    #[must_use]
     pub fn new(name: String) -> Self {
         Self {
             timestamp: Utc::now(),
@@ -137,6 +141,7 @@ impl TraceEvent {
     }
 
     /// Add an attribute to the event
+    #[must_use]
     pub fn with_attribute(mut self, key: String, value: String) -> Self {
         self.attributes.insert(key, value);
         self
@@ -158,6 +163,7 @@ pub struct SpanContext {
 
 impl SpanContext {
     /// Create from a span
+    #[must_use]
     pub fn from_span(span: &TraceSpan) -> Self {
         Self {
             trace_id: span.trace_id.clone(),
@@ -173,6 +179,7 @@ impl SpanContext {
     }
 
     /// Create a child span from this context
+    #[must_use]
     pub fn child_span(&self, operation: String) -> TraceSpan {
         TraceSpan::new(
             self.trace_id.clone(),
@@ -214,6 +221,7 @@ impl std::fmt::Debug for TraceCollector {
 
 impl TraceCollector {
     /// Create a new trace collector
+    #[must_use]
     pub fn new(max_completed_spans: usize) -> Self {
         Self {
             active_spans: Arc::new(RwLock::new(HashMap::new())),
@@ -229,6 +237,7 @@ impl TraceCollector {
     }
 
     /// Start a new span
+    #[must_use]
     pub fn start_span(self: &Arc<Self>, span: TraceSpan) -> SpanHandle {
         let span_id = span.span_id.clone();
         self.active_spans
@@ -266,11 +275,13 @@ impl TraceCollector {
     }
 
     /// Get active span count
+    #[must_use]
     pub fn active_span_count(&self) -> usize {
         self.active_spans.read().unwrap().len()
     }
 
     /// Get completed spans for a trace
+    #[must_use]
     pub fn get_trace(&self, trace_id: &str) -> Vec<TraceSpan> {
         self.completed_spans
             .read()
@@ -384,6 +395,7 @@ pub struct TraceAnalyzer;
 
 impl TraceAnalyzer {
     /// Calculate critical path in a trace
+    #[must_use]
     pub fn critical_path(spans: &[TraceSpan]) -> Vec<String> {
         if spans.is_empty() {
             return Vec::new();
@@ -423,6 +435,7 @@ impl TraceAnalyzer {
     }
 
     /// Calculate trace statistics
+    #[must_use]
     pub fn trace_stats(spans: &[TraceSpan]) -> TraceStatistics {
         if spans.is_empty() {
             return TraceStatistics::default();
