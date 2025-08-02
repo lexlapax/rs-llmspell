@@ -1,6 +1,7 @@
 //! ABOUTME: llmspell-workflows implementation crate
 //! ABOUTME: Provides workflow patterns for orchestrating agents and tools
 
+pub mod adapters;
 pub mod conditional;
 pub mod conditions;
 pub mod error_handling;
@@ -51,3 +52,10 @@ pub use parallel::{
     BranchResult, ParallelBranch, ParallelConfig, ParallelWorkflow, ParallelWorkflowBuilder,
     ParallelWorkflowResult,
 };
+
+// Re-export adapters for workflow-agent integration
+pub use adapters::prelude::{
+    agent_to_workflow_input, agent_to_workflow_output, workflow_to_agent_input,
+    workflow_to_agent_output,
+};
+pub use adapters::{WorkflowInputAdapter, WorkflowOutputAdapter};

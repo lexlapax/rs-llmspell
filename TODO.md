@@ -84,11 +84,26 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
    - All existing workflow-specific methods and execution logic preserved
    - Clippy lint check passed with no warnings
 
-4. [ ] **Input/Output Adapters** (1.5 hours):
-   - [ ] Create `AgentInput` to `WorkflowInput` conversion
-   - [ ] Create `WorkflowOutput` to `AgentOutput` conversion  
-   - [ ] Handle workflow-specific parameters in AgentInput
-   - [ ] Preserve workflow execution results in AgentOutput
+4. [x] **Input/Output Adapters** (1.5 hours): ✅ **COMPLETED**
+   - [x] Create `AgentInput` to `WorkflowInput` conversion
+   - [x] Create `WorkflowOutput` to `AgentOutput` conversion  
+   - [x] Handle workflow-specific parameters in AgentInput
+   - [x] Preserve workflow execution results in AgentOutput
+   **Implementation Details**:
+   - Created `llmspell-workflows/src/adapters.rs` with `WorkflowInputAdapter` and `WorkflowOutputAdapter`
+   - `WorkflowInputAdapter::from_agent_input()` converts AgentInput to WorkflowInput:
+     - Maps text to primary input with metadata
+     - Extracts timeout parameters (timeout_ms, timeout_secs)
+     - Preserves execution context (conversation_id, session_id)
+     - Converts parameters to workflow context
+   - `WorkflowOutputAdapter::to_agent_output()` converts WorkflowOutput to AgentOutput:
+     - Generates appropriate text based on success/failure
+     - Preserves all workflow metadata (execution time, steps executed/failed)
+     - Transfers final context as metadata
+     - Stores structured output when present
+   - Bidirectional conversions support workflow composition
+   - All adapter unit tests pass
+   - Convenience functions exposed in prelude module
 
 5. [ ] **Workflow Factory Interface** (30 min):
    - [ ] Create `WorkflowFactory` trait matching agent factory pattern
@@ -118,7 +133,7 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
 - `llmspell-workflows/src/conditional.rs` (add BaseAgent + Workflow impl) ✅ **UPDATED**
 - `llmspell-workflows/src/loop.rs` (add BaseAgent + Workflow impl) ✅ **UPDATED**
 - `llmspell-workflows/src/factory.rs` (new - WorkflowFactory trait)
-- `llmspell-workflows/src/adapters.rs` (new - input/output conversion)
+- `llmspell-workflows/src/adapters.rs` (new - input/output conversion) ✅ **CREATED**
 - [ ] All workflow pattern tests (WITH PROPER CATEGORIZATION)
 
 **Acceptance Criteria**:
@@ -145,12 +160,13 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
 **Description**: Create standardized WorkflowFactory and WorkflowExecutor interfaces following the agent factory pattern, replacing current ad-hoc workflow creation.
 
 **Implementation Steps**:
-1. [ ] **Analysis & Discovery** (20 min):
+1. [ ] **Additional Analysis & Discovery** (20 min):
    - [ ] Find current workflow creation patterns: `grep -r "create_workflow\|new.*Workflow" llmspell-bridge/src/workflows.rs llmspell-workflows/src/`
    - [ ] Check WorkflowBridge implementation: `grep -r "WorkflowFactory\|WorkflowExecutor" llmspell-bridge/src/`
    - [ ] List agent factory patterns: `grep -r "AgentFactory" llmspell-agents/src/ -A 5`
    - [ ] Document current workflow instantiation inconsistencies
    - [ ] Update implementation plan based on findings
+   - [ ] Augment/Update tasks below as required through the analysis in this step.
 
 2. [ ] **WorkflowFactory Interface** (1.5 hours):
    - [ ] Create `WorkflowFactory` trait matching `AgentFactory` pattern
@@ -226,12 +242,13 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
 **Description**: Standardize all workflow configuration objects to use builder patterns, replacing struct literal initialization.
 
 **Implementation Steps**:
-1. [ ] **Analysis & Discovery** (25 min):
+1. [ ] **Additional Analysis & Discovery** (25 min):
    - [ ] Find workflow config usage: `grep -r "WorkflowConfig\|Config.*{" llmspell-workflows/src/ llmspell-bridge/src/workflows.rs`
    - [ ] Find pattern-specific configs: `grep -r "SequentialConfig\|ParallelConfig\|ConditionalConfig\|LoopConfig" llmspell-workflows/src/`
    - [ ] Check current builder implementations: `grep -r "builder()\|Builder" llmspell-workflows/src/`
    - [ ] Document all struct literal usage in workflow creation
    - [ ] Update implementation plan based on findings
+   - [ ] Augment/Update tasks below as required through the analysis in this step.
 
 2. [ ] **Core WorkflowConfig Builder** (1 hour):
    - [ ] Enhance existing `WorkflowConfig` builder in `llmspell-workflows/src/types.rs`
@@ -300,12 +317,13 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
 **Description**: Standardize workflow bridge APIs to follow consistent naming conventions and integrate with unified discovery pattern.
 
 **Implementation Steps**:
-1. [ ] **Analysis & Discovery** (30 min):
+1. [ ] **Additional Analysis & Discovery** (30 min):
    - [ ] Review WorkflowBridge methods: `grep -r "impl.*WorkflowBridge" llmspell-bridge/src/workflows.rs -A 30`
    - [ ] Find API naming inconsistencies: `grep -r "create_workflow\|get_workflow\|list.*workflow" llmspell-bridge/src/workflows.rs`
    - [ ] Check script global methods: `grep -r "workflow_table\.set" llmspell-bridge/src/lua/globals/workflow.rs`
    - [ ] Compare with other bridge APIs: `grep -r "fn.*\(get\|list\|create\|remove\)" llmspell-bridge/src/agents.rs llmspell-bridge/src/session_bridge.rs`
    - [ ] Document all API inconsistencies and missing methods
+   - [ ] Augment/Update tasks below as required through the analysis in this step.
 
 2. [ ] **Bridge Method Standardization** (1.5 hours):
    - [ ] Rename methods for consistency:
@@ -380,12 +398,13 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
 **Description**: Standardize workflow script APIs to use snake_case consistently and align with other global object naming conventions.
 
 **Implementation Steps**:
-1. [ ] **Analysis & Discovery** (25 min):
+1. [ ] **Additional Analysis & Discovery** (25 min):
    - [ ] Find all camelCase methods in workflow globals: `grep -r "getCurrent\|getMetrics\|getInfo\|listTypes" llmspell-bridge/src/lua/globals/workflow.rs llmspell-bridge/src/javascript/globals/workflow.rs`
    - [ ] List all workflow script methods: `grep -r "workflow_table\.set\|methods\.add" llmspell-bridge/src/lua/globals/workflow.rs`
    - [ ] Check JavaScript workflow methods: `grep -r "define_property\|method" llmspell-bridge/src/javascript/globals/workflow.rs`
    - [ ] Compare with other global naming: `grep -r "get_current\|set_current" llmspell-bridge/src/lua/globals/session.rs`
    - [ ] Document all naming inconsistencies requiring updates
+   - [ ] Augment/Update tasks below as required through the analysis in this step.
 
 2. [ ] **Lua API Standardization** (1.5 hours):
    - [ ] Convert workflow instance methods to snake_case:
@@ -455,11 +474,12 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
 **Description**: Standardize factory method naming across bridge components (excluding workflows, handled by 1.7).
 
 **Implementation Steps**:
-1. [ ] **Analysis and Discovery** (20 min):
+1. [ ] **Additional Analysis and Discovery** (20 min):
    - [ ] Search for all non-workflow factory methods: `grep -r "pub fn new\|pub fn with_\|pub fn create_\|pub fn from_" llmspell-bridge/src/ | grep -v workflow`
    - [ ] Identify specific files with factory methods (excluding WorkflowFactory from 1.7)
    - [ ] Document current patterns per component
    - [ ] Create comprehensive list of files to update
+   - [ ] Augment/Update tasks below as required through the analysis in this step.
 
 2. [ ] **Audit Current Patterns** (30 min):
    - [ ] Document all `new()`, `with_*()`, `create_*()` methods
@@ -527,12 +547,13 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
 **Description**: Update bridge layer to use existing builder patterns for core configuration objects (excluding workflows, handled by 1.8-1.9).
 
 **Implementation Steps**:
-1. [ ] **Analysis and Discovery** (15 min):
+1. [ ] **Additional Analysis and Discovery** (15 min):
    - [ ] Search for non-workflow struct literals: `grep -r "Config {" llmspell-bridge/src/ | grep -v -i workflow`
    - [ ] Find SessionManagerConfig usage: `grep -r "SessionManagerConfig" llmspell-bridge/src/`
    - [ ] Find AgentConfig usage: `grep -r "AgentConfig" llmspell-bridge/src/`
    - [ ] List all files using struct literal initialization (excluding workflows)
-
+   - [ ] Augment/Update tasks below as required through the analysis in this step.
+   
 2. [ ] **Session Infrastructure Updates** (1.25 hours):
    - [ ] Update `session_infrastructure.rs` to use `SessionManagerConfig::builder()`
    - [ ] Replace struct literal with builder pattern
