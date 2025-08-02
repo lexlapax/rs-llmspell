@@ -40,8 +40,7 @@ impl EventSerialization {
             "JavaScript" | "Javascript" => Language::JavaScript,
             "Python" => Language::Python,
             "Rust" => Language::Rust,
-            "Unknown" => Language::Unknown,
-            _ => Language::Unknown, // Default fallback
+            "Unknown" | _ => Language::Unknown,
         };
 
         let mut event = UniversalEvent::new(event_type, data, language);
@@ -113,12 +112,8 @@ impl EventSerialization {
                 // Ensure compatibility with JavaScript JSON parsing
                 Self::ensure_js_compatibility(&mut serialized["data"])?;
             }
-            Language::Python => {
-                // Python-specific transformations if needed
-                // Currently no special handling required
-            }
-            Language::Rust | Language::Unknown => {
-                // No transformations needed for Rust/Unknown
+            Language::Python | Language::Rust | Language::Unknown => {
+                // No transformations needed for Python/Rust/Unknown
             }
         }
 
@@ -157,11 +152,8 @@ impl EventSerialization {
                 // Handle JavaScript-specific deserialization
                 Self::normalize_js_data(&mut working_data["data"])?;
             }
-            Language::Python => {
-                // Python-specific deserialization if needed
-            }
-            Language::Rust | Language::Unknown => {
-                // No transformations needed
+            Language::Python | Language::Rust | Language::Unknown => {
+                // No transformations needed for Python/Rust/Unknown
             }
         }
 

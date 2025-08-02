@@ -1268,10 +1268,7 @@ pub fn inject_agent_global(
         )
         .map_err(|e| mlua::Error::RuntimeError(format!("Failed to get context data: {e}")))?;
 
-        match result {
-            Some(value) => json_to_lua_value(lua, &value),
-            None => Ok(Value::Nil),
-        }
+        result.map_or_else(|| Ok(Value::Nil), |value| json_to_lua_value(lua, &value))
     })?;
 
     // Create Agent.removeContext() function
@@ -1326,10 +1323,7 @@ pub fn inject_agent_global(
         )
         .map_err(|e| mlua::Error::RuntimeError(format!("Failed to get shared memory: {e}")))?;
 
-        match result {
-            Some(value) => json_to_lua_value(lua, &value),
-            None => Ok(Value::Nil),
-        }
+        result.map_or_else(|| Ok(Value::Nil), |value| json_to_lua_value(lua, &value))
     })?;
 
     // Create Agent.getHierarchy() function

@@ -523,7 +523,6 @@ fn parse_condition(condition_json: &serde_json::Value) -> Result<llmspell_workfl
 
     if let Some(condition_type) = condition_json.get("type").and_then(|v| v.as_str()) {
         match condition_type {
-            "always" => Ok(Condition::Always),
             "never" => Ok(Condition::Never),
             "shared_data_equals" => {
                 let key = condition_json
@@ -554,7 +553,7 @@ fn parse_condition(condition_json: &serde_json::Value) -> Result<llmspell_workfl
                     key: key.to_string(),
                 })
             }
-            _ => Ok(Condition::Always), // Default to always true for unknown types
+            "always" | _ => Ok(Condition::Always), // Default to always true for unknown types
         }
     } else {
         // If no type specified, default to always true

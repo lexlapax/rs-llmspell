@@ -850,11 +850,10 @@ impl AgentBridge {
         // Handle inheritance
         if let Some(inheritance) = builder_config.get("inheritance").and_then(|v| v.as_str()) {
             let policy = match inheritance {
-                "inherit" => InheritancePolicy::Inherit,
                 "isolate" => InheritancePolicy::Isolate,
                 "copy" => InheritancePolicy::Copy,
                 "share" => InheritancePolicy::Share,
-                _ => InheritancePolicy::Inherit,
+                "inherit" | _ => InheritancePolicy::Inherit,
             };
             builder = builder.inheritance(policy);
         }
@@ -923,11 +922,10 @@ impl AgentBridge {
 
         let scope = self.parse_context_scope(&scope)?;
         let policy = match inheritance {
-            "inherit" => InheritancePolicy::Inherit,
             "isolate" => InheritancePolicy::Isolate,
             "copy" => InheritancePolicy::Copy,
             "share" => InheritancePolicy::Share,
-            _ => InheritancePolicy::Inherit,
+            "inherit" | _ => InheritancePolicy::Inherit,
         };
 
         let child = Arc::new(parent.create_child(scope, policy));
@@ -1334,9 +1332,7 @@ impl AgentBridge {
         for (name, agent) in agents.iter() {
             // Check various capabilities
             match capability {
-                "streaming" => matching_agents.push(name.clone()),
-                "tools" => matching_agents.push(name.clone()),
-                "context" => matching_agents.push(name.clone()),
+                "streaming" | "tools" | "context" => matching_agents.push(name.clone()),
                 "composite" => {
                     // Check if agent is a composite type
                     let desc = &agent.metadata().description;

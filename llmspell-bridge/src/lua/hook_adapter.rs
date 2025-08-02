@@ -66,7 +66,6 @@ impl LuaHookAdapter {
     /// Convert Lua value to `HookResult`
     pub fn lua_value_to_hook_result(&self, _lua: &Lua, value: Value) -> mlua::Result<HookResult> {
         match value {
-            Value::Nil => Ok(HookResult::Continue),
             Value::String(s) => {
                 let s = s.to_str()?;
                 match s {
@@ -82,7 +81,6 @@ impl LuaHookAdapter {
                 if let Ok(Value::String(result_type)) = table.get::<_, Value>("type") {
                     let result_type = result_type.to_str()?;
                     match result_type {
-                        "continue" => Ok(HookResult::Continue),
                         "modified" => {
                             // Get the modified data
                             if let Ok(data) = table.get::<_, Table>("data") {
@@ -132,13 +130,13 @@ impl LuaHookAdapter {
                                 .unwrap_or_else(|_| "Skipped by Lua hook".to_string());
                             Ok(HookResult::Skipped(reason))
                         }
-                        _ => Ok(HookResult::Continue),
+                        "continue" | _ => Ok(HookResult::Continue),
                     }
                 } else {
                     Ok(HookResult::Continue)
                 }
             }
-            _ => Ok(HookResult::Continue),
+            Value::Nil | _ => Ok(HookResult::Continue),
         }
     }
 }
@@ -164,11 +162,7 @@ impl HookAdapter for LuaHookAdapter {
     }
 
     fn adapt_result(&self, result: Self::Result) -> HookResult {
-        if let Some(hook_result) = result.downcast_ref::<HookResult>() {
-            hook_result.clone()
-        } else {
-            HookResult::Continue
-        }
+        result.downcast_ref::<HookResult>().map_or(HookResult::Continue, |hook_result| hook_result.clone())
     }
 
     fn extract_error(&self, result: &Self::Result) -> Option<String> {

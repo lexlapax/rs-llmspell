@@ -130,10 +130,7 @@ where
     T: Into<Self>,
 {
     fn from(opt: Option<T>) -> Self {
-        match opt {
-            Some(val) => val.into(),
-            None => Self::Null,
-        }
+        opt.map_or(Self::Null, std::convert::Into::into)
     }
 }
 
@@ -195,13 +192,12 @@ impl ConversionUtils {
 #[must_use]
 pub fn parse_error_strategy(strategy: &str) -> ErrorStrategy {
     match strategy.to_lowercase().as_str() {
-        "stop" | "fail_fast" => ErrorStrategy::FailFast,
         "continue" => ErrorStrategy::Continue,
         "retry" => ErrorStrategy::Retry {
             max_attempts: 3,
             backoff_ms: 1000,
         },
-        _ => ErrorStrategy::FailFast,
+        "stop" | "fail_fast" | _ => ErrorStrategy::FailFast,
     }
 }
 

@@ -3,7 +3,7 @@
 
 use crate::engine::types::ScriptEngineError;
 use crate::engine::{
-    factory::{LuaConfig, StdlibLevel},
+    factory::LuaConfig,
     EngineFeatures, ExecutionContext, ScriptEngineBridge, ScriptMetadata, ScriptOutput,
     ScriptStream,
 };
@@ -37,11 +37,8 @@ impl LuaEngine {
             use mlua::Lua;
 
             // Create Lua instance (async is enabled via feature flag)
-            let lua = match config.stdlib {
-                StdlibLevel::None => Lua::new(),
-                StdlibLevel::Safe => Lua::new(), // TODO: restrict stdlib
-                StdlibLevel::Full => Lua::new(),
-            };
+            // TODO: restrict stdlib for Safe level
+            let lua = Lua::new();
 
             Ok(Self {
                 lua: Arc::new(parking_lot::Mutex::new(lua)),
@@ -345,7 +342,7 @@ fn is_lua_array(table: &mlua::Table) -> bool {
         // Check if there are any non-numeric keys
         for (k, _) in table.clone().pairs::<mlua::Value, mlua::Value>().flatten() {
             match k {
-                mlua::Value::Integer(i) if i >= 1 && i <= len => continue,
+                mlua::Value::Integer(i) if i >= 1 && i <= len => {}
                 _ => return false,
             }
         }

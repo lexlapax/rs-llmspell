@@ -99,12 +99,11 @@ impl GlobalObject for EventGlobal {
                                         .unwrap_or(None)
                                         .map_or(Language::Lua, |s| {
                                             match s.to_lowercase().as_str() {
-                                                "lua" => Language::Lua,
                                                 "javascript" | "js" => Language::JavaScript,
                                                 "python" | "py" => Language::Python,
                                                 "unknown" => Language::Unknown,
                                                 "rust" => Language::Rust,
-                                                _ => Language::Lua,
+                                                "lua" | _ => Language::Lua,
                                             }
                                         })
                                 });
@@ -172,12 +171,11 @@ impl GlobalObject for EventGlobal {
                                 opts.get::<&str, Option<String>>("language")
                                     .unwrap_or(None)
                                     .map_or(Language::Lua, |s| match s.to_lowercase().as_str() {
-                                        "lua" => Language::Lua,
                                         "javascript" | "js" => Language::JavaScript,
                                         "python" | "py" => Language::Python,
                                         "unknown" => Language::Unknown,
                                         "rust" => Language::Rust,
-                                        _ => Language::Lua,
+                                        "lua" | _ => Language::Lua,
                                     })
                             });
 

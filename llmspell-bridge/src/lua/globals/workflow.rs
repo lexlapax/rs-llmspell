@@ -96,13 +96,12 @@ fn _parse_workflow_step(_lua: &Lua, step_table: Table) -> mlua::Result<WorkflowS
 #[allow(dead_code)]
 fn _parse_error_strategy(strategy: &str) -> ErrorStrategy {
     match strategy.to_lowercase().as_str() {
-        "fail_fast" | "failfast" => ErrorStrategy::FailFast,
         "continue" => ErrorStrategy::Continue,
         "retry" => ErrorStrategy::Retry {
             max_attempts: 3,
             backoff_ms: 1000,
         },
-        _ => ErrorStrategy::FailFast,
+        "fail_fast" | "failfast" | _ => ErrorStrategy::FailFast,
     }
 }
 

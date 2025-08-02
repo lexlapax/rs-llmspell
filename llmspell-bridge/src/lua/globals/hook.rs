@@ -129,7 +129,6 @@ fn hook_context_to_lua_table<'lua>(
 #[allow(dead_code)]
 fn lua_value_to_hook_result(value: Value) -> mlua::Result<HookResult> {
     match value {
-        Value::Nil => Ok(HookResult::Continue),
         Value::String(s) => {
             let s = s.to_str()?;
             match s {
@@ -143,7 +142,6 @@ fn lua_value_to_hook_result(value: Value) -> mlua::Result<HookResult> {
             if let Ok(Value::String(result_type)) = table.get::<_, Value>("type") {
                 let result_type = result_type.to_str()?;
                 match result_type {
-                    "continue" => Ok(HookResult::Continue),
                     "modified" => {
                         // Get the modified data
                         if let Ok(data) = table.get::<_, Table>("data") {
@@ -191,13 +189,13 @@ fn lua_value_to_hook_result(value: Value) -> mlua::Result<HookResult> {
                             .unwrap_or_else(|_| "Skipped by Lua hook".to_string());
                         Ok(HookResult::Skipped(reason))
                     }
-                    _ => Ok(HookResult::Continue),
+                    "continue" | _ => Ok(HookResult::Continue),
                 }
             } else {
                 Ok(HookResult::Continue)
             }
         }
-        _ => Ok(HookResult::Continue),
+        Value::Nil | _ => Ok(HookResult::Continue),
     }
 }
 
@@ -238,10 +236,9 @@ fn parse_priority(s: Option<String>) -> Priority {
     match s.as_deref() {
         Some("highest") => Priority::HIGHEST,
         Some("high") => Priority::HIGH,
-        Some("normal") => Priority::NORMAL,
         Some("low") => Priority::LOW,
         Some("lowest") => Priority::LOWEST,
-        _ => Priority::NORMAL,
+        Some("normal") | _ => Priority::NORMAL,
     }
 }
 

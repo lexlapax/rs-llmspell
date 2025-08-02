@@ -51,19 +51,19 @@ pub fn inject_tool_global(
             schema_table.set("description", schema.description)?;
 
             // Convert parameters to Lua table
-            let params_table = lua.create_table()?;
+            let parameters_table = lua.create_table()?;
             for (i, param) in schema.parameters.into_iter().enumerate() {
-                let param_table = lua.create_table()?;
-                param_table.set("name", param.name)?;
-                param_table.set("type", format!("{:?}", param.param_type).to_lowercase())?;
-                param_table.set("description", param.description)?;
-                param_table.set("required", param.required)?;
+                let param_entry = lua.create_table()?;
+                param_entry.set("name", param.name)?;
+                param_entry.set("type", format!("{:?}", param.param_type).to_lowercase())?;
+                param_entry.set("description", param.description)?;
+                param_entry.set("required", param.required)?;
                 if let Some(default) = param.default {
-                    param_table.set("default", json_to_lua_value(lua, &default)?)?;
+                    param_entry.set("default", json_to_lua_value(lua, &default)?)?;
                 }
-                params_table.set(i + 1, param_table)?;
+                parameters_table.set(i + 1, param_entry)?;
             }
-            schema_table.set("parameters", params_table)?;
+            schema_table.set("parameters", parameters_table)?;
             tool_table.set("schema", schema_table)?;
 
             // Add execute method to the returned tool
@@ -275,20 +275,20 @@ pub fn inject_tool_global(
                         schema_table.set("name", schema.name.clone())?;
                         schema_table.set("description", schema.description.clone())?;
 
-                        let params_table = lua.create_table()?;
+                        let parameters_table = lua.create_table()?;
                         for (i, param) in schema.parameters.iter().enumerate() {
-                            let param_table = lua.create_table()?;
-                            param_table.set("name", param.name.clone())?;
-                            param_table
+                            let param_entry = lua.create_table()?;
+                            param_entry.set("name", param.name.clone())?;
+                            param_entry
                                 .set("type", format!("{:?}", param.param_type).to_lowercase())?;
-                            param_table.set("description", param.description.clone())?;
-                            param_table.set("required", param.required)?;
+                            param_entry.set("description", param.description.clone())?;
+                            param_entry.set("required", param.required)?;
                             if let Some(default) = &param.default {
-                                param_table.set("default", json_to_lua_value(lua, default)?)?;
+                                param_entry.set("default", json_to_lua_value(lua, default)?)?;
                             }
-                            params_table.set(i + 1, param_table)?;
+                            parameters_table.set(i + 1, param_entry)?;
                         }
-                        schema_table.set("parameters", params_table)?;
+                        schema_table.set("parameters", parameters_table)?;
                         Ok(schema_table)
                     })?,
                 )?;

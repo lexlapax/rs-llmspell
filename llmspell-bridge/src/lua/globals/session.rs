@@ -224,10 +224,7 @@ pub fn inject_session_global(
 
     // getCurrent method - get current session from thread-local context
     let get_current_fn =
-        lua.create_function(|_lua, ()| match SessionBridge::get_current_session() {
-            Some(session_id) => Ok(Some(session_id.to_string())),
-            None => Ok(None),
-        })?;
+        lua.create_function(|_lua, ()| SessionBridge::get_current_session().map_or_else(|| Ok(None), |session_id| Ok(Some(session_id.to_string()))))?;
     session_table.set("getCurrent", get_current_fn)?;
 
     // setCurrent method - set current session in thread-local context
