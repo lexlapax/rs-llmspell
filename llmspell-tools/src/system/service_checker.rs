@@ -729,10 +729,7 @@ mod tests {
     async fn test_dns_check_localhost() {
         let tool = create_test_tool_with_custom_config();
 
-        let input = create_test_tool_input(vec![
-            ("target", "localhost:80"),
-            ("check_type", "dns"),
-        ]);
+        let input = create_test_tool_input(vec![("target", "localhost:80"), ("check_type", "dns")]);
 
         let result = tool
             .execute(input, ExecutionContext::default())

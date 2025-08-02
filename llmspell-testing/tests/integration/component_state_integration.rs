@@ -2,9 +2,7 @@
 // ABOUTME: Validates state persistence integration and cross-component data consistency
 
 use llmspell_core::ComponentMetadata;
-use llmspell_state_persistence::{
-    StateManager as PersistentStateManager, StateScope,
-};
+use llmspell_state_persistence::{StateManager as PersistentStateManager, StateScope};
 use llmspell_testing::state_helpers::create_test_state_manager;
 use llmspell_tools::state::{ToolState, ToolStateRegistry};
 use llmspell_workflows::state::{PersistentWorkflowState, PersistentWorkflowStateManager};
@@ -135,10 +133,12 @@ mod component_integration_tests {
         assert!(loaded_references.is_some());
 
         let refs_value = loaded_references.unwrap();
-        assert!(refs_value["tool_to_workflow"][&tool_metadata.id.to_string()]
-            .as_array()
-            .unwrap()
-            .contains(&serde_json::Value::String(workflow_metadata.id.to_string())));
+        assert!(
+            refs_value["tool_to_workflow"][&tool_metadata.id.to_string()]
+                .as_array()
+                .unwrap()
+                .contains(&serde_json::Value::String(workflow_metadata.id.to_string()))
+        );
 
         println!("✅ Cross-component state sharing integration successful");
     }

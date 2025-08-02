@@ -56,7 +56,7 @@ pub fn create_test_tool_hook_context(tool_name: &str) -> HookContext {
 /// Create a test hook context for workflow execution
 pub fn create_test_workflow_hook_context(workflow_name: &str) -> HookContext {
     let component_id = ComponentId::new(ComponentType::Workflow, workflow_name.to_string());
-    HookContext::new(HookPoint::BeforeWorkflowExecution, component_id)
+    HookContext::new(HookPoint::BeforeWorkflowStart, component_id)
 }
 
 /// Create a test hook context with error
@@ -94,11 +94,11 @@ mod tests {
     #[test]
     fn test_create_hook_context_with_component() {
         let context = create_test_hook_context_with_component(
-            HookPoint::BeforeWorkflowExecution,
+            HookPoint::BeforeWorkflowStart,
             ComponentType::Workflow,
             "test-workflow",
         );
-        assert_eq!(context.point, HookPoint::BeforeWorkflowExecution);
+        assert_eq!(context.point, HookPoint::BeforeWorkflowStart);
         assert_eq!(context.component_id.component_type, ComponentType::Workflow);
         assert_eq!(context.component_id.name, "test-workflow");
     }
@@ -128,7 +128,7 @@ mod tests {
     #[test]
     fn test_create_workflow_hook_context() {
         let context = create_test_workflow_hook_context("test-workflow");
-        assert_eq!(context.point, HookPoint::BeforeWorkflowExecution);
+        assert_eq!(context.point, HookPoint::BeforeWorkflowStart);
         assert_eq!(context.component_id.component_type, ComponentType::Workflow);
         assert_eq!(context.component_id.name, "test-workflow");
     }

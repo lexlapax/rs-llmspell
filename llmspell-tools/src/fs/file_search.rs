@@ -576,8 +576,8 @@ mod tests {
     use super::*;
     use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
     use llmspell_security::sandbox::SandboxContext;
-    use std::collections::HashMap;
     use llmspell_testing::tool_helpers::{create_test_tool, create_test_tool_input};
+    use std::collections::HashMap;
     use tempfile::TempDir;
     use tokio::fs;
 
@@ -768,9 +768,7 @@ mod tests {
         let test_file = temp_dir.path().join("test.txt");
         fs::write(&test_file, "content").await.unwrap();
 
-        let input = create_test_tool_input(vec![
-            ("path", &test_file.to_string_lossy()),
-        ]);
+        let input = create_test_tool_input(vec![("path", &test_file.to_string_lossy())]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());

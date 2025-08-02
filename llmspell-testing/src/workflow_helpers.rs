@@ -2,14 +2,13 @@
 // ABOUTME: Provides reusable helpers for workflow unit and integration tests
 
 use llmspell_workflows::{
-    conditions::{Condition, ConditionType},
-    sequential::{SequentialWorkflow, SequentialWorkflowBuilder},
-    parallel::{ParallelWorkflow, ParallelWorkflowBuilder},
     conditional::{ConditionalWorkflow, ConditionalWorkflowBuilder},
-    loop_workflow::{LoopWorkflow, LoopWorkflowBuilder},
-    traits::{StepType, WorkflowStep},
-    config::WorkflowConfig,
-    error_handling::{ErrorStrategy, RetryPolicy},
+    conditions::Condition,
+    parallel::{ParallelWorkflow, ParallelWorkflowBuilder},
+    r#loop::{LoopWorkflow, LoopWorkflowBuilder},
+    sequential::{SequentialWorkflow, SequentialWorkflowBuilder},
+    traits::{ErrorStrategy, StepType, WorkflowStep},
+    types::WorkflowConfig,
 };
 use serde_json::Value;
 use std::time::Duration;
@@ -37,11 +36,12 @@ pub fn create_test_tool_step(name: &str, tool_name: &str, params: Value) -> Work
 }
 
 /// Create a test agent workflow step
-pub fn create_test_agent_step(name: &str, agent_id: &str, input: Value) -> WorkflowStep {
+pub fn create_test_agent_step(name: &str, agent_id: &str, input: String) -> WorkflowStep {
+    use llmspell_core::types::ComponentId;
     WorkflowStep::new(
         name.to_string(),
         StepType::Agent {
-            agent_id: agent_id.to_string(),
+            agent_id: ComponentId::from_name(agent_id),
             input,
         },
     )
@@ -51,8 +51,11 @@ pub fn create_test_agent_step(name: &str, agent_id: &str, input: Value) -> Workf
 pub fn create_test_subworkflow_step(name: &str, workflow_id: &str) -> WorkflowStep {
     WorkflowStep::new(
         name.to_string(),
-        StepType::SubWorkflow {
-            workflow_id: workflow_id.to_string(),
+        StepType::Custom {
+            function_name: "execute_workflow".to_string(),
+            parameters: serde_json::json!({
+                "workflow_id": workflow_id
+            }),
         },
     )
 }
@@ -87,27 +90,18 @@ pub fn create_test_conditional_workflow(name: &str) -> ConditionalWorkflow {
 /// Create a test loop workflow
 pub fn create_test_loop_workflow(name: &str, max_iterations: usize) -> LoopWorkflow {
     LoopWorkflowBuilder::new(name)
-        .max_iterations(max_iterations)
+        .with_range(0, max_iterations as i64, 1)
         .build()
         .unwrap()
 }
 
 /// Create a test condition
-pub fn create_test_condition(name: &str, always_true: bool) -> Condition {
-    Condition::new(
-        name.to_string(),
-        if always_true {
-            ConditionType::FieldEquals {
-                field: "test".to_string(),
-                expected: serde_json::json!(true),
-            }
-        } else {
-            ConditionType::FieldEquals {
-                field: "test".to_string(),
-                expected: serde_json::json!(false),
-            }
-        },
-    )
+pub fn create_test_condition(always_true: bool) -> Condition {
+    if always_true {
+        Condition::Always
+    } else {
+        Condition::Never
+    }
 }
 
 /// Create a test workflow config
@@ -118,19 +112,16 @@ pub fn create_test_workflow_config() -> WorkflowConfig {
 /// Create a test workflow config with retry
 pub fn create_test_workflow_config_with_retry(max_retries: u32) -> WorkflowConfig {
     let mut config = WorkflowConfig::default();
-    config.retry_policy = RetryPolicy {
-        max_retries,
-        initial_delay: Duration::from_millis(100),
-        max_delay: Duration::from_secs(1),
-        backoff_multiplier: 2.0,
-    };
+    config.max_retry_attempts = max_retries;
+    config.exponential_backoff = true;
+    config.retry_delay_ms = 100;
     config
 }
 
 /// Create a test workflow config with error strategy
 pub fn create_test_workflow_config_with_error_strategy(strategy: ErrorStrategy) -> WorkflowConfig {
     let mut config = WorkflowConfig::default();
-    config.error_strategy = strategy;
+    config.default_error_strategy = strategy;
     config
 }
 
@@ -176,15 +167,16 @@ mod tests {
 
     #[test]
     fn test_create_agent_step() {
-        let input = serde_json::json!({"message": "hello"});
-        let step = create_test_agent_step("chat", "agent-1", input.clone());
+        use llmspell_core::types::ComponentId;
+        let input = "Process this message";
+        let step = create_test_agent_step("chat", "agent-1", input.to_string());
         assert_eq!(step.name, "chat");
         match step.step_type {
             StepType::Agent {
                 agent_id,
                 input: agent_input,
             } => {
-                assert_eq!(agent_id, "agent-1");
+                assert_eq!(agent_id, ComponentId::from_name("agent-1"));
                 assert_eq!(agent_input, input);
             }
             _ => panic!("Expected agent step"),
@@ -208,18 +200,19 @@ mod tests {
 
     #[test]
     fn test_create_condition() {
-        let true_condition = create_test_condition("always_true", true);
-        assert_eq!(true_condition.name(), "always_true");
+        let true_condition = create_test_condition(true);
+        assert!(matches!(true_condition, Condition::Always));
 
-        let false_condition = create_test_condition("always_false", false);
-        assert_eq!(false_condition.name(), "always_false");
+        let false_condition = create_test_condition(false);
+        assert!(matches!(false_condition, Condition::Never));
     }
 
     #[test]
     fn test_create_workflow_config_with_retry() {
         let config = create_test_workflow_config_with_retry(5);
-        assert_eq!(config.retry_policy.max_retries, 5);
-        assert_eq!(config.retry_policy.initial_delay, Duration::from_millis(100));
+        assert_eq!(config.max_retry_attempts, 5);
+        assert_eq!(config.retry_delay_ms, 100);
+        assert!(config.exponential_backoff);
     }
 
     #[test]

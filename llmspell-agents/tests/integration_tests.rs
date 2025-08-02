@@ -12,7 +12,6 @@ use llmspell_core::{types::AgentInput, BaseAgent, ExecutionContext};
 use llmspell_testing::agent_helpers::create_test_provider_manager;
 use std::{sync::Arc, time::Duration};
 
-
 /// Test agent factory creation
 #[tokio::test]
 async fn test_agent_factory_creation() {

@@ -6,8 +6,8 @@ use llmspell_state_persistence::{
     config::{FieldSchema, PersistenceConfig, StorageBackendType},
     manager::{SerializableState, StateManager},
     migration::{
-        DataTransformer, FieldTransform, MigrationPlanner,
-        MigrationValidator, StateTransformation, ValidationRules,
+        DataTransformer, FieldTransform, MigrationPlanner, MigrationValidator, StateTransformation,
+        ValidationRules,
     },
     schema::{EnhancedStateSchema, SemanticVersion},
     StateScope,
@@ -380,10 +380,18 @@ async fn test_multi_step_migration_chain() {
     );
 
     // Register all schemas
-    planner.register_schema(schema_v1_0_0).expect("Should register v1.0.0 schema");
-    planner.register_schema(schema_v1_1_0).expect("Should register v1.1.0 schema");
-    planner.register_schema(schema_v1_2_0).expect("Should register v1.2.0 schema");
-    planner.register_schema(schema_v2_0_0).expect("Should register v2.0.0 schema");
+    planner
+        .register_schema(schema_v1_0_0)
+        .expect("Should register v1.0.0 schema");
+    planner
+        .register_schema(schema_v1_1_0)
+        .expect("Should register v1.1.0 schema");
+    planner
+        .register_schema(schema_v1_2_0)
+        .expect("Should register v1.2.0 schema");
+    planner
+        .register_schema(schema_v2_0_0)
+        .expect("Should register v2.0.0 schema");
 
     // Plan migration from v1.0.0 to v2.0.0
     let plan = planner
@@ -410,7 +418,7 @@ async fn test_multi_step_migration_chain() {
         "Should have at least 1 migration step, but got {}",
         plan.steps.len()
     );
-    
+
     // If it's a multi-step migration, verify the path is correct
     if plan.steps.len() > 1 {
         // Verify the first step starts from the correct version
@@ -543,19 +551,26 @@ async fn test_transformation_error_handling() {
 
     // Apply transformation to test data
     let transformer = DataTransformer::new();
-    
+
     for (key, _) in &initial_states {
-        let value = state_manager.get(StateScope::Global, key).await.unwrap().unwrap();
+        let value = state_manager
+            .get(StateScope::Global, key)
+            .await
+            .unwrap()
+            .unwrap();
         let mut state = SerializableState {
             key: key.to_string(),
             value,
             timestamp: SystemTime::now(),
             schema_version: 1,
         };
-        
+
         let result = transformer.transform_state(&mut state, &transform).unwrap();
         assert!(result.success, "Transformation should succeed");
-        assert!(state.value.get("level").is_some(), "Level field should be added");
+        assert!(
+            state.value.get("level").is_some(),
+            "Level field should be added"
+        );
     }
 }
 
@@ -723,8 +738,7 @@ async fn test_migration_data_integrity() {
 
     println!(
         "Data integrity validation: {} errors, {} warnings",
-        validation_result.errors_count,
-        validation_result.warnings_count
+        validation_result.errors_count, validation_result.warnings_count
     );
 }
 

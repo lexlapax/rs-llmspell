@@ -4,7 +4,6 @@
 #[cfg(test)]
 mod tests {
     use super::*;
-    use llmspell_testing::hook_helpers::create_test_hook_context;
     use crate::context::HookContext;
     use crate::persistence::*;
     use crate::result::HookResult;
@@ -12,6 +11,7 @@ mod tests {
     use crate::types::{ComponentId, ComponentType, HookPoint};
     use anyhow::Result;
     use async_trait::async_trait;
+    use llmspell_testing::hook_helpers::create_test_hook_context;
     use std::sync::Arc;
     use std::time::{Duration, SystemTime};
     use uuid::Uuid;

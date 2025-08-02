@@ -204,7 +204,7 @@ impl DataTransformer {
 
         // Nested field path
         let mut current = target;
-        
+
         // Navigate to the parent of the final field
         for part in &parts[..parts.len() - 1] {
             if let Some(obj) = current.as_object_mut() {
@@ -395,9 +395,7 @@ impl DataTransformer {
                 Ok(false)
             }
 
-            FieldTransform::Remove { field } => {
-                Ok(Self::remove_nested_field(target, field))
-            }
+            FieldTransform::Remove { field } => Ok(Self::remove_nested_field(target, field)),
 
             FieldTransform::Split {
                 from_field,

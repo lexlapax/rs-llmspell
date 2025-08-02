@@ -6,8 +6,7 @@ use llmspell_state_persistence::{
     StateScope,
 };
 use llmspell_testing::state_helpers::{
-    create_test_state_manager_with_backup,
-    populate_test_state_data,
+    create_test_state_manager_with_backup, populate_test_state_data,
 };
 use serde_json::json;
 use std::time::{Duration, SystemTime};

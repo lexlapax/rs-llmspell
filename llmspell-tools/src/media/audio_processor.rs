@@ -651,9 +651,9 @@ impl Tool for AudioProcessorTool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use llmspell_testing::tool_helpers::{create_test_tool, create_test_tool_input};
     use std::collections::HashMap;
     use std::fs;
-    use llmspell_testing::tool_helpers::{create_test_tool, create_test_tool_input};
     use tempfile::TempDir;
 
     fn create_test_audio_processor() -> AudioProcessorTool {
@@ -837,9 +837,7 @@ mod tests {
     async fn test_invalid_operation() {
         let tool = create_test_audio_processor();
 
-        let input = create_test_tool_input(vec![
-            ("operation", "invalid"),
-        ]);
+        let input = create_test_tool_input(vec![("operation", "invalid")]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -853,9 +851,7 @@ mod tests {
         let tool = create_test_audio_processor();
 
         // Missing file_path for metadata operation
-        let input = create_test_tool_input(vec![
-            ("operation", "metadata"),
-        ]);
+        let input = create_test_tool_input(vec![("operation", "metadata")]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -894,9 +890,7 @@ mod tests {
         create_test_wav_file(&file_path).unwrap();
 
         // No operation specified, should default to metadata
-        let input = create_test_tool_input(vec![
-            ("file_path", &file_path.to_str().unwrap()),
-        ]);
+        let input = create_test_tool_input(vec![("file_path", &file_path.to_str().unwrap())]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -909,10 +903,7 @@ mod tests {
     async fn test_empty_file_path() {
         let tool = create_test_audio_processor();
 
-        let input = create_test_tool_input(vec![
-            ("operation", "detect"),
-            ("file_path", ""),
-        ]);
+        let input = create_test_tool_input(vec![("operation", "detect"), ("file_path", "")]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());

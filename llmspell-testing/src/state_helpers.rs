@@ -226,13 +226,13 @@ mod tests {
     #[tokio::test]
     async fn test_create_state_manager() {
         let state_manager = create_test_state_manager().await;
-        
+
         // Should be able to set and get values
         state_manager
             .set(StateScope::Global, "test", json!("value"))
             .await
             .unwrap();
-        
+
         let value = state_manager.get(StateScope::Global, "test").await.unwrap();
         assert_eq!(value, Some(json!("value")));
     }
@@ -241,14 +241,14 @@ mod tests {
     async fn test_populate_test_data() {
         let state_manager = create_test_state_manager().await;
         populate_test_state_data(&state_manager).await.unwrap();
-        
+
         // Check that data was populated
         let settings = state_manager
             .get(StateScope::Global, "user_settings")
             .await
             .unwrap();
         assert!(settings.is_some());
-        
+
         let agent_config = state_manager
             .get(StateScope::Custom("agent_1".to_string()), "config")
             .await
@@ -260,7 +260,7 @@ mod tests {
     fn test_create_scope_test_data() {
         let data = create_scope_test_data();
         assert!(!data.is_empty());
-        
+
         // Should have various scope types
         let has_global = data.iter().any(|(scope, _, _)| scope.is_global());
         let has_user = data.iter().any(|(scope, _, _)| scope.is_user_scope());
@@ -272,7 +272,7 @@ mod tests {
     fn test_create_large_dataset() {
         let dataset = create_large_test_dataset(100);
         assert_eq!(dataset.len(), 100);
-        
+
         // Check that each item is unique
         let keys: Vec<_> = dataset.iter().map(|(k, _)| k).collect();
         let unique_keys: std::collections::HashSet<_> = keys.iter().collect();

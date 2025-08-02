@@ -886,9 +886,7 @@ mod tests {
 
         fs::write(&file_path, b"dummy png content").unwrap();
 
-        let input = create_test_tool_input(vec![
-            ("operation", "metadata"),
-        ]);
+        let input = create_test_tool_input(vec![("operation", "metadata")]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -907,9 +905,7 @@ mod tests {
 
         fs::write(&file_path, b"dummy").unwrap();
 
-        let input = create_test_tool_input(vec![
-            ("operation", "detect"),
-        ]);
+        let input = create_test_tool_input(vec![("operation", "detect")]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -932,9 +928,7 @@ mod tests {
         // Create a file larger than the limit
         fs::write(&file_path, vec![0u8; 100]).unwrap();
 
-        let input = create_test_tool_input(vec![
-            ("operation", "metadata"),
-        ]);
+        let input = create_test_tool_input(vec![("operation", "metadata")]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -982,9 +976,7 @@ mod tests {
     async fn test_invalid_operation() {
         let tool = create_test_image_processor();
 
-        let input = create_test_tool_input(vec![
-            ("operation", "invalid"),
-        ]);
+        let input = create_test_tool_input(vec![("operation", "invalid")]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -998,9 +990,7 @@ mod tests {
         let tool = create_test_image_processor();
 
         // Missing file_path for metadata operation
-        let input = create_test_tool_input(vec![
-            ("operation", "metadata"),
-        ]);
+        let input = create_test_tool_input(vec![("operation", "metadata")]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -1089,9 +1079,7 @@ mod tests {
     async fn test_empty_file_path() {
         let tool = create_test_image_processor();
 
-        let input = create_test_tool_input(vec![
-            ("operation", "detect"),
-        ]);
+        let input = create_test_tool_input(vec![("operation", "detect")]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());

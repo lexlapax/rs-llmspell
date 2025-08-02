@@ -53,7 +53,7 @@ impl TestEnvironment {
         let temp_dir = tempfile::tempdir().expect("Failed to create temp dir");
         let test_data_dir = temp_dir.path().join("test_data");
         std::fs::create_dir_all(&test_data_dir).expect("Failed to create test data dir");
-        
+
         Self {
             name: name.to_string(),
             temp_dir,
@@ -140,9 +140,7 @@ pub fn create_test_context() -> ExecutionContext {
 }
 
 /// Create a test execution context with custom data
-pub fn create_test_context_with_data(
-    data: HashMap<String, serde_json::Value>,
-) -> ExecutionContext {
+pub fn create_test_context_with_data(data: HashMap<String, serde_json::Value>) -> ExecutionContext {
     let mut context = create_test_context();
     for (key, value) in data {
         context = context.with_data(key, value);
@@ -191,7 +189,7 @@ pub mod configs {
             ("RUST_BACKTRACE", "1"),
         ]
     }
-    
+
     /// Production-like environment configuration
     pub fn production_env() -> Vec<(&'static str, &'static str)> {
         vec![
@@ -201,7 +199,7 @@ pub mod configs {
             ("RUST_BACKTRACE", "0"),
         ]
     }
-    
+
     /// CI environment configuration
     pub fn ci_env() -> Vec<(&'static str, &'static str)> {
         vec![
@@ -212,13 +210,10 @@ pub mod configs {
             ("RUST_BACKTRACE", "full"),
         ]
     }
-    
+
     /// Minimal test environment
     pub fn minimal_env() -> Vec<(&'static str, &'static str)> {
-        vec![
-            ("LLMSPELL_ENV", "test"),
-            ("LLMSPELL_LOG_LEVEL", "error"),
-        ]
+        vec![("LLMSPELL_ENV", "test"), ("LLMSPELL_LOG_LEVEL", "error")]
     }
 }
 
@@ -233,24 +228,36 @@ pub mod test_data {
             (".env", "APP_VERSION=1.0.0\nDEBUG=true\n"),
         ]
     }
-    
+
     /// Generate test script files
     pub fn script_files() -> Vec<(&'static str, &'static str)> {
         vec![
-            ("test.py", "#!/usr/bin/env python3\nprint('Hello from Python')\n"),
+            (
+                "test.py",
+                "#!/usr/bin/env python3\nprint('Hello from Python')\n",
+            ),
             ("test.sh", "#!/bin/bash\necho 'Hello from Bash'\n"),
-            ("test.js", "#!/usr/bin/env node\nconsole.log('Hello from Node');\n"),
+            (
+                "test.js",
+                "#!/usr/bin/env node\nconsole.log('Hello from Node');\n",
+            ),
             ("test.lua", "-- Lua test script\nprint('Hello from Lua')\n"),
         ]
     }
-    
+
     /// Generate test data files
     pub fn data_files() -> Vec<(&'static str, &'static str)> {
         vec![
-            ("data.json", r#"[{"id": 1, "name": "Test 1"}, {"id": 2, "name": "Test 2"}]"#),
+            (
+                "data.json",
+                r#"[{"id": 1, "name": "Test 1"}, {"id": 2, "name": "Test 2"}]"#,
+            ),
             ("data.csv", "id,name\n1,Test 1\n2,Test 2\n"),
             ("data.txt", "Line 1\nLine 2\nLine 3\n"),
-            ("data.xml", "<?xml version=\"1.0\"?>\n<data><item>Test</item></data>\n"),
+            (
+                "data.xml",
+                "<?xml version=\"1.0\"?>\n<data><item>Test</item></data>\n",
+            ),
         ]
     }
 }
@@ -258,7 +265,7 @@ pub mod test_data {
 /// Test environment assertions
 pub mod assertions {
     use super::*;
-    
+
     /// Assert that a file exists in the test environment
     pub fn assert_file_exists(env: &TestEnvironment, relative_path: &str) {
         let path = env.path(relative_path);
@@ -268,7 +275,7 @@ pub mod assertions {
             path.display()
         );
     }
-    
+
     /// Assert that a directory exists in the test environment
     pub fn assert_dir_exists(env: &TestEnvironment, relative_path: &str) {
         let path = env.path(relative_path);
@@ -278,23 +285,24 @@ pub mod assertions {
             path.display()
         );
     }
-    
+
     /// Assert file contents match
     pub fn assert_file_contents(env: &TestEnvironment, relative_path: &str, expected: &str) {
         let path = env.path(relative_path);
         let contents = std::fs::read_to_string(&path)
             .unwrap_or_else(|_| panic!("Failed to read file: {}", path.display()));
         assert_eq!(
-            contents, expected,
+            contents,
+            expected,
             "File contents mismatch for: {}",
             path.display()
         );
     }
-    
+
     /// Assert environment variable is set
     pub fn assert_env_var(key: &str, expected: &str) {
-        let value = std::env::var(key)
-            .unwrap_or_else(|_| panic!("Environment variable not set: {}", key));
+        let value =
+            std::env::var(key).unwrap_or_else(|_| panic!("Environment variable not set: {}", key));
         assert_eq!(
             value, expected,
             "Environment variable {} has unexpected value",
@@ -310,15 +318,15 @@ mod tests {
     #[tokio::test]
     async fn test_test_environment() {
         let mut env = TestEnvironment::new("test-env").await;
-        
+
         // Test file creation
         let file_path = env.create_test_file("test.txt", "Hello, World!");
         assert!(file_path.exists());
-        
+
         // Test directory creation
         let dir_path = env.create_dir("test_dir");
         assert!(dir_path.exists() && dir_path.is_dir());
-        
+
         // Test environment variables
         env.set_env_var("TEST_VAR", "test_value");
         assert_eq!(std::env::var("TEST_VAR").unwrap(), "test_value");
@@ -328,11 +336,11 @@ mod tests {
     fn test_with_env_vars() {
         // Original value
         std::env::set_var("TEST_VAR", "original");
-        
+
         let result = with_test_env_vars(vec![("TEST_VAR", "temporary")], || {
             std::env::var("TEST_VAR").unwrap()
         });
-        
+
         assert_eq!(result, "temporary");
         assert_eq!(std::env::var("TEST_VAR").unwrap(), "original");
     }
@@ -342,10 +350,8 @@ mod tests {
         let context = create_test_context();
         assert!(context.data.contains_key("test_mode"));
         assert_eq!(context.data["test_mode"], json!(true));
-        
-        let custom_data = HashMap::from([
-            ("custom_key".to_string(), json!("custom_value")),
-        ]);
+
+        let custom_data = HashMap::from([("custom_key".to_string(), json!("custom_value"))]);
         let context_with_data = create_test_context_with_data(custom_data);
         assert!(context_with_data.data.contains_key("custom_key"));
     }
@@ -353,13 +359,13 @@ mod tests {
     #[tokio::test]
     async fn test_multiple_files() {
         let env = TestEnvironment::new("multi-file-test").await;
-        
+
         let files = env.create_test_files(vec![
             ("file1.txt", "Content 1"),
             ("dir/file2.txt", "Content 2"),
             ("dir/subdir/file3.txt", "Content 3"),
         ]);
-        
+
         assert_eq!(files.len(), 3);
         for file in files {
             assert!(file.exists());

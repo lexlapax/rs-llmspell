@@ -55,7 +55,7 @@ impl TestProviderAgent {
             format!("{}-{}-test", provider, model),
             format!("Test {} agent with model {}", provider, model),
         );
-        
+
         Self {
             metadata,
             config: AgentConfig::default(),
@@ -68,6 +68,10 @@ impl TestProviderAgent {
 
     /// Add a response to the agent's response queue
     pub fn add_response(&mut self, response: String) {
+        // Clear default response if this is the first custom response
+        if self.responses.len() == 1 && self.responses[0] == "Test response" {
+            self.responses.clear();
+        }
         self.responses.push(response);
     }
 
@@ -97,7 +101,7 @@ impl llmspell_core::traits::base_agent::BaseAgent for TestProviderAgent {
             self.responses[*index % self.responses.len()].clone()
         };
         *index += 1;
-        
+
         Ok(AgentOutput::text(response))
     }
 
@@ -208,25 +212,23 @@ impl AgentTestBuilder {
     pub async fn build(self) -> Result<TestProviderAgent, LLMSpellError> {
         let provider = self.provider.unwrap_or_else(|| "mock".to_string());
         let model = self.model.unwrap_or_else(|| "test-model".to_string());
-        
+
         let mut agent = TestProviderAgent::new(&provider, &model);
         agent.config = self.config;
-        
+
         if let Some(metadata) = self.metadata_overrides {
             agent.metadata = metadata;
         } else {
-            agent.metadata = ComponentMetadata::new(
-                self.name.clone(),
-                format!("Test agent: {}", self.name),
-            );
+            agent.metadata =
+                ComponentMetadata::new(self.name.clone(), format!("Test agent: {}", self.name));
         }
-        
+
         if self.responses.is_empty() {
             agent.responses = vec![format!("Response from {} agent", self.name)];
         } else {
             agent.responses = self.responses;
         }
-        
+
         Ok(agent)
     }
 }
@@ -249,7 +251,7 @@ pub fn create_test_agent_config() -> AgentConfig {
 /// Provider-specific agent creators
 pub mod providers {
     use super::*;
-    
+
     /// Create a test OpenAI agent
     pub async fn create_openai_agent(model: &str) -> Result<TestProviderAgent, LLMSpellError> {
         AgentTestBuilder::new("openai-agent")
@@ -261,7 +263,7 @@ pub mod providers {
             .build()
             .await
     }
-    
+
     /// Create a test Anthropic agent
     pub async fn create_anthropic_agent(model: &str) -> Result<TestProviderAgent, LLMSpellError> {
         AgentTestBuilder::new("anthropic-agent")
@@ -273,7 +275,7 @@ pub mod providers {
             .build()
             .await
     }
-    
+
     /// Create a test Gemini agent
     pub async fn create_gemini_agent(model: &str) -> Result<TestProviderAgent, LLMSpellError> {
         AgentTestBuilder::new("gemini-agent")
@@ -285,7 +287,7 @@ pub mod providers {
             .build()
             .await
     }
-    
+
     /// Create a test local/Ollama agent
     pub async fn create_local_agent(model: &str) -> Result<TestProviderAgent, LLMSpellError> {
         AgentTestBuilder::new("local-agent")
@@ -303,7 +305,7 @@ pub mod providers {
 pub mod conversations {
     use super::*;
     use llmspell_core::traits::agent::MessageRole;
-    
+
     /// Build a simple conversation
     pub fn simple_conversation() -> Vec<ConversationMessage> {
         vec![
@@ -312,7 +314,7 @@ pub mod conversations {
             ConversationMessage::assistant("Hello! How can I help you today?".to_string()),
         ]
     }
-    
+
     /// Build a conversation with context
     pub fn conversation_with_context(context: &str) -> Vec<ConversationMessage> {
         vec![
@@ -324,27 +326,30 @@ pub mod conversations {
             ConversationMessage::assistant(format!("The context is: {}", context)),
         ]
     }
-    
+
     /// Build a multi-turn conversation
     pub fn multi_turn_conversation(turns: usize) -> Vec<ConversationMessage> {
-        let mut messages = vec![
-            ConversationMessage::system("You are a helpful assistant.".to_string()),
-        ];
-        
+        let mut messages = vec![ConversationMessage::system(
+            "You are a helpful assistant.".to_string(),
+        )];
+
         for i in 0..turns {
             messages.push(ConversationMessage::user(format!("Question {}", i + 1)));
-            messages.push(ConversationMessage::assistant(format!("Answer to question {}", i + 1)));
+            messages.push(ConversationMessage::assistant(format!(
+                "Answer to question {}",
+                i + 1
+            )));
         }
-        
+
         messages
     }
-    
+
     /// Build a conversation from raw messages
     pub fn from_raw_messages(messages: Vec<(MessageRole, String)>) -> Vec<ConversationMessage> {
         messages
             .into_iter()
-            .map(|(role, content)| ConversationMessage { 
-                role, 
+            .map(|(role, content)| ConversationMessage {
+                role,
                 content,
                 timestamp: chrono::Utc::now(),
             })
@@ -355,17 +360,17 @@ pub mod conversations {
 /// Agent test scenarios
 pub mod scenarios {
     use super::*;
-    
+
     /// Test error handling scenario
     pub async fn test_agent_error_handling(
         agent: &impl Agent,
     ) -> Result<Vec<AgentOutput>, LLMSpellError> {
         let test_cases = vec![
-            AgentInput::text(""),  // Empty input
-            AgentInput::text("a".repeat(10000)),  // Very long input
-            create_malformed_input(),  // Malformed input
+            AgentInput::text(""),                // Empty input
+            AgentInput::text("a".repeat(10000)), // Very long input
+            create_malformed_input(),            // Malformed input
         ];
-        
+
         let mut results = Vec::new();
         for input in test_cases {
             match agent.execute(input, ExecutionContext::default()).await {
@@ -373,26 +378,22 @@ pub mod scenarios {
                 Err(_) => results.push(AgentOutput::text("Error handled")),
             }
         }
-        
+
         Ok(results)
     }
-    
+
     /// Test conversation memory
-    pub async fn test_conversation_memory(
-        agent: &impl Agent,
-    ) -> Result<bool, LLMSpellError> {
+    pub async fn test_conversation_memory(agent: &impl Agent) -> Result<bool, LLMSpellError> {
         let _history = conversations::simple_conversation();
         let input = AgentInput::text("What did we just talk about?");
-        
+
         // For test purposes, just check if agent can execute
-        let output = agent
-            .execute(input, ExecutionContext::default())
-            .await?;
-        
+        let output = agent.execute(input, ExecutionContext::default()).await?;
+
         // Check if we got a response
         Ok(!output.text.is_empty())
     }
-    
+
     /// Create malformed input for testing
     fn create_malformed_input() -> AgentInput {
         AgentInput::text("Test")
@@ -416,7 +417,7 @@ mod tests {
             .build()
             .await
             .unwrap();
-        
+
         assert_eq!(agent.provider, "openai");
         assert_eq!(agent.model, "gpt-4");
         assert_eq!(agent.config.system_prompt, Some("Test prompt".to_string()));
@@ -426,7 +427,7 @@ mod tests {
     async fn test_provider_agents() {
         let openai = providers::create_openai_agent("gpt-4").await.unwrap();
         assert_eq!(openai.provider, "openai");
-        
+
         let anthropic = providers::create_anthropic_agent("claude-3").await.unwrap();
         assert_eq!(anthropic.provider, "anthropic");
     }
@@ -435,7 +436,7 @@ mod tests {
     async fn test_conversation_builders() {
         let simple = conversations::simple_conversation();
         assert_eq!(simple.len(), 3);
-        
+
         let multi_turn = conversations::multi_turn_conversation(5);
         assert_eq!(multi_turn.len(), 11); // 1 system + 5 * (user + assistant)
     }
@@ -445,19 +446,14 @@ mod tests {
         let mut agent = TestProviderAgent::new("test", "model");
         agent.add_response("Response 1".to_string());
         agent.add_response("Response 2".to_string());
-        
+
         let input = AgentInput::text("Test");
         let context = ExecutionContext::default();
-        
+
         let output1 = agent.execute(input.clone(), context.clone()).await.unwrap();
         let output2 = agent.execute(input.clone(), context.clone()).await.unwrap();
-        
-        match (output1, output2) {
-            (AgentOutput::Text(text1), AgentOutput::Text(text2)) => {
-                assert_eq!(text1, "Response 1");
-                assert_eq!(text2, "Response 2");
-            }
-            _ => panic!("Expected text outputs"),
-        }
+
+        assert_eq!(output1.text, "Response 1");
+        assert_eq!(output2.text, "Response 2");
     }
 }

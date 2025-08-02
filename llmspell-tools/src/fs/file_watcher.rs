@@ -506,9 +506,7 @@ mod tests {
     #[tokio::test]
     async fn test_config_operation() {
         let (tool, _temp_dir) = create_test_file_watcher();
-        let input = create_test_tool_input(vec![
-            ("operation", "config"),
-        ]);
+        let input = create_test_tool_input(vec![("operation", "config")]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -524,9 +522,7 @@ mod tests {
     #[tokio::test]
     async fn test_watch_operation_requires_paths() {
         let (tool, _temp_dir) = create_test_file_watcher();
-        let input = create_test_tool_input(vec![
-            ("operation", "watch"),
-        ]);
+        let input = create_test_tool_input(vec![("operation", "watch")]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -538,14 +534,13 @@ mod tests {
     #[tokio::test]
     async fn test_watch_operation_with_nonexistent_path() {
         let (tool, _temp_dir) = create_test_file_watcher();
-        let input = create_test_tool_input(vec![
-            ("operation", "watch"),
-            ("timeout_seconds", "1"),
-        ]);
-        
+        let input = create_test_tool_input(vec![("operation", "watch"), ("timeout_seconds", "1")]);
+
         // Need to add the array parameter separately since create_test_tool_input handles simple values
         let mut input = input;
-        input.parameters.get_mut("parameters")
+        input
+            .parameters
+            .get_mut("parameters")
             .and_then(|v| v.as_object_mut())
             .map(|obj| obj.insert("input".to_string(), json!(["/nonexistent/path"])));
 
@@ -560,12 +555,19 @@ mod tests {
             ("timeout_seconds", "1"),
             ("max_events", "10"),
         ]);
-        
+
         // Need to add the array parameter separately
         let mut input = input;
-        input.parameters.get_mut("parameters")
+        input
+            .parameters
+            .get_mut("parameters")
             .and_then(|v| v.as_object_mut())
-            .map(|obj| obj.insert("input".to_string(), json!([temp_dir.path().to_string_lossy()])));
+            .map(|obj| {
+                obj.insert(
+                    "input".to_string(),
+                    json!([temp_dir.path().to_string_lossy()]),
+                )
+            });
 
         let result = tool
             .execute(input, ExecutionContext::default())

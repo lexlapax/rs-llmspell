@@ -4,6 +4,7 @@
 // Benchmark for workflow hook overhead
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use llmspell_testing::workflow_helpers::create_test_steps;
 use llmspell_workflows::{
     conditional::{ConditionalBranch, ConditionalWorkflow},
     conditions::Condition,
@@ -13,7 +14,6 @@ use llmspell_workflows::{
     sequential::SequentialWorkflow,
     traits::{StepType, WorkflowStep},
 };
-use llmspell_testing::workflow_helpers::create_test_steps;
 use serde_json::json;
 use std::sync::Arc;
 

@@ -441,8 +441,8 @@ impl MetricHook for CachingHook {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use llmspell_testing::hook_helpers::create_test_hook_context;
     use crate::types::{ComponentId, ComponentType, HookPoint};
+    use llmspell_testing::hook_helpers::create_test_hook_context;
     use serde_json::json;
 
     fn create_test_context() -> HookContext {

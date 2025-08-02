@@ -39,7 +39,7 @@
 
 use llmspell_core::{
     execution_context::ExecutionContext,
-    traits::tool::{ParameterDef, ParameterType, Tool, ToolCategory, ToolSchema, SecurityLevel},
+    traits::tool::{ParameterDef, ParameterType, SecurityLevel, Tool, ToolCategory, ToolSchema},
     types::{AgentInput, AgentOutput, ToolOutput},
     ComponentMetadata, LLMSpellError,
 };
@@ -58,7 +58,7 @@ impl TestTool {
     pub fn new(name: &str, description: &str) -> Self {
         let metadata = ComponentMetadata::new(name.to_string(), description.to_string());
         let schema = ToolSchema::new(name.to_string(), description.to_string());
-        
+
         Self {
             metadata,
             schema,
@@ -74,7 +74,7 @@ impl TestTool {
             "boolean" => ParameterType::Boolean,
             "array" => ParameterType::Array,
             "object" => ParameterType::Object,
-            _ => ParameterType::String,  // Default to string for unknown types
+            _ => ParameterType::String, // Default to string for unknown types
         };
 
         self.schema = self.schema.with_parameter(ParameterDef {
@@ -84,7 +84,7 @@ impl TestTool {
             required,
             default: None,
         });
-        
+
         self
     }
 
@@ -168,17 +168,13 @@ impl llmspell_core::traits::base_agent::BaseAgent for TestTool {
 }
 
 /// Create a simple test tool
-pub fn create_test_tool(
-    name: &str,
-    description: &str,
-    parameters: Vec<(&str, &str)>,
-) -> impl Tool {
+pub fn create_test_tool(name: &str, description: &str, parameters: Vec<(&str, &str)>) -> impl Tool {
     let mut tool = TestTool::new(name, description);
-    
+
     for (param_name, param_type) in parameters {
         tool = tool.with_parameter(param_name, param_type, true);
     }
-    
+
     tool
 }
 
@@ -193,18 +189,18 @@ where
     F: Fn(&AgentInput) -> Result<ToolOutput, LLMSpellError> + Send + Sync + 'static,
 {
     let mut tool = TestTool::new(name, description);
-    
+
     for (param_name, param_type) in parameters {
         tool = tool.with_parameter(param_name, param_type, true);
     }
-    
+
     tool.with_handler(handler)
 }
 
 /// Create test tool input
 pub fn create_test_tool_input(parameters: Vec<(&str, &str)>) -> AgentInput {
     let mut input = AgentInput::text("test tool execution");
-    
+
     for (key, value) in parameters {
         // Try to parse as number or boolean first
         let json_value = if let Ok(n) = value.parse::<f64>() {
@@ -214,10 +210,10 @@ pub fn create_test_tool_input(parameters: Vec<(&str, &str)>) -> AgentInput {
         } else {
             json!(value)
         };
-        
+
         input = input.with_parameter(key, json_value);
     }
-    
+
     input
 }
 
@@ -227,39 +223,34 @@ pub fn create_test_tool_input_json(
     parameters: HashMap<String, serde_json::Value>,
 ) -> AgentInput {
     let mut input = AgentInput::text(text);
-    
+
     for (key, value) in parameters {
         input = input.with_parameter(&key, value);
     }
-    
+
     input
 }
 
 /// Create a mock tool using mockall
 pub fn create_mock_tool() -> crate::mocks::MockTool {
     use crate::mocks::MockTool;
-    
-    let mut mock = MockTool::new();
-    
-    // Set up default expectations
-    mock.expect_metadata()
-        .return_const(ComponentMetadata::new(
-            "mock-tool".to_string(),
-            "Mock tool for testing".to_string(),
-        ));
-    
-    mock.expect_schema()
-        .returning(|| ToolSchema::new(
-            "mock-tool".to_string(),
-            "Mock tool schema".to_string(),
-        ));
 
-    mock.expect_category()
-        .returning(|| ToolCategory::Utility);
+    let mut mock = MockTool::new();
+
+    // Set up default expectations
+    mock.expect_metadata().return_const(ComponentMetadata::new(
+        "mock-tool".to_string(),
+        "Mock tool for testing".to_string(),
+    ));
+
+    mock.expect_schema()
+        .returning(|| ToolSchema::new("mock-tool".to_string(), "Mock tool schema".to_string()));
+
+    mock.expect_category().returning(|| ToolCategory::Utility);
 
     mock.expect_security_level()
         .returning(|| SecurityLevel::Safe);
-    
+
     mock
 }
 
@@ -274,7 +265,7 @@ pub mod common_params {
             ("encoding", "string"),
         ]
     }
-    
+
     /// Web request parameters
     pub fn web_params() -> Vec<(&'static str, &'static str)> {
         vec![
@@ -285,7 +276,7 @@ pub mod common_params {
             ("body", "string"),
         ]
     }
-    
+
     /// Process execution parameters
     pub fn process_params() -> Vec<(&'static str, &'static str)> {
         vec![
@@ -296,7 +287,7 @@ pub mod common_params {
             ("env", "object"),
         ]
     }
-    
+
     /// Data processing parameters
     pub fn data_params() -> Vec<(&'static str, &'static str)> {
         vec![
@@ -311,7 +302,7 @@ pub mod common_params {
 /// Test data generators for tools
 pub mod test_data {
     use super::*;
-    
+
     /// Generate test file paths
     pub fn test_file_paths() -> Vec<String> {
         vec![
@@ -321,7 +312,7 @@ pub mod test_data {
             "/tmp/script.py".to_string(),
         ]
     }
-    
+
     /// Generate test URLs
     pub fn test_urls() -> Vec<String> {
         vec![
@@ -331,7 +322,7 @@ pub mod test_data {
             "https://test.example.org/path/to/resource".to_string(),
         ]
     }
-    
+
     /// Generate test JSON data
     pub fn test_json_data() -> Vec<serde_json::Value> {
         vec![
@@ -341,7 +332,7 @@ pub mod test_data {
             json!({"nested": {"data": {"value": true}}}),
         ]
     }
-    
+
     /// Generate test commands
     pub fn test_commands() -> Vec<(&'static str, Vec<&'static str>)> {
         vec![
@@ -356,7 +347,7 @@ pub mod test_data {
 /// Tool test assertions
 pub mod assertions {
     use super::*;
-    
+
     /// Assert tool output contains expected fields
     pub fn assert_tool_output_contains(
         output: &AgentOutput,
@@ -366,7 +357,7 @@ pub mod assertions {
         if output.tool_calls.is_empty() {
             return Err("No tool calls found in output".to_string());
         }
-        
+
         // Check the first tool call's result
         if let Some(result) = &output.tool_calls[0].result {
             let data = &result.data;
@@ -380,13 +371,13 @@ pub mod assertions {
             Err("Tool call has no result".to_string())
         }
     }
-    
+
     /// Assert tool output has success status
     pub fn assert_tool_success(output: &AgentOutput) -> Result<(), String> {
         if output.tool_calls.is_empty() {
             return Err("No tool calls found in output".to_string());
         }
-        
+
         // Check the first tool call's result
         if let Some(result) = &output.tool_calls[0].result {
             if result.success {
@@ -398,7 +389,7 @@ pub mod assertions {
             Err("Tool call has no result".to_string())
         }
     }
-    
+
     /// Assert tool output matches expected structure
     pub fn assert_tool_output_structure(
         output: &AgentOutput,
@@ -407,7 +398,7 @@ pub mod assertions {
         if output.tool_calls.is_empty() {
             return Err("No tool calls found in output".to_string());
         }
-        
+
         // Check the first tool call's result
         if let Some(result) = &output.tool_calls[0].result {
             let data = &result.data;
@@ -453,7 +444,7 @@ mod tests {
             "A test tool",
             vec![("input", "string"), ("count", "number")],
         );
-        
+
         assert_eq!(tool.metadata().name, "test-tool");
         assert_eq!(tool.schema().name, "test-tool");
         assert_eq!(tool.schema().parameters.len(), 2);
@@ -466,7 +457,7 @@ mod tests {
             ("count", "42"),
             ("enabled", "true"),
         ]);
-        
+
         assert_eq!(input.text, "test tool execution");
         assert_eq!(input.parameters["operation"], json!("process"));
         assert_eq!(input.parameters["count"], json!(42.0));
@@ -480,15 +471,23 @@ mod tests {
             "Echoes input",
             vec![("message", "string")],
             |input| {
-                Ok(ToolOutput::new(serde_json::json!({
-                    "echoed": input.parameters.get("message").cloned().unwrap_or(json!(""))
-                })))
+                Ok(ToolOutput {
+                    success: true,
+                    data: serde_json::json!({
+                        "echoed": input.parameters.get("message").cloned().unwrap_or(json!(""))
+                    }),
+                    error: None,
+                    execution_time_ms: None,
+                })
             },
         );
-        
+
         let input = create_test_tool_input(vec![("message", "Hello")]);
-        let output = tool.execute(input, ExecutionContext::default()).await.unwrap();
-        
+        let output = tool
+            .execute(input, ExecutionContext::default())
+            .await
+            .unwrap();
+
         // Check that we got a tool output with the echoed message
         assert!(!output.tool_calls.is_empty());
         if let Some(result) = &output.tool_calls[0].result {
@@ -502,7 +501,7 @@ mod tests {
     fn test_common_params() {
         let file_params = common_params::file_params();
         assert!(file_params.iter().any(|(name, _)| *name == "path"));
-        
+
         let web_params = common_params::web_params();
         assert!(web_params.iter().any(|(name, _)| *name == "url"));
     }
@@ -528,7 +527,7 @@ mod tests {
             .text("Tool executed")
             .add_tool_call(tool_call)
             .build();
-        
+
         assert!(assertions::assert_tool_success(&output).is_ok());
         assert!(assertions::assert_tool_output_contains(&output, vec!["result"]).is_ok());
         assert!(assertions::assert_tool_output_structure(&output, "processed").is_ok());

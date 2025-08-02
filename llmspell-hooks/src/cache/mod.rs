@@ -384,8 +384,8 @@ impl Default for Cache {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use llmspell_testing::hook_helpers::create_test_hook_context;
     use crate::types::{ComponentId, ComponentType, HookPoint};
+    use llmspell_testing::hook_helpers::create_test_hook_context;
     use std::thread;
     use std::time::Duration as StdDuration;
 

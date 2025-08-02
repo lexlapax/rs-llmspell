@@ -507,8 +507,8 @@ impl Tool for EnvironmentReaderTool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use llmspell_testing::tool_helpers::{create_test_tool, create_test_tool_input};
     use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
+    use llmspell_testing::tool_helpers::{create_test_tool, create_test_tool_input};
     use std::collections::HashMap;
 
     fn create_test_environment_reader() -> EnvironmentReaderTool {
@@ -539,10 +539,7 @@ mod tests {
         let tool = create_test_environment_reader();
 
         // Test getting PATH variable (should be allowed by default)
-        let input = create_test_tool_input(vec![
-            ("operation", "get"),
-            ("variable_name", "PATH"),
-        ]);
+        let input = create_test_tool_input(vec![("operation", "get"), ("variable_name", "PATH")]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -585,9 +582,7 @@ mod tests {
     async fn test_list_variables() {
         let tool = create_test_environment_reader();
 
-        let input = create_test_tool_input(vec![
-            ("operation", "list"),
-        ]);
+        let input = create_test_tool_input(vec![("operation", "list")]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -600,10 +595,7 @@ mod tests {
     async fn test_pattern_matching() {
         let tool = create_test_environment_reader();
 
-        let input = create_test_tool_input(vec![
-            ("operation", "pattern"),
-            ("pattern", "PATH*"),
-        ]);
+        let input = create_test_tool_input(vec![("operation", "pattern"), ("pattern", "PATH*")]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -651,9 +643,7 @@ mod tests {
     async fn test_invalid_operation() {
         let tool = create_test_environment_reader();
 
-        let input = create_test_tool_input(vec![
-            ("operation", "invalid"),
-        ]);
+        let input = create_test_tool_input(vec![("operation", "invalid")]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());

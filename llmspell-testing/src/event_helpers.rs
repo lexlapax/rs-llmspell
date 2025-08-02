@@ -3,8 +3,8 @@
 
 use llmspell_events::{
     bus::EventBus,
-    correlation::{EventCorrelationTracker, CorrelationId},
-    event::{UniversalEvent, Language, EventMetadata},
+    correlation::{CorrelationContext, EventCorrelationTracker},
+    EventMetadata, Language, UniversalEvent,
 };
 use serde_json::Value;
 use std::sync::Arc;
@@ -23,11 +23,9 @@ pub fn create_test_event_with_data(event_type: &str, data: Value) -> UniversalEv
 /// Create a test event with correlation ID
 pub fn create_test_event_with_correlation(
     event_type: &str,
-    correlation_id: CorrelationId,
+    correlation_id: Uuid,
 ) -> UniversalEvent {
-    let mut event = UniversalEvent::new(event_type, Value::Null, Language::Rust);
-    event.correlation_id = Some(correlation_id);
-    event
+    UniversalEvent::new(event_type, Value::Null, Language::Rust).with_correlation_id(correlation_id)
 }
 
 /// Create a test event with custom language
@@ -62,7 +60,7 @@ pub fn create_test_correlation_tracker() -> Arc<EventCorrelationTracker> {
 /// Create a sequence of correlated test events
 pub fn create_correlated_event_sequence(
     event_types: Vec<&str>,
-    correlation_id: CorrelationId,
+    correlation_id: Uuid,
 ) -> Vec<UniversalEvent> {
     event_types
         .into_iter()
@@ -131,13 +129,14 @@ mod tests {
     fn test_create_event_with_correlation() {
         let correlation_id = Uuid::new_v4();
         let event = create_test_event_with_correlation("test.event", correlation_id);
-        assert_eq!(event.correlation_id, Some(correlation_id));
+        assert_eq!(event.metadata.correlation_id, correlation_id);
     }
 
     #[test]
     fn test_create_event_with_language() {
         let data = serde_json::json!({"test": true});
-        let event = create_test_event_with_language("test.event", data.clone(), Language::JavaScript);
+        let event =
+            create_test_event_with_language("test.event", data.clone(), Language::JavaScript);
         assert_eq!(event.language, Language::JavaScript);
         assert_eq!(event.data, data);
     }
@@ -145,14 +144,12 @@ mod tests {
     #[test]
     fn test_create_correlated_sequence() {
         let correlation_id = Uuid::new_v4();
-        let events = create_correlated_event_sequence(
-            vec!["start", "process", "complete"],
-            correlation_id,
-        );
-        
+        let events =
+            create_correlated_event_sequence(vec!["start", "process", "complete"], correlation_id);
+
         assert_eq!(events.len(), 3);
         for event in &events {
-            assert_eq!(event.correlation_id, Some(correlation_id));
+            assert_eq!(event.metadata.correlation_id, correlation_id);
         }
         assert_eq!(events[0].event_type, "start");
         assert_eq!(events[1].event_type, "process");

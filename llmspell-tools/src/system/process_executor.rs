@@ -756,10 +756,8 @@ mod tests {
     async fn test_execute_blocked_command() {
         let tool = create_test_process_executor();
 
-        let input = create_test_tool_input(vec![
-            ("executable", "rm"),
-            ("arguments", r#"["-rf", "/"]"#),
-        ]);
+        let input =
+            create_test_tool_input(vec![("executable", "rm"), ("arguments", r#"["-rf", "/"]"#)]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());

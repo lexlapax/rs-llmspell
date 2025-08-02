@@ -689,9 +689,7 @@ mod tests {
     async fn test_collect_all_stats() {
         let tool = create_test_system_monitor();
 
-        let input = create_test_tool_input(vec![
-            ("operation", "all"),
-        ]);
+        let input = create_test_tool_input(vec![("operation", "all")]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -705,9 +703,7 @@ mod tests {
     async fn test_collect_cpu_stats() {
         let tool = create_test_system_monitor();
 
-        let input = create_test_tool_input(vec![
-            ("operation", "cpu"),
-        ]);
+        let input = create_test_tool_input(vec![("operation", "cpu")]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -720,9 +716,7 @@ mod tests {
     async fn test_collect_memory_stats() {
         let tool = create_test_system_monitor();
 
-        let input = create_test_tool_input(vec![
-            ("operation", "memory"),
-        ]);
+        let input = create_test_tool_input(vec![("operation", "memory")]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -735,9 +729,7 @@ mod tests {
     async fn test_collect_disk_stats() {
         let tool = create_test_system_monitor();
 
-        let input = create_test_tool_input(vec![
-            ("operation", "disk"),
-        ]);
+        let input = create_test_tool_input(vec![("operation", "disk")]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -750,9 +742,7 @@ mod tests {
     async fn test_invalid_operation() {
         let tool = create_test_system_monitor();
 
-        let input = create_test_tool_input(vec![
-            ("operation", "invalid"),
-        ]);
+        let input = create_test_tool_input(vec![("operation", "invalid")]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());

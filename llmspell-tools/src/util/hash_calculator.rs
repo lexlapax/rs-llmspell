@@ -362,8 +362,8 @@ impl Tool for HashCalculatorTool {
 mod tests {
     use super::*;
     use llmspell_core::LLMSpellError;
-    use llmspell_utils::file_utils::write_file;
     use llmspell_testing::tool_helpers::{create_test_tool, create_test_tool_input};
+    use llmspell_utils::file_utils::write_file;
     use tempfile::TempDir;
 
     fn create_test_hash_calculator() -> HashCalculatorTool {
@@ -418,7 +418,10 @@ mod tests {
             ("operation", "verify"),
             ("input", "test"),
             ("algorithm", "sha256"),
-            ("expected_hash", "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"),
+            (
+                "expected_hash",
+                "9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+            ),
         ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
@@ -436,7 +439,10 @@ mod tests {
             ("operation", "verify"),
             ("input", "test"),
             ("algorithm", "sha256"),
-            ("expected_hash", "0000000000000000000000000000000000000000000000000000000000000000"),
+            (
+                "expected_hash",
+                "0000000000000000000000000000000000000000000000000000000000000000",
+            ),
         ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
@@ -450,9 +456,7 @@ mod tests {
     #[tokio::test]
     async fn test_missing_required_parameter() {
         let tool = create_test_hash_calculator();
-        let input = create_test_tool_input(vec![
-            ("data", "test"),
-        ]);
+        let input = create_test_tool_input(vec![("data", "test")]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
