@@ -211,18 +211,19 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
      - [x] Update correlation test helpers (timeline.rs, query.rs)
      - [x] Run tests: `cargo test -p llmspell-events` ✅
    
-   **Phase 5: Workflow & Bridge Tests Consolidation** (1.5 hours)
-   - [ ] **llmspell-workflows** (25+ test files):
-     - [ ] Update workflow test utilities
-     - [ ] Remove duplicate workflow builder helpers
-     - [ ] Consolidate execution test patterns
-     - [ ] Run tests: `cargo test -p llmspell-workflows`
-   - [ ] **llmspell-bridge** (40+ test files):
-     - [ ] Update Lua test utilities
-     - [ ] Update JavaScript test utilities
-     - [ ] Remove duplicate script engine setup
-     - [ ] Consolidate global object test helpers
-     - [ ] Run tests: `cargo test -p llmspell-bridge`
+   **Phase 5: Bridge & Workflow Tests Consolidation** (1.5 hours) ✅ **COMPLETED**
+   - [x] **llmspell-workflows** (25+ test files):
+     - [x] Add llmspell-testing to dev-dependencies
+     - [x] Create workflow_helpers.rs with test utilities
+     - [x] Update benchmark to use centralized create_test_steps
+     - [x] Workflow tests use builders extensively (no duplication found)
+     - [x] Run tests: `cargo test -p llmspell-workflows` ✅
+   - [x] **llmspell-bridge** (40+ test files):
+     - [x] Add llmspell-testing to dev-dependencies
+     - [x] Create bridge_helpers.rs with Lua/JS test utilities
+     - [x] Simple test contexts in individual files (not true duplicates)
+     - [x] Created centralized create_test_global_context()
+     - [x] Run tests: `cargo test -p llmspell-bridge` ✅
    
    **Phase 6: Final Verification** (30 min)
    - [ ] Run workspace-wide duplicate check: `./scripts/find-duplicate-test-utils.sh`

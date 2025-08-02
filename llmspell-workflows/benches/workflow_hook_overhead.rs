@@ -1,7 +1,7 @@
 // ABOUTME: Performance benchmarks for workflow hook overhead
 // ABOUTME: Validates <3% overhead requirement for hook execution
 
-#![cfg_attr(test_category = "benchmark")]
+// Benchmark for workflow hook overhead
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use llmspell_workflows::{
@@ -13,22 +13,9 @@ use llmspell_workflows::{
     sequential::SequentialWorkflow,
     traits::{StepType, WorkflowStep},
 };
+use llmspell_testing::workflow_helpers::create_test_steps;
 use serde_json::json;
 use std::sync::Arc;
-
-fn create_test_steps(count: usize) -> Vec<WorkflowStep> {
-    (0..count)
-        .map(|i| {
-            WorkflowStep::new(
-                format!("step_{}", i),
-                StepType::Custom {
-                    function_name: "test".to_string(),
-                    parameters: json!({"index": i}),
-                },
-            )
-        })
-        .collect()
-}
 
 fn benchmark_sequential_workflow(c: &mut Criterion) {
     let mut group = c.benchmark_group("sequential_workflow");

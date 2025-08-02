@@ -60,6 +60,7 @@
 pub mod agent_helpers;
 pub mod attributes;
 pub mod benchmarks;
+pub mod bridge_helpers;
 pub mod environment_helpers;
 pub mod event_helpers;
 pub mod fixtures;
@@ -69,6 +70,7 @@ pub mod macros;
 pub mod mocks;
 pub mod state_helpers;
 pub mod tool_helpers;
+pub mod workflow_helpers;
 
 // Test runner support
 #[cfg(feature = "test-runner")]

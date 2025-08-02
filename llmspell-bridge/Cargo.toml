@@ -43,6 +43,7 @@ mlua = { workspace = true, optional = true }
 boa_engine = { workspace = true, optional = true }
 
 [dev-dependencies]
+llmspell-testing = { path = "../llmspell-testing" }
 criterion = { version = "0.5", features = ["html_reports"] }
 tempfile = "3.0"
 

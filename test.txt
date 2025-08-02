@@ -1,0 +1,25 @@
+   - [x] **llmspell-tools** (50+ test files): 
+     - [x] Add llmspell-testing to dev-dependencies
+     - [x] Run tests: `cargo test -p llmspell-tools` ✅
+     - [x] Verify no duplicate patterns remain: `grep -r "fn create_test_input" llmspell-tools/src/` (0 matches)
+   - [x] **llmspell-agents** (30+ test files):
+     - [x] Add llmspell-testing to dev-dependencies
+     - [x] Run tests: `cargo test -p llmspell-agents` ✅
+   - [x] **llmspell-providers** (15+ test files):
+     - [x] Run tests: `cargo test -p llmspell-providers` ✅
+   - [x] **llmspell-state-persistence** (30+ test files):
+     - [x] Add llmspell-testing to dev-dependencies
+     - [x] Run tests: `cargo test -p llmspell-state-persistence` ✅
+   - [x] **llmspell-sessions** (25+ test files):
+     - [x] llmspell-testing already in dev-dependencies
+     - [x] Run tests: `cargo test -p llmspell-sessions` ✅
+   - [x] **llmspell-hooks** (35+ test files):
+     - [x] Add llmspell-testing to dev-dependencies
+     - [x] Run tests: `cargo test -p llmspell-hooks` ✅
+   - [x] **llmspell-events** (20+ test files):
+     - [x] Add llmspell-testing to dev-dependencies
+     - [x] Run tests: `cargo test -p llmspell-events` ✅
+   - [ ] **llmspell-workflows** (25+ test files):
+     - [ ] Run tests: `cargo test -p llmspell-workflows`
+   - [ ] **llmspell-bridge** (40+ test files):
+     - [ ] Run tests: `cargo test -p llmspell-bridge`
