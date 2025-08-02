@@ -745,7 +745,7 @@ mod tests {
         let tool = create_test_service_checker();
 
         let input = create_test_tool_input(vec![
-            ("target", "127.0.0.1:7", // Echo port (blocked by default)"),
+            ("target", "127.0.0.1:7"), // Echo port (blocked by default)
             ("check_type", "tcp"),
         ]);
 

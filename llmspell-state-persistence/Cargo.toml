@@ -55,3 +55,4 @@ llmspell-state-traits = { path = "../llmspell-state-traits" }
 [dev-dependencies]
 tempfile.workspace = true
 tokio-test = "0.4"
+llmspell-testing = { path = "../llmspell-testing" }

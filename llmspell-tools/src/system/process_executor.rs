@@ -758,7 +758,7 @@ mod tests {
 
         let input = create_test_tool_input(vec![
             ("executable", "rm"),
-            ("arguments", "["-rf", "/"]"),
+            ("arguments", r#"["-rf", "/"]"#),
         ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
@@ -771,7 +771,7 @@ mod tests {
 
         let input = create_test_tool_input(vec![
             ("executable", "nonexistent_command_12345"),
-            ("arguments", "["arg1"]"),
+            ("arguments", r#"["arg1"]"#),
         ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
@@ -804,7 +804,7 @@ mod tests {
 
         let input = create_test_tool_input(vec![
             ("executable", "echo"),
-            ("arguments", "["$TEST_VAR"]"),
+            ("arguments", r#"["$TEST_VAR"]"#),
             ("environment", "env"),
         ]);
 
