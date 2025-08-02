@@ -114,7 +114,7 @@ pub struct SchemaCacheEntry {
 impl SchemaCacheEntry {
     fn is_expired(&self) -> bool {
         let age = Utc::now().signed_duration_since(self.cached_at);
-        age.num_seconds().max(0) as u64 > self.ttl_seconds
+        u64::try_from(age.num_seconds().max(0)).unwrap_or(u64::MAX) > self.ttl_seconds
     }
 }
 

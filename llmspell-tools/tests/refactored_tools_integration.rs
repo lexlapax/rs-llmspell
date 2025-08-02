@@ -245,15 +245,13 @@ async fn test_refactored_tools_error_consistency() {
         let parsed: serde_json::Value = serde_json::from_str(&output.text).unwrap();
         assert!(
             !parsed["success"].as_bool().unwrap_or(true),
-            "Tool {} should have success=false for missing parameters",
-            i
+            "Tool {i} should have success=false for missing parameters"
         );
 
         // Error should be in the response and mention missing parameters
         assert!(
             parsed.get("error").is_some(),
-            "Tool {} should have error field when parameters are missing",
-            i
+            "Tool {i} should have error field when parameters are missing"
         );
     }
 }

@@ -184,6 +184,7 @@ impl ServiceCheckerTool {
     }
 
     /// Parse target into host and port
+    #[allow(clippy::unused_self)]
     fn parse_target(&self, target: &str) -> LLMResult<(String, u16)> {
         if let Some(pos) = target.rfind(':') {
             let host = target[..pos].to_string();
@@ -247,7 +248,8 @@ impl ServiceCheckerTool {
                 return ServiceCheckResult {
                     target: target.clone(),
                     available: false,
-                    response_time_ms: start_time.elapsed().as_millis() as u64,
+                    response_time_ms: u64::try_from(start_time.elapsed().as_millis())
+                        .unwrap_or(u64::MAX),
                     status: "DNS resolution failed".to_string(),
                     error: Some(e.to_string()),
                     metadata: HashMap::new(),
@@ -259,7 +261,8 @@ impl ServiceCheckerTool {
             return ServiceCheckResult {
                 target: target.clone(),
                 available: false,
-                response_time_ms: start_time.elapsed().as_millis() as u64,
+                response_time_ms: u64::try_from(start_time.elapsed().as_millis())
+                    .unwrap_or(u64::MAX),
                 status: "No addresses resolved".to_string(),
                 error: Some("DNS resolution returned no addresses".to_string()),
                 metadata: HashMap::new(),
@@ -270,7 +273,8 @@ impl ServiceCheckerTool {
         let socket_addr = socket_addrs[0];
         match timeout(timeout_duration, TcpStream::connect(socket_addr)).await {
             Ok(Ok(_stream)) => {
-                let response_time = start_time.elapsed().as_millis() as u64;
+                let response_time =
+                    u64::try_from(start_time.elapsed().as_millis()).unwrap_or(u64::MAX);
                 info!("TCP port {} available in {}ms", target, response_time);
                 ServiceCheckResult {
                     target,
@@ -287,7 +291,8 @@ impl ServiceCheckerTool {
                 }
             }
             Ok(Err(e)) => {
-                let response_time = start_time.elapsed().as_millis() as u64;
+                let response_time =
+                    u64::try_from(start_time.elapsed().as_millis()).unwrap_or(u64::MAX);
                 warn!("TCP port {} connection failed: {}", target, e);
                 ServiceCheckResult {
                     target,
@@ -303,7 +308,8 @@ impl ServiceCheckerTool {
                 }
             }
             Err(_) => {
-                let response_time = start_time.elapsed().as_millis() as u64;
+                let response_time =
+                    u64::try_from(start_time.elapsed().as_millis()).unwrap_or(u64::MAX);
                 warn!("TCP port {} check timed out", target);
                 ServiceCheckResult {
                     target,
@@ -394,7 +400,8 @@ impl ServiceCheckerTool {
         // Make HEAD request to check service availability
         match client.head(url).send().await {
             Ok(response) => {
-                let response_time = start_time.elapsed().as_millis() as u64;
+                let response_time =
+                    u64::try_from(start_time.elapsed().as_millis()).unwrap_or(u64::MAX);
                 let status_code = response.status().as_u16();
                 let is_available =
                     response.status().is_success() || response.status().is_redirection();
@@ -428,7 +435,8 @@ impl ServiceCheckerTool {
                 }
             }
             Err(e) => {
-                let response_time = start_time.elapsed().as_millis() as u64;
+                let response_time =
+                    u64::try_from(start_time.elapsed().as_millis()).unwrap_or(u64::MAX);
                 warn!("HTTP service {} check failed: {}", url, e);
 
                 let (status, error_msg) = if e.is_timeout() {
@@ -544,7 +552,8 @@ impl BaseAgent for ServiceCheckerTool {
                 match target.to_socket_addrs() {
                     Ok(addrs) => {
                         let addr_list: Vec<SocketAddr> = addrs.collect();
-                        let response_time = start_time.elapsed().as_millis() as u64;
+                        let response_time =
+                            u64::try_from(start_time.elapsed().as_millis()).unwrap_or(u64::MAX);
                         ServiceCheckResult {
                             target: target.to_string(),
                             available: !addr_list.is_empty(),
@@ -568,7 +577,8 @@ impl BaseAgent for ServiceCheckerTool {
                         }
                     }
                     Err(e) => {
-                        let response_time = start_time.elapsed().as_millis() as u64;
+                        let response_time =
+                            u64::try_from(start_time.elapsed().as_millis()).unwrap_or(u64::MAX);
                         ServiceCheckResult {
                             target: target.to_string(),
                             available: false,

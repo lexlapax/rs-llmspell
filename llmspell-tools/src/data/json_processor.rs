@@ -99,6 +99,7 @@ impl JsonProcessorTool {
     }
 
     /// Validate JQ query for security issues
+    #[allow(clippy::unused_self)]
     fn validate_jq_query(&self, query: &str) -> Result<()> {
         // List of dangerous JQ functions and patterns
         let dangerous_patterns = [
@@ -219,6 +220,7 @@ impl JsonProcessorTool {
     }
 
     /// Validate JSON against a schema
+    #[allow(clippy::unused_async)]
     async fn validate_json(&self, input: &Value, schema: &Value) -> Result<ValidationResult> {
         debug!("Validating JSON against schema");
 
@@ -296,6 +298,10 @@ impl JsonProcessorTool {
     }
 
     /// Parse parameters from input
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation string cannot be parsed
     fn parse_parameters(
         &self,
         params: &Value,

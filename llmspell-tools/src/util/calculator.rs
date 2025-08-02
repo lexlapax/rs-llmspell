@@ -75,7 +75,7 @@ impl CalculatorTool {
     }
 
     /// Convert fasteval error to `LLMSpellError`
-    fn convert_error(&self, error: FastevalError) -> LLMSpellError {
+    fn convert_error(&self, error: &FastevalError) -> LLMSpellError {
         tool_error(error.to_string(), Some(self.metadata.name.clone()))
     }
 
@@ -143,7 +143,7 @@ impl CalculatorTool {
         .await
         {
             Ok(Ok(result)) => Ok(result),
-            Ok(Err(e)) => Err(self.convert_error(e)),
+            Ok(Err(e)) => Err(self.convert_error(&e)),
             Err(_) => Err(validation_error(
                 format!("Expression evaluation timed out after {max_eval_time:?}"),
                 Some("input".to_string()),
@@ -157,6 +157,7 @@ impl CalculatorTool {
     }
 
     /// Preprocess expression to replace custom functions with their implementations
+    #[allow(clippy::unused_self)]
     fn preprocess_custom_functions(&self, expression: &str) -> String {
         use regex::Regex;
         use std::sync::OnceLock;

@@ -1,4 +1,4 @@
-//! ABOUTME: Integration tests for WebSearchTool public API
+//! ABOUTME: Integration tests for `WebSearchTool` public API
 //! ABOUTME: Tests search functionality, parameter handling, and error cases
 
 use llmspell_core::{
@@ -24,7 +24,7 @@ async fn test_basic_web_search() {
     let result = tool.execute(input, context).await;
 
     if let Err(e) = &result {
-        eprintln!("Test failed with error: {}", e);
+        eprintln!("Test failed with error: {e}");
     }
     assert!(result.is_ok());
     let output = result.unwrap();
@@ -68,7 +68,7 @@ async fn test_search_with_options() {
 
     let result = tool.execute(input, context.clone()).await;
     if let Err(e) = &result {
-        eprintln!("test_search_with_options (max_results) failed: {}", e);
+        eprintln!("test_search_with_options (max_results) failed: {e}");
     }
     assert!(result.is_ok());
 
@@ -83,7 +83,7 @@ async fn test_search_with_options() {
 
     let result = tool.execute(input, context.clone()).await;
     if let Err(e) = &result {
-        eprintln!("test_search_with_options (safe_search) failed: {}", e);
+        eprintln!("test_search_with_options (safe_search) failed: {e}");
     }
     assert!(result.is_ok());
 
@@ -98,7 +98,7 @@ async fn test_search_with_options() {
 
     let result = tool.execute(input, context).await;
     if let Err(e) = &result {
-        eprintln!("test_search_with_options (language) failed: {}", e);
+        eprintln!("test_search_with_options (language) failed: {e}");
     }
     assert!(result.is_ok());
 }
@@ -118,7 +118,7 @@ async fn test_search_types() {
 
     let result = tool.execute(input, context.clone()).await;
     if let Err(e) = &result {
-        eprintln!("test_search_types (web) failed: {}", e);
+        eprintln!("test_search_types (web) failed: {e}");
     }
     assert!(result.is_ok());
 
@@ -238,7 +238,7 @@ async fn test_response_format() {
     let result = tool.execute(input, context).await;
 
     if let Err(e) = &result {
-        eprintln!("test_response_format failed with error: {}", e);
+        eprintln!("test_response_format failed with error: {e}");
     }
     assert!(result.is_ok());
 
@@ -284,7 +284,7 @@ async fn test_provider_fallback() {
 
     // Should succeed using fallback to DuckDuckGo
     if let Err(e) = &result {
-        eprintln!("test_provider_fallback failed: {}", e);
+        eprintln!("test_provider_fallback failed: {e}");
     }
     assert!(result.is_ok());
 

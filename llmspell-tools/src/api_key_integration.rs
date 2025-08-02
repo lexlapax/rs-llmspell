@@ -103,21 +103,28 @@ impl ApiKeyConfig {
     }
 
     /// Get the API key
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the key is required but not found
     pub fn get_key(&self) -> Result<Option<String>, String> {
         get_api_key(&self.service).map_or_else(
             || {
-                if let Some(default) = &self.default {
-                    Ok(Some(default.clone()))
-                } else if self.required {
-                    Err(format!(
-                        "API key for service '{}' is required but not found. \
-                        Set the environment variable LLMSPELL_API_KEY_{} or configure it using the CLI.",
-                        self.service,
-                        self.service.to_uppercase()
-                    ))
-                } else {
-                    Ok(None)
-                }
+                self.default.as_ref().map_or_else(
+                    || {
+                        if self.required {
+                            Err(format!(
+                                "API key for service '{}' is required but not found. \
+                                Set the environment variable LLMSPELL_API_KEY_{} or configure it using the CLI.",
+                                self.service,
+                                self.service.to_uppercase()
+                            ))
+                        } else {
+                            Ok(None)
+                        }
+                    },
+                    |default| Ok(Some(default.clone())),
+                )
             },
             |key| Ok(Some(key)),
         )
@@ -130,6 +137,10 @@ pub trait RequiresApiKey {
     fn api_key_configs(&self) -> Vec<ApiKeyConfig>;
 
     /// Validate that all required API keys are available
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any required API key is missing
     fn validate_api_keys(&self) -> Result<(), String> {
         for config in self.api_key_configs() {
             config.get_key()?;

@@ -1,4 +1,4 @@
-//! ABOUTME: Integration tests for WebhookCallerTool
+//! ABOUTME: Integration tests for `WebhookCallerTool`
 //! ABOUTME: Tests webhook calling functionality with various HTTP methods and payloads
 
 mod common;
@@ -125,8 +125,7 @@ async fn test_webhook_caller_timeout() {
             let output_value: serde_json::Value = serde_json::from_str(&output.text).unwrap();
             assert!(
                 !output_value["success"].as_bool().unwrap_or(true),
-                "Expected error response, got success: {}",
-                output_value
+                "Expected error response, got success: {output_value}"
             );
 
             // Extract error message from various possible locations
@@ -144,10 +143,10 @@ async fn test_webhook_caller_timeout() {
                 if let Some(err) = result.get("error").and_then(|e| e.as_str()) {
                     err.to_lowercase()
                 } else {
-                    "".to_string()
+                    String::new()
                 }
             } else {
-                "".to_string()
+                String::new()
             };
 
             assert!(
@@ -155,8 +154,7 @@ async fn test_webhook_caller_timeout() {
                     || error_msg.contains("elapsed")
                     || error_msg.contains("error sending request")
                     || error_msg.contains("timed out"),
-                "Expected timeout-related error, got: '{}'",
-                error_msg
+                "Expected timeout-related error, got: '{error_msg}'"
             );
         }
         Err(e) => {
@@ -166,8 +164,7 @@ async fn test_webhook_caller_timeout() {
                     || err_str.contains("elapsed")
                     || err_str.contains("error sending request")
                     || err_str.contains("timed out"),
-                "Expected timeout-related error, got: '{}'",
-                err_str
+                "Expected timeout-related error, got: '{err_str}'"
             );
         }
     }
@@ -208,7 +205,6 @@ async fn test_webhook_caller_custom_method() {
     let status_code = result["status_code"].as_u64().unwrap_or(0);
     assert!(
         status_code == 200 || status_code == 405 || status_code == 404,
-        "Expected status 200, 404, or 405, got: {}",
-        status_code
+        "Expected status 200, 404, or 405, got: {status_code}"
     );
 }

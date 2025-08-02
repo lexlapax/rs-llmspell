@@ -185,6 +185,10 @@ impl ToolRegistry {
     }
 
     /// Register a tool in the registry
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if tool validation fails or if a tool with the same name already exists
     pub async fn register<T>(&self, name: String, tool: T) -> Result<()>
     where
         T: Tool + 'static,
@@ -235,6 +239,7 @@ impl ToolRegistry {
     }
 
     /// Validate a tool before registration
+    #[allow(clippy::unused_async)]
     async fn validate_tool(&self, tool: &dyn Tool) -> Result<()> {
         // Check that the tool has a valid schema
         let schema = tool.schema();
@@ -322,6 +327,10 @@ impl ToolRegistry {
     }
 
     /// Unregister a tool
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the tool is not found in the registry
     pub async fn unregister_tool(&self, name: &str) -> Result<()> {
         // Get tool info before removal for category cleanup
         let tool_info = {

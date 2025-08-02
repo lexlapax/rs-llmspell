@@ -283,6 +283,7 @@ impl TemplateEngineTool {
     }
 
     /// Sanitize template to prevent injection attacks
+    #[allow(clippy::unused_self)]
     fn sanitize_template(&self, template: &str) -> Result<String> {
         // Basic sanitization - in production, this would be more comprehensive
         let dangerous_patterns = [

@@ -133,6 +133,7 @@ impl SystemMonitorTool {
     }
 
     /// Get basic system information
+    #[allow(clippy::unused_async)]
     async fn get_basic_system_info(&self) -> LLMResult<SystemStats> {
         let system_info = get_system_info().map_err(|e| LLMSpellError::Tool {
             message: format!("Failed to get system information: {e}"),
@@ -172,6 +173,7 @@ impl SystemMonitorTool {
     }
 
     /// Get CPU usage (simplified version without external dependencies)
+    #[allow(clippy::unused_async)]
     async fn get_cpu_usage(&self) -> f64 {
         if !self.config.collect_cpu_stats {
             return 0.0;
@@ -199,6 +201,7 @@ impl SystemMonitorTool {
 
     /// Get system load average (Unix only)
     #[cfg(unix)]
+    #[allow(clippy::unused_self)]
     fn get_load_average(&self) -> Result<[f64; 3], std::io::Error> {
         use std::fs;
 
@@ -206,10 +209,10 @@ impl SystemMonitorTool {
         let parts: Vec<&str> = loadavg_content.split_whitespace().collect();
 
         if parts.len() >= 3 {
-            let load1 = parts[0].parse::<f64>().unwrap_or(0.0);
-            let load5_min = parts[1].parse::<f64>().unwrap_or(0.0);
-            let load15_min = parts[2].parse::<f64>().unwrap_or(0.0);
-            Ok([load1, load5_min, load15_min])
+            let one_minute = parts[0].parse::<f64>().unwrap_or(0.0);
+            let five_minutes = parts[1].parse::<f64>().unwrap_or(0.0);
+            let fifteen_minutes = parts[2].parse::<f64>().unwrap_or(0.0);
+            Ok([one_minute, five_minutes, fifteen_minutes])
         } else {
             Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
@@ -219,6 +222,7 @@ impl SystemMonitorTool {
     }
 
     /// Get disk usage statistics
+    #[allow(clippy::unused_async)]
     async fn get_disk_usage(&self) -> HashMap<String, DiskStats> {
         if !self.config.collect_disk_stats {
             return HashMap::new();
@@ -281,6 +285,7 @@ impl SystemMonitorTool {
 
     /// Get Unix mount points
     #[cfg(unix)]
+    #[allow(clippy::unused_self)]
     fn get_unix_mounts(&self) -> Result<Vec<(String, String)>, std::io::Error> {
         use std::fs;
 
@@ -311,6 +316,7 @@ impl SystemMonitorTool {
     }
 
     /// Get disk statistics for a specific path
+    #[allow(clippy::unused_self)]
     fn get_disk_stats_for_path(&self, path: &str) -> Result<DiskStats, std::io::Error> {
         #[cfg(unix)]
         {
@@ -319,9 +325,11 @@ impl SystemMonitorTool {
 
             let path_c = CString::new(path)?;
             // SAFETY: Creating a zeroed libc::statvfs struct is safe as all fields are scalar types
+            #[allow(unsafe_code)]
             let mut statvfs: libc::statvfs = unsafe { mem::zeroed() };
 
             // SAFETY: path_c is a valid C string and statvfs is a valid mutable reference
+            #[allow(unsafe_code)]
             let result = unsafe { libc::statvfs(path_c.as_ptr(), &mut statvfs) };
 
             if result == 0 {
@@ -404,6 +412,7 @@ impl SystemMonitorTool {
     }
 
     /// Get process count (simplified implementation)
+    #[allow(clippy::unused_async)]
     async fn get_process_count(&self) -> Option<u32> {
         if !self.config.collect_process_stats {
             return None;
@@ -437,6 +446,7 @@ impl SystemMonitorTool {
     }
 
     /// Get system uptime (simplified implementation)
+    #[allow(clippy::unused_async)]
     async fn get_uptime(&self) -> Option<u64> {
         #[cfg(unix)]
         {
@@ -499,6 +509,7 @@ impl SystemMonitorTool {
     }
 
     /// Validate monitoring parameters
+    #[allow(clippy::unused_async)]
     async fn validate_monitoring_parameters(&self, params: &serde_json::Value) -> LLMResult<()> {
         // Validate operation if provided
         if let Some(operation) = extract_optional_string(params, "operation") {

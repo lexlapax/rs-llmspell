@@ -150,6 +150,7 @@ impl FileOperationsTool {
     }
 
     /// Perform read operation
+    #[allow(clippy::unused_async)]
     async fn read_file(&self, path: &Path, sandbox: &FileSandbox) -> Result<String> {
         info!("Reading file: {:?}", path);
 
@@ -168,7 +169,7 @@ impl FileOperationsTool {
                 source: None,
             })?;
 
-        if metadata.size as usize > self.config.max_file_size {
+        if usize::try_from(metadata.size).unwrap_or(usize::MAX) > self.config.max_file_size {
             return Err(LLMSpellError::Validation {
                 message: format!(
                     "File size {} exceeds maximum allowed size {}",
@@ -202,6 +203,7 @@ impl FileOperationsTool {
     }
 
     /// Perform write operation with optional atomic write
+    #[allow(clippy::unused_async)]
     async fn write_file(&self, path: &Path, content: &str, sandbox: &FileSandbox) -> Result<()> {
         info!("Writing file: {:?}", path);
 
@@ -239,6 +241,7 @@ impl FileOperationsTool {
     }
 
     /// Perform append operation
+    #[allow(clippy::unused_async)]
     async fn append_file(&self, path: &Path, content: &str, sandbox: &FileSandbox) -> Result<()> {
         info!("Appending to file: {:?}", path);
 
@@ -248,7 +251,7 @@ impl FileOperationsTool {
         // Read existing content first to check total size
         let existing_size = if file_utils::file_exists(&safe_path) {
             file_utils::get_metadata(&safe_path)
-                .map(|m| m.size as usize)
+                .map(|m| usize::try_from(m.size).unwrap_or(usize::MAX))
                 .unwrap_or(0)
         } else {
             0
@@ -280,6 +283,7 @@ impl FileOperationsTool {
     }
 
     /// Delete file
+    #[allow(clippy::unused_async)]
     async fn delete_file(&self, path: &Path, sandbox: &FileSandbox) -> Result<()> {
         info!("Deleting file: {:?}", path);
 
@@ -318,6 +322,7 @@ impl FileOperationsTool {
     }
 
     /// Create directory
+    #[allow(clippy::unused_async)]
     async fn create_dir(&self, path: &Path, recursive: bool, sandbox: &FileSandbox) -> Result<()> {
         info!("Creating directory: {:?} (recursive: {})", path, recursive);
 
@@ -363,6 +368,7 @@ impl FileOperationsTool {
     }
 
     /// List directory contents
+    #[allow(clippy::unused_async)]
     async fn list_dir(&self, path: &Path, sandbox: &FileSandbox) -> Result<Vec<Value>> {
         info!("Listing directory: {:?}", path);
 
@@ -413,6 +419,7 @@ impl FileOperationsTool {
     }
 
     /// Copy file
+    #[allow(clippy::unused_async)]
     async fn copy_file(&self, from: &Path, to: &Path, sandbox: &FileSandbox) -> Result<()> {
         info!("Copying file from {:?} to {:?}", from, to);
 
@@ -432,7 +439,7 @@ impl FileOperationsTool {
                 source: None,
             })?;
 
-        if metadata.size as usize > self.config.max_file_size {
+        if usize::try_from(metadata.size).unwrap_or(usize::MAX) > self.config.max_file_size {
             return Err(LLMSpellError::Validation {
                 message: format!(
                     "File size {} exceeds maximum allowed size {}",
@@ -456,6 +463,7 @@ impl FileOperationsTool {
     }
 
     /// Move/rename file
+    #[allow(clippy::unused_async)]
     async fn move_file(&self, from: &Path, to: &Path, sandbox: &FileSandbox) -> Result<()> {
         info!("Moving file from {:?} to {:?}", from, to);
 
@@ -530,6 +538,7 @@ impl FileOperationsTool {
     }
 
     /// Parse parameters from input
+    #[allow(clippy::unused_self)]
     fn parse_parameters(&self, params: &Value) -> Result<FileParameters> {
         let operation_str = extract_required_string(params, "operation")?;
         let operation: FileOperation = operation_str.parse()?;

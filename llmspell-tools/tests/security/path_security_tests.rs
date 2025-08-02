@@ -5,6 +5,7 @@ use super::test_framework::*;
 use serde_json::json;
 
 /// Path traversal test vectors
+#[must_use]
 pub fn path_traversal_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -77,6 +78,7 @@ pub fn path_traversal_tests() -> Vec<SecurityTestCase> {
 }
 
 /// Path encoding bypass attempts
+#[must_use]
 pub fn path_encoding_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -138,6 +140,7 @@ pub fn path_encoding_tests() -> Vec<SecurityTestCase> {
 }
 
 /// Symlink attack vectors
+#[must_use]
 pub fn symlink_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -189,6 +192,7 @@ pub fn symlink_tests() -> Vec<SecurityTestCase> {
 }
 
 /// Directory traversal patterns
+#[must_use]
 pub fn directory_pattern_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -250,6 +254,7 @@ pub fn directory_pattern_tests() -> Vec<SecurityTestCase> {
 }
 
 /// Special file access attempts
+#[must_use]
 pub fn special_file_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -304,6 +309,7 @@ pub fn special_file_tests() -> Vec<SecurityTestCase> {
 }
 
 /// Windows-specific path tests
+#[must_use]
 pub fn windows_path_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -355,6 +361,7 @@ pub fn windows_path_tests() -> Vec<SecurityTestCase> {
 }
 
 /// Archive path extraction tests
+#[must_use]
 pub fn archive_path_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -399,6 +406,7 @@ pub fn archive_path_tests() -> Vec<SecurityTestCase> {
 }
 
 /// Permission bypass attempts
+#[must_use]
 pub fn permission_bypass_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -442,6 +450,7 @@ pub fn permission_bypass_tests() -> Vec<SecurityTestCase> {
 }
 
 /// Case sensitivity tests
+#[must_use]
 pub fn case_sensitivity_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -470,6 +479,7 @@ pub fn case_sensitivity_tests() -> Vec<SecurityTestCase> {
 }
 
 /// Path normalization bypass tests
+#[must_use]
 pub fn path_normalization_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -509,6 +519,7 @@ pub fn path_normalization_tests() -> Vec<SecurityTestCase> {
 }
 
 /// Race condition path tests
+#[must_use]
 pub fn race_condition_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -539,6 +550,7 @@ pub fn race_condition_tests() -> Vec<SecurityTestCase> {
 }
 
 /// Path length and boundary tests
+#[must_use]
 pub fn path_boundary_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -578,6 +590,7 @@ pub fn path_boundary_tests() -> Vec<SecurityTestCase> {
 }
 
 /// Create all path security test cases
+#[must_use]
 pub fn all_path_security_tests() -> Vec<SecurityTestCase> {
     let mut tests = Vec::new();
     tests.extend(path_traversal_tests());
@@ -609,7 +622,7 @@ mod tests {
             .map(|t| t.name.split('_').next().unwrap_or(""))
             .collect::<std::collections::HashSet<_>>()
             .into_iter()
-            .map(|s| s.to_string())
+            .map(std::string::ToString::to_string)
             .collect();
 
         assert!(categories.contains(&"PATH".to_string()));

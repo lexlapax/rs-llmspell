@@ -33,8 +33,7 @@ async fn test_http_timeout_with_short_timeout() {
             error_msg.contains("request")
                 || error_msg.contains("timeout")
                 || error_msg.contains("operation timed out"),
-            "Expected timeout error, got: {}",
-            error_msg
+            "Expected timeout error, got: {error_msg}"
         );
     }
 }
@@ -69,7 +68,7 @@ async fn test_http_no_timeout_with_long_timeout() {
         }
         Err(e) => {
             // Don't panic on network errors, just skip the test
-            eprintln!("Warning: HTTP test failed due to network issue: {}", e);
+            eprintln!("Warning: HTTP test failed due to network issue: {e}");
             eprintln!("This is likely due to httpbin.org being unavailable");
             return; // Skip rest of test
         }

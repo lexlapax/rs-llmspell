@@ -169,6 +169,10 @@ impl RequiresApiKey for EmailSenderTool {
 
 impl EmailSenderTool {
     /// Create a new email sender tool
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the configuration is invalid
     pub fn new(config: EmailSenderConfig) -> Result<Self> {
         let is_production = !cfg!(debug_assertions);
 
@@ -208,6 +212,13 @@ impl EmailSenderTool {
     }
 
     /// Send email using the specified provider
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The specified provider is not configured
+    /// - The provider type is unsupported
+    /// - Email sending fails
     async fn send_email(
         &self,
         provider: &str,
@@ -253,6 +264,16 @@ impl EmailSenderTool {
     }
 
     /// Send email via SMTP
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - SMTP host is not configured
+    /// - Failed to parse email addresses
+    /// - Failed to build email message
+    /// - Failed to create SMTP transport
+    /// - Failed to send email
+    #[allow(clippy::unused_async)]
     async fn send_via_smtp(
         &self,
         #[allow(unused_variables)] config: &EmailProviderConfig,
@@ -354,6 +375,11 @@ impl EmailSenderTool {
     }
 
     /// Send email via `SendGrid`
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `SendGrid` API call fails (currently returns mock success)
+    #[allow(clippy::unused_async)]
     async fn send_via_sendgrid(
         &self,
         _config: &EmailProviderConfig,
@@ -376,6 +402,13 @@ impl EmailSenderTool {
     }
 
     /// Send email via AWS SES
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Failed to build email content
+    /// - AWS SES API call fails
+    #[allow(clippy::unused_async)]
     async fn send_via_ses(
         &self,
         #[allow(unused_variables)] config: &EmailProviderConfig,

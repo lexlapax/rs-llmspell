@@ -1,10 +1,11 @@
-//! ABOUTME: Rate limiting and DoS protection security tests
+//! ABOUTME: Rate limiting and `DoS` protection security tests
 //! ABOUTME: Tests for rate limit bypass, resource exhaustion, and denial of service attacks
 
 use super::test_framework::*;
 use serde_json::json;
 
 /// Basic rate limit bypass tests
+#[must_use]
 pub fn rate_limit_bypass_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -67,6 +68,7 @@ pub fn rate_limit_bypass_tests() -> Vec<SecurityTestCase> {
 }
 
 /// Resource exhaustion tests
+#[must_use]
 pub fn resource_exhaustion_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -121,6 +123,7 @@ pub fn resource_exhaustion_tests() -> Vec<SecurityTestCase> {
 }
 
 /// Slowloris and slow attack tests
+#[must_use]
 pub fn slow_attack_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -163,7 +166,8 @@ pub fn slow_attack_tests() -> Vec<SecurityTestCase> {
     ]
 }
 
-/// Application-layer DoS tests
+/// Application-layer `DoS` tests
+#[must_use]
 pub fn application_dos_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -215,7 +219,8 @@ pub fn application_dos_tests() -> Vec<SecurityTestCase> {
     ]
 }
 
-/// Protocol-specific DoS tests
+/// Protocol-specific `DoS` tests
+#[must_use]
 pub fn protocol_dos_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -257,6 +262,7 @@ pub fn protocol_dos_tests() -> Vec<SecurityTestCase> {
 }
 
 /// Rate limit evasion techniques
+#[must_use]
 pub fn rate_limit_evasion_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -305,6 +311,7 @@ pub fn rate_limit_evasion_tests() -> Vec<SecurityTestCase> {
 }
 
 /// Burst attack tests
+#[must_use]
 pub fn burst_attack_tests() -> Vec<SecurityTestCase> {
     vec![
         SecurityTestCase {
@@ -348,7 +355,8 @@ pub fn burst_attack_tests() -> Vec<SecurityTestCase> {
     ]
 }
 
-/// Create all rate limiting and DoS test cases
+/// Create all rate limiting and `DoS` test cases
+#[must_use]
 pub fn all_rate_limit_tests() -> Vec<SecurityTestCase> {
     let mut tests = Vec::new();
     tests.extend(rate_limit_bypass_tests());
@@ -375,7 +383,7 @@ mod tests {
             .map(|t| t.name.split('_').next().unwrap_or(""))
             .collect::<std::collections::HashSet<_>>()
             .into_iter()
-            .map(|s| s.to_string())
+            .map(std::string::ToString::to_string)
             .collect();
 
         assert!(categories.contains(&"RATE".to_string()));

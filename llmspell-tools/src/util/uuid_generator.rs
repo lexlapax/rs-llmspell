@@ -100,12 +100,11 @@ impl UuidGeneratorTool {
         name: Option<&str>,
     ) -> Result<Uuid> {
         match version {
-            UuidVersion::V1 => {
+            UuidVersion::V1 | UuidVersion::V4 => {
                 // UUID v1 is timestamp-based, we'll use v4 as fallback for security
                 // v1 requires MAC address which can be a privacy concern
                 Ok(Uuid::new_v4())
             }
-            UuidVersion::V4 => Ok(Uuid::new_v4()),
             UuidVersion::V5 => {
                 let namespace_uuid = match namespace {
                     Some("agent") => *NAMESPACE_AGENT,
@@ -139,6 +138,7 @@ impl UuidGeneratorTool {
         }
     }
 
+    #[allow(clippy::unused_self)]
     fn format_uuid(&self, uuid: Uuid, format: &UuidFormat) -> String {
         match format {
             UuidFormat::Standard | UuidFormat::Hyphenated => uuid.to_string(),
@@ -148,6 +148,7 @@ impl UuidGeneratorTool {
         }
     }
 
+    #[allow(clippy::unused_async)]
     async fn validate_parameters(&self, params: &serde_json::Value) -> Result<()> {
         // Extract operation type for validation
         let operation = extract_string_with_default(params, "operation", "generate");

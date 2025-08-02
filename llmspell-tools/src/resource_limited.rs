@@ -155,6 +155,7 @@ pub trait ResourceLimitExt: Tool + Sized {
 impl<T: Tool> ResourceLimitExt for T {}
 
 /// Helper to track file operations with size limits
+#[allow(clippy::unused_async)]
 pub async fn check_file_operation(
     tracker: &ResourceTracker,
     path: &std::path::Path,

@@ -56,7 +56,8 @@ impl SecurityTestResult {
     }
 
     /// Mark as prevented
-    pub fn mark_prevented(mut self) -> Self {
+    #[must_use]
+    pub const fn mark_prevented(mut self) -> Self {
         self.prevented = true;
         self
     }
@@ -74,7 +75,8 @@ impl SecurityTestResult {
     }
 
     /// Set execution time
-    pub fn with_execution_time(mut self, duration: Duration) -> Self {
+    #[must_use]
+    pub const fn with_execution_time(mut self, duration: Duration) -> Self {
         self.execution_time = duration;
         self
     }
@@ -104,7 +106,7 @@ pub struct SecurityTestCase {
 }
 
 /// Expected behavior for security tests
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ExpectedBehavior {
     /// Should reject with error
     Reject,
@@ -209,6 +211,7 @@ pub struct ToolStats {
 
 impl SecurityTestRunner {
     /// Create a new test runner
+    #[must_use]
     pub fn new(config: SecurityTestConfig) -> Self {
         Self {
             results: Arc::new(Mutex::new(Vec::new())),
@@ -232,7 +235,7 @@ impl SecurityTestRunner {
             Ok(input) => input,
             Err(e) => {
                 return result
-                    .with_error(format!("Failed to create input: {}", e))
+                    .with_error(format!("Failed to create input: {e}"))
                     .with_execution_time(start.elapsed());
             }
         };
@@ -392,7 +395,7 @@ impl SecurityTestRunner {
         );
 
         if let Some(error) = &result.error {
-            println!("  Error: {}", error);
+            println!("  Error: {error}");
         }
     }
 
@@ -452,6 +455,7 @@ pub struct Vulnerability {
 }
 
 /// Helper to create test execution context
+#[must_use]
 pub fn create_test_context() -> ExecutionContext {
     ExecutionContext::new()
 }
@@ -481,7 +485,7 @@ impl Serialize for SecurityTestConfig {
             &self
                 .categories
                 .iter()
-                .map(|c| format!("{:?}", c))
+                .map(|c| format!("{c:?}"))
                 .collect::<Vec<_>>(),
         )?;
         state.serialize_field("tools", &self.tools)?;
@@ -508,14 +512,14 @@ impl Serialize for TestStatistics {
         let severity_map: HashMap<String, usize> = self
             .by_severity
             .iter()
-            .map(|(k, v)| (format!("{:?}", k), *v))
+            .map(|(k, v)| (format!("{k:?}"), *v))
             .collect();
         state.serialize_field("by_severity", &severity_map)?;
 
         let category_map: HashMap<String, usize> = self
             .by_category
             .iter()
-            .map(|(k, v)| (format!("{:?}", k), *v))
+            .map(|(k, v)| (format!("{k:?}"), *v))
             .collect();
         state.serialize_field("by_category", &category_map)?;
 
@@ -572,10 +576,10 @@ impl Serialize for Severity {
         S: serde::Serializer,
     {
         serializer.serialize_str(match self {
-            Severity::Low => "Low",
-            Severity::Medium => "Medium",
-            Severity::High => "High",
-            Severity::Critical => "Critical",
+            Self::Low => "Low",
+            Self::Medium => "Medium",
+            Self::High => "High",
+            Self::Critical => "Critical",
         })
     }
 }

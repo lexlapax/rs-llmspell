@@ -76,9 +76,7 @@ async fn test_path_traversal_prevention() {
                     !output_str.contains("root:")
                         && !output_str.contains("/etc/passwd")
                         && !output_str.contains("system32"),
-                    "Tool {} may be vulnerable to path traversal: {}",
-                    tool_name,
-                    malicious_path
+                    "Tool {tool_name} may be vulnerable to path traversal: {malicious_path}"
                 );
             }
         }
@@ -125,9 +123,7 @@ async fn test_ssrf_prevention() {
                 Ok(Ok(output)) => {
                     assert!(
                         !output.text.contains("/etc/passwd") && !output.text.contains("metadata"),
-                        "Tool {} may be vulnerable to SSRF with URL: {}",
-                        tool_name,
-                        url
+                        "Tool {tool_name} may be vulnerable to SSRF with URL: {url}"
                     );
                 }
                 Ok(Err(_)) => {
@@ -167,8 +163,7 @@ async fn test_command_injection_prevention() {
         if let Ok(output) = &result {
             assert!(
                 !output.text.contains("root:") && !output.text.contains("/etc/passwd"),
-                "ProcessExecutor may be vulnerable to command injection: {}",
-                cmd
+                "ProcessExecutor may be vulnerable to command injection: {cmd}"
             );
         }
     }
@@ -352,8 +347,7 @@ async fn test_email_header_injection() {
                 || output.text.contains("failed");
             assert!(
                 has_error,
-                "Email sender may be vulnerable to header injection with payload: {}",
-                payload
+                "Email sender may be vulnerable to header injection with payload: {payload}"
             );
         }
     }
@@ -622,7 +616,7 @@ async fn execute_tool_raw(tool_name: &str, params: Value) -> Result<AgentOutput,
         }
 
         _ => Err(LLMSpellError::Tool {
-            message: format!("Unknown tool: {}", tool_name),
+            message: format!("Unknown tool: {tool_name}"),
             tool_name: Some(tool_name.to_string()),
             source: None,
         }),

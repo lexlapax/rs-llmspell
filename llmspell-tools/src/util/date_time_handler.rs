@@ -65,6 +65,7 @@ impl DateTimeHandlerTool {
     }
 
     /// Process date/time operation
+    #[allow(clippy::unused_async)]
     async fn process_operation(&self, params: &Value) -> Result<Value> {
         let operation = extract_string_with_default(params, "operation", "parse");
 

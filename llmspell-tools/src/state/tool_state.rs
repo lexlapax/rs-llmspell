@@ -100,7 +100,7 @@ impl ToolState {
     /// Update execution statistics
     pub fn record_execution(&mut self, success: bool, duration: Duration) {
         self.execution_stats.total_executions += 1;
-        let duration_ms = duration.as_millis() as u64;
+        let duration_ms = u64::try_from(duration.as_millis()).unwrap_or(u64::MAX);
         self.execution_stats.total_execution_time_ms += duration_ms;
 
         if success {
@@ -130,7 +130,7 @@ impl ToolState {
         let cached_result = CachedResult {
             input_hash: input_hash.clone(),
             result,
-            execution_time_ms: execution_time.as_millis() as u64,
+            execution_time_ms: u64::try_from(execution_time.as_millis()).unwrap_or(u64::MAX),
             cached_at: SystemTime::now(),
             ttl_seconds,
             contains_sensitive_data,
@@ -311,16 +311,28 @@ pub trait ToolStatePersistence: Tool {
     }
 
     /// Restore execution statistics (optional override)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if restoration fails
     fn restore_execution_statistics(&self, _stats: ToolExecutionStats) -> Result<()> {
         Ok(())
     }
 
     /// Restore result cache (optional override)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if restoration fails
     fn restore_result_cache(&self, _cache: HashMap<String, CachedResult>) -> Result<()> {
         Ok(())
     }
 
     /// Restore custom state (optional override)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if restoration fails
     fn restore_custom_state(&self, _state: HashMap<String, Value>) -> Result<()> {
         Ok(())
     }
@@ -348,6 +360,9 @@ impl ToolStateRegistry {
     }
 
     /// Register a tool for state management
+    /// # Errors
+    ///
+    /// Returns an error if tool registration fails
     pub async fn register_tool<T: ToolStatePersistence>(&mut self, tool: T) -> Result<T> {
         tool.set_state_manager(self.state_manager.clone());
 
@@ -366,6 +381,9 @@ impl ToolStateRegistry {
     }
 
     /// Save state for all registered tools
+    /// # Errors
+    ///
+    /// Returns an error if saving any tool state fails
     pub async fn save_all_states(&self) -> Result<()> {
         for (tool_id, tool_state) in &self.tool_states {
             let state_scope = StateScope::Custom(format!("tool_{tool_id}"));
@@ -393,6 +411,7 @@ impl ToolStateRegistry {
     }
 
     /// Get registry statistics
+    #[allow(clippy::unused_async)]
     pub async fn get_registry_stats(&self) -> RegistryStatistics {
         let total_tools = self.tool_states.len();
         let total_cached_results: usize = self

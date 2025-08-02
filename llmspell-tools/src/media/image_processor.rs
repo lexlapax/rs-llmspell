@@ -205,6 +205,7 @@ impl ImageProcessorTool {
     }
 
     /// Detect image format from file
+    #[allow(clippy::unused_async)]
     async fn detect_format(&self, file_path: &Path) -> LLMResult<ImageFormat> {
         // First try extension-based detection
         let format = ImageFormat::from_extension(file_path);
@@ -273,6 +274,7 @@ impl ImageProcessorTool {
     }
 
     /// Resize image
+    #[allow(clippy::unused_async)]
     async fn resize_image(
         &self,
         _input_path: &Path,
@@ -292,6 +294,7 @@ impl ImageProcessorTool {
     }
 
     /// Convert image format
+    #[allow(clippy::unused_async)]
     async fn convert_format(
         &self,
         _input_path: &Path,
@@ -318,6 +321,7 @@ impl ImageProcessorTool {
     }
 
     /// Crop image
+    #[allow(clippy::unused_async)]
     async fn crop_image(
         &self,
         _input_path: &Path,
@@ -337,6 +341,7 @@ impl ImageProcessorTool {
     }
 
     /// Rotate image
+    #[allow(clippy::unused_async)]
     async fn rotate_image(
         &self,
         _input_path: &Path,
@@ -354,6 +359,7 @@ impl ImageProcessorTool {
     }
 
     /// Generate thumbnail
+    #[allow(clippy::unused_async)]
     async fn generate_thumbnail(
         &self,
         _input_path: &Path,
@@ -372,6 +378,7 @@ impl ImageProcessorTool {
     }
 
     /// Validate processing parameters
+    #[allow(clippy::unused_async)]
     async fn validate_parameters(&self, params: &serde_json::Value) -> LLMResult<()> {
         // Validate operation
         if let Some(operation) = extract_optional_string(params, "operation") {
@@ -472,15 +479,18 @@ impl BaseAgent for ImageProcessorTool {
                 let mut message = format!("Image file: {:?} format", metadata.format);
 
                 if let Some(dims) = &metadata.dimensions {
-                    message.push_str(&format!(
+                    use std::fmt::Write;
+                    let _ = write!(
+                        message,
                         ", {}x{} pixels ({})",
                         dims.width,
                         dims.height,
                         dims.orientation()
-                    ));
+                    );
                 }
 
-                message.push_str(&format!(", Size: {} bytes", metadata.file_size));
+                use std::fmt::Write;
+                let _ = write!(message, ", Size: {} bytes", metadata.file_size);
 
                 let response = ResponseBuilder::success("metadata")
                     .with_message(message)

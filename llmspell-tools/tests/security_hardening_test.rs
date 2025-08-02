@@ -4,7 +4,7 @@
 //! Security hardening integration tests
 //!
 //! This test suite validates the security hardening measures implemented
-//! in Phase 3.0.12, specifically for Calculator DoS protection
+//! in Phase 3.0.12, specifically for Calculator `DoS` protection
 
 use llmspell_core::{types::AgentInput, BaseAgent, ExecutionContext};
 use llmspell_tools::util::calculator::CalculatorTool;
@@ -81,7 +81,7 @@ async fn test_calculator_dos_protection_comprehensive() {
 
     // Test 4: Function count limit
     let many_funcs = (0..60)
-        .map(|i| format!("sin({})", i))
+        .map(|i| format!("sin({i})"))
         .collect::<Vec<_>>()
         .join(" + ");
     let input = AgentInput::text("test").with_parameter(
@@ -127,11 +127,7 @@ async fn test_calculator_dos_protection_comprehensive() {
             .await
             .unwrap();
         let output: JsonValue = serde_json::from_str(&result.text).unwrap();
-        assert_eq!(
-            output["success"], false,
-            "Pattern '{}' should fail",
-            pattern
-        );
+        assert_eq!(output["success"], false, "Pattern '{pattern}' should fail");
     }
 }
 #[tokio::test]
@@ -165,16 +161,12 @@ async fn test_calculator_safe_expressions_still_work() {
 
         assert_eq!(
             output["success"], true,
-            "Expression '{}' should succeed",
-            expr
+            "Expression '{expr}' should succeed"
         );
         let result_val = output["result"]["result"].as_f64().unwrap();
         assert!(
             (result_val - expected).abs() < 0.0001,
-            "Expression '{}' = {} (expected {})",
-            expr,
-            result_val,
-            expected
+            "Expression '{expr}' = {result_val} (expected {expected})"
         );
     }
 }
@@ -210,9 +202,7 @@ async fn test_calculator_timeout_protection() {
                 error_msg.contains("timeout")
                     || error_msg.contains("complex")
                     || error_msg.contains("operations"),
-                "Expression '{}' failed with: {}",
-                expr,
-                error_msg
+                "Expression '{expr}' failed with: {error_msg}"
             );
         }
     }
@@ -274,17 +264,15 @@ async fn test_expression_validation_operation() {
         let is_valid = output["result"]["valid"].as_bool().unwrap();
         if is_valid != should_be_valid {
             println!(
-                "Expression '{}' validation mismatch. Expected: {}, Got: {}",
-                expr, should_be_valid, is_valid
+                "Expression '{expr}' validation mismatch. Expected: {should_be_valid}, Got: {is_valid}"
             );
             if let Some(error) = output["result"].get("error") {
-                println!("  Error: {}", error);
+                println!("  Error: {error}");
             }
         }
         assert_eq!(
             is_valid, should_be_valid,
-            "Expression '{}' validation result incorrect",
-            expr
+            "Expression '{expr}' validation result incorrect"
         );
     }
 }

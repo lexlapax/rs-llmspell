@@ -118,6 +118,7 @@ impl FileSearchTool {
     }
 
     /// Search within a single file
+    #[allow(clippy::unused_async)]
     async fn search_file(
         &self,
         file_path: &Path,
@@ -162,6 +163,7 @@ impl FileSearchTool {
     }
 
     /// Search within a directory
+    #[allow(clippy::unused_async)]
     async fn search_directory(
         &self,
         directory: &Path,
@@ -220,9 +222,11 @@ impl FileSearchTool {
         }
 
         // Context lines
-        let context_lines = extract_optional_u64(params, "context_lines")
-            .unwrap_or(self.config.default_context_lines as u64)
-            as usize;
+        let context_lines = usize::try_from(
+            extract_optional_u64(params, "context_lines")
+                .unwrap_or(self.config.default_context_lines as u64),
+        )
+        .unwrap_or(usize::MAX);
         options = options.with_context_lines(context_lines);
 
         // File size limit
@@ -278,17 +282,22 @@ impl FileSearchTool {
 
         // Search limits
         if let Some(max_matches) = extract_optional_u64(params, "max_matches_per_file") {
-            options = options.with_max_matches_per_file(max_matches as usize);
+            options = options
+                .with_max_matches_per_file(usize::try_from(max_matches).unwrap_or(usize::MAX));
         }
 
-        let max_depth = extract_optional_u64(params, "max_depth")
-            .unwrap_or(self.config.max_search_depth as u64) as usize;
+        let max_depth = usize::try_from(
+            extract_optional_u64(params, "max_depth")
+                .unwrap_or(self.config.max_search_depth as u64),
+        )
+        .unwrap_or(usize::MAX);
         options = options.with_max_depth(max_depth);
 
         Ok(options)
     }
 
     /// Format search results for output
+    #[allow(clippy::unused_self)]
     fn format_search_results(&self, result: &SearchResult) -> serde_json::Value {
         let matches: Vec<serde_json::Value> = result
             .matches
@@ -330,6 +339,7 @@ impl FileSearchTool {
     }
 
     /// Validate search parameters
+    #[allow(clippy::unused_async)]
     async fn validate_search_parameters(&self, params: &serde_json::Value) -> LLMResult<()> {
         // Required parameters are already validated by extract_required_string
         // Just validate pattern is not empty

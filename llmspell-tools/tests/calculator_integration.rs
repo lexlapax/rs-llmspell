@@ -1,7 +1,7 @@
 // ABOUTME: Integration tests for the CalculatorTool
 // ABOUTME: Tests complex mathematical expressions and edge cases
 
-//! Integration tests for CalculatorTool
+//! Integration tests for `CalculatorTool`
 
 use llmspell_core::{
     traits::{base_agent::BaseAgent, tool::Tool},

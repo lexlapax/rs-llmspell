@@ -79,6 +79,7 @@ impl FileWatcherTool {
     }
 
     /// Start watching files and return events
+    #[allow(clippy::unused_async)]
     async fn watch_files(&self, watch_config: WatchConfig) -> AnyhowResult<Vec<FileEvent>> {
         // Validate configuration
         watch_config.validate()?;
@@ -210,6 +211,7 @@ impl FileWatcherTool {
     }
 
     /// Validate parameters for file watching operations
+    #[allow(clippy::unused_async)]
     async fn validate_parameters(&self, params: &Value) -> Result<()> {
         if !params.is_object() {
             return Err(LLMSpellError::Validation {
@@ -289,15 +291,18 @@ impl BaseAgent for FileWatcherTool {
                 let debounce_ms = extract_optional_u64(params, "debounce_ms")
                     .unwrap_or(self.config.default_debounce_ms);
                 // Support both timeout_ms and timeout_seconds for flexibility
-                let timeout_seconds = if let Some(ms) = extract_optional_u64(params, "timeout_ms") {
-                    ms.div_ceil(1000) // Round up to nearest second
-                } else {
-                    extract_optional_u64(params, "timeout_seconds")
-                        .unwrap_or(self.config.default_timeout)
-                };
-                let max_events = extract_optional_u64(params, "max_events")
-                    .unwrap_or(self.config.max_events as u64)
-                    as usize;
+                let timeout_seconds = extract_optional_u64(params, "timeout_ms").map_or_else(
+                    || {
+                        extract_optional_u64(params, "timeout_seconds")
+                            .unwrap_or(self.config.default_timeout)
+                    },
+                    |ms| ms.div_ceil(1000), // Round up to nearest second
+                );
+                let max_events = usize::try_from(
+                    extract_optional_u64(params, "max_events")
+                        .unwrap_or(self.config.max_events as u64),
+                )
+                .unwrap_or(usize::MAX);
 
                 let mut watch_config = WatchConfig::new()
                     .recursive(recursive)

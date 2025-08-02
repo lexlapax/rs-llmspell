@@ -1,4 +1,4 @@
-//! ABOUTME: Integration tests for UrlAnalyzerTool
+//! ABOUTME: Integration tests for `UrlAnalyzerTool`
 //! ABOUTME: Tests URL parsing, validation, and analysis functionality
 
 mod common;
@@ -161,7 +161,7 @@ async fn test_url_analyzer_relative_url() {
                 assert!(
                     result
                         .get("is_relative")
-                        .and_then(|v| v.as_bool())
+                        .and_then(serde_json::Value::as_bool)
                         .unwrap_or(false)
                         || result["scheme"].is_null()
                 );

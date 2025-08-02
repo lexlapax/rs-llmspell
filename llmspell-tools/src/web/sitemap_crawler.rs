@@ -290,6 +290,7 @@ impl SitemapCrawlerTool {
         })
     }
 
+    #[allow(clippy::unused_self)]
     fn parse_sitemap_index(&self, xml_content: &str) -> std::result::Result<Vec<String>, ()> {
         // Simple XML parsing for sitemap index
         let mut urls = Vec::new();
@@ -322,6 +323,7 @@ impl SitemapCrawlerTool {
         }
     }
 
+    #[allow(clippy::unused_self)]
     fn parse_sitemap(&self, xml_content: &str) -> Result<Vec<Value>> {
         let mut urls = Vec::new();
         let lines: Vec<&str> = xml_content.lines().collect();

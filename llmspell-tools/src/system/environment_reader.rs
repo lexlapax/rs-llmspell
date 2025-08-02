@@ -194,6 +194,7 @@ impl EnvironmentReaderTool {
     }
 
     /// Simple glob pattern matching for environment variable names
+    #[allow(clippy::unused_self)]
     fn matches_pattern(&self, var_name: &str, pattern: &str) -> bool {
         if pattern == "*" {
             return true;
@@ -214,6 +215,7 @@ impl EnvironmentReaderTool {
     }
 
     /// Get a single environment variable
+    #[allow(clippy::unused_async)]
     async fn get_single_var(&self, var_name: &str) -> LLMResult<Option<String>> {
         if !self.is_var_allowed(var_name) {
             return Err(LLMSpellError::Security {
@@ -222,16 +224,18 @@ impl EnvironmentReaderTool {
             });
         }
 
-        if let Some(value) = get_env_var(var_name) {
-            info!("Retrieved environment variable: {}", var_name);
-            Ok(Some(value))
-        } else {
-            debug!("Environment variable '{}' not found", var_name);
-            Ok(None)
-        }
+        Ok(get_env_var(var_name)
+            .inspect(|value| {
+                info!("Retrieved environment variable: {}", var_name);
+            })
+            .or_else(|| {
+                debug!("Environment variable '{}' not found", var_name);
+                None
+            }))
     }
 
     /// Get all allowed environment variables
+    #[allow(clippy::unused_async)]
     async fn get_all_vars(&self) -> LLMResult<HashMap<String, String>> {
         let all_vars = get_all_env_vars();
         let mut allowed_vars = HashMap::new();
@@ -260,6 +264,7 @@ impl EnvironmentReaderTool {
     }
 
     /// Get environment variables matching a pattern
+    #[allow(clippy::unused_async)]
     async fn get_vars_by_pattern(&self, pattern: &str) -> LLMResult<HashMap<String, String>> {
         let all_vars = get_all_env_vars();
         let mut matching_vars = HashMap::new();
@@ -289,6 +294,7 @@ impl EnvironmentReaderTool {
     }
 
     /// Set an environment variable (if allowed)
+    #[allow(clippy::unused_async)]
     async fn set_var(&self, var_name: &str, value: &str) -> LLMResult<()> {
         if !self.config.allow_set_variables {
             return Err(LLMSpellError::Security {

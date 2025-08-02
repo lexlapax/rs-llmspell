@@ -242,6 +242,7 @@ impl HttpRequestTool {
     }
 
     /// Apply authentication to request
+    #[allow(clippy::unused_self)]
     fn apply_auth(
         &self,
         mut request: reqwest::RequestBuilder,
@@ -262,6 +263,12 @@ impl HttpRequestTool {
     }
 
     /// Execute request with retry logic (using shared utility)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Rate limit is exceeded
+    /// - HTTP request fails after all retries
     async fn execute_with_retry(
         &self,
         method: Method,
@@ -325,6 +332,10 @@ impl HttpRequestTool {
     }
 
     /// Parse response based on content type
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if response parsing fails
     async fn parse_response(&self, response: Response) -> Result<HttpResponse> {
         let status = response.status();
         let headers = response
@@ -340,15 +351,15 @@ impl HttpRequestTool {
             .unwrap_or("");
 
         let body = if content_type.contains("application/json") {
-            response.json::<Value>().await.map_or_else(
-                |_| ResponseBody::Text(String::new()),
-                ResponseBody::Json,
-            )
+            response
+                .json::<Value>()
+                .await
+                .map_or_else(|_| ResponseBody::Text(String::new()), ResponseBody::Json)
         } else if content_type.contains("text/") || content_type.contains("xml") {
-            response.text().await.map_or_else(
-                |_| ResponseBody::Text(String::new()),
-                ResponseBody::Text,
-            )
+            response
+                .text()
+                .await
+                .map_or_else(|_| ResponseBody::Text(String::new()), ResponseBody::Text)
         } else {
             // Binary content
             response.bytes().await.map_or_else(
@@ -366,6 +377,14 @@ impl HttpRequestTool {
     }
 
     /// Parse parameters from input
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Invalid HTTP method is specified
+    /// - Required URL parameter is missing
+    /// - Parameter parsing fails
+    #[allow(clippy::unused_self)]
     fn parse_parameters(&self, params: &Value) -> Result<HttpRequestParams> {
         let method_str = extract_optional_string(params, "method").unwrap_or("GET");
         let method: HttpMethod = method_str.parse()?;
@@ -380,11 +399,9 @@ impl HttpRequestTool {
 
         let body = params.get("body").cloned();
 
-        let auth = params
-            .get("auth")
-            .map_or(AuthType::None, |auth_obj| {
-                serde_json::from_value(auth_obj.clone()).unwrap_or(AuthType::None)
-            });
+        let auth = params.get("auth").map_or(AuthType::None, |auth_obj| {
+            serde_json::from_value(auth_obj.clone()).unwrap_or(AuthType::None)
+        });
 
         let retry_config = params
             .get("retry")

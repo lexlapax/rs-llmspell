@@ -209,8 +209,7 @@ mod dry_principle_tests {
             err.to_string().contains("ither")
                 || err.to_string().contains("missing")
                 || err.to_string().contains("required"),
-            "Error was: {}",
-            err
+            "Error was: {err}"
         );
 
         // Both should handle missing parameters consistently

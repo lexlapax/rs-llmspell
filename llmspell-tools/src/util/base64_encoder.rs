@@ -60,6 +60,7 @@ impl Base64EncoderTool {
     }
 
     /// Process Base64 operation
+    #[allow(clippy::unused_async)]
     async fn process_operation(&self, params: &Value) -> Result<Value> {
         // Extract parameters using utilities
         let operation = extract_required_string(params, "operation")?;

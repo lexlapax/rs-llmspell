@@ -133,6 +133,10 @@ impl ToolStateMachine {
     }
 
     /// Initialize the tool
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the state transition is invalid
     pub async fn initialize(&self) -> Result<()> {
         self.transition_to(ToolExecutionState::Initializing).await?;
         // Simulate initialization time
@@ -141,21 +145,37 @@ impl ToolStateMachine {
     }
 
     /// Start execution
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the state transition is invalid
     pub async fn start_execution(&self) -> Result<()> {
         self.transition_to(ToolExecutionState::Executing).await
     }
 
     /// Complete execution successfully
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the state transition is invalid
     pub async fn complete_execution(&self) -> Result<()> {
         self.transition_to(ToolExecutionState::Completed).await
     }
 
     /// Fail execution
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the state transition is invalid
     pub async fn fail_execution(&self) -> Result<()> {
         self.transition_to(ToolExecutionState::Failed).await
     }
 
     /// Start cleanup
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the state transition is invalid
     pub async fn start_cleanup(&self) -> Result<()> {
         self.transition_to(ToolExecutionState::CleaningUp).await
     }
@@ -218,40 +238,17 @@ impl ToolStateMachine {
         };
 
         match (from, to) {
-            // From Uninitialized
-            (Uninitialized, Initializing) => true,
-            (Uninitialized, Terminated) => true, // Direct termination
-
-            // From Initializing
-            (Initializing, Ready) => true,
-            (Initializing, Failed) => true,
-            (Initializing, Terminated) => true,
-
-            // From Ready
-            (Ready, Executing) => true,
-            (Ready, CleaningUp) => true,
-            (Ready, Terminated) => true,
-
-            // From Executing
-            (Executing, Completed) => true,
-            (Executing, Failed) => true,
-
-            // From Completed
-            (Completed, CleaningUp) => true,
-            (Completed, Terminated) => true,
-
-            // From Failed
-            (Failed, CleaningUp) => true,
-            (Failed, Terminated) => true,
-
-            // From CleaningUp
-            (CleaningUp, Terminated) => true,
+            // All valid transitions
+            (Uninitialized, Initializing | Terminated)
+            | (Initializing, Ready | Failed | Terminated)
+            | (Ready, Executing | CleaningUp | Terminated)
+            | (Executing, Completed | Failed)
+            | (Completed, CleaningUp | Terminated)
+            | (Failed, CleaningUp | Terminated)
+            | (CleaningUp, Terminated) => true,
 
             // Terminal states cannot transition
-            (Terminated, _) => false,
-
-            // Any other transition is invalid
-            _ => false,
+            (Terminated, _) | _ => false,
         }
     }
 }

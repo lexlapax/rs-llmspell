@@ -75,6 +75,13 @@ impl FileConverterTool {
     }
 
     /// Convert file encoding
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Failed to read input file
+    /// - Text encoding conversion fails
+    /// - Failed to write output file
     async fn convert_encoding(
         &self,
         input_path: &Path,
@@ -108,6 +115,12 @@ impl FileConverterTool {
     }
 
     /// Convert line endings
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Failed to read input file
+    /// - Failed to write output file
     async fn convert_line_endings(
         &self,
         input_path: &Path,
@@ -138,6 +151,12 @@ impl FileConverterTool {
     }
 
     /// Convert tabs to spaces or vice versa
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Failed to read input file
+    /// - Failed to write output file
     async fn convert_indentation(
         &self,
         input_path: &Path,
@@ -174,6 +193,10 @@ impl FileConverterTool {
     }
 
     /// Create backup file
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if file copy operation fails
     async fn create_backup(&self, file_path: &Path) -> Result<PathBuf> {
         let backup_path = file_path.with_extension(format!(
             "{}.backup",
@@ -211,6 +234,11 @@ impl FileConverterTool {
     }
 
     /// Validate parameters for file conversion operations
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if an invalid operation is specified
+    #[allow(clippy::unused_async)]
     async fn validate_parameters(&self, params: &serde_json::Value) -> LLMResult<()> {
         // Validate operation
         if let Some(operation) = params.get("operation").and_then(|v| v.as_str()) {
@@ -285,10 +313,8 @@ impl BaseAgent for FileConverterTool {
         }
 
         // Determine output path
-        let target_path = extract_optional_string(params, "target_path").map_or_else(
-            || self.get_output_path(&path, operation),
-            PathBuf::from,
-        );
+        let target_path = extract_optional_string(params, "target_path")
+            .map_or_else(|| self.get_output_path(&path, operation), PathBuf::from);
 
         // Validate output path
         self.sandbox
@@ -375,7 +401,12 @@ impl BaseAgent for FileConverterTool {
                 let convert_to_spaces =
                     extract_optional_bool(params, "convert_to_spaces").unwrap_or(true);
 
-                let tab_size = extract_optional_u64(params, "tab_size").unwrap_or(4) as usize;
+                let tab_size =
+                    usize::try_from(extract_optional_u64(params, "tab_size").unwrap_or(4))
+                        .map_err(|_| LLMSpellError::Validation {
+                            message: "Tab size value too large for platform".to_string(),
+                            field: Some("tab_size".to_string()),
+                        })?;
 
                 self.convert_indentation(&path, &target_path, convert_to_spaces, tab_size)
                     .await

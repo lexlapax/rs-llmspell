@@ -84,6 +84,7 @@ impl DiffCalculatorTool {
     }
 
     /// Calculate text diff
+    #[allow(clippy::unused_self)]
     fn calculate_text_diff(&self, old: &str, new: &str, format: DiffFormat) -> Result<String> {
         let diff = TextDiff::from_lines(old, new);
 
@@ -110,7 +111,8 @@ impl DiffCalculatorTool {
                                 let old_slices = diff.old_slices();
                                 for idx in old_range {
                                     if let Some(line) = old_slices.get(idx) {
-                                        output.push_str(&format!("  {line}\n"));
+                                        use std::fmt::Write;
+                                        let _ = writeln!(output, "  {line}");
                                     }
                                 }
                             }
@@ -119,7 +121,8 @@ impl DiffCalculatorTool {
                                 let old_slices = diff.old_slices();
                                 for idx in old_range {
                                     if let Some(line) = old_slices.get(idx) {
-                                        output.push_str(&format!("- {line}\n"));
+                                        use std::fmt::Write;
+                                        let _ = writeln!(output, "- {line}");
                                     }
                                 }
                             }
@@ -128,7 +131,8 @@ impl DiffCalculatorTool {
                                 let new_slices = diff.new_slices();
                                 for idx in new_range {
                                     if let Some(line) = new_slices.get(idx) {
-                                        output.push_str(&format!("+ {line}\n"));
+                                        use std::fmt::Write;
+                                        let _ = writeln!(output, "+ {line}");
                                     }
                                 }
                             }
@@ -137,13 +141,15 @@ impl DiffCalculatorTool {
                                 let old_slices = diff.old_slices();
                                 for idx in old_range {
                                     if let Some(line) = old_slices.get(idx) {
-                                        output.push_str(&format!("- {line}\n"));
+                                        use std::fmt::Write;
+                                        let _ = writeln!(output, "- {line}");
                                     }
                                 }
                                 let new_slices = diff.new_slices();
                                 for idx in new_range {
                                     if let Some(line) = new_slices.get(idx) {
-                                        output.push_str(&format!("+ {line}\n"));
+                                        use std::fmt::Write;
+                                        let _ = writeln!(output, "+ {line}");
                                     }
                                 }
                             }
@@ -162,7 +168,8 @@ impl DiffCalculatorTool {
                         ChangeTag::Insert => "+",
                         ChangeTag::Equal => " ",
                     };
-                    output.push_str(&format!("{sign}{change}"));
+                    use std::fmt::Write;
+                    let _ = write!(output, "{sign}{change}");
                 }
                 Ok(output)
             }
@@ -174,30 +181,36 @@ impl DiffCalculatorTool {
                     match op.tag() {
                         DiffTag::Delete => {
                             changes += 1;
-                            output.push_str(&format!(
-                                "Removed at line {}: {} line(s)\n",
+                            use std::fmt::Write;
+                            let _ = writeln!(
+                                output,
+                                "Removed at line {}: {} line(s)",
                                 op.old_range().start + 1,
                                 op.old_range().len()
-                            ));
+                            );
                         }
                         DiffTag::Insert => {
                             changes += 1;
-                            output.push_str(&format!(
-                                "Added at line {}: {} line(s)\n",
+                            use std::fmt::Write;
+                            let _ = writeln!(
+                                output,
+                                "Added at line {}: {} line(s)",
                                 op.new_range().start + 1,
                                 op.new_range().len()
-                            ));
+                            );
                         }
                         DiffTag::Equal => {}
                         DiffTag::Replace => {
                             changes += 1;
-                            output.push_str(&format!(
-                                "Replaced at lines {}-{} with lines {}-{}\n",
+                            use std::fmt::Write;
+                            let _ = writeln!(
+                                output,
+                                "Replaced at lines {}-{} with lines {}-{}",
                                 op.old_range().start + 1,
                                 op.old_range().end,
                                 op.new_range().start + 1,
                                 op.new_range().end
-                            ));
+                            );
                         }
                     }
                 }
@@ -209,6 +222,7 @@ impl DiffCalculatorTool {
     }
 
     /// Calculate JSON diff
+    #[allow(clippy::unused_self)]
     fn calculate_json_diff(&self, old_json: &Value, new_json: &Value) -> Result<Value> {
         let mut diff = json!({
             "added": {},
@@ -317,6 +331,7 @@ fn compare_json_values(old: &Value, new: &Value, path: &str, diff: &mut Value) -
 
 impl DiffCalculatorTool {
     /// Process diff operation
+    #[allow(clippy::unused_async)]
     async fn process_operation(&self, params: &Value) -> Result<Value> {
         let diff_type = extract_string_with_default(params, "type", "text");
 

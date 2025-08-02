@@ -99,6 +99,7 @@ impl HashCalculatorTool {
         }
     }
 
+    #[allow(clippy::unused_self)]
     fn format_hash(&self, hash: &[u8], format: &OutputFormat) -> String {
         match format {
             OutputFormat::Hex => to_hex_string(hash),

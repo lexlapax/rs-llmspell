@@ -271,7 +271,7 @@ impl ToolExecutor {
 
         // Security validation (before any execution)
         let security_level = tool.security_level();
-        self.validate_tool_security(security_level.clone())?;
+        self.validate_tool_security(&security_level)?;
 
         // Phase 1: Parameter Validation Hook
         let mut tool_context = ToolHookContext::new(
@@ -486,12 +486,12 @@ impl ToolExecutor {
     }
 
     /// Validate security level for tool execution
-    fn validate_tool_security(&self, security_level: SecurityLevel) -> Result<(), LLMSpellError> {
+    fn validate_tool_security(&self, security_level: &SecurityLevel) -> Result<(), LLMSpellError> {
         if !self.config.enable_security_validation {
             return Ok(());
         }
 
-        if !self.config.max_security_level.allows(&security_level) {
+        if !self.config.max_security_level.allows(security_level) {
             error!(
                 "Security validation failed: Tool requires {:?} but maximum allowed is {:?}",
                 security_level, self.config.max_security_level

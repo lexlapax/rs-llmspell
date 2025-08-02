@@ -103,6 +103,7 @@ pub mod test_endpoints {
 pub mod fixtures {
     use serde_json::json;
 
+    #[must_use]
     pub fn sample_json() -> serde_json::Value {
         json!({
             "name": "Test User",
@@ -112,6 +113,7 @@ pub mod fixtures {
         })
     }
 
+    #[must_use]
     pub const fn sample_html() -> &'static str {
         r#"<!DOCTYPE html>
         <html>
@@ -125,6 +127,7 @@ pub mod fixtures {
         </html>"#
     }
 
+    #[must_use]
     pub const fn sample_api_key() -> &'static str {
         "test_api_key_12345"
     }
@@ -132,6 +135,7 @@ pub mod fixtures {
 
 /// Helper to create test configuration
 #[allow(dead_code)]
+#[must_use]
 pub fn create_test_config() -> serde_json::Map<String, serde_json::Value> {
     let mut config = serde_json::Map::new();
     config.insert("timeout".to_string(), json!(30));

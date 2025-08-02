@@ -154,6 +154,7 @@ impl AudioProcessorTool {
     }
 
     /// Detect audio format from file
+    #[allow(clippy::unused_async)]
     async fn detect_format(&self, file_path: &Path) -> LLMResult<AudioFormat> {
         // First try extension-based detection
         let format = AudioFormat::from_extension(file_path);
@@ -237,6 +238,7 @@ impl AudioProcessorTool {
     }
 
     /// Analyze WAV file structure
+    #[allow(clippy::unused_async)]
     async fn analyze_wav_file(&self, file_path: &Path) -> LLMResult<WavInfo> {
         use std::fs::File;
         use std::io::{Read, Seek, SeekFrom};
@@ -409,6 +411,7 @@ impl AudioProcessorTool {
     }
 
     /// Validate processing parameters
+    #[allow(clippy::unused_async)]
     async fn validate_parameters(&self, params: &serde_json::Value) -> LLMResult<()> {
         // Validate operation
         if let Some(operation) = extract_optional_string(params, "operation") {
@@ -521,11 +524,13 @@ impl BaseAgent for AudioProcessorTool {
                 );
 
                 if let Some(duration) = metadata.duration_seconds {
-                    message.push_str(&format!(", Duration: {duration:.1}s"));
+                    use std::fmt::Write;
+                    let _ = write!(message, ", Duration: {duration:.1}s");
                 }
 
                 if let Some(sample_rate) = metadata.sample_rate {
-                    message.push_str(&format!(", Sample rate: {sample_rate}Hz"));
+                    use std::fmt::Write;
+                    let _ = write!(message, ", Sample rate: {sample_rate}Hz");
                 }
 
                 let response = ResponseBuilder::success("metadata")

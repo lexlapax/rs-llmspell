@@ -130,8 +130,19 @@ impl TextManipulatorTool {
                         Some("options".to_string()),
                     )
                 })?;
-                let start = extract_required_u64(&opts, "start")? as usize;
-                let end = extract_required_u64(&opts, "end")? as usize;
+                let start =
+                    usize::try_from(extract_required_u64(&opts, "start")?).map_err(|_| {
+                        LLMSpellError::Validation {
+                            message: "Start index too large for platform".to_string(),
+                            field: Some("start".to_string()),
+                        }
+                    })?;
+                let end = usize::try_from(extract_required_u64(&opts, "end")?).map_err(|_| {
+                    LLMSpellError::Validation {
+                        message: "End index too large for platform".to_string(),
+                        field: Some("end".to_string()),
+                    }
+                })?;
                 Ok(string_utils::substring(text, start, end))
             }
             TextOperation::Split => {
@@ -169,14 +180,18 @@ impl TextManipulatorTool {
                 let max_len = options
                     .as_ref()
                     .and_then(|v| extract_optional_u64(v, "max_length"))
-                    .map_or(self.config.default_truncate_length, |v| v as usize);
+                    .map_or(self.config.default_truncate_length, |v| {
+                        usize::try_from(v).unwrap_or(usize::MAX)
+                    });
                 Ok(string_utils::truncate(text, max_len))
             }
             TextOperation::Indent => {
                 let spaces = options
                     .as_ref()
                     .and_then(|v| extract_optional_u64(v, "spaces"))
-                    .map_or(self.config.default_indent_spaces, |v| v as usize);
+                    .map_or(self.config.default_indent_spaces, |v| {
+                        usize::try_from(v).unwrap_or(usize::MAX)
+                    });
                 Ok(string_utils::indent(text, spaces))
             }
             TextOperation::Dedent => Ok(string_utils::dedent(text)),
@@ -185,13 +200,16 @@ impl TextManipulatorTool {
                 let width = options
                     .as_ref()
                     .and_then(|v| extract_optional_u64(v, "width"))
-                    .map_or(self.config.default_wrap_width, |v| v as usize);
+                    .map_or(self.config.default_wrap_width, |v| {
+                        usize::try_from(v).unwrap_or(usize::MAX)
+                    });
                 let lines = string_utils::word_wrap(text, width);
                 Ok(lines.join("\n"))
             }
         }
     }
 
+    #[allow(clippy::unused_async)]
     async fn validate_parameters(&self, params: &Value) -> Result<()> {
         // Required parameters
         extract_required_string(params, "input")?;

@@ -459,7 +459,9 @@ impl BaseAgent for WebSearchTool {
         let max_results = params
             .get("max_results")
             .and_then(serde_json::Value::as_u64)
-            .map_or(self.config.max_results, |n| n as usize);
+            .map_or(self.config.max_results, |n| {
+                usize::try_from(n).unwrap_or(usize::MAX)
+            });
         let search_type = Self::parse_search_type(extract_optional_string(params, "search_type"));
         let safe_search = params
             .get("safe_search")

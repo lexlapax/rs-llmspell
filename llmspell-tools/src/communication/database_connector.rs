@@ -195,6 +195,10 @@ pub struct DatabaseConnectorTool {
 
 impl DatabaseConnectorTool {
     /// Create a new database connector tool
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the configuration is invalid
     pub fn new(config: DatabaseConnectorConfig) -> Result<Self> {
         let is_production = !cfg!(debug_assertions);
 
@@ -213,6 +217,14 @@ impl DatabaseConnectorTool {
     }
 
     /// Execute a database query
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The specified database is not configured
+    /// - Query validation fails
+    /// - The database type is unsupported
+    /// - Query execution fails
     async fn execute_query(
         &self,
         database: &str,
@@ -246,6 +258,14 @@ impl DatabaseConnectorTool {
     }
 
     /// Validate query against security settings
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The operation is not allowed
+    /// - DDL operations are attempted when not allowed
+    /// - DML operations are attempted when not allowed
+    /// - Query contains potentially unsafe patterns
     fn validate_query(&self, query: &str, operation: &str) -> Result<()> {
         let operation_upper = operation.to_uppercase();
 
@@ -290,16 +310,19 @@ impl DatabaseConnectorTool {
     }
 
     /// Check if operation is DDL
+    #[allow(clippy::unused_self)]
     fn is_ddl_operation(&self, operation: &str) -> bool {
         matches!(operation, "CREATE" | "DROP" | "ALTER" | "TRUNCATE")
     }
 
     /// Check if operation is DML
+    #[allow(clippy::unused_self)]
     fn is_dml_operation(&self, operation: &str) -> bool {
         matches!(operation, "INSERT" | "UPDATE" | "DELETE")
     }
 
     /// Check for suspicious SQL patterns
+    #[allow(clippy::unused_self)]
     fn contains_suspicious_patterns(&self, query: &str) -> bool {
         let query_lower = query.to_lowercase();
         let suspicious_patterns = [
@@ -324,6 +347,14 @@ impl DatabaseConnectorTool {
     }
 
     /// Execute `PostgreSQL` query
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - `PostgreSQL` URL is not configured
+    /// - Failed to connect to `PostgreSQL`
+    /// - Query execution fails
+    #[allow(clippy::unused_async)]
     async fn execute_postgresql_query(
         &self,
         #[allow(unused_variables)] config: &DatabaseConfig,
@@ -408,6 +439,11 @@ impl DatabaseConnectorTool {
     }
 
     /// Execute `MySQL` query
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `MySQL` query execution fails (currently returns mock success)
+    #[allow(clippy::unused_async)]
     async fn execute_mysql_query(
         &self,
         _config: &DatabaseConfig,
@@ -429,6 +465,11 @@ impl DatabaseConnectorTool {
     }
 
     /// Execute `SQLite` query
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `SQLite` query execution fails (currently returns mock success)
+    #[allow(clippy::unused_async)]
     async fn execute_sqlite_query(
         &self,
         _config: &DatabaseConfig,
@@ -450,6 +491,11 @@ impl DatabaseConnectorTool {
     }
 
     /// Get database schema information
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the specified database is not configured
+    #[allow(clippy::unused_async)]
     async fn get_schema(&self, database: &str) -> Result<serde_json::Value> {
         debug!("Getting schema for database '{}'", database);
 

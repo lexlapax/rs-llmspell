@@ -1,4 +1,4 @@
-//! Integration tests for FileOperationsTool
+//! Integration tests for `FileOperationsTool`
 
 use llmspell_core::{
     traits::{base_agent::BaseAgent, tool::Tool},
@@ -161,7 +161,7 @@ async fn test_directory_operations() {
 
     // Create some files in the directory
     for i in 1..=3 {
-        let file_path = test_dir.join(format!("file{}.txt", i));
+        let file_path = test_dir.join(format!("file{i}.txt"));
         let write_input = AgentInput::text("write").with_parameter(
             "parameters",
             json!({

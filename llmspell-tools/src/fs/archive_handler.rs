@@ -181,6 +181,7 @@ impl ArchiveHandlerTool {
     }
 
     /// Extract archive
+    #[allow(clippy::unused_async)]
     async fn extract_archive(&self, params: &Value) -> Result<Value> {
         let archive_path = params.get("path").and_then(|v| v.as_str()).ok_or_else(|| {
             LLMSpellError::Validation {
@@ -563,6 +564,7 @@ impl ArchiveHandlerTool {
     }
 
     /// Create archive
+    #[allow(clippy::unused_async)]
     async fn create_archive(&self, params: &Value) -> Result<Value> {
         eprintln!("DEBUG create_archive: params = {params:?}");
         let archive_path = params.get("path").and_then(|v| v.as_str()).ok_or_else(|| {
@@ -911,6 +913,7 @@ impl ArchiveHandlerTool {
     }
 
     /// List archive contents
+    #[allow(clippy::unused_async)]
     async fn list_archive(&self, params: &Value) -> Result<Value> {
         let archive_path = params.get("path").and_then(|v| v.as_str()).ok_or_else(|| {
             LLMSpellError::Validation {

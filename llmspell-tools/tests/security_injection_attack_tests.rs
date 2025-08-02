@@ -58,8 +58,7 @@ async fn test_template_engine_code_injection() {
                         && !rendered.contains("/bin/bash")
                         && !rendered.contains("SECRET")
                         && !rendered.contains("__class__"),
-                    "Template injection not prevented for: {}",
-                    template
+                    "Template injection not prevented for: {template}"
                 );
             }
         }
@@ -108,8 +107,7 @@ async fn test_json_processor_jq_injection() {
                     && !response_text.contains("secret")
                     && !response_text.contains("root:")
                     && !response_text.contains("api_key"),
-                "JQ injection not prevented for query: {}",
-                query
+                "JQ injection not prevented for query: {query}"
             );
         }
     }
@@ -122,7 +120,7 @@ async fn test_graphql_query_injection() {
     // GraphQL injection attempts
     let injections = vec![
         // Introspection attacks
-        r#"{
+        r"{
             __schema {
                 types {
                     name
@@ -134,7 +132,7 @@ async fn test_graphql_query_injection() {
                     }
                 }
             }
-        }"#,
+        }",
         // Alias abuse
         r#"{
             a1: user(id: "1") { password }
@@ -142,7 +140,7 @@ async fn test_graphql_query_injection() {
             a3: user(id: "3") { password }
         }"#,
         // Nested query explosion
-        r#"{
+        r"{
             user {
                 posts {
                     comments {
@@ -158,7 +156,7 @@ async fn test_graphql_query_injection() {
                     }
                 }
             }
-        }"#,
+        }",
     ];
 
     for query in injections {
@@ -222,26 +220,22 @@ async fn test_process_executor_argument_injection() {
             .await;
 
         // Should either fail or be restricted
-        match result {
-            Ok(output) => {
-                let response: serde_json::Value =
-                    serde_json::from_str(&output.text).unwrap_or(json!({"success": false}));
+        if let Ok(output) = result {
+            let response: serde_json::Value =
+                serde_json::from_str(&output.text).unwrap_or(json!({"success": false}));
 
-                if response["success"].as_bool() == Some(true) {
-                    let stdout = response["result"]["stdout"].as_str().unwrap_or("");
-                    assert!(
-                        !stdout.contains("root:")
-                            && !stdout.contains("password:")
-                            && !stdout.contains(".key")
-                            && !stdout.contains("malicious"),
-                        "Process argument injection not prevented for: {:?}",
-                        args
-                    );
-                }
+            if response["success"].as_bool() == Some(true) {
+                let stdout = response["result"]["stdout"].as_str().unwrap_or("");
+                assert!(
+                    !stdout.contains("root:")
+                        && !stdout.contains("password:")
+                        && !stdout.contains(".key")
+                        && !stdout.contains("malicious"),
+                    "Process argument injection not prevented for: {args:?}"
+                );
             }
-            Err(_) => {
-                // Expected for dangerous commands
-            }
+        } else {
+            // Expected for dangerous commands
         }
     }
 }
@@ -282,9 +276,7 @@ async fn test_data_validation_regex_dos() {
         // Should complete quickly even with pathological input
         assert!(
             elapsed < std::time::Duration::from_millis(100),
-            "Validation took too long for {}: {:?}",
-            validation_type,
-            elapsed
+            "Validation took too long for {validation_type}: {elapsed:?}"
         );
     }
 }
@@ -371,8 +363,7 @@ async fn test_environment_reader_information_leak() {
                 let value = response["result"]["value"].as_str().unwrap_or("");
                 assert!(
                     value.is_empty() || value == "***" || value == "[REDACTED]",
-                    "Sensitive environment variable exposed: {}",
-                    var
+                    "Sensitive environment variable exposed: {var}"
                 );
             }
         }

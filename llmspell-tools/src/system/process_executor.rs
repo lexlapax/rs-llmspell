@@ -221,6 +221,7 @@ impl ProcessExecutorTool {
     }
 
     /// Resolve executable path
+    #[allow(clippy::unused_async)]
     async fn resolve_executable(&self, executable: &str) -> LLMResult<PathBuf> {
         // If it's already a full path, validate it exists
         let exe_path = Path::new(executable);
@@ -358,7 +359,8 @@ impl ProcessExecutorTool {
                     stdout: stdout_str,
                     stderr: stderr_str,
                     success: output.status.success(),
-                    execution_time_ms: execution_time.as_millis() as u64,
+                    execution_time_ms: u64::try_from(execution_time.as_millis())
+                        .unwrap_or(u64::MAX),
                     timed_out: false,
                 }
             }
@@ -395,6 +397,7 @@ impl ProcessExecutorTool {
     }
 
     /// Validate execution parameters
+    #[allow(clippy::unused_async)]
     async fn validate_execution_parameters(
         &self,
         params: &HashMap<String, serde_json::Value>,

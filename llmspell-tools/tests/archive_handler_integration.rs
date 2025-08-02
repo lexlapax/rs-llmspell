@@ -1,4 +1,4 @@
-//! Integration tests for ArchiveHandlerTool
+//! Integration tests for `ArchiveHandlerTool`
 
 use anyhow::Result;
 use llmspell_core::{
@@ -351,7 +351,7 @@ async fn test_compression_levels() -> Result<()> {
 
         let tool = ArchiveHandlerTool::with_config(config);
 
-        let archive_path = temp_dir.path().join(format!("test_level_{}.zip", level));
+        let archive_path = temp_dir.path().join(format!("test_level_{level}.zip"));
         let create_params = json!({
             "operation": "create",
             "path": archive_path.to_str().unwrap(),
@@ -367,7 +367,7 @@ async fn test_compression_levels() -> Result<()> {
 
     // Higher compression levels should produce smaller files
     // (though for small files the difference might be minimal)
-    println!("Compression sizes: {:?}", sizes);
+    println!("Compression sizes: {sizes:?}");
 
     Ok(())
 }

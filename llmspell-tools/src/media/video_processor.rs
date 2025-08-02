@@ -210,6 +210,7 @@ impl VideoProcessorTool {
     }
 
     /// Detect video format from file
+    #[allow(clippy::unused_async)]
     async fn detect_format(&self, file_path: &Path) -> LLMResult<VideoFormat> {
         // First try extension-based detection
         let format = VideoFormat::from_extension(file_path);
@@ -275,6 +276,7 @@ impl VideoProcessorTool {
     }
 
     /// Generate thumbnail from video
+    #[allow(clippy::unused_async)]
     async fn generate_thumbnail(
         &self,
         _video_path: &Path,
@@ -293,6 +295,7 @@ impl VideoProcessorTool {
     }
 
     /// Extract frame at specific timestamp
+    #[allow(clippy::unused_async)]
     async fn extract_frame(
         &self,
         _video_path: &Path,
@@ -313,6 +316,7 @@ impl VideoProcessorTool {
     }
 
     /// Validate processing parameters
+    #[allow(clippy::unused_async)]
     async fn validate_parameters(&self, params: &serde_json::Value) -> LLMResult<()> {
         // Validate operation
         if let Some(operation) = extract_optional_string(params, "operation") {
@@ -405,19 +409,23 @@ impl BaseAgent for VideoProcessorTool {
                 let mut message = format!("Video file: {:?} format", metadata.format);
 
                 if let Some(resolution) = &metadata.resolution {
-                    message.push_str(&format!(
+                    use std::fmt::Write;
+                    let _ = write!(
+                        message,
                         ", Resolution: {}x{} ({})",
                         resolution.width,
                         resolution.height,
                         resolution.name()
-                    ));
+                    );
                 }
 
                 if let Some(duration) = metadata.duration_seconds {
-                    message.push_str(&format!(", Duration: {duration:.1}s"));
+                    use std::fmt::Write;
+                    let _ = write!(message, ", Duration: {duration:.1}s");
                 }
 
-                message.push_str(&format!(", Size: {} bytes", metadata.file_size));
+                use std::fmt::Write;
+                let _ = write!(message, ", Size: {} bytes", metadata.file_size);
 
                 let response = ResponseBuilder::success("metadata")
                     .with_message(message)
