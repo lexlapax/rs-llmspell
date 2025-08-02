@@ -5,6 +5,7 @@ pub mod adapters;
 pub mod conditional;
 pub mod conditions;
 pub mod error_handling;
+pub mod factory;
 pub mod hooks;
 pub mod r#loop;
 pub mod parallel;
@@ -59,3 +60,9 @@ pub use adapters::prelude::{
     workflow_to_agent_output,
 };
 pub use adapters::{WorkflowInputAdapter, WorkflowOutputAdapter};
+
+// Re-export factory types
+pub use factory::{
+    DefaultWorkflowFactory, TemplateWorkflowFactory, WorkflowFactory, WorkflowParams,
+    WorkflowTemplate, WorkflowType,
+};
