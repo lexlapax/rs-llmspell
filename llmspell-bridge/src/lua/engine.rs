@@ -3,9 +3,8 @@
 
 use crate::engine::types::ScriptEngineError;
 use crate::engine::{
-    factory::LuaConfig,
-    EngineFeatures, ExecutionContext, ScriptEngineBridge, ScriptMetadata, ScriptOutput,
-    ScriptStream,
+    factory::LuaConfig, EngineFeatures, ExecutionContext, ScriptEngineBridge, ScriptMetadata,
+    ScriptOutput, ScriptStream,
 };
 use crate::{ComponentRegistry, ProviderManager};
 use async_trait::async_trait;

@@ -13,15 +13,19 @@ use async_trait::async_trait;
 use llmspell_core::{
     execution_context::ExecutionContext,
     traits::base_agent::BaseAgent,
+    traits::workflow::{
+        StepResult as CoreStepResult, Workflow, WorkflowConfig as CoreWorkflowConfig,
+        WorkflowStatus as CoreWorkflowStatus, WorkflowStep as CoreWorkflowStep,
+    },
     types::{AgentInput, AgentOutput},
-    ComponentMetadata, LLMSpellError, Result,
+    ComponentId, ComponentMetadata, LLMSpellError, Result,
 };
 use serde::{Deserialize, Serialize};
 use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use tokio::sync::{Mutex, Semaphore};
+use tokio::sync::{Mutex, RwLock, Semaphore};
 use tracing::{debug, error, info, warn};
 
 /// A branch in a parallel workflow
@@ -262,6 +266,12 @@ pub struct ParallelWorkflow {
     workflow_executor: Option<Arc<WorkflowExecutor>>,
     /// Workflow metadata
     metadata: ComponentMetadata,
+    /// Core workflow configuration for Workflow trait
+    core_config: CoreWorkflowConfig,
+    /// Core workflow steps for Workflow trait
+    core_steps: Arc<RwLock<Vec<CoreWorkflowStep>>>,
+    /// Core workflow results for Workflow trait
+    core_results: Arc<RwLock<Vec<CoreStepResult>>>,
 }
 
 impl ParallelWorkflow {
@@ -279,6 +289,13 @@ impl ParallelWorkflow {
 
         let metadata = ComponentMetadata::new(name.clone(), "Parallel workflow".to_string());
 
+        // Create core workflow config from our config
+        let core_config = CoreWorkflowConfig {
+            max_parallel: Some(config.max_concurrency),
+            continue_on_error: !config.fail_fast,
+            timeout: config.timeout.or(workflow_config.max_execution_time),
+        };
+
         Self {
             name,
             branches,
@@ -289,6 +306,9 @@ impl ParallelWorkflow {
             error_handler,
             workflow_executor: None,
             metadata,
+            core_config,
+            core_steps: Arc::new(RwLock::new(Vec::new())),
+            core_results: Arc::new(RwLock::new(Vec::new())),
         }
     }
 
@@ -310,6 +330,13 @@ impl ParallelWorkflow {
         let metadata =
             ComponentMetadata::new(name.clone(), "Parallel workflow with hooks".to_string());
 
+        // Create core workflow config from our config
+        let core_config = CoreWorkflowConfig {
+            max_parallel: Some(config.max_concurrency),
+            continue_on_error: !config.fail_fast,
+            timeout: config.timeout.or(workflow_config.max_execution_time),
+        };
+
         Self {
             name,
             branches,
@@ -320,6 +347,9 @@ impl ParallelWorkflow {
             error_handler,
             workflow_executor: Some(workflow_executor),
             metadata,
+            core_config,
+            core_steps: Arc::new(RwLock::new(Vec::new())),
+            core_results: Arc::new(RwLock::new(Vec::new())),
         }
     }
 
@@ -872,6 +902,52 @@ impl BaseAgent for ParallelWorkflow {
         );
 
         Ok(AgentOutput::text(error_text).with_metadata(metadata))
+    }
+}
+
+#[async_trait]
+impl Workflow for ParallelWorkflow {
+    fn config(&self) -> &CoreWorkflowConfig {
+        &self.core_config
+    }
+
+    async fn add_step(&self, step: CoreWorkflowStep) -> Result<()> {
+        let mut steps = self.core_steps.write().await;
+        steps.push(step);
+        Ok(())
+    }
+
+    async fn remove_step(&self, step_id: ComponentId) -> Result<()> {
+        let mut steps = self.core_steps.write().await;
+        steps.retain(|s| s.id != step_id);
+        Ok(())
+    }
+
+    async fn get_steps(&self) -> Result<Vec<CoreWorkflowStep>> {
+        let steps = self.core_steps.read().await;
+        Ok(steps.clone())
+    }
+
+    async fn status(&self) -> Result<CoreWorkflowStatus> {
+        // Get the current workflow status
+        let status = self.state_manager.get_status().await?;
+
+        // Convert our WorkflowStatus to CoreWorkflowStatus
+        use crate::traits::WorkflowStatus;
+        let core_status = match status {
+            WorkflowStatus::Pending => CoreWorkflowStatus::Pending,
+            WorkflowStatus::Running => CoreWorkflowStatus::Running,
+            WorkflowStatus::Completed => CoreWorkflowStatus::Completed,
+            WorkflowStatus::Failed => CoreWorkflowStatus::Failed,
+            WorkflowStatus::Cancelled => CoreWorkflowStatus::Cancelled,
+        };
+
+        Ok(core_status)
+    }
+
+    async fn get_results(&self) -> Result<Vec<CoreStepResult>> {
+        let results = self.core_results.read().await;
+        Ok(results.clone())
     }
 }
 

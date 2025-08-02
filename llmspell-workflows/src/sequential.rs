@@ -11,11 +11,16 @@ use async_trait::async_trait;
 use llmspell_core::{
     execution_context::ExecutionContext,
     traits::base_agent::BaseAgent,
+    traits::workflow::{
+        StepResult as CoreStepResult, Workflow, WorkflowConfig as CoreWorkflowConfig,
+        WorkflowStatus as CoreWorkflowStatus, WorkflowStep as CoreWorkflowStep,
+    },
     types::{AgentInput, AgentOutput},
-    ComponentMetadata, LLMSpellError, Result,
+    ComponentId, ComponentMetadata, LLMSpellError, Result,
 };
 use std::sync::Arc;
 use std::time::{Duration, Instant};
+use tokio::sync::RwLock;
 use tracing::{debug, error, info, warn};
 
 /// Sequential workflow that executes steps one after another
@@ -30,6 +35,12 @@ pub struct SequentialWorkflow {
     workflow_executor: Option<Arc<WorkflowExecutor>>,
     /// Workflow metadata
     metadata: ComponentMetadata,
+    /// Core workflow configuration for Workflow trait
+    core_config: CoreWorkflowConfig,
+    /// Core workflow steps for Workflow trait
+    core_steps: Arc<RwLock<Vec<CoreWorkflowStep>>>,
+    /// Core workflow results for Workflow trait
+    core_results: Arc<RwLock<Vec<CoreStepResult>>>,
 }
 
 impl SequentialWorkflow {
@@ -38,9 +49,16 @@ impl SequentialWorkflow {
         let error_strategy = config.default_error_strategy.clone();
         let error_handler = ErrorHandler::new(error_strategy.clone());
         let state_manager = StateManager::new(config.clone());
-        let step_executor = StepExecutor::new(config);
+        let step_executor = StepExecutor::new(config.clone());
 
         let metadata = ComponentMetadata::new(name.clone(), "Sequential workflow".to_string());
+
+        // Create core workflow config from our config
+        let core_config = CoreWorkflowConfig {
+            max_parallel: Some(1), // Sequential execution
+            continue_on_error: matches!(error_strategy, ErrorStrategy::Continue),
+            timeout: config.max_execution_time,
+        };
 
         Self {
             name,
@@ -51,6 +69,9 @@ impl SequentialWorkflow {
             error_strategy,
             workflow_executor: None,
             metadata,
+            core_config,
+            core_steps: Arc::new(RwLock::new(Vec::new())),
+            core_results: Arc::new(RwLock::new(Vec::new())),
         }
     }
 
@@ -63,10 +84,17 @@ impl SequentialWorkflow {
         let error_strategy = config.default_error_strategy.clone();
         let error_handler = ErrorHandler::new(error_strategy.clone());
         let state_manager = StateManager::new_with_hooks(config.clone(), workflow_executor.clone());
-        let step_executor = StepExecutor::new_with_hooks(config, workflow_executor.clone());
+        let step_executor = StepExecutor::new_with_hooks(config.clone(), workflow_executor.clone());
 
         let metadata =
             ComponentMetadata::new(name.clone(), "Sequential workflow with hooks".to_string());
+
+        // Create core workflow config from our config
+        let core_config = CoreWorkflowConfig {
+            max_parallel: Some(1), // Sequential execution
+            continue_on_error: matches!(error_strategy, ErrorStrategy::Continue),
+            timeout: config.max_execution_time,
+        };
 
         Self {
             name,
@@ -77,6 +105,9 @@ impl SequentialWorkflow {
             error_strategy,
             workflow_executor: Some(workflow_executor),
             metadata,
+            core_config,
+            core_steps: Arc::new(RwLock::new(Vec::new())),
+            core_results: Arc::new(RwLock::new(Vec::new())),
         }
     }
 
@@ -432,6 +463,50 @@ impl BaseAgent for SequentialWorkflow {
             .insert("workflow_name".to_string(), serde_json::json!(self.name));
 
         Ok(AgentOutput::text(error_text).with_metadata(metadata))
+    }
+}
+
+#[async_trait]
+impl Workflow for SequentialWorkflow {
+    fn config(&self) -> &CoreWorkflowConfig {
+        &self.core_config
+    }
+
+    async fn add_step(&self, step: CoreWorkflowStep) -> Result<()> {
+        let mut steps = self.core_steps.write().await;
+        steps.push(step);
+        Ok(())
+    }
+
+    async fn remove_step(&self, step_id: ComponentId) -> Result<()> {
+        let mut steps = self.core_steps.write().await;
+        steps.retain(|s| s.id != step_id);
+        Ok(())
+    }
+
+    async fn get_steps(&self) -> Result<Vec<CoreWorkflowStep>> {
+        let steps = self.core_steps.read().await;
+        Ok(steps.clone())
+    }
+
+    async fn status(&self) -> Result<CoreWorkflowStatus> {
+        let status = self.get_status().await?;
+
+        // Convert our WorkflowStatus to CoreWorkflowStatus
+        let core_status = match status {
+            WorkflowStatus::Pending => CoreWorkflowStatus::Pending,
+            WorkflowStatus::Running => CoreWorkflowStatus::Running,
+            WorkflowStatus::Completed => CoreWorkflowStatus::Completed,
+            WorkflowStatus::Failed => CoreWorkflowStatus::Failed,
+            WorkflowStatus::Cancelled => CoreWorkflowStatus::Cancelled,
+        };
+
+        Ok(core_status)
+    }
+
+    async fn get_results(&self) -> Result<Vec<CoreStepResult>> {
+        let results = self.core_results.read().await;
+        Ok(results.clone())
     }
 }
 

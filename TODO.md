@@ -68,11 +68,21 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
    - [x] Add `ComponentMetadata` to all workflow structs (already present)
    - [x] Implement `execute(AgentInput, ExecutionContext) -> AgentOutput` for each
 
-3. [ ] **Workflow Trait Implementation** (2.5 hours):
-   - [ ] Implement core `Workflow` trait from llmspell-core for all patterns
-   - [ ] Add `config()`, `add_step()`, `remove_step()`, `get_steps()` methods
-   - [ ] Ensure workflow-specific methods remain available
-   - [ ] Add workflow composition support (workflows as sub-agents)
+3. [x] **Workflow Trait Implementation** (2.5 hours): ✅ **COMPLETED**
+   - [x] Implement core `Workflow` trait from llmspell-core for all patterns
+   - [x] Add `config()`, `add_step()`, `remove_step()`, `get_steps()` methods  
+   - [x] Ensure workflow-specific methods remain available
+   - [x] Add workflow composition support (workflows as sub-agents)
+   **Implementation Details**:
+   - Added `CoreWorkflowConfig`, `core_steps: Arc<RwLock<Vec<CoreWorkflowStep>>>`, and `core_results: Arc<RwLock<Vec<CoreStepResult>>>` fields to all workflow structs
+   - Implemented `Workflow` trait for `SequentialWorkflow`, `ParallelWorkflow`, `ConditionalWorkflow`, and `LoopWorkflow`
+   - `config()` returns reference to `CoreWorkflowConfig` with appropriate settings for each workflow type
+   - `add_step()` and `remove_step()` manage `CoreWorkflowStep` instances dynamically
+   - `status()` converts internal `WorkflowStatus` enum to `CoreWorkflowStatus` 
+   - `get_results()` returns stored `CoreStepResult` instances
+   - Workflows can now be used as sub-agents via `StepType::Agent` since they implement both `BaseAgent` and `Workflow` traits
+   - All existing workflow-specific methods and execution logic preserved
+   - Clippy lint check passed with no warnings
 
 4. [ ] **Input/Output Adapters** (1.5 hours):
    - [ ] Create `AgentInput` to `WorkflowInput` conversion
@@ -103,20 +113,20 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
    - [ ] Note performance impact of trait implementation
 
 **Files to Create/Update**:
-- `llmspell-workflows/src/sequential.rs` (add BaseAgent + Workflow impl)
-- `llmspell-workflows/src/parallel.rs` (add BaseAgent + Workflow impl)
-- `llmspell-workflows/src/conditional.rs` (add BaseAgent + Workflow impl)  
-- `llmspell-workflows/src/loop.rs` (add BaseAgent + Workflow impl)
+- `llmspell-workflows/src/sequential.rs` (add BaseAgent + Workflow impl) ✅ **UPDATED**
+- `llmspell-workflows/src/parallel.rs` (add BaseAgent + Workflow impl) ✅ **UPDATED**
+- `llmspell-workflows/src/conditional.rs` (add BaseAgent + Workflow impl) ✅ **UPDATED**
+- `llmspell-workflows/src/loop.rs` (add BaseAgent + Workflow impl) ✅ **UPDATED**
 - `llmspell-workflows/src/factory.rs` (new - WorkflowFactory trait)
 - `llmspell-workflows/src/adapters.rs` (new - input/output conversion)
 - [ ] All workflow pattern tests (WITH PROPER CATEGORIZATION)
 
 **Acceptance Criteria**:
-- [ ] All workflow patterns implement BaseAgent trait
-- [ ] All workflow patterns implement Workflow trait  
-- [ ] Workflows can be used as agents in agent systems
-- [ ] Workflows can contain other workflows as sub-agents
-- [ ] Input/output conversion works correctly
+- [x] All workflow patterns implement BaseAgent trait ✅ (Already implemented in step 2)
+- [x] All workflow patterns implement Workflow trait ✅ **COMPLETED in step 3**
+- [x] Workflows can be used as agents in agent systems ✅ (Via BaseAgent trait)
+- [x] Workflows can contain other workflows as sub-agents ✅ (Via StepType::Agent)
+- [ ] Input/output conversion works correctly (step 4 TODO)
 - [ ] All existing workflow functionality preserved
 - [ ] No breaking changes to workflow-specific APIs
 - [ ] All new/modified tests properly categorized
