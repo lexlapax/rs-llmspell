@@ -156,7 +156,7 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
    - [→] Remove duplicate code from individual crates (moved to Step 7)
    - [x] Ensure consistent test isolation (shared cleanup, temp directory management)
 
-7. [ ] **Systematic Duplicate Test Code Removal** (8 hours total):
+7. [x] **Systematic Duplicate Test Code Removal** (8 hours total): ✅ **COMPLETED**
    **Phase 1: Tool Tests Consolidation** (2.5 hours) ✅ **COMPLETED**
    - [x] **llmspell-tools** (50+ test files):
      - [x] Add llmspell-testing to dev-dependencies
@@ -225,12 +225,20 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
      - [x] Created centralized create_test_global_context()
      - [x] Run tests: `cargo test -p llmspell-bridge` ✅
    
-   **Phase 6: Final Verification** (30 min)
-   - [ ] Run workspace-wide duplicate check: `./scripts/find-duplicate-test-utils.sh`
-   - [ ] Verify all crates use llmspell-testing: `grep -r "llmspell-testing" */Cargo.toml | grep dev-dependencies`
-   - [ ] Check for any remaining create_test_* functions: `grep -r "fn create_test" --include="*.rs" . | grep -v llmspell-testing`
-   - [ ] Document any patterns that couldn't be consolidated
-   - [ ] Update migration guide for test utilities
+   **Phase 6: Final Verification** (30 min) ✅ **COMPLETED**
+   - [x] Run workspace-wide duplicate check: `./scripts/find-duplicate-test-utils.sh` ✅ (88 helpers remain in foundational crates)
+   - [x] Verify all crates use llmspell-testing: `grep -r "llmspell-testing" */Cargo.toml | grep dev-dependencies` ✅ (10 crates using)
+   - [x] Check for any remaining create_test_* functions: `grep -r "fn create_test" --include="*.rs" . | grep -v llmspell-testing` ✅ (88 found, all in foundational)
+   - [x] Document any patterns that couldn't be consolidated ✅ (test-utility-migration.md created)
+   - [x] Update migration guide for test utilities ✅ (comprehensive guide in developer-guide/)
+   
+   **IMPORTANT ARCHITECTURAL FINDING**: Foundational crates cannot use llmspell-testing
+   - **Affected crates**: llmspell-core, llmspell-utils, llmspell-storage, llmspell-security, llmspell-config, llmspell-state-traits
+   - **Reason**: Would create circular dependencies (llmspell-testing depends on these crates)
+   - **Impact**: These crates must maintain their own local test utilities
+   - **Test files**: utils (46), core (20), security (4), state-traits (3), storage (2), cli (1), config (0)
+   - **Pattern**: Foundational crates have minimal, module-specific test helpers (appropriate design)
+   - **Conclusion**: The phase design correctly focused on higher-level crates that can safely depend on llmspell-testing
 
 8. [ ] **Quality Assurance** (30 min):
    - [ ] Run fast test suite: `./llmspell-testing/scripts/run-fast-tests.sh`
