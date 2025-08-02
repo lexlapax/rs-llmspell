@@ -202,10 +202,8 @@ mod tests {
     use super::*;
     use crate::factory::DefaultAgentFactory;
     use crate::ResourceLimits;
+    use llmspell_testing::agent_helpers::create_test_provider_manager;
 
-    fn create_test_provider_manager() -> Arc<llmspell_providers::ProviderManager> {
-        Arc::new(llmspell_providers::ProviderManager::new())
-    }
     #[tokio::test]
     async fn test_factory_registry() {
         let registry = FactoryRegistry::new();

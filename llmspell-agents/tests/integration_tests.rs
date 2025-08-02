@@ -9,11 +9,9 @@ use llmspell_agents::{
     AgentBuilder, AgentConfig, AgentFactory, DIContainer, DefaultAgentFactory, ResourceLimits,
 };
 use llmspell_core::{types::AgentInput, BaseAgent, ExecutionContext};
+use llmspell_testing::agent_helpers::create_test_provider_manager;
 use std::{sync::Arc, time::Duration};
 
-fn create_test_provider_manager() -> Arc<llmspell_providers::ProviderManager> {
-    Arc::new(llmspell_providers::ProviderManager::new())
-}
 
 /// Test agent factory creation
 #[tokio::test]

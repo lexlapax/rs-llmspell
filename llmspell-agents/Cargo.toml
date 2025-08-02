@@ -38,6 +38,7 @@ tracing-subscriber.workspace = true
 tempfile = "3.8"
 llmspell-sessions = { path = "../llmspell-sessions" }
 llmspell-workflows = { path = "../llmspell-workflows" }
+llmspell-testing = { path = "../llmspell-testing" }
 
 # Integration test configuration for provider state tests
 [[test]]
