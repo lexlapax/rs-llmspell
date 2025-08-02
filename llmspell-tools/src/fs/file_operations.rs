@@ -979,10 +979,11 @@ impl FileOperationsTool {
 
         let input = AgentInput::text("File operations hook demonstration")
             .with_parameter("parameters", params);
+        use crate::lifecycle::HookableToolExecution;
+
         let context = ExecutionContext::default();
 
         // Execute with hooks using the HookableToolExecution trait
-        use crate::lifecycle::HookableToolExecution;
         self.execute_with_hooks(input, context, tool_executor).await
     }
 }

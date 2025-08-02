@@ -406,10 +406,11 @@ impl BaseAgent for VideoProcessorTool {
                 let path = Path::new(file_path);
                 let metadata = self.extract_metadata(path).await?;
 
+                use std::fmt::Write;
+
                 let mut message = format!("Video file: {:?} format", metadata.format);
 
                 if let Some(resolution) = &metadata.resolution {
-                    use std::fmt::Write;
                     let _ = write!(
                         message,
                         ", Resolution: {}x{} ({})",
@@ -420,11 +421,9 @@ impl BaseAgent for VideoProcessorTool {
                 }
 
                 if let Some(duration) = metadata.duration_seconds {
-                    use std::fmt::Write;
                     let _ = write!(message, ", Duration: {duration:.1}s");
                 }
 
-                use std::fmt::Write;
                 let _ = write!(message, ", Size: {} bytes", metadata.file_size);
 
                 let response = ResponseBuilder::success("metadata")

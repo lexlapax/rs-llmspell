@@ -225,7 +225,7 @@ impl EnvironmentReaderTool {
         }
 
         Ok(get_env_var(var_name)
-            .inspect(|value| {
+            .inspect(|_value| {
                 info!("Retrieved environment variable: {}", var_name);
             })
             .or_else(|| {

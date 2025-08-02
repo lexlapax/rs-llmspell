@@ -243,8 +243,7 @@ impl ToolStateMachine {
             | (Initializing, Ready | Failed | Terminated)
             | (Ready, Executing | CleaningUp | Terminated)
             | (Executing, Completed | Failed)
-            | (Completed, CleaningUp | Terminated)
-            | (Failed, CleaningUp | Terminated)
+            | (Completed | Failed, CleaningUp | Terminated)
             | (CleaningUp, Terminated) => true,
 
             // Terminal states cannot transition

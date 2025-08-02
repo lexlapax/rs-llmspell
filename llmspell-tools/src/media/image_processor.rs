@@ -476,10 +476,11 @@ impl BaseAgent for ImageProcessorTool {
                 let path = Path::new(file_path);
                 let metadata = self.extract_metadata(path).await?;
 
+                use std::fmt::Write;
+
                 let mut message = format!("Image file: {:?} format", metadata.format);
 
                 if let Some(dims) = &metadata.dimensions {
-                    use std::fmt::Write;
                     let _ = write!(
                         message,
                         ", {}x{} pixels ({})",
@@ -489,7 +490,6 @@ impl BaseAgent for ImageProcessorTool {
                     );
                 }
 
-                use std::fmt::Write;
                 let _ = write!(message, ", Size: {} bytes", metadata.file_size);
 
                 let response = ResponseBuilder::success("metadata")
