@@ -580,7 +580,7 @@ pub fn validate_tool_signature(tool_name: &str, params: &Value) -> Result<()> {
 - Tool library: `llmspell-tools/` crate
 - Documentation: `docs/user-guide/` and `docs/technical/`
 - Performance data: `docs/in-progress/PHASE02-ANALYSIS-PERFORMANCE_OPTIMIZATION.md`
-- Architecture: `docs/technical/rs-llmspell-final-architecture.md`
+- Architecture: `docs/technical/master-architecture-vision.md`
 
 **Transition Complete**: Phase 2 → Phase 2.5/3 handoff successful ✅
 

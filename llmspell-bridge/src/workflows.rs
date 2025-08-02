@@ -1,6 +1,7 @@
 //! ABOUTME: Workflow discovery and management for script integration
 //! ABOUTME: Provides workflow type information and factory methods
 
+use crate::standardized_workflows::StandardizedWorkflowFactory;
 use crate::workflow_performance::{ExecutionCache, OptimizedConverter, PerformanceMetrics};
 use crate::ComponentRegistry;
 use llmspell_core::{LLMSpellError, Result};
@@ -737,6 +738,8 @@ pub struct WorkflowBridge {
     _converter: Arc<OptimizedConverter>,
     execution_cache: Arc<ExecutionCache>,
     perf_metrics: Arc<PerformanceMetrics>,
+    /// Standardized workflow factory
+    standardized_factory: Arc<StandardizedWorkflowFactory>,
 }
 
 /// Record of workflow execution
@@ -786,12 +789,13 @@ impl WorkflowBridge {
             _converter: Arc::new(OptimizedConverter::new()),
             execution_cache: Arc::new(ExecutionCache::new(1000)),
             perf_metrics: Arc::new(PerformanceMetrics::new()),
+            standardized_factory: Arc::new(StandardizedWorkflowFactory::new()),
         }
     }
 
     /// List available workflow types
     pub async fn list_workflow_types(&self) -> Vec<String> {
-        self.discovery.list_workflow_types()
+        self.standardized_factory.list_workflow_types()
     }
 
     /// Get information about a specific workflow type
@@ -810,7 +814,10 @@ impl WorkflowBridge {
         workflow_type: &str,
         params: serde_json::Value,
     ) -> Result<String> {
-        let workflow = WorkflowFactory::create_workflow(workflow_type, params).await?;
+        let workflow = self
+            .standardized_factory
+            .create_from_type_json(workflow_type, params)
+            .await?;
 
         let workflow_id = format!("workflow_{}", uuid::Uuid::new_v4());
         let mut workflows = self.active_workflows.write().await;

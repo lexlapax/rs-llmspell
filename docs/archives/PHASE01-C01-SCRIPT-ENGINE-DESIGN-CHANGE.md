@@ -2,7 +2,7 @@
 
 **Date**: 2025-06-26  
 **Context**: Comprehensive analysis of phase-01-design-doc.md changes needed  
-**Scope**: Holistic updates to align with ScriptEngineBridge architecture from implementation-phases.md and rs-llmspell-final-architecture.md
+**Scope**: Holistic updates to align with ScriptEngineBridge architecture from implementation-phases.md and master-architecture-vision.md
 
 ---
 
@@ -949,7 +949,7 @@ enable_streaming = true
 ## **Architectural Consistency Check**
 
 This design change analysis ensures consistency with:
-- ✅ **rs-llmspell-final-architecture.md**: Bridge-first design principles
+- ✅ **master-architecture-vision.md**: Bridge-first design principles
 - ✅ **implementation-phases.md**: Updated Phase 1.2 requirements
 - ✅ **SCRIPT-ENGINE-ANALYSIS.md**: Abstraction layer recommendations
 - ✅ **SCRIPT-ENGINE-ARCH-CHANGE.md**: Architecture document fixes

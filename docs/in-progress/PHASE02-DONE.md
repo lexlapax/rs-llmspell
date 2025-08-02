@@ -7,7 +7,7 @@
 **Phase**: 2 (Self-Contained Tools Library)  
 **Timeline**: Weeks 5-8 (14 working days - extended for 25 tools)  
 **Priority**: CRITICAL (Core Functionality)
-**Arch-Document**: docs/technical/rs-llmspell-final-architecture.md
+**Arch-Document**: docs/technical/master-architecture-vision.md
 **Design-Document**: docs/in-progress/phase-02-design-doc.md
 
 > **📢 UPDATE**: Phase 1 complete! Ready to implement built-in tools library with provider enhancements.

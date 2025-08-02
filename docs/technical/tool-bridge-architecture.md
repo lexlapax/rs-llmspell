@@ -353,5 +353,5 @@ local hashAgent = Agent.fromTool("hash_calculator", {
 ## See Also
 
 - [Tool Implementation Guide](/docs/technical/tool-implementation.md)
-- [Bridge Architecture](/docs/technical/rs-llmspell-final-architecture.md)
+- [Bridge Architecture](/docs/technical/master-architecture-vision.md)
 - [Security Model](/docs/technical/security-model.md)

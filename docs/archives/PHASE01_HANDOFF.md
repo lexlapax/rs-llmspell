@@ -209,4 +209,4 @@ cargo doc --workspace --open
 
 ---
 
-*For questions or clarifications, refer to `/docs/technical/rs-llmspell-final-architecture.md` or contact the Phase 1 team.*
+*For questions or clarifications, refer to `/docs/technical/master-architecture-vision.md` or contact the Phase 1 team.*

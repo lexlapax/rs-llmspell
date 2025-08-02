@@ -6,7 +6,7 @@
 **Phase**: 8 (Advanced Workflow Features)  
 **Timeline**: Weeks 25-26 (10 working days)  
 **Priority**: MEDIUM (Enterprise Features)
-**Arch-Document**: docs/technical/rs-llmspell-final-architecture.md
+**Arch-Document**: docs/technical/master-architecture-vision.md
 **All-Phases-Document**: docs/in-progress/implementation-phases.md
 **Design-Document**: docs/in-progress/phase-08-design-doc-from-previous.md
 

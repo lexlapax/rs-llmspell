@@ -5,6 +5,7 @@ pub mod adapters;
 pub mod conditional;
 pub mod conditions;
 pub mod error_handling;
+pub mod executor;
 pub mod factory;
 pub mod hooks;
 pub mod r#loop;
@@ -65,4 +66,9 @@ pub use adapters::{WorkflowInputAdapter, WorkflowOutputAdapter};
 pub use factory::{
     DefaultWorkflowFactory, TemplateWorkflowFactory, WorkflowFactory, WorkflowParams,
     WorkflowTemplate, WorkflowType,
+};
+
+// Re-export executor types
+pub use executor::{
+    DefaultWorkflowExecutor, ExecutionContext, ExecutionHook, ExecutionMetrics, WorkflowExecutor,
 };

@@ -569,7 +569,7 @@ cargo build --workspace
 ```
 
 #### Documentation
-- [Architecture Overview](docs/technical/rs-llmspell-final-architecture.md)
+- [Architecture Overview](docs/technical/master-architecture-vision.md)
 - [Getting Started Guide](docs/user-guide/getting-started.md)
 - [Phase 1 Handoff](docs/in-progress/PHASE02_HANDOFF.md)
 - [Known Issues](docs/KNOWN_ISSUES.md)
@@ -619,7 +619,7 @@ Today marks a major milestone in the rs-llmspell project: **complete architectur
 ### Major Achievements ✅
 
 #### **Complete Architecture Documentation**
-- **15,034+ line standalone architecture document** (`docs/technical/rs-llmspell-final-architecture.md`)
+- **15,034+ line standalone architecture document** (`docs/technical/master-architecture-vision.md`)
 - All architectural decisions documented with rationale
 - Production-ready specifications with code examples
 - Zero external dependencies - completely self-contained reference
@@ -714,7 +714,7 @@ Script Layer (Lua/JS/Python) ← Bridge Layer ← Core Traits ← Infrastructure
 ### Files Added/Modified
 
 #### **Documentation**
-- ✅ `docs/technical/rs-llmspell-final-architecture.md` - Complete 15,034+ line architecture
+- ✅ `docs/technical/master-architecture-vision.md` - Complete 15,034+ line architecture
 - ✅ `docs/in-progress/implementation-phases.md` - 16-phase roadmap
 - ✅ `docs/in-progress/phase-00-design-doc.md` - Detailed Phase 0 specifications
 - ✅ `docs/in-progress/PHASE00-TODO.md` - 37 implementation tasks

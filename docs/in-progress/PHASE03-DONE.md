@@ -6,7 +6,7 @@
 **Phase**: 3 (Tool Enhancement & Agent Infrastructure)  
 **Timeline**: Weeks 9-16 (40 working days)  
 **Priority**: HIGH (MVP Completion)
-**Arch-Document**: docs/technical/rs-llmspell-final-architecture.md
+**Arch-Document**: docs/technical/master-architecture-vision.md
 **All-Phases-Document**: docs/in-progress/implementation-phases.md
 **Design-Document**: docs/in-progress/phase-03-design-doc.md
 
@@ -1839,7 +1839,7 @@
 - [x] Health monitoring integration ✅ (State machine, resource, and responsiveness checks)
 
 **Implementation Steps:**
-ensure it's certain implementations are consisten with what should go in `llmspell-hooks` look at `docs/technical/rs-llmspell-final-architecture.md` and `docs/in-progress/implementation-phases.md` e.g. hooks, health etc..
+ensure it's certain implementations are consisten with what should go in `llmspell-hooks` look at `docs/technical/master-architecture-vision.md` and `docs/in-progress/implementation-phases.md` e.g. hooks, health etc..
 1. Design agent state machine in `llmspell-agents/src/lifecycle/state_machine.rs`
 2. Implement lifecycle event system in `llmspell-agents/src/lifecycle/events.rs`
 3. Add resource allocation/deallocation hooks in `llmspell-agents/src/lifecycle/resources.rs`

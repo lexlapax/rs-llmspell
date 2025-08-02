@@ -7,7 +7,7 @@
 **Target End Date**: August 1, 2025 (Completed ahead of schedule)
 **Dependencies**: Phase 5 (Persistent State Management) ✅
 **Priority**: HIGH (Production Essential)
-**Arch-Document**: docs/technical/rs-llmspell-final-architecture.md
+**Arch-Document**: docs/technical/master-architecture-vision.md
 **All-Phases-Document**: docs/in-progress/implementation-phases.md
 **Design-Document**: docs/in-progress/phase-06-design-doc.md
 **This-document**: working copy /TODO.md (pristine copy in docs/in-progress/PHASE06-TODO.md)

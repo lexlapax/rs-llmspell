@@ -104,7 +104,7 @@ Rs-LLMSpell is a **focused scripting framework** for LLM interactions. It provid
 4. **[Testing Guide](developer-guide/testing-guide.md)** - Test your contributions
 
 ### 🏛️ **I need architectural understanding**
-1. **[Master Architecture](technical/rs-llmspell-final-architecture.md)** - Complete system reference
+1. **[Master Architecture](technical/master-architecture-vision.md)** - Complete system reference
 2. **[Security Architecture](technical/security-architecture.md)** - Threat model and defenses
 3. **[Global Injection System](technical/global-injection-architecture.md)** - API injection deep dive
 4. **[Performance Characteristics](technical/README.md#performance-characteristics)** - Benchmarks and limits

@@ -57,7 +57,7 @@
    - Updated dependency structure
 
 ### Documentation Updates
-- ✅ Updated rs-llmspell-final-architecture.md (added 3 major sections)
+- ✅ Updated master-architecture-vision.md (added 3 major sections)
 - ✅ Updated implementation-phases.md (modified 6 phases, added Phase 5.5)
 - ✅ Created phase-01-design-doc.md
 - ✅ Created PHASE01-TODO.md (37 tasks)

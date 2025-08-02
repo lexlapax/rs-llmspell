@@ -48,6 +48,19 @@ pub trait WorkflowFactory: Send + Sync {
 
     /// List available workflow types
     fn available_types(&self) -> Vec<WorkflowType>;
+    
+    /// List available workflow types as strings
+    fn list_workflow_types(&self) -> Vec<String> {
+        self.available_types()
+            .into_iter()
+            .map(|t| match t {
+                WorkflowType::Sequential => "sequential".to_string(),
+                WorkflowType::Parallel => "parallel".to_string(),
+                WorkflowType::Conditional => "conditional".to_string(),
+                WorkflowType::Loop => "loop".to_string(),
+            })
+            .collect()
+    }
 
     /// Get default configuration for a workflow type
     fn default_config(&self, workflow_type: &WorkflowType) -> WorkflowConfig;
@@ -59,6 +72,37 @@ pub struct DefaultWorkflowFactory;
 impl DefaultWorkflowFactory {
     pub fn new() -> Self {
         Self
+    }
+    
+    /// Create workflow from string type name (convenience method)
+    pub async fn create_from_type(
+        &self,
+        workflow_type: &str,
+        name: String,
+        config: WorkflowConfig,
+        type_config: serde_json::Value,
+    ) -> Result<Arc<dyn BaseAgent + Send + Sync>> {
+        let workflow_type = match workflow_type {
+            "sequential" => WorkflowType::Sequential,
+            "parallel" => WorkflowType::Parallel,
+            "conditional" => WorkflowType::Conditional,
+            "loop" => WorkflowType::Loop,
+            _ => {
+                return Err(LLMSpellError::Validation {
+                    message: format!("Unknown workflow type: {}", workflow_type),
+                    field: Some("workflow_type".to_string()),
+                })
+            }
+        };
+        
+        let params = WorkflowParams {
+            name,
+            workflow_type,
+            config,
+            type_config,
+        };
+        
+        self.create_workflow(params).await
     }
 }
 

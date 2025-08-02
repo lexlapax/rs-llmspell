@@ -6,7 +6,7 @@
 **Phase**: 4 (Hook and Event System with Cross-Language Support)  
 **Timeline**: Weeks 17-18.5 (11 working days - extended by 2-3 days)  
 **Priority**: HIGH (Production Essential)  
-**Arch-Document**: docs/technical/rs-llmspell-final-architecture.md  
+**Arch-Document**: docs/technical/master-architecture-vision.md  
 **All-Phases-Document**: docs/in-progress/implementation-phases.md  
 **Design-Document**: docs/in-progress/phase-04-design-doc.md v2.0  
 **Design-Analysis**: docs/in-progress/phase-04-design-analysis.md  

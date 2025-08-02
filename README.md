@@ -160,7 +160,7 @@ cat docs/developer-guide/README.md
 
 - **[Contributing Guide](CONTRIBUTING.md)** - How to contribute
 - **[Developer Documentation](docs/developer-guide/)** - Development setup and workflows
-- **[Architecture](docs/technical/rs-llmspell-final-architecture.md)** - System architecture
+- **[Architecture](docs/technical/master-architecture-vision.md)** - System architecture
 
 ## Project Links
 

@@ -7,7 +7,7 @@
 **Target End Date**: TBD (7 days from start)
 **Dependencies**: Phase 6 Release (Session and Artifact Management) ✅
 **Priority**: HIGH (Release Critical)
-**Arch-Document**: docs/technical/rs-llmspell-final-architecture.md
+**Arch-Document**: docs/technical/master-architecture-vision.md
 **All-Phases-Document**: docs/in-progress/implementation-phases.md
 **Design-Document**: docs/in-progress/phase-07-design-doc.md
 **This-document**: working copy /TODO.md (pristine/immutable copy in docs/in-progress/PHASE07-TODO.md)
@@ -2334,7 +2334,7 @@ impl SessionManagerConfigBuilder {
 `docs/technical/security-architecture.md`
 `docs/technical/phase-6.5.1-review-checklist.md`
 `docs/technical/tool-bridge-architecture.md`
-`docs/technical/rs-llmspell-final-architecture.md`
+`docs/technical/master-architecture-vision.md`
 `docs/technical/workflow-bridge-implementation.md`
 `docs/technical/hook-event-architecture.md`
 `docs/technical/session-artifact-api-design.md`

@@ -4,7 +4,7 @@ rs-llmspell: **Scriptable LLM interactions** via Lua, JavaScript - Cast scriptin
 
 ## Primary Documentation
 
-- **Architecture**: `/docs/technical/rs-llmspell-final-architecture.md` - Complete system architecture
+- **Architecture**: `/docs/technical/master-architecture-vision.md` - Complete system architecture
 - **Implementation Phases**: `/docs/in-progress/implementation-phases.md` - 16-phase roadmap
 - **Current Status**: Phase 6 COMPLETE (39/39 tasks) ✅ - Session and Artifact Management ready for production
 - **User Guide**: `/docs/user-guide/README.md` - For end users
@@ -358,4 +358,4 @@ cargo tree -d  # Find duplicate dependencies
 cargo audit    # Security audit
 ```
 
-Remember: When in doubt, refer to `/docs/technical/rs-llmspell-final-architecture.md` for architectural decisions and `/docs/in-progress/implementation-phases.md` for the roadmap.
+Remember: When in doubt, refer to `/docs/technical/master-architecture-vision.md` for architectural decisions and `/docs/in-progress/implementation-phases.md` for the roadmap.

@@ -35,7 +35,7 @@ cargo test -p llmspell-core --lib
 
 ### **Essential Reading**
 - **[Contributing Guidelines](../../CONTRIBUTING.md)** ⚠️ *Missing - needs creation*
-- **[Architecture Overview](../technical/rs-llmspell-final-architecture.md)** - System design and component relationships
+- **[Architecture Overview](../technical/master-architecture-vision.md)** - System design and component relationships
 
 ### **Implementation Guides**
 - **[Synchronous API Patterns](synchronous-api-patterns.md)** ✅ *Current & Accurate* - Lua/JS bridge patterns
@@ -343,5 +343,5 @@ cargo test --test agent_tool_integration
 
 **Happy contributing to rs-llmspell! 🚀**
 
-*For technical architecture details, see [rs-llmspell-final-architecture.md](../technical/rs-llmspell-final-architecture.md)*  
+*For technical architecture details, see [master-architecture-vision.md](../technical/master-architecture-vision.md)*  
 *For user-facing features, see [User Guide](../user-guide/README.md)*

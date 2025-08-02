@@ -6,7 +6,7 @@
 **Phase**: 0 (Foundation Infrastructure)  
 **Timeline**: Weeks 1-2 (10 working days)  
 **Priority**: CRITICAL (MVP Prerequisite)
-**Arch-Document**: docs/technical/rs-llmspell-final-architecture.md
+**Arch-Document**: docs/technical/master-architecture-vision.md
 **All-Phases-Document**: docs/in-progress/implementation-phases.md
 **Design-Document**: docs/in-progress/phase-00-design-doc.md
 

@@ -9,7 +9,7 @@
 **Timeline**: Weeks 19-20 (Completed on schedule)  
 **Priority**: MEDIUM (Production Important)  
 **Dependencies**: Phase 4 Hook System ✅, Phase 3.3 Storage Infrastructure ✅  
-**Arch-Document**: docs/technical/rs-llmspell-final-architecture.md  
+**Arch-Document**: docs/technical/master-architecture-vision.md  
 **All-Phases-Document**: docs/in-progress/implementation-phases.md  
 **Design-Document**: docs/in-progress/phase-05-design-doc.md (v2.0)  
 **State-Architecture**: docs/technical/state-architecture.md (Updated)  

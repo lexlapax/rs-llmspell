@@ -1200,7 +1200,7 @@ After analyzing implementation complexity and team collaboration needs, we recom
 ```
 docs/
 ├── technical/
-│   ├── rs-llmspell-final-architecture.md     # High-level architectural reference (existing)
+│   ├── master-architecture-vision.md     # High-level architectural reference (existing)
 │   ├── implementation-phases.md              # Roadmap overview (this document)
 │   └── phase-implementations/
 │       ├── phase-0-foundation-guide.md       # Detailed implementation guide

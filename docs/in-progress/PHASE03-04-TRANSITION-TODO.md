@@ -13,7 +13,7 @@ now I'm going to ask you a series of questions about the architecture documented
           - Tool execution has pre/post execution points ready
           - Workflow patterns have step boundaries and event emission
           - Event emission infrastructure already exists in agents and workflows
-        - The architecture document (`/docs/technical/rs-llmspell-final-architecture.md`) already includes comprehensive Hook and Event System design
+        - The architecture document (`/docs/technical/master-architecture-vision.md`) already includes comprehensive Hook and Event System design
         - There's also a detailed hook implementation design document (`/docs/technical/hook-implementation.md`) marked as "PLANNED FEATURE" for Phase 4
         - Phase 3 delivers all integration points needed: agent state transitions, tool pre/post execution, workflow boundaries
     - [ ] Todo: 
@@ -55,11 +55,11 @@ now I'm going to ask you a series of questions about the architecture documented
 
 ### Section 3: Transition to next phase
 **Instructions** Read Section 1 and section 2 above and complete the following tasks/questions: 
-- [ ] **Task/question 3.1** Based on the `/docs/technical/rs-llmspell-final-architecture.md`, and the `/docs/in-progress/implemenation-phases.md`,  are you ready to create a very detailed design doc for phase 04 `/docs/in-progress/phase-04-design-doc.md` in the style of `/docs/in-progress/phase-00-design-doc.md` and a todo list `/docs/in-progress/PHASE04-TODO.md` in the style of `/docs/in-progress/PHASE00-TODO.md`? if not what needs to be done? you can also look at output of previous phase `/docs/in-progress/PHASE*-DONE.md`, `/docs/in-progress/PHASE*HANDOFF.md`  to inform your answers and todos. make sure to include relevant portions of the contents of `/docs/in-progress/phase-03-design-doc.md` into the considerations. you may and should look at architecture documents in `docs/technical/*.md` and developer documentation in `docs/developer-guide/*.md` to megathink and analyze for answers. make sure to also accomodate `/docs/in-progress/PHASE03_HANDOFF_PACKAGE.md` anything that relates to phase 4.
+- [ ] **Task/question 3.1** Based on the `/docs/technical/master-architecture-vision.md`, and the `/docs/in-progress/implemenation-phases.md`,  are you ready to create a very detailed design doc for phase 04 `/docs/in-progress/phase-04-design-doc.md` in the style of `/docs/in-progress/phase-00-design-doc.md` and a todo list `/docs/in-progress/PHASE04-TODO.md` in the style of `/docs/in-progress/PHASE00-TODO.md`? if not what needs to be done? you can also look at output of previous phase `/docs/in-progress/PHASE*-DONE.md`, `/docs/in-progress/PHASE*HANDOFF.md`  to inform your answers and todos. make sure to include relevant portions of the contents of `/docs/in-progress/phase-03-design-doc.md` into the considerations. you may and should look at architecture documents in `docs/technical/*.md` and developer documentation in `docs/developer-guide/*.md` to megathink and analyze for answers. make sure to also accomodate `/docs/in-progress/PHASE03_HANDOFF_PACKAGE.md` anything that relates to phase 4.
     - [ ] Answer: 
         - YES, we are ready to create the Phase 4 design doc and TODO list
         - All prerequisites are in place:
-          - Complete architecture documented in `/docs/technical/rs-llmspell-final-architecture.md` (Hook and Event System section)
+          - Complete architecture documented in `/docs/technical/master-architecture-vision.md` (Hook and Event System section)
           - Detailed implementation guide in `/docs/technical/hook-implementation.md`
           - Phase 3 delivered all integration points (agent states, tool hooks, workflow boundaries)
           - Clear scope in `/docs/in-progress/implementation-phases.md` (updated with our clarifications)

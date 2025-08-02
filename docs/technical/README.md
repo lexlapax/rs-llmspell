@@ -13,7 +13,7 @@
 ## Core Architecture Documents
 
 ### Master Reference
-- **[rs-llmspell-final-architecture.md](rs-llmspell-final-architecture.md)** - Complete standalone architecture document containing ALL architectural, implementation, and operational details. No external references required.
+- **[master-architecture-vision.md](master-architecture-vision.md)** - Complete standalone architecture document containing ALL architectural, implementation, and operational details. No external references required.
 
 ### Implementation Deep Dives
 - **[global-injection-architecture.md](global-injection-architecture.md)** - ✅ **Current** - Detailed technical architecture of the global injection system with performance optimizations, dependency resolution, and multi-language support
@@ -42,7 +42,7 @@
 ## Quick Reference Guide
 
 ### For System Architects
-1. Start with [rs-llmspell-final-architecture.md](rs-llmspell-final-architecture.md) for complete system overview
+1. Start with [master-architecture-vision.md](master-architecture-vision.md) for complete system overview
 2. Review [security-architecture.md](security-architecture.md) for threat model and defense layers
 3. Study [global-injection-architecture.md](global-injection-architecture.md) for runtime architecture
 

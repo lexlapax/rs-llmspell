@@ -7,7 +7,7 @@
 **Phase**: 1 (Core Execution Runtime)  
 **Timeline**: Weeks 3-4 (10 working days)  
 **Priority**: CRITICAL (MVP Core)
-**Arch-Document**: docs/technical/rs-llmspell-final-architecture.md
+**Arch-Document**: docs/technical/master-architecture-vision.md
 **All-Phases-Document**: docs/in-progress/implementation-phases.md
 **Design-Document**: docs/in-progress/phase-01-design-doc.md
 
