@@ -39,6 +39,10 @@ pub struct MultiAgentConfig {
 
 /// Create a pipeline coordination workflow
 /// Agents process data sequentially, each building on previous results
+///
+/// # Errors
+///
+/// Returns an error if workflow creation fails
 pub fn create_pipeline_workflow(
     name: String,
     agents: Vec<String>,
@@ -75,6 +79,10 @@ pub fn create_pipeline_workflow(
 
 /// Create a fork-join coordination workflow
 /// Agents work in parallel on different aspects of a problem
+///
+/// # Errors
+///
+/// Returns an error if workflow creation fails
 pub fn create_fork_join_workflow(
     name: String,
     agent_tasks: Vec<(String, String, Value)>, // (agent_id, task_name, input)
@@ -105,6 +113,10 @@ pub fn create_fork_join_workflow(
 
 /// Create a consensus coordination workflow
 /// Multiple agents evaluate and vote on options
+///
+/// # Errors
+///
+/// Returns an error if workflow creation fails
 pub fn create_consensus_workflow(
     name: String,
     evaluator_agents: Vec<String>,
@@ -139,6 +151,10 @@ pub fn create_consensus_workflow(
 
 /// Create a delegation coordination workflow
 /// One agent delegates subtasks to specialized agents
+///
+/// # Errors
+///
+/// Returns an error if workflow creation fails
 pub fn create_delegation_workflow(
     name: String,
     coordinator_agent: String,
@@ -197,6 +213,10 @@ pub fn create_delegation_workflow(
 
 /// Create a collaboration workflow
 /// Agents work together with shared context and iterative refinement
+///
+/// # Errors
+///
+/// Returns an error if workflow creation fails
 pub fn create_collaboration_workflow(
     name: String,
     collaborating_agents: Vec<String>,
@@ -310,6 +330,10 @@ pub struct MultiAgentExamples;
 
 impl MultiAgentExamples {
     /// Research paper analysis pipeline
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if workflow creation fails
     pub fn research_pipeline_example() -> Result<llmspell_workflows::SequentialWorkflow> {
         create_pipeline_workflow(
             "research_paper_pipeline".to_string(),
@@ -327,6 +351,10 @@ impl MultiAgentExamples {
     }
 
     /// Multi-perspective analysis fork-join
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if workflow creation fails
     pub fn multi_perspective_analysis() -> Result<llmspell_workflows::ParallelWorkflow> {
         create_fork_join_workflow(
             "multi_perspective_analysis".to_string(),
@@ -352,6 +380,10 @@ impl MultiAgentExamples {
     }
 
     /// Decision making consensus
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if workflow creation fails
     pub fn investment_consensus() -> Result<llmspell_workflows::ParallelWorkflow> {
         create_consensus_workflow(
             "investment_decision".to_string(),

@@ -31,7 +31,11 @@ pub struct LuaEngine {
 }
 
 // SAFETY: We ensure thread safety by using Mutex for all Lua access
+// The Lua instance is wrapped in a Mutex to prevent concurrent access
+#[allow(unsafe_code)]
 unsafe impl Send for LuaEngine {}
+// SAFETY: All access to Lua is synchronized through a Mutex
+#[allow(unsafe_code)]
 unsafe impl Sync for LuaEngine {}
 
 impl LuaEngine {
@@ -105,12 +109,10 @@ impl ScriptEngineBridge for LuaEngine {
                         let output = lua_value_to_json(value)?;
                         Ok(output)
                     }
-                    Err(e) => {
-                        Err(ScriptEngineError::ExecutionError {
-                            engine: "lua".to_string(),
-                            details: e.to_string(),
-                        })
-                    }
+                    Err(e) => Err(ScriptEngineError::ExecutionError {
+                        engine: "lua".to_string(),
+                        details: e.to_string(),
+                    }),
                 }
             };
 
@@ -147,7 +149,7 @@ impl ScriptEngineBridge for LuaEngine {
             // For now, implement a simple non-streaming execution that returns a single chunk
             // Full streaming with coroutines requires more complex handling due to Send constraints
             let start_time = Instant::now();
-            
+
             // Create a single chunk with the result
             #[allow(clippy::significant_drop_tightening)]
             let chunk = {
@@ -161,7 +163,8 @@ impl ScriptEngineBridge for LuaEngine {
                             stream_id: "lua-stream".to_string(),
                             chunk_index: 0,
                             content: llmspell_core::types::ChunkContent::Text(
-                                serde_json::to_string(&output).unwrap_or_else(|_| "null".to_string()),
+                                serde_json::to_string(&output)
+                                    .unwrap_or_else(|_| "null".to_string()),
                             ),
                             metadata: llmspell_core::types::ChunkMetadata {
                                 is_final: true,
@@ -172,19 +175,17 @@ impl ScriptEngineBridge for LuaEngine {
                             timestamp: chrono::Utc::now(),
                         }
                     }
-                    Err(e) => {
-                        llmspell_core::types::AgentChunk {
-                            stream_id: "lua-stream".to_string(),
-                            chunk_index: 0,
-                            content: llmspell_core::types::ChunkContent::Control(
-                                llmspell_core::types::ControlMessage::StreamCancelled {
-                                    reason: format!("Script execution failed: {e}"),
-                                },
-                            ),
-                            metadata: llmspell_core::types::ChunkMetadata::default(),
-                            timestamp: chrono::Utc::now(),
-                        }
-                    }
+                    Err(e) => llmspell_core::types::AgentChunk {
+                        stream_id: "lua-stream".to_string(),
+                        chunk_index: 0,
+                        content: llmspell_core::types::ChunkContent::Control(
+                            llmspell_core::types::ControlMessage::StreamCancelled {
+                                reason: format!("Script execution failed: {e}"),
+                            },
+                        ),
+                        metadata: llmspell_core::types::ChunkMetadata::default(),
+                        timestamp: chrono::Utc::now(),
+                    },
                 }
             };
 

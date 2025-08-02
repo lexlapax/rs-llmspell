@@ -114,7 +114,8 @@ impl GlobalInjector {
                 .insert(metadata.name.clone(), elapsed);
         }
 
-        metrics.total_injection_time_us = u64::try_from(start.elapsed().as_micros()).unwrap_or(u64::MAX);
+        metrics.total_injection_time_us =
+            u64::try_from(start.elapsed().as_micros()).unwrap_or(u64::MAX);
         metrics.globals_injected = globals.len();
         metrics.cache_hit_rate = self.cache.hit_rate();
 
@@ -156,7 +157,8 @@ impl GlobalInjector {
                 .insert(metadata.name.clone(), elapsed);
         }
 
-        metrics.total_injection_time_us = u64::try_from(start.elapsed().as_micros()).unwrap_or(u64::MAX);
+        metrics.total_injection_time_us =
+            u64::try_from(start.elapsed().as_micros()).unwrap_or(u64::MAX);
         metrics.globals_injected = globals.len();
         metrics.cache_hit_rate = self.cache.hit_rate();
 

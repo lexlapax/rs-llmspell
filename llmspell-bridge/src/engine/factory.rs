@@ -5,16 +5,16 @@ use crate::engine::bridge::{EngineFeatures, ScriptEngineBridge};
 use llmspell_core::error::LLMSpellError;
 use serde_json::Value;
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, LazyLock, RwLock};
 
 /// Factory for creating script engines
 pub struct EngineFactory;
 
 impl EngineFactory {
     /// Create a Lua engine with the given configuration
-    /// 
+    ///
     /// # Errors
-    /// 
+    ///
     /// Returns an error if Lua feature is not enabled or engine creation fails
     pub fn create_lua_engine(
         config: &LuaConfig,
@@ -23,9 +23,9 @@ impl EngineFactory {
     }
 
     /// Create a Lua engine with the given configuration and runtime config
-    /// 
+    ///
     /// # Errors
-    /// 
+    ///
     /// Returns an error if Lua feature is not enabled or engine creation fails
     pub fn create_lua_engine_with_runtime(
         config: &LuaConfig,
@@ -50,9 +50,9 @@ impl EngineFactory {
     }
 
     /// Create a JavaScript engine with the given configuration
-    /// 
+    ///
     /// # Errors
-    /// 
+    ///
     /// Returns an error if JavaScript feature is not enabled or engine creation fails
     #[allow(unused_variables)]
     pub fn create_javascript_engine(
@@ -74,6 +74,17 @@ impl EngineFactory {
     }
 
     /// Create an engine by name with the given configuration
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The engine name is unknown
+    /// - The configuration is invalid for the engine type
+    /// - The engine creation fails
+    ///
+    /// # Panics
+    ///
+    /// Panics if the plugin registry lock is poisoned
     pub fn create_from_name(
         name: &str,
         config: &Value,
@@ -102,19 +113,24 @@ impl EngineFactory {
             _ => {
                 // Check if it's a registered plugin
                 let registry = PLUGIN_REGISTRY.read().unwrap();
-                if let Some(plugin) = registry.get(name) {
-                    plugin.create_engine(config.clone())
-                } else {
-                    Err(LLMSpellError::Validation {
-                        field: Some("engine".to_string()),
-                        message: format!("Unknown engine: {name}. Available: lua, javascript"),
-                    })
-                }
+                registry.get(name).map_or_else(
+                    || {
+                        Err(LLMSpellError::Validation {
+                            field: Some("engine".to_string()),
+                            message: format!("Unknown engine: {name}. Available: lua, javascript"),
+                        })
+                    },
+                    |plugin| plugin.create_engine(config.clone()),
+                )
             }
         }
     }
 
     /// List all available engines (built-in and plugins)
+    ///
+    /// # Panics
+    ///
+    /// Panics if the plugin registry lock is poisoned
     #[must_use]
     pub fn list_available_engines() -> Vec<EngineInfo> {
         let mut engines = vec![];
@@ -136,15 +152,17 @@ impl EngineFactory {
         });
 
         // Add registered plugins
-        let registry = PLUGIN_REGISTRY.read().unwrap();
-        for (name, plugin) in registry.iter() {
-            engines.push(EngineInfo {
-                name: name.clone(),
-                description: plugin.description(),
-                version: plugin.version(),
-                features: plugin.supported_features(),
-            });
-        }
+        {
+            let registry = PLUGIN_REGISTRY.read().unwrap();
+            for (name, plugin) in registry.iter() {
+                engines.push(EngineInfo {
+                    name: name.clone(),
+                    description: plugin.description(),
+                    version: plugin.version(),
+                    features: plugin.supported_features(),
+                });
+            }
+        } // Explicitly drop the lock here
 
         engines
     }
@@ -235,10 +253,8 @@ pub enum ModuleResolution {
 
 // Plugin system for third-party engines
 
-lazy_static::lazy_static! {
-    static ref PLUGIN_REGISTRY: Arc<RwLock<HashMap<String, Box<dyn ScriptEnginePlugin>>>> =
-        Arc::new(RwLock::new(HashMap::new()));
-}
+static PLUGIN_REGISTRY: LazyLock<Arc<RwLock<HashMap<String, Box<dyn ScriptEnginePlugin>>>>> =
+    LazyLock::new(|| Arc::new(RwLock::new(HashMap::new())));
 
 /// Plugin interface for third-party script engines
 pub trait ScriptEnginePlugin: Send + Sync {
@@ -252,6 +268,10 @@ pub trait ScriptEnginePlugin: Send + Sync {
     fn version(&self) -> String;
 
     /// Create an instance of this engine
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if engine creation fails or configuration is invalid
     fn create_engine(&self, config: Value) -> Result<Box<dyn ScriptEngineBridge>, LLMSpellError>;
 
     /// Get the features supported by this engine
@@ -259,12 +279,20 @@ pub trait ScriptEnginePlugin: Send + Sync {
 }
 
 /// Register a third-party engine plugin
+///
+/// # Panics
+///
+/// Panics if the plugin registry lock is poisoned
 pub fn register_engine_plugin<P: ScriptEnginePlugin + 'static>(plugin: P) {
     let mut registry = PLUGIN_REGISTRY.write().unwrap();
     registry.insert(plugin.engine_name().to_string(), Box::new(plugin));
 }
 
 /// Unregister an engine plugin
+///
+/// # Panics
+///
+/// Panics if the plugin registry lock is poisoned
 #[must_use]
 pub fn unregister_engine_plugin(name: &str) -> bool {
     let mut registry = PLUGIN_REGISTRY.write().unwrap();

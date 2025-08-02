@@ -37,66 +37,118 @@ impl SessionBridge {
     }
 
     /// Create a new session
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if session creation fails
     pub async fn create_session(&self, options: CreateSessionOptions) -> Result<SessionId> {
         convert_err!(self.session_manager.create_session(options).await)
     }
 
     /// Get an existing session
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the session is not found
     pub async fn get_session(&self, session_id: &SessionId) -> Result<Session> {
         convert_err!(self.session_manager.get_session(session_id).await)
     }
 
     /// List sessions with optional filtering
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if listing sessions fails
     pub async fn list_sessions(&self, query: SessionQuery) -> Result<Vec<SessionMetadata>> {
         convert_err!(self.session_manager.list_sessions(query).await)
     }
 
     /// Suspend a session
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the session cannot be suspended
     pub async fn suspend_session(&self, session_id: &SessionId) -> Result<()> {
         convert_err!(self.session_manager.suspend_session(session_id).await)
     }
 
     /// Resume a session
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the session cannot be resumed
     pub async fn resume_session(&self, session_id: &SessionId) -> Result<()> {
         convert_err!(self.session_manager.resume_session(session_id).await)
     }
 
     /// Complete a session
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the session cannot be completed
     pub async fn complete_session(&self, session_id: &SessionId) -> Result<()> {
         convert_err!(self.session_manager.complete_session(session_id).await)
     }
 
     /// Delete a session
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the session cannot be deleted
     pub async fn delete_session(&self, session_id: &SessionId) -> Result<()> {
         convert_err!(self.session_manager.delete_session(session_id).await)
     }
 
     /// Save a session to storage
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the session cannot be saved
     pub async fn save_session(&self, session: &Session) -> Result<()> {
         convert_err!(self.session_manager.save_session(session).await)
     }
 
     /// Load a session from storage
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the session cannot be loaded
     pub async fn load_session(&self, session_id: &SessionId) -> Result<Session> {
         convert_err!(self.session_manager.load_session(session_id).await)
     }
 
     /// Save all active sessions
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any session cannot be saved
     pub async fn save_all_sessions(&self) -> Result<()> {
         convert_err!(self.session_manager.save_all_active_sessions().await)
     }
 
     /// Restore recent sessions
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if sessions cannot be restored
     pub async fn restore_recent_sessions(&self, count: usize) -> Result<Vec<SessionId>> {
         convert_err!(self.session_manager.restore_recent_sessions(count).await)
     }
 
     /// Check if a session can be replayed
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the session status cannot be checked
     pub async fn can_replay_session(&self, session_id: &SessionId) -> Result<bool> {
         convert_err!(self.session_manager.can_replay_session(session_id).await)
     }
 
     /// Replay a session
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the session cannot be replayed
     pub async fn replay_session(
         &self,
         session_id: &SessionId,
@@ -152,6 +204,10 @@ impl SessionBridge {
     }
 
     /// Update session metadata
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the session metadata cannot be updated
     pub async fn update_session_metadata(
         &self,
         session_id: &SessionId,
@@ -165,6 +221,10 @@ impl SessionBridge {
     }
 
     /// Get session tags
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the session tags cannot be retrieved
     pub async fn get_session_tags(&self, session_id: &SessionId) -> Result<Vec<String>> {
         let ops = llmspell_sessions::bridge::operations::SessionOperations::new(
             self.session_manager.clone(),
@@ -173,6 +233,10 @@ impl SessionBridge {
     }
 
     /// Set session tags
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the session tags cannot be set
     pub async fn set_session_tags(&self, session_id: &SessionId, tags: Vec<String>) -> Result<()> {
         let ops = llmspell_sessions::bridge::operations::SessionOperations::new(
             self.session_manager.clone(),
@@ -181,6 +245,10 @@ impl SessionBridge {
     }
 
     /// Get replay metadata for a session
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the replay metadata cannot be retrieved
     pub async fn get_session_replay_metadata(
         &self,
         session_id: &SessionId,
@@ -203,6 +271,10 @@ impl SessionBridge {
     }
 
     /// List replayable sessions
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the replayable sessions cannot be listed
     pub async fn list_replayable_sessions(&self) -> Result<Vec<SessionId>> {
         convert_err!(self.session_manager.list_replayable_sessions().await)
     }

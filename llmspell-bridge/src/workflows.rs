@@ -220,6 +220,10 @@ pub struct WorkflowFactory;
 
 impl WorkflowFactory {
     /// Create a workflow instance based on type and parameters
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if workflow type is unknown or creation fails
     pub async fn create_workflow(
         workflow_type: &str,
         params: serde_json::Value,
@@ -506,7 +510,8 @@ async fn create_parallel_workflow(params: serde_json::Value) -> Result<impl Work
         .get("max_concurrency")
         .and_then(serde_json::Value::as_u64)
     {
-        builder = builder.with_max_concurrency(max_concurrency as usize);
+        builder =
+            builder.with_max_concurrency(usize::try_from(max_concurrency).unwrap_or(usize::MAX));
     }
 
     if let Some(fail_fast) = params.get("fail_fast").and_then(serde_json::Value::as_bool) {
@@ -531,7 +536,7 @@ fn parse_workflow_step(step_json: &serde_json::Value) -> Result<llmspell_workflo
         let params = step_json
             .get("parameters")
             .cloned()
-            .unwrap_or(serde_json::json!({}));
+            .unwrap_or_else(|| serde_json::json!({}));
         StepType::Tool {
             tool_name: tool_name.to_string(),
             parameters: params,
@@ -540,7 +545,7 @@ fn parse_workflow_step(step_json: &serde_json::Value) -> Result<llmspell_workflo
         let input = step_json
             .get("input")
             .cloned()
-            .unwrap_or(serde_json::json!({}));
+            .unwrap_or_else(|| serde_json::json!({}));
         StepType::Agent {
             agent_id: ComponentId::from_name(agent_id),
             input: input.to_string(),
@@ -549,7 +554,7 @@ fn parse_workflow_step(step_json: &serde_json::Value) -> Result<llmspell_workflo
         let params = step_json
             .get("parameters")
             .cloned()
-            .unwrap_or(serde_json::json!({}));
+            .unwrap_or_else(|| serde_json::json!({}));
         StepType::Custom {
             function_name: func_name.to_string(),
             parameters: params,
@@ -634,7 +639,8 @@ fn parse_loop_iterator(config: &serde_json::Value) -> Result<llmspell_workflows:
             max_iterations: config
                 .get("max_iterations")
                 .and_then(serde_json::Value::as_u64)
-                .unwrap_or(100) as usize,
+                .map(|v| usize::try_from(v).unwrap_or(usize::MAX))
+                .unwrap_or(100),
         })
     } else {
         Err(llmspell_core::LLMSpellError::Configuration {
@@ -854,6 +860,10 @@ impl WorkflowBridge {
     }
 
     /// Create a workflow instance
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if workflow type is invalid or creation fails
     pub async fn create_workflow(
         &self,
         workflow_type: &str,
@@ -912,7 +922,8 @@ impl WorkflowBridge {
         // Execute workflow
         match workflow.execute(input).await {
             Ok(output) => {
-                let duration_ms = u64::try_from(start_instant.elapsed().as_millis()).unwrap_or(u64::MAX);
+                let duration_ms =
+                    u64::try_from(start_instant.elapsed().as_millis()).unwrap_or(u64::MAX);
 
                 // Record successful execution
                 let record = WorkflowExecutionRecord {
@@ -942,7 +953,8 @@ impl WorkflowBridge {
                 Ok(output)
             }
             Err(e) => {
-                let duration_ms = u64::try_from(start_instant.elapsed().as_millis()).unwrap_or(u64::MAX);
+                let duration_ms =
+                    u64::try_from(start_instant.elapsed().as_millis()).unwrap_or(u64::MAX);
 
                 // Record failed execution
                 let record = WorkflowExecutionRecord {
@@ -990,6 +1002,10 @@ impl WorkflowBridge {
     }
 
     /// Get a workflow instance by ID
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the workflow is not found
     pub async fn get_workflow(&self, workflow_id: &str) -> Result<WorkflowInfo> {
         let workflows = self.active_workflows.read().await;
         let workflow = workflows
@@ -1010,6 +1026,10 @@ impl WorkflowBridge {
     }
 
     /// Remove a workflow instance
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the workflow is not found
     pub async fn remove_workflow(&self, workflow_id: &str) -> Result<()> {
         let mut workflows = self.active_workflows.write().await;
         workflows
@@ -1039,6 +1059,10 @@ impl WorkflowBridge {
     }
 
     /// Get workflow status
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the workflow is not found
     pub async fn get_workflow_status(&self, workflow_id: &str) -> Result<WorkflowStatus> {
         let workflows = self.active_workflows.read().await;
         if workflows.contains_key(workflow_id) {
@@ -1279,6 +1303,10 @@ impl WorkflowRegistry {
     }
 
     /// Unregister a workflow
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the workflow is not found
     pub async fn unregister_workflow(&self, id: &str) -> Result<()> {
         let mut workflows = self.workflows.write().await;
         workflows
@@ -1292,6 +1320,10 @@ impl WorkflowRegistry {
     }
 
     /// Get a workflow by ID
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the workflow is not found
     pub async fn get_workflow(&self, id: &str) -> Result<Arc<Box<dyn WorkflowExecutor>>> {
         let workflows = self.workflows.read().await;
         workflows
@@ -1362,6 +1394,10 @@ impl WorkflowRegistry {
     }
 
     /// Get workflow usage statistics
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the workflow is not found
     pub async fn get_usage_stats(&self, id: &str) -> Result<WorkflowUsageStats> {
         let workflows = self.workflows.read().await;
         workflows
@@ -1374,6 +1410,10 @@ impl WorkflowRegistry {
     }
 
     /// Register a workflow template
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a template with the same ID already exists
     pub async fn register_template(&self, template: WorkflowTemplate) -> Result<()> {
         let mut templates = self.templates.write().await;
         templates.insert(template.id.clone(), template);
@@ -1382,6 +1422,10 @@ impl WorkflowRegistry {
     }
 
     /// Get a workflow template
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the template is not found
     pub async fn get_template(&self, template_id: &str) -> Result<WorkflowTemplate> {
         let templates = self.templates.read().await;
         templates

@@ -24,6 +24,10 @@ impl StandardizedWorkflowFactory {
 
     /// Create a workflow from type string and JSON parameters
     /// This is the bridge-specific method that converts JSON params to workflow configuration
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if workflow creation fails or parameters are invalid
     pub async fn create_from_type_json(
         &self,
         workflow_type: &str,

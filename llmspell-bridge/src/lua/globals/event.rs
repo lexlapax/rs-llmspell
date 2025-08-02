@@ -6,6 +6,10 @@ use crate::globals::types::{GlobalContext, GlobalObject};
 use llmspell_core::error::LLMSpellError;
 
 /// Inject the Event global into a Lua environment
+///
+/// # Errors
+///
+/// Returns an error if global injection fails
 pub fn inject_event_global(lua: &mlua::Lua, context: &GlobalContext) -> Result<(), LLMSpellError> {
     let event_global = EventGlobal::new();
     event_global.inject_lua(lua, context)

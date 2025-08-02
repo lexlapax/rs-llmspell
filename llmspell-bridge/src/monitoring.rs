@@ -51,6 +51,10 @@ impl HealthCheck for HealthCheckImpl {
 }
 
 /// Mock check agent health for bridge
+///
+/// # Errors
+///
+/// Returns an error if health check fails
 pub async fn check_agent_health(_agent_id: &str) -> Result<HealthCheckResult> {
     let mut components = HashMap::new();
     components.insert(

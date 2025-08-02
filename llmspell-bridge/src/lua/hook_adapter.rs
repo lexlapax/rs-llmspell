@@ -24,6 +24,10 @@ impl LuaHookAdapter {
     }
 
     /// Convert `HookContext` to Lua table
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if Lua table creation or field setting fails
     pub fn hook_context_to_lua_table<'lua>(
         &self,
         lua: &'lua Lua,
@@ -64,6 +68,10 @@ impl LuaHookAdapter {
     }
 
     /// Convert Lua value to `HookResult`
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the Lua value cannot be converted to a HookResult
     pub fn lua_value_to_hook_result(&self, _lua: &Lua, value: Value) -> mlua::Result<HookResult> {
         match value {
             Value::String(s) => {

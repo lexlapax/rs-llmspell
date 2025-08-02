@@ -18,6 +18,11 @@ use llmspell_tools::{
 use std::sync::Arc;
 
 /// Initialize and register all Phase 2 tools with the bridge registry
+///
+/// # Errors
+///
+/// Returns an error if tool registration fails
+#[allow(clippy::default_trait_access)]
 pub fn register_all_tools(
     registry: Arc<ComponentRegistry>,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -30,122 +35,15 @@ pub fn register_all_tools(
     );
     let file_sandbox = Arc::new(FileSandbox::new(sandbox_context)?);
 
-    // Utility tools
-    register_tool(registry.clone(), "base64_encoder", Base64EncoderTool::new)?;
-    register_tool(registry.clone(), "calculator", CalculatorTool::new)?;
-    register_tool(registry.clone(), "data_validation", DataValidationTool::new)?;
-    register_tool(
-        registry.clone(),
-        "date_time_handler",
-        DateTimeHandlerTool::new,
-    )?;
-    register_tool(registry.clone(), "diff_calculator", DiffCalculatorTool::new)?;
-    register_tool(registry.clone(), "hash_calculator", || {
-        HashCalculatorTool::new(Default::default())
-    })?;
-    register_tool(registry.clone(), "template_engine", TemplateEngineTool::new)?;
-    register_tool(registry.clone(), "text_manipulator", || {
-        TextManipulatorTool::new(Default::default())
-    })?;
-    register_tool(registry.clone(), "uuid_generator", || {
-        UuidGeneratorTool::new(Default::default())
-    })?;
-
-    // Data processing tools
-    register_tool(registry.clone(), "csv_analyzer", || {
-        CsvAnalyzerTool::new(Default::default())
-    })?;
-    register_tool(registry.clone(), "json_processor", || {
-        JsonProcessorTool::new(Default::default())
-    })?;
-    register_tool_result(registry.clone(), "graphql_query", || {
-        GraphQLQueryTool::new(Default::default())
-    })?;
-    register_tool_result(registry.clone(), "http_request", || {
-        HttpRequestTool::new(Default::default())
-    })?;
-
-    // File system tools
-    register_tool(registry.clone(), "archive_handler", ArchiveHandlerTool::new)?;
-
-    // File converter with sandbox
-    let file_sandbox_converter = file_sandbox.clone();
-    register_tool_with_sandbox(
-        registry.clone(),
-        "file_converter",
-        file_sandbox_converter.clone(),
-        move || FileConverterTool::new(Default::default(), file_sandbox_converter),
-    )?;
-
-    register_tool(registry.clone(), "file_operations", || {
-        FileOperationsTool::new(Default::default())
-    })?;
-
-    // File search with sandbox
-    let file_sandbox_search = file_sandbox.clone();
-    register_tool_with_sandbox(
-        registry.clone(),
-        "file_search",
-        file_sandbox_search.clone(),
-        move || FileSearchTool::new(Default::default(), file_sandbox_search),
-    )?;
-
-    // File watcher with sandbox
-    let file_sandbox_watcher = file_sandbox;
-    register_tool_with_sandbox(
-        registry.clone(),
-        "file_watcher",
-        file_sandbox_watcher.clone(),
-        move || FileWatcherTool::new(Default::default(), file_sandbox_watcher),
-    )?;
-
-    // System integration tools
-    register_tool(registry.clone(), "environment_reader", || {
-        EnvironmentReaderTool::new(Default::default())
-    })?;
-    register_tool(registry.clone(), "process_executor", || {
-        ProcessExecutorTool::new(Default::default())
-    })?;
-    register_tool(registry.clone(), "service_checker", || {
-        ServiceCheckerTool::new(Default::default())
-    })?;
-    register_tool(registry.clone(), "system_monitor", || {
-        SystemMonitorTool::new(Default::default())
-    })?;
-
-    // Media processing tools
-    register_tool(registry.clone(), "audio_processor", || {
-        AudioProcessorTool::new(Default::default())
-    })?;
-    register_tool(registry.clone(), "image_processor", || {
-        ImageProcessorTool::new(Default::default())
-    })?;
-    register_tool(registry.clone(), "video_processor", || {
-        VideoProcessorTool::new(Default::default())
-    })?;
-
-    // Search tools
-    register_tool_result(registry.clone(), "web_search", || {
-        WebSearchTool::new(Default::default())
-    })?;
-
-    // Phase 3.1 Web tools
-    register_tool(registry.clone(), "url-analyzer", UrlAnalyzerTool::new)?;
-    register_tool(registry.clone(), "web-scraper", || {
-        WebScraperTool::new(Default::default())
-    })?;
-    register_tool(registry.clone(), "api-tester", ApiTesterTool::new)?;
-    register_tool(registry.clone(), "webhook-caller", WebhookCallerTool::new)?;
-    register_tool(registry.clone(), "webpage-monitor", WebpageMonitorTool::new)?;
-    register_tool(registry.clone(), "sitemap-crawler", SitemapCrawlerTool::new)?;
-
-    // Phase 3.1 Communication tools
-    register_tool_result(registry.clone(), "email-sender", || {
-        EmailSenderTool::new(Default::default())
-    })?;
-    register_tool_result(registry, "database-connector", || {
-        DatabaseConnectorTool::new(Default::default())
-    })?;
+    // Register different tool categories
+    register_utility_tools(registry.clone())?;
+    register_data_processing_tools(registry.clone())?;
+    register_file_system_tools(registry.clone(), file_sandbox)?;
+    register_system_tools(registry.clone())?;
+    register_media_tools(registry.clone())?;
+    register_search_tools(registry.clone())?;
+    register_web_tools(registry.clone())?;
+    register_communication_tools(registry)?;
 
     Ok(())
 }
@@ -212,4 +110,160 @@ pub fn get_all_tool_names(registry: Arc<ComponentRegistry>) -> Vec<String> {
 #[must_use]
 pub fn get_tool_by_name(registry: Arc<ComponentRegistry>, name: &str) -> Option<Arc<dyn Tool>> {
     registry.get_tool(name)
+}
+
+/// Register utility tools
+fn register_utility_tools(
+    registry: Arc<ComponentRegistry>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    register_tool(registry.clone(), "base64_encoder", Base64EncoderTool::new)?;
+    register_tool(registry.clone(), "calculator", CalculatorTool::new)?;
+    register_tool(registry.clone(), "data_validation", DataValidationTool::new)?;
+    register_tool(
+        registry.clone(),
+        "date_time_handler",
+        DateTimeHandlerTool::new,
+    )?;
+    register_tool(registry.clone(), "diff_calculator", DiffCalculatorTool::new)?;
+    register_tool(registry.clone(), "hash_calculator", || {
+        HashCalculatorTool::new(Default::default())
+    })?;
+    register_tool(registry.clone(), "template_engine", TemplateEngineTool::new)?;
+    register_tool(registry.clone(), "text_manipulator", || {
+        TextManipulatorTool::new(Default::default())
+    })?;
+    register_tool(registry, "uuid_generator", || {
+        UuidGeneratorTool::new(Default::default())
+    })?;
+    Ok(())
+}
+
+/// Register data processing tools
+fn register_data_processing_tools(
+    registry: Arc<ComponentRegistry>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    register_tool(registry.clone(), "csv_analyzer", || {
+        CsvAnalyzerTool::new(Default::default())
+    })?;
+    register_tool(registry.clone(), "json_processor", || {
+        JsonProcessorTool::new(Default::default())
+    })?;
+    register_tool_result(registry.clone(), "graphql_query", || {
+        GraphQLQueryTool::new(Default::default())
+    })?;
+    register_tool_result(registry, "http_request", || {
+        HttpRequestTool::new(Default::default())
+    })?;
+    Ok(())
+}
+
+/// Register file system tools
+fn register_file_system_tools(
+    registry: Arc<ComponentRegistry>,
+    file_sandbox: Arc<FileSandbox>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    register_tool(registry.clone(), "archive_handler", ArchiveHandlerTool::new)?;
+
+    // File converter with sandbox
+    let file_sandbox_converter = file_sandbox.clone();
+    register_tool_with_sandbox(
+        registry.clone(),
+        "file_converter",
+        file_sandbox_converter.clone(),
+        move || FileConverterTool::new(Default::default(), file_sandbox_converter),
+    )?;
+
+    register_tool(registry.clone(), "file_operations", || {
+        FileOperationsTool::new(Default::default())
+    })?;
+
+    // File search with sandbox
+    let file_sandbox_search = file_sandbox.clone();
+    register_tool_with_sandbox(
+        registry.clone(),
+        "file_search",
+        file_sandbox_search.clone(),
+        move || FileSearchTool::new(Default::default(), file_sandbox_search),
+    )?;
+
+    // File watcher with sandbox
+    let file_sandbox_watcher = file_sandbox;
+    register_tool_with_sandbox(
+        registry,
+        "file_watcher",
+        file_sandbox_watcher.clone(),
+        move || FileWatcherTool::new(Default::default(), file_sandbox_watcher),
+    )?;
+    Ok(())
+}
+
+/// Register system integration tools
+fn register_system_tools(
+    registry: Arc<ComponentRegistry>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    register_tool(registry.clone(), "environment_reader", || {
+        EnvironmentReaderTool::new(Default::default())
+    })?;
+    register_tool(registry.clone(), "process_executor", || {
+        ProcessExecutorTool::new(Default::default())
+    })?;
+    register_tool(registry.clone(), "service_checker", || {
+        ServiceCheckerTool::new(Default::default())
+    })?;
+    register_tool(registry, "system_monitor", || {
+        SystemMonitorTool::new(Default::default())
+    })?;
+    Ok(())
+}
+
+/// Register media processing tools
+fn register_media_tools(
+    registry: Arc<ComponentRegistry>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    register_tool(registry.clone(), "audio_processor", || {
+        AudioProcessorTool::new(Default::default())
+    })?;
+    register_tool(registry.clone(), "image_processor", || {
+        ImageProcessorTool::new(Default::default())
+    })?;
+    register_tool(registry, "video_processor", || {
+        VideoProcessorTool::new(Default::default())
+    })?;
+    Ok(())
+}
+
+/// Register search tools
+fn register_search_tools(
+    registry: Arc<ComponentRegistry>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    register_tool_result(registry, "web_search", || {
+        WebSearchTool::new(Default::default())
+    })?;
+    Ok(())
+}
+
+/// Register web tools
+fn register_web_tools(registry: Arc<ComponentRegistry>) -> Result<(), Box<dyn std::error::Error>> {
+    register_tool(registry.clone(), "url-analyzer", UrlAnalyzerTool::new)?;
+    register_tool(registry.clone(), "web-scraper", || {
+        WebScraperTool::new(Default::default())
+    })?;
+    register_tool(registry.clone(), "api-tester", ApiTesterTool::new)?;
+    register_tool(registry.clone(), "webhook-caller", WebhookCallerTool::new)?;
+    register_tool(registry.clone(), "webpage-monitor", WebpageMonitorTool::new)?;
+    register_tool(registry, "sitemap-crawler", SitemapCrawlerTool::new)?;
+    Ok(())
+}
+
+/// Register communication tools
+fn register_communication_tools(
+    registry: Arc<ComponentRegistry>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    register_tool_result(registry.clone(), "email-sender", || {
+        EmailSenderTool::new(Default::default())
+    })?;
+    register_tool_result(registry, "database-connector", || {
+        DatabaseConnectorTool::new(Default::default())
+    })?;
+    Ok(())
 }

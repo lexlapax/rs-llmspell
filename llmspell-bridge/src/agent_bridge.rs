@@ -113,11 +113,19 @@ impl AgentBridge {
     }
 
     /// Get agent information
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the agent type is not found
     pub async fn get_agent_info(&self, agent_type: &str) -> Result<AgentInfo> {
         self.discovery.get_agent_info(agent_type)
     }
 
     /// Create a new agent instance
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the agent instance already exists or creation fails
     pub async fn create_agent(
         &self,
         instance_name: &str,
@@ -148,7 +156,8 @@ impl AgentBridge {
         {
             let mut agents = self.active_agents.write().await;
             agents.insert(instance_name.to_string(), agent.clone());
-
+        }
+        {
             let mut machines = self.state_machines.write().await;
             machines.insert(instance_name.to_string(), state_machine);
         }
@@ -161,6 +170,10 @@ impl AgentBridge {
     }
 
     /// Create agent from template
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the template is not found or agent creation fails
     pub async fn create_from_template(
         &self,
         instance_name: &str,
@@ -191,7 +204,8 @@ impl AgentBridge {
         {
             let mut agents = self.active_agents.write().await;
             agents.insert(instance_name.to_string(), agent.clone());
-
+        }
+        {
             let mut machines = self.state_machines.write().await;
             machines.insert(instance_name.to_string(), state_machine);
         }
@@ -204,6 +218,10 @@ impl AgentBridge {
     }
 
     /// Execute an agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the agent is not found or execution fails
     pub async fn execute_agent(
         &self,
         instance_name: &str,
@@ -235,17 +253,21 @@ impl AgentBridge {
     }
 
     /// Remove an agent instance
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the agent instance is not found
     pub async fn remove_agent(&self, instance_name: &str) -> Result<()> {
         // Remove from active agents and state machines
         let removed = {
             let mut agents = self.active_agents.write().await;
-            let agent = agents.remove(instance_name);
+            agents.remove(instance_name)
+        };
 
+        {
             let mut machines = self.state_machines.write().await;
             machines.remove(instance_name);
-
-            agent
-        };
+        }
 
         if removed.is_none() {
             return Err(LLMSpellError::Component {
@@ -267,6 +289,10 @@ impl AgentBridge {
     }
 
     /// Get agent configuration
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the agent instance is not found
     pub async fn get_agent_config(&self, instance_name: &str) -> Result<serde_json::Value> {
         let agent =
             self.get_agent(instance_name)
@@ -310,6 +336,10 @@ impl AgentBridge {
     }
 
     /// Invoke a tool on behalf of an agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the agent instance or tool is not found, or if tool execution fails
     pub async fn invoke_tool_for_agent(
         &self,
         agent_instance: &str,
@@ -351,16 +381,14 @@ impl AgentBridge {
     /// Get tool metadata for discovery
     #[must_use]
     pub fn get_tool_metadata(&self, tool_name: &str) -> Option<serde_json::Value> {
-        if let Some(tool) = self.registry.get_tool(tool_name) {
+        self.registry.get_tool(tool_name).map(|tool| {
             let metadata = tool.metadata();
-            Some(serde_json::json!({
+            serde_json::json!({
                 "name": metadata.name,
                 "description": metadata.description,
                 "version": metadata.version,
-            }))
-        } else {
-            None
-        }
+            })
+        })
     }
 
     /// Get all tool metadata for bulk discovery
@@ -378,6 +406,10 @@ impl AgentBridge {
     // Monitoring & Lifecycle Methods
 
     /// Get metrics for an agent instance
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the agent instance is not found
     pub async fn get_agent_metrics(&self, agent_instance: &str) -> Result<AgentMetrics> {
         // Verify agent exists
         let _agent =
@@ -415,7 +447,7 @@ impl AgentBridge {
         let memory_usage_mb = perf_snapshot.resources.memory_bytes as f64 / (1024.0 * 1024.0);
         #[allow(clippy::cast_precision_loss)]
         let uptime_seconds = perf_snapshot.timestamp.timestamp() as f64;
-        
+
         metrics.insert(
             "performance".to_string(),
             serde_json::json!({
@@ -429,6 +461,10 @@ impl AgentBridge {
     }
 
     /// Get health status for an agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the agent instance is not found or health check fails
     pub async fn get_agent_health(&self, agent_instance: &str) -> Result<serde_json::Value> {
         // Verify agent exists
         let _agent =
@@ -452,6 +488,10 @@ impl AgentBridge {
     }
 
     /// Get performance report for an agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the agent instance is not found
     pub async fn get_agent_performance(&self, agent_instance: &str) -> Result<serde_json::Value> {
         // Verify agent exists
         let _agent =
@@ -473,6 +513,10 @@ impl AgentBridge {
     }
 
     /// Subscribe to events for an agent (returns event channel)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if event subscription setup fails
     pub fn subscribe_to_agent_events(
         &self,
         _agent_instance: &str,
@@ -487,12 +531,18 @@ impl AgentBridge {
     }
 
     /// Log an event for an agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the agent instance is not found or event logging fails
     pub async fn log_agent_event(
         &self,
         agent_instance: &str,
         event_type: &str,
         message: &str,
     ) -> Result<()> {
+        use llmspell_agents::monitoring::{LogEvent, LogLevel};
+
         // Verify agent exists
         let _agent =
             self.get_agent(agent_instance)
@@ -503,7 +553,6 @@ impl AgentBridge {
                 })?;
 
         // Create a LogEvent and log it
-        use llmspell_agents::monitoring::{LogEvent, LogLevel};
         let log_event = LogEvent {
             id: uuid::Uuid::new_v4().to_string(),
             timestamp: chrono::Utc::now(),
@@ -521,6 +570,10 @@ impl AgentBridge {
     }
 
     /// Configure alerts for an agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the agent instance is not found
     pub async fn configure_agent_alerts(
         &self,
         agent_instance: &str,
@@ -540,6 +593,10 @@ impl AgentBridge {
     }
 
     /// Get active alerts for an agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the agent instance is not found
     pub async fn get_agent_alerts(&self, agent_instance: &str) -> Result<Vec<serde_json::Value>> {
         // Verify agent exists
         let _agent =
@@ -557,6 +614,10 @@ impl AgentBridge {
     // State Machine Methods
 
     /// Get the current state of an agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the agent state machine is not found
     pub async fn get_agent_state(&self, agent_instance: &str) -> Result<AgentState> {
         let machines = self.state_machines.read().await;
         let state_machine =
@@ -571,6 +632,10 @@ impl AgentBridge {
     }
 
     /// Initialize an agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the agent state machine is not found or initialization fails
     pub async fn initialize_agent(&self, agent_instance: &str) -> Result<()> {
         let machines = self.state_machines.read().await;
         let state_machine =
@@ -591,6 +656,10 @@ impl AgentBridge {
     }
 
     /// Start an agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the agent state machine is not found or start fails
     pub async fn start_agent(&self, agent_instance: &str) -> Result<()> {
         let machines = self.state_machines.read().await;
         let state_machine =
@@ -611,6 +680,10 @@ impl AgentBridge {
     }
 
     /// Pause an agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the agent state machine is not found or pause fails
     pub async fn pause_agent(&self, agent_instance: &str) -> Result<()> {
         let machines = self.state_machines.read().await;
         let state_machine =
@@ -631,6 +704,10 @@ impl AgentBridge {
     }
 
     /// Resume an agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the agent state machine is not found or resume fails
     pub async fn resume_agent(&self, agent_instance: &str) -> Result<()> {
         let machines = self.state_machines.read().await;
         let state_machine =
@@ -651,6 +728,10 @@ impl AgentBridge {
     }
 
     /// Stop an agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the agent state machine is not found or stop fails
     pub async fn stop_agent(&self, agent_instance: &str) -> Result<()> {
         let machines = self.state_machines.read().await;
         let state_machine =
@@ -671,6 +752,10 @@ impl AgentBridge {
     }
 
     /// Terminate an agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the agent state machine is not found or termination fails
     pub async fn terminate_agent(&self, agent_instance: &str) -> Result<()> {
         let machines = self.state_machines.read().await;
         let state_machine =
@@ -691,6 +776,10 @@ impl AgentBridge {
     }
 
     /// Put agent in error state
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the agent state machine is not found or error state transition fails
     pub async fn error_agent(&self, agent_instance: &str, error_message: String) -> Result<()> {
         let machines = self.state_machines.read().await;
         let state_machine =
@@ -711,6 +800,10 @@ impl AgentBridge {
     }
 
     /// Attempt to recover agent from error
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the agent state machine is not found or recovery fails
     pub async fn recover_agent(&self, agent_instance: &str) -> Result<()> {
         let machines = self.state_machines.read().await;
         let state_machine =
@@ -731,6 +824,10 @@ impl AgentBridge {
     }
 
     /// Get state transition history
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the agent state machine is not found
     pub async fn get_agent_state_history(
         &self,
         agent_instance: &str,
@@ -762,6 +859,10 @@ impl AgentBridge {
     }
 
     /// Get last error for agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the agent state machine is not found
     pub async fn get_agent_last_error(&self, agent_instance: &str) -> Result<Option<String>> {
         let machines = self.state_machines.read().await;
         let state_machine =
@@ -776,6 +877,10 @@ impl AgentBridge {
     }
 
     /// Get recovery attempts count
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the agent state machine is not found
     pub async fn get_agent_recovery_attempts(&self, agent_instance: &str) -> Result<usize> {
         let machines = self.state_machines.read().await;
         let state_machine =
@@ -790,6 +895,10 @@ impl AgentBridge {
     }
 
     /// Check if agent is healthy
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the agent state machine is not found
     pub async fn is_agent_healthy(&self, agent_instance: &str) -> Result<bool> {
         let machines = self.state_machines.read().await;
         let state_machine =
@@ -804,6 +913,10 @@ impl AgentBridge {
     }
 
     /// Get state machine metrics
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the agent state machine is not found
     pub async fn get_agent_state_metrics(&self, agent_instance: &str) -> Result<serde_json::Value> {
         let machines = self.state_machines.read().await;
         let state_machine =
@@ -829,6 +942,10 @@ impl AgentBridge {
     // Context & Communication Methods
 
     /// Create a new execution context
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if context creation fails
     pub async fn create_context(&self, builder_config: serde_json::Value) -> Result<String> {
         let mut builder = ExecutionContextBuilder::new();
 
@@ -1133,6 +1250,10 @@ impl AgentBridge {
     }
 
     /// Clean up context
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the context is not found
     pub async fn remove_context(&self, context_id: &str) -> Result<()> {
         let mut contexts = self.contexts.write().await;
         contexts
@@ -1186,6 +1307,10 @@ impl AgentBridge {
     }
 
     /// List all agents with their capabilities
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if capability listing fails
     pub async fn list_agent_capabilities(&self) -> Result<serde_json::Value> {
         let agents = self.active_agents.read().await;
         let mut capabilities = serde_json::Map::new();
@@ -1214,6 +1339,10 @@ impl AgentBridge {
     }
 
     /// Get detailed agent information including composition metadata
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the agent is not found
     pub async fn get_agent_details(&self, agent_name: &str) -> Result<serde_json::Value> {
         let agent = self
             .get_agent(agent_name)
@@ -1330,6 +1459,10 @@ impl AgentBridge {
     }
 
     /// Enable dynamic agent discovery by type or capability
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if discovery fails
     pub async fn discover_agents_by_capability(&self, capability: &str) -> Result<Vec<String>> {
         let agents = self.active_agents.read().await;
         let mut matching_agents = Vec::new();
@@ -1360,6 +1493,10 @@ impl AgentBridge {
     }
 
     /// Get composition hierarchy for nested agents
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the agent is not found
     pub async fn get_composition_hierarchy(&self, agent_name: &str) -> Result<serde_json::Value> {
         let agent = self
             .get_agent(agent_name)
@@ -1388,6 +1525,10 @@ impl AgentBridge {
     }
 
     /// Save an agent's state
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the agent is not found or state saving fails
     pub async fn save_agent_state(&self, agent_name: &str) -> Result<()> {
         let state_manager =
             self.state_manager
@@ -1463,6 +1604,10 @@ impl AgentBridge {
     }
 
     /// Load an agent's state
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if state loading fails
     pub async fn load_agent_state(&self, agent_name: &str) -> Result<bool> {
         let state_manager =
             self.state_manager
@@ -1512,6 +1657,10 @@ impl AgentBridge {
     }
 
     /// Delete an agent's state
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if state deletion fails
     pub async fn delete_agent_state(&self, agent_name: &str) -> Result<()> {
         let state_manager =
             self.state_manager
@@ -1545,6 +1694,10 @@ impl AgentBridge {
     }
 
     /// List all saved agent states
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if listing fails
     pub async fn list_saved_agents(&self) -> Result<Vec<String>> {
         let state_manager =
             self.state_manager

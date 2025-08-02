@@ -24,6 +24,14 @@ impl ComponentRegistry {
     }
 
     /// Register an agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if an agent with the same name is already registered
+    ///
+    /// # Panics
+    ///
+    /// Panics if the agents lock is poisoned
     pub fn register_agent(&self, name: String, agent: Arc<dyn Agent>) -> Result<(), LLMSpellError> {
         let mut agents = self.agents.write().unwrap();
         if agents.contains_key(&name) {
@@ -33,10 +41,15 @@ impl ComponentRegistry {
             });
         }
         agents.insert(name, agent);
+        drop(agents); // Explicitly drop the lock
         Ok(())
     }
 
     /// Get an agent by name
+    ///
+    /// # Panics
+    ///
+    /// Panics if the agents lock is poisoned
     #[must_use]
     pub fn get_agent(&self, name: &str) -> Option<Arc<dyn Agent>> {
         let agents = self.agents.read().unwrap();
@@ -44,6 +57,10 @@ impl ComponentRegistry {
     }
 
     /// List all registered agents
+    ///
+    /// # Panics
+    ///
+    /// Panics if the agents lock is poisoned
     #[must_use]
     pub fn list_agents(&self) -> Vec<String> {
         let agents = self.agents.read().unwrap();
@@ -51,6 +68,14 @@ impl ComponentRegistry {
     }
 
     /// Register a tool
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a tool with the same name is already registered
+    ///
+    /// # Panics
+    ///
+    /// Panics if the tools lock is poisoned
     pub fn register_tool(&self, name: String, tool: Arc<dyn Tool>) -> Result<(), LLMSpellError> {
         let mut tools = self.tools.write().unwrap();
         if tools.contains_key(&name) {
@@ -60,10 +85,15 @@ impl ComponentRegistry {
             });
         }
         tools.insert(name, tool);
+        drop(tools); // Explicitly drop the lock
         Ok(())
     }
 
     /// Get a tool by name
+    ///
+    /// # Panics
+    ///
+    /// Panics if the tools lock is poisoned
     #[must_use]
     pub fn get_tool(&self, name: &str) -> Option<Arc<dyn Tool>> {
         let tools = self.tools.read().unwrap();
@@ -71,6 +101,10 @@ impl ComponentRegistry {
     }
 
     /// List all registered tools
+    ///
+    /// # Panics
+    ///
+    /// Panics if the tools lock is poisoned
     #[must_use]
     pub fn list_tools(&self) -> Vec<String> {
         let tools = self.tools.read().unwrap();
@@ -78,6 +112,14 @@ impl ComponentRegistry {
     }
 
     /// Register a workflow
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a workflow with the same name is already registered
+    ///
+    /// # Panics
+    ///
+    /// Panics if the workflows lock is poisoned
     pub fn register_workflow(
         &self,
         name: String,
@@ -91,10 +133,15 @@ impl ComponentRegistry {
             });
         }
         workflows.insert(name, workflow);
+        drop(workflows); // Explicitly drop the lock
         Ok(())
     }
 
     /// Get a workflow by name
+    ///
+    /// # Panics
+    ///
+    /// Panics if the workflows lock is poisoned
     #[must_use]
     pub fn get_workflow(&self, name: &str) -> Option<Arc<dyn Workflow>> {
         let workflows = self.workflows.read().unwrap();
@@ -102,6 +149,10 @@ impl ComponentRegistry {
     }
 
     /// List all registered workflows
+    ///
+    /// # Panics
+    ///
+    /// Panics if the workflows lock is poisoned
     #[must_use]
     pub fn list_workflows(&self) -> Vec<String> {
         let workflows = self.workflows.read().unwrap();

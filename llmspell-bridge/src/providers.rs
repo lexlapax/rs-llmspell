@@ -18,6 +18,10 @@ pub struct ProviderManager {
 
 impl ProviderManager {
     /// Create a new provider manager with configuration
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if provider registration fails
     pub async fn new(config: ProviderManagerConfig) -> Result<Self, LLMSpellError> {
         let core_manager = CoreProviderManager::new();
         let manager = Self {
@@ -144,6 +148,10 @@ impl ProviderManager {
     }
 
     /// Get a provider by name
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the provider is not found or not initialized
     pub async fn get_provider(
         &self,
         name: Option<&str>,
@@ -152,6 +160,10 @@ impl ProviderManager {
     }
 
     /// Get the default provider
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if no default provider is configured
     pub async fn get_default_provider(
         &self,
     ) -> Result<Arc<Box<dyn ProviderInstance>>, LLMSpellError> {
@@ -159,6 +171,10 @@ impl ProviderManager {
     }
 
     /// Set the default provider
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the provider name is not found
     pub async fn set_default_provider(&self, name: String) -> Result<(), LLMSpellError> {
         self.core_manager.set_default_provider(name).await
     }
@@ -167,6 +183,10 @@ impl ProviderManager {
     ///
     /// This is a bridge method that delegates to the core provider manager's
     /// `create_agent_from_spec` method. It supports the new "provider/model" syntax.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if provider creation or initialization fails
     pub async fn create_agent_from_spec(
         &self,
         spec: ModelSpecifier,
@@ -224,6 +244,10 @@ impl ProviderManager {
 
     /// Create an Arc to a new core provider manager with the same configuration
     /// This is needed for components that require ownership of the core manager
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if provider configuration or initialization fails
     pub async fn create_core_manager_arc(&self) -> Result<Arc<CoreProviderManager>, LLMSpellError> {
         // Create a new core manager
         let core_manager = CoreProviderManager::new();

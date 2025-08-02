@@ -31,6 +31,10 @@ pub struct EventBridge {
 
 impl EventBridge {
     /// Create a new `EventBridge` with default `EventBus`
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if EventBridge initialization fails
     pub async fn new(context: Arc<GlobalContext>) -> Result<Self> {
         let event_bus = Arc::new(EventBus::new());
 
@@ -52,6 +56,10 @@ impl EventBridge {
     }
 
     /// Publish an event to the event bus
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if event publication fails
     pub async fn publish_event(&self, event: UniversalEvent) -> Result<()> {
         self.event_bus
             .publish(event)
@@ -142,13 +150,14 @@ impl EventBridge {
 
     /// Get subscription breakdown by language
     fn get_subscriptions_by_language(&self) -> HashMap<String, usize> {
-        let subscriptions = self.subscriptions.read();
         let mut by_language = HashMap::new();
-
-        for handle in subscriptions.values() {
-            let language_str = format!("{:?}", handle.language);
-            *by_language.entry(language_str).or_insert(0) += 1;
-        }
+        {
+            let subscriptions = self.subscriptions.read();
+            for handle in subscriptions.values() {
+                let language_str = format!("{:?}", handle.language);
+                *by_language.entry(language_str).or_insert(0) += 1;
+            }
+        } // Explicitly drop the lock here
 
         by_language
     }

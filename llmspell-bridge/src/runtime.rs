@@ -115,6 +115,10 @@ impl ScriptRuntime {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if runtime initialization fails
     pub async fn new_with_lua(config: RuntimeConfig) -> Result<Self, LLMSpellError> {
         let lua_config = config.engines.lua.clone();
         let config_arc = Arc::new(config.clone());
@@ -124,6 +128,10 @@ impl ScriptRuntime {
     }
 
     /// Create a new runtime with JavaScript engine
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if runtime initialization fails
     pub async fn new_with_javascript(config: RuntimeConfig) -> Result<Self, LLMSpellError> {
         let js_config = config.engines.javascript.clone();
         let engine = EngineFactory::create_javascript_engine(&js_config)?;
@@ -131,6 +139,10 @@ impl ScriptRuntime {
     }
 
     /// Create a new runtime with a specific engine by name
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the engine is not found or runtime initialization fails
     pub async fn new_with_engine_name(
         engine_name: &str,
         config: RuntimeConfig,
@@ -182,11 +194,19 @@ impl ScriptRuntime {
     }
 
     /// Execute a script and return the output
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if script execution fails
     pub async fn execute_script(&self, script: &str) -> Result<ScriptOutput, LLMSpellError> {
         self.engine.execute_script(script).await
     }
 
     /// Execute a script with streaming output
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the engine doesn't support streaming or script execution fails
     pub async fn execute_script_streaming(
         &self,
         script: &str,
@@ -246,12 +266,18 @@ impl ScriptRuntime {
     }
 
     /// Update the execution context
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the context lock is poisoned
     pub fn set_execution_context(
         &self,
         context: crate::engine::ExecutionContext,
     ) -> Result<(), LLMSpellError> {
-        let mut ctx = self.execution_context.write().unwrap();
-        *ctx = context;
+        {
+            let mut ctx = self.execution_context.write().unwrap();
+            *ctx = context;
+        } // Explicitly drop the lock here
         Ok(())
     }
 }
@@ -282,6 +308,10 @@ impl Default for RuntimeConfig {
 
 impl RuntimeConfig {
     /// Get engine-specific configuration
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the engine is not found or configuration serialization fails
     pub fn get_engine_config(&self, engine_name: &str) -> Result<serde_json::Value, LLMSpellError> {
         match engine_name {
             "lua" => Ok(serde_json::to_value(&self.engines.lua)?),

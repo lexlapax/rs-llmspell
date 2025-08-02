@@ -32,6 +32,14 @@ use tracing::{debug, error, trace};
 /// - `Ok(T)` on success
 /// - `Err(mlua::Error)` on failure (including panics, timeouts, and operation errors)
 ///
+/// # Errors
+///
+/// Returns an error if:
+/// - The async operation fails
+/// - The operation times out
+/// - A panic occurs during execution
+/// - The tokio runtime is not available
+///
 /// # Example
 /// ```rust,no_run
 /// # use llmspell_bridge::lua::sync_utils::block_on_async;
