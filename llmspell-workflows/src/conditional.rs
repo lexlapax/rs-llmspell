@@ -132,6 +132,13 @@ pub struct ConditionalWorkflowConfig {
     pub short_circuit_evaluation: bool,
 }
 
+impl ConditionalWorkflowConfig {
+    /// Create a new builder for ConditionalWorkflowConfig
+    pub fn builder() -> ConditionalConfigBuilder {
+        ConditionalConfigBuilder::new()
+    }
+}
+
 impl Default for ConditionalWorkflowConfig {
     fn default() -> Self {
         Self {
@@ -141,6 +148,78 @@ impl Default for ConditionalWorkflowConfig {
             condition_evaluation_timeout_ms: 1000, // 1 second
             short_circuit_evaluation: true,
         }
+    }
+}
+
+/// Type alias for consistency with other workflow configs
+pub type ConditionalConfig = ConditionalWorkflowConfig;
+
+/// Builder for ConditionalWorkflowConfig
+pub struct ConditionalConfigBuilder {
+    config: ConditionalWorkflowConfig,
+}
+
+impl ConditionalConfigBuilder {
+    /// Create a new builder with default configuration
+    pub fn new() -> Self {
+        Self {
+            config: ConditionalWorkflowConfig::default(),
+        }
+    }
+
+    /// Set whether to execute all matching branches or just the first one
+    pub fn execute_all_matching(mut self, enabled: bool) -> Self {
+        self.config.execute_all_matching = enabled;
+        self
+    }
+
+    /// Set whether to execute the default branch if no conditions match
+    pub fn execute_default_on_no_match(mut self, enabled: bool) -> Self {
+        self.config.execute_default_on_no_match = enabled;
+        self
+    }
+
+    /// Set maximum number of branches to evaluate
+    pub fn max_branches_to_evaluate(mut self, max: usize) -> Self {
+        self.config.max_branches_to_evaluate = max;
+        self
+    }
+
+    /// Set timeout for condition evaluation in milliseconds
+    pub fn condition_evaluation_timeout_ms(mut self, timeout_ms: u64) -> Self {
+        self.config.condition_evaluation_timeout_ms = timeout_ms;
+        self
+    }
+
+    /// Set whether to short-circuit evaluation (stop on first true condition)
+    pub fn short_circuit_evaluation(mut self, enabled: bool) -> Self {
+        self.config.short_circuit_evaluation = enabled;
+        self
+    }
+
+    /// Build the final ConditionalWorkflowConfig with validation
+    pub fn build(self) -> Result<ConditionalWorkflowConfig> {
+        if self.config.max_branches_to_evaluate == 0 {
+            return Err(LLMSpellError::Validation {
+                message: "max_branches_to_evaluate must be greater than 0".to_string(),
+                field: Some("max_branches_to_evaluate".to_string()),
+            });
+        }
+
+        if self.config.condition_evaluation_timeout_ms == 0 {
+            return Err(LLMSpellError::Validation {
+                message: "condition_evaluation_timeout_ms must be greater than 0".to_string(),
+                field: Some("condition_evaluation_timeout_ms".to_string()),
+            });
+        }
+
+        Ok(self.config)
+    }
+}
+
+impl Default for ConditionalConfigBuilder {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

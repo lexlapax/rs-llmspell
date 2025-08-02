@@ -88,6 +88,13 @@ pub struct ParallelConfig {
     pub continue_on_optional_failure: bool,
 }
 
+impl ParallelConfig {
+    /// Create a new builder for ParallelConfig
+    pub fn builder() -> ParallelConfigBuilder {
+        ParallelConfigBuilder::new()
+    }
+}
+
 impl Default for ParallelConfig {
     fn default() -> Self {
         Self {
@@ -96,6 +103,61 @@ impl Default for ParallelConfig {
             timeout: None,
             continue_on_optional_failure: true,
         }
+    }
+}
+
+/// Builder for ParallelConfig
+pub struct ParallelConfigBuilder {
+    config: ParallelConfig,
+}
+
+impl ParallelConfigBuilder {
+    /// Create a new builder with default configuration
+    pub fn new() -> Self {
+        Self {
+            config: ParallelConfig::default(),
+        }
+    }
+
+    /// Set maximum number of branches to execute concurrently
+    pub fn max_concurrency(mut self, concurrency: usize) -> Self {
+        self.config.max_concurrency = concurrency;
+        self
+    }
+
+    /// Set whether to fail fast on first error
+    pub fn fail_fast(mut self, enabled: bool) -> Self {
+        self.config.fail_fast = enabled;
+        self
+    }
+
+    /// Set timeout for the entire parallel execution
+    pub fn timeout(mut self, timeout: Option<Duration>) -> Self {
+        self.config.timeout = timeout;
+        self
+    }
+
+    /// Set whether to continue if optional branches fail
+    pub fn continue_on_optional_failure(mut self, enabled: bool) -> Self {
+        self.config.continue_on_optional_failure = enabled;
+        self
+    }
+
+    /// Build the final ParallelConfig with validation
+    pub fn build(self) -> Result<ParallelConfig> {
+        if self.config.max_concurrency == 0 {
+            return Err(LLMSpellError::Validation {
+                message: "max_concurrency must be greater than 0".to_string(),
+                field: Some("max_concurrency".to_string()),
+            });
+        }
+        Ok(self.config)
+    }
+}
+
+impl Default for ParallelConfigBuilder {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

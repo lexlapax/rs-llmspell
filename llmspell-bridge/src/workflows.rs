@@ -5,6 +5,7 @@ use crate::standardized_workflows::StandardizedWorkflowFactory;
 use crate::workflow_performance::{ExecutionCache, OptimizedConverter, PerformanceMetrics};
 use crate::ComponentRegistry;
 use llmspell_core::{LLMSpellError, Result};
+use llmspell_workflows::conditional::ConditionalConfig;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -259,10 +260,9 @@ async fn create_conditional_workflow(params: serde_json::Value) -> Result<impl W
     let mut builder = ConditionalWorkflowBuilder::new(name.clone());
 
     // Configure to execute default branch if no conditions match
-    let config = llmspell_workflows::ConditionalWorkflowConfig {
-        execute_default_on_no_match: true,
-        ..Default::default()
-    };
+    let config = ConditionalConfig::builder()
+        .execute_default_on_no_match(true)
+        .build()?;
     builder = builder.with_conditional_config(config);
 
     // Parse branches - support both array and object formats

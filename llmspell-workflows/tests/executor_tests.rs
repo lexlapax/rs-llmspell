@@ -72,7 +72,9 @@ mod tests {
         let workflow = factory.create_workflow(params).await.unwrap();
         let input = WorkflowInput::new(serde_json::json!({}));
         let mut context = llmspell_workflows::executor::ExecutionContext::new("test-exec-123");
-        context.metadata.insert("test_key".to_string(), "test_value".to_string());
+        context
+            .metadata
+            .insert("test_key".to_string(), "test_value".to_string());
 
         let output = executor
             .execute_with_context(workflow, input, context)
@@ -115,7 +117,10 @@ mod tests {
             create_test_workflow_step("step2"),
             create_test_workflow_step("step3"),
         ];
-        let workflow = Arc::new(create_test_sequential_workflow_with_steps("long_workflow", steps));
+        let workflow = Arc::new(create_test_sequential_workflow_with_steps(
+            "long_workflow",
+            steps,
+        ));
 
         let input = WorkflowInput::new(serde_json::json!({"delay_ms": 100}));
 
@@ -155,13 +160,16 @@ mod tests {
         let input = WorkflowInput::default();
 
         // Execute workflow
-        let output = executor.execute_workflow(workflow.clone(), input).await.unwrap();
+        let output = executor
+            .execute_workflow(workflow.clone(), input)
+            .await
+            .unwrap();
         assert!(output.success);
 
         // Get metrics
         let exec_id = format!("exec_{}", workflow.metadata().name);
         let metrics = executor.get_metrics(&exec_id).await.unwrap();
-        
+
         // Metrics might not be available for very short executions
         if let Some(metrics) = metrics {
             assert!(metrics.duration.as_millis() > 0);
@@ -284,7 +292,7 @@ mod tests {
     #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
     async fn test_multiple_hooks() {
         let executor = DefaultWorkflowExecutor::new();
-        
+
         let hook1 = Arc::new(TestExecutionHook::new());
         let hook2 = Arc::new(TestExecutionHook::new());
 

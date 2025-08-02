@@ -23,11 +23,8 @@ mod tests {
             "steps": []
         });
 
-        let workflow_id = bridge
-            .create_workflow("sequential", params)
-            .await
-            .unwrap();
-        
+        let workflow_id = bridge.create_workflow("sequential", params).await.unwrap();
+
         assert!(workflow_id.starts_with("workflow_"));
 
         // List active workflows
@@ -79,7 +76,7 @@ mod tests {
             .unwrap();
 
         assert!(result["success"].as_bool().unwrap_or(false));
-        
+
         // Workflow should not be in active list
         let active = bridge.list_active_workflows().await;
         assert_eq!(active.len(), 0);
@@ -104,7 +101,10 @@ mod tests {
             .await
             .unwrap();
 
-        bridge.execute_workflow(&workflow_id, json!({})).await.unwrap();
+        bridge
+            .execute_workflow(&workflow_id, json!({}))
+            .await
+            .unwrap();
 
         // Check updated metrics
         let metrics = bridge.get_bridge_metrics().await;
@@ -158,10 +158,8 @@ mod tests {
         let bridge = WorkflowBridge::new(registry);
 
         // Try to execute non-existent workflow
-        let result = bridge
-            .execute_workflow("non_existent_id", json!({}))
-            .await;
-        
+        let result = bridge.execute_workflow("non_existent_id", json!({})).await;
+
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(err.to_string().contains("No active workflow"));
@@ -193,7 +191,7 @@ mod tests {
         // Check history
         let history = bridge.get_execution_history().await;
         assert_eq!(history.len(), 5);
-        
+
         // All should be successful
         for record in &history {
             assert!(record.success);
@@ -217,24 +215,24 @@ mod tests {
 
         // Create multiple workflows
         let mut handles = vec![];
-        
+
         for i in 0..3 {
             let bridge_clone = bridge.clone();
             let handle = tokio::spawn(async move {
                 let params = json!({
                     "name": format!("concurrent_{}", i)
                 });
-                
+
                 let workflow_id = bridge_clone
                     .create_workflow("sequential", params)
                     .await
                     .unwrap();
-                
+
                 let result = bridge_clone
                     .execute_workflow(&workflow_id, json!({"index": i}))
                     .await
                     .unwrap();
-                
+
                 bridge_clone.remove_workflow(&workflow_id).await.unwrap();
                 result
             });

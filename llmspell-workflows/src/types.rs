@@ -204,6 +204,35 @@ impl WorkflowConfig {
     pub fn builder() -> WorkflowConfigBuilder {
         WorkflowConfigBuilder::new()
     }
+
+    /// Create a fast configuration preset (minimal retries, short timeouts)
+    pub fn fast() -> Self {
+        Self {
+            max_execution_time: Some(Duration::from_secs(60)), // 1 minute
+            default_step_timeout: Duration::from_secs(10),
+            max_retry_attempts: 1,
+            retry_delay_ms: 500,
+            exponential_backoff: false,
+            continue_on_error: false,
+            default_error_strategy: crate::traits::ErrorStrategy::FailFast,
+        }
+    }
+
+    /// Create a robust configuration preset (more retries, longer timeouts, continue on error)
+    pub fn robust() -> Self {
+        Self {
+            max_execution_time: Some(Duration::from_secs(1800)), // 30 minutes
+            default_step_timeout: Duration::from_secs(120),
+            max_retry_attempts: 5,
+            retry_delay_ms: 2000,
+            exponential_backoff: true,
+            continue_on_error: true,
+            default_error_strategy: crate::traits::ErrorStrategy::Retry {
+                max_attempts: 5,
+                backoff_ms: 2000,
+            },
+        }
+    }
 }
 
 impl Default for WorkflowConfig {
@@ -274,6 +303,19 @@ impl WorkflowConfigBuilder {
     pub fn default_error_strategy(mut self, strategy: crate::traits::ErrorStrategy) -> Self {
         self.config.default_error_strategy = strategy;
         self
+    }
+
+    /// Convenience method for setting retry strategy with common patterns
+    pub fn retry_strategy(mut self, max_attempts: u32, delay_ms: u64, exponential: bool) -> Self {
+        self.config.max_retry_attempts = max_attempts;
+        self.config.retry_delay_ms = delay_ms;
+        self.config.exponential_backoff = exponential;
+        self
+    }
+
+    /// Convenience method alias for default_step_timeout
+    pub fn default_timeout(self, duration: Duration) -> Self {
+        self.default_step_timeout(duration)
     }
 
     /// Build the final WorkflowConfig

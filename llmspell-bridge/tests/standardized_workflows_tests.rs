@@ -14,7 +14,7 @@ mod tests {
     #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
     async fn test_standardized_sequential_workflow() {
         let factory = StandardizedWorkflowFactory::new();
-        
+
         let params = json!({
             "name": "bridge_sequential",
             "timeout": 10000,
@@ -45,7 +45,7 @@ mod tests {
     #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
     async fn test_standardized_parallel_workflow() {
         let factory = StandardizedWorkflowFactory::new();
-        
+
         let params = json!({
             "name": "bridge_parallel",
             "max_concurrency": 4,
@@ -73,7 +73,7 @@ mod tests {
     #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
     async fn test_standardized_conditional_workflow() {
         let factory = StandardizedWorkflowFactory::new();
-        
+
         let params = json!({
             "name": "bridge_conditional",
             "timeout": 3000
@@ -87,7 +87,10 @@ mod tests {
         assert_eq!(workflow.name(), "bridge_conditional");
         assert_eq!(workflow.workflow_type(), "conditional");
 
-        let result = workflow.execute(json!({"condition": "test"})).await.unwrap();
+        let result = workflow
+            .execute(json!({"condition": "test"}))
+            .await
+            .unwrap();
         assert!(result.is_object());
     }
 
@@ -97,7 +100,7 @@ mod tests {
     #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
     async fn test_standardized_loop_workflow() {
         let factory = StandardizedWorkflowFactory::new();
-        
+
         // Test with collection iterator
         let params = json!({
             "name": "bridge_loop_collection",
@@ -106,10 +109,7 @@ mod tests {
             "continue_on_error": true
         });
 
-        let workflow = factory
-            .create_from_type_json("loop", params)
-            .await
-            .unwrap();
+        let workflow = factory.create_from_type_json("loop", params).await.unwrap();
 
         assert_eq!(workflow.name(), "bridge_loop_collection");
         assert_eq!(workflow.workflow_type(), "loop");
@@ -121,13 +121,10 @@ mod tests {
             "aggregation": "last_only"
         });
 
-        let workflow = factory
-            .create_from_type_json("loop", params)
-            .await
-            .unwrap();
+        let workflow = factory.create_from_type_json("loop", params).await.unwrap();
 
         assert_eq!(workflow.name(), "bridge_loop_range");
-        
+
         // Test with explicit iterator
         let params = json!({
             "name": "bridge_loop_explicit",
@@ -139,10 +136,7 @@ mod tests {
             }
         });
 
-        let workflow = factory
-            .create_from_type_json("loop", params)
-            .await
-            .unwrap();
+        let workflow = factory.create_from_type_json("loop", params).await.unwrap();
 
         assert_eq!(workflow.name(), "bridge_loop_explicit");
     }
@@ -154,7 +148,7 @@ mod tests {
     fn test_list_workflow_types() {
         let factory = StandardizedWorkflowFactory::new();
         let types = factory.list_workflow_types();
-        
+
         assert_eq!(types.len(), 4);
         assert!(types.contains(&"sequential".to_string()));
         assert!(types.contains(&"parallel".to_string()));
@@ -168,7 +162,7 @@ mod tests {
     #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
     async fn test_workflow_with_default_name() {
         let factory = StandardizedWorkflowFactory::new();
-        
+
         // Don't provide name, should use workflow type as default
         let params = json!({
             "timeout": 1000
@@ -188,14 +182,12 @@ mod tests {
     #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
     async fn test_unknown_workflow_type() {
         let factory = StandardizedWorkflowFactory::new();
-        
+
         let params = json!({
             "name": "unknown"
         });
 
-        let result = factory
-            .create_from_type_json("unknown_type", params)
-            .await;
+        let result = factory.create_from_type_json("unknown_type", params).await;
 
         assert!(result.is_err());
         let err = result.unwrap_err();
@@ -208,7 +200,7 @@ mod tests {
     #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
     async fn test_workflow_output_format() {
         let factory = StandardizedWorkflowFactory::new();
-        
+
         let params = json!({
             "name": "output_test"
         });
@@ -219,7 +211,7 @@ mod tests {
             .unwrap();
 
         let result = workflow.execute(json!({})).await.unwrap();
-        
+
         // Verify output format matches expected structure
         assert!(result.get("success").is_some());
         assert!(result.get("output").is_some());

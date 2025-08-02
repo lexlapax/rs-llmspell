@@ -48,7 +48,7 @@ pub trait WorkflowFactory: Send + Sync {
 
     /// List available workflow types
     fn available_types(&self) -> Vec<WorkflowType>;
-    
+
     /// List available workflow types as strings
     fn list_workflow_types(&self) -> Vec<String> {
         self.available_types()
@@ -73,7 +73,7 @@ impl DefaultWorkflowFactory {
     pub fn new() -> Self {
         Self
     }
-    
+
     /// Create workflow from string type name (convenience method)
     pub async fn create_from_type(
         &self,
@@ -94,14 +94,14 @@ impl DefaultWorkflowFactory {
                 })
             }
         };
-        
+
         let params = WorkflowParams {
             name,
             workflow_type,
             config,
             type_config,
         };
-        
+
         self.create_workflow(params).await
     }
 }

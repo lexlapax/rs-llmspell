@@ -97,6 +97,118 @@ pub struct LoopConfig {
     pub iteration_delay: Option<Duration>,
 }
 
+impl LoopConfig {
+    /// Create a new builder for LoopConfig
+    pub fn builder() -> LoopConfigBuilder {
+        LoopConfigBuilder::new()
+    }
+}
+
+/// Builder for LoopConfig
+pub struct LoopConfigBuilder {
+    iterator: Option<LoopIterator>,
+    body: Vec<TraitWorkflowStep>,
+    break_conditions: Vec<BreakCondition>,
+    aggregation: ResultAggregation,
+    continue_on_error: bool,
+    timeout: Option<Duration>,
+    iteration_delay: Option<Duration>,
+}
+
+impl LoopConfigBuilder {
+    /// Create a new builder
+    pub fn new() -> Self {
+        Self {
+            iterator: None,
+            body: Vec::new(),
+            break_conditions: Vec::new(),
+            aggregation: ResultAggregation::CollectAll,
+            continue_on_error: false,
+            timeout: None,
+            iteration_delay: None,
+        }
+    }
+
+    /// Set the iterator configuration
+    pub fn iterator(mut self, iterator: LoopIterator) -> Self {
+        self.iterator = Some(iterator);
+        self
+    }
+
+    /// Add a step to the loop body
+    pub fn add_step(mut self, step: TraitWorkflowStep) -> Self {
+        self.body.push(step);
+        self
+    }
+
+    /// Set all body steps at once
+    pub fn body(mut self, steps: Vec<TraitWorkflowStep>) -> Self {
+        self.body = steps;
+        self
+    }
+
+    /// Add a break condition
+    pub fn add_break_condition(mut self, condition: BreakCondition) -> Self {
+        self.break_conditions.push(condition);
+        self
+    }
+
+    /// Set the result aggregation strategy
+    pub fn aggregation(mut self, aggregation: ResultAggregation) -> Self {
+        self.aggregation = aggregation;
+        self
+    }
+
+    /// Set whether to continue on iteration errors
+    pub fn continue_on_error(mut self, enabled: bool) -> Self {
+        self.continue_on_error = enabled;
+        self
+    }
+
+    /// Set timeout for the entire loop
+    pub fn timeout(mut self, timeout: Option<Duration>) -> Self {
+        self.timeout = timeout;
+        self
+    }
+
+    /// Set delay between iterations
+    pub fn iteration_delay(mut self, delay: Option<Duration>) -> Self {
+        self.iteration_delay = delay;
+        self
+    }
+
+    /// Build the final LoopConfig with validation
+    pub fn build(self) -> Result<LoopConfig> {
+        let iterator = self.iterator.ok_or_else(|| LLMSpellError::Validation {
+            message: "LoopConfig requires an iterator".to_string(),
+            field: Some("iterator".to_string()),
+        })?;
+
+        if self.body.is_empty() {
+            return Err(LLMSpellError::Validation {
+                message: "LoopConfig requires at least one body step".to_string(),
+                field: Some("body".to_string()),
+            });
+        }
+
+        Ok(LoopConfig {
+            iterator,
+            body: self.body,
+            break_conditions: self.break_conditions,
+            aggregation: self.aggregation,
+            continue_on_error: self.continue_on_error,
+            timeout: self.timeout,
+            iteration_delay: self.iteration_delay,
+        })
+    }
+}
+
+impl Default for LoopConfigBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Loop workflow result
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LoopWorkflowResult {
