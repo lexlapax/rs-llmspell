@@ -34,6 +34,7 @@ futures = "0.3"
 default = []
 
 [dev-dependencies]
+llmspell-testing = { path = "../llmspell-testing" }
 tokio-test = "0.4"
 criterion = "0.5"
 mockall = "0.12"

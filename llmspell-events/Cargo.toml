@@ -28,6 +28,7 @@ parking_lot = "0.12"
 futures = "0.3"
 
 [dev-dependencies]
+llmspell-testing = { path = "../llmspell-testing" }
 tokio-test = "0.4"
 criterion = "0.5"
 proptest = "1.4"

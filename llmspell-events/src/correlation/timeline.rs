@@ -614,12 +614,11 @@ mod tests {
     use super::*;
     use crate::correlation::EventCorrelationTracker;
     use crate::universal_event::{Language, UniversalEvent};
+    use llmspell_testing::event_helpers::create_test_event_with_correlation;
     use serde_json::Value;
 
     fn create_test_event(event_type: &str, correlation_id: Uuid) -> UniversalEvent {
-        let mut event = UniversalEvent::new(event_type, Value::Null, Language::Rust);
-        event.metadata.correlation_id = correlation_id;
-        event
+        create_test_event_with_correlation(event_type, correlation_id)
     }
     #[test]
     fn test_timeline_entry_creation() {

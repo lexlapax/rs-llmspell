@@ -383,11 +383,8 @@ impl From<String> for SubscribeError {
 mod tests {
     use super::*;
     use crate::universal_event::{Language, UniversalEvent};
+    use llmspell_testing::event_helpers::create_test_event;
     use serde_json::Value;
-
-    fn create_test_event(event_type: &str) -> UniversalEvent {
-        UniversalEvent::new(event_type, Value::Null, Language::Rust)
-    }
     #[tokio::test]
     async fn test_basic_pub_sub() {
         let bus = EventBus::new();

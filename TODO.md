@@ -197,30 +197,32 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
      - [x] Session test helpers are domain-specific (not duplicates)
      - [x] Run tests: `cargo test -p llmspell-sessions` ✅
    
-   **Phase 4: Infrastructure Tests Consolidation** (1.5 hours)
-   - [ ] **llmspell-hooks** (35+ test files):
-     - [ ] Consolidate hook test utilities
-     - [ ] Remove duplicate circuit breaker test helpers
-     - [ ] Update rate limiter test patterns
-     - [ ] Run tests: `cargo test -p llmspell-hooks`
-   - [ ] **llmspell-events** (20+ test files):
-     - [ ] Consolidate event test utilities
-     - [ ] Remove duplicate event emitter mocks
-     - [ ] Update correlation test helpers
-     - [ ] Run tests: `cargo test -p llmspell-events`
+   **Phase 4: Infrastructure Tests Consolidation** (1.5 hours) ✅ **COMPLETED**
+   - [x] **llmspell-hooks** (35+ test files):
+     - [x] Add llmspell-testing to dev-dependencies
+     - [x] Consolidate hook test utilities (created hook_helpers.rs)
+     - [x] Update 6 files with create_test_context functions
+     - [x] Circuit breaker helpers are part of executor, not duplicated
+     - [x] Run tests: `cargo test -p llmspell-hooks` ✅
+   - [x] **llmspell-events** (20+ test files):
+     - [x] Add llmspell-testing to dev-dependencies
+     - [x] Consolidate event test utilities (created event_helpers.rs)
+     - [x] Update bus.rs, stream.rs to use centralized helpers
+     - [x] Update correlation test helpers (timeline.rs, query.rs)
+     - [x] Run tests: `cargo test -p llmspell-events` ✅
    
-   **Phase 5: Bridge & Workflow Tests Consolidation** (1.5 hours)
+   **Phase 5: Workflow & Bridge Tests Consolidation** (1.5 hours)
+   - [ ] **llmspell-workflows** (25+ test files):
+     - [ ] Update workflow test utilities
+     - [ ] Remove duplicate workflow builder helpers
+     - [ ] Consolidate execution test patterns
+     - [ ] Run tests: `cargo test -p llmspell-workflows`
    - [ ] **llmspell-bridge** (40+ test files):
      - [ ] Update Lua test utilities
      - [ ] Update JavaScript test utilities
      - [ ] Remove duplicate script engine setup
      - [ ] Consolidate global object test helpers
      - [ ] Run tests: `cargo test -p llmspell-bridge`
-   - [ ] **llmspell-workflows** (25+ test files):
-     - [ ] Update workflow test utilities
-     - [ ] Remove duplicate workflow builder helpers
-     - [ ] Consolidate execution test patterns
-     - [ ] Run tests: `cargo test -p llmspell-workflows`
    
    **Phase 6: Final Verification** (30 min)
    - [ ] Run workspace-wide duplicate check: `./scripts/find-duplicate-test-utils.sh`

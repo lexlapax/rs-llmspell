@@ -384,13 +384,13 @@ impl Default for Cache {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use llmspell_testing::hook_helpers::create_test_hook_context;
     use crate::types::{ComponentId, ComponentType, HookPoint};
     use std::thread;
     use std::time::Duration as StdDuration;
 
     fn create_test_context() -> HookContext {
-        let component_id = ComponentId::new(ComponentType::System, "test".to_string());
-        HookContext::new(HookPoint::SystemStartup, component_id)
+        create_test_hook_context()
     }
     #[test]
     fn test_cache_key_generation() {
