@@ -33,7 +33,7 @@ impl AgentDiscovery {
     }
 
     /// List available agent types
-    pub async fn list_agent_types(&self) -> Vec<String> {
+    pub fn list_agent_types(&self) -> Vec<String> {
         // Use the templates from factory as agent types
         self.factory
             .list_templates()
@@ -43,7 +43,7 @@ impl AgentDiscovery {
     }
 
     /// Get available templates from the global registry
-    pub async fn list_templates(&self) -> Vec<String> {
+    pub fn list_templates(&self) -> Vec<String> {
         // For now, use the factory's templates
         self.factory
             .list_templates()
@@ -53,6 +53,10 @@ impl AgentDiscovery {
     }
 
     /// Create an agent by type
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the configuration is invalid or agent creation fails
     pub async fn create_agent(
         &self,
         _agent_type: &str,
@@ -77,6 +81,10 @@ impl AgentDiscovery {
     }
 
     /// Create an agent from a template
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the template is not found or agent creation fails
     pub async fn create_from_template(
         &self,
         template_name: &str,
@@ -93,6 +101,10 @@ impl AgentDiscovery {
     }
 
     /// Get or create a cached agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if agent creation fails
     pub async fn get_or_create_agent(
         &self,
         name: &str,
@@ -132,7 +144,12 @@ impl AgentDiscovery {
     }
 
     /// Get agent metadata
-    pub async fn get_agent_info(&self, agent_type: &str) -> Result<AgentInfo> {
+    /// Get information about an agent type
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the agent type is not found
+    pub fn get_agent_info(&self, agent_type: &str) -> Result<AgentInfo> {
         // For now, return basic info since we don't have template details
         Ok(AgentInfo {
             name: agent_type.to_string(),

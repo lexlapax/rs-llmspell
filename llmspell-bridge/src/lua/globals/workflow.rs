@@ -101,7 +101,8 @@ fn _parse_error_strategy(strategy: &str) -> ErrorStrategy {
             max_attempts: 3,
             backoff_ms: 1000,
         },
-        "fail_fast" | "failfast" | _ => ErrorStrategy::FailFast,
+        "fail_fast" | "failfast" => ErrorStrategy::FailFast,
+        _ => ErrorStrategy::FailFast,
     }
 }
 
@@ -956,7 +957,9 @@ pub fn inject_workflow_global(
             let workflows = block_on_async::<_, Vec<(String, WorkflowInfo)>, LLMSpellError>(
                 "workflow_list",
                 async move {
-                    Ok::<Vec<(String, WorkflowInfo)>, LLMSpellError>(bridge.list_workflows().await)
+                    Ok::<Vec<(String, WorkflowInfo)>, LLMSpellError>(
+                        bridge.get_all_workflow_info().await,
+                    )
                 },
                 None,
             )?;
@@ -987,7 +990,7 @@ pub fn inject_workflow_global(
                 let info = block_on_async::<_, Option<WorkflowInfo>, LLMSpellError>(
                     "workflow_get_info",
                     async move {
-                        let workflows = bridge.list_workflows().await;
+                        let workflows = bridge.get_all_workflow_info().await;
                         Ok::<Option<WorkflowInfo>, LLMSpellError>(
                             workflows
                                 .into_iter()
@@ -1065,7 +1068,7 @@ pub fn inject_workflow_global(
                 "workflow_clear_list",
                 async move {
                     Ok::<Vec<(String, WorkflowInfo)>, LLMSpellError>(
-                        bridge_for_list.list_workflows().await,
+                        bridge_for_list.get_all_workflow_info().await,
                     )
                 },
                 None,

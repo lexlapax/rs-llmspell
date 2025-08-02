@@ -12,6 +12,10 @@ pub struct EngineFactory;
 
 impl EngineFactory {
     /// Create a Lua engine with the given configuration
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an error if Lua feature is not enabled or engine creation fails
     pub fn create_lua_engine(
         config: &LuaConfig,
     ) -> Result<Box<dyn ScriptEngineBridge>, LLMSpellError> {
@@ -19,6 +23,10 @@ impl EngineFactory {
     }
 
     /// Create a Lua engine with the given configuration and runtime config
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an error if Lua feature is not enabled or engine creation fails
     pub fn create_lua_engine_with_runtime(
         config: &LuaConfig,
         runtime_config: Option<Arc<crate::runtime::RuntimeConfig>>,
@@ -42,6 +50,10 @@ impl EngineFactory {
     }
 
     /// Create a JavaScript engine with the given configuration
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an error if JavaScript feature is not enabled or engine creation fails
     #[allow(unused_variables)]
     pub fn create_javascript_engine(
         config: &JSConfig,

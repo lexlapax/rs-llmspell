@@ -46,7 +46,9 @@ impl InjectionCache {
         if total == 0 {
             0.0
         } else {
-            hits as f64 / total as f64
+            #[allow(clippy::cast_precision_loss)]
+            let rate = hits as f64 / total as f64;
+            rate
         }
     }
 
@@ -106,13 +108,13 @@ impl GlobalInjector {
                     source: Some(Box::new(e)),
                 })?;
 
-            let elapsed = global_start.elapsed().as_micros() as u64;
+            let elapsed = u64::try_from(global_start.elapsed().as_micros()).unwrap_or(u64::MAX);
             metrics
                 .per_global_times
                 .insert(metadata.name.clone(), elapsed);
         }
 
-        metrics.total_injection_time_us = start.elapsed().as_micros() as u64;
+        metrics.total_injection_time_us = u64::try_from(start.elapsed().as_micros()).unwrap_or(u64::MAX);
         metrics.globals_injected = globals.len();
         metrics.cache_hit_rate = self.cache.hit_rate();
 
@@ -148,13 +150,13 @@ impl GlobalInjector {
                     source: Some(Box::new(e)),
                 })?;
 
-            let elapsed = global_start.elapsed().as_micros() as u64;
+            let elapsed = u64::try_from(global_start.elapsed().as_micros()).unwrap_or(u64::MAX);
             metrics
                 .per_global_times
                 .insert(metadata.name.clone(), elapsed);
         }
 
-        metrics.total_injection_time_us = start.elapsed().as_micros() as u64;
+        metrics.total_injection_time_us = u64::try_from(start.elapsed().as_micros()).unwrap_or(u64::MAX);
         metrics.globals_injected = globals.len();
         metrics.cache_hit_rate = self.cache.hit_rate();
 

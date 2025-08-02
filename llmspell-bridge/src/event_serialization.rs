@@ -40,7 +40,7 @@ impl EventSerialization {
             "JavaScript" | "Javascript" => Language::JavaScript,
             "Python" => Language::Python,
             "Rust" => Language::Rust,
-            "Unknown" | _ => Language::Unknown,
+            _ => Language::Unknown,
         };
 
         let mut event = UniversalEvent::new(event_type, data, language);

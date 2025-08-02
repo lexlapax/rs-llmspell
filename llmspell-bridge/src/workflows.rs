@@ -1,6 +1,7 @@
 //! ABOUTME: Workflow discovery and management for script integration
 //! ABOUTME: Provides workflow type information and factory methods
 
+use crate::discovery::BridgeDiscovery;
 use crate::standardized_workflows::StandardizedWorkflowFactory;
 use crate::workflow_performance::{ExecutionCache, OptimizedConverter, PerformanceMetrics};
 use crate::ComponentRegistry;
@@ -26,6 +27,19 @@ pub struct WorkflowInfo {
     pub required_params: Vec<String>,
     /// Optional parameters
     pub optional_params: Vec<String>,
+}
+
+/// Status of a workflow instance
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum WorkflowStatus {
+    /// Workflow is ready to execute
+    Ready,
+    /// Workflow is currently executing
+    Running,
+    /// Workflow completed successfully
+    Completed,
+    /// Workflow failed with error
+    Failed(String),
 }
 
 /// Discovery service for available workflow types
@@ -167,6 +181,37 @@ impl WorkflowDiscovery {
 impl Default for WorkflowDiscovery {
     fn default() -> Self {
         Self::new()
+    }
+}
+
+/// Implementation of unified BridgeDiscovery trait for WorkflowDiscovery
+#[async_trait::async_trait]
+impl BridgeDiscovery<WorkflowInfo> for WorkflowDiscovery {
+    async fn discover_types(&self) -> Vec<(String, WorkflowInfo)> {
+        self.get_workflow_types()
+    }
+
+    async fn get_type_info(&self, type_name: &str) -> Option<WorkflowInfo> {
+        self.get_workflow_info(type_name).cloned()
+    }
+
+    async fn has_type(&self, type_name: &str) -> bool {
+        self.has_workflow_type(type_name)
+    }
+
+    async fn list_types(&self) -> Vec<String> {
+        self.list_workflow_types()
+    }
+
+    async fn filter_types<F>(&self, predicate: F) -> Vec<(String, WorkflowInfo)>
+    where
+        F: Fn(&str, &WorkflowInfo) -> bool + Send,
+    {
+        self.workflow_types
+            .iter()
+            .filter(|(k, v)| predicate(k, v))
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .collect()
     }
 }
 
@@ -554,7 +599,7 @@ fn parse_condition(condition_json: &serde_json::Value) -> Result<llmspell_workfl
                     key: key.to_string(),
                 })
             }
-            "always" | _ => Ok(Condition::Always), // Default to always true for unknown types
+            _ => Ok(Condition::Always), // Default to always true for unknown types
         }
     } else {
         // If no type specified, default to always true
@@ -867,7 +912,7 @@ impl WorkflowBridge {
         // Execute workflow
         match workflow.execute(input).await {
             Ok(output) => {
-                let duration_ms = start_instant.elapsed().as_millis() as u64;
+                let duration_ms = u64::try_from(start_instant.elapsed().as_millis()).unwrap_or(u64::MAX);
 
                 // Record successful execution
                 let record = WorkflowExecutionRecord {
@@ -897,7 +942,7 @@ impl WorkflowBridge {
                 Ok(output)
             }
             Err(e) => {
-                let duration_ms = start_instant.elapsed().as_millis() as u64;
+                let duration_ms = u64::try_from(start_instant.elapsed().as_millis()).unwrap_or(u64::MAX);
 
                 // Record failed execution
                 let record = WorkflowExecutionRecord {
@@ -944,6 +989,26 @@ impl WorkflowBridge {
         result
     }
 
+    /// Get a workflow instance by ID
+    pub async fn get_workflow(&self, workflow_id: &str) -> Result<WorkflowInfo> {
+        let workflows = self.active_workflows.read().await;
+        let workflow = workflows
+            .get(workflow_id)
+            .ok_or_else(|| LLMSpellError::Component {
+                message: format!("No active workflow with ID: {workflow_id}"),
+                source: None,
+            })?;
+
+        // Return workflow info for the instance
+        Ok(WorkflowInfo {
+            workflow_type: workflow.workflow_type().to_string(),
+            description: format!("Active workflow: {}", workflow.name()),
+            features: vec![],
+            required_params: vec![],
+            optional_params: vec![],
+        })
+    }
+
     /// Remove a workflow instance
     pub async fn remove_workflow(&self, workflow_id: &str) -> Result<()> {
         let mut workflows = self.active_workflows.write().await;
@@ -973,27 +1038,30 @@ impl WorkflowBridge {
         history.clone()
     }
 
-    /// List all active workflows with detailed info
-    pub async fn list_workflows(&self) -> Vec<(String, WorkflowInfo)> {
+    /// Get workflow status
+    pub async fn get_workflow_status(&self, workflow_id: &str) -> Result<WorkflowStatus> {
         let workflows = self.active_workflows.read().await;
-        workflows
-            .iter()
-            .map(|(id, workflow)| {
-                let info = WorkflowInfo {
-                    workflow_type: workflow.workflow_type().to_string(),
-                    description: format!("Active workflow: {}", workflow.name()),
-                    features: vec![],
-                    required_params: vec![],
-                    optional_params: vec![],
-                };
-                (id.clone(), info)
-            })
-            .collect()
-    }
+        if workflows.contains_key(workflow_id) {
+            // Check if workflow is in execution history
+            let history = self.execution_history.read().await;
+            let recent_execution = history
+                .iter()
+                .rfind(|record| record.workflow_id == workflow_id);
 
-    /// Discover available workflow types
-    pub async fn discover_workflow_types(&self) -> Vec<(String, WorkflowInfo)> {
-        self.discovery.get_workflow_types()
+            let status = match recent_execution {
+                Some(record) if record.end_time.is_none() => WorkflowStatus::Running,
+                Some(record) if record.success => WorkflowStatus::Completed,
+                Some(record) => WorkflowStatus::Failed(record.error.clone().unwrap_or_default()),
+                None => WorkflowStatus::Ready,
+            };
+
+            Ok(status)
+        } else {
+            Err(LLMSpellError::Component {
+                message: format!("No active workflow with ID: {workflow_id}"),
+                source: None,
+            })
+        }
     }
 
     /// Get bridge metrics

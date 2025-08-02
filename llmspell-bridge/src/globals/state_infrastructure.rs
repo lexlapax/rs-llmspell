@@ -131,7 +131,7 @@ pub async fn get_or_create_state_infrastructure(
                     "gzip" => llmspell_state_persistence::config::CompressionType::Gzip,
                     "lz4" => llmspell_state_persistence::config::CompressionType::Lz4,
                     "brotli" => llmspell_state_persistence::config::CompressionType::Brotli,
-                    "zstd" | _ => llmspell_state_persistence::config::CompressionType::Zstd,
+                    _ => llmspell_state_persistence::config::CompressionType::Zstd,
                 },
                 compression_level: backup_cfg.compression_level,
                 encryption_enabled: false, // Not exposed in runtime config yet

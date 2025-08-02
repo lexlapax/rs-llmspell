@@ -232,24 +232,25 @@ impl OrchestrationRuntime {
                 completed_nodes: state.completed_nodes.len(),
                 failed_nodes: state.failed_nodes.len(),
                 total_nodes: count_nodes(&state.plan.root_workflow),
-                is_complete: self.is_orchestration_complete(state),
+                is_complete: Self::is_orchestration_complete(state),
                 is_successful: self.is_orchestration_successful(state),
             })
     }
 
     /// Check if orchestration is complete
-    fn is_orchestration_complete(&self, state: &OrchestrationState) -> bool {
+    fn is_orchestration_complete(state: &OrchestrationState) -> bool {
         let total_nodes = count_nodes(&state.plan.root_workflow);
         state.completed_nodes.len() + state.failed_nodes.len() >= total_nodes
     }
 
     /// Check if orchestration is successful
     fn is_orchestration_successful(&self, state: &OrchestrationState) -> bool {
-        if !self.is_orchestration_complete(state) {
+        if !Self::is_orchestration_complete(state) {
             return false;
         }
 
         let total_nodes = count_nodes(&state.plan.root_workflow);
+        #[allow(clippy::cast_precision_loss)]
         let success_rate = state.completed_nodes.len() as f64 / total_nodes as f64;
 
         success_rate >= state.plan.success_criteria.min_success_rate

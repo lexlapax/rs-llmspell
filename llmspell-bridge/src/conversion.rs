@@ -10,12 +10,20 @@ use std::collections::HashMap;
 /// Trait for converting Rust types to script values
 pub trait ToScriptValue<T> {
     /// Convert this Rust type to a script value
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the conversion fails
     fn to_script_value(&self) -> Result<T>;
 }
 
 /// Trait for converting script values to Rust types
 pub trait FromScriptValue<T>: Sized {
     /// Convert a script value to this Rust type
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the conversion fails or the value is invalid
     fn from_script_value(value: T) -> Result<Self>;
 }
 
@@ -97,7 +105,10 @@ impl From<i32> for ScriptValue {
 
 impl From<i64> for ScriptValue {
     fn from(n: i64) -> Self {
-        Self::Number(n as f64)
+        // Note: i64 to f64 conversion may lose precision for very large numbers
+        #[allow(clippy::cast_precision_loss)]
+        let f = n as f64;
+        Self::Number(f)
     }
 }
 
@@ -197,7 +208,7 @@ pub fn parse_error_strategy(strategy: &str) -> ErrorStrategy {
             max_attempts: 3,
             backoff_ms: 1000,
         },
-        "stop" | "fail_fast" | _ => ErrorStrategy::FailFast,
+        _ => ErrorStrategy::FailFast,
     }
 }
 
@@ -210,6 +221,10 @@ pub struct WorkflowParams {
 }
 
 /// Convert JSON value to workflow parameters
+///
+/// # Errors
+///
+/// Returns an error if the JSON value is not an object or is missing required fields
 pub fn json_to_workflow_params(value: serde_json::Value) -> Result<WorkflowParams> {
     let obj = value
         .as_object()
@@ -537,6 +552,10 @@ pub fn transform_parallel_result(
 }
 
 /// Transform generic workflow result from JSON
+///
+/// # Errors
+///
+/// Returns an error if the result JSON cannot be parsed into a valid workflow result
 pub fn transform_generic_result(
     workflow_type: &str,
     workflow_name: &str,

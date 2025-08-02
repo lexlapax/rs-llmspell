@@ -103,7 +103,7 @@ impl GlobalObject for EventGlobal {
                                                 "python" | "py" => Language::Python,
                                                 "unknown" => Language::Unknown,
                                                 "rust" => Language::Rust,
-                                                "lua" | _ => Language::Lua,
+                                                _ => Language::Lua,
                                             }
                                         })
                                 });
@@ -175,7 +175,7 @@ impl GlobalObject for EventGlobal {
                                         "python" | "py" => Language::Python,
                                         "unknown" => Language::Unknown,
                                         "rust" => Language::Rust,
-                                        "lua" | _ => Language::Lua,
+                                        _ => Language::Lua,
                                     })
                             });
 

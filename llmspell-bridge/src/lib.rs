@@ -93,6 +93,7 @@
 
 // Core modules
 pub mod conversion;
+pub mod discovery;
 pub mod engine;
 pub mod providers;
 pub mod registry;

@@ -406,17 +406,17 @@ impl UserData for LuaAgentInstance {
                 Ok(alerts) => {
                     let alerts_table = lua.create_table()?;
                     for (i, alert) in alerts.iter().enumerate() {
-                        let alert_table = lua.create_table()?;
+                        let alert_item = lua.create_table()?;
                         if let Some(severity) = alert.get("severity").and_then(|v| v.as_str()) {
-                            alert_table.set("severity", severity)?;
+                            alert_item.set("severity", severity)?;
                         }
                         if let Some(message) = alert.get("message").and_then(|v| v.as_str()) {
-                            alert_table.set("message", message)?;
+                            alert_item.set("message", message)?;
                         }
                         if let Some(timestamp) = alert.get("timestamp").and_then(|v| v.as_str()) {
-                            alert_table.set("timestamp", timestamp)?;
+                            alert_item.set("timestamp", timestamp)?;
                         }
-                        alerts_table.set(i + 1, alert_table)?;
+                        alerts_table.set(i + 1, alert_item)?;
                     }
                     Ok(alerts_table)
                 }
@@ -1008,12 +1008,12 @@ pub fn inject_agent_global(
     // Create Agent.createComposite() function
     let bridge_clone = bridge.clone();
     let create_composite_fn = lua.create_function(move |_lua, args: (String, Table, Table)| {
-        let (name, agents_table, config) = args;
+        let (name, agent_list, config) = args;
         let bridge = bridge_clone.clone();
 
         // Convert agents table to Vec<String>
         let mut agents = Vec::new();
-        for pair in agents_table.pairs::<mlua::Integer, String>() {
+        for pair in agent_list.pairs::<mlua::Integer, String>() {
             let (_, agent_name) = pair?;
             agents.push(agent_name);
         }
@@ -1047,11 +1047,11 @@ pub fn inject_agent_global(
         .map_err(|e| mlua::Error::RuntimeError(format!("Failed to discover agents: {e}")))?;
 
         // Convert to Lua table
-        let agents_table = lua.create_table()?;
+        let agent_results = lua.create_table()?;
         for (i, agent_name) in agents.into_iter().enumerate() {
-            agents_table.set(i + 1, agent_name)?;
+            agent_results.set(i + 1, agent_name)?;
         }
-        Ok(agents_table)
+        Ok(agent_results)
     })?;
 
     // Create Agent.register() function - alias for create

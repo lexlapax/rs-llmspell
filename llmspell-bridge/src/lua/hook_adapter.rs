@@ -130,13 +130,13 @@ impl LuaHookAdapter {
                                 .unwrap_or_else(|_| "Skipped by Lua hook".to_string());
                             Ok(HookResult::Skipped(reason))
                         }
-                        "continue" | _ => Ok(HookResult::Continue),
+                        _ => Ok(HookResult::Continue),
                     }
                 } else {
                     Ok(HookResult::Continue)
                 }
             }
-            Value::Nil | _ => Ok(HookResult::Continue),
+            _ => Ok(HookResult::Continue),
         }
     }
 }

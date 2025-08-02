@@ -469,7 +469,7 @@ impl GlobalObject for StateGlobal {
                                 .set("to_version", migration_result.to_version.to_string())?;
                             result_table.set("items_migrated", migration_result.items_migrated)?;
                             result_table
-                                .set("duration_ms", migration_result.duration.as_millis() as u64)?;
+                                .set("duration_ms", u64::try_from(migration_result.duration.as_millis()).unwrap_or(u64::MAX))?;
 
                             // Add warnings if any
                             if !migration_result.warnings.is_empty() {

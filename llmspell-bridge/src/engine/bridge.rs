@@ -25,6 +25,10 @@ pub trait ScriptEngineBridge: Send + Sync {
     /// - Tool discovery and execution APIs
     /// - Workflow orchestration APIs
     /// - Provider access APIs
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an error if API injection fails
     fn inject_apis(
         &mut self,
         registry: &Arc<crate::ComponentRegistry>,
@@ -44,9 +48,17 @@ pub trait ScriptEngineBridge: Send + Sync {
     fn supported_features(&self) -> EngineFeatures;
 
     /// Get the current execution context
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an error if the execution context is invalid
     fn get_execution_context(&self) -> Result<ExecutionContext, LLMSpellError>;
 
     /// Set the execution context
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an error if the execution context cannot be set
     fn set_execution_context(&mut self, context: ExecutionContext) -> Result<(), LLMSpellError>;
 }
 
@@ -84,6 +96,7 @@ pub struct ScriptMetadata {
 
 /// Features supported by a script engine
 #[derive(Debug, Clone, Default)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct EngineFeatures {
     /// Supports async/await or coroutines
     pub async_execution: bool,

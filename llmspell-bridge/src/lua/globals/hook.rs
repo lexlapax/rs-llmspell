@@ -189,13 +189,13 @@ fn lua_value_to_hook_result(value: Value) -> mlua::Result<HookResult> {
                             .unwrap_or_else(|_| "Skipped by Lua hook".to_string());
                         Ok(HookResult::Skipped(reason))
                     }
-                    "continue" | _ => Ok(HookResult::Continue),
+                    _ => Ok(HookResult::Continue),
                 }
             } else {
                 Ok(HookResult::Continue)
             }
         }
-        Value::Nil | _ => Ok(HookResult::Continue),
+        _ => Ok(HookResult::Continue),
     }
 }
 
@@ -238,7 +238,7 @@ fn parse_priority(s: Option<String>) -> Priority {
         Some("high") => Priority::HIGH,
         Some("low") => Priority::LOW,
         Some("lowest") => Priority::LOWEST,
-        Some("normal") | _ => Priority::NORMAL,
+        _ => Priority::NORMAL,
     }
 }
 

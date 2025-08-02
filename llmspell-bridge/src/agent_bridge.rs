@@ -104,17 +104,17 @@ impl AgentBridge {
 
     /// List available agent types
     pub async fn list_agent_types(&self) -> Vec<String> {
-        self.discovery.list_agent_types().await
+        self.discovery.list_agent_types()
     }
 
     /// List available templates
     pub async fn list_templates(&self) -> Vec<String> {
-        self.discovery.list_templates().await
+        self.discovery.list_templates()
     }
 
     /// Get agent information
     pub async fn get_agent_info(&self, agent_type: &str) -> Result<AgentInfo> {
-        self.discovery.get_agent_info(agent_type).await
+        self.discovery.get_agent_info(agent_type)
     }
 
     /// Create a new agent instance
@@ -411,12 +411,17 @@ impl AgentBridge {
 
         // Get performance metrics
         let perf_snapshot = self.performance_monitor.take_snapshot();
+        #[allow(clippy::cast_precision_loss)]
+        let memory_usage_mb = perf_snapshot.resources.memory_bytes as f64 / (1024.0 * 1024.0);
+        #[allow(clippy::cast_precision_loss)]
+        let uptime_seconds = perf_snapshot.timestamp.timestamp() as f64;
+        
         metrics.insert(
             "performance".to_string(),
             serde_json::json!({
-                "memory_usage_mb": perf_snapshot.resources.memory_bytes as f64 / (1024.0 * 1024.0),
+                "memory_usage_mb": memory_usage_mb,
                 "cpu_usage_percent": perf_snapshot.resources.cpu_percent,
-                "uptime_seconds": perf_snapshot.timestamp.timestamp() as f64,
+                "uptime_seconds": uptime_seconds,
             }),
         );
 
@@ -843,7 +848,7 @@ impl AgentBridge {
 
         // Handle scope configuration
         if let Some(scope_config) = builder_config.get("scope") {
-            let scope = self.parse_context_scope(scope_config)?;
+            let scope = Self::parse_context_scope(scope_config)?;
             builder = builder.scope(scope);
         }
 
@@ -853,7 +858,7 @@ impl AgentBridge {
                 "isolate" => InheritancePolicy::Isolate,
                 "copy" => InheritancePolicy::Copy,
                 "share" => InheritancePolicy::Share,
-                "inherit" | _ => InheritancePolicy::Inherit,
+                _ => InheritancePolicy::Inherit,
             };
             builder = builder.inheritance(policy);
         }
@@ -920,12 +925,12 @@ impl AgentBridge {
                 source: None,
             })?;
 
-        let scope = self.parse_context_scope(&scope)?;
+        let scope = Self::parse_context_scope(&scope)?;
         let policy = match inheritance {
             "isolate" => InheritancePolicy::Isolate,
             "copy" => InheritancePolicy::Copy,
             "share" => InheritancePolicy::Share,
-            "inherit" | _ => InheritancePolicy::Inherit,
+            _ => InheritancePolicy::Inherit,
         };
 
         let child = Arc::new(parent.create_child(scope, policy));
@@ -986,7 +991,7 @@ impl AgentBridge {
         key: String,
         value: serde_json::Value,
     ) -> Result<()> {
-        let scope = self.parse_context_scope(&scope)?;
+        let scope = Self::parse_context_scope(&scope)?;
         self.shared_memory.set(scope, key, value);
         Ok(())
     }
@@ -997,7 +1002,7 @@ impl AgentBridge {
         scope: serde_json::Value,
         key: &str,
     ) -> Result<Option<serde_json::Value>> {
-        let scope = self.parse_context_scope(&scope)?;
+        let scope = Self::parse_context_scope(&scope)?;
         Ok(self.shared_memory.get(&scope, key))
     }
 
@@ -1073,7 +1078,7 @@ impl AgentBridge {
     }
 
     /// Parse context scope from JSON
-    fn parse_context_scope(&self, scope_config: &serde_json::Value) -> Result<ContextScope> {
+    fn parse_context_scope(scope_config: &serde_json::Value) -> Result<ContextScope> {
         if let Some(scope_type) = scope_config.get("type").and_then(|v| v.as_str()) {
             match scope_type {
                 "global" => Ok(ContextScope::Global),
