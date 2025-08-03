@@ -154,6 +154,40 @@ impl StorageDiscovery {
             .map(|(name, info)| (name.clone(), info.clone()))
             .collect()
     }
+
+    /// Get backends that support compression
+    pub fn get_compression_enabled_backends(&self) -> Vec<(String, StorageInfo)> {
+        self.backends
+            .iter()
+            .filter(|(_, info)| info.supports_compression)
+            .map(|(name, info)| (name.clone(), info.clone()))
+            .collect()
+    }
+
+    /// Get backends that support encryption
+    pub fn get_encryption_enabled_backends(&self) -> Vec<(String, StorageInfo)> {
+        self.backends
+            .iter()
+            .filter(|(_, info)| info.supports_encryption)
+            .map(|(name, info)| (name.clone(), info.clone()))
+            .collect()
+    }
+
+    /// Get backends by performance characteristics
+    pub fn get_backends_by_performance(
+        &self,
+        latency: &str,
+        throughput: &str,
+    ) -> Vec<(String, StorageInfo)> {
+        self.backends
+            .iter()
+            .filter(|(_, info)| {
+                info.performance.read_latency == latency
+                    && info.performance.throughput == throughput
+            })
+            .map(|(name, info)| (name.clone(), info.clone()))
+            .collect()
+    }
 }
 
 impl Default for StorageDiscovery {
@@ -196,6 +230,127 @@ impl BridgeDiscovery<StorageInfo> for StorageDiscovery {
     }
 }
 
+/// Configuration for storage backend selection and setup
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StorageConfig {
+    /// Selected backend name (memory, sled, rocksdb)
+    pub backend: String,
+    /// Backend-specific configuration parameters
+    pub parameters: HashMap<String, serde_json::Value>,
+    /// Enable compression if backend supports it
+    pub enable_compression: bool,
+    /// Enable encryption if backend supports it
+    pub enable_encryption: bool,
+    /// Performance optimization preset (fast, balanced, storage_optimized)
+    pub performance_preset: String,
+}
+
+impl Default for StorageConfig {
+    fn default() -> Self {
+        Self {
+            backend: "memory".to_string(),
+            parameters: HashMap::new(),
+            enable_compression: false,
+            enable_encryption: false,
+            performance_preset: "balanced".to_string(),
+        }
+    }
+}
+
+impl StorageConfig {
+    /// Create a new builder for StorageConfig
+    pub fn builder() -> StorageConfigBuilder {
+        StorageConfigBuilder::new()
+    }
+}
+
+/// Builder for StorageConfig
+#[derive(Debug, Clone, Default)]
+pub struct StorageConfigBuilder {
+    config: StorageConfig,
+}
+
+impl StorageConfigBuilder {
+    /// Create a new builder with default configuration
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set the backend type
+    #[must_use]
+    pub fn backend(mut self, backend: impl Into<String>) -> Self {
+        self.config.backend = backend.into();
+        self
+    }
+
+    /// Add a configuration parameter
+    #[must_use]
+    pub fn parameter(mut self, key: impl Into<String>, value: serde_json::Value) -> Self {
+        self.config.parameters.insert(key.into(), value);
+        self
+    }
+
+    /// Set multiple parameters at once
+    #[must_use]
+    pub fn parameters(mut self, parameters: HashMap<String, serde_json::Value>) -> Self {
+        self.config.parameters = parameters;
+        self
+    }
+
+    /// Enable compression
+    #[must_use]
+    pub fn enable_compression(mut self, enable: bool) -> Self {
+        self.config.enable_compression = enable;
+        self
+    }
+
+    /// Enable encryption
+    #[must_use]
+    pub fn enable_encryption(mut self, enable: bool) -> Self {
+        self.config.enable_encryption = enable;
+        self
+    }
+
+    /// Set performance preset
+    #[must_use]
+    pub fn performance_preset(mut self, preset: impl Into<String>) -> Self {
+        self.config.performance_preset = preset.into();
+        self
+    }
+
+    /// Convenience method to configure for memory backend
+    #[must_use]
+    pub fn memory_backend(mut self) -> Self {
+        self.config.backend = "memory".to_string();
+        self
+    }
+
+    /// Convenience method to configure for sled backend
+    #[must_use]
+    pub fn sled_backend(mut self, path: impl Into<String>) -> Self {
+        self.config.backend = "sled".to_string();
+        self.config
+            .parameters
+            .insert("path".to_string(), serde_json::Value::String(path.into()));
+        self
+    }
+
+    /// Convenience method to configure for rocksdb backend
+    #[must_use]
+    pub fn rocksdb_backend(mut self, path: impl Into<String>) -> Self {
+        self.config.backend = "rocksdb".to_string();
+        self.config
+            .parameters
+            .insert("path".to_string(), serde_json::Value::String(path.into()));
+        self
+    }
+
+    /// Build the final StorageConfig
+    pub fn build(self) -> StorageConfig {
+        self.config
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -224,6 +379,18 @@ mod tests {
         // Test large dataset backends
         let large_dataset = discovery.get_large_dataset_backends();
         assert_eq!(large_dataset.len(), 2);
+
+        // Test compression-enabled backends
+        let compression_backends = discovery.get_compression_enabled_backends();
+        assert_eq!(compression_backends.len(), 3); // All backends support compression
+
+        // Test encryption-enabled backends
+        let encryption_backends = discovery.get_encryption_enabled_backends();
+        assert_eq!(encryption_backends.len(), 3); // All backends support encryption
+
+        // Test performance-based filtering
+        let high_perf = discovery.get_backends_by_performance("low", "high");
+        assert_eq!(high_perf.len(), 2); // memory and rocksdb
     }
 
     #[tokio::test]
@@ -249,5 +416,52 @@ mod tests {
             .filter_types(|_, info| info.performance.throughput == "high")
             .await;
         assert_eq!(high_perf.len(), 2); // memory and rocksdb
+    }
+
+    #[test]
+    fn test_storage_config_builder() {
+        // Test default config
+        let default_config = StorageConfig::default();
+        assert_eq!(default_config.backend, "memory");
+        assert!(!default_config.enable_compression);
+        assert!(!default_config.enable_encryption);
+
+        // Test builder pattern
+        let config = StorageConfig::builder()
+            .sled_backend("/tmp/test.sled")
+            .enable_compression(true)
+            .enable_encryption(true)
+            .performance_preset("fast")
+            .parameter(
+                "cache_capacity",
+                serde_json::Value::Number(serde_json::Number::from(1000)),
+            )
+            .build();
+
+        assert_eq!(config.backend, "sled");
+        assert!(config.enable_compression);
+        assert!(config.enable_encryption);
+        assert_eq!(config.performance_preset, "fast");
+        assert_eq!(
+            config.parameters.get("path"),
+            Some(&serde_json::Value::String("/tmp/test.sled".to_string()))
+        );
+        assert_eq!(
+            config.parameters.get("cache_capacity"),
+            Some(&serde_json::Value::Number(serde_json::Number::from(1000)))
+        );
+
+        // Test convenience methods
+        let memory_config = StorageConfig::builder().memory_backend().build();
+        assert_eq!(memory_config.backend, "memory");
+
+        let rocksdb_config = StorageConfig::builder()
+            .rocksdb_backend("/tmp/rocks")
+            .build();
+        assert_eq!(rocksdb_config.backend, "rocksdb");
+        assert_eq!(
+            rocksdb_config.parameters.get("path"),
+            Some(&serde_json::Value::String("/tmp/rocks".to_string()))
+        );
     }
 }
