@@ -1,6 +1,7 @@
 //! ABOUTME: Agent discovery and management for script bridge
 //! ABOUTME: Provides registry integration for agents from llmspell-agents crate
 
+use crate::discovery::BridgeDiscovery;
 use llmspell_agents::{AgentConfig, AgentFactory, DefaultAgentFactory};
 use llmspell_core::{Agent, LLMSpellError, Result};
 use std::collections::HashMap;
@@ -181,6 +182,51 @@ pub struct AgentInfo {
     pub required_parameters: Vec<String>,
     /// Optional parameters
     pub optional_parameters: Vec<String>,
+}
+
+// Implementation of unified BridgeDiscovery trait for AgentDiscovery
+#[async_trait::async_trait]
+impl BridgeDiscovery<AgentInfo> for AgentDiscovery {
+    async fn discover_types(&self) -> Vec<(String, AgentInfo)> {
+        self.list_agent_types()
+            .into_iter()
+            .filter_map(|agent_type| {
+                self.get_agent_info(&agent_type)
+                    .ok()
+                    .map(|info| (agent_type, info))
+            })
+            .collect()
+    }
+
+    async fn get_type_info(&self, type_name: &str) -> Option<AgentInfo> {
+        self.get_agent_info(type_name).ok()
+    }
+
+    async fn has_type(&self, type_name: &str) -> bool {
+        self.list_agent_types().contains(&type_name.to_string())
+    }
+
+    async fn list_types(&self) -> Vec<String> {
+        self.list_agent_types()
+    }
+
+    async fn filter_types<F>(&self, predicate: F) -> Vec<(String, AgentInfo)>
+    where
+        F: Fn(&str, &AgentInfo) -> bool + Send,
+    {
+        self.list_agent_types()
+            .into_iter()
+            .filter_map(|agent_type| {
+                self.get_agent_info(&agent_type).ok().and_then(|info| {
+                    if predicate(&agent_type, &info) {
+                        Some((agent_type, info))
+                    } else {
+                        None
+                    }
+                })
+            })
+            .collect()
+    }
 }
 
 // Removed Default impl - AgentDiscovery now requires provider manager

@@ -96,8 +96,10 @@ pub mod conversion;
 pub mod discovery;
 pub mod engine;
 pub mod providers;
+pub mod providers_discovery;
 pub mod registry;
 pub mod runtime;
+pub mod storage;
 pub mod tools;
 
 // Event bridge modules
