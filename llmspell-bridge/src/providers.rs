@@ -307,6 +307,57 @@ pub struct ProviderManagerConfig {
     pub providers: HashMap<String, ProviderConfig>,
 }
 
+impl ProviderManagerConfig {
+    /// Create a new builder for `ProviderManagerConfig`
+    pub fn builder() -> ProviderManagerConfigBuilder {
+        ProviderManagerConfigBuilder::new()
+    }
+}
+
+/// Builder for `ProviderManagerConfig`
+#[derive(Debug, Clone, Default)]
+pub struct ProviderManagerConfigBuilder {
+    config: ProviderManagerConfig,
+}
+
+impl ProviderManagerConfigBuilder {
+    /// Create a new builder with default configuration
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set the default provider
+    #[must_use]
+    pub fn default_provider(mut self, provider: impl Into<String>) -> Self {
+        self.config.default_provider = Some(provider.into());
+        self
+    }
+
+    /// Add a provider configuration
+    #[must_use]
+    pub fn add_provider(
+        mut self,
+        name: impl Into<String>,
+        provider_config: ProviderConfig,
+    ) -> Self {
+        self.config.providers.insert(name.into(), provider_config);
+        self
+    }
+
+    /// Set all provider configurations at once
+    #[must_use]
+    pub fn providers(mut self, providers: HashMap<String, ProviderConfig>) -> Self {
+        self.config.providers = providers;
+        self
+    }
+
+    /// Build the `ProviderManagerConfig`
+    #[must_use]
+    pub fn build(self) -> ProviderManagerConfig {
+        self.config
+    }
+}
+
 /// Configuration for a specific provider
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ProviderConfig {
@@ -325,6 +376,102 @@ pub struct ProviderConfig {
     pub extra: HashMap<String, serde_json::Value>,
 }
 
+impl Default for ProviderConfig {
+    fn default() -> Self {
+        Self {
+            provider_type: "openai".to_string(),
+            api_key_env: None,
+            base_url: None,
+            model: None,
+            max_tokens: None,
+            extra: HashMap::new(),
+        }
+    }
+}
+
+impl ProviderConfig {
+    /// Create a new builder for `ProviderConfig`
+    pub fn builder() -> ProviderConfigBuilder {
+        ProviderConfigBuilder::new()
+    }
+}
+
+/// Builder for `ProviderConfig`
+#[derive(Debug, Clone)]
+pub struct ProviderConfigBuilder {
+    config: ProviderConfig,
+}
+
+impl ProviderConfigBuilder {
+    /// Create a new builder with default configuration
+    pub fn new() -> Self {
+        Self {
+            config: ProviderConfig::default(),
+        }
+    }
+
+    /// Set the provider type
+    #[must_use]
+    pub fn provider_type(mut self, provider_type: impl Into<String>) -> Self {
+        self.config.provider_type = provider_type.into();
+        self
+    }
+
+    /// Set the API key environment variable
+    #[must_use]
+    pub fn api_key_env(mut self, env_var: impl Into<String>) -> Self {
+        self.config.api_key_env = Some(env_var.into());
+        self
+    }
+
+    /// Set the base URL override
+    #[must_use]
+    pub fn base_url(mut self, url: impl Into<String>) -> Self {
+        self.config.base_url = Some(url.into());
+        self
+    }
+
+    /// Set the model to use
+    #[must_use]
+    pub fn model(mut self, model: impl Into<String>) -> Self {
+        self.config.model = Some(model.into());
+        self
+    }
+
+    /// Set the maximum tokens
+    #[must_use]
+    pub fn max_tokens(mut self, tokens: u32) -> Self {
+        self.config.max_tokens = Some(tokens);
+        self
+    }
+
+    /// Add an extra configuration parameter
+    #[must_use]
+    pub fn extra(mut self, key: impl Into<String>, value: serde_json::Value) -> Self {
+        self.config.extra.insert(key.into(), value);
+        self
+    }
+
+    /// Set all extra configuration parameters at once
+    #[must_use]
+    pub fn extras(mut self, extras: HashMap<String, serde_json::Value>) -> Self {
+        self.config.extra = extras;
+        self
+    }
+
+    /// Build the `ProviderConfig`
+    #[must_use]
+    pub fn build(self) -> ProviderConfig {
+        self.config
+    }
+}
+
+impl Default for ProviderConfigBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -336,10 +483,9 @@ mod tests {
     }
     #[tokio::test]
     async fn test_provider_config_validation() {
-        let config = ProviderManagerConfig {
-            default_provider: Some("nonexistent".to_string()),
-            ..Default::default()
-        };
+        let config = ProviderManagerConfig::builder()
+            .default_provider("nonexistent")
+            .build();
 
         let result = ProviderManager::new(config).await;
         assert!(result.is_err());

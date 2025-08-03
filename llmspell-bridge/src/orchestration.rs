@@ -55,6 +55,61 @@ impl Default for ResourceLimits {
     }
 }
 
+impl ResourceLimits {
+    /// Create a new builder for `ResourceLimits`
+    pub fn builder() -> ResourceLimitsBuilder {
+        ResourceLimitsBuilder::new()
+    }
+}
+
+/// Builder for `ResourceLimits`
+#[derive(Debug, Clone)]
+pub struct ResourceLimitsBuilder {
+    limits: ResourceLimits,
+}
+
+impl ResourceLimitsBuilder {
+    /// Create a new builder with default limits
+    pub fn new() -> Self {
+        Self {
+            limits: ResourceLimits::default(),
+        }
+    }
+
+    /// Set maximum concurrent workflows
+    #[must_use]
+    pub fn max_concurrent_workflows(mut self, max: usize) -> Self {
+        self.limits.max_concurrent_workflows = max;
+        self
+    }
+
+    /// Set maximum total agent invocations
+    #[must_use]
+    pub fn max_agent_invocations(mut self, max: usize) -> Self {
+        self.limits.max_agent_invocations = max;
+        self
+    }
+
+    /// Set maximum memory usage in MB
+    #[must_use]
+    pub fn max_memory_mb(mut self, max: usize) -> Self {
+        self.limits.max_memory_mb = max;
+        self
+    }
+
+    /// Build the `ResourceLimits`
+    #[must_use]
+    pub fn build(self) -> ResourceLimits {
+        self.limits
+    }
+}
+
+impl Default for ResourceLimitsBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Default for OrchestrationConfig {
     fn default() -> Self {
         Self {
@@ -64,6 +119,75 @@ impl Default for OrchestrationConfig {
             allow_parallel: true,
             resource_limits: ResourceLimits::default(),
         }
+    }
+}
+
+impl OrchestrationConfig {
+    /// Create a new builder for `OrchestrationConfig`
+    pub fn builder() -> OrchestrationConfigBuilder {
+        OrchestrationConfigBuilder::new()
+    }
+}
+
+/// Builder for `OrchestrationConfig`
+#[derive(Debug, Clone)]
+pub struct OrchestrationConfigBuilder {
+    config: OrchestrationConfig,
+}
+
+impl OrchestrationConfigBuilder {
+    /// Create a new builder with default configuration
+    pub fn new() -> Self {
+        Self {
+            config: OrchestrationConfig::default(),
+        }
+    }
+
+    /// Set the orchestration strategy
+    #[must_use]
+    pub fn strategy(mut self, strategy: OrchestrationStrategy) -> Self {
+        self.config.strategy = strategy;
+        self
+    }
+
+    /// Set the maximum orchestration depth
+    #[must_use]
+    pub fn max_depth(mut self, depth: usize) -> Self {
+        self.config.max_depth = depth;
+        self
+    }
+
+    /// Set the timeout in seconds
+    #[must_use]
+    pub fn timeout_seconds(mut self, timeout: u64) -> Self {
+        self.config.timeout_seconds = timeout;
+        self
+    }
+
+    /// Set whether to allow parallel orchestration branches
+    #[must_use]
+    pub fn allow_parallel(mut self, allow: bool) -> Self {
+        self.config.allow_parallel = allow;
+        self
+    }
+
+    /// Set the resource limits
+    #[must_use]
+    pub fn resource_limits(mut self, limits: ResourceLimits) -> Self {
+        self.config.resource_limits = limits;
+        self
+    }
+
+    /// Build the `OrchestrationConfig`
+    #[must_use]
+    pub fn build(self) -> OrchestrationConfig {
+        self.config
+    }
+}
+
+impl Default for OrchestrationConfigBuilder {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -134,6 +258,71 @@ pub struct RetryConfig {
     pub backoff_ms: u64,
     /// Whether to use exponential backoff
     pub exponential_backoff: bool,
+}
+
+impl Default for RetryConfig {
+    fn default() -> Self {
+        Self {
+            max_attempts: 3,
+            backoff_ms: 1000,
+            exponential_backoff: false,
+        }
+    }
+}
+
+impl RetryConfig {
+    /// Create a new builder for `RetryConfig`
+    pub fn builder() -> RetryConfigBuilder {
+        RetryConfigBuilder::new()
+    }
+}
+
+/// Builder for `RetryConfig`
+#[derive(Debug, Clone)]
+pub struct RetryConfigBuilder {
+    config: RetryConfig,
+}
+
+impl RetryConfigBuilder {
+    /// Create a new builder with default configuration
+    pub fn new() -> Self {
+        Self {
+            config: RetryConfig::default(),
+        }
+    }
+
+    /// Set maximum retry attempts
+    #[must_use]
+    pub fn max_attempts(mut self, attempts: usize) -> Self {
+        self.config.max_attempts = attempts;
+        self
+    }
+
+    /// Set backoff in milliseconds
+    #[must_use]
+    pub fn backoff_ms(mut self, ms: u64) -> Self {
+        self.config.backoff_ms = ms;
+        self
+    }
+
+    /// Set whether to use exponential backoff
+    #[must_use]
+    pub fn exponential_backoff(mut self, exponential: bool) -> Self {
+        self.config.exponential_backoff = exponential;
+        self
+    }
+
+    /// Build the `RetryConfig`
+    #[must_use]
+    pub fn build(self) -> RetryConfig {
+        self.config
+    }
+}
+
+impl Default for RetryConfigBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 /// Success criteria for orchestration
@@ -314,11 +503,13 @@ impl OrchestrationTemplates {
                             store_in_context: true,
                             context_key: Some("raw_data".to_string()),
                             propagate_errors: true,
-                            retry_config: Some(RetryConfig {
-                                max_attempts: 3,
-                                backoff_ms: 1000,
-                                exponential_backoff: true,
-                            }),
+                            retry_config: Some(
+                                RetryConfig::builder()
+                                    .max_attempts(3)
+                                    .backoff_ms(1000)
+                                    .exponential_backoff(true)
+                                    .build(),
+                            ),
                         },
                     },
                     WorkflowNode {

@@ -33,12 +33,16 @@ pub fn inject_session_global(
                 .get::<_, Option<Vec<String>>>("tags")?
                 .unwrap_or_default();
 
-            CreateSessionOptions {
-                name,
-                description,
-                tags,
-                ..Default::default()
+            let mut builder = CreateSessionOptions::builder().tags(tags);
+
+            if let Some(n) = name {
+                builder = builder.name(n);
             }
+            if let Some(d) = description {
+                builder = builder.description(d);
+            }
+
+            builder.build()
         } else {
             CreateSessionOptions::default()
         };
