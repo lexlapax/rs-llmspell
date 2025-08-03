@@ -3,6 +3,9 @@
 
 use crate::globals::types::GlobalContext;
 use llmspell_core::error::LLMSpellError;
+use llmspell_events::{
+    universal_event::UniversalEventBuilder, Language as EventLanguage, UniversalEvent,
+};
 use llmspell_hooks::{
     Hook, HookAdapter, HookContext, HookExecutor, HookMetadata, HookPoint, HookRegistry,
     HookResult, Language, Priority,
@@ -18,6 +21,7 @@ struct LanguageHook {
     language: Language,
     hook_point: HookPoint,
     priority: Priority,
+    enabled: Arc<RwLock<bool>>,
     #[allow(dead_code)]
     callback: Arc<RwLock<Box<dyn std::any::Any + Send + Sync>>>,
     adapter:
@@ -32,6 +36,12 @@ struct LanguageHookWrapper {
 #[async_trait::async_trait]
 impl Hook for LanguageHookWrapper {
     async fn execute(&self, context: &mut HookContext) -> anyhow::Result<HookResult> {
+        // Check if hook is enabled
+        let enabled = *self.inner.enabled.read().await;
+        if !enabled {
+            return Ok(HookResult::Continue);
+        }
+
         // Set the language in context
         context.language = self.inner.language;
 
@@ -76,6 +86,17 @@ pub struct HookHandle {
     pub id: String,
     pub hook_point: HookPoint,
     pub language: Language,
+}
+
+/// Information about a registered hook
+#[derive(Debug, Clone)]
+pub struct HookInfo {
+    pub id: String,
+    pub hook_point: HookPoint,
+    pub language: Language,
+    pub priority: Priority,
+    pub enabled: bool,
+    pub metadata: HookMetadata,
 }
 
 /// Type alias for language adapter map
@@ -177,6 +198,7 @@ impl HookBridge {
             language,
             hook_point: hook_point.clone(),
             priority,
+            enabled: Arc::new(RwLock::new(true)),
             callback: Arc::new(RwLock::new(callback)),
             adapter,
         });
@@ -241,6 +263,140 @@ impl HookBridge {
         metadata.sort_by(|a, b| a.priority.cmp(&b.priority));
 
         Ok(metadata)
+    }
+
+    /// Get information about a specific hook
+    pub async fn get_hook_info(&self, hook_id: &str) -> Result<Option<HookInfo>, LLMSpellError> {
+        let language_hooks = self.language_hooks.read().await;
+
+        if let Some(hook) = language_hooks.get(hook_id) {
+            let enabled = *hook.enabled.read().await;
+            let wrapper = LanguageHookWrapper {
+                inner: hook.clone(),
+            };
+
+            Ok(Some(HookInfo {
+                id: hook.id.clone(),
+                hook_point: hook.hook_point.clone(),
+                language: hook.language,
+                priority: hook.priority,
+                enabled,
+                metadata: wrapper.metadata(),
+            }))
+        } else {
+            Ok(None)
+        }
+    }
+
+    /// Enable a hook by ID
+    pub async fn enable_hook(&self, hook_id: &str) -> Result<bool, LLMSpellError> {
+        let language_hooks = self.language_hooks.read().await;
+
+        if let Some(hook) = language_hooks.get(hook_id) {
+            let mut enabled = hook.enabled.write().await;
+            *enabled = true;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    /// Disable a hook by ID
+    pub async fn disable_hook(&self, hook_id: &str) -> Result<bool, LLMSpellError> {
+        let language_hooks = self.language_hooks.read().await;
+
+        if let Some(hook) = language_hooks.get(hook_id) {
+            let mut enabled = hook.enabled.write().await;
+            *enabled = false;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    /// Execute hooks and publish integration events
+    pub async fn execute_hook_with_events(
+        &self,
+        hook_point: HookPoint,
+        context: &mut HookContext,
+        event_bridge: Option<Arc<crate::event_bridge::EventBridge>>,
+    ) -> Result<HookResult, LLMSpellError> {
+        // Use the existing correlation ID from context
+        let correlation_id = context.correlation_id;
+
+        // Publish before hook event if event bridge is available
+        if let Some(ref bridge) = event_bridge {
+            let before_event =
+                self.create_hook_event(&hook_point, "before", correlation_id, context)?;
+            if let Err(e) = bridge
+                .publish_correlated_event(before_event, correlation_id)
+                .await
+            {
+                // Log error but don't fail hook execution
+                eprintln!("Failed to publish before hook event: {e}");
+            }
+        }
+
+        // Execute the hook
+        let result = self.execute_hook(hook_point.clone(), context).await;
+
+        // Publish after hook event
+        if let Some(ref bridge) = event_bridge {
+            let status = match &result {
+                Ok(HookResult::Continue) => "success",
+                Ok(HookResult::Modified(_)) => "modified",
+                Ok(HookResult::Cancel(_)) => "cancelled",
+                Ok(HookResult::Redirect(_)) => "redirected",
+                Ok(HookResult::Replace(_)) => "replaced",
+                Ok(HookResult::Retry { .. }) => "retry",
+                Ok(HookResult::Fork { .. }) => "forked",
+                Ok(HookResult::Cache { .. }) => "cached",
+                Ok(HookResult::Skipped(_)) => "skipped",
+                Err(_) => "error",
+            };
+            let after_event =
+                self.create_hook_event(&hook_point, status, correlation_id, context)?;
+            if let Err(e) = bridge
+                .publish_correlated_event(after_event, correlation_id)
+                .await
+            {
+                eprintln!("Failed to publish after hook event: {e}");
+            }
+        }
+
+        result
+    }
+
+    /// Create a standardized hook event
+    fn create_hook_event(
+        &self,
+        hook_point: &HookPoint,
+        status: &str,
+        correlation_id: Uuid,
+        context: &HookContext,
+    ) -> Result<UniversalEvent, LLMSpellError> {
+        let event_type = format!(
+            "hook.{}.{}",
+            hook_point.to_string().to_lowercase().replace(' ', "_"),
+            status
+        );
+
+        // Create event data payload
+        let event_data = serde_json::json!({
+            "hook_point": hook_point.to_string(),
+            "component_id": context.component_id.clone(),
+            "language": context.language.to_string(),
+            "status": status
+        });
+
+        let event = UniversalEventBuilder::new(&event_type)
+            .language(EventLanguage::Rust)
+            .data(event_data)
+            .source("hook_bridge")
+            .correlation_id(correlation_id)
+            .build();
+
+        Ok(event)
     }
 
     /// Get metrics from the hook executor

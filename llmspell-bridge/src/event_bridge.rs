@@ -10,12 +10,28 @@ use std::sync::Arc;
 use tokio::sync::mpsc::UnboundedReceiver;
 use uuid::Uuid;
 
+/// Event filter criteria for advanced pattern matching
+#[derive(Debug, Clone)]
+pub struct EventFilter {
+    /// Event type pattern
+    pub event_type: Option<String>,
+    /// Source component pattern
+    pub source: Option<String>,
+    /// Target component pattern
+    pub target: Option<String>,
+    /// Correlation ID filter
+    pub correlation_id: Option<uuid::Uuid>,
+    /// Additional metadata filters
+    pub metadata: HashMap<String, serde_json::Value>,
+}
+
 /// Subscription handle for managing event subscriptions
 #[derive(Debug, Clone)]
 pub struct SubscriptionHandle {
     pub id: String,
     pub pattern: String,
     pub language: EventLanguage,
+    pub filter: Option<EventFilter>,
 }
 
 /// `EventBridge` for cross-language event communication
@@ -67,8 +83,27 @@ impl EventBridge {
             .with_context(|| "Failed to publish event to event bus")
     }
 
+    /// Publish an event with correlation ID for hook integration
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if event publication fails
+    pub async fn publish_correlated_event(
+        &self,
+        mut event: UniversalEvent,
+        correlation_id: uuid::Uuid,
+    ) -> Result<()> {
+        // Set correlation ID in event metadata
+        event.metadata.correlation_id = correlation_id;
+
+        self.event_bus
+            .publish(event)
+            .await
+            .with_context(|| "Failed to publish correlated event to event bus")
+    }
+
     /// Subscribe to events matching a pattern
-    pub async fn subscribe_pattern(
+    pub async fn subscribe_events(
         &self,
         pattern: &str,
         language: EventLanguage,
@@ -87,6 +122,39 @@ impl EventBridge {
             id: subscription_id.clone(),
             pattern: pattern.to_string(),
             language,
+            filter: None,
+        };
+
+        {
+            let mut subscriptions = self.subscriptions.write();
+            subscriptions.insert(subscription_id.clone(), handle);
+        }
+
+        Ok((subscription_id, receiver))
+    }
+
+    /// Subscribe to events with advanced filtering
+    pub async fn subscribe_events_filtered(
+        &self,
+        pattern: &str,
+        language: EventLanguage,
+        filter: EventFilter,
+    ) -> Result<(String, UnboundedReceiver<UniversalEvent>)> {
+        let subscription_id = Uuid::new_v4().to_string();
+
+        // Subscribe to the pattern through the event bus
+        let receiver = self
+            .event_bus
+            .subscribe(pattern)
+            .await
+            .with_context(|| format!("Failed to subscribe to filtered pattern: {pattern}"))?;
+
+        // Store subscription metadata with filter
+        let handle = SubscriptionHandle {
+            id: subscription_id.clone(),
+            pattern: pattern.to_string(),
+            language,
+            filter: Some(filter),
         };
 
         {
@@ -188,7 +256,7 @@ mod tests {
 
         // Subscribe to events
         let (sub_id, mut receiver) = bridge
-            .subscribe_pattern("test.*", Language::Rust)
+            .subscribe_events("test.*", Language::Rust)
             .await
             .unwrap();
         assert_eq!(bridge.subscription_count(), 1);
@@ -223,11 +291,11 @@ mod tests {
 
         // Create multiple subscriptions
         let (sub1, _) = bridge
-            .subscribe_pattern("user.*", Language::Lua)
+            .subscribe_events("user.*", Language::Lua)
             .await
             .unwrap();
         let (_sub2, _) = bridge
-            .subscribe_pattern("system.*", Language::Rust)
+            .subscribe_events("system.*", Language::Rust)
             .await
             .unwrap();
 
@@ -252,15 +320,15 @@ mod tests {
 
         // Create subscriptions with different languages
         let (_sub1, _) = bridge
-            .subscribe_pattern("test1.*", Language::Lua)
+            .subscribe_events("test1.*", Language::Lua)
             .await
             .unwrap();
         let (_sub2, _) = bridge
-            .subscribe_pattern("test2.*", Language::Rust)
+            .subscribe_events("test2.*", Language::Rust)
             .await
             .unwrap();
         let (_sub3, _) = bridge
-            .subscribe_pattern("test3.*", Language::Lua)
+            .subscribe_events("test3.*", Language::Lua)
             .await
             .unwrap();
 

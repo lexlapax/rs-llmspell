@@ -176,7 +176,7 @@ impl GlobalObject for EventGlobal {
                             });
 
                             let (subscription_id, receiver) = bridge
-                                .subscribe_pattern(&pattern, language)
+                                .subscribe_events(&pattern, language)
                                 .await
                                 .map_err(|e| LLMSpellError::Component {
                                     message: format!("Failed to subscribe to pattern: {e}"),
