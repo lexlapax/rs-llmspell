@@ -32,6 +32,95 @@ impl Default for PersistenceConfig {
     }
 }
 
+impl PersistenceConfig {
+    /// Create a new builder for `PersistenceConfig`
+    pub fn builder() -> PersistenceConfigBuilder {
+        PersistenceConfigBuilder::new()
+    }
+}
+
+/// Builder for `PersistenceConfig`
+#[derive(Debug, Clone)]
+pub struct PersistenceConfigBuilder {
+    config: PersistenceConfig,
+}
+
+impl PersistenceConfigBuilder {
+    /// Create a new builder with default configuration
+    pub fn new() -> Self {
+        Self {
+            config: PersistenceConfig::default(),
+        }
+    }
+
+    /// Enable or disable persistence
+    #[must_use]
+    pub fn enabled(mut self, enabled: bool) -> Self {
+        self.config.enabled = enabled;
+        self
+    }
+
+    /// Set the storage backend type
+    #[must_use]
+    pub fn backend_type(mut self, backend_type: StorageBackendType) -> Self {
+        self.config.backend_type = backend_type;
+        self
+    }
+
+    /// Set the flush interval
+    #[must_use]
+    pub fn flush_interval(mut self, interval: Duration) -> Self {
+        self.config.flush_interval = interval;
+        self
+    }
+
+    /// Enable or disable compression
+    #[must_use]
+    pub fn compression(mut self, compression: bool) -> Self {
+        self.config.compression = compression;
+        self
+    }
+
+    /// Set the encryption configuration
+    #[must_use]
+    pub fn encryption(mut self, encryption: Option<EncryptionConfig>) -> Self {
+        self.config.encryption = encryption;
+        self
+    }
+
+    /// Set the backup retention duration
+    #[must_use]
+    pub fn backup_retention(mut self, retention: Duration) -> Self {
+        self.config.backup_retention = retention;
+        self
+    }
+
+    /// Set the backup configuration
+    #[must_use]
+    pub fn backup(mut self, backup: Option<BackupConfig>) -> Self {
+        self.config.backup = backup;
+        self
+    }
+
+    /// Set the performance configuration
+    #[must_use]
+    pub fn performance(mut self, performance: PerformanceConfig) -> Self {
+        self.config.performance = performance;
+        self
+    }
+
+    /// Build the `PersistenceConfig`
+    pub fn build(self) -> PersistenceConfig {
+        self.config
+    }
+}
+
+impl Default for PersistenceConfigBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum StorageBackendType {
     Memory,

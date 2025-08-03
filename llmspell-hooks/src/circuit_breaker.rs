@@ -55,6 +55,11 @@ impl Default for BreakerConfig {
 }
 
 impl BreakerConfig {
+    /// Create a new builder for `BreakerConfig`
+    pub fn builder() -> BreakerConfigBuilder {
+        BreakerConfigBuilder::new()
+    }
+
     /// Production-optimized configuration for hook system
     pub fn production_optimized() -> Self {
         Self {
@@ -77,6 +82,88 @@ impl BreakerConfig {
             slow_call_threshold: 3,
             slow_call_duration: Duration::from_millis(100),
         }
+    }
+}
+
+/// Builder for `BreakerConfig`
+#[derive(Debug, Clone)]
+pub struct BreakerConfigBuilder {
+    config: BreakerConfig,
+}
+
+impl BreakerConfigBuilder {
+    /// Create a new builder with default configuration
+    pub fn new() -> Self {
+        Self {
+            config: BreakerConfig::default(),
+        }
+    }
+
+    /// Create a builder from production-optimized defaults
+    pub fn production_optimized() -> Self {
+        Self {
+            config: BreakerConfig::production_optimized(),
+        }
+    }
+
+    /// Create a builder from conservative defaults
+    pub fn conservative() -> Self {
+        Self {
+            config: BreakerConfig::conservative(),
+        }
+    }
+
+    /// Set the failure threshold
+    #[must_use]
+    pub fn failure_threshold(mut self, threshold: u32) -> Self {
+        self.config.failure_threshold = threshold;
+        self
+    }
+
+    /// Set the success threshold
+    #[must_use]
+    pub fn success_threshold(mut self, threshold: u32) -> Self {
+        self.config.success_threshold = threshold;
+        self
+    }
+
+    /// Set the failure window duration
+    #[must_use]
+    pub fn failure_window(mut self, window: Duration) -> Self {
+        self.config.failure_window = window;
+        self
+    }
+
+    /// Set the open duration
+    #[must_use]
+    pub fn open_duration(mut self, duration: Duration) -> Self {
+        self.config.open_duration = duration;
+        self
+    }
+
+    /// Set the slow call threshold
+    #[must_use]
+    pub fn slow_call_threshold(mut self, threshold: u32) -> Self {
+        self.config.slow_call_threshold = threshold;
+        self
+    }
+
+    /// Set the slow call duration
+    #[must_use]
+    pub fn slow_call_duration(mut self, duration: Duration) -> Self {
+        self.config.slow_call_duration = duration;
+        self
+    }
+
+    /// Build the configuration
+    pub fn build(self) -> BreakerConfig {
+        self.config
+    }
+}
+
+impl Default for BreakerConfigBuilder {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
