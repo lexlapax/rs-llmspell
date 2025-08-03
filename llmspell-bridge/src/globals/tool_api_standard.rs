@@ -174,13 +174,17 @@ pub fn to_standard_schema(schema: ToolSchema) -> StandardToolSchema {
     StandardToolSchema {
         name: schema.name,
         description: schema.description,
-        parameters: schema.parameters.into_iter().map(|p| StandardParameterDef {
-            name: p.name,
-            param_type: format!("{:?}", p.param_type).to_lowercase(),
-            description: p.description,
-            required: p.required,
-            default: p.default,
-        }).collect(),
+        parameters: schema
+            .parameters
+            .into_iter()
+            .map(|p| StandardParameterDef {
+                name: p.name,
+                param_type: format!("{:?}", p.param_type).to_lowercase(),
+                description: p.description,
+                required: p.required,
+                default: p.default,
+            })
+            .collect(),
     }
 }
 
@@ -189,22 +193,30 @@ pub fn to_standard_schema(schema: ToolSchema) -> StandardToolSchema {
 pub trait StandardToolApi {
     /// List all available tools
     async fn list_tools(&self) -> Vec<StandardToolInfo>;
-    
+
     /// Get a specific tool's information
     async fn get_tool(&self, name: &str) -> Option<StandardToolInfo>;
-    
+
     /// Invoke a tool with parameters
-    async fn invoke_tool(&self, name: &str, params: serde_json::Value) -> Result<serde_json::Value, String>;
-    
+    async fn invoke_tool(
+        &self,
+        name: &str,
+        params: serde_json::Value,
+    ) -> Result<serde_json::Value, String>;
+
     /// Check if a tool exists
     async fn tool_exists(&self, name: &str) -> bool;
-    
+
     /// Get all tool categories
     async fn get_categories(&self) -> Vec<String>;
-    
+
     /// Discover tools with optional filters
-    async fn discover_tools(&self, category: Option<String>, tag: Option<String>) -> Vec<StandardToolInfo>;
-    
+    async fn discover_tools(
+        &self,
+        category: Option<String>,
+        tag: Option<String>,
+    ) -> Vec<StandardToolInfo>;
+
     /// Get a tool's schema
     async fn get_tool_schema(&self, name: &str) -> Option<StandardToolSchema>;
 }

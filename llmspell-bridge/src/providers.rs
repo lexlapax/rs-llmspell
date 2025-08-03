@@ -220,7 +220,7 @@ impl ProviderManager {
     }
 
     /// Check if a provider supports a specific capability
-    pub async fn provider_supports(&self, provider_name: &str, capability: &str) -> bool {
+    pub async fn check_provider_capability(&self, provider_name: &str, capability: &str) -> bool {
         if let Ok(caps) = self
             .core_manager
             .query_capabilities(Some(provider_name))
