@@ -307,6 +307,11 @@ impl Default for RuntimeConfig {
 }
 
 impl RuntimeConfig {
+    /// Create a new builder for `RuntimeConfig`
+    pub fn builder() -> RuntimeConfigBuilder {
+        RuntimeConfigBuilder::new()
+    }
+
     /// Get engine-specific configuration
     ///
     /// # Errors
@@ -336,6 +341,74 @@ impl RuntimeConfig {
             "lua" | "javascript" | "js" => true,
             custom => self.engines.custom.contains_key(custom),
         }
+    }
+}
+
+/// Builder for `RuntimeConfig`
+#[derive(Debug, Clone)]
+pub struct RuntimeConfigBuilder {
+    config: RuntimeConfig,
+}
+
+impl RuntimeConfigBuilder {
+    /// Create a new builder with default configuration
+    pub fn new() -> Self {
+        Self {
+            config: RuntimeConfig::default(),
+        }
+    }
+
+    /// Set the default script engine
+    #[must_use]
+    pub fn default_engine(mut self, engine: impl Into<String>) -> Self {
+        self.config.default_engine = engine.into();
+        self
+    }
+
+    /// Set the engine configurations
+    #[must_use]
+    pub fn engines(mut self, engines: EngineConfigs) -> Self {
+        self.config.engines = engines;
+        self
+    }
+
+    /// Set the Lua configuration
+    #[must_use]
+    pub fn lua_config(mut self, config: LuaConfig) -> Self {
+        self.config.engines.lua = config;
+        self
+    }
+
+    /// Set the JavaScript configuration
+    #[must_use]
+    pub fn javascript_config(mut self, config: JSConfig) -> Self {
+        self.config.engines.javascript = config;
+        self
+    }
+
+    /// Set the provider configuration
+    #[must_use]
+    pub fn providers(mut self, providers: ProviderManagerConfig) -> Self {
+        self.config.providers = providers;
+        self
+    }
+
+    /// Set the global runtime configuration
+    #[must_use]
+    pub fn runtime(mut self, runtime: GlobalRuntimeConfig) -> Self {
+        self.config.runtime = runtime;
+        self
+    }
+
+    /// Build the configuration
+    pub fn build(self) -> RuntimeConfig {
+        self.config
+    }
+}
+
+impl Default for RuntimeConfigBuilder {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -376,6 +449,81 @@ impl Default for GlobalRuntimeConfig {
             state_persistence: StatePersistenceConfig::default(),
             sessions: SessionConfig::default(),
         }
+    }
+}
+
+impl GlobalRuntimeConfig {
+    /// Create a new builder for `GlobalRuntimeConfig`
+    pub fn builder() -> GlobalRuntimeConfigBuilder {
+        GlobalRuntimeConfigBuilder::new()
+    }
+}
+
+/// Builder for `GlobalRuntimeConfig`
+#[derive(Debug, Clone)]
+pub struct GlobalRuntimeConfigBuilder {
+    config: GlobalRuntimeConfig,
+}
+
+impl GlobalRuntimeConfigBuilder {
+    /// Create a new builder with default configuration
+    pub fn new() -> Self {
+        Self {
+            config: GlobalRuntimeConfig::default(),
+        }
+    }
+
+    /// Set the maximum concurrent scripts
+    #[must_use]
+    pub fn max_concurrent_scripts(mut self, max: usize) -> Self {
+        self.config.max_concurrent_scripts = max;
+        self
+    }
+
+    /// Set the script execution timeout in seconds
+    #[must_use]
+    pub fn script_timeout_seconds(mut self, timeout: u64) -> Self {
+        self.config.script_timeout_seconds = timeout;
+        self
+    }
+
+    /// Enable or disable streaming
+    #[must_use]
+    pub fn enable_streaming(mut self, enable: bool) -> Self {
+        self.config.enable_streaming = enable;
+        self
+    }
+
+    /// Set the security configuration
+    #[must_use]
+    pub fn security(mut self, security: SecurityConfig) -> Self {
+        self.config.security = security;
+        self
+    }
+
+    /// Set the state persistence configuration
+    #[must_use]
+    pub fn state_persistence(mut self, persistence: StatePersistenceConfig) -> Self {
+        self.config.state_persistence = persistence;
+        self
+    }
+
+    /// Set the session configuration
+    #[must_use]
+    pub fn sessions(mut self, sessions: SessionConfig) -> Self {
+        self.config.sessions = sessions;
+        self
+    }
+
+    /// Build the configuration
+    pub fn build(self) -> GlobalRuntimeConfig {
+        self.config
+    }
+}
+
+impl Default for GlobalRuntimeConfigBuilder {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

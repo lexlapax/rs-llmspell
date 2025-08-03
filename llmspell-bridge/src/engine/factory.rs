@@ -202,6 +202,74 @@ impl Default for LuaConfig {
     }
 }
 
+impl LuaConfig {
+    /// Create a new builder for `LuaConfig`
+    pub fn builder() -> LuaConfigBuilder {
+        LuaConfigBuilder::new()
+    }
+}
+
+/// Builder for `LuaConfig`
+#[derive(Debug, Clone)]
+pub struct LuaConfigBuilder {
+    config: LuaConfig,
+}
+
+impl LuaConfigBuilder {
+    /// Create a new builder with default configuration
+    pub fn new() -> Self {
+        Self {
+            config: LuaConfig::default(),
+        }
+    }
+
+    /// Set the standard library access level
+    #[must_use]
+    pub fn stdlib(mut self, level: StdlibLevel) -> Self {
+        self.config.stdlib = level;
+        self
+    }
+
+    /// Set the maximum memory usage in bytes
+    #[must_use]
+    pub fn max_memory(mut self, memory: Option<usize>) -> Self {
+        self.config.max_memory = memory;
+        self
+    }
+
+    /// Enable or disable debug features
+    #[must_use]
+    pub fn debug(mut self, debug: bool) -> Self {
+        self.config.debug = debug;
+        self
+    }
+
+    /// Add a package path
+    #[must_use]
+    pub fn add_package_path(mut self, path: impl Into<String>) -> Self {
+        self.config.package_paths.push(path.into());
+        self
+    }
+
+    /// Set all package paths at once
+    #[must_use]
+    pub fn package_paths(mut self, paths: Vec<String>) -> Self {
+        self.config.package_paths = paths;
+        self
+    }
+
+    /// Build the configuration
+    pub fn build(self) -> LuaConfig {
+        self.config
+    }
+}
+
+impl Default for LuaConfigBuilder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 /// Lua standard library access levels
 #[derive(Debug, Clone, Copy, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "lowercase")]
@@ -236,6 +304,67 @@ impl Default for JSConfig {
             enable_console: true,
             module_resolution: ModuleResolution::Node,
         }
+    }
+}
+
+impl JSConfig {
+    /// Create a new builder for `JSConfig`
+    pub fn builder() -> JSConfigBuilder {
+        JSConfigBuilder::new()
+    }
+}
+
+/// Builder for `JSConfig`
+#[derive(Debug, Clone)]
+pub struct JSConfigBuilder {
+    config: JSConfig,
+}
+
+impl JSConfigBuilder {
+    /// Create a new builder with default configuration
+    pub fn new() -> Self {
+        Self {
+            config: JSConfig::default(),
+        }
+    }
+
+    /// Enable or disable strict mode
+    #[must_use]
+    pub fn strict_mode(mut self, strict: bool) -> Self {
+        self.config.strict_mode = strict;
+        self
+    }
+
+    /// Set the maximum heap size in bytes
+    #[must_use]
+    pub fn max_heap_size(mut self, size: Option<usize>) -> Self {
+        self.config.max_heap_size = size;
+        self
+    }
+
+    /// Enable or disable console API
+    #[must_use]
+    pub fn enable_console(mut self, enable: bool) -> Self {
+        self.config.enable_console = enable;
+        self
+    }
+
+    /// Set the module resolution strategy
+    #[must_use]
+    pub fn module_resolution(mut self, resolution: ModuleResolution) -> Self {
+        self.config.module_resolution = resolution;
+        self
+    }
+
+    /// Build the configuration
+    pub fn build(self) -> JSConfig {
+        self.config
+    }
+}
+
+impl Default for JSConfigBuilder {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

@@ -12,7 +12,8 @@ pub use bridge::{
 
 pub use factory::{
     register_engine_plugin, unregister_engine_plugin, EngineFactory, EngineInfo, JSConfig,
-    LuaConfig, ModuleResolution, ScriptEnginePlugin, StdlibLevel,
+    JSConfigBuilder, LuaConfig, LuaConfigBuilder, ModuleResolution, ScriptEnginePlugin,
+    StdlibLevel,
 };
 
 pub use types::ScriptEngineError;
