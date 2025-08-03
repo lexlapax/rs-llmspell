@@ -35,22 +35,21 @@ pub async fn get_or_create_session_infrastructure(
     // Create storage backend based on configuration
     let storage_backend = create_storage_backend(&config.storage_backend).await?;
 
-    // Create SessionManagerConfig from runtime config
-    let session_config = SessionManagerConfig {
-        max_active_sessions: config.max_sessions,
-        default_session_timeout: chrono::Duration::seconds(config.session_timeout_seconds as i64),
-        storage_path: std::path::PathBuf::from("./sessions"),
-        auto_persist: true,
-        persist_interval_secs: 300,
-        track_activity: true,
-        max_storage_size_bytes: 10 * 1024 * 1024 * 1024, // 10GB
-        enable_compression: config.artifact_compression_threshold > 0,
-        compression_level: 3,
-        enable_deduplication: true,
-        cleanup_config: Default::default(),
-        hook_config: Default::default(),
-        event_config: Default::default(),
-    };
+    // Create SessionManagerConfig from runtime config using builder pattern
+    let session_config = SessionManagerConfig::builder()
+        .max_active_sessions(config.max_sessions)
+        .default_session_timeout(chrono::Duration::seconds(
+            config.session_timeout_seconds as i64,
+        ))
+        .storage_path(std::path::PathBuf::from("./sessions"))
+        .auto_persist(true)
+        .persist_interval_secs(300)
+        .track_activity(true)
+        .max_storage_size_bytes(10 * 1024 * 1024 * 1024) // 10GB
+        .enable_compression(config.artifact_compression_threshold > 0)
+        .compression_level(3)
+        .enable_deduplication(true)
+        .build();
 
     // Create SessionManager
     let session_manager = Arc::new(

@@ -195,13 +195,15 @@ impl UserData for LuaAgentInstance {
                 let mut wrapped_params = std::collections::HashMap::new();
                 wrapped_params.insert("parameters".to_string(), tool_input_json);
 
-                let agent_input = llmspell_core::types::AgentInput {
-                    text: format!("Invoking tool: {tool_name}"),
-                    media: vec![],
-                    context: None,
-                    parameters: wrapped_params,
-                    output_modalities: vec![],
-                };
+                let mut builder = llmspell_core::types::AgentInput::builder()
+                    .text(format!("Invoking tool: {tool_name}"));
+
+                // Add parameters
+                for (key, value) in wrapped_params {
+                    builder = builder.parameter(key, value);
+                }
+
+                let agent_input = builder.build();
 
                 let bridge = this.bridge.clone();
                 let agent_name = this.agent_instance_name.clone();

@@ -158,13 +158,21 @@ pub fn lua_table_to_agent_input(lua: &Lua, table: Table) -> mlua::Result<AgentIn
         }
     }
 
-    Ok(AgentInput {
-        text,
-        parameters,
-        context: None,
-        output_modalities,
-        media,
-    })
+    let mut builder = AgentInput::builder()
+        .text(text)
+        .output_modalities(output_modalities);
+
+    // Add parameters
+    for (key, value) in parameters {
+        builder = builder.parameter(key, value);
+    }
+
+    // Add media
+    for media_item in media {
+        builder = builder.add_media(media_item);
+    }
+
+    Ok(builder.build())
 }
 
 /// Parse media content from Lua table
