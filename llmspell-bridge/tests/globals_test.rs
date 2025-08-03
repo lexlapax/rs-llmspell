@@ -240,7 +240,7 @@ mod lua_globals {
                 }
             })
             assert(seq ~= nil, "Sequential workflow creation failed")
-            local info = seq:getInfo()
+            local info = seq:get_info()
             assert(info.name == "test_seq", "Sequential workflow name mismatch")
             assert(info.type == "sequential", "Sequential workflow type mismatch")
             
@@ -264,7 +264,7 @@ mod lua_globals {
                 }
             })
             assert(cond ~= nil, "Conditional workflow creation failed")
-            info = cond:getInfo()
+            info = cond:get_info()
             assert(info.type == "conditional", "Conditional workflow type mismatch")
             
             -- Test Workflow.loop()
@@ -288,7 +288,7 @@ mod lua_globals {
                 }
             })
             assert(loop_wf ~= nil, "Loop workflow creation failed")
-            info = loop_wf:getInfo()
+            info = loop_wf:get_info()
             assert(info.type == "loop", "Loop workflow type mismatch")
             
             -- Test Workflow.parallel()
@@ -310,7 +310,7 @@ mod lua_globals {
                 }
             })
             assert(par ~= nil, "Parallel workflow creation failed")
-            info = par:getInfo()
+            info = par:get_info()
             assert(info.type == "parallel", "Parallel workflow type mismatch")
             
             -- Test Workflow types listing

@@ -103,11 +103,11 @@ async fn test_workflow_discovery() {
     let registry = Arc::new(ComponentRegistry::new());
     let bridge = WorkflowBridge::new(registry);
 
-    let types = bridge.discover_workflow_types().await;
-    assert_eq!(types.len(), 4);
+    let type_infos = bridge.get_all_workflow_info().await;
+    assert_eq!(type_infos.len(), 4);
 
     // Check each type has proper info
-    for (type_name, info) in types {
+    for (type_name, info) in type_infos {
         assert!(!type_name.is_empty());
         assert!(!info.description.is_empty());
         assert!(info.workflow_type == type_name);

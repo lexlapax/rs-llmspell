@@ -49,7 +49,7 @@ async fn test_lua_workflow_sequential_creation() {
             }
         })
         
-        local info = workflow:getInfo()
+        local info = workflow:get_info()
         
         return { 
             workflow_type = info.type,
@@ -82,7 +82,7 @@ async fn test_lua_workflow_parallel() {
             max_concurrency = 2
         })
         
-        local info = workflow:getInfo()
+        local info = workflow:get_info()
         return { workflow_type = info.type }
     "#;
 
@@ -117,7 +117,7 @@ async fn test_lua_workflow_conditional() {
             }
         })
         
-        local info = workflow:getInfo()
+        local info = workflow:get_info()
         return { workflow_type = info.type }
     "#;
 
@@ -150,7 +150,7 @@ async fn test_lua_workflow_loop() {
             }
         })
         
-        local info = workflow:getInfo()
+        local info = workflow:get_info()
         return { workflow_type = info.type }
     "#;
 

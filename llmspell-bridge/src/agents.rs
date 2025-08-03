@@ -198,11 +198,11 @@ mod tests {
         let discovery = AgentDiscovery::new(provider_manager);
 
         // List agent types
-        let types = discovery.list_agent_types().await;
+        let types = discovery.list_agent_types();
         assert!(!types.is_empty());
 
         // List templates
-        let templates = discovery.list_templates().await;
+        let templates = discovery.list_templates();
         assert!(!templates.is_empty());
     }
     #[tokio::test]

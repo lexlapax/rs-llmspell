@@ -134,8 +134,8 @@ async fn test_workflow_sync_behavior() {
         
         assert(workflow, "Workflow should be created synchronously")
         
-        -- Workflow is a userdata object, use getInfo() to access properties
-        local info = workflow:getInfo()
+        -- Workflow is a userdata object, use get_info() to access properties
+        local info = workflow:get_info()
         assert(info.id, "Workflow should have an ID")
         assert(info.name == "test-workflow", "Workflow should have correct name")
         

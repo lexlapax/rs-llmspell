@@ -262,8 +262,8 @@ impl UserData for WorkflowInstance {
             }
         });
 
-        // getInfo method
-        methods.add_method("getInfo", |lua, this, ()| {
+        // get_info method
+        methods.add_method("get_info", |lua, this, ()| {
             let info_table = lua.create_table()?;
             info_table.set("id", this.workflow_id.clone())?;
             info_table.set("name", this.name.clone())?;
@@ -272,8 +272,8 @@ impl UserData for WorkflowInstance {
             Ok(info_table)
         });
 
-        // getState method (integrates with State global)
-        methods.add_method("getState", |lua, this, key: String| {
+        // get_state method (integrates with State global)
+        methods.add_method("get_state", |lua, this, key: String| {
             // Access State global if available
             if let Ok(globals) = lua.globals().get::<_, Table>("State") {
                 if let Ok(get_fn) = globals.get::<_, mlua::Function>("get") {
@@ -290,9 +290,9 @@ impl UserData for WorkflowInstance {
             Ok(mlua::Value::Table(state_table))
         });
 
-        // setState method (integrates with State global)
+        // set_state method (integrates with State global)
         methods.add_method(
-            "setState",
+            "set_state",
             |lua, this, (key, value): (String, mlua::Value)| {
                 // Access State global if available
                 if let Ok(globals) = lua.globals().get::<_, Table>("State") {
@@ -308,34 +308,40 @@ impl UserData for WorkflowInstance {
             },
         );
 
-        // onBeforeExecute method (Hook integration)
-        methods.add_method("onBeforeExecute", |lua, this, _callback: mlua::Function| {
-            // Store callback for future use in Phase 4
-            // For now, just acknowledge the registration
-            let result_table = lua.create_table()?;
-            result_table.set(
-                "message",
-                "Hook registered (Phase 4 implementation pending)",
-            )?;
-            result_table.set("workflow_id", this.workflow_id.clone())?;
-            result_table.set("hook_type", "before_execute")?;
-            Ok(result_table)
-        });
+        // on_before_execute method (Hook integration)
+        methods.add_method(
+            "on_before_execute",
+            |lua, this, _callback: mlua::Function| {
+                // Store callback for future use in Phase 4
+                // For now, just acknowledge the registration
+                let result_table = lua.create_table()?;
+                result_table.set(
+                    "message",
+                    "Hook registered (Phase 4 implementation pending)",
+                )?;
+                result_table.set("workflow_id", this.workflow_id.clone())?;
+                result_table.set("hook_type", "before_execute")?;
+                Ok(result_table)
+            },
+        );
 
-        // onAfterExecute method (Hook integration)
-        methods.add_method("onAfterExecute", |lua, this, _callback: mlua::Function| {
-            let result_table = lua.create_table()?;
-            result_table.set(
-                "message",
-                "Hook registered (Phase 4 implementation pending)",
-            )?;
-            result_table.set("workflow_id", this.workflow_id.clone())?;
-            result_table.set("hook_type", "after_execute")?;
-            Ok(result_table)
-        });
+        // on_after_execute method (Hook integration)
+        methods.add_method(
+            "on_after_execute",
+            |lua, this, _callback: mlua::Function| {
+                let result_table = lua.create_table()?;
+                result_table.set(
+                    "message",
+                    "Hook registered (Phase 4 implementation pending)",
+                )?;
+                result_table.set("workflow_id", this.workflow_id.clone())?;
+                result_table.set("hook_type", "after_execute")?;
+                Ok(result_table)
+            },
+        );
 
-        // onError method (Hook integration)
-        methods.add_method("onError", |lua, this, _callback: mlua::Function| {
+        // on_error method (Hook integration)
+        methods.add_method("on_error", |lua, this, _callback: mlua::Function| {
             let result_table = lua.create_table()?;
             result_table.set(
                 "message",
@@ -411,8 +417,8 @@ impl UserData for WorkflowInstance {
             Ok(validation_result)
         });
 
-        // getMetrics method - Performance and execution metrics
-        methods.add_method("getMetrics", |lua, this, ()| {
+        // get_metrics method - Performance and execution metrics
+        methods.add_method("get_metrics", |lua, this, ()| {
             let metrics_table = lua.create_table()?;
             metrics_table.set("workflow_id", this.workflow_id.clone())?;
 
@@ -680,11 +686,10 @@ pub fn inject_workflow_global(
                     let step = range.get::<_, i32>("step").unwrap_or(1);
 
                     serde_json::json!({
-                        "range": {
-                            "start": start,
-                            "end": end,
-                            "step": step
-                        }
+                        "type": "range",
+                        "start": start,
+                        "end": end,
+                        "step": step
                     })
                 } else if let Ok(collection) = iterator_table.get::<_, Table>("collection") {
                     // Collection iterator
@@ -707,7 +712,8 @@ pub fn inject_workflow_global(
                     }
 
                     serde_json::json!({
-                        "collection": collection_vec
+                        "type": "collection",
+                        "items": collection_vec
                     })
                 } else if let Ok(condition_str) = iterator_table.get::<_, String>("while_condition")
                 {
@@ -717,7 +723,8 @@ pub fn inject_workflow_global(
                         .unwrap_or(100);
 
                     serde_json::json!({
-                        "while_condition": condition_str,
+                        "type": "while",
+                        "condition": condition_str,
                         "max_iterations": max_iterations
                     })
                 } else {

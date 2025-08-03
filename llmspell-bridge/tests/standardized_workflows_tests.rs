@@ -145,7 +145,7 @@ mod tests {
     #[cfg_attr(feature = "unit-tests", ignore = "unit")]
     #[cfg_attr(feature = "bridge-tests", ignore = "bridge")]
     #[cfg_attr(feature = "workflow-tests", ignore = "workflow")]
-    fn test_list_workflow_types() {
+    async fn test_list_workflow_types() {
         let factory = StandardizedWorkflowFactory::new();
         let types = factory.list_workflow_types();
 
@@ -190,8 +190,11 @@ mod tests {
         let result = factory.create_from_type_json("unknown_type", params).await;
 
         assert!(result.is_err());
-        let err = result.unwrap_err();
-        assert!(err.to_string().contains("Unknown workflow type"));
+        if let Err(err) = result {
+            assert!(err.to_string().contains("Unknown workflow type"));
+        } else {
+            panic!("Expected error");
+        }
     }
 
     #[tokio::test]
