@@ -13,7 +13,7 @@ async fn create_test_environment() -> (Lua, GlobalContext, Arc<HookBridge>) {
     let registry = Arc::new(ComponentRegistry::new());
     let providers = Arc::new(ProviderManager::new(Default::default()).await.unwrap());
     let context = GlobalContext::new(registry, providers);
-    let hook_bridge = Arc::new(HookBridge::new(Arc::new(context.clone())).await.unwrap());
+    let hook_bridge = Arc::new(HookBridge::new(Arc::new(context.clone())).unwrap());
 
     inject_hook_global(&lua, &context, hook_bridge.clone()).unwrap();
 

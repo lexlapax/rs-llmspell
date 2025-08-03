@@ -98,7 +98,7 @@ pub struct HookBridge {
 
 impl HookBridge {
     /// Create a new hook bridge
-    pub async fn new(_context: Arc<GlobalContext>) -> Result<Self, LLMSpellError> {
+    pub fn new(_context: Arc<GlobalContext>) -> Result<Self, LLMSpellError> {
         // Create hook executor and registry
         let hook_executor = Arc::new(HookExecutor::new());
         let hook_registry = Arc::new(HookRegistry::new());
@@ -265,7 +265,7 @@ mod tests {
                     .unwrap(),
             ),
         ));
-        let bridge = HookBridge::new(context).await.unwrap();
+        let bridge = HookBridge::new(context).unwrap();
         assert!(bridge.language_hooks.read().await.is_empty());
     }
     #[tokio::test]
@@ -278,7 +278,7 @@ mod tests {
                     .unwrap(),
             ),
         ));
-        let bridge = HookBridge::new(context).await.unwrap();
+        let bridge = HookBridge::new(context).unwrap();
 
         // Create a simple adapter for testing
         struct TestAdapter;

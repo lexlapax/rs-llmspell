@@ -93,7 +93,7 @@ pub async fn create_standard_registry(context: Arc<GlobalContext>) -> Result<Glo
     }
 
     // Create HookBridge for hook system integration
-    let hook_bridge = Arc::new(crate::hook_bridge::HookBridge::new(context.clone()).await?);
+    let hook_bridge = Arc::new(crate::hook_bridge::HookBridge::new(context.clone())?);
     builder.register(Arc::new(hook_global::HookGlobal::new(hook_bridge.clone())));
 
     // Register replay global for hook debugging

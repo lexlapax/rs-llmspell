@@ -64,7 +64,7 @@ mod tests {
             Arc::new(ComponentRegistry::new()),
             Arc::new(ProviderManager::new(Default::default()).await.unwrap()),
         ));
-        let hook_bridge = Arc::new(HookBridge::new(context).await.unwrap());
+        let hook_bridge = Arc::new(HookBridge::new(context).unwrap());
         let global = HookGlobal::new(hook_bridge);
         let metadata = global.metadata();
         assert_eq!(metadata.name, "Hook");

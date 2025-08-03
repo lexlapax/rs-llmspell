@@ -21,23 +21,19 @@ impl EventGlobal {
 }
 
 /// Helper function to get or create an `EventBridge` from `GlobalContext`
-async fn get_or_create_event_bridge(
-    context: &GlobalContext,
-) -> Result<Arc<EventBridge>, LLMSpellError> {
+fn get_or_create_event_bridge(context: &GlobalContext) -> Result<Arc<EventBridge>, LLMSpellError> {
     // Try to get existing bridge from context first
     if let Some(bridge) = context.get_bridge::<EventBridge>("event_bridge") {
         return Ok(bridge);
     }
 
     // Create new bridge and store it in context
-    let new_bridge = Arc::new(
-        EventBridge::new(Arc::new(context.clone()))
-            .await
-            .map_err(|e| LLMSpellError::Component {
-                message: format!("Failed to initialize EventBridge: {e}"),
-                source: None,
-            })?,
-    );
+    let new_bridge = Arc::new(EventBridge::new(Arc::new(context.clone())).map_err(|e| {
+        LLMSpellError::Component {
+            message: format!("Failed to initialize EventBridge: {e}"),
+            source: None,
+        }
+    })?);
 
     // Store for future use
     context.set_bridge("event_bridge", new_bridge.clone());
@@ -84,7 +80,7 @@ impl GlobalObject for EventGlobal {
                         block_on_async::<_, _, LLMSpellError>(
                             "event_publish",
                             async move {
-                                let bridge = get_or_create_event_bridge(&context).await?;
+                                let bridge = get_or_create_event_bridge(&context)?;
 
                                 // Convert Lua data to JSON
                                 let data_json = crate::lua::conversion::lua_value_to_json(data)
@@ -165,7 +161,7 @@ impl GlobalObject for EventGlobal {
                     block_on_async::<_, _, LLMSpellError>(
                         "event_subscribe",
                         async move {
-                            let bridge = get_or_create_event_bridge(&context).await?;
+                            let bridge = get_or_create_event_bridge(&context)?;
 
                             let language = options.as_ref().map_or(Language::Lua, |opts| {
                                 opts.get::<&str, Option<String>>("language")
@@ -284,7 +280,7 @@ impl GlobalObject for EventGlobal {
                 block_on_async::<_, _, LLMSpellError>(
                     "event_unsubscribe",
                     async move {
-                        let bridge = get_or_create_event_bridge(&context).await?;
+                        let bridge = get_or_create_event_bridge(&context)?;
 
                         // Remove the receiver from GlobalContext (we can't easily remove from GlobalContext,
                         // so we'll just check if it exists)
@@ -330,7 +326,7 @@ impl GlobalObject for EventGlobal {
                 block_on_async::<_, _, LLMSpellError>(
                     "event_list_subscriptions",
                     async move {
-                        let bridge = get_or_create_event_bridge(&context).await?;
+                        let bridge = get_or_create_event_bridge(&context)?;
                         let subscriptions = bridge.list_subscriptions();
 
                         // Convert to Lua-friendly format
@@ -379,7 +375,7 @@ impl GlobalObject for EventGlobal {
                 block_on_async::<_, _, LLMSpellError>(
                     "event_get_stats",
                     async move {
-                        let bridge = get_or_create_event_bridge(&context).await?;
+                        let bridge = get_or_create_event_bridge(&context)?;
                         let stats = bridge.get_stats().await;
 
                         // Convert JSON stats to Lua value

@@ -489,7 +489,7 @@ mod tests {
             Arc::new(ComponentRegistry::new()),
             Arc::new(ProviderManager::new(Default::default()).await.unwrap()),
         ));
-        let hook_bridge = Arc::new(HookBridge::new(context.clone()).await.unwrap());
+        let hook_bridge = Arc::new(HookBridge::new(context.clone()).unwrap());
 
         inject_hook_global(&lua, &context, hook_bridge).unwrap();
 

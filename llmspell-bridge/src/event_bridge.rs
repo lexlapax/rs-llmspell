@@ -35,7 +35,7 @@ impl EventBridge {
     /// # Errors
     ///
     /// Returns an error if EventBridge initialization fails
-    pub async fn new(context: Arc<GlobalContext>) -> Result<Self> {
+    pub fn new(context: Arc<GlobalContext>) -> Result<Self> {
         let event_bus = Arc::new(EventBus::new());
 
         Ok(Self {
@@ -177,14 +177,14 @@ mod tests {
     #[tokio::test]
     async fn test_event_bridge_creation() {
         let context = create_test_context().await;
-        let bridge = EventBridge::new(context).await.unwrap();
+        let bridge = EventBridge::new(context).unwrap();
 
         assert_eq!(bridge.subscription_count(), 0);
     }
     #[tokio::test]
     async fn test_event_publish_and_subscribe() {
         let context = create_test_context().await;
-        let bridge = EventBridge::new(context).await.unwrap();
+        let bridge = EventBridge::new(context).unwrap();
 
         // Subscribe to events
         let (sub_id, mut receiver) = bridge
@@ -219,7 +219,7 @@ mod tests {
     #[tokio::test]
     async fn test_subscription_management() {
         let context = create_test_context().await;
-        let bridge = EventBridge::new(context).await.unwrap();
+        let bridge = EventBridge::new(context).unwrap();
 
         // Create multiple subscriptions
         let (sub1, _) = bridge
@@ -248,7 +248,7 @@ mod tests {
     #[tokio::test]
     async fn test_stats() {
         let context = create_test_context().await;
-        let bridge = EventBridge::new(context).await.unwrap();
+        let bridge = EventBridge::new(context).unwrap();
 
         // Create subscriptions with different languages
         let (_sub1, _) = bridge
