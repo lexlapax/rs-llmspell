@@ -15,6 +15,7 @@ pub mod session_infrastructure;
 pub mod state_global;
 pub mod state_infrastructure;
 pub mod streaming_global;
+pub mod tool_api_standard;
 pub mod tool_global;
 pub mod types;
 pub mod workflow_global;

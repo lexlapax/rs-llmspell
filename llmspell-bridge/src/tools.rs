@@ -3,7 +3,9 @@
 
 use crate::discovery::BridgeDiscovery;
 use crate::ComponentRegistry;
-use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
+use llmspell_core::traits::tool::{
+    ResourceLimits, SecurityLevel, SecurityRequirements, ToolCategory, ToolSchema,
+};
 use llmspell_core::Tool;
 use llmspell_security::sandbox::{file_sandbox::FileSandbox, SandboxContext};
 use llmspell_tools::{
@@ -17,7 +19,6 @@ use llmspell_tools::{
     WebSearchTool, WebhookCallerTool, WebpageMonitorTool,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::sync::Arc;
 
 /// Initialize and register all Phase 2 tools with the bridge registry
@@ -279,128 +280,48 @@ pub struct ToolInfo {
     /// Tool description
     pub description: String,
     /// Tool category
-    pub category: String,
-    /// Required parameters
-    pub required_params: Vec<String>,
-    /// Optional parameters
-    pub optional_params: Vec<String>,
+    pub category: ToolCategory,
+    /// Security level
+    pub security_level: SecurityLevel,
+    /// Tool schema with parameters
+    pub schema: ToolSchema,
     /// Security requirements
-    pub requires_file_access: bool,
-    pub requires_network_access: bool,
-    pub requires_process_spawn: bool,
+    pub security_requirements: SecurityRequirements,
+    /// Resource limits
+    pub resource_limits: ResourceLimits,
 }
 
 /// Tool discovery service
 pub struct ToolDiscovery {
     /// Component registry
     registry: Arc<ComponentRegistry>,
-    /// Cached tool information
-    tool_info_cache: HashMap<String, ToolInfo>,
 }
 
 impl ToolDiscovery {
     /// Create a new tool discovery service
     pub fn new(registry: Arc<ComponentRegistry>) -> Self {
-        let mut tool_info_cache = HashMap::new();
-
-        // Populate tool information
-        // Utility tools
-        tool_info_cache.insert(
-            "base64_encoder".to_string(),
-            ToolInfo {
-                name: "base64_encoder".to_string(),
-                description: "Encode and decode Base64 data".to_string(),
-                category: "utility".to_string(),
-                required_params: vec!["operation".to_string(), "input".to_string()],
-                optional_params: vec!["encoding".to_string()],
-                requires_file_access: false,
-                requires_network_access: false,
-                requires_process_spawn: false,
-            },
-        );
-
-        tool_info_cache.insert(
-            "calculator".to_string(),
-            ToolInfo {
-                name: "calculator".to_string(),
-                description: "Perform mathematical calculations".to_string(),
-                category: "utility".to_string(),
-                required_params: vec!["expression".to_string()],
-                optional_params: vec!["precision".to_string()],
-                requires_file_access: false,
-                requires_network_access: false,
-                requires_process_spawn: false,
-            },
-        );
-
-        // Data processing tools
-        tool_info_cache.insert(
-            "csv_analyzer".to_string(),
-            ToolInfo {
-                name: "csv_analyzer".to_string(),
-                description: "Analyze and process CSV data".to_string(),
-                category: "data_processing".to_string(),
-                required_params: vec!["operation".to_string(), "input".to_string()],
-                optional_params: vec!["delimiter".to_string(), "headers".to_string()],
-                requires_file_access: false,
-                requires_network_access: false,
-                requires_process_spawn: false,
-            },
-        );
-
-        tool_info_cache.insert(
-            "json_processor".to_string(),
-            ToolInfo {
-                name: "json_processor".to_string(),
-                description: "Process and transform JSON data".to_string(),
-                category: "data_processing".to_string(),
-                required_params: vec!["operation".to_string(), "input".to_string()],
-                optional_params: vec!["expression".to_string(), "format".to_string()],
-                requires_file_access: false,
-                requires_network_access: false,
-                requires_process_spawn: false,
-            },
-        );
-
-        // File system tools
-        tool_info_cache.insert(
-            "file_operations".to_string(),
-            ToolInfo {
-                name: "file_operations".to_string(),
-                description: "Perform file system operations".to_string(),
-                category: "file_system".to_string(),
-                required_params: vec!["operation".to_string(), "path".to_string()],
-                optional_params: vec!["content".to_string(), "target_path".to_string()],
-                requires_file_access: true,
-                requires_network_access: false,
-                requires_process_spawn: false,
-            },
-        );
-
-        // Web tools
-        tool_info_cache.insert(
-            "web_search".to_string(),
-            ToolInfo {
-                name: "web_search".to_string(),
-                description: "Search the web for information".to_string(),
-                category: "web".to_string(),
-                required_params: vec!["query".to_string()],
-                optional_params: vec!["limit".to_string(), "language".to_string()],
-                requires_file_access: false,
-                requires_network_access: true,
-                requires_process_spawn: false,
-            },
-        );
-
-        Self {
-            registry,
-            tool_info_cache,
-        }
+        Self { registry }
     }
 
     /// Get information about a specific tool
     pub fn get_tool_info(&self, tool_name: &str) -> Option<ToolInfo> {
-        self.tool_info_cache.get(tool_name).cloned()
+        let tool = self.registry.get_tool(tool_name)?;
+        let metadata = tool.metadata();
+        let schema = tool.schema();
+        let category = tool.category();
+        let security_level = tool.security_level();
+        let security_requirements = tool.security_requirements();
+        let resource_limits = tool.resource_limits();
+
+        Some(ToolInfo {
+            name: tool_name.to_string(),
+            description: metadata.description.clone(),
+            category,
+            security_level,
+            schema,
+            security_requirements,
+            resource_limits,
+        })
     }
 
     /// List all available tool names
@@ -410,10 +331,18 @@ impl ToolDiscovery {
 
     /// Get tools by category
     pub fn get_tools_by_category(&self, category: &str) -> Vec<(String, ToolInfo)> {
-        self.tool_info_cache
-            .iter()
-            .filter(|(_, info)| info.category == category)
-            .map(|(name, info)| (name.clone(), info.clone()))
+        let tool_names = self.registry.list_tools();
+        tool_names
+            .into_iter()
+            .filter_map(|name| {
+                let tool = self.registry.get_tool(&name)?;
+                let tool_category = tool.category();
+                if tool_category.to_string() == category {
+                    self.get_tool_info(&name).map(|info| (name, info))
+                } else {
+                    None
+                }
+            })
             .collect()
     }
 }
@@ -444,10 +373,14 @@ impl BridgeDiscovery<ToolInfo> for ToolDiscovery {
     where
         F: Fn(&str, &ToolInfo) -> bool + Send,
     {
-        self.tool_info_cache
-            .iter()
-            .filter(|(name, info)| predicate(name, info))
-            .map(|(name, info)| (name.clone(), info.clone()))
+        let tool_names = self.registry.list_tools();
+        tool_names
+            .into_iter()
+            .filter_map(|name| {
+                self.get_tool_info(&name)
+                    .filter(|info| predicate(&name, info))
+                    .map(|info| (name, info))
+            })
             .collect()
     }
 }
