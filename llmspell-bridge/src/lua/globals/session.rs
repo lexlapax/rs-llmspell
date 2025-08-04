@@ -9,9 +9,83 @@ use llmspell_sessions::{
     types::{CreateSessionOptions, SessionQuery},
     SessionId,
 };
-use mlua::{Error as LuaError, Lua, Table};
+use mlua::{Error as LuaError, Lua, Table, UserData, UserDataMethods};
 use std::str::FromStr;
 use std::sync::Arc;
+
+/// SessionBuilder for creating sessions with method chaining
+#[derive(Clone)]
+struct SessionBuilder {
+    bridge: Arc<SessionBridge>,
+    name: Option<String>,
+    description: Option<String>,
+    tags: Vec<String>,
+}
+
+impl SessionBuilder {
+    fn new(bridge: Arc<SessionBridge>) -> Self {
+        Self {
+            bridge,
+            name: None,
+            description: None,
+            tags: Vec::new(),
+        }
+    }
+}
+
+impl UserData for SessionBuilder {
+    fn add_methods<'lua, M: UserDataMethods<'lua, Self>>(methods: &mut M) {
+        // Set name
+        methods.add_method_mut("name", |_, this, name: String| {
+            this.name = Some(name);
+            Ok(this.clone())
+        });
+
+        // Set description
+        methods.add_method_mut("description", |_, this, desc: String| {
+            this.description = Some(desc);
+            Ok(this.clone())
+        });
+
+        // Add single tag
+        methods.add_method_mut("tag", |_, this, tag: String| {
+            this.tags.push(tag);
+            Ok(this.clone())
+        });
+
+        // Add multiple tags
+        methods.add_method_mut("tags", |_, this, tags: Vec<String>| {
+            this.tags.extend(tags);
+            Ok(this.clone())
+        });
+
+        // Build method
+        methods.add_method("build", |_lua, this, ()| {
+            // Create session options
+            let mut builder = CreateSessionOptions::builder().tags(this.tags.clone());
+
+            if let Some(n) = &this.name {
+                builder = builder.name(n.clone());
+            }
+            if let Some(d) = &this.description {
+                builder = builder.description(d.clone());
+            }
+
+            let options = builder.build();
+
+            // Create session using bridge
+            let bridge = this.bridge.clone();
+            let result = block_on_async(
+                "session_builder_create",
+                async move { bridge.create_session(options).await },
+                None,
+            )?;
+
+            // Convert SessionId to string for Lua
+            Ok(result.to_string())
+        });
+    }
+}
 
 /// Inject Session global into Lua environment
 pub fn inject_session_global(
@@ -316,7 +390,7 @@ pub fn inject_session_global(
     session_table.set("get_replay_metadata", metadata_fn)?;
 
     // list_replayable method - list all sessions that can be replayed
-    let list_replayable_bridge = session_bridge;
+    let list_replayable_bridge = session_bridge.clone();
     let list_replayable_fn = lua.create_function(move |lua, ()| {
         let bridge = list_replayable_bridge.clone();
         let result = block_on_async(
@@ -335,6 +409,14 @@ pub fn inject_session_global(
     session_table.set("list_replayable", list_replayable_fn)?;
 
     // Set the Session table as a global
+    // Add Session.builder() method
+    let bridge_for_builder = session_bridge.clone();
+    let builder_fn =
+        lua.create_function(move |_lua, ()| Ok(SessionBuilder::new(bridge_for_builder.clone())))?;
+    session_table.set("builder", builder_fn)?;
+
+    // Note: Session.create() remains available but builder pattern is preferred
+
     lua.globals().set("Session", session_table)?;
 
     Ok(())

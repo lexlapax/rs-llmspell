@@ -11,6 +11,7 @@ use mlua::{Lua, Table, UserData, UserDataMethods, Value};
 use std::sync::Arc;
 // use std::time::Duration; // Unused for now
 use tracing::{debug, info};
+use uuid;
 
 /// Parse step configuration from Lua table
 #[allow(dead_code)]
@@ -434,6 +435,304 @@ impl UserData for WorkflowInstance {
 
             Ok(metrics_table)
         });
+    }
+}
+
+/// WorkflowBuilder for creating workflows with method chaining
+struct WorkflowBuilder {
+    bridge: Arc<WorkflowBridge>,
+    workflow_type: Option<String>,
+    name: Option<String>,
+    description: Option<String>,
+    steps: Vec<WorkflowStep>,
+    error_strategy: Option<String>,
+    timeout_ms: Option<u64>,
+    // Conditional workflow fields
+    condition: Option<Box<dyn Fn(&serde_json::Value) -> bool + Send + Sync>>,
+    then_steps: Vec<WorkflowStep>,
+    else_steps: Vec<WorkflowStep>,
+    // Loop workflow fields
+    loop_condition: Option<Box<dyn Fn(&serde_json::Value) -> bool + Send + Sync>>,
+    max_iterations: Option<usize>,
+    // Parallel workflow fields
+    max_concurrency: Option<usize>,
+}
+
+impl WorkflowBuilder {
+    fn new(bridge: Arc<WorkflowBridge>) -> Self {
+        Self {
+            bridge,
+            workflow_type: None,
+            name: None,
+            description: None,
+            steps: Vec::new(),
+            error_strategy: None,
+            timeout_ms: None,
+            condition: None,
+            then_steps: Vec::new(),
+            else_steps: Vec::new(),
+            loop_condition: None,
+            max_iterations: None,
+            max_concurrency: None,
+        }
+    }
+}
+
+impl UserData for WorkflowBuilder {
+    fn add_methods<'lua, M: UserDataMethods<'lua, Self>>(methods: &mut M) {
+        // Set workflow type
+        methods.add_method_mut("sequential", |_, this, ()| {
+            this.workflow_type = Some("sequential".to_string());
+            Ok(this.clone())
+        });
+
+        methods.add_method_mut("conditional", |_, this, ()| {
+            this.workflow_type = Some("conditional".to_string());
+            Ok(this.clone())
+        });
+
+        methods.add_method_mut("loop_workflow", |_, this, ()| {
+            this.workflow_type = Some("loop".to_string());
+            Ok(this.clone())
+        });
+
+        methods.add_method_mut("parallel", |_, this, ()| {
+            this.workflow_type = Some("parallel".to_string());
+            Ok(this.clone())
+        });
+
+        // Common configuration methods
+        methods.add_method_mut("name", |_, this, name: String| {
+            this.name = Some(name);
+            Ok(this.clone())
+        });
+
+        methods.add_method_mut("description", |_, this, desc: String| {
+            this.description = Some(desc);
+            Ok(this.clone())
+        });
+
+        methods.add_method_mut("error_strategy", |_, this, strategy: String| {
+            this.error_strategy = Some(strategy);
+            Ok(this.clone())
+        });
+
+        methods.add_method_mut("timeout_ms", |_, this, timeout: u64| {
+            this.timeout_ms = Some(timeout);
+            Ok(this.clone())
+        });
+
+        // Add step (for sequential, loop, and parallel workflows)
+        methods.add_method_mut("add_step", |lua, this, step_table: Table| {
+            let step = _parse_workflow_step(lua, step_table)?;
+            this.steps.push(step);
+            Ok(this.clone())
+        });
+
+        // Conditional workflow specific methods
+        methods.add_method_mut("condition", |_lua, this, _func: mlua::Function| {
+            // Store Lua function for condition evaluation
+            // Note: This is a simplified version - in production, you'd need to handle
+            // Lua function storage and evaluation properly
+            this.condition = Some(Box::new(move |_value| {
+                // In a real implementation, this would evaluate the Lua function
+                true
+            }));
+            Ok(this.clone())
+        });
+
+        methods.add_method_mut("add_then_step", |lua, this, step_table: Table| {
+            let step = _parse_workflow_step(lua, step_table)?;
+            this.then_steps.push(step);
+            Ok(this.clone())
+        });
+
+        methods.add_method_mut("add_else_step", |lua, this, step_table: Table| {
+            let step = _parse_workflow_step(lua, step_table)?;
+            this.else_steps.push(step);
+            Ok(this.clone())
+        });
+
+        // Loop workflow specific methods
+        methods.add_method_mut("loop_condition", |_lua, this, _func: mlua::Function| {
+            // Store Lua function for loop condition
+            this.loop_condition = Some(Box::new(move |_value| {
+                // In a real implementation, this would evaluate the Lua function
+                true
+            }));
+            Ok(this.clone())
+        });
+
+        methods.add_method_mut("max_iterations", |_, this, max: usize| {
+            this.max_iterations = Some(max);
+            Ok(this.clone())
+        });
+
+        // Parallel workflow specific methods
+        methods.add_method_mut("max_concurrency", |_, this, max: usize| {
+            this.max_concurrency = Some(max);
+            Ok(this.clone())
+        });
+
+        // Build method
+        methods.add_method("build", |_lua, this, ()| {
+            let workflow_type = this.workflow_type.as_ref().ok_or_else(|| {
+                mlua::Error::RuntimeError("Workflow type not specified".to_string())
+            })?;
+
+            let name = this.name.clone().unwrap_or_else(|| {
+                format!(
+                    "workflow_{}",
+                    uuid::Uuid::new_v4()
+                        .to_string()
+                        .chars()
+                        .take(8)
+                        .collect::<String>()
+                )
+            });
+
+            // Create configuration based on workflow type
+            let mut config = serde_json::json!({
+                "name": &name,
+                "description": this.description.as_deref().unwrap_or("Workflow created via builder")
+            });
+
+            if let Some(strategy) = &this.error_strategy {
+                config["error_strategy"] = serde_json::json!(strategy);
+            }
+
+            if let Some(timeout) = this.timeout_ms {
+                config["timeout_ms"] = serde_json::json!(timeout);
+            }
+
+            // Convert steps to JSON
+            let steps_json: Vec<serde_json::Value> = this
+                .steps
+                .iter()
+                .map(|step| {
+                    serde_json::json!({
+                        "name": &step.name,
+                        "type": match &step.step_type {
+                            StepType::Tool { tool_name, parameters } => {
+                                let mut step_json = serde_json::json!({
+                                    "type": "tool",
+                                    "tool": tool_name
+                                });
+                                if !parameters.is_null() {
+                                    step_json["input"] = parameters.clone();
+                                }
+                                step_json
+                            },
+                            StepType::Agent { agent_id, input } => {
+                                serde_json::json!({
+                                    "type": "agent",
+                                    "agent": agent_id.to_string(),
+                                    "input": input
+                                })
+                            },
+                            StepType::Custom { function_name, parameters } => {
+                                serde_json::json!({
+                                    "type": "custom",
+                                    "function": function_name,
+                                    "parameters": parameters
+                                })
+                            }
+                        }
+                    })
+                })
+                .collect();
+
+            config["steps"] = serde_json::json!(steps_json);
+
+            // Add type-specific configuration
+            match workflow_type.as_str() {
+                "conditional" => {
+                    // For conditional workflows, add then/else steps
+                    let then_steps_json: Vec<serde_json::Value> = this
+                        .then_steps
+                        .iter()
+                        .map(|step| {
+                            serde_json::json!({
+                                "name": &step.name,
+                                "type": "tool", // Simplified for now
+                                "tool": "placeholder"
+                            })
+                        })
+                        .collect();
+
+                    let else_steps_json: Vec<serde_json::Value> = this
+                        .else_steps
+                        .iter()
+                        .map(|step| {
+                            serde_json::json!({
+                                "name": &step.name,
+                                "type": "tool", // Simplified for now
+                                "tool": "placeholder"
+                            })
+                        })
+                        .collect();
+
+                    config["then_steps"] = serde_json::json!(then_steps_json);
+                    config["else_steps"] = serde_json::json!(else_steps_json);
+                }
+                "loop" => {
+                    if let Some(max_iter) = this.max_iterations {
+                        config["max_iterations"] = serde_json::json!(max_iter);
+                    }
+                }
+                "parallel" => {
+                    if let Some(max_conc) = this.max_concurrency {
+                        config["max_concurrency"] = serde_json::json!(max_conc);
+                    }
+                }
+                _ => {}
+            }
+
+            // Create workflow using bridge
+            let bridge = this.bridge.clone();
+            let workflow_name = name.clone();
+
+            let result = block_on_async(
+                "workflow_builder_create",
+                async move {
+                    let workflow_name_clone = workflow_name.clone();
+                    let workflow_type_clone = workflow_type.clone();
+                    bridge
+                        .create_workflow(workflow_type, config)
+                        .await
+                        .map(|_| WorkflowInstance {
+                            workflow_id: workflow_name_clone.clone(),
+                            bridge: bridge.clone(),
+                            name: workflow_name_clone,
+                            workflow_type: workflow_type_clone,
+                        })
+                },
+                None,
+            )?;
+
+            Ok(result)
+        });
+    }
+}
+
+// Implement Clone for WorkflowBuilder
+impl Clone for WorkflowBuilder {
+    fn clone(&self) -> Self {
+        Self {
+            bridge: self.bridge.clone(),
+            workflow_type: self.workflow_type.clone(),
+            name: self.name.clone(),
+            description: self.description.clone(),
+            steps: self.steps.clone(),
+            error_strategy: self.error_strategy.clone(),
+            timeout_ms: self.timeout_ms,
+            condition: None, // Can't clone closures, will be set fresh
+            then_steps: self.then_steps.clone(),
+            else_steps: self.else_steps.clone(),
+            loop_condition: None, // Can't clone closures, will be set fresh
+            max_iterations: self.max_iterations,
+            max_concurrency: self.max_concurrency,
+        }
     }
 }
 
@@ -1063,7 +1362,7 @@ pub fn inject_workflow_global(
     )?;
 
     // Workflow.clear() - remove all workflows
-    let bridge_clone = workflow_bridge;
+    let bridge_clone = workflow_bridge.clone();
     workflow_table.set(
         "clear",
         lua.create_function(move |_lua, ()| {
@@ -1096,6 +1395,12 @@ pub fn inject_workflow_global(
     )?;
 
     // Note: executeAsync helper removed - all methods now use synchronous API
+
+    // Add Workflow.builder() method
+    let bridge_for_builder = workflow_bridge.clone();
+    let builder_fn =
+        lua.create_function(move |_lua, ()| Ok(WorkflowBuilder::new(bridge_for_builder.clone())))?;
+    workflow_table.set("builder", builder_fn)?;
 
     // Set Workflow as global
     lua.globals().set("Workflow", workflow_table)?;

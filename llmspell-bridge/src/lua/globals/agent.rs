@@ -777,6 +777,257 @@ impl UserData for LuaAgentInstance {
     }
 }
 
+/// Lua userdata representing an agent builder
+#[derive(Clone)]
+struct AgentBuilder {
+    bridge: Arc<AgentBridge>,
+    name: Option<String>,
+    description: Option<String>,
+    model: Option<String>,
+    provider: Option<String>,
+    system_prompt: Option<String>,
+    temperature: Option<f32>,
+    max_tokens: Option<u32>,
+    max_conversation_length: Option<usize>,
+    base_url: Option<String>,
+    api_key: Option<String>,
+    allowed_tools: Vec<String>,
+    max_execution_time_secs: Option<u64>,
+    max_memory_mb: Option<u32>,
+    max_tool_calls: Option<u32>,
+    max_recursion_depth: Option<u32>,
+}
+
+impl AgentBuilder {
+    fn new(bridge: Arc<AgentBridge>) -> Self {
+        Self {
+            bridge,
+            name: None,
+            description: None,
+            model: None,
+            provider: None,
+            system_prompt: None,
+            temperature: None,
+            max_tokens: None,
+            max_conversation_length: None,
+            base_url: None,
+            api_key: None,
+            allowed_tools: Vec::new(),
+            max_execution_time_secs: None,
+            max_memory_mb: None,
+            max_tool_calls: None,
+            max_recursion_depth: None,
+        }
+    }
+}
+
+impl UserData for AgentBuilder {
+    fn add_methods<'lua, M: UserDataMethods<'lua, Self>>(methods: &mut M) {
+        // name method
+        methods.add_method_mut("name", |_, this, name: String| {
+            this.name = Some(name);
+            Ok(this.clone())
+        });
+
+        // description method
+        methods.add_method_mut("description", |_, this, description: String| {
+            this.description = Some(description);
+            Ok(this.clone())
+        });
+
+        // model method - supports "provider/model" syntax
+        methods.add_method_mut("model", |_, this, model: String| {
+            if model.contains('/') {
+                let parts: Vec<&str> = model.splitn(2, '/').collect();
+                this.provider = Some(parts[0].to_string());
+                this.model = Some(parts[1].to_string());
+            } else {
+                this.model = Some(model);
+                if this.provider.is_none() {
+                    this.provider = Some("openai".to_string());
+                }
+            }
+            Ok(this.clone())
+        });
+
+        // provider method
+        methods.add_method_mut("provider", |_, this, provider: String| {
+            this.provider = Some(provider);
+            Ok(this.clone())
+        });
+
+        // system_prompt method
+        methods.add_method_mut("system_prompt", |_, this, prompt: String| {
+            this.system_prompt = Some(prompt);
+            Ok(this.clone())
+        });
+
+        // temperature method
+        methods.add_method_mut("temperature", |_, this, temp: f32| {
+            this.temperature = Some(temp);
+            Ok(this.clone())
+        });
+
+        // max_tokens method
+        methods.add_method_mut("max_tokens", |_, this, tokens: u32| {
+            this.max_tokens = Some(tokens);
+            Ok(this.clone())
+        });
+
+        // max_conversation_length method
+        methods.add_method_mut("max_conversation_length", |_, this, length: usize| {
+            this.max_conversation_length = Some(length);
+            Ok(this.clone())
+        });
+
+        // base_url method
+        methods.add_method_mut("base_url", |_, this, url: String| {
+            this.base_url = Some(url);
+            Ok(this.clone())
+        });
+
+        // api_key method
+        methods.add_method_mut("api_key", |_, this, key: String| {
+            this.api_key = Some(key);
+            Ok(this.clone())
+        });
+
+        // allowed_tools method - can be called multiple times
+        methods.add_method_mut("allow_tool", |_, this, tool: String| {
+            this.allowed_tools.push(tool);
+            Ok(this.clone())
+        });
+
+        // allowed_tools method - set all at once
+        methods.add_method_mut("allowed_tools", |_, this, tools: Vec<String>| {
+            this.allowed_tools = tools;
+            Ok(this.clone())
+        });
+
+        // Resource limit methods
+        methods.add_method_mut("max_execution_time", |_, this, secs: u64| {
+            this.max_execution_time_secs = Some(secs);
+            Ok(this.clone())
+        });
+
+        methods.add_method_mut("max_memory_mb", |_, this, mb: u32| {
+            this.max_memory_mb = Some(mb);
+            Ok(this.clone())
+        });
+
+        methods.add_method_mut("max_tool_calls", |_, this, calls: u32| {
+            this.max_tool_calls = Some(calls);
+            Ok(this.clone())
+        });
+
+        methods.add_method_mut("max_recursion_depth", |_, this, depth: u32| {
+            this.max_recursion_depth = Some(depth);
+            Ok(this.clone())
+        });
+
+        // build method - creates the agent
+        methods.add_method("build", |_lua, this, ()| {
+            // Validate required fields
+            let model = this
+                .model
+                .as_ref()
+                .ok_or_else(|| mlua::Error::RuntimeError("Model is required".to_string()))?;
+
+            let provider = this
+                .provider
+                .as_ref()
+                .ok_or_else(|| mlua::Error::RuntimeError("Provider is required".to_string()))?;
+
+            // Generate name if not provided
+            let name = this.name.clone().unwrap_or_else(|| {
+                format!(
+                    "agent_{}",
+                    uuid::Uuid::new_v4()
+                        .to_string()
+                        .chars()
+                        .take(8)
+                        .collect::<String>()
+                )
+            });
+
+            // Create model configuration
+            let model_config = serde_json::json!({
+                "provider": provider,
+                "model_id": model,
+                "temperature": this.temperature,
+                "max_tokens": this.max_tokens,
+                "settings": {
+                    "base_url": this.base_url,
+                    "api_key": this.api_key
+                }
+            });
+
+            // Create custom config
+            let mut custom_config = serde_json::Map::new();
+            if let Some(prompt) = &this.system_prompt {
+                custom_config.insert("system_prompt".to_string(), serde_json::json!(prompt));
+            }
+            if let Some(len) = this.max_conversation_length {
+                custom_config.insert(
+                    "max_conversation_length".to_string(),
+                    serde_json::json!(len),
+                );
+            }
+
+            // Create full agent configuration
+            let agent_config = serde_json::json!({
+                "name": &name,
+                "description": this.description.as_deref().unwrap_or("LLM-powered agent"),
+                "agent_type": "llm",
+                "model": model_config,
+                "allowed_tools": this.allowed_tools,
+                "custom_config": custom_config,
+                "resource_limits": {
+                    "max_execution_time_secs": this.max_execution_time_secs.unwrap_or(300),
+                    "max_memory_mb": this.max_memory_mb.unwrap_or(512),
+                    "max_tool_calls": this.max_tool_calls.unwrap_or(100),
+                    "max_recursion_depth": this.max_recursion_depth.unwrap_or(10)
+                }
+            });
+
+            // Convert JSON value to HashMap for bridge
+            let config_map: HashMap<String, serde_json::Value> = match agent_config {
+                serde_json::Value::Object(map) => map.into_iter().collect(),
+                _ => {
+                    return Err(mlua::Error::RuntimeError(
+                        "Invalid agent configuration format".to_string(),
+                    ))
+                }
+            };
+
+            // Create agent using bridge
+            let bridge = this.bridge.clone();
+            let agent_name_clone = name.clone();
+            let agent_name_for_create = name.clone();
+
+            block_on_async(
+                "agent_builder_create",
+                async move {
+                    bridge
+                        .create_agent(
+                            &agent_name_for_create,
+                            "llm", // agent_type from the config
+                            config_map,
+                        )
+                        .await
+                },
+                None,
+            )?;
+
+            // Return agent instance
+            Ok(LuaAgentInstance {
+                agent_instance_name: agent_name_clone,
+                bridge: this.bridge.clone(),
+            })
+        });
+    }
+}
+
 /// Inject Agent global into Lua environment
 pub fn inject_agent_global(
     lua: &Lua,
@@ -787,129 +1038,6 @@ pub fn inject_agent_global(
 
     // Store bridge reference in context for cross-global access
     context.set_bridge("agent", bridge.clone());
-
-    // Create Agent.create() function (synchronous wrapper)
-    let bridge_clone = bridge.clone();
-    let create_fn = lua.create_function(move |_lua, args: Table| {
-        let bridge = bridge_clone.clone();
-
-        // Extract configuration from Lua table
-        let name: String = args.get("name").unwrap_or_else(|_| {
-            format!(
-                "agent_{}",
-                uuid::Uuid::new_v4()
-                    .to_string()
-                    .chars()
-                    .take(8)
-                    .collect::<String>()
-            )
-        });
-        let description: String = args
-            .get("description")
-            .unwrap_or_else(|_| "LLM-powered agent".to_string());
-        let system_prompt: Option<String> = args.get("system_prompt").ok();
-        let temperature: Option<f32> = args.get("temperature").ok();
-        let max_tokens: Option<u32> = args.get("max_tokens").ok().map(|v: usize| v as u32);
-        let max_conversation_length: Option<usize> = args.get("max_conversation_length").ok();
-        let base_url: Option<String> = args.get("base_url").ok();
-        let api_key: Option<String> = args.get("api_key").ok();
-
-        // Get model specification - support both "model" and "provider_model" fields
-        let model_str = args
-            .get::<_, Option<String>>("model")
-            .ok()
-            .flatten()
-            .or_else(|| {
-                args.get::<_, Option<String>>("provider_model")
-                    .ok()
-                    .flatten()
-            })
-            .ok_or_else(|| {
-                mlua::Error::RuntimeError(
-                    "Model specification required (use 'model' field)".to_string(),
-                )
-            })?;
-
-        // Parse provider/model syntax (e.g., "openai/gpt-4")
-        let (provider, model_id) = if model_str.contains('/') {
-            let parts: Vec<&str> = model_str.splitn(2, '/').collect();
-            (parts[0].to_string(), parts[1].to_string())
-        } else {
-            // Default to openai if no provider specified
-            ("openai".to_string(), model_str)
-        };
-
-        // Create model configuration
-        let model_config = serde_json::json!({
-            "provider": provider,
-            "model_id": model_id,
-            "temperature": temperature,
-            "max_tokens": max_tokens,
-            "settings": {
-                "base_url": base_url,
-                "api_key": api_key
-            }
-        });
-
-        // Create custom config for agent
-        let mut custom_config = serde_json::Map::new();
-        if let Some(prompt) = system_prompt {
-            custom_config.insert("system_prompt".to_string(), serde_json::json!(prompt));
-        }
-        if let Some(len) = max_conversation_length {
-            custom_config.insert(
-                "max_conversation_length".to_string(),
-                serde_json::json!(len),
-            );
-        }
-
-        // Create full agent configuration
-        let agent_config = serde_json::json!({
-            "name": name,
-            "description": description,
-            "agent_type": "llm",  // Default to LLM agent type
-            "model": model_config,
-            "allowed_tools": [],  // Can be extended later
-            "custom_config": custom_config,
-            "resource_limits": {
-                "max_execution_time_secs": 300,
-                "max_memory_mb": 512,
-                "max_tool_calls": 100,
-                "max_recursion_depth": 10
-            }
-        });
-
-        // Convert JSON value to HashMap for bridge
-        let config_map: HashMap<String, serde_json::Value> = match agent_config {
-            serde_json::Value::Object(map) => map.into_iter().collect(),
-            _ => {
-                return Err(mlua::Error::RuntimeError(
-                    "Invalid agent configuration format".to_string(),
-                ))
-            }
-        };
-
-        // Use block_on to execute async code synchronously
-        tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(async {
-                // Create the agent through discovery
-                bridge
-                    .create_agent(&name, "llm", config_map)
-                    .await
-                    .map_err(|e| {
-                        mlua::Error::RuntimeError(format!("Failed to create agent: {e}"))
-                    })?;
-
-                // Create Lua agent instance
-                let agent_instance = LuaAgentInstance {
-                    agent_instance_name: name,
-                    bridge: bridge.clone(),
-                };
-
-                Ok(agent_instance)
-            })
-        })
-    })?;
 
     // Create Agent.list() function
     let bridge_clone = bridge.clone();
@@ -1344,7 +1472,7 @@ pub fn inject_agent_global(
     })?;
 
     // Create Agent.get_details() function (alias for get_info with different return format)
-    let bridge_clone = bridge;
+    let bridge_clone = bridge.clone();
     let get_details_fn = lua.create_function(move |lua, agent_name: String| {
         let bridge = bridge_clone.clone();
 
@@ -1358,8 +1486,27 @@ pub fn inject_agent_global(
         json_to_lua_value(lua, &details)
     })?;
 
+    // Add builder() method
+    let bridge_for_builder = bridge.clone();
+    let builder_fn =
+        lua.create_function(move |_lua, ()| Ok(AgentBuilder::new(bridge_for_builder.clone())))?;
+    agent_table.set("builder", builder_fn)?;
+
+    // Replace create() with deprecation notice
+    let create_deprecated_fn = lua.create_function(|_, _: Value| {
+        Err::<Value, _>(mlua::Error::RuntimeError(
+            "Agent.create() is deprecated. Use Agent.builder() instead:\n\
+             local agent = Agent.builder()\n\
+                 :name('my_agent')\n\
+                 :model('openai/gpt-4')\n\
+                 :temperature(0.7)\n\
+                 :build()"
+                .to_string(),
+        ))
+    })?;
+
     // Set functions on Agent table
-    agent_table.set("create", create_fn)?;
+    agent_table.set("create", create_deprecated_fn)?;
     agent_table.set("list", list_fn)?;
     agent_table.set("discover", discover_fn)?;
     agent_table.set("wrap_as_tool", wrap_as_tool_fn)?;
