@@ -1,7 +1,7 @@
 //! ABOUTME: Core types and foundational data structures
 //! ABOUTME: Provides ComponentId, Version, ComponentMetadata and streaming types
 
-mod agent_io;
+pub mod agent_io;
 mod media;
 mod streaming;
 

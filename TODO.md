@@ -1809,11 +1809,12 @@ All code compiles cleanly with no warnings from cargo fmt or clippy.
    - Doc test failure for tool execute() method
 
 **Implementation Steps**:
-1. [ ] **Fix Core Module Access** (30 min):
-   - [ ] Change `mod agent_io;` to `pub mod agent_io;` in llmspell-core/src/types/mod.rs
-   - [ ] Verify AgentInput/AgentOutput/ExecutionContext accessible from all crates
-   - [ ] Run `cargo build --all` to confirm basic compilation
-   - [ ] DO NOT add old fields back - maintain simplified AgentOutput structure
+1. [x] **Fix Core Module Access** (30 min): ✅ COMPLETED
+   - [x] Change `mod agent_io;` to `pub mod agent_io;` in llmspell-core/src/types/mod.rs
+   - [x] Verify AgentInput/AgentOutput/ExecutionContext accessible from all crates
+   - [x] Run `cargo build --all` to confirm basic compilation
+   - [x] DO NOT add old fields back - maintain simplified AgentOutput structure
+   **Notes**: Module now public, AgentInput errors show `prompt` → `text` field change needed
 
 2. [ ] **Fix llmspell-workflows (Most Critical)** (3.5 hours):
    - [ ] **Examples** (2 hours):
