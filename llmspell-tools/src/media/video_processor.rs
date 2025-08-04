@@ -557,6 +557,7 @@ impl Tool for VideoProcessorTool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use llmspell_testing::tool_helpers::create_test_tool_input;
     use std::collections::HashMap;
     use std::fs;
     use tempfile::TempDir;
@@ -783,9 +784,7 @@ mod tests {
         fs::write(&file_path, b"dummy").unwrap();
 
         // No operation specified, should default to metadata
-        let input = create_test_tool_input(vec![
-            ,
-        ]);
+        let input = create_test_tool_input(vec![]);
 
         let result = tool
             .execute(input, ExecutionContext::default())

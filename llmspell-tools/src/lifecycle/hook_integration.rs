@@ -215,6 +215,8 @@ impl ToolHookContext {
 pub struct ToolExecutor {
     /// Hook executor for running hooks
     hook_executor: Option<Arc<HookExecutor>>,
+    /// Hook registry for retrieving hooks
+    hook_registry: Option<Arc<HookRegistry>>,
     /// Circuit breaker for performance protection
     circuit_breaker: Option<Arc<CircuitBreaker>>,
     /// Configuration
@@ -235,7 +237,7 @@ impl ToolExecutor {
         let component_id = ComponentId::new(ComponentType::Tool, "tool_executor".to_string());
 
         let circuit_breaker = if config.enable_circuit_breaker {
-            hook_registry.map(|_registry| {
+            hook_registry.as_ref().map(|_registry| {
                 Arc::new(CircuitBreaker::new(format!(
                     "tool_executor_{}",
                     component_id.name
@@ -247,6 +249,7 @@ impl ToolExecutor {
 
         Self {
             hook_executor,
+            hook_registry,
             circuit_breaker,
             config,
             component_id,
@@ -437,11 +440,13 @@ impl ToolExecutor {
             return Ok(input_data);
         }
 
-        let Some(ref _hook_executor) = self.hook_executor else {
+        let (Some(ref hook_executor), Some(ref hook_registry)) =
+            (&self.hook_executor, &self.hook_registry)
+        else {
             return Ok(input_data);
         };
 
-        let _hook_point = tool_context.get_hook_point();
+        let hook_point = tool_context.get_hook_point();
 
         // Track hook execution time for performance monitoring
         let hook_start = Instant::now();
@@ -458,9 +463,66 @@ impl ToolExecutor {
             }
         }
 
-        // TODO: Get hooks from registry and execute them properly
-        // For now, simulate hook execution delay
-        tokio::time::sleep(Duration::from_millis(1)).await;
+        // Get hooks from registry for this hook point
+        let hooks = hook_registry.get_hooks(&hook_point);
+
+        if !hooks.is_empty() {
+            // Convert tool context to hook context for execution
+            let mut hook_context = tool_context.base_context.clone();
+
+            // Add tool-specific metadata
+            hook_context.metadata.insert(
+                "tool_name".to_string(),
+                tool_context.tool_metadata.name.clone(),
+            );
+            hook_context.metadata.insert(
+                "tool_category".to_string(),
+                format!("{:?}", tool_context.tool_category),
+            );
+            hook_context.metadata.insert(
+                "security_level".to_string(),
+                format!("{:?}", tool_context.security_level),
+            );
+            hook_context.metadata.insert(
+                "execution_phase".to_string(),
+                format!("{:?}", tool_context.execution_phase),
+            );
+
+            // Add resource metrics to hook context
+            for (key, value) in &tool_context.resource_metrics {
+                hook_context
+                    .data
+                    .insert(format!("resource_{}", key), value.clone());
+            }
+
+            // Execute hooks
+            let results = hook_executor.execute_hooks(&hooks, &mut hook_context).await;
+
+            match results {
+                Ok(hook_results) => {
+                    // Check results for any that should block execution
+                    for result in hook_results {
+                        if let llmspell_hooks::HookResult::Cancel(reason) = result {
+                            return Err(LLMSpellError::Tool {
+                                message: format!(
+                                    "Hook cancelled tool execution for phase {:?}: {}",
+                                    tool_context.execution_phase, reason
+                                ),
+                                tool_name: Some(tool_context.tool_metadata.name.clone()),
+                                source: None,
+                            });
+                        }
+                    }
+                }
+                Err(e) => {
+                    warn!(
+                        "Hook execution failed for phase {:?}: {}",
+                        tool_context.execution_phase, e
+                    );
+                    // Continue execution - hooks should not break tool functionality
+                }
+            }
+        }
 
         let hook_duration = hook_start.elapsed();
 

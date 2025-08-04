@@ -748,7 +748,7 @@ mod tests {
 
         let input = create_test_tool_input(vec![
             ("executable", "echo"),
-            ("arguments", "["Hello", "World"]"),
+            ("arguments", r#"["Hello", "World"]"#),
         ]);
 
         let result = tool
@@ -822,7 +822,7 @@ mod tests {
         let tool = create_test_process_executor();
 
         // Test dangerous characters
-        let input1 = create_test_input(
+        let input1 = create_test_tool_input(
             "Execute with dangerous chars",
             json!({
                 "executable": "echo; rm -rf /",
@@ -838,7 +838,7 @@ mod tests {
             .contains("dangerous characters"));
 
         // Test path traversal
-        let input2 = create_test_input(
+        let input2 = create_test_tool_input(
             "Execute with path traversal",
             json!({
                 "executable": "../../../bin/echo",
@@ -873,7 +873,7 @@ mod tests {
             .contains("Missing parameters object"));
 
         // Empty executable
-        let input2 = create_test_input(
+        let input2 = create_test_tool_input(
             "Empty executable",
             json!({
                 "executable": ""

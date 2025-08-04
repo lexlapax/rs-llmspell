@@ -495,7 +495,9 @@ impl Tool for EnvironmentReaderTool {
 mod tests {
     use super::*;
     use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
-    use llmspell_testing::tool_helpers::{create_test_tool, create_test_tool_input};
+    use llmspell_testing::tool_helpers::{
+        create_test_tool, create_test_tool_input, create_test_tool_input_json,
+    };
     use std::collections::HashMap;
 
     fn create_test_environment_reader() -> EnvironmentReaderTool {
@@ -644,27 +646,17 @@ mod tests {
         let tool = create_test_environment_reader();
 
         // Missing operation
-        let input1 = create_test_input("Missing operation", json!({}));
+        let input1 = create_test_tool_input(vec![]);
         let result1 = tool.execute(input1, ExecutionContext::default()).await;
         assert!(result1.is_err());
 
         // Missing variable_name for get operation
-        let input2 = create_test_input(
-            "Missing variable name",
-            json!({
-                "operation": "get"
-            }),
-        );
+        let input2 = create_test_tool_input(vec![("operation", "get")]);
         let result2 = tool.execute(input2, ExecutionContext::default()).await;
         assert!(result2.is_err());
 
         // Missing pattern for pattern operation
-        let input3 = create_test_input(
-            "Missing pattern",
-            json!({
-                "operation": "pattern"
-            }),
-        );
+        let input3 = create_test_tool_input(vec![("operation", "pattern")]);
         let result3 = tool.execute(input3, ExecutionContext::default()).await;
         assert!(result3.is_err());
     }
@@ -673,7 +665,7 @@ mod tests {
         let tool = create_test_tool_with_sandbox();
 
         // Should allow TEST_* variables due to sandbox permissions
-        let input1 = create_test_input(
+        let input1 = create_test_tool_input(
             "Get test variable",
             json!({
                 "operation": "get",
@@ -688,7 +680,7 @@ mod tests {
         );
 
         // Should allow PATH due to sandbox permissions
-        let input2 = create_test_input(
+        let input2 = create_test_tool_input(
             "Get PATH",
             json!({
                 "operation": "get",
@@ -699,7 +691,7 @@ mod tests {
         assert!(result2.is_ok(), "PATH should be allowed by sandbox");
 
         // Should deny HOME even though it's in default safe vars (sandbox overrides)
-        let input3 = create_test_input(
+        let input3 = create_test_tool_input(
             "Get HOME",
             json!({
                 "operation": "get",

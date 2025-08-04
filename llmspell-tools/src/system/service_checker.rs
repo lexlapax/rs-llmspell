@@ -683,6 +683,7 @@ impl Tool for ServiceCheckerTool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use llmspell_testing::tool_helpers::create_test_tool_input;
     use llmspell_testing::tool_helpers::{create_test_tool, create_test_tool_input};
     use std::collections::HashMap;
 
@@ -781,7 +782,7 @@ mod tests {
         let tool = create_test_service_checker();
 
         // Missing target
-        let input1 = create_test_input(
+        let input1 = create_test_tool_input(
             "Missing target",
             json!({
                 "check_type": "tcp"
@@ -795,7 +796,7 @@ mod tests {
             .contains("Missing required parameter 'target'"));
 
         // Missing check_type
-        let input2 = create_test_input(
+        let input2 = create_test_tool_input(
             "Missing check type",
             json!({
                 "target": "localhost:80"
@@ -809,7 +810,7 @@ mod tests {
             .contains("Missing required parameter 'check_type'"));
 
         // Invalid check_type
-        let input3 = create_test_input(
+        let input3 = create_test_tool_input(
             "Invalid check type",
             json!({
                 "target": "localhost:80",
@@ -824,7 +825,7 @@ mod tests {
             .contains("Invalid check_type"));
 
         // Empty target
-        let input4 = create_test_input(
+        let input4 = create_test_tool_input(
             "Empty target",
             json!({
                 "target": "",
@@ -836,7 +837,7 @@ mod tests {
         assert!(result4.unwrap_err().to_string().contains("cannot be empty"));
 
         // Excessive timeout
-        let input5 = create_test_input(
+        let input5 = create_test_tool_input(
             "Excessive timeout",
             json!({
                 "target": "localhost:80",

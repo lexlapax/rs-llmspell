@@ -587,6 +587,7 @@ mod tests {
     use super::*;
     use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
     use llmspell_security::sandbox::SandboxContext;
+    use llmspell_testing::tool_helpers::create_test_tool_input;
     use llmspell_testing::tool_helpers::{create_test_tool, create_test_tool_input};
     use std::collections::HashMap;
     use tempfile::TempDir;
@@ -851,7 +852,7 @@ mod tests {
         let (tool, _temp_dir) = create_test_tool();
 
         // Missing pattern
-        let input1 = create_test_input(
+        let input1 = create_test_tool_input(
             "Missing pattern",
             json!({
                 "path": "/tmp/test.txt"
@@ -865,7 +866,7 @@ mod tests {
             .contains("Missing required parameter"));
 
         // Missing path
-        let input2 = create_test_input(
+        let input2 = create_test_tool_input(
             "Missing path",
             json!({
                 "pattern": "test"
@@ -879,7 +880,7 @@ mod tests {
             .contains("Missing required parameter"));
 
         // Invalid context_lines
-        let input3 = create_test_input(
+        let input3 = create_test_tool_input(
             "Invalid context lines",
             json!({
                 "pattern": "test",

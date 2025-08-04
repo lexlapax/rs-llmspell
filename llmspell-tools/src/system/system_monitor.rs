@@ -680,6 +680,7 @@ impl Tool for SystemMonitorTool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use llmspell_testing::tool_helpers::create_test_tool_input;
     use llmspell_testing::tool_helpers::{create_test_tool, create_test_tool_input};
 
     fn create_test_system_monitor() -> SystemMonitorTool {
@@ -767,7 +768,7 @@ mod tests {
         let tool = create_test_system_monitor();
 
         // No operation parameter should default to "all"
-        let input = create_test_input("Get default statistics", json!({}));
+        let input = create_test_tool_input("Get default statistics", json!({}));
 
         let result = tool
             .execute(input, ExecutionContext::default())
