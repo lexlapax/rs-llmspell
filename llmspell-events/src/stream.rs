@@ -322,9 +322,13 @@ pub struct ThroughputMeasurement {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::universal_event::Language;
-    use llmspell_testing::event_helpers::create_test_event;
+    use crate::universal_event::{Language, UniversalEvent};
     use serde_json::Value;
+
+    // Local test helper to avoid circular dependency with llmspell-testing
+    fn create_test_event(event_type: &str) -> UniversalEvent {
+        UniversalEvent::new(event_type, Value::Null, Language::Rust)
+    }
     use tokio_stream::StreamExt;
     #[tokio::test]
     async fn test_batched_stream() {

@@ -684,7 +684,7 @@ mod tests {
     #[tokio::test]
     async fn test_parameter_transform_types() {
         let agent = Arc::new(MockAgent::new("test-agent", "A test agent"));
-        let wrapped = AgentWrappedTool::new(agent, ToolCategory::Utility, SecurityLevel::Safe);
+        let _wrapped = AgentWrappedTool::new(agent, ToolCategory::Utility, SecurityLevel::Safe);
 
         // Test ToString transform
         let transform = ParameterTransform::to_string("target");

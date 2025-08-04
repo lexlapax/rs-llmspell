@@ -9,13 +9,14 @@ use llmspell_agents::{
     AgentBuilder, AgentConfig, AgentFactory, DIContainer, DefaultAgentFactory, ResourceLimits,
 };
 use llmspell_core::{types::AgentInput, BaseAgent, ExecutionContext};
-use llmspell_testing::agent_helpers::create_test_provider_manager;
+use llmspell_providers::ProviderManager;
 use std::{sync::Arc, time::Duration};
 
 /// Test agent factory creation
 #[tokio::test]
 async fn test_agent_factory_creation() {
-    let factory = DefaultAgentFactory::new(create_test_provider_manager());
+    let provider_manager = Arc::new(ProviderManager::new());
+    let factory = DefaultAgentFactory::new(provider_manager);
 
     let config = AgentConfig {
         name: "test_agent".to_string(),
@@ -41,7 +42,8 @@ async fn test_agent_builder() {
         .build()
         .unwrap();
 
-    let factory = DefaultAgentFactory::new(create_test_provider_manager());
+    let provider_manager = Arc::new(ProviderManager::new());
+    let factory = DefaultAgentFactory::new(provider_manager);
     let agent = factory.create_agent(config).await.unwrap();
 
     let metadata = agent.metadata();

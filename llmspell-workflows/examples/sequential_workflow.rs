@@ -3,6 +3,9 @@
 //! This example demonstrates how to create and execute a sequential workflow
 //! that processes data through multiple steps in order.
 
+use llmspell_core::traits::base_agent::BaseAgent;
+use llmspell_core::types::agent_io::AgentInput;
+use llmspell_core::execution_context::ExecutionContext;
 use llmspell_workflows::{
     ErrorStrategy, SequentialWorkflow, StepType, WorkflowConfig, WorkflowStep,
 };
@@ -12,6 +15,16 @@ use std::time::Duration;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize tracing for logging
     tracing_subscriber::fmt::init();
+    
+    // Create reusable input and context for examples
+    let create_execution_params = || {
+        let input = AgentInput {
+            prompt: "Execute workflow".to_string(),
+            context: Default::default(),
+        };
+        let context = ExecutionContext::default();
+        (input, context)
+    };
 
     println!("🚀 Starting Sequential Workflow Example");
 
@@ -115,7 +128,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("🔄 Executing workflow...");
     let start_time = std::time::Instant::now();
 
-    match workflow.execute().await {
+    let (input, context) = create_execution_params();
+    match workflow.execute(input, context).await {
         Ok(result) => {
             let execution_time = start_time.elapsed();
             println!("🎉 Workflow completed successfully in {:?}", execution_time);
@@ -210,7 +224,8 @@ async fn example_with_retry_strategy() -> Result<(), Box<dyn std::error::Error>>
         .add_step(unstable_step)
         .build();
 
-    match workflow.execute().await {
+    let (input, context) = create_execution_params();
+    match workflow.execute(input, context).await {
         Ok(result) => {
             println!("✅ Workflow with retry completed");
             if let Some(step_result) = result.successful_steps.first() {
@@ -271,7 +286,8 @@ async fn example_with_continue_strategy() -> Result<(), Box<dyn std::error::Erro
     }
 
     let workflow = workflow_builder.build();
-    let result = workflow.execute().await?;
+    let (input, context) = create_execution_params();
+    let result = workflow.execute(input, context).await?;
 
     println!(
         "📊 Results: {} successful, {} failed",

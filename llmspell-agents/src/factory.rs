@@ -471,7 +471,7 @@ impl AgentFactory for DefaultAgentFactory {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use llmspell_testing::agent_helpers::create_test_provider_manager;
+    use llmspell_providers::ProviderManager;
     #[test]
     fn test_default_resource_limits() {
         let limits = ResourceLimits::default();
@@ -482,7 +482,7 @@ mod tests {
     }
 
     async fn create_test_factory() -> DefaultAgentFactory {
-        let provider_manager = create_test_provider_manager();
+        let provider_manager = Arc::new(ProviderManager::new());
         DefaultAgentFactory::new(provider_manager)
     }
     #[tokio::test]

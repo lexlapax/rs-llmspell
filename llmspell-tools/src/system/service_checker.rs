@@ -683,7 +683,6 @@ impl Tool for ServiceCheckerTool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use llmspell_testing::tool_helpers::create_test_tool_input;
     use llmspell_testing::tool_helpers::{create_test_tool, create_test_tool_input};
     use std::collections::HashMap;
 
@@ -796,12 +795,9 @@ mod tests {
             .contains("Missing required parameter 'target'"));
 
         // Missing check_type
-        let input2 = create_test_tool_input(
-            "Missing check type",
-            json!({
-                "target": "localhost:80"
-            }),
-        );
+        let input2 = create_test_tool_input(vec![
+            ("target", "localhost:80"),
+        ]);
         let result2 = tool.execute(input2, ExecutionContext::default()).await;
         assert!(result2.is_err());
         assert!(result2
@@ -810,13 +806,10 @@ mod tests {
             .contains("Missing required parameter 'check_type'"));
 
         // Invalid check_type
-        let input3 = create_test_tool_input(
-            "Invalid check type",
-            json!({
-                "target": "localhost:80",
-                "check_type": "invalid"
-            }),
-        );
+        let input3 = create_test_tool_input(vec![
+            ("target", "localhost:80"),
+            ("check_type", "invalid"),
+        ]);
         let result3 = tool.execute(input3, ExecutionContext::default()).await;
         assert!(result3.is_err());
         assert!(result3
@@ -825,26 +818,20 @@ mod tests {
             .contains("Invalid check_type"));
 
         // Empty target
-        let input4 = create_test_tool_input(
-            "Empty target",
-            json!({
-                "target": "",
-                "check_type": "tcp"
-            }),
-        );
+        let input4 = create_test_tool_input(vec![
+            ("target", ""),
+            ("check_type", "tcp"),
+        ]);
         let result4 = tool.execute(input4, ExecutionContext::default()).await;
         assert!(result4.is_err());
         assert!(result4.unwrap_err().to_string().contains("cannot be empty"));
 
         // Excessive timeout
-        let input5 = create_test_tool_input(
-            "Excessive timeout",
-            json!({
-                "target": "localhost:80",
-                "check_type": "tcp",
-                "timeout_seconds": 100
-            }),
-        );
+        let input5 = create_test_tool_input(vec![
+            ("target", "localhost:80"),
+            ("check_type", "tcp"),
+            ("timeout_seconds", "100"),
+        ]);
         let result5 = tool.execute(input5, ExecutionContext::default()).await;
         assert!(result5.is_err());
         assert!(result5.unwrap_err().to_string().contains("exceeds maximum"));

@@ -204,12 +204,12 @@ mod tests {
     use super::*;
     use crate::factory::DefaultAgentFactory;
     use crate::ResourceLimits;
-    use llmspell_testing::agent_helpers::create_test_provider_manager;
+    use llmspell_providers::ProviderManager;
 
     #[tokio::test]
     async fn test_factory_registry() {
         let registry = FactoryRegistry::new();
-        let provider_manager = create_test_provider_manager();
+        let provider_manager = Arc::new(ProviderManager::new());
         let factory1 = Arc::new(DefaultAgentFactory::new(provider_manager.clone()));
         let factory2 = Arc::new(DefaultAgentFactory::new(provider_manager.clone()));
 
@@ -254,7 +254,7 @@ mod tests {
     }
     #[test]
     fn test_custom_factory() {
-        let provider_manager = create_test_provider_manager();
+        let provider_manager = Arc::new(ProviderManager::new());
         let base = Arc::new(DefaultAgentFactory::new(provider_manager));
         let custom = CustomAgentFactory::new(base)
             .with_customizer(|config| {
@@ -270,7 +270,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_custom_factory_customization() {
-        let provider_manager = create_test_provider_manager();
+        let provider_manager = Arc::new(ProviderManager::new());
         let base = Arc::new(DefaultAgentFactory::new(provider_manager));
         let custom = Arc::new(CustomAgentFactory::new(base).with_customizer(|config| {
             config.resource_limits.max_execution_time_secs = 1000;
@@ -302,7 +302,7 @@ mod tests {
         assert!(result.is_err());
 
         // Register and set default
-        let provider_manager = create_test_provider_manager();
+        let provider_manager = Arc::new(ProviderManager::new());
         let factory = Arc::new(DefaultAgentFactory::new(provider_manager));
         registry
             .register_factory("default".to_string(), factory)
@@ -321,7 +321,7 @@ mod tests {
     async fn test_registry_specific_factory() {
         let registry = FactoryRegistry::new();
 
-        let provider_manager = create_test_provider_manager();
+        let provider_manager = Arc::new(ProviderManager::new());
         let factory1 = Arc::new(DefaultAgentFactory::new(provider_manager.clone()));
         let factory2 = Arc::new(DefaultAgentFactory::new(provider_manager.clone()));
 

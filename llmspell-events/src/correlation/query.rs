@@ -575,11 +575,12 @@ mod tests {
     use super::*;
     use crate::correlation::EventCorrelationTracker;
     use crate::universal_event::{Language, UniversalEvent};
-    use llmspell_testing::event_helpers::create_test_event_with_correlation;
     use serde_json::Value;
 
+    // Local test helper to avoid circular dependency with llmspell-testing
     fn create_test_event(event_type: &str, correlation_id: Uuid) -> UniversalEvent {
-        create_test_event_with_correlation(event_type, correlation_id)
+        UniversalEvent::new(event_type, Value::Null, Language::Rust)
+            .with_correlation_id(correlation_id)
     }
     #[test]
     fn test_time_range() {

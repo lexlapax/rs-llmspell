@@ -1,6 +1,9 @@
 //! Example demonstrating parallel workflow capabilities
 //! Shows fork-join pattern with concurrent branch execution
 
+use llmspell_core::traits::base_agent::BaseAgent;
+use llmspell_core::types::agent_io::AgentInput;
+use llmspell_core::execution_context::ExecutionContext;
 use llmspell_workflows::{
     traits::{StepType, WorkflowStep},
     ParallelBranch, ParallelWorkflowBuilder, WorkflowConfig,
@@ -13,6 +16,16 @@ use tracing::info;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Initialize tracing
     tracing_subscriber::fmt::init();
+    
+    // Create reusable input and context for examples
+    let create_execution_params = || {
+        let input = AgentInput {
+            prompt: "Execute workflow".to_string(),
+            context: Default::default(),
+        };
+        let context = ExecutionContext::default();
+        (input, context)
+    };
 
     info!("Parallel Workflow Examples");
 
@@ -82,7 +95,8 @@ async fn simple_parallel_example() -> Result<(), Box<dyn std::error::Error>> {
         .add_branch(branch2)
         .build()?;
 
-    let result = workflow.execute().await?;
+    let (input, context) = create_execution_params();
+    let result = workflow.execute(input, context).await?;
 
     info!("Simple parallel workflow completed:");
     info!("  Success: {}", result.success);
@@ -139,7 +153,8 @@ async fn mixed_branches_example() -> Result<(), Box<dyn std::error::Error>> {
         .continue_on_optional_failure(true)
         .build()?;
 
-    let result = workflow.execute().await?;
+    let (input, context) = create_execution_params();
+    let result = workflow.execute(input, context).await?;
 
     info!("Mixed branches workflow completed:");
     info!("  Success: {}", result.success);
@@ -196,7 +211,8 @@ async fn fail_fast_example() -> Result<(), Box<dyn std::error::Error>> {
         .fail_fast(true)
         .build()?;
 
-    let result = workflow.execute().await?;
+    let (input, context) = create_execution_params();
+    let result = workflow.execute(input, context).await?;
 
     info!("Fail-fast workflow completed:");
     info!("  Success: {}", result.success);
@@ -243,7 +259,8 @@ async fn concurrency_limits_example() -> Result<(), Box<dyn std::error::Error>> 
     let workflow = builder.build()?;
 
     let start = std::time::Instant::now();
-    let result = workflow.execute().await?;
+    let (input, context) = create_execution_params();
+    let result = workflow.execute(input, context).await?;
     let elapsed = start.elapsed();
 
     info!("Concurrency limited workflow completed:");
@@ -375,7 +392,8 @@ async fn complex_workflow_example() -> Result<(), Box<dyn std::error::Error>> {
         })
         .build()?;
 
-    let result = workflow.execute().await?;
+    let (input, context) = create_execution_params();
+    let result = workflow.execute(input, context).await?;
 
     info!("Complex workflow completed:");
     info!("{}", result.generate_report());
@@ -426,7 +444,8 @@ async fn error_handling_example() -> Result<(), Box<dyn std::error::Error>> {
         .continue_on_optional_failure(true)
         .build()?;
 
-    let result = workflow.execute().await?;
+    let (input, context) = create_execution_params();
+    let result = workflow.execute(input, context).await?;
 
     info!("Error handling workflow completed:");
     info!("  Overall success: {}", result.success);

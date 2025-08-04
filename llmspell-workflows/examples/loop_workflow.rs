@@ -1,6 +1,9 @@
 //! Example demonstrating loop workflow capabilities
 //! Shows collection, range, and while-condition iterations with break conditions
 
+use llmspell_core::traits::base_agent::BaseAgent;
+use llmspell_core::types::agent_io::AgentInput;
+use llmspell_core::execution_context::ExecutionContext;
 use llmspell_workflows::{
     traits::{StepType, WorkflowStep},
     LoopWorkflowBuilder, ResultAggregation, WorkflowConfig,
@@ -56,7 +59,12 @@ async fn range_example() -> Result<(), Box<dyn std::error::Error>> {
         .with_aggregation(ResultAggregation::LastOnly)
         .build()?;
 
-    let result = workflow.execute().await?;
+    let input = AgentInput {
+        prompt: "Execute workflow".to_string(),
+        context: Default::default(),
+    };
+    let context = ExecutionContext::default();
+    let result = workflow.execute(input, context).await?;
 
     info!("Range workflow completed:");
     info!("  Total iterations: {}", result.total_iterations);
@@ -105,7 +113,12 @@ async fn collection_example() -> Result<(), Box<dyn std::error::Error>> {
         .with_aggregation(ResultAggregation::CollectAll)
         .build()?;
 
-    let result = workflow.execute().await?;
+    let input = AgentInput {
+        prompt: "Execute workflow".to_string(),
+        context: Default::default(),
+    };
+    let context = ExecutionContext::default();
+    let result = workflow.execute(input, context).await?;
 
     info!("Collection workflow completed:");
     info!("  Processed {} users", result.completed_iterations);
@@ -138,7 +151,12 @@ async fn while_condition_example() -> Result<(), Box<dyn std::error::Error>> {
         .with_iteration_delay(Duration::from_millis(100))
         .build()?;
 
-    let result = workflow.execute().await?;
+    let input = AgentInput {
+        prompt: "Execute workflow".to_string(),
+        context: Default::default(),
+    };
+    let context = ExecutionContext::default();
+    let result = workflow.execute(input, context).await?;
 
     info!("While condition workflow completed:");
     info!("  Search attempts: {}", result.completed_iterations);
@@ -170,7 +188,12 @@ async fn error_handling_example() -> Result<(), Box<dyn std::error::Error>> {
         .with_timeout(Duration::from_secs(30))
         .build()?;
 
-    let result = workflow.execute().await?;
+    let input = AgentInput {
+        prompt: "Execute workflow".to_string(),
+        context: Default::default(),
+    };
+    let context = ExecutionContext::default();
+    let result = workflow.execute(input, context).await?;
 
     info!("Error handling workflow completed:");
     info!("  Total iterations: {}", result.total_iterations);
@@ -214,7 +237,12 @@ async fn aggregation_strategies_example() -> Result<(), Box<dyn std::error::Erro
             .with_aggregation(strategy)
             .build()?;
 
-        let result = workflow.execute().await?;
+        let input = AgentInput {
+        prompt: "Execute workflow".to_string(),
+        context: Default::default(),
+    };
+    let context = ExecutionContext::default();
+    let result = workflow.execute(input, context).await?;
         info!("  Results: {} keys", result.aggregated_results.len());
         for key in result.aggregated_results.keys() {
             info!("    - {}", key);
@@ -268,7 +296,12 @@ async fn nested_data_example() -> Result<(), Box<dyn std::error::Error>> {
         })
         .build()?;
 
-    let result = workflow.execute().await?;
+    let input = AgentInput {
+        prompt: "Execute workflow".to_string(),
+        context: Default::default(),
+    };
+    let context = ExecutionContext::default();
+    let result = workflow.execute(input, context).await?;
 
     info!("Nested data workflow completed:");
     info!("  Departments processed: {}", result.completed_iterations);

@@ -4,7 +4,7 @@
 use llmspell_state_persistence::{
     backup::{BackupConfig, BackupManager, CompressionType, RestoreOptions},
     config::{PersistenceConfig, StorageBackendType},
-    manager::{SerializableState, StateManager},
+    manager::StateManager,
     StateScope,
 };
 use serde_json::json;

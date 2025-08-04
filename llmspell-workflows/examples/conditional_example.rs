@@ -1,6 +1,9 @@
 //! ABOUTME: Example demonstrating conditional workflow patterns
 //! ABOUTME: Shows condition evaluation, branch selection, and default branch handling
 
+use llmspell_core::traits::base_agent::BaseAgent;
+use llmspell_core::types::agent_io::AgentInput;
+use llmspell_core::execution_context::ExecutionContext;
 use llmspell_workflows::{
     Condition, ConditionalBranch, ConditionalWorkflow, ConditionalWorkflowConfig, StepType,
     WorkflowConfig, WorkflowStep,
@@ -9,6 +12,16 @@ use llmspell_workflows::{
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("🔀 Conditional Workflow Example");
+    
+    // Create reusable input and context for examples
+    let create_execution_params = || {
+        let input = AgentInput {
+            prompt: "Execute workflow".to_string(),
+            context: Default::default(),
+        };
+        let context = ExecutionContext::default();
+        (input, context)
+    };
     println!("===============================\n");
 
     // Initialize tracing for logging
@@ -77,7 +90,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .set_shared_data("data_type".to_string(), serde_json::json!("csv"))
         .await?;
 
-    let csv_result = workflow.execute().await?;
+    let (input, context) = create_execution_params();
+    let csv_result = workflow.execute(input, context).await?;
     println!("📊 CSV processing completed!");
     println!("{}", csv_result.generate_report());
 
@@ -100,7 +114,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .set_shared_data("data_type".to_string(), serde_json::json!("json"))
         .await?;
 
-    let json_result = workflow.execute().await?;
+    let (input, context) = create_execution_params();
+    let json_result = workflow.execute(input, context).await?;
     println!("📊 JSON processing completed!");
     println!("{}", json_result.generate_report());
 
@@ -123,7 +138,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .set_shared_data("data_type".to_string(), serde_json::json!("xml"))
         .await?;
 
-    let default_result = workflow.execute().await?;
+    let (input, context) = create_execution_params();
+    let default_result = workflow.execute(input, context).await?;
     println!("📊 Default processing completed!");
     println!("{}", default_result.generate_report());
 
@@ -196,7 +212,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .set_shared_data("priority".to_string(), serde_json::json!("high"))
         .await?;
 
-    let complex_result = complex_workflow.execute().await?;
+    let (input, context) = create_execution_params();
+    let complex_result = complex_workflow.execute(input, context).await?;
     println!("📊 Priority CSV processing completed!");
     println!("{}", complex_result.generate_report());
 

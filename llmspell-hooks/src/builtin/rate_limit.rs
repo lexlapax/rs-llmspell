@@ -568,7 +568,7 @@ impl ReplayableHook for RateLimitHook {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::{ComponentType, HookPoint};
+    use crate::types::{ComponentId, ComponentType, HookPoint};
     use llmspell_testing::hook_helpers::create_test_hook_context_with_component;
     use std::time::Duration;
 

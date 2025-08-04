@@ -1766,16 +1766,140 @@ All code compiles cleanly with no warnings from cargo fmt or clippy.
 
 ---
 
-#### Task 7.1.25: Fix all fixable clippy errors across all creates
-**Priority**: CRITICAL
+#### Task 7.1.25: Fix Test Infrastructure Failures Across All Crates
+**Priority**: CRITICAL (Blocks All Testing)
+**Estimated Time**: 10 hours  
+**Status**: IN PROGRESS 🚧
+**Assigned To**: Core Team
+**Dependencies**: Task 7.1.24 (Hook Execution Standardization) ✅, Task 7.1.7 (Workflow-Agent Integration) ✅
+
+**Description**: Fix critical test compilation and runtime failures across multiple crates caused by Phase 7 architectural changes. Primary issues stem from workflow-agent integration, test helper API changes, and type mismatches.
+
+**Test Status by Crate** (as of testing):
+- ✅ **PASSING** (12 crates): llmspell-core, llmspell-utils, llmspell-agents, llmspell-events, llmspell-sessions, llmspell-state-persistence, llmspell-cli, llmspell-providers, llmspell-config, llmspell-security, llmspell-storage, llmspell-state-traits
+- ❌ **COMPILATION FAILURES** (3 crates): llmspell-hooks, llmspell-tools, llmspell-workflows
+- ⚠️ **TEST FAILURES** (2 crates): llmspell-bridge (1 test), llmspell-testing (1 doc test)
+
+**Architectural Context from Phase 7**:
+- Task 7.1.7 made workflows implement BaseAgent trait (Google ADK pattern)
+- Workflows ARE agents - they use execute(AgentInput, ExecutionContext) -> AgentOutput
+- WorkflowOutputAdapter stores workflow data in AgentOutput.metadata.extra:
+  - `workflow_success` (bool) instead of direct `success` field
+  - `steps_executed`, `steps_failed` instead of direct fields
+  - `workflow_output` contains the raw workflow output
+  - `context_*` prefix for workflow context data
+- AgentOutput has ONLY: text, media, tool_calls, metadata, transfer_to
+
+**Root Causes by Crate**:
+1. **llmspell-workflows** (most affected):
+   - Examples use old workflow.execute() expecting WorkflowOutput
+   - Tests access non-existent fields (success, branch_results, etc.)
+   - Missing create_execution_params() function
+   - Integration tests expect old execute() method
+2. **llmspell-hooks**:
+   - Type mismatches: llmspell_hooks compiled multiple times
+   - create_test_hook_context() returns wrong HookContext type
+3. **llmspell-tools**:
+   - Test helper signatures changed (create_test_tool, create_test_tool_input)
+   - GraphQL tool method should be associated function
+   - 17 compilation errors total
+4. **llmspell-bridge**:
+   - test_agent_templates_from_lua failing at runtime
+5. **llmspell-testing**:
+   - Doc test failure for tool execute() method
+
+**Implementation Steps**:
+1. [ ] **Fix Core Module Access** (30 min):
+   - [ ] Change `mod agent_io;` to `pub mod agent_io;` in llmspell-core/src/types/mod.rs
+   - [ ] Verify AgentInput/AgentOutput/ExecutionContext accessible from all crates
+   - [ ] Run `cargo build --all` to confirm basic compilation
+   - [ ] DO NOT add old fields back - maintain simplified AgentOutput structure
+
+2. [ ] **Fix llmspell-workflows (Most Critical)** (3.5 hours):
+   - [ ] **Examples** (2 hours):
+     - [ ] Create helper function to replace missing `create_execution_params()`:
+       ```rust
+       fn create_workflow_params() -> (AgentInput, ExecutionContext) {
+           (AgentInput::text("workflow input"), ExecutionContext::default())
+       }
+       ```
+     - [ ] Update all 4 examples to use BaseAgent interface correctly
+     - [ ] Access workflow data from metadata.extra as shown in architectural context
+     - [ ] Remove all generate_report() calls - use result.text
+   - [ ] **Integration Tests** (1.5 hours):
+     - [ ] Fix all workflow tests expecting old execute() method
+     - [ ] Update tests to use BaseAgent::execute(AgentInput, ExecutionContext)
+     - [ ] Fix WorkflowInput::default() and ExecutionContext::new() calls
+
+3. [ ] **Fix llmspell-tools Compilation** (2 hours):
+   - [ ] Update all create_test_tool() calls to 3-parameter version
+   - [ ] Convert create_test_tool_input() calls from json! to Vec format
+   - [ ] Fix GraphQL tool: change instance method to associated function
+   - [ ] Fix 17 compilation errors in:
+     - api/graphql_query.rs: lines 692, 695, 698
+     - fs/file_search.rs: lines 831, 851, 854, 868, 882
+     - system/environment_reader.rs: lines 668, 683, 694
+     - system/process_executor.rs: lines 825, 841, 876
+     - system/service_checker.rs: line 784
+
+4. [ ] **Fix llmspell-hooks Type Mismatches** (1.5 hours):
+   - [ ] Investigate multiple compilation issue (likely circular dependency)
+   - [ ] Fix HookContext type mismatches in 5 test files:
+     - builtin/caching.rs:449
+     - builtin/rate_limit.rs:576-580
+     - cache/mod.rs:393
+     - persistence/tests.rs:73
+   - [ ] Consider extracting test helpers to avoid circular deps
+
+5. [ ] **Fix Runtime Test Failures** (1 hour):
+   - [ ] llmspell-bridge: Fix test_agent_templates_from_lua
+   - [ ] llmspell-testing: Fix doc test for tool execute() method
+   - [ ] Ensure these align with Phase 7 architectural changes
+
+6. [ ] **Final Validation** (30 min):
+   - [ ] Run `cargo test --all --lib` - all should compile
+   - [ ] Run `cargo test --all --tests` - all should compile
+   - [ ] Run `cargo test --all --examples` - all should compile
+   - [ ] Document any remaining issues for follow-up
+
+**Quality Standards**:
+- [ ] Maintain Phase 7 architectural decisions - workflows ARE agents
+- [ ] No reversion to old WorkflowOutput structure
+- [ ] Examples demonstrate correct workflow-as-agent patterns
+- [ ] No new clippy warnings introduced
+- [ ] Tests use proper helper function signatures
+- [ ] All 12 passing crates remain passing
+
+**Acceptance Criteria**:
+- [ ] `cargo build --all` succeeds with no errors
+- [ ] `cargo test -p llmspell-workflows` compiles and passes
+- [ ] `cargo test -p llmspell-tools` compiles and passes
+- [ ] `cargo test -p llmspell-hooks` compiles and passes
+- [ ] `cargo test -p llmspell-bridge` - all tests pass
+- [ ] `cargo test -p llmspell-testing` - all tests pass
+- [ ] All workflow examples run successfully demonstrating BaseAgent usage
+- [ ] Documentation added showing metadata access patterns for workflows
+
+**Test Fix Priority**:
+1. llmspell-workflows (blocks everything - most critical)
+2. llmspell-tools (many compilation errors)
+3. llmspell-hooks (type system issues)
+4. llmspell-bridge & llmspell-testing (runtime failures)
+
+---
+
+#### Task 7.1.26: Fix all fixable clippy errors across all crates
+**Priority**: HIGH
 **Estimated Time**: 5.5 hours
-**Status**: 
+**Status**: TODO
 **Assigned To**: Clean up team
+**Dependencies**: Task 7.1.25 (Must compile first)
 
 **Description**: Fix All clippy warnings and errors 1 by 1 across all crates.
 
-1. [ ]
- - [ ]
+1. [ ] Run cargo clippy --all -- -D warnings
+2. [ ] Fix each warning systematically by crate
+3. [ ] Document any suppressed warnings with justification
 ---
 
 ### Set 2: Rust API Documentation (Day 3-5)

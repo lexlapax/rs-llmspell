@@ -361,7 +361,6 @@ impl Tool for HashCalculatorTool {
 mod tests {
     use super::*;
     use llmspell_core::LLMSpellError;
-    use llmspell_testing::tool_helpers::create_test_tool_input;
     use llmspell_testing::tool_helpers::{create_test_tool, create_test_tool_input};
     use llmspell_utils::file_utils::write_file;
     use tempfile::TempDir;

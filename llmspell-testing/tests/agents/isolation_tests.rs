@@ -382,7 +382,7 @@ async fn test_concurrent_access_safety() {
     for i in 0..10 {
         let agent_id = if i % 2 == 0 { "agent1" } else { "agent2" };
         let isolation_mgr = isolation_manager.clone();
-        let state_mgr = state_manager.clone();
+        let _state_mgr = state_manager.clone();
         let scope_clone = scope.clone();
 
         let handle = tokio::spawn(async move {
@@ -394,7 +394,7 @@ async fn test_concurrent_access_safety() {
 
             // Perform write
             // TODO: When StateManager is properly integrated, uncomment this:
-            // state_mgr
+            // _state_mgr
             //     .set_scoped(scope_clone, &format!("key_{}", i), json!(i))
             //     .await
             //     .unwrap();

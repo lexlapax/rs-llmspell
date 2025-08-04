@@ -418,18 +418,18 @@ mod tests {
             .await
             .unwrap();
 
-        assert_eq!(agent.provider, "openai");
-        assert_eq!(agent.model, "gpt-4");
+        assert_eq!(agent._provider, "openai");
+        assert_eq!(agent._model, "gpt-4");
         assert_eq!(agent.config.system_prompt, Some("Test prompt".to_string()));
     }
 
     #[tokio::test]
     async fn test_provider_agents() {
         let openai = providers::create_openai_agent("gpt-4").await.unwrap();
-        assert_eq!(openai.provider, "openai");
+        assert_eq!(openai._provider, "openai");
 
         let anthropic = providers::create_anthropic_agent("claude-3").await.unwrap();
-        assert_eq!(anthropic.provider, "anthropic");
+        assert_eq!(anthropic._provider, "anthropic");
     }
 
     #[tokio::test]
