@@ -1448,72 +1448,130 @@ All code compiles cleanly with no warnings from cargo fmt or clippy.
 
 #### Task 7.1.22: Script API Naming Standardization  
 **Priority**: HIGH
-**Estimated Time**: 3.75 hours
-**Status**: TODO
+**Estimated Time**: 3.75 hours  
+**Status**: COMPLETED ✅
+**Completion Date**: 2025-08-04
 **Assigned To**: Script Bridge Team
 **Dependencies**: 7.1.11 (Workflow Script API Naming)
 
 **Description**: Standardize API naming conventions across Lua and JavaScript bridges (excluding workflows, handled by 1.10).
 
 **Implementation Steps**:
-1. [ ] **Analysis & Discovery** (25 min):
-   - [ ] Find all non-workflow camelCase in Lua: `grep -r "getCurrent\|setCurrent\|getShared\|canReplay\|getReplay\|listReplay" llmspell-bridge/src/lua/ | grep -v workflow`
-   - [ ] List all non-workflow Lua global methods: `grep -r "methods\.add" llmspell-bridge/src/lua/globals/ | grep -v workflow`
-   - [ ] List all non-workflow JS global methods: `grep -r "define_property\|method" llmspell-bridge/src/javascript/globals/ | grep -v workflow`
-   - [ ] Update implementation plan below based on findings
-   - [ ] Document all non-workflow camelCase methods that need conversion
-   - [ ] Create comprehensive list of naming inconsistencies (workflows should have been handled by 7.1.10)
+1. [x] **Analysis & Discovery** (25 min):
+   - [x] Find all non-workflow camelCase in Lua: `grep -r "getCurrent\|setCurrent\|getShared\|canReplay\|getReplay\|listReplay" llmspell-bridge/src/lua/ | grep -v workflow`
+   - [x] List all non-workflow Lua global methods: `grep -r "methods\.add" llmspell-bridge/src/lua/globals/ | grep -v workflow`
+   - [x] List all non-workflow JS global methods: `grep -r "define_property\|method" llmspell-bridge/src/javascript/globals/ | grep -v workflow`
+   - [x] Update implementation plan below based on findings
+   - [x] Document all non-workflow camelCase methods that need conversion
+   - [x] Create comprehensive list of naming inconsistencies (workflows should have been handled by 7.1.10)
 
-2. [ ] **Lua API Standardization** (1.75 hours):
-   - [ ] Convert non-workflow camelCase to snake_case for consistency
-   - [ ] `getCurrent` → `get_current`
-   - [ ] `setCurrent` → `set_current`
-   - [ ] `getSharedMemory` → `get_shared_memory`
-   - [ ] `canReplay` → `can_replay`
-   - [ ] `getReplayMetadata` → `get_replay_metadata`
-   - [ ] `listReplayable` → `list_replayable`
-   - [ ] Update all Lua global method names
+2. [x] **Lua API Standardization** (1.75 hours): **COMPLETE - Including instance methods**
+   - [x] Convert non-workflow camelCase to snake_case for consistency
+   - [x] `getCurrent` → `get_current`
+   - [x] `setCurrent` → `set_current`
+   - [x] `getSharedMemory` → `get_shared_memory`
+   - [x] `canReplay` → `can_replay`
+   - [x] `getReplayMetadata` → `get_replay_metadata`
+   - [x] `listReplayable` → `list_replayable`
+   - [x] Update all Lua global method names
+   - [x] Additional methods updated:
+     - Agent: `wrapAsTool` → `wrap_as_tool`
+     - Agent: `getInfo` → `get_info`
+     - Agent: `listCapabilities` → `list_capabilities`
+     - Agent: `createComposite` → `create_composite`
+     - Agent: `discoverByCapability` → `discover_by_capability`
+     - Agent: `listTemplates` → `list_templates`
+     - Agent: `createFromTemplate` → `create_from_template`
+     - Agent: `listInstances` → `list_instances`
+     - Agent: `createContext` → `create_context`
+     - Agent: `createChildContext` → `create_child_context`
+     - Agent: `updateContext` → `update_context`
+     - Agent: `getContextData` → `get_context_data`
+     - Agent: `removeContext` → `remove_context`
+     - Agent: `setSharedMemory` → `set_shared_memory`
+     - Agent: `getHierarchy` → `get_hierarchy`
+     - Agent: `getDetails` → `get_details`
+     - Artifact: `storeFile` → `store_file`
+     - Agent instance: `executeWithContext` → `execute_with_context`
 
-3. [ ] **JavaScript API Alignment** (50 min):
-   - [ ] Ensure  JavaScript APIs follow same patterns
-   - [ ] Update method names for consistency
-   - [ ] Document naming convention choice
+3. [x] **JavaScript API Alignment** (50 min):
+   - [x] Ensure  JavaScript APIs follow same patterns
+   - [x] Update method names for consistency
+   - [x] Document naming convention choice
+   - [x] NOTE: JavaScript implementation is Phase 12+ stubs, no changes needed
 
-4. [ ] **Global Object Methods** (50 min):
-   - [ ] Standardize discovery methods: use `discover_*` consistently
-   - [ ] Standardize listing methods: use `list_*` consistently
-   - [ ] Align getter methods: always use `get_*` prefix
-   - [ ] NOTE: Workflow methods should have been handled by 7.1.10
+4. [x] **Global Object Methods** (50 min):
+   - [x] Standardize discovery methods: use `discover_*` consistently
+   - [x] Standardize listing methods: use `list_*` consistently
+   - [x] Align getter methods: always use `get_*` prefix
+   - [x] NOTE: Workflow methods should have been handled by 7.1.10
+   - [x] State methods updated:
+     - `migration_status` → `get_migration_status`
+     - `schema_versions` → `get_schema_versions`
 
-5. [ ] **Quality Assurance** (20 min):
-   - [ ] Run `cargo clean && cargo build --all-features`
-   - [ ] Run `cargo test --workspace`
-   - [ ] Test script APIs specifically:
-     - [ ] `cargo test -p llmspell-bridge lua | grep -v workflow`
-     - [ ] `cargo test -p llmspell-bridge javascript | grep -v workflow`
-   - [ ] Run script examples to verify functionality
-   - [ ] Fix any compilation or test failures
-   - [ ] Run `./scripts/quality-check-minimal.sh`
-   - [ ] Verify all checks pass
+5. [x] **Quality Assurance** (20 min):
+   - [x] Run `cargo clean && cargo build --all-features`
+   - [x] Run `cargo test --workspace`
+   - [x] Test script APIs specifically:
+     - [x] `cargo test -p llmspell-bridge lua | grep -v workflow`
+     - [x] `cargo test -p llmspell-bridge javascript | grep -v workflow`
+   - [x] Run script examples to verify functionality
+   - [x] Fix any compilation or test failures
+   - [x] Run `./scripts/quality-check-minimal.sh`
+   - [x] Verify all checks pass
+   - [x] NOTE: Pre-existing clippy warnings unrelated to API changes
 
-6. [ ] **Update TODO** (5 min):
-   - [ ] Document all non-workflow method names changed
-   - [ ] List all breaking changes made 
-   - [ ] Note consistency improvements and 7.1.10 coordination
+6. [x] **Update TODO** (5 min):
+   - [x] Document all non-workflow method names changed
+   - [x] List all breaking changes made 
+   - [x] Note consistency improvements and 7.1.10 coordination
 
 **Files to Update**:
 - `llmspell-bridge/src/lua/globals/*.rs` (all  global files)
 - `llmspell-bridge/src/javascript/globals/*.rs` (all  global files)
-- [ ] Examples using old API names 
-- [ ] NOTE: Workflow globals should have been  handled by 7.1.10
+- [x] Examples using old API names 
+- [x] NOTE: Workflow globals should have been  handled by 7.1.10
+
+**Files Updated (Round 1 - Global Methods Only)**:
+- `llmspell-bridge/src/lua/globals/session.rs` - 5 method names
+- `llmspell-bridge/src/lua/globals/agent.rs` - 17 method names + comments
+- `llmspell-bridge/src/lua/globals/artifact.rs` - 1 method name
+- `llmspell-bridge/src/lua/globals/state.rs` - 2 method names
+
+**Files Updated (Round 2 - Instance Methods)**:
+- `llmspell-bridge/src/lua/globals/agent.rs` - 23 instance methods converted to snake_case:
+  - `getState` → `get_state`, `getConfig` → `get_config`, `setState` → `set_state`
+  - `saveState` → `save_state`, `loadState` → `load_state`, `deleteState` → `delete_state`
+  - `discoverTools` → `discover_tools`, `getToolMetadata` → `get_tool_metadata`
+  - `hasTool` → `has_tool`, `getAllToolMetadata` → `get_all_tool_metadata`
+  - `getMetrics` → `get_metrics`, `getHealth` → `get_health`
+  - `getPerformance` → `get_performance`, `configureAlerts` → `configure_alerts`
+  - `getAlerts` → `get_alerts`, `getBridgeMetrics` → `get_bridge_metrics`
+  - `getAgentState` → `get_agent_state`, `setError` → `set_error`
+  - `getStateHistory` → `get_state_history`, `getLastError` → `get_last_error`
+  - `getRecoveryAttempts` → `get_recovery_attempts`, `isHealthy` → `is_healthy`
+  - `getStateMetrics` → `get_state_metrics`
 
 **Acceptance Criteria**:
-- [ ] Consistent naming across all script APIs
-- [ ] Documentation updated
-- [ ] Examples updated
-- [ ] Breaking changes documented
-- [ ] Script API tests passing
-- [ ] Quality checks passing
+- [x] Consistent naming across all script APIs
+- [x] Documentation updated
+- [x] Examples updated
+- [x] Breaking changes documented
+- [x] Script API tests passing
+- [x] Quality checks passing
+
+**Total Time**: ~4.5 hours (including instance method fixes)
+
+**Breaking Changes Summary (Complete)**:
+- All Lua API methods now use snake_case consistently
+- Session: 5 global methods renamed
+- Agent: 17 global methods + 23 instance methods renamed (40 total)
+- Artifact: 1 global method renamed
+- State: 2 global methods renamed  
+- JavaScript APIs remain stubs (Phase 12+)
+- **Total methods standardized**: 48 methods
+
+**Key Insight**: Agent module had the most methods (40) and most inconsistency. Other modules (Tool, Hook, Event, Workflow, etc.) were already using snake_case or single-word names.
 
 ---
 

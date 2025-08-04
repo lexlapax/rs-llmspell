@@ -226,14 +226,14 @@ pub fn inject_session_global(
     })?;
     session_table.set("delete", delete_fn)?;
 
-    // getCurrent method - get current session from thread-local context
+    // get_current method - get current session from thread-local context
     let get_current_fn = lua.create_function(|_lua, ()| {
         SessionBridge::get_current_session()
             .map_or_else(|| Ok(None), |session_id| Ok(Some(session_id.to_string())))
     })?;
-    session_table.set("getCurrent", get_current_fn)?;
+    session_table.set("get_current", get_current_fn)?;
 
-    // setCurrent method - set current session in thread-local context
+    // set_current method - set current session in thread-local context
     let set_current_fn = lua.create_function(|_lua, session_id: Option<String>| {
         let session_id = match session_id {
             Some(id) => Some(
@@ -245,11 +245,11 @@ pub fn inject_session_global(
         SessionBridge::set_current_session(session_id);
         Ok(())
     })?;
-    session_table.set("setCurrent", set_current_fn)?;
+    session_table.set("set_current", set_current_fn)?;
 
     // Replay methods - session replay functionality
 
-    // canReplay method - check if a session can be replayed
+    // can_replay method - check if a session can be replayed
     let can_replay_bridge = session_bridge.clone();
     let can_replay_fn = lua.create_function(move |_lua, session_id: String| {
         let session_id = SessionId::from_str(&session_id)
@@ -262,7 +262,7 @@ pub fn inject_session_global(
             None,
         )
     })?;
-    session_table.set("canReplay", can_replay_fn)?;
+    session_table.set("can_replay", can_replay_fn)?;
 
     // replay method - replay a session
     let replay_bridge = session_bridge.clone();
@@ -297,7 +297,7 @@ pub fn inject_session_global(
     })?;
     session_table.set("replay", replay_fn)?;
 
-    // getReplayMetadata method - get replay metadata for a session
+    // get_replay_metadata method - get replay metadata for a session
     let metadata_bridge = session_bridge.clone();
     let metadata_fn = lua.create_function(move |lua, session_id: String| {
         let session_id = SessionId::from_str(&session_id)
@@ -313,9 +313,9 @@ pub fn inject_session_global(
         // Convert JSON to Lua value
         json_to_lua_value(lua, &result)
     })?;
-    session_table.set("getReplayMetadata", metadata_fn)?;
+    session_table.set("get_replay_metadata", metadata_fn)?;
 
-    // listReplayable method - list all sessions that can be replayed
+    // list_replayable method - list all sessions that can be replayed
     let list_replayable_bridge = session_bridge;
     let list_replayable_fn = lua.create_function(move |lua, ()| {
         let bridge = list_replayable_bridge.clone();
@@ -332,7 +332,7 @@ pub fn inject_session_global(
         }
         Ok(lua_table)
     })?;
-    session_table.set("listReplayable", list_replayable_fn)?;
+    session_table.set("list_replayable", list_replayable_fn)?;
 
     // Set the Session table as a global
     lua.globals().set("Session", session_table)?;

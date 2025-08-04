@@ -246,7 +246,7 @@ pub fn inject_state_global(
         })?;
         state_table.set("migrate", migrate_fn)?;
 
-        // migration_status() - Get migration status information
+        // get_migration_status() - Get migration status information
         let status_registry = schema_registry.clone();
         let status_fn = lua.create_function(move |lua, (): ()| {
             let status_table = lua.create_table()?;
@@ -278,9 +278,9 @@ pub fn inject_state_global(
 
             Ok(status_table)
         })?;
-        state_table.set("migration_status", status_fn)?;
+        state_table.set("get_migration_status", status_fn)?;
 
-        // schema_versions() - List all available schema versions
+        // get_schema_versions() - List all available schema versions
         let versions_registry = schema_registry.clone();
         let versions_fn = lua.create_function(move |lua, (): ()| {
             let versions = versions_registry.list_versions();
@@ -292,7 +292,7 @@ pub fn inject_state_global(
 
             Ok(versions_table)
         })?;
-        state_table.set("schema_versions", versions_fn)?;
+        state_table.set("get_schema_versions", versions_fn)?;
     }
 
     // Backup methods (available when backup manager is configured)

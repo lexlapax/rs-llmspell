@@ -198,7 +198,7 @@ pub fn inject_artifact_global(
     })?;
     artifact_table.set("delete", delete_fn)?;
 
-    // storeFile method - store a file as an artifact
+    // store_file method - store a file as an artifact
     let store_file_bridge = artifact_bridge.clone();
     let store_file_fn =
         lua.create_function(move |lua, args: (String, String, String, Option<Table>)| {
@@ -249,7 +249,7 @@ pub fn inject_artifact_global(
             id_table.set("sequence", result.sequence)?;
             Ok(id_table)
         })?;
-    artifact_table.set("storeFile", store_file_fn)?;
+    artifact_table.set("store_file", store_file_fn)?;
 
     // query method - query artifacts with filters
     let query_bridge = artifact_bridge;

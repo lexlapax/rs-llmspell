@@ -86,8 +86,8 @@ impl UserData for LuaAgentInstance {
             },
         );
 
-        // getState method - synchronous wrapper
-        methods.add_method("getState", |_, this, ()| {
+        // get_state method - synchronous wrapper
+        methods.add_method("get_state", |_, this, ()| {
             let bridge = this.bridge.clone();
             let agent_name = this.agent_instance_name.clone();
 
@@ -100,21 +100,21 @@ impl UserData for LuaAgentInstance {
         });
 
         // getConfig method
-        methods.add_method("getConfig", |lua, _this, ()| {
+        methods.add_method("get_config", |lua, _this, ()| {
             // TODO: Get agent configuration from bridge when API is available
             // For now, return empty config table
             let config_table = lua.create_table()?;
             Ok(config_table)
         });
 
-        // setState method
-        methods.add_method("setState", |_lua, _this, _state: Table| {
+        // set_state method
+        methods.add_method("set_state", |_lua, _this, _state: Table| {
             // TODO: Implement state setting when bridge supports it
             Ok(())
         });
 
-        // saveState method - synchronous wrapper
-        methods.add_method("saveState", |_, this, ()| {
+        // save_state method - synchronous wrapper
+        methods.add_method("save_state", |_, this, ()| {
             let bridge = this.bridge.clone();
             let agent_name = this.agent_instance_name.clone();
 
@@ -126,8 +126,8 @@ impl UserData for LuaAgentInstance {
             Ok(())
         });
 
-        // loadState method - synchronous wrapper
-        methods.add_method("loadState", |_, this, ()| {
+        // load_state method - synchronous wrapper
+        methods.add_method("load_state", |_, this, ()| {
             let bridge = this.bridge.clone();
             let agent_name = this.agent_instance_name.clone();
 
@@ -139,8 +139,8 @@ impl UserData for LuaAgentInstance {
             Ok(loaded)
         });
 
-        // deleteState method - synchronous wrapper
-        methods.add_method("deleteState", |_, this, ()| {
+        // delete_state method - synchronous wrapper
+        methods.add_method("delete_state", |_, this, ()| {
             let bridge = this.bridge.clone();
             let agent_name = this.agent_instance_name.clone();
 
@@ -154,8 +154,8 @@ impl UserData for LuaAgentInstance {
 
         // Tool Integration Methods
 
-        // discoverTools method
-        methods.add_method("discoverTools", |lua, this, ()| {
+        // discover_tools method
+        methods.add_method("discover_tools", |lua, this, ()| {
             let tools = this.bridge.list_tools();
             let tools_table = lua.create_table()?;
             for (i, tool_name) in tools.iter().enumerate() {
@@ -164,8 +164,8 @@ impl UserData for LuaAgentInstance {
             Ok(tools_table)
         });
 
-        // getToolMetadata method
-        methods.add_method("getToolMetadata", |lua, this, tool_name: String| {
+        // get_tool_metadata method
+        methods.add_method("get_tool_metadata", |lua, this, tool_name: String| {
             if let Some(metadata) = this.bridge.get_tool_metadata(&tool_name) {
                 // Convert JSON to Lua table
                 let metadata_table = lua.create_table()?;
@@ -224,13 +224,13 @@ impl UserData for LuaAgentInstance {
             },
         );
 
-        // hasTool method
-        methods.add_method("hasTool", |_lua, this, tool_name: String| {
+        // has_tool method
+        methods.add_method("has_tool", |_lua, this, tool_name: String| {
             Ok(this.bridge.has_tool(&tool_name))
         });
 
-        // getAllToolMetadata method
-        methods.add_method("getAllToolMetadata", |lua, this, ()| {
+        // get_all_tool_metadata method
+        methods.add_method("get_all_tool_metadata", |lua, this, ()| {
             let all_metadata = this.bridge.get_all_tool_metadata();
             let metadata_table = lua.create_table()?;
 
@@ -253,8 +253,8 @@ impl UserData for LuaAgentInstance {
 
         // Monitoring & Lifecycle Methods
 
-        // getMetrics method - synchronous wrapper
-        methods.add_method("getMetrics", |lua, this, ()| {
+        // get_metrics method - synchronous wrapper
+        methods.add_method("get_metrics", |lua, this, ()| {
             let bridge = this.bridge.clone();
             let agent_name = this.agent_instance_name.clone();
 
@@ -280,8 +280,8 @@ impl UserData for LuaAgentInstance {
             }
         });
 
-        // getHealth method - synchronous wrapper
-        methods.add_method("getHealth", |lua, this, ()| {
+        // get_health method - synchronous wrapper
+        methods.add_method("get_health", |lua, this, ()| {
             let bridge = this.bridge.clone();
             let agent_name = this.agent_instance_name.clone();
 
@@ -310,8 +310,8 @@ impl UserData for LuaAgentInstance {
             }
         });
 
-        // getPerformance method - synchronous wrapper
-        methods.add_method("getPerformance", |lua, this, ()| {
+        // get_performance method - synchronous wrapper
+        methods.add_method("get_performance", |lua, this, ()| {
             let bridge = this.bridge.clone();
             let agent_name = this.agent_instance_name.clone();
 
@@ -374,8 +374,8 @@ impl UserData for LuaAgentInstance {
             },
         );
 
-        // configureAlerts method - synchronous wrapper
-        methods.add_method("configureAlerts", |_lua, this, config_table: Table| {
+        // configure_alerts method - synchronous wrapper
+        methods.add_method("configure_alerts", |_lua, this, config_table: Table| {
             // Convert Lua table to JSON for alert configuration
             let config_json = lua_table_to_json(config_table)?;
             let bridge = this.bridge.clone();
@@ -393,8 +393,8 @@ impl UserData for LuaAgentInstance {
             Ok(())
         });
 
-        // getAlerts method - synchronous wrapper
-        methods.add_method("getAlerts", |lua, this, ()| {
+        // get_alerts method - synchronous wrapper
+        methods.add_method("get_alerts", |lua, this, ()| {
             let bridge = this.bridge.clone();
             let agent_name = this.agent_instance_name.clone();
 
@@ -426,8 +426,8 @@ impl UserData for LuaAgentInstance {
             }
         });
 
-        // getBridgeMetrics method (static bridge-wide metrics)
-        methods.add_method("getBridgeMetrics", |lua, this, ()| {
+        // get_bridge_metrics method (static bridge-wide metrics)
+        methods.add_method("get_bridge_metrics", |lua, this, ()| {
             let bridge_metrics = this.bridge.get_bridge_metrics();
             let metrics_table = lua.create_table()?;
 
@@ -461,8 +461,8 @@ impl UserData for LuaAgentInstance {
 
         // State Machine Methods
 
-        // getAgentState method - Get current agent state with full details - synchronous wrapper
-        methods.add_method("getAgentState", |_, this, ()| {
+        // get_agent_state method - Get current agent state with full details - synchronous wrapper
+        methods.add_method("get_agent_state", |_, this, ()| {
             let bridge = this.bridge.clone();
             let agent_name = this.agent_instance_name.clone();
 
@@ -552,8 +552,8 @@ impl UserData for LuaAgentInstance {
             Ok(())
         });
 
-        // setError method - synchronous wrapper
-        methods.add_method("setError", |_, this, error_message: String| {
+        // set_error method - synchronous wrapper
+        methods.add_method("set_error", |_, this, error_message: String| {
             let bridge = this.bridge.clone();
             let agent_name = this.agent_instance_name.clone();
 
@@ -578,8 +578,8 @@ impl UserData for LuaAgentInstance {
             Ok(())
         });
 
-        // getStateHistory method - synchronous wrapper
-        methods.add_method("getStateHistory", |lua, this, ()| {
+        // get_state_history method - synchronous wrapper
+        methods.add_method("get_state_history", |lua, this, ()| {
             let bridge = this.bridge.clone();
             let agent_name = this.agent_instance_name.clone();
 
@@ -622,8 +622,8 @@ impl UserData for LuaAgentInstance {
             }
         });
 
-        // getLastError method - synchronous wrapper
-        methods.add_method("getLastError", |_, this, ()| {
+        // get_last_error method - synchronous wrapper
+        methods.add_method("get_last_error", |_, this, ()| {
             let bridge = this.bridge.clone();
             let agent_name = this.agent_instance_name.clone();
 
@@ -639,8 +639,8 @@ impl UserData for LuaAgentInstance {
             }
         });
 
-        // getRecoveryAttempts method - synchronous wrapper
-        methods.add_method("getRecoveryAttempts", |_, this, ()| {
+        // get_recovery_attempts method - synchronous wrapper
+        methods.add_method("get_recovery_attempts", |_, this, ()| {
             let bridge = this.bridge.clone();
             let agent_name = this.agent_instance_name.clone();
 
@@ -656,8 +656,8 @@ impl UserData for LuaAgentInstance {
             }
         });
 
-        // isHealthy method - synchronous wrapper
-        methods.add_method("isHealthy", |_, this, ()| {
+        // is_healthy method - synchronous wrapper
+        methods.add_method("is_healthy", |_, this, ()| {
             let bridge = this.bridge.clone();
             let agent_name = this.agent_instance_name.clone();
 
@@ -673,8 +673,8 @@ impl UserData for LuaAgentInstance {
             }
         });
 
-        // getStateMetrics method - synchronous wrapper
-        methods.add_method("getStateMetrics", |lua, this, ()| {
+        // get_state_metrics method - synchronous wrapper
+        methods.add_method("get_state_metrics", |lua, this, ()| {
             let bridge = this.bridge.clone();
             let agent_name = this.agent_instance_name.clone();
 
@@ -740,9 +740,9 @@ impl UserData for LuaAgentInstance {
 
         // Context & Communication Methods
 
-        // executeWithContext method - synchronous wrapper
+        // execute_with_context method - synchronous wrapper
         methods.add_method(
-            "executeWithContext",
+            "execute_with_context",
             |lua, this, (input, context_id): (Table, String)| {
                 let agent_input = lua_table_to_agent_input(lua, input)?;
                 let bridge = this.bridge.clone();
@@ -750,7 +750,7 @@ impl UserData for LuaAgentInstance {
 
                 // Use shared sync utility to execute async code
                 let result = block_on_async(
-                    "agent_executeWithContext",
+                    "agent_execute_with_context",
                     async move {
                         bridge
                             .execute_agent_with_context(&agent_name, agent_input, &context_id)
@@ -941,7 +941,7 @@ pub fn inject_agent_global(
         Ok(discover_table)
     })?;
 
-    // Create Agent.wrapAsTool() function
+    // Create Agent.wrap_as_tool() function
     let bridge_clone = bridge.clone();
     let wrap_as_tool_fn = lua.create_function(move |_lua, args: (String, Table)| {
         let (agent_name, config) = args;
@@ -962,7 +962,7 @@ pub fn inject_agent_global(
         Ok(tool_name)
     })?;
 
-    // Create Agent.getInfo() function
+    // Create Agent.get_info() function
     let bridge_clone = bridge.clone();
     let get_info_fn = lua.create_function(move |lua, agent_name: String| {
         let bridge = bridge_clone.clone();
@@ -984,7 +984,7 @@ pub fn inject_agent_global(
         }
     })?;
 
-    // Create Agent.listCapabilities() function
+    // Create Agent.list_capabilities() function
     let bridge_clone = bridge.clone();
     let list_capabilities_fn = lua.create_function(move |lua, ()| {
         let bridge = bridge_clone.clone();
@@ -1007,7 +1007,7 @@ pub fn inject_agent_global(
         }
     })?;
 
-    // Create Agent.createComposite() function
+    // Create Agent.create_composite() function
     let bridge_clone = bridge.clone();
     let create_composite_fn = lua.create_function(move |_lua, args: (String, Table, Table)| {
         let (name, agent_list, config) = args;
@@ -1026,7 +1026,7 @@ pub fn inject_agent_global(
 
         // Use sync wrapper to call async method
         block_on_async(
-            "agent_createComposite",
+            "agent_create_composite",
             bridge.create_composite_agent(name, agents, config_json),
             None,
         )
@@ -1035,7 +1035,7 @@ pub fn inject_agent_global(
         Ok(())
     })?;
 
-    // Create Agent.discoverByCapability() function
+    // Create Agent.discover_by_capability() function
     let bridge_clone = bridge.clone();
     let discover_by_capability_fn = lua.create_function(move |lua, capability: String| {
         let bridge = bridge_clone.clone();
@@ -1139,7 +1139,7 @@ pub fn inject_agent_global(
         }
     })?;
 
-    // Create Agent.listTemplates() function
+    // Create Agent.list_templates() function
     let bridge_clone = bridge.clone();
     let list_templates_fn = lua.create_function(move |lua, ()| {
         let templates = tokio::task::block_in_place(|| {
@@ -1152,7 +1152,7 @@ pub fn inject_agent_global(
         Ok(list_table)
     })?;
 
-    // Create Agent.createFromTemplate() function
+    // Create Agent.create_from_template() function
     let bridge_clone = bridge.clone();
     let create_from_template_fn =
         lua.create_function(move |_lua, args: (String, String, Table)| {
@@ -1186,7 +1186,7 @@ pub fn inject_agent_global(
             Ok(agent_instance)
         })?;
 
-    // Create Agent.listInstances() function (alias for list)
+    // Create Agent.list_instances() function (alias for list)
     let bridge_clone = bridge.clone();
     let list_instances_fn = lua.create_function(move |lua, ()| {
         let instances = tokio::task::block_in_place(|| {
@@ -1201,7 +1201,7 @@ pub fn inject_agent_global(
 
     // Context Management Functions
 
-    // Create Agent.createContext() function
+    // Create Agent.create_context() function
     let bridge_clone = bridge.clone();
     let create_context_fn = lua.create_function(move |_lua, config: Table| {
         let bridge = bridge_clone.clone();
@@ -1218,7 +1218,7 @@ pub fn inject_agent_global(
         Ok(context_id)
     })?;
 
-    // Create Agent.createChildContext() function
+    // Create Agent.create_child_context() function
     let bridge_clone = bridge.clone();
     let create_child_context_fn =
         lua.create_function(move |_lua, args: (String, Table, String)| {
@@ -1239,7 +1239,7 @@ pub fn inject_agent_global(
             Ok(child_id)
         })?;
 
-    // Create Agent.updateContext() function
+    // Create Agent.update_context() function
     let bridge_clone = bridge.clone();
     let update_context_fn = lua.create_function(move |_lua, args: (String, String, Value)| {
         let (context_id, key, value) = args;
@@ -1257,7 +1257,7 @@ pub fn inject_agent_global(
         Ok(())
     })?;
 
-    // Create Agent.getContextData() function
+    // Create Agent.get_context_data() function
     let bridge_clone = bridge.clone();
     let get_context_data_fn = lua.create_function(move |lua, args: (String, String)| {
         let (context_id, key) = args;
@@ -1273,7 +1273,7 @@ pub fn inject_agent_global(
         result.map_or_else(|| Ok(Value::Nil), |value| json_to_lua_value(lua, &value))
     })?;
 
-    // Create Agent.removeContext() function
+    // Create Agent.remove_context() function
     let bridge_clone = bridge.clone();
     let remove_context_fn = lua.create_function(move |_lua, context_id: String| {
         let bridge = bridge_clone.clone();
@@ -1290,7 +1290,7 @@ pub fn inject_agent_global(
 
     // Shared Memory Functions
 
-    // Create Agent.setSharedMemory() function
+    // Create Agent.set_shared_memory() function
     let bridge_clone = bridge.clone();
     let set_shared_memory_fn = lua.create_function(move |_lua, args: (Table, String, Value)| {
         let (scope, key, value) = args;
@@ -1310,7 +1310,7 @@ pub fn inject_agent_global(
         Ok(())
     })?;
 
-    // Create Agent.getSharedMemory() function
+    // Create Agent.get_shared_memory() function
     let bridge_clone = bridge.clone();
     let get_shared_memory_fn = lua.create_function(move |lua, args: (Table, String)| {
         let (scope, key) = args;
@@ -1328,7 +1328,7 @@ pub fn inject_agent_global(
         result.map_or_else(|| Ok(Value::Nil), |value| json_to_lua_value(lua, &value))
     })?;
 
-    // Create Agent.getHierarchy() function
+    // Create Agent.get_hierarchy() function
     let bridge_clone = bridge.clone();
     let get_hierarchy_fn = lua.create_function(move |lua, agent_name: String| {
         let bridge = bridge_clone.clone();
@@ -1343,7 +1343,7 @@ pub fn inject_agent_global(
         json_to_lua_value(lua, &hierarchy)
     })?;
 
-    // Create Agent.getDetails() function (alias for getInfo with different return format)
+    // Create Agent.get_details() function (alias for get_info with different return format)
     let bridge_clone = bridge;
     let get_details_fn = lua.create_function(move |lua, agent_name: String| {
         let bridge = bridge_clone.clone();
@@ -1362,25 +1362,25 @@ pub fn inject_agent_global(
     agent_table.set("create", create_fn)?;
     agent_table.set("list", list_fn)?;
     agent_table.set("discover", discover_fn)?;
-    agent_table.set("wrapAsTool", wrap_as_tool_fn)?;
-    agent_table.set("getInfo", get_info_fn)?;
-    agent_table.set("listCapabilities", list_capabilities_fn)?;
-    agent_table.set("createComposite", create_composite_fn)?;
-    agent_table.set("discoverByCapability", discover_by_capability_fn)?;
+    agent_table.set("wrap_as_tool", wrap_as_tool_fn)?;
+    agent_table.set("get_info", get_info_fn)?;
+    agent_table.set("list_capabilities", list_capabilities_fn)?;
+    agent_table.set("create_composite", create_composite_fn)?;
+    agent_table.set("discover_by_capability", discover_by_capability_fn)?;
     agent_table.set("register", register_fn)?;
     agent_table.set("get", get_fn)?;
-    agent_table.set("listTemplates", list_templates_fn)?;
-    agent_table.set("createFromTemplate", create_from_template_fn)?;
-    agent_table.set("listInstances", list_instances_fn)?;
-    agent_table.set("createContext", create_context_fn)?;
-    agent_table.set("createChildContext", create_child_context_fn)?;
-    agent_table.set("updateContext", update_context_fn)?;
-    agent_table.set("getContextData", get_context_data_fn)?;
-    agent_table.set("removeContext", remove_context_fn)?;
-    agent_table.set("setSharedMemory", set_shared_memory_fn)?;
-    agent_table.set("getSharedMemory", get_shared_memory_fn)?;
-    agent_table.set("getHierarchy", get_hierarchy_fn)?;
-    agent_table.set("getDetails", get_details_fn)?;
+    agent_table.set("list_templates", list_templates_fn)?;
+    agent_table.set("create_from_template", create_from_template_fn)?;
+    agent_table.set("list_instances", list_instances_fn)?;
+    agent_table.set("create_context", create_context_fn)?;
+    agent_table.set("create_child_context", create_child_context_fn)?;
+    agent_table.set("update_context", update_context_fn)?;
+    agent_table.set("get_context_data", get_context_data_fn)?;
+    agent_table.set("remove_context", remove_context_fn)?;
+    agent_table.set("set_shared_memory", set_shared_memory_fn)?;
+    agent_table.set("get_shared_memory", get_shared_memory_fn)?;
+    agent_table.set("get_hierarchy", get_hierarchy_fn)?;
+    agent_table.set("get_details", get_details_fn)?;
 
     // Set Agent as global
     lua.globals().set("Agent", agent_table)?;
