@@ -88,12 +88,17 @@ impl StatsCollection {
     pub fn is_enabled(&self, stat_type: StatType) -> bool {
         self.enabled_stats.contains(&stat_type)
     }
-    
+
     /// Enable all statistics
     #[must_use]
     pub fn all() -> Self {
         Self {
-            enabled_stats: vec![StatType::Cpu, StatType::Memory, StatType::Disk, StatType::Process],
+            enabled_stats: vec![
+                StatType::Cpu,
+                StatType::Memory,
+                StatType::Disk,
+                StatType::Process,
+            ],
         }
     }
 }

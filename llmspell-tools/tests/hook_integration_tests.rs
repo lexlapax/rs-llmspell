@@ -5,7 +5,7 @@ use llmspell_tools::{
     data::json_processor::JsonProcessorTool,
     fs::file_operations::FileOperationsTool,
     lifecycle::{
-        hook_integration::{ToolExecutor, ToolLifecycleConfig},
+        hook_integration::{AuditConfig, HookFeatures, ToolExecutor, ToolLifecycleConfig},
         HookableToolExecution,
     },
     registry::ToolRegistry,
@@ -25,7 +25,10 @@ use std::time::{Duration, Instant};
 #[tokio::test]
 async fn test_tool_executor_basic_execution() {
     let config = ToolLifecycleConfig {
-        enable_hooks: false, // Start with hooks disabled
+        features: HookFeatures {
+            hooks_enabled: false, // Start with hooks disabled
+            ..Default::default()
+        },
         ..Default::default()
     };
 
@@ -51,7 +54,10 @@ async fn test_tool_executor_basic_execution() {
 #[tokio::test]
 async fn test_security_validation_with_safe_tool() {
     let config = ToolLifecycleConfig {
-        enable_security_validation: true,
+        features: HookFeatures {
+            security_validation_enabled: true,
+            ..Default::default()
+        },
         max_security_level: SecurityLevel::Safe,
         ..Default::default()
     };
@@ -78,7 +84,10 @@ async fn test_security_validation_with_safe_tool() {
 #[tokio::test]
 async fn test_security_validation_with_restricted_tool() {
     let config = ToolLifecycleConfig {
-        enable_security_validation: true,
+        features: HookFeatures {
+            security_validation_enabled: true,
+            ..Default::default()
+        },
         max_security_level: SecurityLevel::Safe,
         ..Default::default()
     };
@@ -110,8 +119,10 @@ async fn test_security_validation_with_restricted_tool() {
 #[tokio::test]
 async fn test_audit_logging_enabled() {
     let config = ToolLifecycleConfig {
-        enable_audit_logging: true,
-        audit_log_parameters: false,
+        audit: AuditConfig {
+            enabled: true,
+            log_parameters: false,
+        },
         ..Default::default()
     };
 
@@ -138,7 +149,10 @@ async fn test_audit_logging_enabled() {
 #[tokio::test]
 async fn test_error_handling_with_invalid_expression() {
     let config = ToolLifecycleConfig {
-        enable_hooks: false,
+        features: HookFeatures {
+            hooks_enabled: false,
+            ..Default::default()
+        },
         ..Default::default()
     };
 
@@ -166,7 +180,10 @@ async fn test_error_handling_with_invalid_expression() {
 #[tokio::test]
 async fn test_resource_tracking_integration() {
     let config = ToolLifecycleConfig {
-        enable_hooks: false,
+        features: HookFeatures {
+            hooks_enabled: false,
+            ..Default::default()
+        },
         ..Default::default()
     };
 
@@ -196,14 +213,20 @@ async fn test_resource_tracking_integration() {
 async fn test_hook_performance_overhead() {
     // Test with hooks disabled
     let config_no_hooks = ToolLifecycleConfig {
-        enable_hooks: false,
+        features: HookFeatures {
+            hooks_enabled: false,
+            ..Default::default()
+        },
         ..Default::default()
     };
     let executor_no_hooks = ToolExecutor::new(config_no_hooks, None, None);
 
     // Test with hooks enabled (but no actual hooks registered)
     let config_with_hooks = ToolLifecycleConfig {
-        enable_hooks: true,
+        features: HookFeatures {
+            hooks_enabled: true,
+            ..Default::default()
+        },
         ..Default::default()
     };
     let executor_with_hooks = ToolExecutor::new(config_with_hooks, None, None);
@@ -258,8 +281,11 @@ async fn test_hook_performance_overhead() {
 #[tokio::test]
 async fn test_circuit_breaker_functionality() {
     let config = ToolLifecycleConfig {
-        enable_hooks: false,
-        enable_circuit_breaker: true,
+        features: HookFeatures {
+            hooks_enabled: false,
+            circuit_breaker_enabled: true,
+            ..Default::default()
+        },
         circuit_breaker_failure_threshold: 3,
         circuit_breaker_recovery_time: Duration::from_secs(1),
         ..Default::default()
@@ -289,7 +315,10 @@ async fn test_circuit_breaker_functionality() {
 #[tokio::test]
 async fn test_hook_integration_with_multiple_tool_types() {
     let config = ToolLifecycleConfig {
-        enable_hooks: false,
+        features: HookFeatures {
+            hooks_enabled: false,
+            ..Default::default()
+        },
         ..Default::default()
     };
 
@@ -338,7 +367,10 @@ async fn test_hook_integration_with_multiple_tool_types() {
 #[tokio::test]
 async fn test_tool_registry_with_executor() {
     let config = ToolLifecycleConfig {
-        enable_hooks: false,
+        features: HookFeatures {
+            hooks_enabled: false,
+            ..Default::default()
+        },
         ..Default::default()
     };
 
@@ -432,7 +464,10 @@ async fn test_different_security_levels() {
 #[tokio::test]
 async fn test_max_hook_execution_time() {
     let config = ToolLifecycleConfig {
-        enable_hooks: true,
+        features: HookFeatures {
+            hooks_enabled: true,
+            ..Default::default()
+        },
         max_hook_execution_time: Duration::from_millis(10), // Very short timeout
         ..Default::default()
     };

@@ -506,8 +506,10 @@ impl BaseAgent for ImageProcessorTool {
             "resize" => {
                 let input_path = extract_required_string(params, "source_path")?;
                 let output_path = extract_required_string(params, "target_path")?;
-                let width = extract_optional_u64(params, "width").map(|w| w.min(u32::MAX as u64) as u32);
-                let height = extract_optional_u64(params, "height").map(|h| h.min(u32::MAX as u64) as u32);
+                let width =
+                    extract_optional_u64(params, "width").map(|w| w.min(u32::MAX as u64) as u32);
+                let height =
+                    extract_optional_u64(params, "height").map(|h| h.min(u32::MAX as u64) as u32);
                 let maintain_aspect_ratio =
                     extract_optional_bool(params, "maintain_aspect_ratio").unwrap_or(true);
 

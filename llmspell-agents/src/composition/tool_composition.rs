@@ -627,7 +627,9 @@ impl ToolComposition {
                 matches!(self.error_strategy, CompositionErrorStrategy::FailFast)
             }
             StepErrorStrategy::Stop => true,
-            StepErrorStrategy::Continue | StepErrorStrategy::Skip | StepErrorStrategy::Retry { .. } => false,
+            StepErrorStrategy::Continue
+            | StepErrorStrategy::Skip
+            | StepErrorStrategy::Retry { .. } => false,
         }
     }
 

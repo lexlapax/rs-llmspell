@@ -597,8 +597,7 @@ mod tests {
         });
 
         let previous_output = AgentOutput::text("test_output".to_string());
-        let result = manager
-            .substitute_previous_output(parameters, &previous_output);
+        let result = manager.substitute_previous_output(parameters, &previous_output);
 
         assert_eq!(
             result["input"],

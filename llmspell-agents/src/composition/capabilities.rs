@@ -203,11 +203,11 @@ impl CapabilityAggregator {
         let capabilities = self.capabilities.read().unwrap();
         let capabilities_vec: Vec<_> = capabilities.values().cloned().collect();
         drop(capabilities);
-        
+
         let requirements = self.requirements.read().unwrap();
         let requirements_vec: Vec<_> = requirements.clone();
         drop(requirements);
-        
+
         let mut matches = Vec::new();
 
         for entry in capabilities_vec.iter() {

@@ -87,7 +87,7 @@ impl DiffCalculatorTool {
     #[allow(clippy::unused_self)]
     fn calculate_text_diff(&self, old: &str, new: &str, format: DiffFormat) -> Result<String> {
         use std::fmt::Write;
-        
+
         let diff = TextDiff::from_lines(old, new);
 
         match format {

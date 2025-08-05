@@ -3,7 +3,7 @@
 
 use llmspell_core::{types::AgentInput, ExecutionContext};
 use llmspell_tools::{
-    lifecycle::hook_integration::{ToolExecutor, ToolLifecycleConfig},
+    lifecycle::hook_integration::{AuditConfig, HookFeatures, ToolExecutor, ToolLifecycleConfig},
     util::calculator::CalculatorTool,
 };
 use serde_json::json;
@@ -46,16 +46,24 @@ async fn test_hook_overhead_under_5_percent() {
 
         // Create executors
         let config_no_hooks = ToolLifecycleConfig {
-            enable_hooks: false,
+            features: HookFeatures {
+                hooks_enabled: false,
+                ..Default::default()
+            },
             ..Default::default()
         };
         let executor_no_hooks = ToolExecutor::new(config_no_hooks, None, None);
 
         let config_with_hooks = ToolLifecycleConfig {
-            enable_hooks: true,
-            enable_security_validation: true,
-            enable_audit_logging: true,
-            enable_circuit_breaker: true,
+            features: HookFeatures {
+                hooks_enabled: true,
+                security_validation_enabled: true,
+                circuit_breaker_enabled: true,
+            },
+            audit: AuditConfig {
+                enabled: true,
+                log_parameters: false,
+            },
             ..Default::default()
         };
         let executor_with_hooks = ToolExecutor::new(config_with_hooks, None, None);
@@ -119,8 +127,11 @@ async fn test_hook_overhead_under_5_percent() {
 #[tokio::test]
 async fn test_circuit_breaker_performance() {
     let config = ToolLifecycleConfig {
-        enable_hooks: true,
-        enable_circuit_breaker: true,
+        features: HookFeatures {
+            hooks_enabled: true,
+            circuit_breaker_enabled: true,
+            ..Default::default()
+        },
         circuit_breaker_failure_threshold: 3,
         circuit_breaker_recovery_time: Duration::from_millis(100),
         ..Default::default()
@@ -159,7 +170,10 @@ async fn test_circuit_breaker_performance() {
 #[tokio::test]
 async fn test_resource_tracking_overhead() {
     let config = ToolLifecycleConfig {
-        enable_hooks: true,
+        features: HookFeatures {
+            hooks_enabled: true,
+            ..Default::default()
+        },
         ..Default::default()
     };
 
@@ -196,7 +210,10 @@ async fn test_resource_tracking_overhead() {
 #[tokio::test]
 async fn test_hook_execution_time_limit() {
     let config = ToolLifecycleConfig {
-        enable_hooks: true,
+        features: HookFeatures {
+            hooks_enabled: true,
+            ..Default::default()
+        },
         max_hook_execution_time: Duration::from_millis(50), // Very short timeout
         ..Default::default()
     };
@@ -229,17 +246,28 @@ async fn test_audit_logging_performance_impact() {
 
     // Test with audit logging disabled
     let config_no_audit = ToolLifecycleConfig {
-        enable_hooks: true,
-        enable_audit_logging: false,
+        features: HookFeatures {
+            hooks_enabled: true,
+            ..Default::default()
+        },
+        audit: AuditConfig {
+            enabled: false,
+            log_parameters: false,
+        },
         ..Default::default()
     };
     let executor_no_audit = ToolExecutor::new(config_no_audit, None, None);
 
     // Test with audit logging enabled
     let config_with_audit = ToolLifecycleConfig {
-        enable_hooks: true,
-        enable_audit_logging: true,
-        audit_log_parameters: true, // Full logging
+        features: HookFeatures {
+            hooks_enabled: true,
+            ..Default::default()
+        },
+        audit: AuditConfig {
+            enabled: true,
+            log_parameters: true, // Full logging
+        },
         ..Default::default()
     };
     let executor_with_audit = ToolExecutor::new(config_with_audit, None, None);

@@ -3,7 +3,7 @@
 async fn test_simple_hook_overhead() {
     use llmspell_core::{types::AgentInput, ExecutionContext};
     use llmspell_tools::{
-        lifecycle::hook_integration::{ToolExecutor, ToolLifecycleConfig},
+        lifecycle::hook_integration::{HookFeatures, ToolExecutor, ToolLifecycleConfig},
         util::calculator::CalculatorTool,
     };
     use serde_json::json;
@@ -17,7 +17,10 @@ async fn test_simple_hook_overhead() {
 
     // Without hooks
     let config_no_hooks = ToolLifecycleConfig {
-        enable_hooks: false,
+        features: HookFeatures {
+            hooks_enabled: false,
+            ..Default::default()
+        },
         ..Default::default()
     };
     let executor_no_hooks = ToolExecutor::new(config_no_hooks, None, None);
@@ -33,7 +36,10 @@ async fn test_simple_hook_overhead() {
 
     // With hooks
     let config_with_hooks = ToolLifecycleConfig {
-        enable_hooks: true,
+        features: HookFeatures {
+            hooks_enabled: true,
+            ..Default::default()
+        },
         ..Default::default()
     };
     let executor_with_hooks = ToolExecutor::new(config_with_hooks, None, None);

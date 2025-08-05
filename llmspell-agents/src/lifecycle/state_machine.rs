@@ -265,14 +265,14 @@ impl StateHandler for DefaultStateHandler {
 
         match (self.state, target) {
             // Valid transitions
-            (Uninitialized, Initializing | Error) |
-            (Initializing, Ready | Error | Terminating) |
-            (Ready, Running | Paused | Terminating | Error) |
-            (Running, Ready | Paused | Terminating | Error) |
-            (Paused, Ready | Running | Terminating | Error) |
-            (Error, Recovering | Terminating | Terminated) |
-            (Recovering, Ready | Error | Terminating) |
-            (Terminating, Terminated | Error) => true,
+            (Uninitialized, Initializing | Error)
+            | (Initializing, Ready | Error | Terminating)
+            | (Ready, Running | Paused | Terminating | Error)
+            | (Running, Ready | Paused | Terminating | Error)
+            | (Paused, Ready | Running | Terminating | Error)
+            | (Error, Recovering | Terminating | Terminated)
+            | (Recovering, Ready | Error | Terminating)
+            | (Terminating, Terminated | Error) => true,
 
             // From Terminated (final state)
             (Terminated, _) => false,

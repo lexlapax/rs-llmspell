@@ -1,9 +1,7 @@
 //! ABOUTME: Tool registry for discovery, validation, and management
 //! ABOUTME: Provides thread-safe tool registration and capability-based discovery
 
-use crate::lifecycle::{
-    hook_integration::HookFeatures, ExecutionMetrics, ToolExecutor, ToolLifecycleConfig,
-};
+use crate::lifecycle::{ExecutionMetrics, ToolExecutor, ToolLifecycleConfig};
 use llmspell_core::{
     error::LLMSpellError,
     traits::tool::{ResourceLimits, SecurityLevel, SecurityRequirements, Tool, ToolCategory},
@@ -540,6 +538,7 @@ pub struct ResourceUsageStats {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::lifecycle::hook_integration::HookFeatures;
     use async_trait::async_trait;
     use llmspell_core::{
         traits::{

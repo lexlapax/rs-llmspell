@@ -284,7 +284,7 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
 10. [ ] **Phase 10: Complete Warning Elimination** (8 hours) - All crates
     **Goal**: Reduce warnings from ~1,278 to 0 (plus justified exceptions)
     
-    10.1. [ ] **Documentation Sprint** (2.5 hours) - 361 warnings
+    10.1. [ ] **Documentation Sprint** (2.5 hours) - 361 warnings, do not skip or be lazy
         - [ ] Add 304 # Errors sections to Result-returning functions
         - [ ] Add 57 # Panics sections to functions that may panic
         - [ ] Fix any other documentation warnings
@@ -292,41 +292,41 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
         - [ ] Ensure the changed crates compile
         - [ ] Ensure all tests pass for the affected crate
 
-    10.2. [ ] **Must-Use Attributes** (1 hour) - 82 warnings
+    10.2. [ ] **Must-Use Attributes** (1 hour) - 82 warnings, do not skip or be lazy
         - [ ] Add #[must_use] to all methods returning Self
         - [ ] Add #[must_use] to constructors and builders
         - [ ] Add #[must_use] to methods that should be used
         - [ ] Ensure the changed crates compile
         - [ ] Ensure all tests pass for the affected crate
     
-    10.3. [ ] **Type Casting Cleanup** (1 hour) - 65 warnings
+    10.3. [ ] **Type Casting Cleanup** (1 hour) - 65 warnings, do not skip or be lazy
         - [ ] Fix 43 u64 to f64 precision warnings (use `as` with #[allow] where needed)
         - [ ] Fix 18 usize to f64 precision warnings
         - [ ] Fix other casting warnings using From trait where possible
         - [ ] Ensure the changed crates compile
         - [ ] Ensure all tests pass for the affected crate
     
-    10.4. [ ] **Code Pattern Improvements** (1.5 hours) - 104 warnings
+    10.4. [ ] **Code Pattern Improvements** (1.5 hours) - 104 warnings, do not skip or be lazy
         - [ ] Replace 55 map_or patterns with map_or_else where appropriate
         - [ ] Remove 40 unused async keywords
         - [ ] Fix 9 items after statements warnings
         - [ ] Ensure the changed crates compile
         - [ ] Ensure all tests pass for the affected crate
     
-    10.5. [ ] **Function Refactoring** (1 hour) - 73 warnings
+    10.5. [ ] **Function Refactoring** (1 hour) - 73 warnings, do not skip or be lazy
         - [ ] Fix 28 unused self arguments (convert to associated functions)
         - [ ] Fix 45 too many lines warnings (split functions or add #[allow])
         - [ ] Ensure the changed crates compile
         - [ ] Ensure all tests pass for the affected crate
     
-    10.6. [ ] **Result/Option Cleanup** (1 hour) - ~20 warnings
+    10.6. [ ] **Result/Option Cleanup** (1 hour) - ~20 warnings, do not skip or be lazy
         - [ ] Remove unnecessary Result wrappings
         - [ ] Fix unnecessary function return values
         - [ ] Fix map().unwrap_or_else() patterns
         - [ ] Ensure the changed crates compile
         - [ ] Ensure all tests pass for the affected crate
     
-    10.7. [ ] **Remaining Issues** (1 hour) - ~50 warnings
+    10.7. [ ] **Remaining Issues** (1 hour) - ~50 warnings, do not skip or be lazy
         - [ ] Fix identical match arms
         - [ ] Fix inefficient clone assignments
         - [ ] Fix format! string interpolations

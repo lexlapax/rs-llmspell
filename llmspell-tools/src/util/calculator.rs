@@ -951,8 +951,8 @@ mod tests {
     }
     #[tokio::test]
     async fn test_calculator_with_hook_executor() {
-        use crate::lifecycle::{ToolExecutor, ToolLifecycleConfig};
         use crate::lifecycle::hook_integration::HookFeatures;
+        use crate::lifecycle::{ToolExecutor, ToolLifecycleConfig};
 
         let tool = CalculatorTool::new();
 
@@ -1003,8 +1003,8 @@ mod tests {
     }
     #[tokio::test]
     async fn test_hookable_tool_execution_trait() {
-        use crate::lifecycle::{HookableToolExecution, ToolExecutor, ToolLifecycleConfig};
         use crate::lifecycle::hook_integration::HookFeatures;
+        use crate::lifecycle::{HookableToolExecution, ToolExecutor, ToolLifecycleConfig};
 
         let tool = CalculatorTool::new();
 

@@ -116,14 +116,15 @@ impl ProviderManager {
 
         // Set API key from environment if specified
         if let Some(ref api_key_env) = config.api_key_env {
-            provider_config.api_key = Some(
-                std::env::var(api_key_env).map_err(|_| LLMSpellError::Configuration {
-                    message: format!(
-                        "Environment variable '{api_key_env}' not found for provider '{name}'"
-                    ),
-                    source: None,
-                })?,
-            );
+            provider_config.api_key =
+                Some(
+                    std::env::var(api_key_env).map_err(|_| LLMSpellError::Configuration {
+                        message: format!(
+                            "Environment variable '{api_key_env}' not found for provider '{name}'"
+                        ),
+                        source: None,
+                    })?,
+                );
         }
 
         // Set other configuration
