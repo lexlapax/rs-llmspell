@@ -116,13 +116,14 @@ impl ProviderManager {
 
         // Set API key from environment if specified
         if let Some(ref api_key_env) = config.api_key_env {
-            let api_key = std::env::var(api_key_env).map_err(|_| LLMSpellError::Configuration {
-                message: format!(
-                    "Environment variable '{api_key_env}' not found for provider '{name}'"
-                ),
-                source: None,
-            })?;
-            provider_config.api_key = Some(api_key);
+            provider_config.api_key = Some(
+                std::env::var(api_key_env).map_err(|_| LLMSpellError::Configuration {
+                    message: format!(
+                        "Environment variable '{api_key_env}' not found for provider '{name}'"
+                    ),
+                    source: None,
+                })?,
+            );
         }
 
         // Set other configuration
@@ -221,19 +222,14 @@ impl ProviderManager {
 
     /// Check if a provider supports a specific capability
     pub async fn check_provider_capability(&self, provider_name: &str, capability: &str) -> bool {
-        if let Ok(caps) = self
-            .core_manager
+        self.core_manager
             .query_capabilities(Some(provider_name))
             .await
-        {
-            match capability {
+            .is_ok_and(|caps| match capability {
                 "streaming" => caps.supports_streaming,
                 "multimodal" => caps.supports_multimodal,
                 _ => false,
-            }
-        } else {
-            false
-        }
+            })
     }
 
     /// Get the core provider manager
@@ -444,7 +440,7 @@ impl ProviderConfigBuilder {
 
     /// Set the maximum tokens
     #[must_use]
-    pub fn max_tokens(mut self, tokens: u32) -> Self {
+    pub const fn max_tokens(mut self, tokens: u32) -> Self {
         self.config.max_tokens = Some(tokens);
         self
     }

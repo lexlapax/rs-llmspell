@@ -141,7 +141,7 @@ where
     T: Into<Self>,
 {
     fn from(opt: Option<T>) -> Self {
-        opt.map_or(Self::Null, std::convert::Into::into)
+        opt.map_or(Self::Null, Into::into)
     }
 }
 

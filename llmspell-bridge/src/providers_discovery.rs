@@ -40,6 +40,7 @@ pub struct ProviderDiscovery {
 
 impl ProviderDiscovery {
     /// Create a new provider discovery service
+    #[must_use]
     pub fn new() -> Self {
         let mut provider_types = HashMap::new();
 
@@ -325,6 +326,7 @@ impl ProviderDiscovery {
     }
 
     /// Create with a provider manager for dynamic discovery
+    #[must_use]
     pub fn with_provider_manager(provider_manager: Arc<ProviderManager>) -> Self {
         let mut discovery = Self::new();
         discovery.provider_manager = Some(provider_manager);
@@ -332,6 +334,7 @@ impl ProviderDiscovery {
     }
 
     /// Get information about a specific provider type
+    #[must_use]
     pub fn get_provider_info(&self, provider_type: &str) -> Option<ProviderTypeInfo> {
         self.provider_types.get(provider_type).cloned()
     }

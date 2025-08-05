@@ -169,13 +169,9 @@ impl EventBridge {
     pub async fn unsubscribe(&self, subscription_id: &str) -> Result<bool> {
         let mut subscriptions = self.subscriptions.write();
 
-        if let Some(_handle) = subscriptions.remove(subscription_id) {
-            // Note: EventBus doesn't currently support explicit unsubscribe
-            // The receiver will be dropped when the script context is cleaned up
-            Ok(true)
-        } else {
-            Ok(false)
-        }
+        // Note: EventBus doesn't currently support explicit unsubscribe
+        // The receiver will be dropped when the script context is cleaned up
+        Ok(subscriptions.remove(subscription_id).is_some())
     }
 
     /// List active subscriptions

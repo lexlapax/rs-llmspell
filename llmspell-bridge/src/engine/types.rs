@@ -52,17 +52,13 @@ impl From<ScriptEngineError> for llmspell_core::error::LLMSpellError {
                 message,
                 line,
                 ..
-            } => {
-                let detail = if let Some(l) = line {
-                    format!("{message} at line {l}")
-                } else {
-                    message
-                };
-                Self::Validation {
-                    field: Some("script".to_string()),
-                    message: format!("{engine} syntax error: {detail}"),
-                }
-            }
+            } => Self::Validation {
+                field: Some("script".to_string()),
+                message: format!(
+                    "{engine} syntax error: {}",
+                    line.map_or_else(|| message.clone(), |l| format!("{message} at line {l}"))
+                ),
+            },
             ScriptEngineError::UnsupportedFeature { engine, feature } => Self::Component {
                 message: format!("Feature '{feature}' not supported by {engine} engine"),
                 source: None,

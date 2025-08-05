@@ -327,7 +327,7 @@ impl HookBridge {
         // Publish before hook event if event bridge is available
         if let Some(ref bridge) = event_bridge {
             let before_event =
-                self.create_hook_event(&hook_point, "before", correlation_id, context)?;
+                Self::create_hook_event(&hook_point, "before", correlation_id, context)?;
             if let Err(e) = bridge
                 .publish_correlated_event(before_event, correlation_id)
                 .await
@@ -355,7 +355,7 @@ impl HookBridge {
                 Err(_) => "error",
             };
             let after_event =
-                self.create_hook_event(&hook_point, status, correlation_id, context)?;
+                Self::create_hook_event(&hook_point, status, correlation_id, context)?;
             if let Err(e) = bridge
                 .publish_correlated_event(after_event, correlation_id)
                 .await
@@ -369,7 +369,6 @@ impl HookBridge {
 
     /// Create a standardized hook event
     fn create_hook_event(
-        &self,
         hook_point: &HookPoint,
         status: &str,
         correlation_id: Uuid,

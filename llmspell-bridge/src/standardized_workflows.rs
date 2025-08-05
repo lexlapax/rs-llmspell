@@ -43,17 +43,17 @@ impl StandardizedWorkflowFactory {
         // Build workflow configuration
         let mut config = WorkflowConfig::default();
 
-        if let Some(timeout_ms) = params.get("timeout").and_then(|v| v.as_u64()) {
+        params.get("timeout").and_then(|v| v.as_u64()).map(|timeout_ms| {
             config.max_execution_time = Some(Duration::from_millis(timeout_ms));
-        }
+        });
 
-        if let Some(continue_on_error) = params.get("continue_on_error").and_then(|v| v.as_bool()) {
+        params.get("continue_on_error").and_then(|v| v.as_bool()).map(|continue_on_error| {
             config.continue_on_error = continue_on_error;
-        }
+        });
 
-        if let Some(max_retries) = params.get("max_retry_attempts").and_then(|v| v.as_u64()) {
+        params.get("max_retry_attempts").and_then(|v| v.as_u64()).map(|max_retries| {
             config.max_retry_attempts = max_retries as u32;
-        }
+        });
 
         // Extract type-specific configuration
         let type_config = match workflow_type {

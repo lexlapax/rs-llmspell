@@ -363,7 +363,7 @@ impl JSConfigBuilder {
 
     /// Build the configuration
     #[must_use]
-    pub fn build(self) -> JSConfig {
+    pub const fn build(self) -> JSConfig {
         self.config
     }
 }
