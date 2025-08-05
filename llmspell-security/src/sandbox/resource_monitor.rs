@@ -121,12 +121,16 @@ impl ResourceMonitor {
                 }
 
                 if let Some(limit) = resource_limits.max_file_ops_per_sec {
+                    #[allow(clippy::cast_precision_loss)]
                     let ops_per_sec = current.file_operations as f64
                         / current.timestamp.elapsed().as_secs_f64().max(1.0);
-                    if ops_per_sec > limit as f64 {
+                    #[allow(clippy::cast_precision_loss)]
+                    let limit_f64 = limit as f64;
+                    if ops_per_sec > limit_f64 {
                         viols.push(SandboxViolation::ResourceLimit {
                             resource: "file_operations".to_string(),
-                            limit: limit as u64,
+                            limit: limit,
+                            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
                             actual: ops_per_sec as u64,
                             reason: "File operations per second exceeded limit".to_string(),
                         });
@@ -174,12 +178,16 @@ impl ResourceMonitor {
         if let Some(limit) = self.context.resource_limits.max_network_bps {
             let usage = self.current_usage.read().await;
             let duration = self.start_time.elapsed().as_secs_f64().max(1.0);
+            #[allow(clippy::cast_precision_loss)]
             let bps = usage.network_bytes as f64 / duration;
 
-            if bps > limit as f64 {
+            #[allow(clippy::cast_precision_loss)]
+            let limit_f64 = limit as f64;
+            if bps > limit_f64 {
                 let violation = SandboxViolation::ResourceLimit {
                     resource: "network_bandwidth".to_string(),
                     limit,
+                    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
                     actual: bps as u64,
                     reason: "Network bandwidth exceeded limit".to_string(),
                 };
@@ -206,12 +214,16 @@ impl ResourceMonitor {
         if let Some(limit) = self.context.resource_limits.max_file_ops_per_sec {
             let usage = self.current_usage.read().await;
             let duration = self.start_time.elapsed().as_secs_f64().max(1.0);
+            #[allow(clippy::cast_precision_loss)]
             let ops_per_sec = usage.file_operations as f64 / duration;
 
-            if ops_per_sec > limit as f64 {
+            #[allow(clippy::cast_precision_loss)]
+            let limit_f64 = limit as f64;
+            if ops_per_sec > limit_f64 {
                 let violation = SandboxViolation::ResourceLimit {
                     resource: "file_operations".to_string(),
-                    limit: limit as u64,
+                    limit,
+                    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
                     actual: ops_per_sec as u64,
                     reason: "File operations per second exceeded limit".to_string(),
                 };
@@ -265,6 +277,7 @@ impl ResourceMonitor {
 
         ResourceUsage {
             memory_bytes: (now.elapsed().as_secs() * 1024 * 1024).min(50 * 1024 * 1024),
+            #[allow(clippy::cast_possible_truncation)]
             cpu_time_ms: now.elapsed().as_millis() as u64 / 10,
             network_bytes: 0,
             file_operations: 0,
@@ -292,6 +305,7 @@ impl ResourceMonitor {
             current_usage: usage.clone(),
             limits: self.context.resource_limits.clone(),
             uptime_seconds: elapsed.as_secs(),
+            #[allow(clippy::cast_possible_truncation)]
             violations_count: self.violations.len(),
             efficiency_metrics: EfficiencyMetrics {
                 memory_efficiency: self.calculate_memory_efficiency(&usage).await,
@@ -304,7 +318,9 @@ impl ResourceMonitor {
     /// Calculate memory efficiency (0.0 to 1.0)
     async fn calculate_memory_efficiency(&self, usage: &ResourceUsage) -> f64 {
         if let Some(limit) = self.context.resource_limits.max_memory_bytes {
-            1.0 - (usage.memory_bytes as f64 / limit as f64).min(1.0)
+            #[allow(clippy::cast_precision_loss)]
+            let efficiency = 1.0 - (usage.memory_bytes as f64 / limit as f64).min(1.0);
+            efficiency
         } else {
             1.0 // No limit means perfect efficiency
         }
@@ -313,7 +329,9 @@ impl ResourceMonitor {
     /// Calculate CPU efficiency (0.0 to 1.0)
     async fn calculate_cpu_efficiency(&self, usage: &ResourceUsage) -> f64 {
         if let Some(limit) = self.context.resource_limits.max_cpu_time_ms {
-            1.0 - (usage.cpu_time_ms as f64 / limit as f64).min(1.0)
+            #[allow(clippy::cast_precision_loss)]
+            let efficiency = 1.0 - (usage.cpu_time_ms as f64 / limit as f64).min(1.0);
+            efficiency
         } else {
             1.0
         }
@@ -323,8 +341,11 @@ impl ResourceMonitor {
     async fn calculate_network_efficiency(&self, usage: &ResourceUsage) -> f64 {
         if let Some(limit) = self.context.resource_limits.max_network_bps {
             let duration = self.start_time.elapsed().as_secs_f64().max(1.0);
+            #[allow(clippy::cast_precision_loss)]
             let actual_bps = usage.network_bytes as f64 / duration;
-            1.0 - (actual_bps / limit as f64).min(1.0)
+            #[allow(clippy::cast_precision_loss)]
+            let efficiency = 1.0 - (actual_bps / limit as f64).min(1.0);
+            efficiency
         } else {
             1.0
         }

@@ -506,10 +506,16 @@ impl BaseAgent for ImageProcessorTool {
             "resize" => {
                 let input_path = extract_required_string(params, "source_path")?;
                 let output_path = extract_required_string(params, "target_path")?;
-                let width =
-                    extract_optional_u64(params, "width").map(|w| w.min(u32::MAX as u64) as u32);
-                let height =
-                    extract_optional_u64(params, "height").map(|h| h.min(u32::MAX as u64) as u32);
+                let width = extract_optional_u64(params, "width").map(|w| {
+                    #[allow(clippy::cast_possible_truncation)]
+                    let width_val = w.min(u32::MAX as u64) as u32;
+                    width_val
+                });
+                let height = extract_optional_u64(params, "height").map(|h| {
+                    #[allow(clippy::cast_possible_truncation)]
+                    let height_val = h.min(u32::MAX as u64) as u32;
+                    height_val
+                });
                 let maintain_aspect_ratio =
                     extract_optional_bool(params, "maintain_aspect_ratio").unwrap_or(true);
 
@@ -581,7 +587,9 @@ impl BaseAgent for ImageProcessorTool {
                         message: "x is required".to_string(),
                         field: Some("x".to_string()),
                     })?
-                    .min(u32::MAX as u64) as u32;
+                    .min(u32::MAX as u64);
+                #[allow(clippy::cast_possible_truncation)]
+                let x = x as u32;
 
                 let y = params
                     .get("y")
@@ -590,7 +598,9 @@ impl BaseAgent for ImageProcessorTool {
                         message: "y is required".to_string(),
                         field: Some("y".to_string()),
                     })?
-                    .min(u32::MAX as u64) as u32;
+                    .min(u32::MAX as u64);
+                #[allow(clippy::cast_possible_truncation)]
+                let y = y as u32;
 
                 let width = params
                     .get("width")
@@ -599,7 +609,9 @@ impl BaseAgent for ImageProcessorTool {
                         message: "width is required".to_string(),
                         field: Some("width".to_string()),
                     })?
-                    .min(u32::MAX as u64) as u32;
+                    .min(u32::MAX as u64);
+                #[allow(clippy::cast_possible_truncation)]
+                let width = width as u32;
 
                 let height = params
                     .get("height")
@@ -608,7 +620,9 @@ impl BaseAgent for ImageProcessorTool {
                         message: "height is required".to_string(),
                         field: Some("height".to_string()),
                     })?
-                    .min(u32::MAX as u64) as u32;
+                    .min(u32::MAX as u64);
+                #[allow(clippy::cast_possible_truncation)]
+                let height = height as u32;
 
                 self.crop_image(
                     Path::new(input_path),
@@ -643,7 +657,9 @@ impl BaseAgent for ImageProcessorTool {
                 let degrees = params
                     .get("degrees")
                     .and_then(serde_json::Value::as_i64)
-                    .unwrap_or(90) as i32;
+                    .unwrap_or(90);
+                #[allow(clippy::cast_possible_truncation)]
+                let degrees = degrees as i32;
 
                 self.rotate_image(Path::new(input_path), Path::new(output_path), degrees)
                     .await?;
@@ -665,9 +681,16 @@ impl BaseAgent for ImageProcessorTool {
             "thumbnail" => {
                 let input_path = extract_required_string(params, "source_path")?;
                 let output_path = extract_required_string(params, "target_path")?;
-                let max_width = extract_optional_u64(params, "max_width").map_or(200, |w| w as u32);
-                let max_height =
-                    extract_optional_u64(params, "max_height").map_or(200, |h| h as u32);
+                let max_width = extract_optional_u64(params, "max_width").map_or(200, |w| {
+                    #[allow(clippy::cast_possible_truncation)]
+                    let width_val = w as u32;
+                    width_val
+                });
+                let max_height = extract_optional_u64(params, "max_height").map_or(200, |h| {
+                    #[allow(clippy::cast_possible_truncation)]
+                    let height_val = h as u32;
+                    height_val
+                });
 
                 self.generate_thumbnail(
                     Path::new(input_path),

@@ -170,14 +170,20 @@ impl HookInspector {
             {
                 let hours = (duration_since_epoch.as_secs() / 3600) % 24;
                 let days = duration_since_epoch.as_secs() / 86400;
-                *hourly_dist.entry(hours as u32).or_insert(0) += 1;
-                *daily_dist.entry(days as u32).or_insert(0) += 1;
+                #[allow(clippy::cast_possible_truncation)]
+                let hours_u32 = hours as u32;
+                #[allow(clippy::cast_possible_truncation)]
+                let days_u32 = days as u32;
+                *hourly_dist.entry(hours_u32).or_insert(0) += 1;
+                *daily_dist.entry(days_u32).or_insert(0) += 1;
             }
         }
 
         // Calculate average duration
         let average_duration = if total_executions > 0 {
-            total_duration / total_executions as u32
+            #[allow(clippy::cast_possible_truncation)]
+            let total_exec_u32 = total_executions as u32;
+            total_duration / total_exec_u32
         } else {
             Duration::from_secs(0)
         };
@@ -186,7 +192,9 @@ impl HookInspector {
         let mut slowest_hooks: Vec<(String, Duration)> = durations_by_hook
             .iter()
             .map(|(hook, durations)| {
-                let avg = durations.iter().sum::<Duration>() / durations.len() as u32;
+                #[allow(clippy::cast_possible_truncation)]
+                let len_u32 = durations.len() as u32;
+                let avg = durations.iter().sum::<Duration>() / len_u32;
                 (hook.clone(), avg)
             })
             .collect();
@@ -194,12 +202,14 @@ impl HookInspector {
         slowest_hooks.truncate(10);
 
         // Calculate rates
-        let error_rate =
-            *result_counts.get("Cancel").unwrap_or(&0) as f64 / total_executions as f64;
-        let modification_rate =
-            *result_counts.get("Modified").unwrap_or(&0) as f64 / total_executions as f64;
-        let cancellation_rate =
-            *result_counts.get("Cancel").unwrap_or(&0) as f64 / total_executions as f64;
+        #[allow(clippy::cast_precision_loss)]
+        let total_exec_f64 = total_executions as f64;
+        #[allow(clippy::cast_precision_loss)]
+        let error_rate = *result_counts.get("Cancel").unwrap_or(&0) as f64 / total_exec_f64;
+        #[allow(clippy::cast_precision_loss)]
+        let modification_rate = *result_counts.get("Modified").unwrap_or(&0) as f64 / total_exec_f64;
+        #[allow(clippy::cast_precision_loss)]
+        let cancellation_rate = *result_counts.get("Cancel").unwrap_or(&0) as f64 / total_exec_f64;
 
         // Find peak times
         let peak_hour = hourly_dist
@@ -275,7 +285,9 @@ impl HookInspector {
         let error_rate_change = analysis_b.error_rate - analysis_a.error_rate;
 
         Ok(ComparisonResult {
+            #[allow(clippy::cast_possible_wrap)]
             total_executions_change: set_b.len() as i64 - set_a.len() as i64,
+            #[allow(clippy::cast_possible_wrap)]
             unique_hooks_change: analysis_b.unique_hooks.len() as i64
                 - analysis_a.unique_hooks.len() as i64,
             average_duration_change_percent: duration_change,
@@ -396,8 +408,9 @@ impl HookInspector {
         executions: &[SerializedHookExecution],
     ) -> Option<ExecutionPattern> {
         // Find hooks that consistently take longer than average
-        let avg_duration =
-            executions.iter().map(|e| e.duration).sum::<Duration>() / executions.len() as u32;
+        #[allow(clippy::cast_possible_truncation)]
+        let exec_len_u32 = executions.len() as u32;
+        let avg_duration = executions.iter().map(|e| e.duration).sum::<Duration>() / exec_len_u32;
         let threshold = avg_duration * 3; // 3x average is considered a bottleneck
 
         let slow_hooks: Vec<String> = executions

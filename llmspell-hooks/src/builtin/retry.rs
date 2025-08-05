@@ -125,7 +125,9 @@ impl RetryMetrics {
         if self.total_operations == 0 {
             0.0
         } else {
-            self.retry_attempts as f64 / self.total_operations as f64
+            #[allow(clippy::cast_precision_loss)]
+            let rate = self.retry_attempts as f64 / self.total_operations as f64;
+            rate
         }
     }
 
@@ -133,7 +135,9 @@ impl RetryMetrics {
         if self.retry_attempts == 0 {
             0.0
         } else {
-            self.successful_retries as f64 / self.retry_attempts as f64
+            #[allow(clippy::cast_precision_loss)]
+            let rate = self.successful_retries as f64 / self.retry_attempts as f64;
+            rate
         }
     }
 }
@@ -261,13 +265,20 @@ impl RetryHook {
                 multiplier,
                 max,
             } => {
+                #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
                 let delay = base.as_millis() as f64 * multiplier.powf(state.attempts as f64);
-                Duration::from_millis(delay.min(max.as_millis() as f64) as u64)
+                #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+                let delay_ms = delay.min(max.as_millis() as f64) as u64;
+                Duration::from_millis(delay_ms)
             }
             BackoffStrategy::Fibonacci { base, max } => {
                 let fib = self.fibonacci(state.attempts);
-                let delay = base.as_millis() as u64 * fib;
-                Duration::from_millis(delay.min(max.as_millis() as u64))
+                #[allow(clippy::cast_possible_truncation)]
+                let base_ms = base.as_millis() as u64;
+                let delay = base_ms * fib;
+                #[allow(clippy::cast_possible_truncation)]
+                let max_ms = max.as_millis() as u64;
+                Duration::from_millis(delay.min(max_ms))
             }
         };
 
@@ -276,17 +287,23 @@ impl RetryHook {
             JitterStrategy::None => base_delay,
             JitterStrategy::Full => {
                 let mut rng = rand::thread_rng();
-                Duration::from_millis(rng.gen_range(0..=base_delay.as_millis() as u64))
+                #[allow(clippy::cast_possible_truncation)]
+                let max_ms = base_delay.as_millis() as u64;
+                Duration::from_millis(rng.gen_range(0..=max_ms))
             }
             JitterStrategy::Equal => {
                 let mut rng = rand::thread_rng();
-                let half = base_delay.as_millis() as u64 / 2;
-                Duration::from_millis(rng.gen_range(half..=base_delay.as_millis() as u64))
+                #[allow(clippy::cast_possible_truncation)]
+                let base_ms = base_delay.as_millis() as u64;
+                let half = base_ms / 2;
+                Duration::from_millis(rng.gen_range(half..=base_ms))
             }
             JitterStrategy::Decorrelated { .. } => {
                 let mut rng = rand::thread_rng();
                 let previous = state.last_delay.unwrap_or(base_delay);
+                #[allow(clippy::cast_possible_truncation)]
                 let min = base_delay.as_millis() as u64;
+                #[allow(clippy::cast_possible_truncation)]
                 let max = (previous.as_millis() as u64 * 3).min(60000); // Cap at 60s
                 Duration::from_millis(rng.gen_range(min..=max))
             }
@@ -431,7 +448,9 @@ impl Hook for RetryHook {
         // Update metrics
         {
             let mut metrics = self.metrics.write().unwrap();
-            metrics.total_delay_ms += delay.as_millis() as u64;
+            #[allow(clippy::cast_possible_truncation)]
+            let delay_ms = delay.as_millis() as u64;
+            metrics.total_delay_ms += delay_ms;
         }
 
         // Add retry metadata
@@ -694,23 +713,30 @@ impl ReplayableHook for RetryHook {
                 "backoff_strategy": match &self.config.backoff_strategy {
                     BackoffStrategy::Fixed(d) => serde_json::json!({
                         "type": "fixed",
-                        "delay_ms": d.as_millis()
+                        #[allow(clippy::cast_possible_truncation)]
+                        "delay_ms": d.as_millis() as u64
                     }),
                     BackoffStrategy::Linear { base, increment } => serde_json::json!({
                         "type": "linear",
-                        "base_ms": base.as_millis(),
-                        "increment_ms": increment.as_millis()
+                        #[allow(clippy::cast_possible_truncation)]
+                        "base_ms": base.as_millis() as u64,
+                        #[allow(clippy::cast_possible_truncation)]
+                        "increment_ms": increment.as_millis() as u64
                     }),
                     BackoffStrategy::Exponential { base, multiplier, max } => serde_json::json!({
                         "type": "exponential",
-                        "base_ms": base.as_millis(),
+                        #[allow(clippy::cast_possible_truncation)]
+                        "base_ms": base.as_millis() as u64,
                         "multiplier": multiplier,
-                        "max_ms": max.as_millis()
+                        #[allow(clippy::cast_possible_truncation)]
+                        "max_ms": max.as_millis() as u64
                     }),
                     BackoffStrategy::Fibonacci { base, max } => serde_json::json!({
                         "type": "fibonacci",
-                        "base_ms": base.as_millis(),
-                        "max_ms": max.as_millis()
+                        #[allow(clippy::cast_possible_truncation)]
+                        "base_ms": base.as_millis() as u64,
+                        #[allow(clippy::cast_possible_truncation)]
+                        "max_ms": max.as_millis() as u64
                     }),
                 },
                 "jitter_strategy": match &self.config.jitter_strategy {
@@ -733,8 +759,10 @@ impl ReplayableHook for RetryHook {
                 "_retry_state".to_string(),
                 serde_json::json!({
                     "attempts": state.attempts,
-                    "last_delay_ms": state.last_delay.map(|d| d.as_millis()),
-                    "total_delay_ms": state.total_delay.as_millis(),
+                    #[allow(clippy::cast_possible_truncation)]
+                    "last_delay_ms": state.last_delay.map(|d| d.as_millis() as u64),
+                    #[allow(clippy::cast_possible_truncation)]
+                    "total_delay_ms": state.total_delay.as_millis() as u64,
                 }),
             );
         }

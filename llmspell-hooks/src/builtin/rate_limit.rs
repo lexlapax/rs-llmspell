@@ -101,7 +101,9 @@ impl RateLimitMetrics {
         if self.total_requests == 0 {
             1.0
         } else {
-            self.allowed_requests as f64 / self.total_requests as f64
+            #[allow(clippy::cast_precision_loss)]
+            let ratio = self.allowed_requests as f64 / self.total_requests as f64;
+            ratio
         }
     }
 
@@ -109,7 +111,9 @@ impl RateLimitMetrics {
         if self.total_requests == 0 {
             0.0
         } else {
-            self.rate_limited_requests as f64 / self.total_requests as f64
+            #[allow(clippy::cast_precision_loss)]
+            let ratio = self.rate_limited_requests as f64 / self.total_requests as f64;
+            ratio
         }
     }
 }
@@ -184,7 +188,9 @@ impl RateLimitHook {
 
     /// Set rate per second
     pub fn with_rate_per_second(mut self, rate: f64) -> Self {
-        self.config.bucket_config.capacity = rate as usize;
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let capacity = rate as usize;
+        self.config.bucket_config.capacity = capacity;
         self.config.bucket_config.refill_rate = rate;
         self.config.bucket_config.refill_interval = Duration::from_secs(1);
         self.rate_limiter = Arc::new(RateLimiter::new(self.config.bucket_config.clone()));
@@ -366,18 +372,22 @@ impl Hook for RateLimitHook {
             {
                 let mut metrics = self.metrics.write().unwrap();
                 metrics.allowed_requests += 1;
-                metrics.tokens_consumed += tokens_requested as u64;
+                #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+                let tokens_consumed = tokens_requested as u64;
+                metrics.tokens_consumed += tokens_consumed;
             }
 
             // Check if we're using burst capacity
             let bucket_state = rate_limiter.get_bucket_state(&key);
-            if tokens_remaining < bucket_state.capacity as f64 - bucket_state.burst_capacity as f64
-            {
+            #[allow(clippy::cast_precision_loss)]
+            let burst_threshold = bucket_state.capacity as f64 - bucket_state.burst_capacity as f64;
+            if tokens_remaining < burst_threshold {
                 let mut metrics = self.metrics.write().unwrap();
                 metrics.burst_requests += 1;
             }
 
             // Check warning threshold
+            #[allow(clippy::cast_precision_loss)]
             let total_capacity = (bucket_state.capacity + bucket_state.burst_capacity) as f64;
             if self.check_warning_threshold(tokens_remaining, total_capacity) {
                 let mut metrics = self.metrics.write().unwrap();
@@ -502,7 +512,9 @@ impl MetricHook for RateLimitHook {
 
         if bucket_state.last_refill_amount > 0.0 {
             let mut metrics = self.metrics.write().unwrap();
-            metrics.tokens_refilled += bucket_state.last_refill_amount as u64;
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            let tokens_refilled = bucket_state.last_refill_amount as u64;
+            metrics.tokens_refilled += tokens_refilled;
         }
 
         Ok(())

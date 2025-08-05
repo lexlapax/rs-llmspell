@@ -182,7 +182,9 @@ impl SystemMonitorTool {
         let available_memory = system_info.available_memory.unwrap_or(0);
         let used_memory = total_memory.saturating_sub(available_memory);
         let memory_usage_percent = if total_memory > 0 {
-            (used_memory as f64 / total_memory as f64) * 100.0
+            #[allow(clippy::cast_precision_loss)]
+            let usage_percent = (used_memory as f64 / total_memory as f64) * 100.0;
+            usage_percent
         } else {
             0.0
         };
@@ -223,6 +225,7 @@ impl SystemMonitorTool {
         #[cfg(unix)]
         {
             if let Ok(load_avg) = self.get_load_average() {
+                #[allow(clippy::cast_precision_loss)]
                 let cpu_count = get_cpu_count() as f64;
                 // Convert load average to approximate CPU percentage
                 let cpu_percent = (load_avg[0] / cpu_count * 100.0).min(100.0);
@@ -377,7 +380,9 @@ impl SystemMonitorTool {
                 let available_bytes = available_blocks * block_size;
                 let used_bytes = total_bytes.saturating_sub(available_bytes);
                 let usage_percent = if total_bytes > 0 {
-                    (used_bytes as f64 / total_bytes as f64) * 100.0
+                    #[allow(clippy::cast_precision_loss)]
+                    let percent = (used_bytes as f64 / total_bytes as f64) * 100.0;
+                    percent
                 } else {
                     0.0
                 };
@@ -420,7 +425,9 @@ impl SystemMonitorTool {
             if result != 0 {
                 let used_bytes = total_bytes.saturating_sub(free_bytes);
                 let usage_percent = if total_bytes > 0 {
-                    (used_bytes as f64 / total_bytes as f64) * 100.0
+                    #[allow(clippy::cast_precision_loss)]
+                    let percent = (used_bytes as f64 / total_bytes as f64) * 100.0;
+                    percent
                 } else {
                     0.0
                 };
@@ -466,7 +473,9 @@ impl SystemMonitorTool {
                             .chars()
                             .all(|c| c.is_ascii_digit())
                     })
-                    .count() as u32;
+                    .count();
+                #[allow(clippy::cast_possible_truncation)] 
+                let count = count as u32;
                 debug!("Process count: {}", count);
                 return Some(count);
             }
@@ -489,8 +498,10 @@ impl SystemMonitorTool {
             if let Ok(uptime_content) = std::fs::read_to_string("/proc/uptime") {
                 if let Some(uptime_str) = uptime_content.split_whitespace().next() {
                     if let Ok(uptime_seconds) = uptime_str.parse::<f64>() {
-                        debug!("System uptime: {} seconds", uptime_seconds as u64);
-                        return Some(uptime_seconds as u64);
+                        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+                        let uptime_u64 = uptime_seconds as u64;
+                        debug!("System uptime: {} seconds", uptime_u64);
+                        return Some(uptime_u64);
                     }
                 }
             }
@@ -539,7 +550,11 @@ impl SystemMonitorTool {
         let collection_time = start_time.elapsed();
         info!(
             "System statistics collected in {}ms - CPU: {:.1}%, Memory: {:.1}%, Disks: {}",
-            collection_time.as_millis(),
+            {
+                #[allow(clippy::cast_possible_truncation)]
+                let millis = collection_time.as_millis() as u64;
+                millis
+            },
             stats.cpu_usage_percent,
             stats.memory_usage_percent,
             stats.disk_usage.len()

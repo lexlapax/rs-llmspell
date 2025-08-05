@@ -123,16 +123,20 @@ impl PerformanceReport {
             response_times.push(snapshot.avg_response_time);
         }
 
+        #[allow(clippy::cast_precision_loss)]
         let count = snapshots.len() as f64;
         let avg_cpu_percent = total_cpu / count;
+        #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
         let avg_memory_bytes = (total_memory as f64 / count).round() as u64;
         let avg_response_time = total_response_time / count;
 
         // Calculate percentiles
         response_times.sort_by(|a, b| a.partial_cmp(b).unwrap());
+        #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
         let p95_index = usize::try_from((response_times.len() as f64 * 0.95).round() as u64)
             .unwrap_or(0)
             .min(response_times.len() - 1);
+        #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
         let p99_index = usize::try_from((response_times.len() as f64 * 0.99).round() as u64)
             .unwrap_or(0)
             .min(response_times.len() - 1);
@@ -140,20 +144,26 @@ impl PerformanceReport {
         let p99_response_time = response_times[p99_index];
 
         // Calculate totals from first and last snapshots
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         let total_requests = snapshots.iter().map(|s| s.request_rate).sum::<f64>() as u64;
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         let failed_requests = snapshots
             .iter()
             .map(|s| (s.error_rate * s.request_rate / 100.0) as u64)
             .sum();
 
         let throughput = if duration.as_secs() > 0 {
-            total_requests as f64 / duration.as_secs_f64()
+            #[allow(clippy::cast_precision_loss)]
+            let throughput_val = total_requests as f64 / duration.as_secs_f64();
+            throughput_val
         } else {
             0.0
         };
 
         let availability = if total_requests > 0 {
-            ((total_requests - failed_requests) as f64 / total_requests as f64) * 100.0
+            #[allow(clippy::cast_precision_loss)]
+            let avail_val = ((total_requests - failed_requests) as f64 / total_requests as f64) * 100.0;
+            avail_val
         } else {
             100.0
         };
@@ -212,12 +222,24 @@ impl PerformanceReport {
             duration.as_secs_f64(),
             self.avg_cpu_percent,
             self.peak_cpu_percent,
-            self.avg_memory_bytes as f64 / (1024.0 * 1024.0),
-            self.peak_memory_bytes as f64 / (1024.0 * 1024.0),
+            {
+                #[allow(clippy::cast_precision_loss)]
+                let avg_mb = self.avg_memory_bytes as f64 / (1024.0 * 1024.0);
+                avg_mb
+            },
+            {
+                #[allow(clippy::cast_precision_loss)]
+                let peak_mb = self.peak_memory_bytes as f64 / (1024.0 * 1024.0);
+                peak_mb
+            },
             self.total_requests,
             self.failed_requests,
-            (self.failed_requests as f64 / self.total_requests.max(1) as f64)
-                .mul_add(-100.0, 100.0),
+            {
+                #[allow(clippy::cast_precision_loss)]
+                let success_rate = (self.failed_requests as f64 / self.total_requests.max(1) as f64)
+                    .mul_add(-100.0, 100.0);
+                success_rate
+            },
             self.avg_response_time,
             self.p95_response_time,
             self.p99_response_time,
@@ -304,11 +326,15 @@ impl PerformanceMonitor {
         // Calculate rates from metrics
         let total_requests = self.metrics.requests_total.get();
         let failed_requests = self.metrics.requests_failed.get();
+        #[allow(clippy::cast_possible_truncation)]
         let active_requests = self.metrics.requests_active.get() as usize;
 
+        #[allow(clippy::cast_precision_loss)]
         let request_rate = total_requests as f64 / self.snapshot_interval.as_secs_f64();
         let error_rate = if total_requests > 0 {
-            (failed_requests as f64 / total_requests as f64) * 100.0
+            #[allow(clippy::cast_precision_loss)]
+            let rate = (failed_requests as f64 / total_requests as f64) * 100.0;
+            rate
         } else {
             0.0
         };
@@ -317,7 +343,9 @@ impl PerformanceMonitor {
         let avg_response_time = match self.metrics.request_duration.get() {
             crate::monitoring::metrics::MetricValue::Histogram { sum, count, .. } => {
                 if count > 0 {
-                    (sum / count as f64) * 1000.0 // Convert to milliseconds
+                    #[allow(clippy::cast_precision_loss)]
+                    let avg_time = (sum / count as f64) * 1000.0; // Convert to milliseconds
+                    avg_time
                 } else {
                     0.0
                 }
@@ -373,17 +401,21 @@ impl PerformanceMonitor {
         if snapshot.resources.memory_bytes > self.thresholds.max_memory_bytes {
             violations.push(PerformanceViolation {
                 metric: "memory_bytes".to_string(),
+                #[allow(clippy::cast_precision_loss)]
                 current_value: snapshot.resources.memory_bytes as f64,
+                #[allow(clippy::cast_precision_loss)]
                 threshold_value: self.thresholds.max_memory_bytes as f64,
                 severity: ViolationSeverity::Critical,
             });
         }
 
-        if snapshot.avg_response_time > self.thresholds.max_response_time_ms as f64 {
+        #[allow(clippy::cast_precision_loss)]
+        let max_response_time = self.thresholds.max_response_time_ms as f64;
+        if snapshot.avg_response_time > max_response_time {
             violations.push(PerformanceViolation {
                 metric: "response_time_ms".to_string(),
                 current_value: snapshot.avg_response_time,
-                threshold_value: self.thresholds.max_response_time_ms as f64,
+                threshold_value: max_response_time,
                 severity: ViolationSeverity::Warning,
             });
         }
@@ -413,8 +445,10 @@ impl PerformanceMonitor {
                 let snapshot = monitor.take_snapshot();
 
                 // Update metrics
+                #[allow(clippy::cast_precision_loss)]
+                let memory_f64 = snapshot.resources.memory_bytes as f64;
                 monitor.metrics.update_resources(
-                    snapshot.resources.memory_bytes as f64,
+                    memory_f64,
                     snapshot.resources.cpu_percent,
                 );
 

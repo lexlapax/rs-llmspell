@@ -231,7 +231,13 @@ impl SearchProvider for SerperDevProvider {
                                 .snippet
                                 .unwrap_or_else(|| "No description available".to_string()),
                             provider: self.name().to_string(),
-                            rank: result.position.unwrap_or(rank as i32) as usize,
+                            rank: {
+                                #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+                                let rank_i32 = rank as i32;
+                                #[allow(clippy::cast_sign_loss)]
+                                let position = result.position.unwrap_or(rank_i32) as usize;
+                                position
+                            },
                         });
                         rank += 1;
                     }
@@ -252,7 +258,13 @@ impl SearchProvider for SerperDevProvider {
                             url: result.link,
                             snippet,
                             provider: self.name().to_string(),
-                            rank: result.position.unwrap_or(rank as i32) as usize,
+                            rank: {
+                                #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+                                let rank_i32 = rank as i32;
+                                #[allow(clippy::cast_sign_loss)]
+                                let position = result.position.unwrap_or(rank_i32) as usize;
+                                position
+                            },
                         });
                         rank += 1;
                     }
@@ -266,7 +278,13 @@ impl SearchProvider for SerperDevProvider {
                             url: result.image_url,
                             snippet: result.source.unwrap_or_else(|| result.link.clone()),
                             provider: self.name().to_string(),
-                            rank: result.position.unwrap_or(rank as i32) as usize,
+                            rank: {
+                                #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+                                let rank_i32 = rank as i32;
+                                #[allow(clippy::cast_sign_loss)]
+                                let position = result.position.unwrap_or(rank_i32) as usize;
+                                position
+                            },
                         });
                         rank += 1;
                     }

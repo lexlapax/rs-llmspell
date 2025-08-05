@@ -159,7 +159,9 @@ impl UserData for LuaAgentInstance {
             let tools = this.bridge.list_tools();
             let tools_table = lua.create_table()?;
             for (i, tool_name) in tools.iter().enumerate() {
-                tools_table.set(i + 1, tool_name.clone())?;
+                #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+                let lua_index = (i + 1) as i32;
+                tools_table.set(lua_index, tool_name.clone())?;
             }
             Ok(tools_table)
         });
@@ -268,10 +270,16 @@ impl UserData for LuaAgentInstance {
                 Ok(metrics) => {
                     let metrics_table = lua.create_table()?;
                     metrics_table.set("agent_id", metrics.agent_id.clone())?;
-                    metrics_table.set("requests_total", metrics.requests_total.get() as f64)?;
-                    metrics_table.set("requests_failed", metrics.requests_failed.get() as f64)?;
+                    #[allow(clippy::cast_precision_loss)]
+                    let requests_total = metrics.requests_total.get() as f64;
+                    #[allow(clippy::cast_precision_loss)]
+                    let requests_failed = metrics.requests_failed.get() as f64;
+                    #[allow(clippy::cast_precision_loss)]
+                    let tool_invocations = metrics.tool_invocations.get() as f64;
+                    metrics_table.set("requests_total", requests_total)?;
+                    metrics_table.set("requests_failed", requests_failed)?;
                     metrics_table.set("requests_active", metrics.requests_active.get())?;
-                    metrics_table.set("tool_invocations", metrics.tool_invocations.get() as f64)?;
+                    metrics_table.set("tool_invocations", tool_invocations)?;
                     metrics_table.set("memory_bytes", metrics.memory_bytes.get())?;
                     metrics_table.set("cpu_percent", metrics.cpu_percent.get())?;
                     Ok(Some(metrics_table))
@@ -328,7 +336,9 @@ impl UserData for LuaAgentInstance {
                         .get("total_executions")
                         .and_then(serde_json::Value::as_u64)
                     {
-                        perf_table.set("total_executions", total_executions as f64)?;
+                        #[allow(clippy::cast_precision_loss)]
+                        let total_exec_f64 = total_executions as f64;
+                        perf_table.set("total_executions", total_exec_f64)?;
                     }
                     if let Some(avg_time) = perf_json
                         .get("avg_execution_time_ms")
@@ -418,7 +428,9 @@ impl UserData for LuaAgentInstance {
                         if let Some(timestamp) = alert.get("timestamp").and_then(|v| v.as_str()) {
                             alert_item.set("timestamp", timestamp)?;
                         }
-                        alerts_table.set(i + 1, alert_item)?;
+                        #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+                        let lua_index = (i + 1) as i32;
+                        alerts_table.set(lua_index, alert_item)?;
                     }
                     Ok(alerts_table)
                 }
@@ -614,7 +626,9 @@ impl UserData for LuaAgentInstance {
                         if let Some(reason) = transition.get("reason").and_then(|v| v.as_str()) {
                             transition_table.set("reason", reason)?;
                         }
-                        history_table.set(i + 1, transition_table)?;
+                        #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
+                        let lua_index = (i + 1) as i32;
+                        history_table.set(lua_index, transition_table)?;
                     }
                     Ok(history_table)
                 }
@@ -695,19 +709,25 @@ impl UserData for LuaAgentInstance {
                         .get("total_transitions")
                         .and_then(serde_json::Value::as_u64)
                     {
-                        metrics_table.set("total_transitions", transitions as f64)?;
+                        #[allow(clippy::cast_precision_loss)]
+                        let transitions_f64 = transitions as f64;
+                        metrics_table.set("total_transitions", transitions_f64)?;
                     }
                     if let Some(errors) = metrics_json
                         .get("error_count")
                         .and_then(serde_json::Value::as_u64)
                     {
-                        metrics_table.set("error_count", errors as f64)?;
+                        #[allow(clippy::cast_precision_loss)]
+                        let errors_f64 = errors as f64;
+                        metrics_table.set("error_count", errors_f64)?;
                     }
                     if let Some(attempts) = metrics_json
                         .get("recovery_attempts")
                         .and_then(serde_json::Value::as_u64)
                     {
-                        metrics_table.set("recovery_attempts", attempts as f64)?;
+                        #[allow(clippy::cast_precision_loss)]
+                        let attempts_f64 = attempts as f64;
+                        metrics_table.set("recovery_attempts", attempts_f64)?;
                     }
                     if let Some(uptime) = metrics_json
                         .get("uptime")
