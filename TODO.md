@@ -57,260 +57,135 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
 #### Task 7.1.22: Script API Naming Standardization  
 #### Task 7.1.23: Configuration Builder Exposure in Script APIs
 #### Task 7.1.24: Hook Execution Standardization
-
----
-
 #### Task 7.1.25: Fix Test Infrastructure Failures Across All Crates
-**Priority**: CRITICAL (Blocks All Testing)
-**Estimated Time**: 10 hours  
-**Status**: ✅ COMPLETED
-**Assigned To**: Core Team
-**Dependencies**: Task 7.1.24 (Hook Execution Standardization) ✅, Task 7.1.7 (Workflow-Agent Integration) ✅
-
-**Description**: Fix critical test compilation and runtime failures across multiple crates caused by Phase 7 architectural changes. Primary issues stem from workflow-agent integration, test helper API changes, and type mismatches.
-
-**Test Status by Crate** (as of testing):
-- ✅ **PASSING** (12 crates): llmspell-core, llmspell-utils, llmspell-agents, llmspell-events, llmspell-sessions, llmspell-state-persistence, llmspell-cli, llmspell-providers, llmspell-config, llmspell-security, llmspell-storage, llmspell-state-traits
-- ❌ **COMPILATION FAILURES** (3 crates): llmspell-hooks, llmspell-tools, llmspell-workflows
-- ⚠️ **TEST FAILURES** (2 crates): llmspell-bridge (1 test), llmspell-testing (1 doc test)
-
-**Architectural Context from Phase 7**:
-- Task 7.1.7 made workflows implement BaseAgent trait (Google ADK pattern)
-- Workflows ARE agents - they use execute(AgentInput, ExecutionContext) -> AgentOutput
-- WorkflowOutputAdapter stores workflow data in AgentOutput.metadata.extra:
-  - `workflow_success` (bool) instead of direct `success` field
-  - `steps_executed`, `steps_failed` instead of direct fields
-  - `workflow_output` contains the raw workflow output
-  - `context_*` prefix for workflow context data
-- AgentOutput has ONLY: text, media, tool_calls, metadata, transfer_to
-
-**Root Causes by Crate**:
-1. **llmspell-workflows** (most affected):
-   - Examples use old workflow.execute() expecting WorkflowOutput
-   - Tests access non-existent fields (success, branch_results, etc.)
-   - Missing create_execution_params() function
-   - Integration tests expect old execute() method
-2. **llmspell-hooks**:
-   - Type mismatches: llmspell_hooks compiled multiple times
-   - create_test_hook_context() returns wrong HookContext type
-3. **llmspell-tools**:
-   - Test helper signatures changed (create_test_tool, create_test_tool_input)
-   - GraphQL tool method should be associated function
-   - 17 compilation errors total
-4. **llmspell-bridge**:
-   - test_agent_templates_from_lua failing at runtime
-5. **llmspell-testing**:
-   - Doc test failure for tool execute() method
-
-**Implementation Steps**:
-1. [x] **Fix Core Module Access** (30 min): ✅ COMPLETED
-   - [x] Change `mod agent_io;` to `pub mod agent_io;` in llmspell-core/src/types/mod.rs
-   - [x] Verify AgentInput/AgentOutput/ExecutionContext accessible from all crates
-   - [x] Run `cargo build --all` to confirm basic compilation
-   - [x] DO NOT add old fields back - maintain simplified AgentOutput structure
-   **Notes**: Module now public, AgentInput errors show `prompt` → `text` field change needed
-
-2. [x] **Fix llmspell-workflows (Most Critical)** (3.5 hours): ✅ COMPLETED
-   - [x] **Examples** (2 hours): ✅ COMPLETED
-     - [x] Deleted old incompatible examples (parallel_workflow.rs, sequential_workflow.rs, loop_workflow.rs, conditional_example.rs)
-     - [x] Created new simple examples demonstrating workflows as agents:
-       - parallel_workflow_simple.rs
-       - sequential_workflow_simple.rs  
-       - loop_workflow_simple.rs
-       - conditional_workflow_simple.rs
-     - [x] Fixed all builder API usage (string literals to String, correct field names)
-     - [x] All examples now use BaseAgent::execute(AgentInput, ExecutionContext) → AgentOutput
-     - [x] Applied cargo fmt to all examples
-   - [x] **Integration Tests** (1.5 hours): ✅ COMPLETED
-     - [x] Deleted old incompatible tests (sequential_tests.rs, parallel_tests.rs, loop_tests.rs, workflow_hooks.rs, executor_tests.rs)
-     - [x] Created new workflow_agent_tests.rs with 8 tests demonstrating BaseAgent interface
-     - [x] All tests use BaseAgent::execute(AgentInput, ExecutionContext) → AgentOutput
-     - [x] Tests cover all workflow types (sequential, parallel, conditional, loop)
-     - [x] Tests verify error handling, metadata preservation, and parameter handling
-   **Notes**: Realized old examples were fundamentally incompatible with new architecture. Instead of forcing them to work, created new clean examples that properly demonstrate the workflow-as-agent pattern. This is aligned with Phase 7 principles. Old tests were completely replaced with new ones that test workflows through the BaseAgent interface.
-
-3. [x] **Fix llmspell-tools Compilation** (4 hours): ✅ COMPLETED
-   - [x] Updated create_test_tool_input() calls from json! to Vec format
-   - [x] Fixed GraphQL tool: changed instance method to associated function
-   - [x] Fixed clippy warnings in modified files
-   - [x] Applied cargo fmt to all files
-   - [x] Compilation now succeeds
-   - **DISCOVERED**: 78 failing tests due to test helper API changes requiring systematic fixes:
-     **Test Categories by File**:
-     - **fs/file_converter.rs**: 4 tests - missing parameters, operation validation
-     - **fs/file_search.rs**: 9 tests - all create_test_tool_input calls need Vec format
-     - **fs/file_watcher.rs**: 4 tests - configuration and path validation tests
-     - **media/audio_processor.rs**: 9 tests - file processing and validation tests  
-     - **media/image_processor.rs**: 9 tests - image processing and validation tests
-     - **media/video_processor.rs**: 9 tests - video processing and validation tests
-     - **system/environment_reader.rs**: 10 tests - all environment operations
-     - **system/process_executor.rs**: 8 tests - process execution and validation
-     - **system/service_checker.rs**: 7 tests - network service checking
-     - **system/system_monitor.rs**: 6 tests - system statistics collection
-     - **util/hash_calculator.rs**: 3 tests - hash operations
-   - **Next Step**: Fix all 78 tests systematically using new create_test_tool_input Vec format
-
-3a. [x] **Fix 78 llmspell-tools Test Failures - CENTRALIZED APPROACH** (2 hours): ✅ COMPLETED
-   **MEGATHINK DISCOVERY**: Instead of fixing 78 individual tests, identified that the issue was in the centralized test helper function in `llmspell-testing::tool_helpers::create_test_tool_input()`.
-   
-   **Root Cause**: The centralized helper was putting parameters at root level (`input.parameters[key] = value`) but tools expect them wrapped in a "parameters" object (`input.parameters["parameters"][key] = value`) as required by `extract_parameters()` function.
-   
-   **Solution**: Fixed centralized helper to wrap all parameters in "parameters" object:
-   ```rust
-   // OLD: input = input.with_parameter(key, json_value);
-   // NEW: input.with_parameter("parameters", json!(params_obj))
-   ```
-   
-   **Results**: ✅ **65+ of 78 tests now pass with single centralized fix!**
-   - [x] **Phase 1 - Filesystem Tools**: ✅ FIXED - file_converter.rs, file_search.rs working
-   - [x] **Phase 2 - Media Tools**: ✅ FIXED - audio_processor.rs, image_processor.rs, video_processor.rs working  
-   - [x] **Phase 3 - System Tools**: ✅ MOSTLY FIXED - environment_reader.rs, process_executor.rs working
-   - [x] **Utility Tools**: ✅ FIXED - hash_calculator.rs working
-   
-   **Remaining Issues** (5-10 tests with different root causes):
-   - service_checker.rs: test_invalid_parameters - different validation issue  
-   - hash_calculator.rs: test_verify_hash_failure - logic issue not parameter issue
-   - file_watcher.rs: Some timeout issues (long-running tests)
-   
-   **ARCHITECTURAL WIN**: ✅ Complied with Task 7.1.6 tenet of centralized test infrastructure
-
-3b. [x] **Fix Hex String Parsing in Test Helper** (30 min): ✅ COMPLETED
-   **Root Cause**: Hash calculator test was failing because hex string "0000...0000" was being parsed as Number(0) instead of staying as a string.
-   
-   **Solution**: Updated test helper to detect long hex strings and skip numeric parsing:
-   ```rust
-   let json_value = if value.len() > 10 && value.chars().all(|c| c.is_ascii_hexdigit()) {
-       json!(value)  // Keep long hex strings as strings
-   } else if let Ok(n) = value.parse::<u64>() {
-       json!(n)  // Parse normal numbers
-   }
-   ```
-   
-   **Results**: ✅ **Reduced failures from 78 to 17** - hash_calculator tests now passing
-
-3c. [x] **Fix File Search Test Missing Parameters** (15 min): ✅ COMPLETED
-   **Root Cause**: Two file search tests were missing required "pattern" parameter:
-   - test_search_empty_pattern: Only had "path", needed empty "pattern" 
-   - test_search_with_regex: Missing "pattern" parameter entirely
-   
-   **Solution**: Added missing pattern parameters and fixed expected match count (4 matches not 3)
-   
-   **Results**: ✅ **Reduced failures from 17 to 15** - file search tests now passing
-
-3d. [x] **Fix Remaining 15 llmspell-tools Test Failures** (1 hour): ✅ COMPLETED
-   **Final Status**: ✅ **ALL 269 TESTS PASS** (up from 254 passed; 15 failed)
-   
-   **Fixed Tests by Category**:
-   - **Image Processor** (7 tests): ✅ ALL FIXED
-     - test_default_operation: Added missing `file_path` parameter
-     - test_metadata_extraction: Added missing `file_path` parameter  
-     - test_format_detection_operation: Added missing `file_path` parameter
-     - test_resize_not_implemented: Fixed parameter names (`source_path`, `target_path` vs `file_path`)
-     - test_file_size_limit: Already working (fixed by 3a)
-     - test_empty_file_path: Already working (fixed by 3a)
-     - test_convert_not_implemented: Already working (fixed by 3a)
-   - **Video Processor** (7 tests): ✅ ALL FIXED
-     - test_default_operation: Added missing `file_path` parameter
-     - test_metadata_extraction: Added missing `file_path` parameter
-     - test_format_detection_operation: Added missing `file_path` parameter
-     - test_extract_frame_not_implemented: Added missing `file_path` parameter
-     - test_thumbnail_not_implemented: Added missing `file_path` parameter
-     - test_file_size_limit: Already working (fixed by 3a) 
-     - test_empty_file_path: Already working (fixed by 3a)
-   - **Process Executor** (1 test): ✅ FIXED
-     - test_execute_with_working_directory: Fixed literal string vs actual temp directory path
-   
-   **Root Causes Fixed**:
-   1. **Missing file_path parameters** (8 tests): Tests missing required file path parameters causing validation errors
-   2. **Literal string vs actual path** (1 test): Process executor passing literal "temp_dir.path().to_string_lossy()" string instead of actual path
-   3. **Wrong parameter names** (1 test): Image resize test using `file_path` instead of required `source_path`/`target_path`
-   
-   **Verification**: ✅ `cargo test -p llmspell-tools --lib` shows "269 passed; 0 failed"
-
-4. [x] **Fix llmspell-hooks Type Mismatches** (1.5 hours): ✅ COMPLETED
-   **Final Status**: ✅ **ALL 254 TESTS PASS** - Circular dependency resolved
-   
-   **Root Cause**: Circular dependency between llmspell-hooks ↔ llmspell-testing
-   - llmspell-hooks tests tried to use llmspell-testing helpers
-   - llmspell-testing depended on llmspell-hooks types
-   - Created circular import causing "multiple compiled versions" error
-   
-   **Solution**: Created minimal local test helpers in llmspell-hooks (respecting 7.1.6 architecture):
-   - **builtin/caching.rs**: Local `create_test_context()` with `HookPoint::BeforeAgentExecution`
-   - **builtin/rate_limit.rs**: Local `create_test_context()` with `HookPoint::BeforeToolExecution` 
-   - **cache/mod.rs**: Local `create_test_context()` with `HookPoint::SystemStartup`
-   - **persistence/tests.rs**: Local `create_test_context()` with `HookPoint::BeforeAgentExecution`
-   
-   **Architectural Compliance**: ✅ Per Task 7.1.6 - centralized test infrastructure BUT foundational crates may have minimal local helpers when architecturally necessary
-   
-   **Verification**: ✅ `cargo test -p llmspell-hooks` shows "254 passed; 0 failed"
-
-5. [x] **Fix Runtime Test Failures** (1 hour): ✅ COMPLETED
-   **Final Status**: ✅ **BOTH RUNTIME FAILURES FIXED**
-   
-   **Fixed Issues**:
-   - [x] **llmspell-bridge**: Fixed `test_agent_templates_from_lua` - changed `Agent.listTemplates()` → `Agent.list_templates()` (Phase 7 naming standardization)
-   - [x] **llmspell-testing**: Fixed doc test - added missing `BaseAgent` import for tool.execute() method
-   
-   **Root Cause**: Phase 7 API standardization changed method naming from camelCase to snake_case and consolidated trait interfaces
-   
-   **Verification**: ✅ Both tests now pass consistently
-
-6. [x] **Final Validation & Issue Resolution** (1 hour): ✅ COMPLETED
-   **Final Test Results Summary**:
-   - [x] `cargo test --all --lib` - ✅ **977 TESTS PASSING** - All library tests pass across all crates
-   - [x] `cargo test --all --tests` - ✅ **MOSTLY PASSING** - Only 2 provider tests failing due to deprecated API
-   - [x] `cargo test --all --examples` - ✅ **ALL EXAMPLES COMPILING AND PASSING**
-   
-   **Fixed Issues**:
-   - [x] **llmspell-bridge artifact tests**: Fixed API method names from camelCase to snake_case (`setCurrent` → `set_current`, `storeFile` → `store_file`)
-   - [x] **llmspell-agents examples**: Fixed import errors by updating `create_test_context` import from `fixtures` to `environment_helpers` module  
-   - [x] **llmspell-agents coordinator**: Fixed validation error (monitoring_interval parameter must be >= 5)
-   
-   **Additional Fixes Applied**:
-   - [x] **llmspell-bridge provider tests**: Fixed 2 tests by updating `Agent.create()` → `Agent.builder()` API calls (Phase 7 breaking change)
-   - [x] **llmspell-bridge workflow tests**: Properly marked 5 incomplete workflow factory integration tests as ignored with clear explanations
-   
-   **Final Status**: ✅ **TASK 7.1.25 FULLY COMPLETED** - All critical test infrastructure issues resolved, 977+ library tests passing, all crates compiling successfully, provider tests updated to Phase 7 API, workflow integration tests properly handled
-
-**Quality Standards**:
-- [x] Maintain Phase 7 architectural decisions - workflows ARE agents ✅
-- [x] No reversion to old WorkflowOutput structure ✅
-- [x] Examples demonstrate correct workflow-as-agent patterns ✅
-- [x] No new clippy warnings introduced ✅
-- [x] Tests use proper helper function signatures ✅
-- [x] All 12 passing crates remain passing ✅
-
-**Acceptance Criteria**:
-- [x] `cargo build --all` succeeds with no errors ✅
-- [x] `cargo test -p llmspell-workflows` compiles and passes ✅
-- [x] `cargo test -p llmspell-tools` compiles and passes ✅ (All 269 tests pass)
-- [x] `cargo test -p llmspell-hooks` compiles and passes ✅ (All 254 tests pass)
-- [x] `cargo test -p llmspell-bridge` - all tests pass ✅ (Workflow integration tests properly ignored)
-- [x] `cargo test -p llmspell-testing` - all tests pass ✅ (All 68 tests pass)
-- [x] All workflow examples run successfully demonstrating BaseAgent usage ✅
-- [x] Documentation added showing metadata access patterns for workflows ✅
-
-**Test Fix Priority**:
-1. llmspell-workflows (blocks everything - most critical)
-2. llmspell-tools (many compilation errors)
-3. llmspell-hooks (type system issues)
-4. llmspell-bridge & llmspell-testing (runtime failures)
 
 ---
 
 #### Task 7.1.26: Fix all fixable clippy errors across all crates
 **Priority**: HIGH
-**Estimated Time**: 5.5 hours
-**Status**: TODO
+**Estimated Time**: 12 hours
+**Status**: IN PROGRESS
 **Assigned To**: Clean up team
 **Dependencies**: Task 7.1.25 (Must compile first)
+**Reference** `/clippy_analysis_7.1.26.md` file for reference of clippy analysis
 
 **Description**: Fix All clippy warnings and errors 1 by 1 across all crates.
 
-1. [ ] Run cargo clippy --all -- -D warnings
-2. [ ] Fix each warning systematically by crate
-3. [ ] Document any suppressed warnings with justification
+**Current Status**: 1782 total warnings identified
+- llmspell-agents: 1138 warnings (63.9%)
+- llmspell-bridge: 520 warnings (29.2%)
+- llmspell-tools: 188 warnings (10.6%)
+- llmspell-testing: 7 warnings (0.4%)
+
+**Warning Categories** (Top Issues):
+1. **Documentation Issues** (396 warnings):
+   - 304 `docs for function returning Result missing # Errors section`
+   - 92 `docs for function which may panic missing # Panics section`
+
+2. **Match Pattern Issues** (358 warnings):
+   - 358 `this match arm has an identical body to another arm`
+
+3. **Memory Management** (173 warnings):
+   - 173 `temporary with significant Drop can be early dropped`
+
+4. **API Design Issues** (138 warnings):
+   - 48 `this method could have a #[must_use] attribute`
+   - 46 `missing #[must_use] attribute on a method returning Self`
+   - 44 `this could be a const fn`
+
+5. **Type Casting Issues** (93 warnings):
+   - 43 `casting u64 to f64 causes a loss of precision`
+   - 24 `casting usize to f64 causes a loss of precision`
+   - 13 `casting u64 to u32 may truncate the value`
+   - 8 `casting u64 to usize may truncate on 32-bit`
+   - 5 other casting warnings
+
+6. **Code Quality Issues** (129 warnings):
+   - 48 `use Option::map_or_else instead of an if let/else`
+   - 40 `unused async for function with no await statements`
+   - 29 `variables can be used directly in the format! string`
+   - 12 other code quality issues
+
+7. **Configuration Issues** (44 warnings):
+   - 15 `unexpected cfg condition value: workflow-tests`
+   - 15 `unexpected cfg condition value: bridge-tests`
+   - 14 `unexpected cfg condition value: integration-tests`
+
+**Fix Tasks by Priority**:
+
+1. [ ] **Phase 1: Critical Fixes** (2 hours) - llmspell-agents
+   - [ ] Fix 358 identical match arm bodies (consolidate patterns)
+   - [ ] Fix 11 unnecessary Result wrappings
+   - [ ] Fix 4 unnecessary function return values
+   - [ ] Ensure the crate compiles
+   - [ ] Ensure all tests pass for the affected crate
+
+2. [ ] **Phase 2: Memory Management** (1.5 hours) - llmspell-agents
+   - [ ] Fix 173 early drop opportunities for temporaries
+   - [ ] Fix 6 redundant clones
+   - [ ] Fix 9 redundant closures
+   - [ ] Ensure the crate compiles
+   - [ ] Ensure all tests pass for the affected crate
+
+3. [ ] **Phase 3: Type Safety** (1 hour) - All crates
+   - [ ] Fix 43 u64 to f64 precision loss warnings
+   - [ ] Fix 24 usize to f64 precision loss warnings
+   - [ ] Fix 13 u64 to u32 truncation warnings
+   - [ ] Fix 8 u64 to usize truncation warnings
+   - [ ] Fix 7 other casting warnings
+   - [ ] Ensure the crate compiles
+   - [ ] Ensure all tests pass for the affected crate
+
+4. [ ] **Phase 4: API Design** (1.5 hours) - llmspell-bridge
+   - [ ] Add 48 #[must_use] attributes to methods
+   - [ ] Add 46 #[must_use] to methods returning Self
+   - [ ] Convert 44 functions to const fn where possible
+   - [ ] Ensure the crate compiles
+   - [ ] Ensure all tests pass for the affected crate
+
+5. [ ] **Phase 5: Code Quality** (1 hour) - llmspell-bridge
+   - [ ] Replace 48 if let/else with Option::map_or_else
+   - [ ] Remove 40 unnecessary async keywords
+   - [ ] Update 29 format! calls to use inline variables
+   - [ ] Fix 29 unused self arguments
+   - [ ] Ensure the crate compiles
+   - [ ] Ensure all tests pass for the affected crate
+
+6. [ ] **Phase 6: Documentation** (3 hours) - All crates
+   - [ ] Add 304 # Errors sections to Result-returning functions
+   - [ ] Add 92 # Panics sections to functions that may panic
+   - [ ] Add 22 missing backticks in documentation
+   - [ ] Fix 6 first paragraph length issues
+   - [ ] Ensure the crate compiles
+   - [ ] Ensure all tests pass for the affected crate
+
+7. [ ] **Phase 7: Code Structure** (1 hour) - llmspell-tools
+   - [ ] Fix 29 items after statements issues
+   - [ ] Fix 9 structs with more than 3 bools
+   - [ ] Fix 8 long literals lacking separators
+   - [ ] Fix 6 underscore-prefixed items/bindings
+   - [ ] Ensure the crate compiles
+   - [ ] Ensure all tests pass for the affected crate
+
+8. [ ] **Phase 8: Configuration Cleanup** (30 min) - llmspell-testing
+   - [ ] Fix 44 unexpected cfg condition values
+   - [ ] Remove or properly configure test features
+   - [ ] Update Cargo.toml files accordingly
+   - [ ] Ensure the crate compiles
+   - [ ] Ensure all tests pass for the affected crate
+
+9. [ ] **Phase 9: Final Cleanup** (30 min) - All crates
+   - [ ] Fix remaining minor warnings
+   - [ ] Run final clippy check
+   - [ ] Document any allowed warnings with #[allow()] and justification
+   - [ ] Ensure the crate compiles
+   - [ ] Ensure all tests pass for the affected crate
+
+**Acceptance Criteria**:
+- [ ] All clippy warnings resolved or explicitly allowed with justification
+- [ ] No new warnings introduced
+- [ ] Performance not degraded by fixes
+- [ ] All tests still passing
 ---
 
 ### Set 2: Rust API Documentation (Day 3-5)
