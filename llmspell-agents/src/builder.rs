@@ -133,6 +133,14 @@ impl AgentBuilder {
     }
 
     /// Build the agent configuration
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an error if:
+    /// - Agent name is empty
+    /// - Agent type is empty
+    /// - Invalid tool IDs are specified
+    /// - Configuration validation fails
     pub fn build(self) -> Result<AgentConfig> {
         // Validate the configuration
         if self.config.name.is_empty() {

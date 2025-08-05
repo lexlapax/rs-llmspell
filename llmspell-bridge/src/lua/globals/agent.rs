@@ -1029,6 +1029,12 @@ impl UserData for AgentBuilder {
 }
 
 /// Inject Agent global into Lua environment
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Lua table creation fails
+/// - Function binding fails
 pub fn inject_agent_global(
     lua: &Lua,
     context: &GlobalContext,

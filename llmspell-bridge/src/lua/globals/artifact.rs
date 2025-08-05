@@ -12,6 +12,12 @@ use std::str::FromStr;
 use std::sync::Arc;
 
 /// Inject Artifact global into Lua environment
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Lua table creation fails
+/// - Function binding fails
 pub fn inject_artifact_global(
     lua: &Lua,
     _context: &GlobalContext,

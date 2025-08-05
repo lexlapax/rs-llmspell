@@ -5,6 +5,10 @@ use crate::globals::types::GlobalContext;
 use llmspell_core::Result;
 
 /// Inject the Hook global into JavaScript (stub for Phase 15)
+///
+/// # Errors
+///
+/// Returns an error if JavaScript engine initialization fails
 #[cfg(feature = "javascript")]
 pub fn inject_hook_global(_ctx: &mut boa_engine::Context, _context: &GlobalContext) -> Result<()> {
     // TODO (Phase 15): Implement JavaScript hook global
@@ -15,6 +19,11 @@ pub fn inject_hook_global(_ctx: &mut boa_engine::Context, _context: &GlobalConte
     Ok(())
 }
 
+/// Stub for when JavaScript feature is not enabled
+///
+/// # Errors
+///
+/// Always returns Ok(()) in stub implementation
 #[cfg(not(feature = "javascript"))]
 pub fn inject_hook_global(_ctx: &mut (), _context: &GlobalContext) -> Result<()> {
     Ok(())

@@ -80,6 +80,12 @@ impl GlobalRegistryBuilder {
     }
 
     /// Build the registry with dependency resolution
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Cyclic dependencies are detected
+    /// - Dependency resolution fails
     pub fn build(self) -> Result<GlobalRegistry> {
         let injection_order = self.resolve_dependencies()?;
 

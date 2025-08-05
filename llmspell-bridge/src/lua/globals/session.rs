@@ -88,6 +88,12 @@ impl UserData for SessionBuilder {
 }
 
 /// Inject Session global into Lua environment
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Lua table creation fails
+/// - Function binding fails
 pub fn inject_session_global(
     lua: &Lua,
     _context: &GlobalContext,

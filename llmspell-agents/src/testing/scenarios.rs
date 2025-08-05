@@ -150,6 +150,10 @@ pub struct ScenarioRunner;
 
 impl ScenarioRunner {
     /// Run a scenario against an agent
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an error if the agent execution fails during scenario testing.
     pub async fn run_scenario(
         agent: &dyn llmspell_core::BaseAgent,
         scenario: &ScenarioConfig,

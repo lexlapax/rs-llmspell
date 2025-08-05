@@ -6,6 +6,12 @@ use crate::lua::conversion::{json_to_lua_value, lua_value_to_json};
 use mlua::{Error as LuaError, Lua, Value};
 
 /// Inject State global into Lua environment
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Lua table creation fails
+/// - Function binding fails
 pub fn inject_state_global(
     lua: &Lua,
     _context: &GlobalContext,

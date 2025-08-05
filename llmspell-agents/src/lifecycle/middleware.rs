@@ -116,12 +116,27 @@ impl LifecyclePhase {
 #[async_trait]
 pub trait LifecycleMiddleware: Send + Sync {
     /// Called before the lifecycle phase executes
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an error if the pre-processing fails and should prevent the lifecycle
+    /// phase from executing (e.g., security validation failures, resource unavailability).
     async fn before(&self, context: &mut MiddlewareContext) -> Result<()>;
 
     /// Called after the lifecycle phase executes successfully
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an error if the post-processing fails (e.g., cleanup operations,
+    /// metric recording, or notification sending failures).
     async fn after(&self, context: &mut MiddlewareContext) -> Result<()>;
 
     /// Called if the lifecycle phase encounters an error
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an error if the error handling fails (e.g., alert sending failures,
+    /// recovery operation failures).
     async fn on_error(&self, context: &mut MiddlewareContext, error: &anyhow::Error) -> Result<()>;
 
     /// Get middleware name for identification
@@ -230,6 +245,12 @@ impl LifecycleMiddlewareChain {
     }
 
     /// Execute middleware chain for a lifecycle phase
+    /// 
+    /// # Errors
+    /// 
+    /// Currently never returns an error as middleware failures are handled internally
+    /// and stored in the context data. The Result type is provided for future
+    /// extensibility (e.g., critical system-level middleware failures).
     pub async fn execute(&self, mut context: MiddlewareContext) -> Result<MiddlewareContext> {
         if !self.config.enabled {
             return Ok(context);

@@ -5,6 +5,10 @@ use crate::globals::GlobalContext;
 use llmspell_core::error::LLMSpellError;
 
 /// Inject Workflow global into JavaScript engine
+///
+/// # Errors
+///
+/// Returns an error if JavaScript engine initialization fails
 #[cfg(feature = "javascript")]
 pub fn inject_workflow_global(
     _ctx: &mut boa_engine::Context,
@@ -20,6 +24,10 @@ pub fn inject_workflow_global(
 }
 
 /// Stub for when JavaScript feature is not enabled
+///
+/// # Errors
+///
+/// Always returns Ok(()) in stub implementation
 #[cfg(not(feature = "javascript"))]
 pub fn inject_workflow_global(_ctx: &(), _context: &GlobalContext) -> Result<(), LLMSpellError> {
     Ok(())

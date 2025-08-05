@@ -154,6 +154,11 @@ impl ComponentHealth {
 #[async_trait]
 pub trait HealthCheck: Send + Sync {
     /// Perform a health check
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an error if the health check cannot be performed due to system failures,
+    /// resource unavailability, or other critical issues that prevent health assessment.
     async fn check_health(&self) -> Result<Vec<HealthIndicator>>;
 
     /// Get component metadata
@@ -264,6 +269,12 @@ impl HealthMonitor {
     }
 
     /// Perform all health checks
+    /// 
+    /// # Errors
+    /// 
+    /// Currently never returns an error as it handles all individual health check failures
+    /// internally and converts them to unhealthy indicators. The Result type is provided
+    /// for future extensibility (e.g., system-level health check failures).
     pub async fn check_all(&self) -> Result<HealthCheckResult> {
         let mut components = HashMap::new();
         let _start = std::time::Instant::now();

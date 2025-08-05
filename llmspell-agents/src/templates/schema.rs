@@ -304,6 +304,15 @@ impl TemplateSchema {
     }
 
     /// Validate the template schema
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an error if:
+    /// - Template ID, name, or version is empty
+    /// - Duplicate parameter names are found
+    /// - Required parameters have default values
+    /// - Duplicate tool dependency names are found
+    /// - CPU requirement exceeds 100%
     pub fn validate(&self) -> Result<()> {
         // Validate metadata
         if self.metadata.id.is_empty() {

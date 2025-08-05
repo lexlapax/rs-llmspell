@@ -5,6 +5,10 @@ use crate::globals::{state_global::StateGlobal, GlobalContext};
 use llmspell_core::error::LLMSpellError;
 
 /// Inject State global into JavaScript engine
+///
+/// # Errors
+///
+/// Returns an error if JavaScript engine initialization fails
 #[cfg(feature = "javascript")]
 pub fn inject_state_global(
     _ctx: &mut boa_engine::Context,
@@ -22,6 +26,10 @@ pub fn inject_state_global(
 }
 
 /// Stub for when JavaScript feature is not enabled
+///
+/// # Errors
+///
+/// Always returns Ok(()) in stub implementation
 #[cfg(not(feature = "javascript"))]
 pub fn inject_state_global(
     _ctx: &(),

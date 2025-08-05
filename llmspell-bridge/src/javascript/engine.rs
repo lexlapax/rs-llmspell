@@ -16,6 +16,10 @@ pub struct JSEngine {
 
 impl JSEngine {
     /// Create a new JavaScript engine with the given configuration
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if engine initialization fails
     pub fn new(config: &JSConfig) -> Result<Self, LLMSpellError> {
         Ok(Self {
             _config: config.clone(),

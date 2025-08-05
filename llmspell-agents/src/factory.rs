@@ -206,15 +206,30 @@ impl AgentConfigBuilder {
 #[async_trait]
 pub trait AgentFactory: Send + Sync {
     /// Create an agent from configuration
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an error if agent creation fails due to invalid configuration,
+    /// resource constraints, dependency resolution failures, or system-level issues.
     async fn create_agent(&self, config: AgentConfig) -> Result<Arc<dyn Agent>>;
 
     /// Create an agent from a template
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an error if the template is not found, template instantiation fails,
+    /// or the resulting agent configuration is invalid.
     async fn create_from_template(&self, template_name: &str) -> Result<Arc<dyn Agent>>;
 
     /// List available agent templates
     fn list_templates(&self) -> Vec<&str>;
 
     /// Validate agent configuration
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an error if the configuration is invalid (e.g., missing required fields,
+    /// invalid tool references, conflicting settings, or unsupported agent types).
     fn validate_config(&self, config: &AgentConfig) -> Result<()>;
 }
 

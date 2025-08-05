@@ -9,6 +9,12 @@ use mlua::{Lua, Table, Value};
 use std::sync::Arc;
 
 /// Inject Tool global into Lua environment
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Lua table creation fails
+/// - Function binding fails
 pub fn inject_tool_global(
     lua: &Lua,
     _context: &GlobalContext,

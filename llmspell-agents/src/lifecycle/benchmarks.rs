@@ -341,6 +341,11 @@ impl PerformanceBenchmark {
     }
 
     /// Run complete benchmark suite
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an error if the benchmark execution fails due to resource constraints,
+    /// hook execution failures, or system-level issues that prevent performance measurement.
     pub async fn run(&self) -> Result<BenchmarkResults> {
         println!("🚀 Starting production performance benchmark...");
         println!(

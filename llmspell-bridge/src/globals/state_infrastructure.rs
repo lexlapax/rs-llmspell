@@ -178,6 +178,12 @@ pub async fn get_or_create_state_infrastructure(
 }
 
 /// Create storage backend type based on configuration
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Unknown backend type is specified
+/// - Backend configuration is invalid
 fn create_backend_type(config: &StatePersistenceConfig) -> Result<StorageBackendType> {
     match config.backend_type.as_str() {
         "memory" => {

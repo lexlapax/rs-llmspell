@@ -402,6 +402,11 @@ impl TemplateBuilder {
     }
 
     /// Build into a basic template
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an error if the template schema validation fails (e.g., empty ID, name, or version;
+    /// duplicate parameter names; or invalid configuration).
     pub fn build(self) -> Result<BasicTemplate> {
         self.schema.validate()?;
         Ok(BasicTemplate {

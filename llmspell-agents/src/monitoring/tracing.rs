@@ -368,6 +368,11 @@ impl SpanHandle {
 /// Trait for exporting traces
 pub trait TraceExporter: Send + Sync {
     /// Export a completed span
+    /// 
+    /// # Errors
+    /// 
+    /// Returns an error if the span cannot be exported due to network issues,
+    /// serialization failures, or backend service unavailability.
     fn export(&self, span: &TraceSpan) -> Result<()>;
 }
 

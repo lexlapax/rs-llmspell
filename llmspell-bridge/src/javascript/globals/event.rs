@@ -10,6 +10,10 @@ use llmspell_core::error::LLMSpellError;
 ///
 /// NOTE: This is a stub implementation for Phase 15.
 /// Full JavaScript event bridge will be implemented when JavaScript support is added.
+///
+/// # Errors
+///
+/// Returns an error if JavaScript engine initialization fails
 #[cfg(feature = "javascript")]
 pub fn inject_event_global(
     _ctx: &mut Context,
@@ -24,6 +28,10 @@ pub fn inject_event_global(
 }
 
 /// No-op stub when JavaScript feature is not enabled
+///
+/// # Errors
+///
+/// Always returns Ok(()) in stub implementation
 #[cfg(not(feature = "javascript"))]
 pub fn inject_event_global(_ctx: &mut (), _context: &GlobalContext) -> Result<(), LLMSpellError> {
     Ok(())

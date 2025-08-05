@@ -5,7 +5,6 @@ use std::sync::Arc;
 
 #[cfg(feature = "lua")]
 pub mod lua {
-    use super::*;
 
     /// Create a test Lua engine configuration
     pub fn create_test_lua_config() -> llmspell_bridge::engine::factory::LuaConfig {
@@ -14,26 +13,25 @@ pub mod lua {
 
     /// Create a test Lua engine with basic setup
     pub fn create_test_lua_engine(
-    ) -> Result<Box<dyn llmspell_bridge::traits::ScriptEngine>, anyhow::Error> {
+    ) -> Result<Box<dyn llmspell_bridge::ScriptEngineBridge>, anyhow::Error> {
         let config = create_test_lua_config();
-        llmspell_bridge::engine::factory::EngineFactory::create_lua_engine(&config)
+        Ok(llmspell_bridge::engine::factory::EngineFactory::create_lua_engine(&config)?)
     }
 }
 
 #[cfg(feature = "javascript")]
 pub mod javascript {
-    use super::*;
 
     /// Create a test JavaScript engine configuration
-    pub fn create_test_js_config() -> llmspell_bridge::engine::factory::JavaScriptConfig {
-        llmspell_bridge::engine::factory::JavaScriptConfig::default()
+    pub fn create_test_js_config() -> llmspell_bridge::engine::factory::JSConfig {
+        llmspell_bridge::engine::factory::JSConfig::default()
     }
 
     /// Create a test JavaScript engine with basic setup
     pub fn create_test_js_engine(
-    ) -> Result<Box<dyn llmspell_bridge::traits::ScriptEngine>, anyhow::Error> {
+    ) -> Result<Box<dyn llmspell_bridge::ScriptEngineBridge>, anyhow::Error> {
         let config = create_test_js_config();
-        llmspell_bridge::engine::factory::EngineFactory::create_javascript_engine(&config)
+        Ok(llmspell_bridge::engine::factory::EngineFactory::create_javascript_engine(&config)?)
     }
 }
 
@@ -66,32 +64,31 @@ pub async fn create_test_provider_manager() -> Arc<llmspell_bridge::providers::P
 
 #[cfg(test)]
 mod tests {
-    use super::*;
 
     #[cfg(feature = "lua")]
     #[test]
     fn test_create_lua_config() {
-        let config = lua::create_test_lua_config();
+        let config = crate::bridge_helpers::lua::create_test_lua_config();
         assert!(config.memory_limit > 0);
     }
 
     #[cfg(feature = "javascript")]
     #[test]
     fn test_create_js_config() {
-        let config = javascript::create_test_js_config();
+        let config = crate::bridge_helpers::javascript::create_test_js_config();
         assert!(config.memory_limit > 0);
     }
 
     #[test]
     fn test_create_registry() {
-        let registry = create_test_registry();
+        let registry = crate::bridge_helpers::create_test_registry();
         assert_eq!(registry.list_agents().len(), 0);
         assert_eq!(registry.list_tools().len(), 0);
     }
 
     #[tokio::test]
     async fn test_create_provider_manager() {
-        let manager = create_test_provider_manager().await;
+        let manager = crate::bridge_helpers::create_test_provider_manager().await;
         let providers = manager.list_providers().await;
         assert!(providers.is_empty() || !providers.is_empty()); // Either way is fine
     }

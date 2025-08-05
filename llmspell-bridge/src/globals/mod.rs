@@ -29,6 +29,12 @@ use llmspell_core::Result;
 use std::sync::Arc;
 
 /// Initialize the standard global registry with all core globals
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Global registration fails
+/// - Registry building fails
 pub async fn create_standard_registry(context: Arc<GlobalContext>) -> Result<GlobalRegistry> {
     let mut builder = GlobalRegistryBuilder::new();
 

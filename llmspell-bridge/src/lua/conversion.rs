@@ -422,6 +422,12 @@ pub fn workflow_result_to_lua_table(lua: &Lua, result: serde_json::Value) -> mlu
 }
 
 /// Convert `ScriptWorkflowResult` to Lua table
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Table creation fails
+/// - JSON to Lua conversion fails
 pub fn script_workflow_result_to_lua_table(
     lua: &Lua,
     result: crate::conversion::ScriptWorkflowResult,

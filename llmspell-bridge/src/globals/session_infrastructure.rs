@@ -132,6 +132,12 @@ async fn get_or_create_event_bus(context: &GlobalContext) -> Result<Arc<EventBus
 }
 
 /// Create storage backend based on configuration
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Unknown backend type is specified
+/// - Backend creation fails
 async fn create_storage_backend(backend_type: &str) -> Result<Arc<dyn StorageBackend>> {
     match backend_type {
         "memory" => {

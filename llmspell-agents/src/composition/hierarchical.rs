@@ -111,6 +111,11 @@ impl HierarchicalCompositeAgent {
     }
 
     /// Set the parent of this agent
+    /// 
+    /// # Errors
+    /// 
+    /// Currently never returns an error, but the Result type is provided for future
+    /// extensibility (e.g., validation of parent-child relationships, cycle detection).
     pub fn set_parent(&self, parent: Weak<dyn HierarchicalAgent>) -> Result<()> {
         let mut parent_guard = self.parent.write().unwrap();
         *parent_guard = Some(parent);
