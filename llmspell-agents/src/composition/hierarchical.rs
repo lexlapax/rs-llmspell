@@ -114,6 +114,7 @@ impl HierarchicalCompositeAgent {
     pub fn set_parent(&self, parent: Weak<dyn HierarchicalAgent>) -> Result<()> {
         let mut parent_guard = self.parent.write().unwrap();
         *parent_guard = Some(parent);
+        drop(parent_guard);
         Ok(())
     }
 

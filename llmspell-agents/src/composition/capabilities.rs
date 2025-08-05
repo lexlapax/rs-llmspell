@@ -152,6 +152,7 @@ impl CapabilityAggregator {
         // Add to main registry
         let mut capabilities = self.capabilities.write().unwrap();
         capabilities.insert(capability_id.clone(), entry);
+        drop(capabilities);
 
         // Update category index
         let mut index = self.category_index.write().unwrap();
@@ -159,6 +160,7 @@ impl CapabilityAggregator {
             .entry(capability.category)
             .or_default()
             .insert(capability_id);
+        drop(index);
 
         Ok(())
     }
@@ -169,11 +171,15 @@ impl CapabilityAggregator {
 
         let mut capabilities = self.capabilities.write().unwrap();
         if let Some(entry) = capabilities.remove(&capability_id) {
+            drop(capabilities);
             // Remove from category index
             let mut index = self.category_index.write().unwrap();
             if let Some(set) = index.get_mut(&entry.capability.category) {
                 set.remove(&capability_id);
             }
+            drop(index);
+        } else {
+            drop(capabilities);
         }
 
         Ok(())
@@ -189,15 +195,22 @@ impl CapabilityAggregator {
     pub fn clear_requirements(&self) {
         let mut requirements = self.requirements.write().unwrap();
         requirements.clear();
+        drop(requirements);
     }
 
     /// Find capabilities matching requirements
     pub fn find_matches(&self) -> Vec<CapabilityMatch> {
         let capabilities = self.capabilities.read().unwrap();
+        let capabilities_vec: Vec<_> = capabilities.values().cloned().collect();
+        drop(capabilities);
+        
         let requirements = self.requirements.read().unwrap();
+        let requirements_vec: Vec<_> = requirements.clone();
+        drop(requirements);
+        
         let mut matches = Vec::new();
 
-        for (_cap_id, entry) in capabilities.iter() {
+        for entry in capabilities_vec.iter() {
             if !entry.available {
                 continue;
             }
@@ -206,7 +219,7 @@ impl CapabilityAggregator {
             let mut total_score = 0.0;
             let mut requirement_count = 0;
 
-            for (idx, req) in requirements.iter().enumerate() {
+            for (idx, req) in requirements_vec.iter().enumerate() {
                 if self.matches_requirement(&entry.capability, req) {
                     satisfied.push(format!("req-{idx}"));
                     total_score += entry.score;

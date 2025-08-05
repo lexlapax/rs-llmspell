@@ -147,6 +147,7 @@ impl DelegatingAgent {
         // Store the agent
         let mut agents = self.agents.write().await;
         agents.insert(agent_id.clone(), agent.clone());
+        drop(agents);
 
         // Index capabilities if caching is enabled
         if self.config.cache_capabilities {
@@ -160,12 +161,14 @@ impl DelegatingAgent {
     pub async fn unregister_agent(&self, agent_id: &str) -> Result<()> {
         let mut agents = self.agents.write().await;
         agents.remove(agent_id);
+        drop(agents);
 
         // Remove from capabilities index
         let mut index = self.capabilities_index.write().await;
         for agents in index.values_mut() {
             agents.retain(|id| id != agent_id);
         }
+        drop(index);
 
         Ok(())
     }
@@ -193,6 +196,7 @@ impl DelegatingAgent {
                 .or_default()
                 .push(agent_id.to_string());
         }
+        drop(index);
 
         Ok(())
     }
