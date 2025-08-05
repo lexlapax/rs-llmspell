@@ -442,11 +442,13 @@ impl MetricHook for CachingHook {
 mod tests {
     use super::*;
     use crate::types::{ComponentId, ComponentType, HookPoint};
-    use llmspell_testing::hook_helpers::create_test_hook_context;
     use serde_json::json;
 
+    /// Local test helper to avoid circular dependency with llmspell-testing
+    /// (Architectural exception per 7.1.6: foundational crates may have minimal local helpers)
     fn create_test_context() -> HookContext {
-        create_test_hook_context()
+        let component_id = ComponentId::new(ComponentType::Agent, "test-agent".to_string());
+        HookContext::new(HookPoint::BeforeAgentExecution, component_id)
     }
     #[tokio::test]
     async fn test_caching_hook_basic() {

@@ -569,15 +569,13 @@ impl ReplayableHook for RateLimitHook {
 mod tests {
     use super::*;
     use crate::types::{ComponentId, ComponentType, HookPoint};
-    use llmspell_testing::hook_helpers::create_test_hook_context_with_component;
     use std::time::Duration;
 
+    /// Local test helper to avoid circular dependency with llmspell-testing
+    /// (Architectural exception per 7.1.6: foundational crates may have minimal local helpers)
     fn create_test_context() -> HookContext {
-        create_test_hook_context_with_component(
-            HookPoint::BeforeToolExecution,
-            ComponentType::System,
-            "test",
-        )
+        let component_id = ComponentId::new(ComponentType::System, "test".to_string());
+        HookContext::new(HookPoint::BeforeToolExecution, component_id)
     }
     #[tokio::test]
     async fn test_rate_limit_hook_basic() {

@@ -227,14 +227,23 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
    
    **Verification**: ✅ `cargo test -p llmspell-tools --lib` shows "269 passed; 0 failed"
 
-4. [ ] **Fix llmspell-hooks Type Mismatches** (1.5 hours):
-   - [ ] Investigate multiple compilation issue (likely circular dependency)
-   - [ ] Fix HookContext type mismatches in 5 test files:
-     - builtin/caching.rs:449
-     - builtin/rate_limit.rs:576-580
-     - cache/mod.rs:393
-     - persistence/tests.rs:73
-   - [ ] Consider extracting test helpers to avoid circular deps
+4. [x] **Fix llmspell-hooks Type Mismatches** (1.5 hours): ✅ COMPLETED
+   **Final Status**: ✅ **ALL 254 TESTS PASS** - Circular dependency resolved
+   
+   **Root Cause**: Circular dependency between llmspell-hooks ↔ llmspell-testing
+   - llmspell-hooks tests tried to use llmspell-testing helpers
+   - llmspell-testing depended on llmspell-hooks types
+   - Created circular import causing "multiple compiled versions" error
+   
+   **Solution**: Created minimal local test helpers in llmspell-hooks (respecting 7.1.6 architecture):
+   - **builtin/caching.rs**: Local `create_test_context()` with `HookPoint::BeforeAgentExecution`
+   - **builtin/rate_limit.rs**: Local `create_test_context()` with `HookPoint::BeforeToolExecution` 
+   - **cache/mod.rs**: Local `create_test_context()` with `HookPoint::SystemStartup`
+   - **persistence/tests.rs**: Local `create_test_context()` with `HookPoint::BeforeAgentExecution`
+   
+   **Architectural Compliance**: ✅ Per Task 7.1.6 - centralized test infrastructure BUT foundational crates may have minimal local helpers when architecturally necessary
+   
+   **Verification**: ✅ `cargo test -p llmspell-hooks` shows "254 passed; 0 failed"
 
 5. [ ] **Fix Runtime Test Failures** (1 hour):
    - [ ] llmspell-bridge: Fix test_agent_templates_from_lua

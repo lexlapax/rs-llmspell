@@ -3,7 +3,6 @@
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use crate::context::HookContext;
     use crate::persistence::*;
     use crate::result::HookResult;
@@ -11,7 +10,6 @@ mod tests {
     use crate::types::{ComponentId, ComponentType, HookPoint};
     use anyhow::Result;
     use async_trait::async_trait;
-    use llmspell_testing::hook_helpers::create_test_hook_context;
     use std::sync::Arc;
     use std::time::{Duration, SystemTime};
     use uuid::Uuid;
@@ -69,8 +67,11 @@ mod tests {
         }
     }
 
+    /// Local test helper to avoid circular dependency with llmspell-testing
+    /// (Architectural exception per 7.1.6: foundational crates may have minimal local helpers)
     fn create_test_context() -> HookContext {
-        create_test_hook_context()
+        let component_id = ComponentId::new(ComponentType::Agent, "test-agent".to_string());
+        HookContext::new(HookPoint::BeforeAgentExecution, component_id)
     }
 
     fn create_test_execution(hook_id: String, correlation_id: Uuid) -> SerializedHookExecution {

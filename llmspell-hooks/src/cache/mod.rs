@@ -385,12 +385,14 @@ impl Default for Cache {
 mod tests {
     use super::*;
     use crate::types::{ComponentId, ComponentType, HookPoint};
-    use llmspell_testing::hook_helpers::create_test_hook_context;
     use std::thread;
     use std::time::Duration as StdDuration;
 
+    /// Local test helper to avoid circular dependency with llmspell-testing
+    /// (Architectural exception per 7.1.6: foundational crates may have minimal local helpers)
     fn create_test_context() -> HookContext {
-        create_test_hook_context()
+        let component_id = ComponentId::new(ComponentType::System, "test".to_string());
+        HookContext::new(HookPoint::SystemStartup, component_id)
     }
     #[test]
     fn test_cache_key_generation() {
