@@ -620,6 +620,8 @@ impl JsonProcessorTool {
         json_data: &str,
         query_or_schema: Option<&str>,
     ) -> Result<AgentOutput> {
+        use crate::lifecycle::HookableToolExecution;
+
         let mut params = serde_json::json!({
             "operation": operation,
             "input": json_data,
@@ -636,8 +638,6 @@ impl JsonProcessorTool {
 
         let input = AgentInput::text("JSON processing hook demonstration")
             .with_parameter("parameters", params);
-        use crate::lifecycle::HookableToolExecution;
-
         let context = ExecutionContext::default();
 
         // Execute with hooks using the HookableToolExecution trait

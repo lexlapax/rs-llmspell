@@ -471,12 +471,12 @@ impl BaseAgent for ImageProcessorTool {
             }
 
             "metadata" => {
+                use std::fmt::Write;
+
                 let file_path = extract_required_string(params, "file_path")?;
 
                 let path = Path::new(file_path);
                 let metadata = self.extract_metadata(path).await?;
-
-                use std::fmt::Write;
 
                 let mut message = format!("Image file: {:?} format", metadata.format);
 

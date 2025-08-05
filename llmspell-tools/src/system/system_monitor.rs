@@ -63,17 +63,45 @@ pub struct DiskStats {
     pub filesystem: Option<String>,
 }
 
+/// Statistics types that can be collected
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum StatType {
+    /// CPU usage statistics
+    Cpu,
+    /// Memory statistics
+    Memory,
+    /// Disk usage statistics
+    Disk,
+    /// Process information
+    Process,
+}
+
+/// Statistics collection configuration
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct StatsCollection {
+    /// Set of statistics types to collect
+    pub enabled_stats: Vec<StatType>,
+}
+
+impl StatsCollection {
+    /// Check if a specific stat type is enabled
+    pub fn is_enabled(&self, stat_type: StatType) -> bool {
+        self.enabled_stats.contains(&stat_type)
+    }
+    
+    /// Enable all statistics
+    pub fn all() -> Self {
+        Self {
+            enabled_stats: vec![StatType::Cpu, StatType::Memory, StatType::Disk, StatType::Process],
+        }
+    }
+}
+
 /// System monitor configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SystemMonitorConfig {
-    /// Whether to collect CPU usage statistics
-    pub collect_cpu_stats: bool,
-    /// Whether to collect memory statistics
-    pub collect_memory_stats: bool,
-    /// Whether to collect disk usage statistics
-    pub collect_disk_stats: bool,
-    /// Whether to collect process information
-    pub collect_process_stats: bool,
+    /// Statistics collection settings
+    pub collect: StatsCollection,
     /// Maximum number of disk mounts to report
     pub max_disk_mounts: usize,
     /// CPU sampling duration in milliseconds
@@ -85,10 +113,7 @@ pub struct SystemMonitorConfig {
 impl Default for SystemMonitorConfig {
     fn default() -> Self {
         Self {
-            collect_cpu_stats: true,
-            collect_memory_stats: true,
-            collect_disk_stats: true,
-            collect_process_stats: true,
+            collect: StatsCollection::all(),
             max_disk_mounts: 20,
             cpu_sample_duration_ms: 1000,
             include_disk_details: true,
@@ -175,7 +200,7 @@ impl SystemMonitorTool {
     /// Get CPU usage (simplified version without external dependencies)
     #[allow(clippy::unused_async)]
     async fn get_cpu_usage(&self) -> f64 {
-        if !self.config.collect_cpu_stats {
+        if !self.config.collect.is_enabled(StatType::Cpu) {
             return 0.0;
         }
 
@@ -224,7 +249,7 @@ impl SystemMonitorTool {
     /// Get disk usage statistics
     #[allow(clippy::unused_async)]
     async fn get_disk_usage(&self) -> HashMap<String, DiskStats> {
-        if !self.config.collect_disk_stats {
+        if !self.config.collect.is_enabled(StatType::Disk) {
             return HashMap::new();
         }
 
@@ -414,7 +439,7 @@ impl SystemMonitorTool {
     /// Get process count (simplified implementation)
     #[allow(clippy::unused_async)]
     async fn get_process_count(&self) -> Option<u32> {
-        if !self.config.collect_process_stats {
+        if !self.config.collect.is_enabled(StatType::Process) {
             return None;
         }
 
@@ -471,17 +496,17 @@ impl SystemMonitorTool {
         let mut stats = self.get_basic_system_info().await?;
 
         // Collect CPU usage
-        if self.config.collect_cpu_stats {
+        if self.config.collect.is_enabled(StatType::Cpu) {
             stats.cpu_usage_percent = self.get_cpu_usage().await;
         }
 
         // Collect disk usage
-        if self.config.collect_disk_stats {
+        if self.config.collect.is_enabled(StatType::Disk) {
             stats.disk_usage = self.get_disk_usage().await;
         }
 
         // Collect process count
-        if self.config.collect_process_stats {
+        if self.config.collect.is_enabled(StatType::Process) {
             stats.process_count = self.get_process_count().await;
         }
 
@@ -848,9 +873,9 @@ mod tests {
     #[tokio::test]
     async fn test_selective_collection() {
         let config = SystemMonitorConfig {
-            collect_cpu_stats: false,
-            collect_disk_stats: false,
-            collect_process_stats: false,
+            collect: StatsCollection {
+                enabled_stats: vec![StatType::Memory],
+            },
             ..Default::default()
         };
         let tool = SystemMonitorTool::new(config);

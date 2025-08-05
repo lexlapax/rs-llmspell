@@ -975,6 +975,8 @@ impl FileOperationsTool {
         path: &str,
         file_content: Option<&str>,
     ) -> Result<AgentOutput> {
+        use crate::lifecycle::HookableToolExecution;
+
         let mut params = json!({
             "operation": operation,
             "path": path,
@@ -987,8 +989,6 @@ impl FileOperationsTool {
 
         let input = AgentInput::text("File operations hook demonstration")
             .with_parameter("parameters", params);
-        use crate::lifecycle::HookableToolExecution;
-
         let context = ExecutionContext::default();
 
         // Execute with hooks using the HookableToolExecution trait

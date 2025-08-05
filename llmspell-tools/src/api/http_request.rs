@@ -546,6 +546,8 @@ impl HttpRequestTool {
         headers: Option<&std::collections::HashMap<String, String>>,
         body: Option<&str>,
     ) -> Result<AgentOutput> {
+        use crate::lifecycle::HookableToolExecution;
+
         let mut params = json!({
             "method": method,
             "input": url,
@@ -562,8 +564,6 @@ impl HttpRequestTool {
 
         let input = AgentInput::text("HTTP request hook demonstration")
             .with_parameter("parameters", params);
-        use crate::lifecycle::HookableToolExecution;
-
         let context = ExecutionContext::default();
 
         // Execute with hooks using the HookableToolExecution trait

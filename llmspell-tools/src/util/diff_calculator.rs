@@ -86,6 +86,8 @@ impl DiffCalculatorTool {
     /// Calculate text diff
     #[allow(clippy::unused_self)]
     fn calculate_text_diff(&self, old: &str, new: &str, format: DiffFormat) -> Result<String> {
+        use std::fmt::Write;
+        
         let diff = TextDiff::from_lines(old, new);
 
         match format {
@@ -111,7 +113,6 @@ impl DiffCalculatorTool {
                                 let old_slices = diff.old_slices();
                                 for idx in old_range {
                                     if let Some(line) = old_slices.get(idx) {
-                                        use std::fmt::Write;
                                         let _ = writeln!(output, "  {line}");
                                     }
                                 }
@@ -121,7 +122,6 @@ impl DiffCalculatorTool {
                                 let old_slices = diff.old_slices();
                                 for idx in old_range {
                                     if let Some(line) = old_slices.get(idx) {
-                                        use std::fmt::Write;
                                         let _ = writeln!(output, "- {line}");
                                     }
                                 }
@@ -131,7 +131,6 @@ impl DiffCalculatorTool {
                                 let new_slices = diff.new_slices();
                                 for idx in new_range {
                                     if let Some(line) = new_slices.get(idx) {
-                                        use std::fmt::Write;
                                         let _ = writeln!(output, "+ {line}");
                                     }
                                 }
@@ -141,14 +140,12 @@ impl DiffCalculatorTool {
                                 let old_slices = diff.old_slices();
                                 for idx in old_range {
                                     if let Some(line) = old_slices.get(idx) {
-                                        use std::fmt::Write;
                                         let _ = writeln!(output, "- {line}");
                                     }
                                 }
                                 let new_slices = diff.new_slices();
                                 for idx in new_range {
                                     if let Some(line) = new_slices.get(idx) {
-                                        use std::fmt::Write;
                                         let _ = writeln!(output, "+ {line}");
                                     }
                                 }
@@ -168,7 +165,6 @@ impl DiffCalculatorTool {
                         ChangeTag::Insert => "+",
                         ChangeTag::Equal => " ",
                     };
-                    use std::fmt::Write;
                     let _ = write!(output, "{sign}{change}");
                 }
                 Ok(output)
@@ -181,7 +177,6 @@ impl DiffCalculatorTool {
                     match op.tag() {
                         DiffTag::Delete => {
                             changes += 1;
-                            use std::fmt::Write;
                             let _ = writeln!(
                                 output,
                                 "Removed at line {}: {} line(s)",
@@ -191,7 +186,6 @@ impl DiffCalculatorTool {
                         }
                         DiffTag::Insert => {
                             changes += 1;
-                            use std::fmt::Write;
                             let _ = writeln!(
                                 output,
                                 "Added at line {}: {} line(s)",
@@ -202,7 +196,6 @@ impl DiffCalculatorTool {
                         DiffTag::Equal => {}
                         DiffTag::Replace => {
                             changes += 1;
-                            use std::fmt::Write;
                             let _ = writeln!(
                                 output,
                                 "Replaced at lines {}-{} with lines {}-{}",

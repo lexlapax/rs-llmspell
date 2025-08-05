@@ -165,7 +165,7 @@ impl ToolRegistry {
         hook_registry: Option<Arc<HookRegistry>>,
         hook_config: ToolLifecycleConfig,
     ) -> Self {
-        let tool_executor = if hook_config.enable_hooks {
+        let tool_executor = if hook_config.features.hooks_enabled {
             Some(Arc::new(ToolExecutor::new(
                 hook_config.clone(),
                 hook_executor,
@@ -463,7 +463,7 @@ impl ToolRegistry {
 
     /// Enable or disable hook integration
     pub const fn set_hook_integration_enabled(&mut self, enabled: bool) {
-        self.hook_config.enable_hooks = enabled;
+        self.hook_config.features.hooks_enabled = enabled;
         // Note: This only changes the config - to create/destroy the ToolExecutor
         // would require recreating the registry with the new configuration
     }
@@ -855,7 +855,10 @@ mod tests {
         let hook_registry = Arc::new(HookRegistry::new());
         let hook_executor = Arc::new(HookExecutorImpl::new());
         let hook_config = ToolLifecycleConfig {
-            enable_hooks: true,
+            features: llmspell_tools::lifecycle::HookFeatures {
+                hooks_enabled: true,
+                ..Default::default()
+            },
             ..Default::default()
         };
 
@@ -951,7 +954,10 @@ mod tests {
         let hook_registry = Arc::new(HookRegistry::new());
         let hook_executor = Arc::new(HookExecutorImpl::new());
         let hook_config = ToolLifecycleConfig {
-            enable_hooks: true,
+            features: llmspell_tools::lifecycle::HookFeatures {
+                hooks_enabled: true,
+                ..Default::default()
+            },
             ..Default::default()
         };
 

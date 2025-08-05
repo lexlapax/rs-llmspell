@@ -18,13 +18,31 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tracing::{debug, error, info, warn};
 
+/// Hook execution features configuration
+#[derive(Debug, Clone, Default)]
+pub struct HookFeatures {
+    /// Enable hook execution (can be disabled for performance)
+    pub hooks_enabled: bool,
+    /// Enable circuit breaker protection
+    pub circuit_breaker_enabled: bool,
+    /// Enable security-level validation for hooks
+    pub security_validation_enabled: bool,
+}
+
+/// Audit logging configuration
+#[derive(Debug, Clone, Default)]
+pub struct AuditConfig {
+    /// Enable comprehensive audit logging
+    pub enabled: bool,
+    /// Audit log sensitive parameters (be careful with secrets)
+    pub log_parameters: bool,
+}
+
 /// Configuration for tool lifecycle hook integration
 #[derive(Debug, Clone)]
 pub struct ToolLifecycleConfig {
-    /// Enable hook execution (can be disabled for performance)
-    pub enable_hooks: bool,
-    /// Enable circuit breaker protection
-    pub enable_circuit_breaker: bool,
+    /// Hook features configuration
+    pub features: HookFeatures,
     /// Maximum time allowed for hook execution
     pub max_hook_execution_time: Duration,
     /// Resource limits for tool execution including hooks
@@ -32,29 +50,29 @@ pub struct ToolLifecycleConfig {
     /// Circuit breaker configuration
     pub circuit_breaker_failure_threshold: u32,
     pub circuit_breaker_recovery_time: Duration,
-    /// Enable security-level validation for hooks
-    pub enable_security_validation: bool,
     /// Maximum security level allowed for hook execution
     pub max_security_level: SecurityLevel,
-    /// Enable comprehensive audit logging
-    pub enable_audit_logging: bool,
-    /// Audit log sensitive parameters (be careful with secrets)
-    pub audit_log_parameters: bool,
+    /// Audit logging configuration
+    pub audit: AuditConfig,
 }
 
 impl Default for ToolLifecycleConfig {
     fn default() -> Self {
         Self {
-            enable_hooks: true,
-            enable_circuit_breaker: true,
+            features: HookFeatures {
+                hooks_enabled: true,
+                circuit_breaker_enabled: true,
+                security_validation_enabled: true,
+            },
             max_hook_execution_time: Duration::from_millis(100), // 100ms max for hooks
             resource_limits: ResourceLimits::default(),
             circuit_breaker_failure_threshold: 5,
             circuit_breaker_recovery_time: Duration::from_secs(30),
-            enable_security_validation: true,
             max_security_level: SecurityLevel::Privileged, // Allow all security levels by default
-            enable_audit_logging: true,
-            audit_log_parameters: false, // Don't log parameters by default to avoid leaking secrets
+            audit: AuditConfig {
+                enabled: true,
+                log_parameters: false, // Don't log parameters by default to avoid leaking secrets
+            },
         }
     }
 }
@@ -236,7 +254,7 @@ impl ToolExecutor {
     ) -> Self {
         let component_id = ComponentId::new(ComponentType::Tool, "tool_executor".to_string());
 
-        let circuit_breaker = if config.enable_circuit_breaker {
+        let circuit_breaker = if config.features.circuit_breaker_enabled {
             hook_registry.as_ref().map(|_registry| {
                 Arc::new(CircuitBreaker::new(format!(
                     "tool_executor_{}",
@@ -444,7 +462,7 @@ impl ToolExecutor {
         tool_context: &ToolHookContext,
         input_data: Option<T>,
     ) -> Result<Option<T>, LLMSpellError> {
-        if !self.config.enable_hooks {
+        if !self.config.features.hooks_enabled {
             return Ok(input_data);
         }
 
@@ -557,7 +575,7 @@ impl ToolExecutor {
 
     /// Validate security level for tool execution
     fn validate_tool_security(&self, security_level: &SecurityLevel) -> Result<(), LLMSpellError> {
-        if !self.config.enable_security_validation {
+        if !self.config.features.security_validation_enabled {
             return Ok(());
         }
 
@@ -591,7 +609,7 @@ impl ToolExecutor {
         input: &AgentInput,
         resource_metrics: &HashMap<String, JsonValue>,
     ) -> AuditLogEntry {
-        let parameters = if self.config.audit_log_parameters {
+        let parameters = if self.config.audit.log_parameters {
             Some(input.parameters.clone())
         } else {
             Some({
@@ -619,7 +637,7 @@ impl ToolExecutor {
 
     /// Log audit entry
     fn log_audit_entry(&self, entry: &AuditLogEntry) {
-        if !self.config.enable_audit_logging {
+        if !self.config.audit.enabled {
             return;
         }
 
@@ -799,7 +817,10 @@ mod tests {
     #[tokio::test]
     async fn test_tool_execution_without_hooks() {
         let config = ToolLifecycleConfig {
-            enable_hooks: false,
+            features: HookFeatures {
+                hooks_enabled: false,
+                ..Default::default()
+            },
             ..Default::default()
         };
         let executor = ToolExecutor::new(config, None, None);
@@ -1066,8 +1087,10 @@ mod tests {
     #[tokio::test]
     async fn test_audit_logging_enabled() {
         let config = ToolLifecycleConfig {
-            enable_audit_logging: true,
-            audit_log_parameters: false, // Don't log parameters for security
+            audit: AuditConfig {
+                enabled: true,
+                log_parameters: false, // Don't log parameters for security
+            },
             ..Default::default()
         };
         let executor = ToolExecutor::new(config, None, None);
@@ -1088,7 +1111,10 @@ mod tests {
     #[tokio::test]
     async fn test_audit_logging_disabled() {
         let config = ToolLifecycleConfig {
-            enable_audit_logging: false,
+            audit: AuditConfig {
+                enabled: false,
+                ..Default::default()
+            },
             ..Default::default()
         };
         let executor = ToolExecutor::new(config, None, None);
@@ -1106,7 +1132,10 @@ mod tests {
     #[tokio::test]
     async fn test_security_validation_disabled() {
         let config = ToolLifecycleConfig {
-            enable_security_validation: false,
+            features: HookFeatures {
+                security_validation_enabled: false,
+                ..Default::default()
+            },
             max_security_level: SecurityLevel::Safe, // Restrictive, but disabled
             ..Default::default()
         };
