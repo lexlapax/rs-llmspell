@@ -737,6 +737,10 @@ impl Clone for WorkflowBuilder {
 }
 
 /// Inject Workflow global into Lua environment
+///
+/// # Panics
+///
+/// Panics if the Lua table creation or function binding fails
 pub fn inject_workflow_global(
     lua: &Lua,
     _context: &GlobalContext,

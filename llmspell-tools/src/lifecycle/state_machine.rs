@@ -93,6 +93,11 @@ impl ToolStateMachine {
     }
 
     /// Transition to a new state
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the requested state transition is invalid
+    /// according to the state machine rules
     pub async fn transition_to(&self, new_state: ToolExecutionState) -> Result<()> {
         let mut state_guard = self.state.write().await;
         let current_state = *state_guard;
@@ -181,6 +186,11 @@ impl ToolStateMachine {
     }
 
     /// Terminate the tool
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the state transition to Terminated is invalid
+    /// from the current state
     pub async fn terminate(&self) -> Result<()> {
         self.transition_to(ToolExecutionState::Terminated).await
     }

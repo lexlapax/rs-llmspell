@@ -96,6 +96,11 @@ struct CachedExecution {
 }
 
 impl ExecutionCache {
+    /// Create a new execution cache with the specified capacity
+    ///
+    /// # Panics
+    ///
+    /// Panics if capacity is 0
     #[must_use]
     pub fn new(capacity: usize) -> Self {
         Self {

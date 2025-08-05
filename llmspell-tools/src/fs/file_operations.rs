@@ -960,6 +960,14 @@ impl FileOperationsTool {
 
     /// Demonstrate hook-aware execution for file operations
     /// This method showcases how the file operations tool works with the hook system
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Invalid operation is specified
+    /// - File path is invalid or inaccessible
+    /// - Hook execution fails
+    /// - Tool execution fails
     pub async fn demonstrate_hook_integration(
         &self,
         tool_executor: &crate::lifecycle::ToolExecutor,

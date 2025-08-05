@@ -393,6 +393,13 @@ impl ToolRegistry {
     }
 
     /// Execute a tool with hook integration (if enabled)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Tool not found in registry
+    /// - Hook execution fails
+    /// - Tool execution fails
     pub async fn execute_tool_with_hooks(
         &self,
         tool_name: &str,
@@ -419,6 +426,13 @@ impl ToolRegistry {
     }
 
     /// Execute a tool by name (with or without hooks based on configuration)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Tool not found in registry
+    /// - Tool execution fails
+    /// - Hook execution fails (if hooks are enabled)
     pub async fn execute_tool(
         &self,
         tool_name: &str,

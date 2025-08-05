@@ -260,6 +260,10 @@ impl ScriptRuntime {
     }
 
     /// Get the current execution context
+    ///
+    /// # Panics
+    ///
+    /// Panics if the execution context lock is poisoned
     #[must_use]
     pub fn get_execution_context(&self) -> crate::engine::ExecutionContext {
         self.execution_context.read().unwrap().clone()
@@ -270,6 +274,10 @@ impl ScriptRuntime {
     /// # Errors
     ///
     /// Returns an error if the context lock is poisoned
+    ///
+    /// # Panics
+    ///
+    /// Panics if the write lock cannot be acquired
     pub fn set_execution_context(
         &self,
         context: crate::engine::ExecutionContext,

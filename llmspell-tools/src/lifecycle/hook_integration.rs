@@ -257,6 +257,14 @@ impl ToolExecutor {
     }
 
     /// Execute a tool with full hook integration
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Hook execution fails and cannot be recovered
+    /// - Tool execution fails
+    /// - Resource limits are exceeded
+    /// - Circuit breaker trips due to repeated failures
     pub async fn execute_tool_with_hooks(
         &self,
         tool: &dyn Tool,

@@ -261,6 +261,13 @@ impl JsonProcessorTool {
     }
 
     /// Process JSON lines with streaming
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The JQ query is invalid or contains security risks
+    /// - JSON parsing fails for any line
+    /// - I/O errors occur while reading from the stream
     pub async fn process_json_stream<R: AsyncRead + Unpin>(
         &self,
         reader: R,
@@ -599,6 +606,13 @@ impl JsonProcessorTool {
 
     /// Demonstrate hook-aware execution for JSON processing
     /// This method showcases how the JSON processor tool works with the hook system
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Tool execution fails
+    /// - Hook execution fails
+    /// - JSON parsing or processing fails
     pub async fn demonstrate_hook_integration(
         &self,
         tool_executor: &crate::lifecycle::ToolExecutor,
