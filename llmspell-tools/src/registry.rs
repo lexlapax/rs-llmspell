@@ -1,8 +1,9 @@
 //! ABOUTME: Tool registry for discovery, validation, and management
 //! ABOUTME: Provides thread-safe tool registration and capability-based discovery
 
-use crate::lifecycle::{ExecutionMetrics, ToolExecutor, ToolLifecycleConfig};
-use crate::lifecycle::hook_integration::HookFeatures;
+use crate::lifecycle::{
+    hook_integration::HookFeatures, ExecutionMetrics, ToolExecutor, ToolLifecycleConfig,
+};
 use llmspell_core::{
     error::LLMSpellError,
     traits::tool::{ResourceLimits, SecurityLevel, SecurityRequirements, Tool, ToolCategory},

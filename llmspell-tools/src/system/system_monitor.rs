@@ -90,6 +90,7 @@ impl StatsCollection {
     }
     
     /// Enable all statistics
+    #[must_use]
     pub fn all() -> Self {
         Self {
             enabled_stats: vec![StatType::Cpu, StatType::Memory, StatType::Disk, StatType::Process],
