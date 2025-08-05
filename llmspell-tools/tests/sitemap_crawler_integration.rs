@@ -14,7 +14,9 @@ async fn test_sitemap_crawler_xml() {
 
     // Most sites have a sitemap.xml
     let input = create_agent_input(json!({
-        "input": "https://www.rust-lang.org/sitemap.xml"
+        "parameters": {
+            "input": "https://www.rust-lang.org/sitemap.xml"
+        }
     }))
     .unwrap();
 
@@ -44,7 +46,9 @@ async fn test_sitemap_crawler_robots_txt() {
 
     // Try to parse example.com directly (won't find sitemap)
     let input = create_agent_input(json!({
-        "input": test_endpoints::EXAMPLE_WEBSITE
+        "parameters": {
+            "input": test_endpoints::EXAMPLE_WEBSITE
+        }
     }))
     .unwrap();
 
@@ -68,9 +72,11 @@ async fn test_sitemap_crawler_with_filters() {
     let context = create_test_context();
 
     let input = create_agent_input(json!({
-        "input": "https://example.com/sitemap.xml",
-        "url_filter": "blog",
-        "max_urls": 10
+        "parameters": {
+            "input": "https://example.com/sitemap.xml",
+            "url_filter": "blog",
+            "max_urls": 10
+        }
     }))
     .unwrap();
 
@@ -96,9 +102,11 @@ async fn test_sitemap_crawler_depth_limit() {
     let context = create_test_context();
 
     let input = create_agent_input(json!({
-        "input": "https://example.com/sitemap.xml",
-        "max_depth": 1,
-        "follow_sitemap_index": true
+        "parameters": {
+            "input": "https://example.com/sitemap.xml",
+            "max_depth": 1,
+            "follow_sitemap_index": true
+        }
     }))
     .unwrap();
 
@@ -119,7 +127,9 @@ async fn test_sitemap_crawler_invalid_url() {
     let context = create_test_context();
 
     let input = create_agent_input(json!({
-        "input": "not-a-url"
+        "parameters": {
+            "input": "not-a-url"
+        }
     }))
     .unwrap();
 
@@ -135,7 +145,9 @@ async fn test_sitemap_crawler_non_sitemap_url() {
 
     // Regular HTML page, not a sitemap
     let input = create_agent_input(json!({
-        "input": test_endpoints::EXAMPLE_WEBSITE
+        "parameters": {
+            "input": test_endpoints::EXAMPLE_WEBSITE
+        }
     }))
     .unwrap();
 
@@ -157,8 +169,10 @@ async fn test_sitemap_crawler_timeout() {
     let context = create_test_context();
 
     let input = create_agent_input(json!({
-        "input": "http://1.2.3.4:9999/sitemap.xml",
-        "timeout": 1
+        "parameters": {
+            "input": "http://1.2.3.4:9999/sitemap.xml",
+            "timeout": 1
+        }
     }))
     .unwrap();
 

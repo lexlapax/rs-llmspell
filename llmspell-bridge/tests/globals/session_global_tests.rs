@@ -51,8 +51,8 @@ async fn test_session_creation_and_operations() {
         assert(metadata.description == "Integration test session", "Description should match")
         
         -- Test session context
-        Session.setCurrent(session_id)
-        local current = Session.getCurrent()
+        Session.set_current(session_id)
+        local current = Session.get_current()
         assert(current == session_id, "Current session should match set session")
         
         -- Test session listing

@@ -13,7 +13,9 @@ async fn test_url_analyzer_basic() {
     let context = create_test_context();
 
     let input = create_agent_input(json!({
-        "input": "https://example.com/path/to/page?param=value&foo=bar#section"
+        "parameters": {
+            "input": "https://example.com/path/to/page?param=value&foo=bar#section"
+        }
     }))
     .unwrap();
 
@@ -39,7 +41,9 @@ async fn test_url_analyzer_simple_url() {
     let context = create_test_context();
 
     let input = create_agent_input(json!({
-        "input": "https://example.com"
+        "parameters": {
+            "input": "https://example.com"
+        }
     }))
     .unwrap();
 
@@ -60,7 +64,9 @@ async fn test_url_analyzer_with_port() {
     let context = create_test_context();
 
     let input = create_agent_input(json!({
-        "input": "http://localhost:8080/api/v1/users"
+        "parameters": {
+            "input": "http://localhost:8080/api/v1/users"
+        }
     }))
     .unwrap();
 
@@ -80,7 +86,9 @@ async fn test_url_analyzer_with_auth() {
     let context = create_test_context();
 
     let input = create_agent_input(json!({
-        "input": "https://user:pass@example.com/secure"
+        "parameters": {
+            "input": "https://user:pass@example.com/secure"
+        }
     }))
     .unwrap();
 
@@ -100,8 +108,10 @@ async fn test_url_analyzer_decode_params() {
     let context = create_test_context();
 
     let input = create_agent_input(json!({
-        "input": "https://example.com/search?q=hello%20world&category=books%2Fmagazines",
-        "decode_params": true
+        "parameters": {
+            "input": "https://example.com/search?q=hello%20world&category=books%2Fmagazines",
+            "decode_params": true
+        }
     }))
     .unwrap();
 
@@ -120,7 +130,9 @@ async fn test_url_analyzer_invalid_url() {
     let context = create_test_context();
 
     let input = create_agent_input(json!({
-        "input": "not a valid url at all"
+        "parameters": {
+            "input": "not a valid url at all"
+        }
     }))
     .unwrap();
 
@@ -145,7 +157,9 @@ async fn test_url_analyzer_relative_url() {
     let context = create_test_context();
 
     let input = create_agent_input(json!({
-        "input": "/path/to/resource"
+        "parameters": {
+            "input": "/path/to/resource"
+        }
     }))
     .unwrap();
 
@@ -181,7 +195,9 @@ async fn test_url_analyzer_special_characters() {
     let context = create_test_context();
 
     let input = create_agent_input(json!({
-        "input": "https://example.com/path?key=value&special=!@$%^&*()"
+        "parameters": {
+            "input": "https://example.com/path?key=value&special=!@$%^&*()"
+        }
     }))
     .unwrap();
 

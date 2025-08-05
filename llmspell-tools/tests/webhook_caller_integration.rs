@@ -21,9 +21,11 @@ async fn test_webhook_caller_post() {
     });
 
     let input = create_agent_input(json!({
-        "input": test_endpoints::HTTPBIN_POST,
-        "method": "POST",
-        "payload": webhook_data
+        "parameters": {
+            "input": test_endpoints::HTTPBIN_POST,
+            "method": "POST",
+            "payload": webhook_data
+        }
     }))
     .unwrap();
 
@@ -45,13 +47,15 @@ async fn test_webhook_caller_with_headers() {
     let context = create_test_context();
 
     let input = create_agent_input(json!({
-        "input": test_endpoints::HTTPBIN_POST,
-        "headers": {
-            "X-Webhook-Secret": "test-secret",
-            "X-Event-Type": "user.created"
-        },
-        "payload": {
-            "user_id": 456
+        "parameters": {
+            "input": test_endpoints::HTTPBIN_POST,
+            "headers": {
+                "X-Webhook-Secret": "test-secret",
+                "X-Event-Type": "user.created"
+            },
+            "payload": {
+                "user_id": 456
+            }
         }
     }))
     .unwrap();
@@ -73,8 +77,10 @@ async fn test_webhook_caller_get_method() {
     let context = create_test_context();
 
     let input = create_agent_input(json!({
-        "input": test_endpoints::HTTPBIN_GET,
-        "method": "GET"
+        "parameters": {
+            "input": test_endpoints::HTTPBIN_GET,
+            "method": "GET"
+        }
     }))
     .unwrap();
 
@@ -93,9 +99,11 @@ async fn test_webhook_caller_retry_on_failure() {
 
     // Test with a 500 status code endpoint
     let input = create_agent_input(json!({
-        "input": format!("{}/500", test_endpoints::HTTPBIN_STATUS),
-        "retry_count": 2,
-        "retry_delay": 100
+        "parameters": {
+            "input": format!("{}/500", test_endpoints::HTTPBIN_STATUS),
+            "retry_count": 2,
+            "retry_delay": 100
+        }
     }))
     .unwrap();
 
@@ -114,8 +122,10 @@ async fn test_webhook_caller_timeout() {
     let context = create_test_context();
 
     let input = create_agent_input(json!({
-        "input": format!("{}/delay/10", test_endpoints::HTTPBIN_BASE),
-        "timeout": 2
+        "parameters": {
+            "input": format!("{}/delay/10", test_endpoints::HTTPBIN_BASE),
+            "timeout": 2
+        }
     }))
     .unwrap();
 
@@ -175,8 +185,10 @@ async fn test_webhook_caller_invalid_url() {
     let context = create_test_context();
 
     let input = create_agent_input(json!({
-        "input": "not-a-url",
-        "payload": {"test": "data"}
+        "parameters": {
+            "input": "not-a-url",
+            "payload": {"test": "data"}
+        }
     }))
     .unwrap();
 
@@ -191,9 +203,11 @@ async fn test_webhook_caller_custom_method() {
     let context = create_test_context();
 
     let input = create_agent_input(json!({
-        "input": format!("{}/put", test_endpoints::HTTPBIN_BASE),
-        "method": "PUT",
-        "payload": {"updated": true}
+        "parameters": {
+            "input": format!("{}/put", test_endpoints::HTTPBIN_BASE),
+            "method": "PUT",
+            "payload": {"updated": true}
+        }
     }))
     .unwrap();
 

@@ -43,7 +43,7 @@ async fn test_agent_templates_from_lua() {
 
     // Test listing templates
     let script = r#"
-        local templates = Agent.listTemplates()
+        local templates = Agent.list_templates()
         print("Available templates:")
         for i, t in ipairs(templates) do
             print(i .. ": " .. t)

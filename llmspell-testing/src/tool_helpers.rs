@@ -15,7 +15,7 @@
 //!     create_test_tool_input,
 //!     create_mock_tool,
 //! };
-//! use llmspell_core::ComponentMetadata;
+//! use llmspell_core::{BaseAgent, ComponentMetadata};
 //!
 //! # async fn test_example() {
 //! // Create a test tool
@@ -472,9 +472,12 @@ mod tests {
         ]);
 
         assert_eq!(input.text, "test tool execution");
-        assert_eq!(input.parameters["operation"], json!("process"));
-        assert_eq!(input.parameters["count"], json!(42.0));
-        assert_eq!(input.parameters["enabled"], json!(true));
+        assert_eq!(
+            input.parameters["parameters"]["operation"],
+            json!("process")
+        );
+        assert_eq!(input.parameters["parameters"]["count"], json!(42));
+        assert_eq!(input.parameters["parameters"]["enabled"], json!(true));
     }
 
     #[tokio::test]
@@ -487,7 +490,7 @@ mod tests {
                 Ok(ToolOutput {
                     success: true,
                     data: serde_json::json!({
-                        "echoed": input.parameters.get("message").cloned().unwrap_or(json!(""))
+                        "echoed": input.parameters["parameters"].get("message").cloned().unwrap_or(json!(""))
                     }),
                     error: None,
                     execution_time_ms: None,

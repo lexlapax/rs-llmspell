@@ -170,10 +170,10 @@ async fn test_invalid_provider_handling() {
     let script = r#"
         -- Test invalid provider
         local success, err = pcall(function()
-            return Agent.create({
-                model = "invalid_provider/some-model",
-                prompt = "Test"
-            })
+            return Agent.builder()
+                :model("invalid_provider/some-model")
+                :system_prompt("Test")
+                :build()
         end)
         
         -- Should fail with provider error
@@ -210,10 +210,10 @@ async fn test_provider_fallback() {
     let script = r#"
         -- Test model without provider - creates a basic agent
         local success1, agent1 = pcall(function()
-            return Agent.create({
-                model = "gpt-3.5-turbo",
-                prompt = "Test"
-            })
+            return Agent.builder()
+                :model("gpt-3.5-turbo")
+                :system_prompt("Test")
+                :build()
         end)
         
         -- Agents can be created even without providers
@@ -222,10 +222,10 @@ async fn test_provider_fallback() {
         
         -- Test explicit provider - this might fail if it tries to validate
         local success2, agent2 = pcall(function()
-            return Agent.create({
-                model = "anthropic/claude-instant",
-                prompt = "Test"
-            })
+            return Agent.builder()
+                :model("anthropic/claude-instant")
+                :system_prompt("Test")
+                :build()
         end)
         
         -- This might fail with provider validation

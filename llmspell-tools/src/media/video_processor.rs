@@ -372,7 +372,7 @@ impl BaseAgent for VideoProcessorTool {
         _context: ExecutionContext,
     ) -> LLMResult<AgentOutput> {
         use std::fmt::Write;
-        
+
         // Get parameters using shared utility
         let params = extract_parameters(&input)?;
 

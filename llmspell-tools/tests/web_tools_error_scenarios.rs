@@ -20,8 +20,10 @@ mod timeout_tests {
 
         // Use unreachable endpoint with 1 second timeout
         let input = create_agent_input(json!({
-            "input": "http://1.2.3.4:9999/test",
-            "timeout": 1
+            "parameters": {
+                "input": "http://1.2.3.4:9999/test",
+                "timeout": 1
+            }
         }))
         .unwrap();
 
@@ -108,7 +110,9 @@ mod invalid_url_tests {
 
         for (url, case_name) in test_cases {
             let input = create_agent_input(json!({
-                "input": url
+                "parameters": {
+                    "input": url
+                }
             }))
             .unwrap();
 
@@ -182,7 +186,9 @@ mod network_failure_tests {
         for (name, tool) in tools {
             let context = create_test_context();
             let input = create_agent_input(json!({
-                "input": test_endpoints::INVALID_URL
+                "parameters": {
+                    "input": test_endpoints::INVALID_URL
+                }
             }))
             .unwrap();
 
@@ -213,7 +219,9 @@ mod network_failure_tests {
         let tool = ApiTesterTool::new();
         let context = create_test_context();
         let input = create_agent_input(json!({
-            "input": refused_url
+            "parameters": {
+                "input": refused_url
+            }
         }))
         .unwrap();
 
@@ -244,7 +252,9 @@ mod http_status_tests {
         for status in statuses {
             let context = create_test_context();
             let input = create_agent_input(json!({
-                "input": format!("{}/{}", test_endpoints::HTTPBIN_STATUS, status)
+                "parameters": {
+                    "input": format!("{}/{}", test_endpoints::HTTPBIN_STATUS, status)
+                }
             }))
             .unwrap();
 
@@ -298,7 +308,9 @@ mod rate_limit_tests {
         for i in 0..5 {
             let context = create_test_context();
             let input = create_agent_input(json!({
-                "input": format!("{}/get?request={}", test_endpoints::HTTPBIN_BASE, i)
+                "parameters": {
+                    "input": format!("{}/get?request={}", test_endpoints::HTTPBIN_BASE, i)
+                }
             }))
             .unwrap();
 
@@ -333,7 +345,9 @@ mod input_validation_tests {
 
         // Missing "input" parameter
         let input = create_agent_input(json!({
-            "method": "GET"
+            "parameters": {
+                "method": "GET"
+            }
         }))
         .unwrap();
 
@@ -347,8 +361,10 @@ mod input_validation_tests {
 
         // Invalid timeout type (string instead of number)
         let input = create_agent_input(json!({
-            "input": test_endpoints::HTTPBIN_GET,
-            "timeout": "not a number"
+            "parameters": {
+                "input": test_endpoints::HTTPBIN_GET,
+                "timeout": "not a number"
+            }
         }))
         .unwrap();
 
@@ -363,7 +379,9 @@ mod input_validation_tests {
         // Create a very long URL
         let long_param = "x".repeat(10000);
         let input = create_agent_input(json!({
-            "input": format!("https://example.com/?param={}", long_param)
+            "parameters": {
+                "input": format!("https://example.com/?param={}", long_param)
+            }
         }))
         .unwrap();
 

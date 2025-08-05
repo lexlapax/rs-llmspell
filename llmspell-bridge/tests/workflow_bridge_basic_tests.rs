@@ -153,11 +153,10 @@ async fn test_loop_workflow_creation() {
     let params = serde_json::json!({
         "name": "loop_test",
         "iterator": {
-            "range": {
-                "start": 0,
-                "end": 3,
-                "step": 1
-            }
+            "type": "range",
+            "start": 0,
+            "end": 3,
+            "step": 1
         },
         "body": [{
             "name": "loop_step",

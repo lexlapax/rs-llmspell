@@ -131,7 +131,7 @@ impl HashCalculatorTool {
 
         let hash = self.compute_hash(params, &input_type, algorithm).await?;
         let formatted = self.format_hash(&hash, &format);
-        
+
         let response = ResponseBuilder::success("hash")
             .with_message(format!(
                 "Calculated {} hash",
@@ -186,7 +186,12 @@ impl HashCalculatorTool {
         Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
     }
 
-    async fn compute_hash(&self, params: &serde_json::Value, input_type: &str, algorithm: HashAlgorithm) -> Result<Vec<u8>> {
+    async fn compute_hash(
+        &self,
+        params: &serde_json::Value,
+        input_type: &str,
+        algorithm: HashAlgorithm,
+    ) -> Result<Vec<u8>> {
         match input_type {
             "string" => {
                 let text = extract_required_string(params, "input")?;
@@ -208,7 +213,11 @@ impl HashCalculatorTool {
         }
     }
 
-    fn decode_expected_hash(&self, expected_hash_str: &str, expected_format: &str) -> Result<Vec<u8>> {
+    fn decode_expected_hash(
+        &self,
+        expected_hash_str: &str,
+        expected_format: &str,
+    ) -> Result<Vec<u8>> {
         match expected_format {
             "hex" => from_hex_string(expected_hash_str).map_err(|_| {
                 validation_error(
@@ -216,13 +225,12 @@ impl HashCalculatorTool {
                     Some("expected_hash".to_string()),
                 )
             }),
-            "base64" => llmspell_utils::encoding::base64_decode(expected_hash_str)
-                .map_err(|_| {
-                    validation_error(
-                        "Invalid base64 string in expected_hash",
-                        Some("expected_hash".to_string()),
-                    )
-                }),
+            "base64" => llmspell_utils::encoding::base64_decode(expected_hash_str).map_err(|_| {
+                validation_error(
+                    "Invalid base64 string in expected_hash",
+                    Some("expected_hash".to_string()),
+                )
+            }),
             _ => unreachable!(), // Already validated
         }
     }

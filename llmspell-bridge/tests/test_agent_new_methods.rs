@@ -35,9 +35,9 @@ async fn test_agent_new_methods() -> Result<(), Box<dyn std::error::Error>> {
         -- Check all methods exist
         local methods = {
             "create", "list", "discover", 
-            "register", "get", "wrapAsTool", 
-            "getInfo", "listCapabilities", 
-            "createComposite", "discoverByCapability"
+            "register", "get", "wrap_as_tool", 
+            "get_info", "list_capabilities", 
+            "create_composite", "discover_by_capability"
         }
         
         for _, method in ipairs(methods) do

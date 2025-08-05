@@ -149,7 +149,7 @@ async fn test_artifact_file_storage() {
         }})
         
         -- Store file as artifact
-        local artifact_id = Artifact.storeFile(
+        local artifact_id = Artifact.store_file(
             session_id,
             "{}",
             "user_input",

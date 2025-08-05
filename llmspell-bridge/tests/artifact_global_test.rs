@@ -62,7 +62,7 @@ mod artifact_tests {
         let lua_code = r#"
         -- Create a session first
         local session_id = Session.create({name = "Artifact Test"})
-        Session.setCurrent(session_id)
+        Session.set_current(session_id)
         
         -- Store a text artifact
         local artifact_id = Artifact.store(
@@ -202,7 +202,7 @@ mod artifact_tests {
         end
         
         -- Test list with empty session ID (uses current)
-        Session.setCurrent(session_id)
+        Session.set_current(session_id)
         local current_artifacts = Artifact.list("")
         assert(#current_artifacts == 5, "Should list current session artifacts")
         
@@ -228,7 +228,7 @@ mod artifact_tests {
         local session_id = Session.create({{name = "File Test"}})
         
         -- Store file as artifact
-        local artifact_id = Artifact.storeFile(
+        local artifact_id = Artifact.store_file(
             session_id,
             "{}",
             "tool_result",

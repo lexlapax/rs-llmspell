@@ -13,8 +13,10 @@ async fn test_webpage_monitor_initial_check() {
     let context = create_test_context();
 
     let input = create_agent_input(json!({
-        "input": test_endpoints::EXAMPLE_WEBSITE,
-        "check_interval": 60
+        "parameters": {
+            "input": test_endpoints::EXAMPLE_WEBSITE,
+            "check_interval": 60
+        }
     }))
     .unwrap();
 
@@ -50,9 +52,11 @@ async fn test_webpage_monitor_with_selector() {
     let context = create_test_context();
 
     let input = create_agent_input(json!({
-        "input": test_endpoints::EXAMPLE_WEBSITE,
-        "selector": "h1",
-        "monitor_mode": "selector"
+        "parameters": {
+            "input": test_endpoints::EXAMPLE_WEBSITE,
+            "selector": "h1",
+            "monitor_mode": "selector"
+        }
     }))
     .unwrap();
 
@@ -86,8 +90,10 @@ async fn test_webpage_monitor_metadata_changes() {
     let context = create_test_context();
 
     let input = create_agent_input(json!({
-        "input": test_endpoints::EXAMPLE_WEBSITE,
-        "monitor_metadata": true
+        "parameters": {
+            "input": test_endpoints::EXAMPLE_WEBSITE,
+            "monitor_metadata": true
+        }
     }))
     .unwrap();
 
@@ -118,7 +124,9 @@ async fn test_webpage_monitor_content_diff() {
 
     // First check to get baseline content
     let input1 = create_agent_input(json!({
-        "input": format!("{}/html", test_endpoints::HTTPBIN_BASE)
+        "parameters": {
+            "input": format!("{}/html", test_endpoints::HTTPBIN_BASE)
+        }
     }))
     .unwrap();
 
@@ -129,8 +137,10 @@ async fn test_webpage_monitor_content_diff() {
 
             // Second check with previous content provided
             let input2 = create_agent_input(json!({
-                "input": format!("{}/html", test_endpoints::HTTPBIN_BASE),
-                "previous_content": baseline_content
+                "parameters": {
+                    "input": format!("{}/html", test_endpoints::HTTPBIN_BASE),
+                    "previous_content": baseline_content
+                }
             }))
             .unwrap();
 
@@ -171,9 +181,11 @@ async fn test_webpage_monitor_alert_threshold() {
     let context = create_test_context();
 
     let input = create_agent_input(json!({
-        "input": test_endpoints::EXAMPLE_WEBSITE,
-        "alert_on_change": true,
-        "change_threshold": 10  // 10% change threshold
+        "parameters": {
+            "input": test_endpoints::EXAMPLE_WEBSITE,
+            "alert_on_change": true,
+            "change_threshold": 10  // 10% change threshold
+        }
     }))
     .unwrap();
 
@@ -203,7 +215,9 @@ async fn test_webpage_monitor_invalid_url() {
     let context = create_test_context();
 
     let input = create_agent_input(json!({
-        "input": "not-a-url"
+        "parameters": {
+            "input": "not-a-url"
+        }
     }))
     .unwrap();
 
@@ -218,8 +232,10 @@ async fn test_webpage_monitor_network_error() {
     let context = create_test_context();
 
     let input = create_agent_input(json!({
-        "input": test_endpoints::INVALID_URL,
-        "retry_on_error": false
+        "parameters": {
+            "input": test_endpoints::INVALID_URL,
+            "retry_on_error": false
+        }
     }))
     .unwrap();
 

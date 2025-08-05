@@ -186,7 +186,7 @@ async fn main() -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use llmspell_testing::fixtures::create_test_context;
+    use llmspell_testing::environment_helpers::create_test_context;
 
     #[tokio::test]
     async fn test_multi_agent_setup() {
@@ -250,7 +250,7 @@ mod tests {
         let monitor_template = MonitorAgentTemplate::new();
         let params = TemplateInstantiationParams::new("health-test".to_string())
             .with_parameter("agent_name", "Health Monitor".into())
-            .with_parameter("monitoring_interval", 1.into())
+            .with_parameter("monitoring_interval", 5.into())
             .with_parameter("enable_performance_tracking", true.into());
 
         let result = monitor_template.instantiate(params).await.unwrap();
