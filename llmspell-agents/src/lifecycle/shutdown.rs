@@ -226,6 +226,13 @@ impl ShutdownCoordinator {
     }
 
     /// Shutdown single agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Agent is already shutting down
+    /// - Shutdown process fails
+    /// - Timeout occurs and force shutdown is disabled
     pub async fn shutdown_agent(
         &self,
         request: ShutdownRequest,
@@ -488,6 +495,12 @@ impl ShutdownCoordinator {
     }
 
     /// Shutdown multiple agents by priority
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - State machine lookup fails
+    /// - Any agent shutdown fails
     pub async fn shutdown_agents_by_priority(
         &self,
         requests: Vec<ShutdownRequest>,
@@ -568,6 +581,10 @@ impl ShutdownCoordinator {
     }
 
     /// Emergency shutdown all agents
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if emergency broadcast fails
     pub async fn emergency_shutdown(&self) -> Result<()> {
         warn!("Emergency shutdown initiated");
 

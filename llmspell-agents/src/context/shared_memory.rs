@@ -141,6 +141,10 @@ impl MemoryRegion {
     }
 
     /// Get a value with permission check
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if read permission is denied
     pub fn get(&self, key: &str, accessor: &ComponentId) -> Result<Option<Value>> {
         if !self.has_permission(accessor, MemoryPermission::Read) {
             return Err(LLMSpellError::Security {
@@ -158,6 +162,10 @@ impl MemoryRegion {
     }
 
     /// Set a value with permission check
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if write permission is denied
     pub fn set(&self, key: String, value: Value, accessor: &ComponentId) -> Result<()> {
         if !self.has_permission(accessor, MemoryPermission::Write) {
             return Err(LLMSpellError::Security {
@@ -193,6 +201,10 @@ impl MemoryRegion {
     }
 
     /// Remove a value with permission check
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if write permission is denied
     pub fn remove(&self, key: &str, accessor: &ComponentId) -> Result<Option<Value>> {
         if !self.has_permission(accessor, MemoryPermission::Write) {
             return Err(LLMSpellError::Security {
@@ -230,6 +242,10 @@ impl MemoryRegion {
     }
 
     /// Get all keys in the region
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if read permission is denied
     pub fn keys(&self, accessor: &ComponentId) -> Result<Vec<String>> {
         if !self.has_permission(accessor, MemoryPermission::Read) {
             return Err(LLMSpellError::Security {
@@ -246,6 +262,10 @@ impl MemoryRegion {
     }
 
     /// Clear all data in the region
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if write permission is denied
     pub fn clear(&self, accessor: &ComponentId) -> Result<()> {
         if !self.has_permission(accessor, MemoryPermission::Write) {
             return Err(LLMSpellError::Security {
@@ -342,6 +362,12 @@ impl SharedMemoryManager {
     }
 
     /// Create a new memory region
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Maximum region limit is exceeded
+    /// - Region already exists
     pub fn create_region(&self, id: String, scope: ContextScope, owner: ComponentId) -> Result<()> {
         let mut regions = self.regions.write().unwrap();
 
@@ -376,6 +402,12 @@ impl SharedMemoryManager {
     }
 
     /// Delete a memory region
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Delete permission is denied
+    /// - Memory region is not found
     pub fn delete_region(&self, id: &str, requester: &ComponentId) -> Result<()> {
         let mut regions = self.regions.write().unwrap();
 

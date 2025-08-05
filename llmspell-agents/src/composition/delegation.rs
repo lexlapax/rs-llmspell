@@ -141,6 +141,10 @@ impl DelegatingAgent {
     }
 
     /// Register an agent for delegation
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if agent registration fails
     pub async fn register_agent(&self, agent: Arc<dyn BaseAgent>) -> Result<()> {
         let agent_id = agent.metadata().id.to_string();
 
@@ -158,6 +162,10 @@ impl DelegatingAgent {
     }
 
     /// Unregister an agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if agent unregistration fails
     pub async fn unregister_agent(&self, agent_id: &str) -> Result<()> {
         let mut agents = self.agents.write().await;
         agents.remove(agent_id);
@@ -275,6 +283,13 @@ impl DelegatingAgent {
     }
 
     /// Delegate a request to an appropriate agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - No suitable agent is found
+    /// - Agent execution fails
+    /// - Strategy processing fails
     pub async fn delegate(&self, request: DelegationRequest) -> Result<DelegationResult> {
         let start_time = std::time::Instant::now();
 
@@ -498,6 +513,10 @@ impl DelegatingAgentBuilder {
     }
 
     /// Build the delegating agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if agent building fails
     pub async fn build(self) -> Result<DelegatingAgent> {
         let agent = DelegatingAgent::new(self.name, self.config);
         agent.set_strategy(self.strategy);

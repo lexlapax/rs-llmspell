@@ -39,6 +39,10 @@ impl ArtifactBridge {
     }
 
     /// Store an artifact
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if artifact storage fails
     pub async fn store_artifact(
         &self,
         session_id: &SessionId,
@@ -55,6 +59,10 @@ impl ArtifactBridge {
     }
 
     /// Get an artifact with metadata
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if artifact retrieval fails
     pub async fn get_artifact(
         &self,
         session_id: &SessionId,
@@ -68,6 +76,10 @@ impl ArtifactBridge {
     }
 
     /// Get artifact content only
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if content retrieval fails
     pub async fn get_artifact_content(
         &self,
         session_id: &SessionId,
@@ -81,11 +93,19 @@ impl ArtifactBridge {
     }
 
     /// List artifacts for a session
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if artifact listing fails
     pub async fn list_artifacts(&self, session_id: &SessionId) -> Result<Vec<ArtifactMetadata>> {
         convert_err!(self.session_manager.list_artifacts(session_id).await)
     }
 
     /// Delete an artifact
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if artifact deletion fails
     pub async fn delete_artifact(
         &self,
         session_id: &SessionId,
@@ -99,11 +119,21 @@ impl ArtifactBridge {
     }
 
     /// Query artifacts across sessions
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if artifact query fails
     pub async fn query_artifacts(&self, query: ArtifactQuery) -> Result<Vec<ArtifactMetadata>> {
         convert_err!(self.session_manager.query_artifacts(query).await)
     }
 
     /// Store a file as an artifact
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - File reading fails
+    /// - Artifact storage fails
     pub async fn store_file_artifact(
         &self,
         session_id: &SessionId,
@@ -119,6 +149,10 @@ impl ArtifactBridge {
     }
 
     /// Grant permission on an artifact
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if permission granting fails
     pub async fn grant_permission(
         &self,
         granting_session_id: &SessionId,
@@ -139,6 +173,10 @@ impl ArtifactBridge {
     }
 
     /// Revoke permission on an artifact
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if permission revocation fails
     pub async fn revoke_permission(
         &self,
         revoking_session_id: &SessionId,

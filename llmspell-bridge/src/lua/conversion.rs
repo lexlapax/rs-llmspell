@@ -14,6 +14,13 @@ use std::collections::HashMap;
 // ===== Core Lua <-> JSON conversions =====
 
 /// Convert Lua value to JSON value
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - String conversion fails
+/// - Table conversion fails
+/// - Unsupported Lua type is provided
 pub fn lua_value_to_json(value: LuaValue) -> mlua::Result<JsonValue> {
     match value {
         LuaValue::Nil => Ok(JsonValue::Null),
@@ -37,6 +44,13 @@ pub fn lua_value_to_json(value: LuaValue) -> mlua::Result<JsonValue> {
 }
 
 /// Convert Lua table to JSON value
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Table iteration fails
+/// - Value conversion fails
+/// - Key conversion fails
 pub fn lua_table_to_json(table: Table) -> mlua::Result<JsonValue> {
     // Check if it's an array by looking for numeric keys starting at 1
     let len = table.raw_len();
@@ -75,6 +89,13 @@ pub fn lua_table_to_json(table: Table) -> mlua::Result<JsonValue> {
 }
 
 /// Convert JSON value to Lua value
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - String creation fails
+/// - Table creation fails
+/// - Setting table values fails
 pub fn json_to_lua_value<'lua>(lua: &'lua Lua, json: &JsonValue) -> mlua::Result<LuaValue<'lua>> {
     match json {
         JsonValue::Null => Ok(LuaValue::Nil),
@@ -109,6 +130,13 @@ pub fn json_to_lua_value<'lua>(lua: &'lua Lua, json: &JsonValue) -> mlua::Result
 // ===== Agent conversions =====
 
 /// Convert Lua table to `AgentInput`
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Required fields are missing
+/// - Media content parsing fails
+/// - Value conversion fails
 pub fn lua_table_to_agent_input(lua: &Lua, table: Table) -> mlua::Result<AgentInput> {
     // Extract text (required)
     let text: String = table.get("text").unwrap_or_default();
@@ -237,6 +265,13 @@ fn parse_media_content(_lua: &Lua, table: Table) -> mlua::Result<MediaContent> {
 }
 
 /// Convert `AgentOutput` to Lua table
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Table creation fails
+/// - Setting table values fails
+/// - Media encoding fails
 pub fn agent_output_to_lua_table(lua: &Lua, output: AgentOutput) -> mlua::Result<Table> {
     let table = lua.create_table()?;
 
@@ -315,11 +350,22 @@ pub fn agent_output_to_lua_table(lua: &Lua, output: AgentOutput) -> mlua::Result
 // ===== Tool conversions =====
 
 /// Convert Lua table to tool input (JSON)
+///
+/// # Errors
+///
+/// Returns an error if table to JSON conversion fails
 pub fn lua_table_to_tool_input(_lua: &Lua, table: Table) -> mlua::Result<JsonValue> {
     lua_table_to_json(table)
 }
 
 /// Convert tool output to Lua table
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Table creation fails
+/// - JSON to Lua conversion fails
+/// - Setting table values fails
 pub fn tool_output_to_lua_table(lua: &Lua, output: ToolOutput) -> mlua::Result<Table> {
     let table = lua.create_table()?;
 
@@ -346,6 +392,10 @@ pub fn tool_output_to_lua_table(lua: &Lua, output: ToolOutput) -> mlua::Result<T
 // ===== Workflow conversions =====
 
 /// Convert Lua table to workflow parameters
+///
+/// # Errors
+///
+/// Returns an error if table to JSON conversion fails
 pub fn lua_table_to_workflow_params(_lua: &Lua, table: Table) -> Result<JsonValue> {
     lua_table_to_json(table).map_err(|e| LLMSpellError::Component {
         message: format!("Failed to convert Lua table to workflow params: {e}"),
@@ -353,7 +403,13 @@ pub fn lua_table_to_workflow_params(_lua: &Lua, table: Table) -> Result<JsonValu
     })
 }
 
-/// Convert workflow result to Lua table  
+/// Convert workflow result to Lua table
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - JSON to Lua conversion fails
+/// - Table creation fails
 pub fn workflow_result_to_lua_table(lua: &Lua, result: serde_json::Value) -> mlua::Result<Table> {
     if let LuaValue::Table(table) = json_to_lua_value(lua, &result)? {
         Ok(table)

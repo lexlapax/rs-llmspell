@@ -103,6 +103,13 @@ impl<R: AgentRegistry> Discovery<R> {
     }
 
     /// Search agents with advanced criteria
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Agent querying fails
+    /// - Metadata retrieval fails
+    /// - Scoring calculation fails
     pub async fn search(&self, criteria: &SearchCriteria) -> Result<Vec<SearchResult>> {
         // First, get basic results from registry
         let basic_results = self.registry.query_agents(&criteria.base_query).await?;
@@ -198,6 +205,12 @@ impl<R: AgentRegistry> Discovery<R> {
     }
 
     /// Find similar agents
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Reference agent metadata is not found
+    /// - Agent similarity search fails
     pub async fn find_similar(&self, agent_id: &str, limit: usize) -> Result<Vec<SearchResult>> {
         // Get the reference agent
         let reference = match self.registry.get_metadata(agent_id).await? {
@@ -224,6 +237,10 @@ impl<R: AgentRegistry> Discovery<R> {
     }
 
     /// Get recommended agents based on usage patterns
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if recommendation generation fails
     pub async fn get_recommendations(
         &self,
         context: &RecommendationContext,

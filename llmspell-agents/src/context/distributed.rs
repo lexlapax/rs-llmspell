@@ -235,6 +235,12 @@ impl DistributedContext {
     }
 
     /// Initialize distributed context
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Node registration fails
+    /// - Initial node refresh fails
     pub async fn initialize(&self) -> Result<()> {
         // Register with discovery service
         self.discovery.register(self.local_node.clone()).await?;
@@ -249,6 +255,10 @@ impl DistributedContext {
     }
 
     /// Refresh node list
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if node discovery fails
     pub async fn refresh_nodes(&self) -> Result<()> {
         let discovered = self.discovery.discover().await?;
         let mut nodes = self.nodes.write().await;
@@ -264,6 +274,10 @@ impl DistributedContext {
     }
 
     /// Replicate context to other nodes
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if replication to any node fails
     pub async fn replicate(&self, context: &ExecutionContext) -> Result<()> {
         let replication = self.replication.read().await;
 
@@ -310,6 +324,12 @@ impl DistributedContext {
     }
 
     /// Sync context from remote node
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Node communication fails
+    /// - Context synchronization fails
     pub async fn sync_from(&self, context_id: &str, node_id: &str) -> Result<ExecutionContext> {
         self.send_to_node(
             node_id,
@@ -328,6 +348,10 @@ impl DistributedContext {
     }
 
     /// Handle incoming sync message
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if message handling fails
     pub async fn handle_sync_message(&self, message: SyncMessage) -> Result<()> {
         match message {
             SyncMessage::SyncRequest {

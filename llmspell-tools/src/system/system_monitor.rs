@@ -164,6 +164,10 @@ impl SystemMonitorTool {
     }
 
     /// Get basic system information
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if system information cannot be retrieved
     #[allow(clippy::unused_async)]
     async fn get_basic_system_info(&self) -> LLMResult<SystemStats> {
         let system_info = get_system_info().map_err(|e| LLMSpellError::Tool {
@@ -495,6 +499,10 @@ impl SystemMonitorTool {
     }
 
     /// Collect comprehensive system statistics
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if system information cannot be retrieved
     async fn collect_system_stats(&self) -> LLMResult<SystemStats> {
         let start_time = Instant::now();
 
@@ -540,6 +548,11 @@ impl SystemMonitorTool {
     }
 
     /// Validate monitoring parameters
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - An invalid operation is specified
     #[allow(clippy::unused_async)]
     async fn validate_monitoring_parameters(&self, params: &serde_json::Value) -> LLMResult<()> {
         // Validate operation if provided

@@ -10,6 +10,10 @@ pub struct EventSerialization;
 
 impl EventSerialization {
     /// Convert `UniversalEvent` to JSON representation suitable for cross-language transfer
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if JSON serialization fails
     pub fn universal_event_to_json(event: &UniversalEvent) -> Result<JsonValue> {
         let json = serde_json::json!({
             "id": event.id,
@@ -27,6 +31,13 @@ impl EventSerialization {
     }
 
     /// Convert JSON representation back to `UniversalEvent`
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Required fields are missing
+    /// - JSON parsing fails
+    /// - UUID parsing fails
     pub fn json_to_universal_event(json: &JsonValue) -> Result<UniversalEvent> {
         let event_type = json["event_type"]
             .as_str()
@@ -86,6 +97,12 @@ impl EventSerialization {
     }
 
     /// Serialize event data for a specific language context
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Event serialization fails
+    /// - Language-specific transformations fail
     pub fn serialize_for_language(
         event: &UniversalEvent,
         target_language: Language,
@@ -121,6 +138,12 @@ impl EventSerialization {
     }
 
     /// Deserialize event data from a specific language context
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Language-specific transformations fail
+    /// - Event deserialization fails
     pub fn deserialize_from_language(
         data: &JsonValue,
         source_language: Language,
@@ -239,6 +262,13 @@ impl EventSerialization {
     }
 
     /// Validate that an event can be safely serialized/deserialized for a target language
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Serialization fails
+    /// - Deserialization fails
+    /// - Round-trip validation fails
     pub fn validate_event_compatibility(
         event: &UniversalEvent,
         target_language: Language,

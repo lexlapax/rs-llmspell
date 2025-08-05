@@ -53,30 +53,50 @@ impl ToolDiscovery {
     }
 
     /// Find tools by category
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if tool discovery fails
     pub async fn find_by_category(&self, category: &str) -> Result<Vec<ToolInfo>> {
         let query = ToolQuery::new().with_category(category);
         self.discover_tools(&query).await
     }
 
     /// Find tools by security level
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if tool discovery fails
     pub async fn find_by_security_level(&self, level: &str) -> Result<Vec<ToolInfo>> {
         let query = ToolQuery::new().with_max_security_level(level);
         self.discover_tools(&query).await
     }
 
     /// Find tools with specific capability
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if tool discovery fails
     pub async fn find_with_capability(&self, capability: &str) -> Result<Vec<ToolInfo>> {
         let query = ToolQuery::new().with_capability(capability);
         self.discover_tools(&query).await
     }
 
     /// Find tools by text search in name/description
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if tool discovery fails
     pub async fn find_by_text(&self, search_text: &str) -> Result<Vec<ToolInfo>> {
         let query = ToolQuery::new().with_text_search(search_text);
         self.discover_tools(&query).await
     }
 
     /// Find tools that match multiple criteria
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if tool discovery fails
     pub async fn find_by_criteria(&self, criteria: &ToolSearchCriteria) -> Result<Vec<ToolInfo>> {
         let mut query = ToolQuery::new();
 
@@ -113,12 +133,20 @@ impl ToolDiscovery {
     }
 
     /// Get all available tools
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if tool discovery fails
     pub async fn get_all_tools(&self) -> Result<Vec<ToolInfo>> {
         let query = ToolQuery::new();
         self.discover_tools(&query).await
     }
 
     /// Get tool information by name
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if registry access fails
     pub async fn get_tool_info(&self, name: &str) -> Result<Option<ToolInfo>> {
         if let Some(registry_info) = self.registry.get_tool_info(name).await {
             Ok(Some(self.convert_registry_info(&registry_info)))
@@ -133,6 +161,10 @@ impl ToolDiscovery {
     }
 
     /// Get tools by multiple categories
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if tool discovery fails
     pub async fn find_by_categories(&self, categories: &[&str]) -> Result<Vec<ToolInfo>> {
         let mut query = ToolQuery::new();
         for category in categories {
@@ -142,6 +174,12 @@ impl ToolDiscovery {
     }
 
     /// Get recommended tools based on context
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Tool discovery fails
+    /// - Recommendation processing fails
     pub async fn get_recommended_tools(
         &self,
         context: &RecommendationContext,

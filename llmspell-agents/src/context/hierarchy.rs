@@ -126,6 +126,10 @@ impl HierarchicalContext {
     }
 
     /// Create a new root context
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if context creation fails
     pub fn create_root(&mut self, name: String, context: ExecutionContext) -> Result<String> {
         let node = ContextNode::new(context.clone());
         let node_arc = Arc::new(RwLock::new(node));
@@ -140,6 +144,12 @@ impl HierarchicalContext {
     }
 
     /// Create a child context
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Parent context not found
+    /// - Child context creation fails
     pub fn create_child(
         &self,
         parent_id: &str,
@@ -185,6 +195,10 @@ impl HierarchicalContext {
     }
 
     /// Remove a context and all its descendants
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if context not found
     pub fn remove(&mut self, id: &str) -> Result<()> {
         let mut index = self.index.write().unwrap();
 

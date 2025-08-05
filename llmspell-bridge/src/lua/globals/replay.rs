@@ -170,6 +170,12 @@ fn lua_value_to_json(_lua: &Lua, value: Value) -> LuaResult<serde_json::Value> {
 }
 
 /// Inject replay global into Lua environment
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Replay API creation fails
+/// - Global injection fails
 pub fn inject_replay_global(lua: &Lua) -> Result<(), LLMSpellError> {
     let replay = create_replay_api(lua).map_err(|e| LLMSpellError::Internal {
         message: e.to_string(),
@@ -187,6 +193,12 @@ pub fn inject_replay_global(lua: &Lua) -> Result<(), LLMSpellError> {
 }
 
 /// Create the replay API table
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Table creation fails
+/// - Method injection fails
 pub fn create_replay_api(lua: &Lua) -> LuaResult<Table> {
     let replay = lua.create_table()?;
 

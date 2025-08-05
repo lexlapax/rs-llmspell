@@ -198,6 +198,10 @@ impl CategoryManager {
     }
 
     /// Add a category
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the category already exists
     pub fn add_category(&mut self, category: AgentCategory) -> Result<()> {
         if self.categories.contains_key(&category.id) {
             anyhow::bail!("Category '{}' already exists", category.id);
@@ -242,6 +246,10 @@ impl CategoryManager {
     }
 
     /// Assign agent to category
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the category is not found
     pub fn assign_to_category(&mut self, agent_id: &str, category_id: &str) -> Result<()> {
         if !self.categories.contains_key(category_id) {
             anyhow::bail!("Category '{}' not found", category_id);
@@ -256,6 +264,10 @@ impl CategoryManager {
     }
 
     /// Remove agent from category
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails
     pub fn remove_from_category(&mut self, agent_id: &str, category_id: &str) -> Result<()> {
         if let Some(categories) = self.agent_categories.get_mut(agent_id) {
             categories.remove(category_id);
@@ -288,6 +300,10 @@ impl CategoryManager {
     }
 
     /// Add tag to agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if tag addition fails
     pub fn add_tag(&mut self, agent_id: &str, tag: AgentTag) -> Result<()> {
         let tags = self.agent_tags.entry(agent_id.to_string()).or_default();
 
@@ -300,6 +316,10 @@ impl CategoryManager {
     }
 
     /// Remove tag from agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if tag removal fails
     pub fn remove_tag(&mut self, agent_id: &str, tag: &AgentTag) -> Result<()> {
         if let Some(tags) = self.agent_tags.get_mut(agent_id) {
             tags.retain(|t| t != tag);

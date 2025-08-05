@@ -119,6 +119,10 @@ pub struct HookBridge {
 
 impl HookBridge {
     /// Create a new hook bridge
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if hook executor or registry creation fails
     pub fn new(_context: Arc<GlobalContext>) -> Result<Self, LLMSpellError> {
         // Create hook executor and registry
         let hook_executor = Arc::new(HookExecutor::new());
@@ -133,6 +137,10 @@ impl HookBridge {
     }
 
     /// Register a language adapter
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if adapter registration fails
     pub async fn register_adapter(
         &self,
         language: Language,
@@ -146,6 +154,10 @@ impl HookBridge {
     }
 
     /// Execute hooks for a given hook point
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if hook execution fails for the given hook point
     pub async fn execute_hook(
         &self,
         hook_point: HookPoint,
@@ -172,6 +184,12 @@ impl HookBridge {
     }
 
     /// Register a hook from a script language
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - No adapter is registered for the specified language
+    /// - Hook registration fails
     pub async fn register_hook(
         &self,
         language: Language,
@@ -228,6 +246,10 @@ impl HookBridge {
     }
 
     /// Unregister a hook
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if hook unregistration fails
     pub async fn unregister_hook(&self, handle: &HookHandle) -> Result<(), LLMSpellError> {
         // Remove from language hooks
         {
@@ -243,6 +265,10 @@ impl HookBridge {
     }
 
     /// List all registered hooks for a hook point
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if retrieving hook metadata fails
     pub async fn list_hooks(
         &self,
         hook_point: Option<HookPoint>,
@@ -266,6 +292,10 @@ impl HookBridge {
     }
 
     /// Get information about a specific hook
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if retrieving hook information fails
     pub async fn get_hook_info(&self, hook_id: &str) -> Result<Option<HookInfo>, LLMSpellError> {
         let language_hooks = self.language_hooks.read().await;
 
@@ -289,6 +319,10 @@ impl HookBridge {
     }
 
     /// Enable a hook by ID
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if enabling the hook fails
     pub async fn enable_hook(&self, hook_id: &str) -> Result<bool, LLMSpellError> {
         let language_hooks = self.language_hooks.read().await;
 
@@ -302,6 +336,10 @@ impl HookBridge {
     }
 
     /// Disable a hook by ID
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if hook state update fails
     pub async fn disable_hook(&self, hook_id: &str) -> Result<bool, LLMSpellError> {
         let language_hooks = self.language_hooks.read().await;
 
@@ -315,6 +353,12 @@ impl HookBridge {
     }
 
     /// Execute hooks and publish integration events
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Hook execution fails
+    /// - Event creation or publishing fails
     pub async fn execute_hook_with_events(
         &self,
         hook_point: HookPoint,

@@ -265,6 +265,14 @@ impl ResourceManager {
     }
 
     /// Allocate resources for agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Validation fails
+    /// - Resource allocation fails
+    /// - Insufficient resources available
+    /// - Quota exceeded
     pub async fn allocate(&self, request: ResourceRequest) -> Result<ResourceAllocation> {
         debug!(
             "Allocating {} {} for agent {}",
@@ -355,6 +363,12 @@ impl ResourceManager {
     }
 
     /// Deallocate specific resource
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Allocation not found
+    /// - Deallocation hooks fail
     pub async fn deallocate(&self, allocation_id: &str) -> Result<()> {
         let allocation = self.find_allocation(allocation_id).await?;
 
@@ -426,6 +440,10 @@ impl ResourceManager {
     }
 
     /// Deallocate all resources for agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any deallocation fails
     pub async fn deallocate_all(&self, agent_id: &str) -> Result<()> {
         debug!("Deallocating all resources for agent {}", agent_id);
 

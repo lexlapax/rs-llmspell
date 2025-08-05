@@ -189,6 +189,10 @@ impl MockAgent {
     }
 
     /// Initialize the agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if state machine initialization fails
     pub async fn initialize(&mut self) -> Result<()> {
         self.state_machine
             .initialize()
@@ -197,6 +201,10 @@ impl MockAgent {
     }
 
     /// Start the agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if state machine start fails
     pub async fn start(&mut self) -> Result<()> {
         self.state_machine
             .start()
@@ -205,6 +213,10 @@ impl MockAgent {
     }
 
     /// Stop the agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if state machine stop fails
     pub async fn stop(&mut self) -> Result<()> {
         self.state_machine
             .stop()
@@ -213,6 +225,10 @@ impl MockAgent {
     }
 
     /// Terminate the agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if state machine termination fails
     pub async fn terminate(&mut self) -> Result<()> {
         self.state_machine
             .terminate()

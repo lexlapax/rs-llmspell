@@ -19,6 +19,10 @@ pub struct AgentGlobal {
 
 impl AgentGlobal {
     /// Create a new Agent global
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if core provider manager creation fails
     pub async fn new(
         registry: Arc<ComponentRegistry>,
         providers: Arc<ProviderManager>,
@@ -34,6 +38,10 @@ impl AgentGlobal {
     }
 
     /// Create with state manager support
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if core provider manager creation fails
     pub async fn with_state_manager(
         registry: Arc<ComponentRegistry>,
         providers: Arc<ProviderManager>,

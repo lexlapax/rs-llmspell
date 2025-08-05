@@ -212,6 +212,14 @@ impl ToolInvoker {
     }
 
     /// Invoke a tool with full validation and error handling
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Parameter validation fails
+    /// - Security checks fail
+    /// - Tool execution fails
+    /// - Resource limits are exceeded
     pub async fn invoke(
         &self,
         tool: Arc<dyn Tool>,
@@ -306,6 +314,12 @@ impl ToolInvoker {
     }
 
     /// Invoke a tool with basic error handling (convenience method)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Tool invocation fails
+    /// - Tool returns an error result
     pub async fn invoke_simple(
         &self,
         tool: Arc<dyn Tool>,

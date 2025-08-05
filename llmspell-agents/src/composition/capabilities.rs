@@ -128,6 +128,10 @@ impl CapabilityAggregator {
     }
 
     /// Register a capability
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if capability registration fails
     pub fn register_capability(
         &self,
         capability: Capability,
@@ -166,6 +170,10 @@ impl CapabilityAggregator {
     }
 
     /// Unregister a capability
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if capability is not found
     pub fn unregister_capability(&self, provider_id: &str, capability_name: &str) -> Result<()> {
         let capability_id = format!("{provider_id}::{capability_name}");
 
@@ -337,6 +345,10 @@ impl CapabilityAggregator {
     }
 
     /// Update usage statistics for a capability
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if capability is not found
     pub fn update_usage(
         &self,
         provider_id: &str,
@@ -403,6 +415,10 @@ impl CapabilityAggregator {
     }
 
     /// Set availability for a capability
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if capability is not found
     pub fn set_availability(
         &self,
         provider_id: &str,

@@ -175,6 +175,10 @@ impl SessionBridge {
     }
 
     /// Get session timeline
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if timeline retrieval fails
     pub async fn get_session_timeline(
         &self,
         session_id: &SessionId,
@@ -197,6 +201,12 @@ impl SessionBridge {
     }
 
     /// Get session metadata
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Session not found
+    /// - Metadata access fails
     pub async fn get_session_metadata(&self, session_id: &SessionId) -> Result<serde_json::Value> {
         let session = convert_err!(self.session_manager.get_session(session_id).await)?;
         let metadata = session.metadata.read().await.clone();

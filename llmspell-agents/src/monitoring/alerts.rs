@@ -350,6 +350,13 @@ impl AlertManager {
     }
 
     /// Evaluate all rules
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Rule evaluation fails
+    /// - Alert triggering fails
+    /// - Notification sending fails
     pub async fn evaluate_rules(&self, context: AlertContext<'_>) -> Result<()> {
         let rules_to_evaluate: Vec<AlertRule> = {
             let rules = self.rules.read().unwrap();
@@ -517,6 +524,10 @@ impl AlertManager {
     }
 
     /// Acknowledge an alert
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the alert is not found
     pub fn acknowledge_alert(&self, alert_id: &str) -> Result<()> {
         if let Some(alert) = self.active_alerts.write().unwrap().get_mut(alert_id) {
             alert.acknowledge();
@@ -530,6 +541,10 @@ impl AlertManager {
     }
 
     /// Resolve an alert
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the alert is not found
     pub fn resolve_alert(&self, alert_id: &str) -> Result<()> {
         if let Some(mut alert) = self.active_alerts.write().unwrap().remove(alert_id) {
             alert.resolve();

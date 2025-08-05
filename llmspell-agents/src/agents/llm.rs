@@ -34,6 +34,13 @@ pub struct LLMAgent {
 
 impl LLMAgent {
     /// Create a new LLM agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Model configuration is missing
+    /// - Provider creation fails
+    /// - Agent initialization fails
     pub async fn new(config: AgentConfig, provider_manager: Arc<ProviderManager>) -> Result<Self> {
         let metadata = ComponentMetadata::new(config.name.clone(), config.description.clone());
         let agent_id_string = metadata.id.to_string();
@@ -154,6 +161,10 @@ impl LLMAgent {
     }
 
     /// Initialize the agent and its state machine
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if state machine initialization fails
     pub async fn initialize(&self) -> Result<()> {
         info!("Initializing LLMAgent '{}'", self.metadata.name);
         self.state_machine.initialize().await?;
@@ -162,6 +173,10 @@ impl LLMAgent {
     }
 
     /// Start the agent execution
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if state machine start fails
     pub async fn start(&self) -> Result<()> {
         info!("Starting LLMAgent '{}'", self.metadata.name);
 
@@ -177,6 +192,10 @@ impl LLMAgent {
     }
 
     /// Pause the agent execution
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if state machine pause fails
     pub async fn pause(&self) -> Result<()> {
         info!("Pausing LLMAgent '{}'", self.metadata.name);
         self.state_machine.pause().await?;
@@ -201,6 +220,10 @@ impl LLMAgent {
     }
 
     /// Resume the agent execution
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if state machine resume fails
     pub async fn resume(&self) -> Result<()> {
         info!("Resuming LLMAgent '{}'", self.metadata.name);
 
@@ -216,6 +239,10 @@ impl LLMAgent {
     }
 
     /// Stop the agent execution
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if state machine stop fails
     pub async fn stop(&self) -> Result<()> {
         info!("Stopping LLMAgent '{}'", self.metadata.name);
 
@@ -240,6 +267,10 @@ impl LLMAgent {
     }
 
     /// Terminate the agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if state machine termination fails
     pub async fn terminate(&self) -> Result<()> {
         info!("Terminating LLMAgent '{}'", self.metadata.name);
         self.state_machine.terminate().await?;

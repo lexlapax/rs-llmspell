@@ -129,6 +129,10 @@ pub struct TestAssertions;
 
 impl TestAssertions {
     /// Assert duration is within range
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the duration is outside the specified range
     pub fn assert_duration_range(
         actual: Duration,
         min: Duration,
@@ -144,6 +148,10 @@ impl TestAssertions {
     }
 
     /// Assert approximately equal with tolerance
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the difference exceeds the tolerance
     pub fn assert_approx_eq(actual: f64, expected: f64, tolerance: f64) -> Result<(), String> {
         let diff = (actual - expected).abs();
         if diff > tolerance {
@@ -171,6 +179,10 @@ impl TestEnvironment {
     }
 
     /// Run with timeout
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the future times out
     pub async fn with_timeout<F, T>(duration: Duration, future: F) -> Result<T, String>
     where
         F: std::future::Future<Output = T>,

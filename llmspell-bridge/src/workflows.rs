@@ -890,6 +890,13 @@ impl WorkflowBridge {
     }
 
     /// Execute a workflow
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - JSON serialization fails
+    /// - Workflow is not found
+    /// - Workflow execution fails
     pub async fn execute_workflow(
         &self,
         workflow_id: &str,
@@ -983,6 +990,13 @@ impl WorkflowBridge {
     }
 
     /// Execute a workflow and immediately return (one-shot execution)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Workflow creation fails
+    /// - Workflow execution fails
+    /// - Cleanup operations fail
     pub async fn execute_workflow_oneshot(
         &self,
         workflow_type: &str,
@@ -1273,6 +1287,10 @@ impl WorkflowRegistry {
     }
 
     /// Register a workflow instance
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a workflow with the same ID is already registered
     pub async fn register_workflow(
         &self,
         id: String,
@@ -1358,6 +1376,10 @@ impl WorkflowRegistry {
     }
 
     /// Update workflow usage statistics
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the workflow is not found
     pub async fn update_usage_stats(
         &self,
         id: &str,
@@ -1444,6 +1466,13 @@ impl WorkflowRegistry {
     }
 
     /// Create workflow from template
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Template is not found
+    /// - Parameter merging fails
+    /// - Workflow creation fails
     pub async fn create_from_template(
         &self,
         template_id: &str,

@@ -222,6 +222,12 @@ impl ContextEventBus {
     }
 
     /// Publish an event
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Event broadcast fails
+    /// - Event persistence fails (if enabled)
     pub async fn publish(&self, event: ContextEvent) -> Result<()> {
         // Add to history
         {
@@ -261,6 +267,10 @@ impl ContextEventBus {
     }
 
     /// Unsubscribe from events
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if subscription not found
     pub async fn unsubscribe(&self, subscription_id: &str) -> Result<()> {
         let mut subscriptions = self.subscriptions.write().await;
         subscriptions.retain(|sub| sub.id != subscription_id);
@@ -392,6 +402,11 @@ pub struct LoggingEventHandler;
 
 #[async_trait]
 impl EventHandler for LoggingEventHandler {
+    /// Handle event by logging it
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if logging fails
     async fn handle(&self, event: ContextEvent, _context: ExecutionContext) -> Result<()> {
         tracing::info!(
             event_type = %event.event_type,

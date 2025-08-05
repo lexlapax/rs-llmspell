@@ -189,6 +189,10 @@ impl ToolExecutionContext {
     }
 
     /// Create a child context for nested tool execution
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if context creation fails
     pub async fn create_child_context(&self, child_id: impl Into<String>) -> Result<Self> {
         // Collect inheritance data first
         let parent_data = self.tool_data.read().await;
@@ -310,6 +314,10 @@ impl ToolExecutionContext {
     }
 
     /// Import context state from serialization
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if state import fails
     pub async fn import_state(&self, state: ContextState) -> Result<()> {
         {
             let mut tool_data = self.tool_data.write().await;

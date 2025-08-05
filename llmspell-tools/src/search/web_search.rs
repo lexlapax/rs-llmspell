@@ -170,6 +170,10 @@ impl RequiresApiKey for WebSearchTool {
 
 impl WebSearchTool {
     /// Create a new web search tool
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if provider initialization fails
     pub fn new(config: WebSearchConfig) -> Result<Self> {
         let mut providers = HashMap::new();
 
@@ -288,6 +292,12 @@ impl WebSearchTool {
     }
 
     /// Create from environment configuration
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Environment configuration is invalid
+    /// - Tool creation fails
     pub fn from_env() -> Result<Self> {
         Self::new(WebSearchConfig::from_env())
     }

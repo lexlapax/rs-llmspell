@@ -11,6 +11,13 @@ use std::sync::Arc;
 use tokio::sync::{mpsc, Mutex};
 
 /// Inject Streaming global into Lua environment
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Lua table creation fails
+/// - Function injection fails
+/// - Global setting fails
 pub fn inject_streaming_global(lua: &Lua, _context: &GlobalContext) -> Result<(), LLMSpellError> {
     // Create the streaming utilities table
     let streaming_table = lua.create_table().map_err(|e| LLMSpellError::Component {
@@ -173,6 +180,12 @@ impl UserData for StreamReceiver {
 }
 
 /// Create a Lua-compatible stream from a Rust async stream
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Table creation fails
+/// - Method creation fails
 pub fn create_lua_stream_bridge(lua: &Lua, receiver: mpsc::Receiver<String>) -> LuaResult<Table> {
     let stream = lua.create_table()?;
 

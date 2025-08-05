@@ -84,6 +84,12 @@ impl GlobalInjector {
     }
 
     /// Inject all globals into a Lua environment
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Global initialization fails
+    /// - Lua injection fails for any global
     #[cfg(feature = "lua")]
     pub fn inject_lua(&self, lua: &Lua, context: &GlobalContext) -> Result<InjectionMetrics> {
         let start = Instant::now();
@@ -123,6 +129,12 @@ impl GlobalInjector {
     }
 
     /// Inject all globals into a JavaScript environment
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Global initialization fails
+    /// - JavaScript injection fails for any global
     #[cfg(feature = "javascript")]
     pub fn inject_javascript(
         &self,
@@ -166,6 +178,10 @@ impl GlobalInjector {
     }
 
     /// Clean up all globals
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if cleanup fails for any global
     pub fn cleanup(&self) -> Result<()> {
         let globals = self.registry.get_all_ordered();
 

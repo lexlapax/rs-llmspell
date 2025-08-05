@@ -160,6 +160,13 @@ impl CompositeLifecycleManager {
     }
 
     /// Initialize a composite agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Component initialization fails
+    /// - Initialization timeout is exceeded
+    /// - Event emission fails
     pub async fn initialize_composite(&self, agent: &dyn CompositeAgent) -> Result<()> {
         // Set state to initializing
         *self.state.write().await = LifecycleState::Initializing;
@@ -234,16 +241,30 @@ impl CompositeLifecycleManager {
     }
 
     /// Activate the composite agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if state transition fails
     pub async fn activate(&self) -> Result<()> {
         self.transition_state(LifecycleState::Active).await
     }
 
     /// Pause the composite agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if state transition fails
     pub async fn pause(&self) -> Result<()> {
         self.transition_state(LifecycleState::Paused).await
     }
 
     /// Resume from pause
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The agent is not currently paused
+    /// - State transition fails
     pub async fn resume(&self) -> Result<()> {
         let current = self.state.read().await.clone();
         if current != LifecycleState::Paused {
@@ -256,6 +277,12 @@ impl CompositeLifecycleManager {
     }
 
     /// Shutdown the composite agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Component shutdown fails
+    /// - Shutdown timeout is exceeded (results in forced termination)
     pub async fn shutdown(&self) -> Result<()> {
         *self.state.write().await = LifecycleState::ShuttingDown;
 
@@ -349,6 +376,10 @@ impl CompositeLifecycleManager {
     }
 
     /// Add a component dynamically
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if event emission fails
     pub async fn add_component(&self, component: Arc<dyn BaseAgent>) -> Result<()> {
         let component_id = component.metadata().id.to_string();
 
@@ -374,6 +405,10 @@ impl CompositeLifecycleManager {
     }
 
     /// Remove a component
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if event emission fails
     pub async fn remove_component(&self, component_id: &str, reason: &str) -> Result<()> {
         self.components.write().await.remove(component_id);
 
@@ -414,6 +449,10 @@ impl CompositeLifecycleManager {
     }
 
     /// Perform health check
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if event emission fails
     pub async fn health_check(&self) -> Result<HealthCheckResult> {
         let state = self.state.read().await.clone();
         let components = self.components.read().await;
@@ -458,6 +497,10 @@ impl CompositeLifecycleManager {
     }
 
     /// Update component activity
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if component is not found
     pub async fn update_activity(&self, component_id: &str) -> Result<()> {
         if let Some(lifecycle) = self.components.write().await.get_mut(component_id) {
             lifecycle.last_active = Some(chrono::Utc::now());
@@ -466,6 +509,10 @@ impl CompositeLifecycleManager {
     }
 
     /// Record component error
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if event emission fails
     pub async fn record_error(
         &self,
         component_id: &str,
@@ -530,6 +577,12 @@ impl HierarchicalLifecycleManager {
     }
 
     /// Initialize a hierarchical agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Base initialization fails
+    /// - Hierarchy building fails
     pub async fn initialize_hierarchical(&self, agent: &dyn HierarchicalAgent) -> Result<()> {
         // Initialize base
         self.base.initialize_composite(agent).await?;
@@ -550,6 +603,12 @@ impl HierarchicalLifecycleManager {
     }
 
     /// Cascade an event through the hierarchy
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Event processing fails
+    /// - Recursive cascading fails
     pub async fn cascade_event(
         &self,
         from_id: &str,

@@ -36,6 +36,10 @@ impl DIContainer {
     }
 
     /// Register a tool
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a tool with the same ID is already registered
     pub async fn register_tool(&self, id: String, tool: Arc<dyn Tool>) -> Result<()> {
         let mut tools = self.tools.write().await;
         if tools.contains_key(&id) {
@@ -58,6 +62,10 @@ impl DIContainer {
     }
 
     /// Register a service by type
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a service of the same type is already registered
     pub async fn register_service<T: Any + Send + Sync + 'static>(&self, service: T) -> Result<()> {
         let type_id = TypeId::of::<T>();
         let mut services = self.services.write().await;
@@ -81,6 +89,10 @@ impl DIContainer {
     }
 
     /// Register a named instance
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a named instance with the same name is already registered
     pub async fn register_named<T: Any + Send + Sync + 'static>(
         &self,
         name: String,
@@ -131,6 +143,10 @@ pub struct ScopedDIContainer<'a> {
 
 impl ScopedDIContainer<'_> {
     /// Register a scoped service
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if service registration fails
     pub async fn register_scoped<T: Any + Send + Sync + 'static>(&self, service: T) -> Result<()> {
         let type_id = TypeId::of::<T>();
         let mut services = self.scoped_services.write().await;

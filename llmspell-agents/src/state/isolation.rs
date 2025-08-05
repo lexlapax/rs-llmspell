@@ -192,6 +192,10 @@ impl StateIsolationManager {
     }
 
     /// Check if an agent can access a specific state scope
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if access check fails
     #[instrument(skip(self))]
     pub fn check_access(
         &self,
@@ -274,6 +278,12 @@ impl StateIsolationManager {
     }
 
     /// Create a shared scope for multiple agents
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The shared scope already exists
+    /// - Creation fails
     #[instrument(skip(self))]
     pub fn create_shared_scope(
         &self,
@@ -312,6 +322,10 @@ impl StateIsolationManager {
     }
 
     /// Remove a shared scope
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the shared scope is not found
     #[instrument(skip(self))]
     pub fn remove_shared_scope(&self, scope_id: &str) -> Result<()> {
         let mut shared_scopes = self.shared_scopes.write();
@@ -486,6 +500,10 @@ impl IsolatedStateAccessor {
     }
 
     /// Get state with isolation check
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if access is denied to the scope
     pub async fn get(&self, scope: StateScope, _key: &str) -> Result<Option<serde_json::Value>> {
         // Check access permission
         if !self
@@ -501,6 +519,10 @@ impl IsolatedStateAccessor {
     }
 
     /// Set state with isolation check
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if access is denied to the scope
     pub async fn set(
         &self,
         scope: StateScope,
@@ -520,6 +542,10 @@ impl IsolatedStateAccessor {
     }
 
     /// Delete state with isolation check
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if access is denied to the scope
     pub async fn delete(&self, scope: StateScope, _key: &str) -> Result<()> {
         // Check access permission
         if !self
@@ -534,6 +560,10 @@ impl IsolatedStateAccessor {
     }
 
     /// List keys with isolation check
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if access is denied to the scope
     pub async fn list_keys(&self, scope: StateScope) -> Result<Vec<String>> {
         // Check access permission
         if !self

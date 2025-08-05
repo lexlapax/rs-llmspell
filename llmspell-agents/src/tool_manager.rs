@@ -116,6 +116,10 @@ impl ToolManager {
     }
 
     /// Discover tools based on query criteria
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if tool discovery fails
     pub async fn discover_tools(&self, query: &ToolQuery) -> Result<Vec<ToolInfo>> {
         // Convert ToolQuery to CapabilityMatcher
         let mut matcher = CapabilityMatcher::new();
@@ -183,6 +187,13 @@ impl ToolManager {
     }
 
     /// Invoke a tool by name with given parameters
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Tool is not found or not available
+    /// - Tool execution times out
+    /// - Tool execution fails
     pub async fn invoke_tool(
         &self,
         tool_name: &str,
@@ -232,6 +243,10 @@ impl ToolManager {
     }
 
     /// List all available tools
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if tool listing fails
     pub async fn list_available_tools(&self) -> Result<Vec<String>> {
         let all_tools = self.registry.list_tools().await;
         Ok(all_tools)
@@ -260,6 +275,10 @@ impl ToolManager {
     }
 
     /// Get information about a specific tool
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if tool information retrieval fails
     pub async fn get_tool_info(&self, tool_name: &str) -> Result<Option<ToolInfo>> {
         // Check cache first if enabled
         if self.config.enable_metadata_cache {
@@ -288,6 +307,13 @@ impl ToolManager {
     }
 
     /// Compose multiple tools into a workflow
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Tool composition execution fails
+    /// - Any step fails with ErrorStrategy::Fail
+    /// - Retry attempts are exhausted
     pub async fn compose_tools(
         &self,
         composition: &ToolComposition,

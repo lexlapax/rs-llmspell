@@ -142,6 +142,10 @@ pub enum LifecycleEventData {
 #[async_trait]
 pub trait LifecycleEventListener: Send + Sync {
     /// Handle lifecycle event
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if event handling fails
     async fn handle_event(&self, event: &LifecycleEvent) -> Result<()>;
 
     /// Check if listener is interested in event type
@@ -336,6 +340,10 @@ impl LifecycleEventSystem {
     }
 
     /// Unsubscribe from events
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if unsubscription fails
     pub async fn unsubscribe(&self, subscription_id: &str) -> Result<()> {
         let mut subscriptions = self.subscriptions.write().await;
         if subscriptions.remove(subscription_id).is_some() {
@@ -352,6 +360,13 @@ impl LifecycleEventSystem {
     }
 
     /// Emit lifecycle event
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Event processing fails
+    /// - Listener handling fails
+    /// - Metrics recording fails
     pub async fn emit(&self, event: LifecycleEvent) -> Result<()> {
         let start_time = Instant::now();
 
@@ -417,6 +432,10 @@ impl LifecycleEventSystem {
     }
 
     /// Process event subscriptions
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if subscription processing fails
     async fn process_subscriptions(&self, event: &LifecycleEvent) -> Result<()> {
         let subscriptions = self.subscriptions.read().await;
         let matching_subscriptions: Vec<_> = subscriptions
@@ -474,6 +493,10 @@ impl LifecycleEventSystem {
     }
 
     /// Emit state transition event
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if event emission fails
     pub async fn emit_state_transition(
         &self,
         agent_id: String,
@@ -495,6 +518,10 @@ impl LifecycleEventSystem {
     }
 
     /// Emit error event
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if event emission fails
     pub async fn emit_error(
         &self,
         agent_id: String,
@@ -517,6 +544,10 @@ impl LifecycleEventSystem {
     }
 
     /// Emit health check event
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if event emission fails
     pub async fn emit_health_check(
         &self,
         agent_id: String,
@@ -620,6 +651,11 @@ impl LoggingEventListener {
 
 #[async_trait]
 impl LifecycleEventListener for LoggingEventListener {
+    /// Handle event for logging
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if logging fails
     async fn handle_event(&self, event: &LifecycleEvent) -> Result<()> {
         let message = match &event.data {
             LifecycleEventData::StateTransition { from, to, .. } => {

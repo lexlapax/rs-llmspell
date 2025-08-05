@@ -111,6 +111,10 @@ pub trait AgentTemplate: Send + Sync {
     fn schema(&self) -> &TemplateSchema;
 
     /// Validate instantiation parameters
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if parameters are invalid or required parameters are missing
     async fn validate_parameters(&self, params: &TemplateInstantiationParams) -> Result<()> {
         // Default validation implementation
         let schema = self.schema();
@@ -290,6 +294,10 @@ pub trait AgentTemplate: Send + Sync {
     }
 
     /// Apply default values to parameters
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if default value application fails
     async fn apply_defaults(&self, params: &mut TemplateInstantiationParams) -> Result<()> {
         let schema = self.schema();
 
@@ -371,6 +379,10 @@ impl TemplateFactory {
     }
 
     /// Register a template
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if template registration fails or template already exists
     pub fn register_template(&mut self, template: Box<dyn AgentTemplate>) -> Result<()> {
         let template_id = template.schema().metadata.id.clone();
         let category = template.category().clone();
@@ -456,6 +468,12 @@ impl TemplateFactory {
     }
 
     /// Instantiate template by ID
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Template not found
+    /// - Instantiation fails
     pub async fn instantiate_template(
         &self,
         template_id: &str,
@@ -469,6 +487,12 @@ impl TemplateFactory {
     }
 
     /// Validate template parameters without instantiation
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Template not found
+    /// - Parameter validation fails
     pub async fn validate_template_parameters(
         &self,
         template_id: &str,
@@ -494,6 +518,10 @@ impl TemplateFactory {
     }
 
     /// Unregister template
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if template is not found
     pub fn unregister_template(&mut self, template_id: &str) -> Result<()> {
         if let Some(template) = self.templates.remove(template_id) {
             let category = template.category().clone();

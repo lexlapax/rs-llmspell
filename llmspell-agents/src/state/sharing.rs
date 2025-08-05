@@ -72,6 +72,12 @@ impl StateSharingManager {
     }
 
     /// Create a new shared state channel
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - A channel with the given ID already exists
+    /// - Subscribing the creator agent fails
     #[instrument(skip(self))]
     pub fn create_channel(
         &self,
@@ -117,6 +123,12 @@ impl StateSharingManager {
     }
 
     /// Subscribe an agent to a channel
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The specified channel does not exist
+    /// - The agent ID is invalid
     #[instrument(skip(self))]
     pub fn subscribe_agent(&self, agent_id: &str, channel_id: &str) -> Result<()> {
         // Verify channel exists
@@ -142,6 +154,12 @@ impl StateSharingManager {
     }
 
     /// Unsubscribe an agent from a channel
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The specified channel does not exist
+    /// - The agent is not subscribed to the channel
     #[instrument(skip(self))]
     pub fn unsubscribe_agent(&self, agent_id: &str, channel_id: &str) -> Result<()> {
         // Remove from channel participants
@@ -164,6 +182,13 @@ impl StateSharingManager {
     }
 
     /// Publish a message to a channel
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The specified channel does not exist
+    /// - The sender agent is not a participant in the channel
+    /// - Pattern permissions validation fails
     #[instrument(skip(self, payload))]
     pub async fn publish_message(
         &self,
@@ -229,6 +254,13 @@ impl StateSharingManager {
     }
 
     /// Reply to a message in a channel
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The specified channel does not exist
+    /// - The original message to reply to is not found
+    /// - Publishing the reply message fails
     #[instrument(skip(self, payload))]
     pub async fn reply_to_message(
         &self,
@@ -274,6 +306,10 @@ impl StateSharingManager {
     }
 
     /// Get messages for an agent from their subscribed channels
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the agent has no subscriptions
     #[instrument(skip(self))]
     pub fn get_messages_for_agent(
         &self,
@@ -324,6 +360,12 @@ impl StateSharingManager {
     }
 
     /// Create a collaborative workspace for multiple agents
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Creating the collaborative channel fails
+    /// - Subscribing any participant to the workspace fails
     #[instrument(skip(self))]
     pub async fn create_collaborative_workspace(
         &self,
@@ -367,6 +409,13 @@ impl StateSharingManager {
     }
 
     /// Create a data pipeline between agents
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Creating the pipeline channel fails
+    /// - The stages list is empty
+    /// - Setting pipeline metadata fails
     #[instrument(skip(self))]
     pub fn create_pipeline(
         &self,
@@ -403,6 +452,14 @@ impl StateSharingManager {
     }
 
     /// Process next stage in a pipeline
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - The pipeline is not found
+    /// - Pipeline stages metadata is missing or invalid
+    /// - The current agent is not in the pipeline
+    /// - Publishing the stage completion message fails
     #[instrument(skip(self, data))]
     pub async fn process_pipeline_stage(
         &self,
@@ -548,18 +605,30 @@ impl SharedStateAccessor {
     }
 
     /// Subscribe to a channel
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if subscription fails
     pub fn subscribe(&self, channel_id: &str) -> Result<()> {
         self.sharing_manager
             .subscribe_agent(&self.agent_id, channel_id)
     }
 
     /// Unsubscribe from a channel
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if unsubscription fails
     pub fn unsubscribe(&self, channel_id: &str) -> Result<()> {
         self.sharing_manager
             .unsubscribe_agent(&self.agent_id, channel_id)
     }
 
     /// Publish a message
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if publishing the message fails
     pub async fn publish(
         &self,
         channel_id: &str,
@@ -572,6 +641,10 @@ impl SharedStateAccessor {
     }
 
     /// Get new messages
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if retrieving messages fails
     pub fn get_messages(&self, since: Option<SystemTime>) -> Result<Vec<StateMessage>> {
         self.sharing_manager
             .get_messages_for_agent(&self.agent_id, since, None)

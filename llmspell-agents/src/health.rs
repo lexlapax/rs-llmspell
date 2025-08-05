@@ -285,6 +285,10 @@ impl AgentHealthMonitor {
     }
 
     /// Perform immediate health check
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any health check fails to execute
     pub async fn check_health(&self) -> Result<HealthCheckResult> {
         let start_time = Instant::now();
 
@@ -433,6 +437,10 @@ impl AgentHealthMonitor {
     }
 
     /// Start continuous health monitoring
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if monitoring task spawn fails
     pub async fn start_monitoring(&self) -> Result<()> {
         if !self.config.enable_monitoring {
             return Ok(());

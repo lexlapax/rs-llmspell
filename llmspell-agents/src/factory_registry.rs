@@ -25,6 +25,10 @@ impl FactoryRegistry {
     }
 
     /// Register a factory with a given name
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a factory with the same name is already registered
     pub async fn register_factory(
         &self,
         name: String,
@@ -62,6 +66,10 @@ impl FactoryRegistry {
     }
 
     /// Set the default factory
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the factory is not registered
     pub async fn set_default_factory(&self, name: String) -> Result<()> {
         let factories = self.factories.read().await;
         if !factories.contains_key(&name) {
@@ -80,6 +88,12 @@ impl FactoryRegistry {
     }
 
     /// Create an agent using a specific factory
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Factory is not found
+    /// - Agent creation fails
     pub async fn create_agent_with(
         &self,
         factory_name: &str,
@@ -94,6 +108,12 @@ impl FactoryRegistry {
     }
 
     /// Create an agent using the default factory
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - No default factory is set
+    /// - Agent creation fails
     pub async fn create_agent(&self, config: AgentConfig) -> Result<Arc<dyn Agent>> {
         let factory = self
             .get_default_factory()
@@ -104,6 +124,12 @@ impl FactoryRegistry {
     }
 
     /// Create an agent from a template using a specific factory
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Factory is not found
+    /// - Template creation fails
     pub async fn create_from_template_with(
         &self,
         factory_name: &str,
@@ -118,6 +144,12 @@ impl FactoryRegistry {
     }
 
     /// Create an agent from a template using the default factory
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - No default factory is set
+    /// - Template creation fails
     pub async fn create_from_template(&self, template_name: &str) -> Result<Arc<dyn Agent>> {
         let factory = self
             .get_default_factory()

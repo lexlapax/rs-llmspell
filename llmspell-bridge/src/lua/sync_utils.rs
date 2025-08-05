@@ -136,6 +136,14 @@ where
 /// This is a convenience wrapper for operations that already return `LuaResult<LuaValue>`
 /// and don't need additional error transformation.
 ///
+/// # Errors
+///
+/// Returns an error if:
+/// - The async operation fails
+/// - The operation times out
+/// - A panic occurs during execution
+/// - The tokio runtime is not available
+///
 /// # Example
 /// ```rust,no_run
 /// # use llmspell_bridge::lua::sync_utils::block_on_async_lua;

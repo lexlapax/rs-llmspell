@@ -155,6 +155,12 @@ pub trait ResourceLimitExt: Tool + Sized {
 impl<T: Tool> ResourceLimitExt for T {}
 
 /// Helper to track file operations with size limits
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Operation tracking fails due to resource limits
+/// - File size exceeds configured limits
 #[allow(clippy::unused_async)]
 pub async fn check_file_operation(
     tracker: &ResourceTracker,
@@ -176,6 +182,12 @@ pub async fn check_file_operation(
 }
 
 /// Helper to track memory allocation for data processing
+///
+/// # Errors
+///
+/// Returns an error if:
+/// - Memory allocation would exceed configured limits
+/// - The operation function returns an error
 pub fn track_data_processing<T, F>(
     tracker: &ResourceTracker,
     estimated_size: usize,

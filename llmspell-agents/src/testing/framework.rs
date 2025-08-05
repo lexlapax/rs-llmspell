@@ -148,6 +148,13 @@ impl TestHarness {
     }
 
     /// Run a test with the given agent configuration
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Agent creation fails
+    /// - The test function returns an error
+    /// - The test times out
     pub async fn run_test<F, Fut>(
         &self,
         agent_config: AgentConfig,
@@ -194,6 +201,10 @@ impl TestHarness {
     }
 
     /// Execute agent and record interaction
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if agent execution fails
     pub async fn execute_and_record(
         &self,
         agent: Arc<dyn Agent>,
@@ -269,6 +280,10 @@ pub struct AgentAssertions;
 
 impl AgentAssertions {
     /// Assert that agent output contains expected text
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the output does not contain the expected text
     pub fn assert_output_contains(output: &AgentOutput, expected: &str) -> Result<()> {
         if !output.text.contains(expected) {
             return Err(anyhow::anyhow!(
@@ -280,6 +295,10 @@ impl AgentAssertions {
     }
 
     /// Assert that agent made expected tool calls
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any expected tool was not called
     pub fn assert_tool_calls(output: &AgentOutput, expected_tools: &[&str]) -> Result<()> {
         let actual_tools: Vec<String> = output
             .tool_calls
@@ -299,6 +318,10 @@ impl AgentAssertions {
     }
 
     /// Assert execution time is within bounds
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if execution time exceeds the maximum duration
     pub fn assert_execution_time(duration: Duration, max_duration: Duration) -> Result<()> {
         if duration > max_duration {
             return Err(anyhow::anyhow!(
@@ -311,6 +334,12 @@ impl AgentAssertions {
     }
 
     /// Assert resource usage is within limits
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Memory usage exceeds the limit
+    /// - Tool call count exceeds the limit
     pub fn assert_resource_usage(usage: &ResourceUsage, limits: &ResourceLimits) -> Result<()> {
         if usage.peak_memory > (limits.max_memory_mb as usize * 1024 * 1024) {
             return Err(anyhow::anyhow!(
@@ -332,6 +361,10 @@ impl AgentAssertions {
     }
 
     /// Assert agent state transitions
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the expected state transition is not found in the events
     pub fn assert_state_transition(
         from_state: AgentState,
         to_state: AgentState,
@@ -438,6 +471,15 @@ impl TestScenarioBuilder {
     }
 
     /// Build and run the test scenario
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Agent configuration is not provided
+    /// - Setup function fails
+    /// - Test execution fails
+    /// - Teardown function fails
+    /// - Output assertions fail
     pub async fn run(self, harness: &TestHarness) -> Result<TestResult> {
         // Run setup if provided
         if let Some(setup) = &self.setup {

@@ -396,6 +396,12 @@ impl ToolStateRegistry {
     }
 
     /// Load state for a specific tool
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - State loading fails
+    /// - State deserialization fails
     pub async fn load_tool_state(&self, tool_id: &str) -> Result<Option<ToolState>> {
         let state_scope = StateScope::Custom(format!("tool_{tool_id}"));
 

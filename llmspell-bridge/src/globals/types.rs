@@ -71,19 +71,35 @@ pub trait GlobalObject: Send + Sync {
     fn metadata(&self) -> GlobalMetadata;
 
     /// Initialize any resources needed by this global
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if resource initialization fails
     fn initialize(&self, _context: &GlobalContext) -> Result<()> {
         Ok(())
     }
 
     /// Inject this global into a Lua environment
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if Lua injection fails
     #[cfg(feature = "lua")]
     fn inject_lua(&self, lua: &Lua, context: &GlobalContext) -> Result<()>;
 
     /// Inject this global into a JavaScript environment
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if JavaScript injection fails
     #[cfg(feature = "javascript")]
     fn inject_javascript(&self, ctx: &mut Context, context: &GlobalContext) -> Result<()>;
 
     /// Clean up any resources when the global is removed
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if cleanup fails
     fn cleanup(&self) -> Result<()> {
         Ok(())
     }

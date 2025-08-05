@@ -1028,6 +1028,12 @@ impl AgentBridge {
     }
 
     /// Create a child context
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Parent context is not found
+    /// - Context scope parsing fails
     pub async fn create_child_context(
         &self,
         parent_id: &str,
@@ -1063,6 +1069,10 @@ impl AgentBridge {
     }
 
     /// Update context data
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the context is not found
     pub async fn update_context(
         &self,
         context_id: &str,
@@ -1085,6 +1095,10 @@ impl AgentBridge {
     }
 
     /// Get data from context
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the context is not found
     pub async fn get_context_data(
         &self,
         context_id: &str,
@@ -1102,6 +1116,10 @@ impl AgentBridge {
     }
 
     /// Set shared memory data
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if scope parsing fails
     pub async fn set_shared_memory(
         &self,
         scope: serde_json::Value,
@@ -1114,6 +1132,10 @@ impl AgentBridge {
     }
 
     /// Get shared memory data
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if scope parsing fails
     pub async fn get_shared_memory(
         &self,
         scope: serde_json::Value,
@@ -1124,6 +1146,12 @@ impl AgentBridge {
     }
 
     /// Execute agent with context
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Context is not found
+    /// - Agent execution fails
     pub async fn execute_agent_with_context(
         &self,
         instance_name: &str,
@@ -1143,6 +1171,10 @@ impl AgentBridge {
     }
 
     /// Execute agent with streaming
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the agent instance is not found
     pub async fn execute_agent_streaming(
         &self,
         instance_name: &str,
@@ -1268,6 +1300,12 @@ impl AgentBridge {
     // Composition Pattern Methods
 
     /// Wrap an agent as a tool for composition
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Agent is not found
+    /// - Tool registration fails
     pub async fn wrap_agent_as_tool(
         &self,
         agent_name: &str,
@@ -1401,6 +1439,12 @@ impl AgentBridge {
     }
 
     /// Create a composite agent that delegates to multiple agents
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Any delegate agent is not found
+    /// - Composite agent creation fails
     pub async fn create_composite_agent(
         &self,
         composite_name: String,

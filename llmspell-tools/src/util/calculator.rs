@@ -476,6 +476,12 @@ impl CalculatorTool {
 
     /// Demonstrate hook-aware execution
     /// This method showcases how the calculator works with the hook system
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Tool execution fails
+    /// - Hook integration fails
     pub async fn demonstrate_hook_integration(
         &self,
         tool_executor: &crate::lifecycle::ToolExecutor,

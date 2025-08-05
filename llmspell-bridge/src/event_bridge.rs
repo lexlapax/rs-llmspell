@@ -103,6 +103,10 @@ impl EventBridge {
     }
 
     /// Subscribe to events matching a pattern
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if subscription to the pattern fails
     pub async fn subscribe_events(
         &self,
         pattern: &str,
@@ -134,6 +138,10 @@ impl EventBridge {
     }
 
     /// Subscribe to events with advanced filtering
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if subscription to the filtered pattern fails
     pub async fn subscribe_events_filtered(
         &self,
         pattern: &str,
@@ -166,6 +174,10 @@ impl EventBridge {
     }
 
     /// Unsubscribe from events
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if unsubscription fails
     pub async fn unsubscribe(&self, subscription_id: &str) -> Result<bool> {
         let mut subscriptions = self.subscriptions.write();
 

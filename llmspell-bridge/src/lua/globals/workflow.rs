@@ -738,6 +738,10 @@ impl Clone for WorkflowBuilder {
 
 /// Inject Workflow global into Lua environment
 ///
+/// # Errors
+///
+/// Returns an error if Lua table creation or function binding fails
+///
 /// # Panics
 ///
 /// Panics if the Lua table creation or function binding fails

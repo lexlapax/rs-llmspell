@@ -256,6 +256,10 @@ pub fn create_collaboration_workflow(
 
 /// Create a hierarchical coordination workflow
 /// Agents organized in hierarchy with managers and workers
+///
+/// # Errors
+///
+/// Returns an error if workflow creation fails
 pub fn create_hierarchical_workflow(
     name: String,
     manager_agent: String,

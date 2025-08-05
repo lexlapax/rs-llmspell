@@ -31,6 +31,10 @@ pub struct BasicAgent {
 
 impl BasicAgent {
     /// Create a new basic agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if agent configuration is invalid
     pub fn new(config: AgentConfig) -> Result<Self> {
         let metadata = ComponentMetadata::new(config.name.clone(), config.description.clone());
         let agent_id_string = metadata.id.to_string();
@@ -79,6 +83,10 @@ impl BasicAgent {
     }
 
     /// Initialize the agent and its state machine
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if state machine initialization fails
     pub async fn initialize(&self) -> Result<()> {
         info!("Initializing BasicAgent '{}'", self.metadata.name);
         self.state_machine.initialize().await?;
@@ -90,6 +98,10 @@ impl BasicAgent {
     }
 
     /// Start the agent execution
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the state machine cannot transition to the Running state
     pub async fn start(&self) -> Result<()> {
         info!("Starting BasicAgent '{}'", self.metadata.name);
 
@@ -105,6 +117,10 @@ impl BasicAgent {
     }
 
     /// Pause the agent execution
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the state machine cannot transition to the Paused state
     pub async fn pause(&self) -> Result<()> {
         info!("Pausing BasicAgent '{}'", self.metadata.name);
         self.state_machine.pause().await?;
@@ -129,6 +145,10 @@ impl BasicAgent {
     }
 
     /// Resume the agent execution
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the state machine cannot transition from Paused to Running state
     pub async fn resume(&self) -> Result<()> {
         info!("Resuming BasicAgent '{}'", self.metadata.name);
 
@@ -144,6 +164,10 @@ impl BasicAgent {
     }
 
     /// Stop the agent execution
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the state machine cannot transition to the Stopped state
     pub async fn stop(&self) -> Result<()> {
         info!("Stopping BasicAgent '{}'", self.metadata.name);
 
@@ -168,6 +192,10 @@ impl BasicAgent {
     }
 
     /// Terminate the agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the state machine cannot transition to the Terminated state
     pub async fn terminate(&self) -> Result<()> {
         info!("Terminating BasicAgent '{}'", self.metadata.name);
         self.state_machine.terminate().await?;

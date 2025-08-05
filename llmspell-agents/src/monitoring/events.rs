@@ -217,6 +217,10 @@ impl EventLogger {
     }
 
     /// Log an event
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any exporter fails to export the event
     pub fn log(&self, event: LogEvent) -> Result<()> {
         // Check minimum level
         if !event.level.should_log(self.get_level()) {
@@ -246,6 +250,10 @@ impl EventLogger {
     }
 
     /// Log a trace event
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if logging fails
     pub fn trace(&self, component: &str, message: &str) -> Result<()> {
         let event = LogEvent::new(
             LogLevel::Trace,
@@ -257,6 +265,10 @@ impl EventLogger {
     }
 
     /// Log a debug event
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if logging fails
     pub fn debug(&self, component: &str, message: &str) -> Result<()> {
         let event = LogEvent::new(
             LogLevel::Debug,
@@ -268,6 +280,10 @@ impl EventLogger {
     }
 
     /// Log an info event
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if logging fails
     pub fn info(&self, component: &str, message: &str) -> Result<()> {
         let event = LogEvent::new(
             LogLevel::Info,
@@ -279,6 +295,10 @@ impl EventLogger {
     }
 
     /// Log a warning event
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if logging fails
     pub fn warn(&self, component: &str, message: &str) -> Result<()> {
         let event = LogEvent::new(
             LogLevel::Warn,
@@ -290,6 +310,10 @@ impl EventLogger {
     }
 
     /// Log an error event
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if logging fails
     pub fn error(&self, component: &str, message: &str, error: Option<ErrorDetails>) -> Result<()> {
         let mut event = LogEvent::new(
             LogLevel::Error,
@@ -306,6 +330,10 @@ impl EventLogger {
     }
 
     /// Log a fatal event
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if logging fails
     pub fn fatal(&self, component: &str, message: &str, error: Option<ErrorDetails>) -> Result<()> {
         let mut event = LogEvent::new(
             LogLevel::Fatal,
@@ -397,6 +425,10 @@ pub struct EventStatistics {
 /// Trait for exporting log events
 pub trait LogExporter: Send + Sync {
     /// Export a log event
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the export operation fails
     fn export(&self, event: &LogEvent) -> Result<()>;
 }
 
@@ -405,6 +437,11 @@ pub trait LogExporter: Send + Sync {
 pub struct ConsoleLogExporter;
 
 impl LogExporter for ConsoleLogExporter {
+    /// Export a log event to console
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if console output fails
     fn export(&self, event: &LogEvent) -> Result<()> {
         println!("{}", event.format());
         Ok(())

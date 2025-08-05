@@ -29,6 +29,10 @@ pub struct PersistentAgentRegistry {
 
 impl PersistentAgentRegistry {
     /// Create new persistent registry with given storage backend
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if loading metadata from storage fails
     pub async fn new(storage: Arc<dyn StorageBackend>) -> Result<Self> {
         // Load existing metadata from storage
         let metadata = Self::load_all_metadata(&storage).await?;
@@ -68,6 +72,13 @@ impl PersistentAgentRegistry {
     }
 
     /// Persist current state
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Metadata serialization fails
+    /// - Storage write operations fail
+    /// - Snapshot creation fails
     pub async fn persist(&self) -> Result<()> {
         let cache = self.metadata_cache.read().await;
 
@@ -88,6 +99,12 @@ impl PersistentAgentRegistry {
     }
 
     /// Load from snapshot (faster than loading individual entries)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Storage read fails
+    /// - Snapshot deserialization fails
     pub async fn load_from_snapshot(&mut self) -> Result<()> {
         if let Some(data) = self.storage.get(REGISTRY_SNAPSHOT_KEY).await? {
             if let Ok(metadata) = HashMap::<String, AgentMetadata>::from_storage_bytes(&data) {

@@ -548,11 +548,24 @@ impl AgentStateMachine {
     }
 
     /// Transition to new state
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if state transition fails
     pub async fn transition_to(&self, target_state: AgentState) -> Result<()> {
         self.transition_to_with_reason(target_state, None).await
     }
 
     /// Transition to new state with reason
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Circuit breaker is open (transitions blocked)
+    /// - The transition is invalid
+    /// - Hook execution prevents the transition
+    /// - Validation fails
+    /// - Timeout occurs
     pub async fn transition_to_with_reason(
         &self,
         target_state: AgentState,
@@ -808,6 +821,12 @@ impl AgentStateMachine {
     }
 
     /// Initialize agent (transition from Uninitialized to Ready)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Agent is not in Uninitialized state
+    /// - State transition fails
     pub async fn initialize(&self) -> Result<()> {
         if !self.is_state(AgentState::Uninitialized).await {
             return Err(anyhow!(
@@ -836,6 +855,12 @@ impl AgentStateMachine {
     }
 
     /// Start execution (transition to Running)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Agent is not in Ready or Paused state
+    /// - State transition fails
     pub async fn start(&self) -> Result<()> {
         let current = self.current_state().await;
         if !matches!(current, AgentState::Ready | AgentState::Paused) {
@@ -850,6 +875,12 @@ impl AgentStateMachine {
     }
 
     /// Pause execution
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Agent is not in Running state
+    /// - State transition fails
     pub async fn pause(&self) -> Result<()> {
         if !self.is_state(AgentState::Running).await {
             return Err(anyhow!("Agent can only be paused from Running state"));
@@ -860,6 +891,12 @@ impl AgentStateMachine {
     }
 
     /// Resume execution
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Agent is not in Paused state
+    /// - State transition fails
     pub async fn resume(&self) -> Result<()> {
         if !self.is_state(AgentState::Paused).await {
             return Err(anyhow!("Agent can only be resumed from Paused state"));
@@ -870,6 +907,12 @@ impl AgentStateMachine {
     }
 
     /// Stop execution (transition to Ready)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Agent is not in Running state
+    /// - State transition fails
     pub async fn stop(&self) -> Result<()> {
         if !self.is_state(AgentState::Running).await {
             return Err(anyhow!("Agent can only be stopped from Running state"));
@@ -880,6 +923,10 @@ impl AgentStateMachine {
     }
 
     /// Terminate agent (graceful shutdown)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if agent cannot be terminated from current state
     pub async fn terminate(&self) -> Result<()> {
         let current = self.current_state().await;
         if !current.can_terminate() {
@@ -910,6 +957,10 @@ impl AgentStateMachine {
     }
 
     /// Trigger error state
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if agent is already terminated
     pub async fn error(&self, error_message: String) -> Result<()> {
         let current = self.current_state().await;
         if current == AgentState::Terminated {
@@ -930,6 +981,13 @@ impl AgentStateMachine {
     }
 
     /// Attempt recovery from error state
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Agent is not in error state
+    /// - Maximum recovery attempts exceeded
+    /// - State transition fails
     pub async fn recover(&self) -> Result<()> {
         if !self.is_state(AgentState::Error).await {
             return Err(anyhow!("Agent can only recover from Error state"));

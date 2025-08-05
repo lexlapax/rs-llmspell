@@ -253,6 +253,10 @@ impl MetadataManager {
     }
 
     /// Store extended metadata
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if metadata storage fails
     pub fn store(&mut self, id: String, metadata: ExtendedAgentMetadata) -> Result<()> {
         self.storage.insert(id, metadata);
         Ok(())
@@ -265,6 +269,10 @@ impl MetadataManager {
     }
 
     /// Update version info
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if agent is not found
     pub fn update_version(&mut self, id: &str, version: VersionInfo) -> Result<()> {
         match self.storage.get_mut(id) {
             Some(metadata) => {
@@ -277,6 +285,10 @@ impl MetadataManager {
     }
 
     /// Add capability
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if agent is not found
     pub fn add_capability(&mut self, id: &str, capability: AgentCapability) -> Result<()> {
         match self.storage.get_mut(id) {
             Some(metadata) => {
@@ -289,6 +301,10 @@ impl MetadataManager {
     }
 
     /// Update health status
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if agent is not found
     pub fn update_health(&mut self, id: &str, health: HealthStatus) -> Result<()> {
         match self.storage.get_mut(id) {
             Some(metadata) => {

@@ -120,6 +120,10 @@ impl<R: AgentRegistry> AgentRegistrar<R> {
     }
 
     /// Register agent with default options
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if agent registration fails
     pub async fn register_agent(
         &self,
         agent: Arc<dyn Agent>,
@@ -131,6 +135,14 @@ impl<R: AgentRegistry> AgentRegistrar<R> {
     }
 
     /// Register agent with custom options
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Agent validation fails
+    /// - Metadata serialization fails
+    /// - Registry registration fails
+    /// - Heartbeat fails (if enabled)
     pub async fn register_agent_with_options(
         &self,
         agent: Arc<dyn Agent>,
@@ -191,6 +203,13 @@ impl<R: AgentRegistry> AgentRegistrar<R> {
     }
 
     /// Validate agent before registration
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Agent validation fails
+    /// - Agent is not responsive
+    /// - Configuration is invalid
     async fn validate_agent(&self, agent: &Arc<dyn Agent>, config: &AgentConfig) -> Result<()> {
         // Check agent is responsive
         let test_input = llmspell_core::types::AgentInput::text("__registry_validation__");
@@ -214,6 +233,13 @@ impl<R: AgentRegistry> AgentRegistrar<R> {
     }
 
     /// Unregister agent
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Agent not found
+    /// - Status update fails
+    /// - Removal from registry fails
     pub async fn unregister_agent(&self, id: &str) -> Result<()> {
         // Update status to stopped first
         self.registry
@@ -225,6 +251,10 @@ impl<R: AgentRegistry> AgentRegistrar<R> {
     }
 
     /// Batch register multiple agents
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any agent registration fails
     pub async fn register_agents(
         &self,
         agents: Vec<(Arc<dyn Agent>, AgentConfig)>,
@@ -244,9 +274,17 @@ impl<R: AgentRegistry> AgentRegistrar<R> {
 #[async_trait::async_trait]
 pub trait RegistrationHook: Send + Sync {
     /// Called before registration
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if pre-registration validation fails
     async fn before_register(&self, config: &AgentConfig) -> Result<()>;
 
     /// Called after successful registration
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if post-registration processing fails
     async fn after_register(&self, id: &str, metadata: &AgentMetadata) -> Result<()>;
 
     /// Called on registration failure

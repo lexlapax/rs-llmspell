@@ -26,6 +26,12 @@ pub struct ProviderTestContext {
 
 impl ProviderTestContext {
     /// Create a new test context with persistent storage
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Temporary directory creation fails
+    /// - State manager initialization fails
     pub async fn new() -> Result<Self> {
         let temp_dir = TempDir::new()?;
         let storage_path = temp_dir.path().to_path_buf();
@@ -69,6 +75,12 @@ impl ProviderTestContext {
     }
 
     /// Create an `OpenAI` agent if API key is available
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Agent configuration fails
+    /// - Agent creation fails
     pub async fn create_openai_agent(&self) -> Result<Option<LLMAgent>> {
         if env::var("OPENAI_API_KEY").is_err() {
             warn!("OPENAI_API_KEY not set, skipping OpenAI tests");
@@ -89,6 +101,12 @@ impl ProviderTestContext {
     }
 
     /// Create an Anthropic agent if API key is available
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Agent configuration fails
+    /// - Agent creation fails
     pub async fn create_anthropic_agent(&self) -> Result<Option<LLMAgent>> {
         if env::var("ANTHROPIC_API_KEY").is_err() {
             warn!("ANTHROPIC_API_KEY not set, skipping Anthropic tests");
@@ -109,6 +127,10 @@ impl ProviderTestContext {
     }
 
     /// Verify that agent state is properly persisted
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if state loading fails
     pub async fn verify_state_persistence(
         &self,
         agent_id: &str,
@@ -131,6 +153,12 @@ impl ProviderTestContext {
     }
 
     /// Get conversation from agent state
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - State loading fails
+    /// - JSON serialization fails
     pub async fn get_saved_conversation(
         &self,
         agent_id: &str,
@@ -148,6 +176,10 @@ impl ProviderTestContext {
     }
 
     /// Verify provider metadata is saved
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if state loading fails
     pub async fn verify_provider_metadata(&self, agent_id: &str) -> Result<bool> {
         let saved_state = self.state_manager.load_agent_state(agent_id).await?;
 
@@ -165,6 +197,10 @@ impl ProviderTestContext {
     }
 
     /// Verify token usage is tracked
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if state loading fails
     pub async fn verify_token_usage(&self, agent_id: &str) -> Result<bool> {
         let saved_state = self.state_manager.load_agent_state(agent_id).await?;
 
@@ -186,6 +222,13 @@ impl ProviderTestContext {
     }
 
     /// Run a conversation and save state
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Agent initialization fails
+    /// - Agent execution fails
+    /// - State saving fails
     pub async fn run_conversation_with_save(
         &self,
         agent: &mut LLMAgent,
@@ -215,6 +258,12 @@ impl ProviderTestContext {
     }
 
     /// Create an agent with a custom ID
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Agent configuration fails
+    /// - Agent creation fails
     pub async fn create_agent_with_id(
         &self,
         agent_id: &str,
@@ -246,6 +295,10 @@ impl ProviderTestContext {
     }
 
     /// Create a fresh agent with the same ID and verify state restoration
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if agent creation or restoration fails
     pub async fn create_and_restore_agent(
         &self,
         provider: &str,
@@ -256,6 +309,13 @@ impl ProviderTestContext {
     }
 
     /// Create and restore an agent with a custom ID
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - Agent configuration fails
+    /// - Agent creation fails
+    /// - State restoration fails
     pub async fn create_and_restore_agent_with_id(
         &self,
         agent_id: &str,

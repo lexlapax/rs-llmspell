@@ -98,6 +98,12 @@ impl StatePersistenceHook {
     }
 
     /// Handle lifecycle events
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if:
+    /// - State save fails
+    /// - State restore fails
     pub async fn handle_event(&self, event: &LifecycleEvent) -> Result<()> {
         match &event.event_type {
             LifecycleEventType::AgentPaused => {
@@ -121,6 +127,10 @@ impl StatePersistenceHook {
     }
 
     /// Check if auto-save is needed for any agents
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if state save fails for any agent
     pub async fn check_auto_save(&self) -> Result<()> {
         if let Some(interval) = self.config.auto_save_interval {
             let now = SystemTime::now();
