@@ -120,6 +120,112 @@ impl HashCalculatorTool {
 
         Ok(file_size)
     }
+
+    async fn execute_hash_operation(&self, params: &serde_json::Value) -> Result<AgentOutput> {
+        let input_type = extract_string_with_default(params, "input_type", "string");
+        let algorithm = self.parse_algorithm(extract_optional_string(params, "algorithm"));
+        let format = self.parse_format(extract_optional_string(params, "format"));
+
+        // Validate input type
+        validate_enum(&input_type, &["string", "file"], "input_type")?;
+
+        let hash = self.compute_hash(params, &input_type, algorithm).await?;
+        let formatted = self.format_hash(&hash, &format);
+        
+        let response = ResponseBuilder::success("hash")
+            .with_message(format!(
+                "Calculated {} hash",
+                algorithm.to_string().to_uppercase()
+            ))
+            .with_result(json!({
+                "algorithm": algorithm.to_string(),
+                "hash": formatted,
+                "format": match format {
+                    OutputFormat::Hex => "hex",
+                    OutputFormat::Base64 => "base64",
+                }
+            }))
+            .build();
+
+        Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
+    }
+
+    async fn execute_verify_operation(&self, params: &serde_json::Value) -> Result<AgentOutput> {
+        let input_type = extract_string_with_default(params, "input_type", "string");
+        let algorithm = self.parse_algorithm(extract_optional_string(params, "algorithm"));
+        let expected_hash_str = extract_required_string(params, "expected_hash")?;
+        let expected_format = extract_string_with_default(params, "expected_format", "hex");
+
+        // Validate enums
+        validate_enum(&input_type, &["string", "file"], "input_type")?;
+        validate_enum(&expected_format, &["hex", "base64"], "expected_format")?;
+
+        let expected_hash = self.decode_expected_hash(expected_hash_str, &expected_format)?;
+        let actual_hash = self.compute_hash(params, &input_type, algorithm).await?;
+        let matches = actual_hash == expected_hash;
+
+        let response = if matches {
+            ResponseBuilder::success("verify")
+                .with_message("Hash verification successful")
+                .with_result(json!({
+                    "verified": true,
+                    "algorithm": algorithm.to_string(),
+                }))
+        } else {
+            ResponseBuilder::success("verify")
+                .with_message("Hash verification failed")
+                .with_result(json!({
+                    "verified": false,
+                    "algorithm": algorithm.to_string(),
+                    "expected": self.format_hash(&expected_hash, &self.parse_format(Some(&expected_format))),
+                    "actual": self.format_hash(&actual_hash, &self.parse_format(Some(&expected_format))),
+                }))
+        }
+        .build();
+
+        Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
+    }
+
+    async fn compute_hash(&self, params: &serde_json::Value, input_type: &str, algorithm: HashAlgorithm) -> Result<Vec<u8>> {
+        match input_type {
+            "string" => {
+                let text = extract_required_string(params, "input")?;
+                Ok(hash_string(text, algorithm))
+            }
+            "file" => {
+                let file_path = extract_required_string(params, "file")?;
+                let path = Path::new(file_path);
+                self.check_file_size(path).await?;
+
+                hash_file(path, algorithm).map_err(|e| {
+                    storage_error(
+                        format!("Failed to hash file: {e}"),
+                        Some(format!("hash file {file_path}")),
+                    )
+                })
+            }
+            _ => unreachable!(), // Already validated
+        }
+    }
+
+    fn decode_expected_hash(&self, expected_hash_str: &str, expected_format: &str) -> Result<Vec<u8>> {
+        match expected_format {
+            "hex" => from_hex_string(expected_hash_str).map_err(|_| {
+                validation_error(
+                    "Invalid hex string in expected_hash",
+                    Some("expected_hash".to_string()),
+                )
+            }),
+            "base64" => llmspell_utils::encoding::base64_decode(expected_hash_str)
+                .map_err(|_| {
+                    validation_error(
+                        "Invalid base64 string in expected_hash",
+                        Some("expected_hash".to_string()),
+                    )
+                }),
+            _ => unreachable!(), // Already validated
+        }
+    }
 }
 
 #[async_trait]
@@ -133,123 +239,8 @@ impl BaseAgent for HashCalculatorTool {
         let operation = extract_required_string(params, "operation")?;
 
         match operation {
-            "hash" => {
-                let input_type = extract_string_with_default(params, "input_type", "string");
-                let algorithm = self.parse_algorithm(extract_optional_string(params, "algorithm"));
-                let format = self.parse_format(extract_optional_string(params, "format"));
-
-                // Validate input type
-                validate_enum(&input_type, &["string", "file"], "input_type")?;
-
-                let hash = match input_type {
-                    "string" => {
-                        let text = extract_required_string(params, "input")?;
-                        hash_string(text, algorithm)
-                    }
-                    "file" => {
-                        let file_path = extract_required_string(params, "file")?;
-                        let path = Path::new(file_path);
-                        self.check_file_size(path).await?;
-
-                        hash_file(path, algorithm).map_err(|e| {
-                            storage_error(
-                                format!("Failed to hash file: {e}"),
-                                Some(format!("hash file {file_path}")),
-                            )
-                        })?
-                    }
-                    _ => unreachable!(), // Already validated
-                };
-
-                let formatted = self.format_hash(&hash, &format);
-                let response = ResponseBuilder::success("hash")
-                    .with_message(format!(
-                        "Calculated {} hash",
-                        algorithm.to_string().to_uppercase()
-                    ))
-                    .with_result(json!({
-                        "algorithm": algorithm.to_string(),
-                        "hash": formatted,
-                        "format": match format {
-                            OutputFormat::Hex => "hex",
-                            OutputFormat::Base64 => "base64",
-                        }
-                    }))
-                    .build();
-
-                Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
-            }
-            "verify" => {
-                let input_type = extract_string_with_default(params, "input_type", "string");
-                let algorithm = self.parse_algorithm(extract_optional_string(params, "algorithm"));
-                let expected_hash_str = extract_required_string(params, "expected_hash")?;
-                let expected_format = extract_string_with_default(params, "expected_format", "hex");
-
-                // Validate enums
-                validate_enum(&input_type, &["string", "file"], "input_type")?;
-                validate_enum(&expected_format, &["hex", "base64"], "expected_format")?;
-
-                let expected_hash = match expected_format {
-                    "hex" => from_hex_string(expected_hash_str).map_err(|_| {
-                        validation_error(
-                            "Invalid hex string in expected_hash",
-                            Some("expected_hash".to_string()),
-                        )
-                    })?,
-                    "base64" => llmspell_utils::encoding::base64_decode(expected_hash_str)
-                        .map_err(|_| {
-                            validation_error(
-                                "Invalid base64 string in expected_hash",
-                                Some("expected_hash".to_string()),
-                            )
-                        })?,
-                    _ => unreachable!(), // Already validated
-                };
-
-                let actual_hash = match input_type {
-                    "string" => {
-                        let text = extract_required_string(params, "input")?;
-                        hash_string(text, algorithm)
-                    }
-                    "file" => {
-                        let file_path = extract_required_string(params, "file")?;
-                        let path = Path::new(file_path);
-                        self.check_file_size(path).await?;
-
-                        hash_file(path, algorithm).map_err(|e| {
-                            storage_error(
-                                format!("Failed to hash file for verification: {e}"),
-                                Some(format!("hash file {file_path}")),
-                            )
-                        })?
-                    }
-                    _ => unreachable!(), // Already validated
-                };
-
-                // verify_hash compares the hashes directly
-                let matches = actual_hash == expected_hash;
-
-                let response = if matches {
-                    ResponseBuilder::success("verify")
-                        .with_message("Hash verification successful")
-                        .with_result(json!({
-                            "verified": true,
-                            "algorithm": algorithm.to_string(),
-                        }))
-                } else {
-                    ResponseBuilder::success("verify")
-                        .with_message("Hash verification failed")
-                        .with_result(json!({
-                            "verified": false,
-                            "algorithm": algorithm.to_string(),
-                            "expected": self.format_hash(&expected_hash, &self.parse_format(Some(expected_format))),
-                            "actual": self.format_hash(&actual_hash, &self.parse_format(Some(expected_format))),
-                        }))
-                }
-                .build();
-
-                Ok(AgentOutput::text(serde_json::to_string_pretty(&response)?))
-            }
+            "hash" => self.execute_hash_operation(params).await,
+            "verify" => self.execute_verify_operation(params).await,
             _ => Err(validation_error(
                 format!("Invalid operation: {operation}"),
                 Some("operation".to_string()),

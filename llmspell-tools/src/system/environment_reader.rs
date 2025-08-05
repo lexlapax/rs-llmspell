@@ -665,13 +665,10 @@ mod tests {
         let tool = create_test_tool_with_sandbox();
 
         // Should allow TEST_* variables due to sandbox permissions
-        let input1 = create_test_tool_input(
-            "Get test variable",
-            json!({
-                "operation": "get",
-                "variable_name": "TEST_ALLOWED"
-            }),
-        );
+        let input1 = create_test_tool_input(vec![
+            ("operation", "get"),
+            ("variable_name", "TEST_ALLOWED"),
+        ]);
         let result1 = tool.execute(input1, ExecutionContext::default()).await;
         // Should succeed (even if variable doesn't exist)
         assert!(
@@ -680,24 +677,12 @@ mod tests {
         );
 
         // Should allow PATH due to sandbox permissions
-        let input2 = create_test_tool_input(
-            "Get PATH",
-            json!({
-                "operation": "get",
-                "variable_name": "PATH"
-            }),
-        );
+        let input2 = create_test_tool_input(vec![("operation", "get"), ("variable_name", "PATH")]);
         let result2 = tool.execute(input2, ExecutionContext::default()).await;
         assert!(result2.is_ok(), "PATH should be allowed by sandbox");
 
         // Should deny HOME even though it's in default safe vars (sandbox overrides)
-        let input3 = create_test_tool_input(
-            "Get HOME",
-            json!({
-                "operation": "get",
-                "variable_name": "HOME"
-            }),
-        );
+        let input3 = create_test_tool_input(vec![("operation", "get"), ("variable_name", "HOME")]);
         let result3 = tool.execute(input3, ExecutionContext::default()).await;
         assert!(
             result3.is_err(),

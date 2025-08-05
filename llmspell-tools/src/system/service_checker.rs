@@ -781,12 +781,7 @@ mod tests {
         let tool = create_test_service_checker();
 
         // Missing target
-        let input1 = create_test_tool_input(
-            "Missing target",
-            json!({
-                "check_type": "tcp"
-            }),
-        );
+        let input1 = create_test_tool_input(vec![("check_type", "tcp")]);
         let result1 = tool.execute(input1, ExecutionContext::default()).await;
         assert!(result1.is_err());
         assert!(result1
@@ -795,9 +790,7 @@ mod tests {
             .contains("Missing required parameter 'target'"));
 
         // Missing check_type
-        let input2 = create_test_tool_input(vec![
-            ("target", "localhost:80"),
-        ]);
+        let input2 = create_test_tool_input(vec![("target", "localhost:80")]);
         let result2 = tool.execute(input2, ExecutionContext::default()).await;
         assert!(result2.is_err());
         assert!(result2
@@ -806,10 +799,8 @@ mod tests {
             .contains("Missing required parameter 'check_type'"));
 
         // Invalid check_type
-        let input3 = create_test_tool_input(vec![
-            ("target", "localhost:80"),
-            ("check_type", "invalid"),
-        ]);
+        let input3 =
+            create_test_tool_input(vec![("target", "localhost:80"), ("check_type", "invalid")]);
         let result3 = tool.execute(input3, ExecutionContext::default()).await;
         assert!(result3.is_err());
         assert!(result3
@@ -818,10 +809,7 @@ mod tests {
             .contains("Invalid check_type"));
 
         // Empty target
-        let input4 = create_test_tool_input(vec![
-            ("target", ""),
-            ("check_type", "tcp"),
-        ]);
+        let input4 = create_test_tool_input(vec![("target", ""), ("check_type", "tcp")]);
         let result4 = tool.execute(input4, ExecutionContext::default()).await;
         assert!(result4.is_err());
         assert!(result4.unwrap_err().to_string().contains("cannot be empty"));

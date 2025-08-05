@@ -98,8 +98,8 @@ impl VideoResolution {
         format!("{w}:{h}")
     }
 
-    const fn gcd(&self, _a: u32, b: u32) -> u32 {
-        let mut a = _a;
+    const fn gcd(&self, a: u32, b: u32) -> u32 {
+        let mut a = a;
         let mut b = b;
         while b != 0 {
             let tmp = b;
@@ -371,6 +371,8 @@ impl BaseAgent for VideoProcessorTool {
         input: AgentInput,
         _context: ExecutionContext,
     ) -> LLMResult<AgentOutput> {
+        use std::fmt::Write;
+        
         // Get parameters using shared utility
         let params = extract_parameters(&input)?;
 
@@ -405,8 +407,6 @@ impl BaseAgent for VideoProcessorTool {
 
                 let path = Path::new(file_path);
                 let metadata = self.extract_metadata(path).await?;
-
-                use std::fmt::Write;
 
                 let mut message = format!("Video file: {:?} format", metadata.format);
 
@@ -628,7 +628,10 @@ mod tests {
 
         fs::write(&file_path, b"dummy mp4 content").unwrap();
 
-        let input = create_test_tool_input(vec![("operation", "metadata")]);
+        let input = create_test_tool_input(vec![
+            ("operation", "metadata"),
+            ("file_path", file_path.to_str().unwrap()),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -647,7 +650,10 @@ mod tests {
 
         fs::write(&file_path, b"dummy").unwrap();
 
-        let input = create_test_tool_input(vec![("operation", "detect")]);
+        let input = create_test_tool_input(vec![
+            ("operation", "detect"),
+            ("file_path", file_path.to_str().unwrap()),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -670,7 +676,10 @@ mod tests {
         // Create a file larger than the limit
         fs::write(&file_path, vec![0u8; 100]).unwrap();
 
-        let input = create_test_tool_input(vec![("operation", "metadata")]);
+        let input = create_test_tool_input(vec![
+            ("operation", "metadata"),
+            ("file_path", file_path.to_str().unwrap()),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -687,7 +696,8 @@ mod tests {
 
         let input = create_test_tool_input(vec![
             ("operation", "thumbnail"),
-            ("target_path", "target_path.to_str().unwrap()"),
+            ("file_path", video_path.to_str().unwrap()),
+            ("target_path", target_path.to_str().unwrap()),
         ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
@@ -705,7 +715,8 @@ mod tests {
 
         let input = create_test_tool_input(vec![
             ("operation", "extract_frame"),
-            ("target_path", "target_path.to_str().unwrap()"),
+            ("file_path", video_path.to_str().unwrap()),
+            ("target_path", target_path.to_str().unwrap()),
             ("timestamp_seconds", "5.0"),
         ]);
 
@@ -784,7 +795,7 @@ mod tests {
         fs::write(&file_path, b"dummy").unwrap();
 
         // No operation specified, should default to metadata
-        let input = create_test_tool_input(vec![]);
+        let input = create_test_tool_input(vec![("file_path", file_path.to_str().unwrap())]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -797,7 +808,7 @@ mod tests {
     async fn test_empty_file_path() {
         let tool = create_test_video_processor();
 
-        let input = create_test_tool_input(vec![("operation", "detect")]);
+        let input = create_test_tool_input(vec![("operation", "detect"), ("file_path", "")]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());

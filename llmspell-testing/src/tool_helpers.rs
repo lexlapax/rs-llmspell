@@ -202,22 +202,32 @@ where
 
 /// Create test tool input
 pub fn create_test_tool_input(parameters: Vec<(&str, &str)>) -> AgentInput {
-    let mut input = AgentInput::text("test tool execution");
+    let input = AgentInput::text("test tool execution");
+    let mut params_obj = serde_json::Map::new();
 
     for (key, value) in parameters {
-        // Try to parse as number or boolean first
-        let json_value = if let Ok(n) = value.parse::<f64>() {
-            json!(n)
+        // Try to parse as integer first, then float, then boolean, then string
+        // Skip numeric parsing for long strings that look like hex hashes
+        let json_value = if value.len() > 10 && value.chars().all(|c| c.is_ascii_hexdigit()) {
+            // Long hex string - keep as string
+            json!(value)
+        } else if let Ok(n) = value.parse::<u64>() {
+            json!(n) // This will be a JSON integer, not float
+        } else if let Ok(n) = value.parse::<i64>() {
+            json!(n) // Handle negative integers
+        } else if let Ok(n) = value.parse::<f64>() {
+            json!(n) // Float values
         } else if let Ok(b) = value.parse::<bool>() {
             json!(b)
         } else {
             json!(value)
         };
 
-        input = input.with_parameter(key, json_value);
+        params_obj.insert(key.to_string(), json_value);
     }
 
-    input
+    // Wrap all parameters in a "parameters" object as expected by extract_parameters()
+    input.with_parameter("parameters", json!(params_obj))
 }
 
 /// Create test tool input with JSON values

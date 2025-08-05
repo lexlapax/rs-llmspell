@@ -1,6 +1,7 @@
 // ABOUTME: Process execution tool with security sandboxing and resource controls
 // ABOUTME: Provides safe execution of system processes with configurable permissions and limits
 
+use crate::lifecycle::HookableToolExecution;
 use async_trait::async_trait;
 use llmspell_core::{
     traits::{
@@ -52,6 +53,24 @@ pub struct ProcessResult {
     pub timed_out: bool,
 }
 
+/// I/O capture configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct IoCapture {
+    /// Whether to capture stdout
+    pub stdout: bool,
+    /// Whether to capture stderr
+    pub stderr: bool,
+}
+
+/// Execution permissions configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExecutionPermissions {
+    /// Whether to allow arbitrary command execution
+    pub allow_arbitrary_commands: bool,
+    /// Whether to inherit current process environment
+    pub inherit_environment: bool,
+}
+
 /// Process executor tool configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProcessExecutorConfig {
@@ -63,18 +82,14 @@ pub struct ProcessExecutorConfig {
     pub allowed_executables: Vec<String>,
     /// Blocked executable patterns
     pub blocked_executables: Vec<String>,
-    /// Whether to allow arbitrary command execution
-    pub allow_arbitrary_commands: bool,
+    /// Execution permissions
+    pub permissions: ExecutionPermissions,
     /// Default working directory
     pub default_working_directory: Option<PathBuf>,
-    /// Whether to capture stdout
-    pub capture_stdout: bool,
-    /// Whether to capture stderr
-    pub capture_stderr: bool,
+    /// I/O capture settings
+    pub io_capture: IoCapture,
     /// Environment variables to pass to processes
     pub allowed_env_vars: Vec<String>,
-    /// Whether to inherit current process environment
-    pub inherit_environment: bool,
 }
 
 impl Default for ProcessExecutorConfig {
@@ -128,10 +143,15 @@ impl Default for ProcessExecutorConfig {
                 "killall".to_string(),
                 "pkill".to_string(),
             ],
-            allow_arbitrary_commands: false,
+            permissions: ExecutionPermissions {
+                allow_arbitrary_commands: false,
+                inherit_environment: false,
+            },
             default_working_directory: None,
-            capture_stdout: true,
-            capture_stderr: true,
+            io_capture: IoCapture {
+                stdout: true,
+                stderr: true,
+            },
             allowed_env_vars: vec![
                 "PATH".to_string(),
                 "HOME".to_string(),
@@ -142,7 +162,6 @@ impl Default for ProcessExecutorConfig {
                 "LC_ALL".to_string(),
                 "TZ".to_string(),
             ],
-            inherit_environment: false,
         }
     }
 }
@@ -194,30 +213,30 @@ impl ProcessExecutorTool {
     }
 
     /// Check if an executable is allowed to be executed
-    fn is_executable_allowed(&self, executable: &str) -> LLMResult<bool> {
+    fn is_executable_allowed(&self, executable: &str) -> bool {
         // Check blocked executables first (takes precedence)
         for blocked in &self.config.blocked_executables {
             if executable == blocked || executable.ends_with(&format!("/{blocked}")) {
                 debug!("Executable '{}' is blocked", executable);
-                return Ok(false);
+                return false;
             }
         }
 
         // If arbitrary commands are allowed, allow it
-        if self.config.allow_arbitrary_commands {
-            return Ok(true);
+        if self.config.permissions.allow_arbitrary_commands {
+            return true;
         }
 
         // Check allowed executables
         for allowed in &self.config.allowed_executables {
             if executable == allowed || executable.ends_with(&format!("/{allowed}")) {
                 debug!("Executable '{}' is allowed", executable);
-                return Ok(true);
+                return true;
             }
         }
 
         debug!("Executable '{}' is not in allowed list", executable);
-        Ok(false)
+        false
     }
 
     /// Resolve executable path
@@ -236,14 +255,15 @@ impl ProcessExecutorTool {
         }
 
         // Try to find in PATH
-        if let Some(path) = find_executable(executable) {
-            Ok(path)
-        } else {
-            Err(LLMSpellError::Validation {
-                message: format!("Executable not found in PATH: {executable}"),
-                field: Some("executable".to_string()),
-            })
-        }
+        find_executable(executable).map_or_else(
+            || {
+                Err(LLMSpellError::Validation {
+                    message: format!("Executable not found in PATH: {executable}"),
+                    field: Some("executable".to_string()),
+                })
+            },
+            Ok,
+        )
     }
 
     /// Execute a process with the given arguments
@@ -260,7 +280,7 @@ impl ProcessExecutorTool {
         let exe_path = self.resolve_executable(executable).await?;
 
         // Check if executable is allowed
-        if !self.is_executable_allowed(exe_path.to_str().unwrap_or(executable))? {
+        if !self.is_executable_allowed(exe_path.to_str().unwrap_or(executable)) {
             return Err(LLMSpellError::Security {
                 message: format!("Execution of '{executable}' is not permitted"),
                 violation_type: Some("executable_blocked".to_string()),
@@ -283,13 +303,13 @@ impl ProcessExecutorTool {
         }
 
         // Configure stdio
-        if self.config.capture_stdout {
+        if self.config.io_capture.stdout {
             cmd.stdout(Stdio::piped());
         } else {
             cmd.stdout(Stdio::null());
         }
 
-        if self.config.capture_stderr {
+        if self.config.io_capture.stderr {
             cmd.stderr(Stdio::piped());
         } else {
             cmd.stderr(Stdio::null());
@@ -298,7 +318,7 @@ impl ProcessExecutorTool {
         cmd.stdin(Stdio::null()); // Don't allow stdin input for security
 
         // Set environment variables
-        if !self.config.inherit_environment {
+        if !self.config.permissions.inherit_environment {
             cmd.env_clear();
         }
 
@@ -312,7 +332,7 @@ impl ProcessExecutorTool {
         }
 
         // Add default environment variables if inheriting
-        if self.config.inherit_environment {
+        if self.config.permissions.inherit_environment {
             for var in &self.config.allowed_env_vars {
                 if let Ok(value) = std::env::var(var) {
                     cmd.env(var, value);
@@ -494,17 +514,13 @@ impl BaseAgent for ProcessExecutorTool {
             .unwrap_or_default();
 
         let working_dir_str = extract_optional_string(params, "working_directory");
-        let working_dir = if let Some(dir) = working_dir_str.as_ref() {
+        let working_dir = working_dir_str.as_ref().and_then(|dir| {
             // Sanitize path to prevent directory traversal
-            if let Ok(safe_path) = sanitizer.sanitize_path(dir) {
-                Some(safe_path)
-            } else {
+            sanitizer.sanitize_path(dir).ok().or_else(|| {
                 warn!("Invalid working directory path detected: {}", dir);
                 None
-            }
-        } else {
-            None
-        };
+            })
+        });
         let working_dir_path = working_dir.as_deref().map(Path::new);
 
         let env_vars: Option<HashMap<String, String>> =
@@ -693,6 +709,10 @@ impl ProcessExecutorTool {
 
     /// Demonstrate hook-aware execution for process execution
     /// This method showcases how the process executor tool works with the hook system
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the process execution fails or hook execution fails
     pub async fn demonstrate_hook_integration(
         &self,
         tool_executor: &crate::lifecycle::ToolExecutor,
@@ -718,7 +738,6 @@ impl ProcessExecutorTool {
         let context = ExecutionContext::default();
 
         // Execute with hooks using the HookableToolExecution trait
-        use crate::lifecycle::HookableToolExecution;
         self.execute_with_hooks(input, context, tool_executor).await
     }
 }
@@ -788,7 +807,7 @@ mod tests {
 
         let input = create_test_tool_input(vec![
             ("executable", "pwd"),
-            ("working_directory", "temp_dir.path().to_string_lossy()"),
+            ("working_directory", &temp_dir.path().to_string_lossy()),
         ]);
 
         let result = tool
@@ -822,13 +841,10 @@ mod tests {
         let tool = create_test_process_executor();
 
         // Test dangerous characters
-        let input1 = create_test_tool_input(
-            "Execute with dangerous chars",
-            json!({
-                "executable": "echo; rm -rf /",
-                "arguments": ["test"]
-            }),
-        );
+        let input1 = create_test_tool_input(vec![
+            ("executable", "echo; rm -rf /"),
+            ("arguments", "[\"test\"]"),
+        ]);
 
         let result1 = tool.execute(input1, ExecutionContext::default()).await;
         assert!(result1.is_err());
@@ -838,13 +854,10 @@ mod tests {
             .contains("dangerous characters"));
 
         // Test path traversal
-        let input2 = create_test_tool_input(
-            "Execute with path traversal",
-            json!({
-                "executable": "../../../bin/echo",
-                "arguments": ["test"]
-            }),
-        );
+        let input2 = create_test_tool_input(vec![
+            ("executable", "../../../bin/echo"),
+            ("arguments", "[\"test\"]"),
+        ]);
 
         let result2 = tool.execute(input2, ExecutionContext::default()).await;
         assert!(result2.is_err());
@@ -873,12 +886,7 @@ mod tests {
             .contains("Missing parameters object"));
 
         // Empty executable
-        let input2 = create_test_tool_input(
-            "Empty executable",
-            json!({
-                "executable": ""
-            }),
-        );
+        let input2 = create_test_tool_input(vec![("executable", "")]);
         let result2 = tool.execute(input2, ExecutionContext::default()).await;
         assert!(result2.is_err());
         assert!(result2.unwrap_err().to_string().contains("cannot be empty"));
@@ -902,15 +910,15 @@ mod tests {
         let tool = create_test_process_executor();
 
         // Test allowed executable
-        assert!(tool.is_executable_allowed("echo").unwrap());
-        assert!(tool.is_executable_allowed("/bin/echo").unwrap());
+        assert!(tool.is_executable_allowed("echo"));
+        assert!(tool.is_executable_allowed("/bin/echo"));
 
         // Test blocked executable
-        assert!(!tool.is_executable_allowed("rm").unwrap());
-        assert!(!tool.is_executable_allowed("/bin/rm").unwrap());
+        assert!(!tool.is_executable_allowed("rm"));
+        assert!(!tool.is_executable_allowed("/bin/rm"));
 
         // Test unknown executable (should be denied by default)
-        assert!(!tool.is_executable_allowed("unknown_command").unwrap());
+        assert!(!tool.is_executable_allowed("unknown_command"));
     }
     #[tokio::test]
     async fn test_tool_metadata() {
@@ -953,27 +961,33 @@ mod tests {
     #[tokio::test]
     async fn test_arbitrary_commands_disabled() {
         let config = ProcessExecutorConfig {
-            allow_arbitrary_commands: false,
+            permissions: ExecutionPermissions {
+                allow_arbitrary_commands: false,
+                inherit_environment: false,
+            },
             ..Default::default()
         };
         let tool = ProcessExecutorTool::new(config);
 
         // Should not allow arbitrary commands
-        assert!(!tool.is_executable_allowed("arbitrary_command").unwrap());
+        assert!(!tool.is_executable_allowed("arbitrary_command"));
     }
     #[tokio::test]
     async fn test_arbitrary_commands_enabled() {
         let config = ProcessExecutorConfig {
-            allow_arbitrary_commands: true,
+            permissions: ExecutionPermissions {
+                allow_arbitrary_commands: true,
+                inherit_environment: false,
+            },
             ..Default::default()
         };
         let tool = ProcessExecutorTool::new(config);
 
         // Should allow arbitrary commands (unless blocked)
-        assert!(tool.is_executable_allowed("arbitrary_command").unwrap());
+        assert!(tool.is_executable_allowed("arbitrary_command"));
 
         // But still respect blocked list
-        assert!(!tool.is_executable_allowed("rm").unwrap());
+        assert!(!tool.is_executable_allowed("rm"));
     }
     #[test]
     fn test_hook_integration_metadata() {

@@ -689,13 +689,13 @@ mod tests {
         let tool = GraphQLQueryTool::default();
 
         let simple_query = "{ user { name } }";
-        assert_eq!(tool.estimate_query_depth(simple_query), 2);
+        assert_eq!(GraphQLQueryTool::estimate_query_depth(simple_query), 2);
 
         let nested_query = "{ user { posts { comments { author { name } } } } }";
-        assert_eq!(tool.estimate_query_depth(nested_query), 5);
+        assert_eq!(GraphQLQueryTool::estimate_query_depth(nested_query), 5);
 
         let flat_query = "{ user posts comments }";
-        assert_eq!(tool.estimate_query_depth(flat_query), 1);
+        assert_eq!(GraphQLQueryTool::estimate_query_depth(flat_query), 1);
     }
     #[test]
     fn test_schema_cache_expiry() {

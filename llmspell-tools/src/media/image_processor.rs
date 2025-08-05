@@ -894,7 +894,10 @@ mod tests {
 
         fs::write(&file_path, b"dummy png content").unwrap();
 
-        let input = create_test_tool_input(vec![("operation", "metadata")]);
+        let input = create_test_tool_input(vec![
+            ("operation", "metadata"),
+            ("file_path", file_path.to_str().unwrap()),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -913,7 +916,10 @@ mod tests {
 
         fs::write(&file_path, b"dummy").unwrap();
 
-        let input = create_test_tool_input(vec![("operation", "detect")]);
+        let input = create_test_tool_input(vec![
+            ("operation", "detect"),
+            ("file_path", file_path.to_str().unwrap()),
+        ]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -936,7 +942,10 @@ mod tests {
         // Create a file larger than the limit
         fs::write(&file_path, vec![0u8; 100]).unwrap();
 
-        let input = create_test_tool_input(vec![("operation", "metadata")]);
+        let input = create_test_tool_input(vec![
+            ("operation", "metadata"),
+            ("file_path", file_path.to_str().unwrap()),
+        ]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
@@ -953,7 +962,8 @@ mod tests {
 
         let input = create_test_tool_input(vec![
             ("operation", "resize"),
-            ("source_path", "input_path.to_str().unwrap()"),
+            ("source_path", input_path.to_str().unwrap()),
+            ("target_path", output_path.to_str().unwrap()),
             ("width", "100"),
         ]);
 
@@ -972,7 +982,8 @@ mod tests {
 
         let input = create_test_tool_input(vec![
             ("operation", "convert"),
-            ("source_path", "input_path.to_str().unwrap()"),
+            ("source_path", input_path.to_str().unwrap()),
+            ("target_path", output_path.to_str().unwrap()),
             ("target_format", "jpeg"),
         ]);
 
@@ -1072,7 +1083,7 @@ mod tests {
         fs::write(&file_path, b"dummy").unwrap();
 
         // No operation specified, should default to metadata
-        let input = create_test_tool_input(vec![]);
+        let input = create_test_tool_input(vec![("file_path", file_path.to_str().unwrap())]);
 
         let result = tool
             .execute(input, ExecutionContext::default())
@@ -1085,7 +1096,7 @@ mod tests {
     async fn test_empty_file_path() {
         let tool = create_test_image_processor();
 
-        let input = create_test_tool_input(vec![("operation", "detect")]);
+        let input = create_test_tool_input(vec![("operation", "detect"), ("file_path", "")]);
 
         let result = tool.execute(input, ExecutionContext::default()).await;
         assert!(result.is_err());
