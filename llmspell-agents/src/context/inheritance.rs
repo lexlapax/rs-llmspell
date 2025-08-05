@@ -267,7 +267,6 @@ impl InheritanceRules {
 
     fn transform_value(&self, field: &str, value: &Value) -> Value {
         match self.field_rules.transforms.get(field) {
-            Some(FieldTransform::Copy) => value.clone(),
             Some(FieldTransform::Prefix(prefix)) => {
                 if let Some(str_val) = value.as_str() {
                     Value::String(format!("{prefix}{str_val}"))
@@ -282,11 +281,7 @@ impl InheritanceRules {
                     value.clone()
                 }
             }
-            Some(FieldTransform::Custom(_)) => {
-                // Custom transforms would be implemented by validators
-                value.clone()
-            }
-            None => value.clone(),
+            Some(FieldTransform::Copy) | Some(FieldTransform::Custom(_)) | None => value.clone(),
         }
     }
 

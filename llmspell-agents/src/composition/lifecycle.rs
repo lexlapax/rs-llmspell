@@ -622,12 +622,11 @@ impl HierarchicalLifecycleManager {
     fn parse_lifecycle_state(&self, state: &str) -> LifecycleState {
         match state {
             "initializing" => LifecycleState::Initializing,
-            "ready" => LifecycleState::Ready,
             "active" => LifecycleState::Active,
             "paused" => LifecycleState::Paused,
             "shutting_down" => LifecycleState::ShuttingDown,
             "terminated" => LifecycleState::Terminated,
-            _ => LifecycleState::Ready,
+            "ready" | _ => LifecycleState::Ready,
         }
     }
 }

@@ -199,7 +199,7 @@ impl ToolDiscovery {
             let categories: Vec<ToolCategory> = query
                 .categories
                 .iter()
-                .filter_map(|cat| self.string_to_tool_category(cat))
+                .map(|cat| self.string_to_tool_category(cat))
                 .collect();
             if !categories.is_empty() {
                 matcher = matcher.with_categories(categories);
@@ -277,17 +277,17 @@ impl ToolDiscovery {
     }
 
     /// Convert string to `ToolCategory`
-    fn string_to_tool_category(&self, category_str: &str) -> Option<ToolCategory> {
+    fn string_to_tool_category(&self, category_str: &str) -> ToolCategory {
         match category_str.to_lowercase().as_str() {
-            "filesystem" => Some(ToolCategory::Filesystem),
-            "web" => Some(ToolCategory::Web),
-            "api" => Some(ToolCategory::Api),
-            "analysis" => Some(ToolCategory::Analysis),
-            "data" => Some(ToolCategory::Data),
-            "system" => Some(ToolCategory::System),
-            "media" => Some(ToolCategory::Media),
-            "utility" => Some(ToolCategory::Utility),
-            _ => Some(ToolCategory::Custom(category_str.to_string())),
+            "filesystem" => ToolCategory::Filesystem,
+            "web" => ToolCategory::Web,
+            "api" => ToolCategory::Api,
+            "analysis" => ToolCategory::Analysis,
+            "data" => ToolCategory::Data,
+            "system" => ToolCategory::System,
+            "media" => ToolCategory::Media,
+            "utility" => ToolCategory::Utility,
+            _ => ToolCategory::Custom(category_str.to_string()),
         }
     }
 

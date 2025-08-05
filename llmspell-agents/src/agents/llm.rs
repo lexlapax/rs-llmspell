@@ -118,7 +118,7 @@ impl LLMAgent {
     }
 
     /// Build messages for provider including conversation history
-    fn build_messages(&self, input: &str) -> Result<Vec<ConversationMessage>, LLMSpellError> {
+    fn build_messages(&self, input: &str) -> Vec<ConversationMessage> {
         let mut messages = Vec::new();
 
         // Add system prompt if configured
@@ -144,7 +144,7 @@ impl LLMAgent {
         // Add current input
         messages.push(ConversationMessage::user(input.to_string()));
 
-        Ok(messages)
+        messages
     }
 
     /// Get state machine for lifecycle management
@@ -330,7 +330,7 @@ impl BaseAgent for LLMAgent {
         );
 
         // Build messages for the provider
-        let messages = self.build_messages(&input.text)?;
+        let messages = self.build_messages(&input.text);
 
         // Create provider input with conversation messages as JSON
         let messages_json =

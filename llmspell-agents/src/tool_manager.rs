@@ -125,7 +125,7 @@ impl ToolManager {
             let categories: Vec<ToolCategory> = query
                 .categories
                 .iter()
-                .filter_map(|cat| self.string_to_tool_category(cat))
+                .map(|cat| self.string_to_tool_category(cat))
                 .collect();
             if !categories.is_empty() {
                 matcher = matcher.with_categories(categories);
@@ -404,7 +404,7 @@ impl ToolManager {
             ContextMode::Previous => {
                 // Replace ${previous.output} with actual previous output
                 if let Some(prev_output) = previous_output {
-                    parameters = self.substitute_previous_output(parameters, prev_output)?;
+                    parameters = self.substitute_previous_output(parameters, prev_output);
                 }
             }
             ContextMode::Selective(_fields) => {
@@ -421,7 +421,7 @@ impl ToolManager {
         &self,
         mut parameters: JsonValue,
         previous_output: &AgentOutput,
-    ) -> Result<JsonValue> {
+    ) -> JsonValue {
         // Simple substitution - replace "${previous.output}" with the output text
         if let JsonValue::Object(ref mut map) = parameters {
             for (_, value) in map.iter_mut() {
@@ -432,7 +432,7 @@ impl ToolManager {
                 }
             }
         }
-        Ok(parameters)
+        parameters
     }
 
     /// Convert registry `ToolInfo` to our `ToolInfo` format
@@ -457,17 +457,17 @@ impl ToolManager {
     }
 
     /// Convert string to `ToolCategory`
-    fn string_to_tool_category(&self, category_str: &str) -> Option<ToolCategory> {
+    fn string_to_tool_category(&self, category_str: &str) -> ToolCategory {
         match category_str.to_lowercase().as_str() {
-            "filesystem" => Some(ToolCategory::Filesystem),
-            "web" => Some(ToolCategory::Web),
-            "api" => Some(ToolCategory::Api),
-            "analysis" => Some(ToolCategory::Analysis),
-            "data" => Some(ToolCategory::Data),
-            "system" => Some(ToolCategory::System),
-            "media" => Some(ToolCategory::Media),
-            "utility" => Some(ToolCategory::Utility),
-            _ => Some(ToolCategory::Custom(category_str.to_string())),
+            "filesystem" => ToolCategory::Filesystem,
+            "web" => ToolCategory::Web,
+            "api" => ToolCategory::Api,
+            "analysis" => ToolCategory::Analysis,
+            "data" => ToolCategory::Data,
+            "system" => ToolCategory::System,
+            "media" => ToolCategory::Media,
+            "utility" => ToolCategory::Utility,
+            _ => ToolCategory::Custom(category_str.to_string()),
         }
     }
 
@@ -598,8 +598,7 @@ mod tests {
 
         let previous_output = AgentOutput::text("test_output".to_string());
         let result = manager
-            .substitute_previous_output(parameters, &previous_output)
-            .unwrap();
+            .substitute_previous_output(parameters, &previous_output);
 
         assert_eq!(
             result["input"],

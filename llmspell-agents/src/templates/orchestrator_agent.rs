@@ -475,7 +475,7 @@ impl OrchestratorAgentTemplate {
         &self,
         config: &mut OrchestratorAgentConfig,
         params: &HashMap<String, serde_json::Value>,
-    ) -> Result<()> {
+    ) {
         if let Some(max_agents) = params.get("max_managed_agents") {
             if let Some(value) = max_agents.as_u64() {
                 config.max_managed_agents = value as usize;
@@ -536,8 +536,6 @@ impl OrchestratorAgentTemplate {
                 config.workflow_templates_dir = Some(value.to_string());
             }
         }
-
-        Ok(())
     }
 }
 
@@ -565,7 +563,7 @@ impl AgentTemplate for OrchestratorAgentTemplate {
 
         // Create agent-specific configuration
         let mut agent_config = self.config.clone();
-        self.apply_parameters_to_config(&mut agent_config, &params.parameters)?;
+        self.apply_parameters_to_config(&mut agent_config, &params.parameters);
 
         // Build final configuration
         let mut final_config = HashMap::new();

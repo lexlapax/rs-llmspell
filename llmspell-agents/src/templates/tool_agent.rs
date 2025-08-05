@@ -340,7 +340,7 @@ impl ToolAgentTemplate {
         &self,
         config: &mut ToolAgentConfig,
         params: &HashMap<String, serde_json::Value>,
-    ) -> Result<()> {
+    ) {
         if let Some(max_tools) = params.get("max_tools") {
             if let Some(value) = max_tools.as_u64() {
                 config.max_tools = value as usize;
@@ -373,8 +373,6 @@ impl ToolAgentTemplate {
                     .collect();
             }
         }
-
-        Ok(())
     }
 }
 
@@ -402,7 +400,7 @@ impl AgentTemplate for ToolAgentTemplate {
 
         // Create agent-specific configuration
         let mut agent_config = self.config.clone();
-        self.apply_parameters_to_config(&mut agent_config, &params.parameters)?;
+        self.apply_parameters_to_config(&mut agent_config, &params.parameters);
 
         // Build final configuration
         let mut final_config = HashMap::new();

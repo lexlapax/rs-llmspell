@@ -264,46 +264,15 @@ impl StateHandler for DefaultStateHandler {
         };
 
         match (self.state, target) {
-            // From Uninitialized
-            (Uninitialized, Initializing) => true,
-            (Uninitialized, Error) => true,
-
-            // From Initializing
-            (Initializing, Ready) => true,
-            (Initializing, Error) => true,
-            (Initializing, Terminating) => true,
-
-            // From Ready
-            (Ready, Running) => true,
-            (Ready, Paused) => true,
-            (Ready, Terminating) => true,
-            (Ready, Error) => true,
-
-            // From Running
-            (Running, Ready) => true,
-            (Running, Paused) => true,
-            (Running, Terminating) => true,
-            (Running, Error) => true,
-
-            // From Paused
-            (Paused, Ready) => true,
-            (Paused, Running) => true,
-            (Paused, Terminating) => true,
-            (Paused, Error) => true,
-
-            // From Error
-            (Error, Recovering) => true,
-            (Error, Terminating) => true,
-            (Error, Terminated) => true,
-
-            // From Recovering
-            (Recovering, Ready) => true,
-            (Recovering, Error) => true,
-            (Recovering, Terminating) => true,
-
-            // From Terminating
-            (Terminating, Terminated) => true,
-            (Terminating, Error) => true,
+            // Valid transitions
+            (Uninitialized, Initializing | Error) |
+            (Initializing, Ready | Error | Terminating) |
+            (Ready, Running | Paused | Terminating | Error) |
+            (Running, Ready | Paused | Terminating | Error) |
+            (Paused, Ready | Running | Terminating | Error) |
+            (Error, Recovering | Terminating | Terminated) |
+            (Recovering, Ready | Error | Terminating) |
+            (Terminating, Terminated | Error) => true,
 
             // From Terminated (final state)
             (Terminated, _) => false,

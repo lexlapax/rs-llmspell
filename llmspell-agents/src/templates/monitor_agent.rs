@@ -508,7 +508,7 @@ impl MonitorAgentTemplate {
         &self,
         config: &mut MonitorAgentConfig,
         params: &HashMap<String, serde_json::Value>,
-    ) -> Result<()> {
+    ) {
         if let Some(scopes) = params.get("monitoring_scopes") {
             if let Some(array) = scopes.as_array() {
                 config.monitoring_scopes = array
@@ -596,8 +596,6 @@ impl MonitorAgentTemplate {
                     .collect();
             }
         }
-
-        Ok(())
     }
 }
 
@@ -625,7 +623,7 @@ impl AgentTemplate for MonitorAgentTemplate {
 
         // Create agent-specific configuration
         let mut agent_config = self.config.clone();
-        self.apply_parameters_to_config(&mut agent_config, &params.parameters)?;
+        self.apply_parameters_to_config(&mut agent_config, &params.parameters);
 
         // Build final configuration
         let mut final_config = HashMap::new();
