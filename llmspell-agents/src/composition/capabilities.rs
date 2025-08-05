@@ -132,6 +132,10 @@ impl CapabilityAggregator {
     /// # Errors
     ///
     /// Returns an error if capability registration fails
+    ///
+    /// # Panics
+    ///
+    /// Panics if the RwLock is poisoned
     pub fn register_capability(
         &self,
         capability: Capability,
@@ -174,6 +178,10 @@ impl CapabilityAggregator {
     /// # Errors
     ///
     /// Returns an error if capability is not found
+    ///
+    /// # Panics
+    ///
+    /// Panics if the RwLock is poisoned
     pub fn unregister_capability(&self, provider_id: &str, capability_name: &str) -> Result<()> {
         let capability_id = format!("{provider_id}::{capability_name}");
 
@@ -194,12 +202,20 @@ impl CapabilityAggregator {
     }
 
     /// Add a capability requirement
+    ///
+    /// # Panics
+    ///
+    /// Panics if the RwLock is poisoned
     pub fn add_requirement(&self, requirement: CapabilityRequirement) {
         let mut requirements = self.requirements.write().unwrap();
         requirements.push(requirement);
     }
 
     /// Clear all requirements
+    ///
+    /// # Panics
+    ///
+    /// Panics if the RwLock is poisoned
     pub fn clear_requirements(&self) {
         let mut requirements = self.requirements.write().unwrap();
         requirements.clear();
@@ -207,6 +223,10 @@ impl CapabilityAggregator {
     }
 
     /// Find capabilities matching requirements
+    ///
+    /// # Panics
+    ///
+    /// Panics if the RwLock is poisoned
     pub fn find_matches(&self) -> Vec<CapabilityMatch> {
         let capabilities = self.capabilities.read().unwrap();
         let capabilities_vec: Vec<_> = capabilities.values().cloned().collect();
@@ -257,6 +277,10 @@ impl CapabilityAggregator {
     }
 
     /// Check if a capability matches a requirement
+    ///
+    /// # Panics
+    ///
+    /// Panics if the RwLock is poisoned
     fn matches_requirement(
         &self,
         capability: &Capability,
@@ -349,6 +373,10 @@ impl CapabilityAggregator {
     /// # Errors
     ///
     /// Returns an error if capability is not found
+    ///
+    /// # Panics
+    ///
+    /// Panics if the RwLock is poisoned
     pub fn update_usage(
         &self,
         provider_id: &str,
@@ -389,6 +417,10 @@ impl CapabilityAggregator {
     }
 
     /// Get all capabilities for a provider
+    ///
+    /// # Panics
+    ///
+    /// Panics if the RwLock is poisoned
     pub fn get_provider_capabilities(&self, provider_id: &str) -> Vec<Capability> {
         let capabilities = self.capabilities.read().unwrap();
         capabilities
@@ -399,6 +431,10 @@ impl CapabilityAggregator {
     }
 
     /// Get capabilities by category
+    ///
+    /// # Panics
+    ///
+    /// Panics if the RwLock is poisoned
     pub fn get_by_category(&self, category: &CapabilityCategory) -> Vec<Capability> {
         let index = self.category_index.read().unwrap();
         let capabilities = self.capabilities.read().unwrap();
@@ -440,6 +476,10 @@ impl CapabilityAggregator {
     }
 
     /// Get statistics for all capabilities
+    ///
+    /// # Panics
+    ///
+    /// Panics if the RwLock is poisoned
     pub fn get_statistics(&self) -> CapabilityStatistics {
         let capabilities = self.capabilities.read().unwrap();
         let total = capabilities.len();

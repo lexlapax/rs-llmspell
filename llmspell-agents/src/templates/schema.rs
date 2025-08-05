@@ -304,9 +304,9 @@ impl TemplateSchema {
     }
 
     /// Validate the template schema
-    /// 
+    ///
     /// # Errors
-    /// 
+    ///
     /// Returns an error if:
     /// - Template ID, name, or version is empty
     /// - Duplicate parameter names are found

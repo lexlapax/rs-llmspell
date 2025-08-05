@@ -147,29 +147,49 @@ impl MockAgent {
     }
 
     /// Get execution count
+    ///
+    /// # Panics
+    ///
+    /// Panics if the Mutex is poisoned
     #[must_use]
     pub fn execution_count(&self) -> usize {
         *self.execution_count.lock().unwrap()
     }
 
     /// Get last input
+    ///
+    /// # Panics
+    ///
+    /// Panics if the Mutex is poisoned
     #[must_use]
     pub fn last_input(&self) -> Option<AgentInput> {
         self.last_input.lock().unwrap().clone()
     }
 
     /// Get last context
+    ///
+    /// # Panics
+    ///
+    /// Panics if the Mutex is poisoned
     #[must_use]
     pub fn last_context(&self) -> Option<ExecutionContext> {
         self.last_context.lock().unwrap().clone()
     }
 
     /// Add response to mock agent
+    ///
+    /// # Panics
+    ///
+    /// Panics if the Mutex is poisoned
     pub fn add_response(&self, response: MockResponse) {
         self.config.lock().unwrap().responses.push(response);
     }
 
     /// Set failure mode
+    ///
+    /// # Panics
+    ///
+    /// Panics if the Mutex is poisoned
     pub fn set_failure(&self, should_fail: bool, message: &str) {
         let mut config = self.config.lock().unwrap();
         config.should_fail = should_fail;
@@ -177,6 +197,10 @@ impl MockAgent {
     }
 
     /// Add state transition
+    ///
+    /// # Panics
+    ///
+    /// Panics if the Mutex is poisoned
     pub fn add_state_transition(&self, state: AgentState) {
         self.config.lock().unwrap().state_transitions.push(state);
     }
@@ -243,6 +267,9 @@ impl BaseAgent for MockAgent {
         &self.metadata
     }
 
+    /// # Panics
+    ///
+    /// Panics if any Mutex is poisoned
     async fn execute(
         &self,
         input: AgentInput,
@@ -609,6 +636,10 @@ impl MockTool {
     }
 
     /// Get execution count
+    ///
+    /// # Panics
+    ///
+    /// Panics if the Mutex is poisoned
     #[must_use]
     pub fn execution_count(&self) -> usize {
         *self.execution_count.lock().unwrap()
@@ -621,6 +652,9 @@ impl BaseAgent for MockTool {
         &self.metadata
     }
 
+    /// # Panics
+    ///
+    /// Panics if any Mutex is poisoned
     async fn execute(
         &self,
         input: AgentInput,

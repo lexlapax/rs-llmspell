@@ -46,6 +46,10 @@ impl AgentBuilder {
     }
 
     /// Set model temperature
+    ///
+    /// # Panics
+    ///
+    /// Will not panic. This function only modifies the temperature if a model config exists.
     #[must_use]
     pub const fn temperature(mut self, temperature: f32) -> Self {
         if let Some(model) = &mut self.config.model {
@@ -55,6 +59,10 @@ impl AgentBuilder {
     }
 
     /// Set maximum tokens for model
+    ///
+    /// # Panics
+    ///
+    /// Will not panic. This function only modifies the max tokens if a model config exists.
     #[must_use]
     pub const fn max_tokens(mut self, max_tokens: u32) -> Self {
         if let Some(model) = &mut self.config.model {
@@ -64,6 +72,10 @@ impl AgentBuilder {
     }
 
     /// Add a model setting
+    ///
+    /// # Panics
+    ///
+    /// Will not panic. This function only adds settings if a model config exists.
     pub fn model_setting(mut self, key: impl Into<String>, value: Value) -> Self {
         if let Some(model) = &mut self.config.model {
             model.settings.insert(key.into(), value);
@@ -133,9 +145,9 @@ impl AgentBuilder {
     }
 
     /// Build the agent configuration
-    /// 
+    ///
     /// # Errors
-    /// 
+    ///
     /// Returns an error if:
     /// - Agent name is empty
     /// - Agent type is empty

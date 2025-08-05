@@ -409,9 +409,9 @@ impl MetricRegistry {
     }
 
     /// Register a metric
-    /// 
+    ///
     /// # Errors
-    /// 
+    ///
     /// Currently never returns an error, but the Result type is provided for future
     /// extensibility (e.g., validation of metric names or handling registration conflicts).
     pub fn register(&self, name: String, metric: Arc<dyn MetricAccess>) -> Result<()> {

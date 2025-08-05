@@ -88,6 +88,10 @@ impl TraceSpan {
     }
 
     /// Complete the span
+    ///
+    /// # Panics
+    ///
+    /// Panics if the end_time calculation results in a negative duration
     pub fn complete(&mut self, status: SpanStatus) {
         self.end_time = Some(Utc::now());
         self.duration = Some(
@@ -203,6 +207,9 @@ pub struct TraceCollector {
 }
 
 impl std::fmt::Debug for TraceCollector {
+    /// # Panics
+    ///
+    /// Panics if any RwLock is poisoned
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TraceCollector")
             .field(
@@ -237,6 +244,10 @@ impl TraceCollector {
     }
 
     /// Start a new span
+    ///
+    /// # Panics
+    ///
+    /// Panics if the RwLock is poisoned
     #[must_use]
     pub fn start_span(self: &Arc<Self>, span: TraceSpan) -> SpanHandle {
         let span_id = span.span_id.clone();
@@ -252,6 +263,10 @@ impl TraceCollector {
     }
 
     /// Complete a span
+    ///
+    /// # Panics
+    ///
+    /// Panics if any RwLock is poisoned
     fn complete_span(&self, span_id: &str, status: SpanStatus) -> Result<()> {
         let mut active = self.active_spans.write().unwrap();
 
@@ -275,12 +290,20 @@ impl TraceCollector {
     }
 
     /// Get active span count
+    ///
+    /// # Panics
+    ///
+    /// Panics if the RwLock is poisoned
     #[must_use]
     pub fn active_span_count(&self) -> usize {
         self.active_spans.read().unwrap().len()
     }
 
     /// Get completed spans for a trace
+    ///
+    /// # Panics
+    ///
+    /// Panics if the RwLock is poisoned
     #[must_use]
     pub fn get_trace(&self, trace_id: &str) -> Vec<TraceSpan> {
         self.completed_spans
@@ -307,6 +330,10 @@ impl TraceCollector {
     }
 
     /// Clear all completed spans
+    ///
+    /// # Panics
+    ///
+    /// Panics if the RwLock is poisoned
     pub fn clear_completed(&self) {
         self.completed_spans.write().unwrap().clear();
     }
@@ -368,9 +395,9 @@ impl SpanHandle {
 /// Trait for exporting traces
 pub trait TraceExporter: Send + Sync {
     /// Export a completed span
-    /// 
+    ///
     /// # Errors
-    /// 
+    ///
     /// Returns an error if the span cannot be exported due to network issues,
     /// serialization failures, or backend service unavailability.
     fn export(&self, span: &TraceSpan) -> Result<()>;

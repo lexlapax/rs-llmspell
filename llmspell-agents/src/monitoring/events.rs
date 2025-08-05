@@ -171,6 +171,9 @@ pub struct EventLogger {
 }
 
 impl std::fmt::Debug for EventLogger {
+    /// # Panics
+    ///
+    /// Panics if the RwLock is poisoned
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("EventLogger")
             .field("agent_id", &self.agent_id)
@@ -197,11 +200,19 @@ impl EventLogger {
     }
 
     /// Set minimum log level
+    ///
+    /// # Panics
+    ///
+    /// Panics if the RwLock is poisoned
     pub fn set_level(&self, level: LogLevel) {
         *self.min_level.write().unwrap() = level;
     }
 
     /// Get current log level
+    ///
+    /// # Panics
+    ///
+    /// Panics if the RwLock is poisoned
     pub fn get_level(&self) -> LogLevel {
         *self.min_level.read().unwrap()
     }
@@ -221,6 +232,10 @@ impl EventLogger {
     /// # Errors
     ///
     /// Returns an error if any exporter fails to export the event
+    ///
+    /// # Panics
+    ///
+    /// Panics if the RwLock is poisoned
     pub fn log(&self, event: LogEvent) -> Result<()> {
         // Check minimum level
         if !event.level.should_log(self.get_level()) {
@@ -350,12 +365,20 @@ impl EventLogger {
     }
 
     /// Get recent events
+    ///
+    /// # Panics
+    ///
+    /// Panics if the RwLock is poisoned
     pub fn get_recent_events(&self, count: usize) -> Vec<LogEvent> {
         let buffer = self.buffer.read().unwrap();
         buffer.iter().rev().take(count).cloned().collect()
     }
 
     /// Get events by level
+    ///
+    /// # Panics
+    ///
+    /// Panics if the RwLock is poisoned
     pub fn get_events_by_level(&self, level: LogLevel) -> Vec<LogEvent> {
         let buffer = self.buffer.read().unwrap();
         buffer
@@ -366,6 +389,10 @@ impl EventLogger {
     }
 
     /// Get events by trace ID
+    ///
+    /// # Panics
+    ///
+    /// Panics if the RwLock is poisoned
     pub fn get_events_by_trace(&self, trace_id: &str) -> Vec<LogEvent> {
         let buffer = self.buffer.read().unwrap();
         buffer
@@ -376,6 +403,10 @@ impl EventLogger {
     }
 
     /// Clear the event buffer
+    ///
+    /// # Panics
+    ///
+    /// Panics if the RwLock is poisoned
     pub fn clear_buffer(&self) {
         self.buffer.write().unwrap().clear();
     }

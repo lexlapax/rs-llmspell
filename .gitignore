@@ -28,3 +28,4 @@ tarpaulin-report.json
 build_rs_cov.profraw
 examples/backups/*
 errors_tracking.txt
+panics_tracking.txt

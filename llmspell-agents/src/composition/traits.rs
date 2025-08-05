@@ -238,9 +238,9 @@ impl CompositeAgentBuilder {
     }
 
     /// Build the composite agent (to be implemented by concrete types)
-    /// 
+    ///
     /// # Errors
-    /// 
+    ///
     /// Returns an error if:
     /// - The build method is called on the base builder (must be implemented by concrete types)
     /// - Component validation fails
