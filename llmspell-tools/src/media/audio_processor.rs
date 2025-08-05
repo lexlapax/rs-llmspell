@@ -291,7 +291,8 @@ impl AudioProcessorTool {
                         source: None,
                     })?;
 
-                let channels = u16::from_le_bytes([fmt_data[2], fmt_data[3]]) as u8;
+                let channels_u16 = u16::from_le_bytes([fmt_data[2], fmt_data[3]]);
+                let channels = channels_u16.min(u8::MAX as u16) as u8;
                 let sample_rate =
                     u32::from_le_bytes([fmt_data[4], fmt_data[5], fmt_data[6], fmt_data[7]]);
                 let byte_rate =

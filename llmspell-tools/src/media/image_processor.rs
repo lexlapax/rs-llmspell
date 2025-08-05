@@ -506,8 +506,8 @@ impl BaseAgent for ImageProcessorTool {
             "resize" => {
                 let input_path = extract_required_string(params, "source_path")?;
                 let output_path = extract_required_string(params, "target_path")?;
-                let width = extract_optional_u64(params, "width").map(|w| w as u32);
-                let height = extract_optional_u64(params, "height").map(|h| h as u32);
+                let width = extract_optional_u64(params, "width").map(|w| w.min(u32::MAX as u64) as u32);
+                let height = extract_optional_u64(params, "height").map(|h| h.min(u32::MAX as u64) as u32);
                 let maintain_aspect_ratio =
                     extract_optional_bool(params, "maintain_aspect_ratio").unwrap_or(true);
 
@@ -578,7 +578,8 @@ impl BaseAgent for ImageProcessorTool {
                     .ok_or_else(|| LLMSpellError::Validation {
                         message: "x is required".to_string(),
                         field: Some("x".to_string()),
-                    })? as u32;
+                    })?
+                    .min(u32::MAX as u64) as u32;
 
                 let y = params
                     .get("y")
@@ -586,7 +587,8 @@ impl BaseAgent for ImageProcessorTool {
                     .ok_or_else(|| LLMSpellError::Validation {
                         message: "y is required".to_string(),
                         field: Some("y".to_string()),
-                    })? as u32;
+                    })?
+                    .min(u32::MAX as u64) as u32;
 
                 let width = params
                     .get("width")
@@ -594,7 +596,8 @@ impl BaseAgent for ImageProcessorTool {
                     .ok_or_else(|| LLMSpellError::Validation {
                         message: "width is required".to_string(),
                         field: Some("width".to_string()),
-                    })? as u32;
+                    })?
+                    .min(u32::MAX as u64) as u32;
 
                 let height = params
                     .get("height")
@@ -602,7 +605,8 @@ impl BaseAgent for ImageProcessorTool {
                     .ok_or_else(|| LLMSpellError::Validation {
                         message: "height is required".to_string(),
                         field: Some("height".to_string()),
-                    })? as u32;
+                    })?
+                    .min(u32::MAX as u64) as u32;
 
                 self.crop_image(
                     Path::new(input_path),

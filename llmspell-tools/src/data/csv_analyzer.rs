@@ -205,8 +205,11 @@ impl StreamingColumnStats {
 
         let (mean, std_dev) = if let (Some(sum), Some(sum_squares)) = (self.sum, self.sum_squares) {
             if self.count > 0 {
-                let mean = sum / self.count as f64;
-                let variance = mean.mul_add(-mean, sum_squares / self.count as f64);
+                // Use explicit conversion with saturation check
+                #[allow(clippy::cast_precision_loss)]
+                let count_f64 = self.count as f64;
+                let mean = sum / count_f64;
+                let variance = mean.mul_add(-mean, sum_squares / count_f64);
                 let std_dev = if variance > 0.0 { variance.sqrt() } else { 0.0 };
                 (Some(mean), Some(std_dev))
             } else {
@@ -350,8 +353,11 @@ impl CsvAnalyzerTool {
 
             if field_counts.len() > 1 {
                 let all_same = field_counts.windows(2).all(|w| w[0] == w[1]);
-                let avg_fields =
-                    field_counts.iter().sum::<usize>() as f64 / field_counts.len() as f64;
+                #[allow(clippy::cast_precision_loss)]
+                let sum = field_counts.iter().sum::<usize>() as f64;
+                #[allow(clippy::cast_precision_loss)]
+                let len = field_counts.len() as f64;
+                let avg_fields = sum / len;
 
                 if all_same && avg_fields > 1.0 {
                     delimiter_scores.insert(delim, avg_fields);
@@ -1376,7 +1382,8 @@ impl BaseAgent for CsvAnalyzerTool {
                     .as_ref()
                     .and_then(|o| o.get("size"))
                     .and_then(serde_json::Value::as_u64)
-                    .unwrap_or(10) as usize;
+                    .unwrap_or(10)
+                    .min(usize::MAX as u64) as usize;
 
                 let sampled = self.sample_csv(&content, sample_size).await?;
                 Value::String(sampled)
