@@ -204,6 +204,7 @@ impl Default for LuaConfig {
 
 impl LuaConfig {
     /// Create a new builder for `LuaConfig`
+    #[must_use]
     pub fn builder() -> LuaConfigBuilder {
         LuaConfigBuilder::new()
     }
@@ -217,6 +218,7 @@ pub struct LuaConfigBuilder {
 
 impl LuaConfigBuilder {
     /// Create a new builder with default configuration
+    #[must_use]
     pub fn new() -> Self {
         Self {
             config: LuaConfig::default(),
@@ -225,21 +227,21 @@ impl LuaConfigBuilder {
 
     /// Set the standard library access level
     #[must_use]
-    pub fn stdlib(mut self, level: StdlibLevel) -> Self {
+    pub const fn stdlib(mut self, level: StdlibLevel) -> Self {
         self.config.stdlib = level;
         self
     }
 
     /// Set the maximum memory usage in bytes
     #[must_use]
-    pub fn max_memory(mut self, memory: Option<usize>) -> Self {
+    pub const fn max_memory(mut self, memory: Option<usize>) -> Self {
         self.config.max_memory = memory;
         self
     }
 
     /// Enable or disable debug features
     #[must_use]
-    pub fn debug(mut self, debug: bool) -> Self {
+    pub const fn debug(mut self, debug: bool) -> Self {
         self.config.debug = debug;
         self
     }
@@ -259,6 +261,7 @@ impl LuaConfigBuilder {
     }
 
     /// Build the configuration
+    #[must_use]
     pub fn build(self) -> LuaConfig {
         self.config
     }
@@ -309,6 +312,7 @@ impl Default for JSConfig {
 
 impl JSConfig {
     /// Create a new builder for `JSConfig`
+    #[must_use]
     pub fn builder() -> JSConfigBuilder {
         JSConfigBuilder::new()
     }
@@ -322,6 +326,7 @@ pub struct JSConfigBuilder {
 
 impl JSConfigBuilder {
     /// Create a new builder with default configuration
+    #[must_use]
     pub fn new() -> Self {
         Self {
             config: JSConfig::default(),
@@ -330,33 +335,34 @@ impl JSConfigBuilder {
 
     /// Enable or disable strict mode
     #[must_use]
-    pub fn strict_mode(mut self, strict: bool) -> Self {
+    pub const fn strict_mode(mut self, strict: bool) -> Self {
         self.config.strict_mode = strict;
         self
     }
 
     /// Set the maximum heap size in bytes
     #[must_use]
-    pub fn max_heap_size(mut self, size: Option<usize>) -> Self {
+    pub const fn max_heap_size(mut self, size: Option<usize>) -> Self {
         self.config.max_heap_size = size;
         self
     }
 
     /// Enable or disable console API
     #[must_use]
-    pub fn enable_console(mut self, enable: bool) -> Self {
+    pub const fn enable_console(mut self, enable: bool) -> Self {
         self.config.enable_console = enable;
         self
     }
 
     /// Set the module resolution strategy
     #[must_use]
-    pub fn module_resolution(mut self, resolution: ModuleResolution) -> Self {
+    pub const fn module_resolution(mut self, resolution: ModuleResolution) -> Self {
         self.config.module_resolution = resolution;
         self
     }
 
     /// Build the configuration
+    #[must_use]
     pub fn build(self) -> JSConfig {
         self.config
     }

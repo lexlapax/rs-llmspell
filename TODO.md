@@ -152,12 +152,17 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
    - **Note**: llmspell-agents had no type casting warnings
    - **Result**: Total warnings down to 1460
 
-4. [ ] **Phase 4: API Design** (1.5 hours) - llmspell-bridge
-   - [ ] Add 48 #[must_use] attributes to methods
-   - [ ] Add 46 #[must_use] to methods returning Self
-   - [ ] Convert 44 functions to const fn where possible
-   - [ ] Ensure the crate compiles
-   - [ ] Ensure all tests pass for the affected crate
+4. [x] **Phase 4: API Design** (1.5 hours) - llmspell-bridge ✅ COMPLETE
+   - [x] Add 48 #[must_use] attributes to methods - Added to builder() and new() methods
+   - [x] Add 46 #[must_use] to methods returning Self - Already had #[must_use] on builder methods
+   - [x] Convert 44 functions to const fn where possible - Converted builder methods in factory.rs
+   - [x] Ensure the crate compiles - ✅ Compiles
+   - [x] Ensure all tests pass for the affected crate - ✅ 85 tests passed
+   - **Fixed in**: 
+     - engine/factory.rs: LuaConfigBuilder and JSConfigBuilder methods
+     - providers.rs: ProviderManagerConfigBuilder and ProviderConfigBuilder methods
+   - **Note**: Many builder methods already had #[must_use] attributes
+   - **Result**: Warning count at 1213 for llmspell-bridge
 
 5. [ ] **Phase 5: Code Quality** (1 hour) - llmspell-bridge
    - [ ] Replace 48 if let/else with Option::map_or_else

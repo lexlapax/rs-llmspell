@@ -309,6 +309,7 @@ pub struct ProviderManagerConfig {
 
 impl ProviderManagerConfig {
     /// Create a new builder for `ProviderManagerConfig`
+    #[must_use]
     pub fn builder() -> ProviderManagerConfigBuilder {
         ProviderManagerConfigBuilder::new()
     }
@@ -322,6 +323,7 @@ pub struct ProviderManagerConfigBuilder {
 
 impl ProviderManagerConfigBuilder {
     /// Create a new builder with default configuration
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -391,6 +393,7 @@ impl Default for ProviderConfig {
 
 impl ProviderConfig {
     /// Create a new builder for `ProviderConfig`
+    #[must_use]
     pub fn builder() -> ProviderConfigBuilder {
         ProviderConfigBuilder::new()
     }
@@ -404,6 +407,7 @@ pub struct ProviderConfigBuilder {
 
 impl ProviderConfigBuilder {
     /// Create a new builder with default configuration
+    #[must_use]
     pub fn new() -> Self {
         Self {
             config: ProviderConfig::default(),
