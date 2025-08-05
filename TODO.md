@@ -71,14 +71,15 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
 
 **Description**: Fix All clippy warnings and errors 1 by 1 across all crates.
 
-**Current Status**: ~830 total warnings remaining (down from 1782) - PHASE 10.1 COMPLETE 🎉
+**Current Status**: ~748 total warnings remaining (down from 1782) - PHASE 10.2 COMPLETE 🎉
 **# Errors warnings**: 0 (down from 361) - ALL FIXED! ✅
 **# Panics warnings**: 0 (down from 87) - ALL FIXED! ✅
-- llmspell-agents: ~462 warnings (down from 1138) 
-- llmspell-bridge: ~321 warnings (down from 520)
-- llmspell-tools: ~134 warnings (down from 188)
+**#[must_use] warnings**: 0 (down from 82) - ALL FIXED! ✅
+- llmspell-agents: ~380 warnings (down from 1138) 
+- llmspell-bridge: ~275 warnings (down from 520)
+- llmspell-tools: ~91 warnings (down from 188)
 - llmspell-testing: ~2 warnings (down from 7)
-**Progress**: 10.1 of 10 phases complete (952 warnings fixed, 53.4% reduction)
+**Progress**: 10.2 of 10 phases complete (1034 warnings fixed, 58% reduction)
 
 **Phase 10 Goal**: Eliminate ALL remaining warnings (1,369 → 0)
 
@@ -318,13 +319,28 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
         - [x] Ensure all tests pass for the affected crate - ✅ Tests run successfully
         - [x] Ensure cargo fmt has no errors or warnings - ✅ No formatting issues
 
-    10.2. [ ] **Must-Use Attributes** (1 hour) - 82 warnings, do not skip or be lazy
-        - [ ] Add #[must_use] to all methods returning Self
-        - [ ] Add #[must_use] to constructors and builders
-        - [ ] Add #[must_use] to methods that should be used
-        - [ ] Ensure the changed crates compile
-        - [ ] Ensure all tests pass for the affected crate
-        - [ ] Ensure cargo fmt has no errors or warnings
+    10.2. [x] **Must-Use Attributes** (1 hour) - 82 warnings, do not skip or be lazy - COMPLETE! 🎉
+        - **Tracking File**: `must_use_tracking.txt` (created with file-by-file counts)
+        - [x] Add #[must_use] to all methods returning Self - ✅ ALL 82 fixed!
+        - [x] Add #[must_use] to constructors and builders - ✅ Fixed in all builder patterns
+        - [x] Add #[must_use] to methods that should be used - ✅ Fixed getters and factory methods
+        - [x] Ensure the changed crates compile - ✅ All crates compile
+        - [x] Ensure all tests pass for the affected crate - ✅ Tests pass
+        - [x] Ensure cargo fmt has no errors or warnings - ✅ No formatting issues
+        
+        **Files Fixed (28 total, 82 warnings)**:
+        - 11 warnings: storage.rs (builder methods)
+        - 9 warnings: tool_discovery.rs (builder methods including 2 duplicate with_max_security_level)
+        - 6 warnings: runtime.rs (builder methods)
+        - 6 warnings: orchestration.rs (builder methods)  
+        - 5 warnings: templates/customization.rs (trait methods)
+        - 5 warnings: builder.rs (builder methods)
+        - 4 warnings each: tools.rs, providers_discovery.rs, testing/framework.rs, factory.rs
+        - 3 warnings: composition/traits.rs
+        - 2 warnings each: standardized_workflows.rs, tool_errors.rs, tool_composition.rs, capabilities.rs, agent_wrapped_tool.rs
+        - 1 warning each: system_monitor.rs, api_key_integration.rs, javascript/engine.rs, tool_api_standard.rs, tool_invocation.rs, tool_context.rs, registry/registration.rs, lifecycle/hooks.rs, factory_registry.rs, di.rs, hierarchical.rs, delegation.rs
+        
+        **FINAL RESULT**: Fixed ALL 82 #[must_use] warnings (100% complete! 🎊)
     
     10.3. [ ] **Type Casting Cleanup** (1 hour) - 65 warnings, do not skip or be lazy
         - [ ] Fix 43 u64 to f64 precision warnings (use `as` with #[allow] where needed)

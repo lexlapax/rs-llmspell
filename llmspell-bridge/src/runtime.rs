@@ -316,6 +316,7 @@ impl Default for RuntimeConfig {
 
 impl RuntimeConfig {
     /// Create a new builder for `RuntimeConfig`
+    #[must_use]
     pub fn builder() -> RuntimeConfigBuilder {
         RuntimeConfigBuilder::new()
     }
@@ -360,6 +361,7 @@ pub struct RuntimeConfigBuilder {
 
 impl RuntimeConfigBuilder {
     /// Create a new builder with default configuration
+    #[must_use]
     pub fn new() -> Self {
         Self {
             config: RuntimeConfig::default(),
@@ -409,6 +411,7 @@ impl RuntimeConfigBuilder {
     }
 
     /// Build the configuration
+    #[must_use]
     pub fn build(self) -> RuntimeConfig {
         self.config
     }
@@ -462,6 +465,7 @@ impl Default for GlobalRuntimeConfig {
 
 impl GlobalRuntimeConfig {
     /// Create a new builder for `GlobalRuntimeConfig`
+    #[must_use]
     pub fn builder() -> GlobalRuntimeConfigBuilder {
         GlobalRuntimeConfigBuilder::new()
     }
@@ -475,6 +479,7 @@ pub struct GlobalRuntimeConfigBuilder {
 
 impl GlobalRuntimeConfigBuilder {
     /// Create a new builder with default configuration
+    #[must_use]
     pub fn new() -> Self {
         Self {
             config: GlobalRuntimeConfig::default(),
@@ -524,6 +529,7 @@ impl GlobalRuntimeConfigBuilder {
     }
 
     /// Build the configuration
+    #[must_use]
     pub fn build(self) -> GlobalRuntimeConfig {
         self.config
     }

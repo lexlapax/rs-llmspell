@@ -131,6 +131,7 @@ impl ParameterMappingConfig {
     }
 
     /// Add a parameter transformation
+    #[must_use]
     pub fn with_parameter_transform(
         mut self,
         source_name: impl Into<String>,
@@ -149,6 +150,7 @@ impl ParameterMappingConfig {
     }
 
     /// Set custom input template for agent
+    #[must_use]
     pub fn with_input_template(mut self, template: impl Into<String>) -> Self {
         self.input_template = Some(template.into());
         self

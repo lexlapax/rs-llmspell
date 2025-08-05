@@ -306,6 +306,7 @@ impl ToolComposition {
     }
 
     /// Add shared context data
+    #[must_use]
     pub fn with_shared_context(mut self, key: impl Into<String>, value: JsonValue) -> Self {
         self.shared_context.insert(key.into(), value);
         self
@@ -669,6 +670,7 @@ impl CompositionStep {
     }
 
     /// Add an input mapping
+    #[must_use]
     pub fn with_input_mapping(
         mut self,
         param_name: impl Into<String>,

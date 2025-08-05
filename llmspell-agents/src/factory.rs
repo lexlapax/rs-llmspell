@@ -115,12 +115,14 @@ impl AgentConfigBuilder {
     }
 
     /// Set the agent's description
+    #[must_use]
     pub fn description(mut self, description: impl Into<String>) -> Self {
         self.description = description.into();
         self
     }
 
     /// Set the agent type
+    #[must_use]
     pub fn agent_type(mut self, agent_type: impl Into<String>) -> Self {
         self.agent_type = agent_type.into();
         self
@@ -134,6 +136,7 @@ impl AgentConfigBuilder {
     }
 
     /// Add an allowed tool
+    #[must_use]
     pub fn allow_tool(mut self, tool_id: impl Into<String>) -> Self {
         self.allowed_tools.push(tool_id.into());
         self
@@ -147,6 +150,7 @@ impl AgentConfigBuilder {
     }
 
     /// Add a custom configuration parameter
+    #[must_use]
     pub fn custom_param(mut self, key: impl Into<String>, value: serde_json::Value) -> Self {
         self.custom_config.insert(key.into(), value);
         self

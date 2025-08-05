@@ -49,6 +49,7 @@ pub struct StorageDiscovery {
 
 impl StorageDiscovery {
     /// Create a new storage discovery service
+    #[must_use]
     pub fn new() -> Self {
         let mut backends = HashMap::new();
 
@@ -128,16 +129,19 @@ impl StorageDiscovery {
     }
 
     /// Get information about a specific storage backend
+    #[must_use]
     pub fn get_backend_info(&self, backend_name: &str) -> Option<StorageInfo> {
         self.backends.get(backend_name).cloned()
     }
 
     /// List all available backend names
+    #[must_use]
     pub fn list_backend_names(&self) -> Vec<String> {
         self.backends.keys().cloned().collect()
     }
 
     /// Get backends by persistence characteristic
+    #[must_use]
     pub fn get_persistent_backends(&self) -> Vec<(String, StorageInfo)> {
         self.backends
             .iter()
@@ -147,6 +151,7 @@ impl StorageDiscovery {
     }
 
     /// Get backends suitable for large datasets
+    #[must_use]
     pub fn get_large_dataset_backends(&self) -> Vec<(String, StorageInfo)> {
         self.backends
             .iter()
@@ -156,6 +161,7 @@ impl StorageDiscovery {
     }
 
     /// Get backends that support compression
+    #[must_use]
     pub fn get_compression_enabled_backends(&self) -> Vec<(String, StorageInfo)> {
         self.backends
             .iter()
@@ -165,6 +171,7 @@ impl StorageDiscovery {
     }
 
     /// Get backends that support encryption
+    #[must_use]
     pub fn get_encryption_enabled_backends(&self) -> Vec<(String, StorageInfo)> {
         self.backends
             .iter()
@@ -174,6 +181,7 @@ impl StorageDiscovery {
     }
 
     /// Get backends by performance characteristics
+    #[must_use]
     pub fn get_backends_by_performance(
         &self,
         latency: &str,
@@ -259,6 +267,7 @@ impl Default for StorageConfig {
 
 impl StorageConfig {
     /// Create a new builder for StorageConfig
+    #[must_use]
     pub fn builder() -> StorageConfigBuilder {
         StorageConfigBuilder::new()
     }
@@ -272,6 +281,7 @@ pub struct StorageConfigBuilder {
 
 impl StorageConfigBuilder {
     /// Create a new builder with default configuration
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }
@@ -346,6 +356,7 @@ impl StorageConfigBuilder {
     }
 
     /// Build the final StorageConfig
+    #[must_use]
     pub fn build(self) -> StorageConfig {
         self.config
     }

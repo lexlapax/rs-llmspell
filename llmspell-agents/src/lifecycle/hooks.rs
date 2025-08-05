@@ -299,6 +299,7 @@ impl CompositeHook {
         Self { hooks: vec![] }
     }
 
+    #[must_use]
     pub fn add_hook(mut self, hook: Arc<dyn CreationHook>) -> Self {
         self.hooks.push(hook);
         self

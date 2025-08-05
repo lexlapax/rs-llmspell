@@ -57,6 +57,7 @@ impl Default for ResourceLimits {
 
 impl ResourceLimits {
     /// Create a new builder for `ResourceLimits`
+    #[must_use]
     pub fn builder() -> ResourceLimitsBuilder {
         ResourceLimitsBuilder::new()
     }
@@ -70,6 +71,7 @@ pub struct ResourceLimitsBuilder {
 
 impl ResourceLimitsBuilder {
     /// Create a new builder with default limits
+    #[must_use]
     pub fn new() -> Self {
         Self {
             limits: ResourceLimits::default(),
@@ -124,6 +126,7 @@ impl Default for OrchestrationConfig {
 
 impl OrchestrationConfig {
     /// Create a new builder for `OrchestrationConfig`
+    #[must_use]
     pub fn builder() -> OrchestrationConfigBuilder {
         OrchestrationConfigBuilder::new()
     }
@@ -137,6 +140,7 @@ pub struct OrchestrationConfigBuilder {
 
 impl OrchestrationConfigBuilder {
     /// Create a new builder with default configuration
+    #[must_use]
     pub fn new() -> Self {
         Self {
             config: OrchestrationConfig::default(),
@@ -272,6 +276,7 @@ impl Default for RetryConfig {
 
 impl RetryConfig {
     /// Create a new builder for `RetryConfig`
+    #[must_use]
     pub fn builder() -> RetryConfigBuilder {
         RetryConfigBuilder::new()
     }
@@ -285,6 +290,7 @@ pub struct RetryConfigBuilder {
 
 impl RetryConfigBuilder {
     /// Create a new builder with default configuration
+    #[must_use]
     pub fn new() -> Self {
         Self {
             config: RetryConfig::default(),

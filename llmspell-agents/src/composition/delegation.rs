@@ -507,6 +507,7 @@ impl DelegatingAgentBuilder {
     }
 
     /// Add an initial agent
+    #[must_use]
     pub fn add_agent(mut self, agent: Arc<dyn BaseAgent>) -> Self {
         self.initial_agents.push(agent);
         self

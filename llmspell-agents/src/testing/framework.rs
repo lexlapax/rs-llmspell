@@ -424,6 +424,7 @@ impl TestScenarioBuilder {
     }
 
     /// Set scenario description
+    #[must_use]
     pub fn description(mut self, desc: impl Into<String>) -> Self {
         self.description = desc.into();
         self
@@ -444,6 +445,7 @@ impl TestScenarioBuilder {
     }
 
     /// Add expected output assertion
+    #[must_use]
     pub fn expect_output<F>(mut self, assertion: F) -> Self
     where
         F: Fn(&AgentOutput) -> Result<()> + Send + Sync + 'static,
@@ -453,6 +455,7 @@ impl TestScenarioBuilder {
     }
 
     /// Set setup function
+    #[must_use]
     pub fn with_setup<F>(mut self, setup: F) -> Self
     where
         F: Fn() -> Result<()> + Send + Sync + 'static,
@@ -462,6 +465,7 @@ impl TestScenarioBuilder {
     }
 
     /// Set teardown function
+    #[must_use]
     pub fn with_teardown<F>(mut self, teardown: F) -> Self
     where
         F: Fn() -> Result<()> + Send + Sync + 'static,

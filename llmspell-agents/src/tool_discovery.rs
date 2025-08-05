@@ -365,36 +365,42 @@ impl ToolSearchCriteria {
     }
 
     /// Add a category filter
+    #[must_use]
     pub fn with_category(mut self, category: impl Into<String>) -> Self {
         self.categories.push(category.into());
         self
     }
 
     /// Add a capability filter
+    #[must_use]
     pub fn with_capability(mut self, capability: impl Into<String>) -> Self {
         self.capabilities.push(capability.into());
         self
     }
 
     /// Set maximum security level
+    #[must_use]
     pub fn with_max_security_level(mut self, level: impl Into<String>) -> Self {
         self.max_security_level = Some(level.into());
         self
     }
 
     /// Set minimum security level
+    #[must_use]
     pub fn with_min_security_level(mut self, level: impl Into<String>) -> Self {
         self.min_security_level = Some(level.into());
         self
     }
 
     /// Add text search filter
+    #[must_use]
     pub fn with_text_search(mut self, text: impl Into<String>) -> Self {
         self.text_search = Some(text.into());
         self
     }
 
     /// Add custom filter
+    #[must_use]
     pub fn with_custom_filter(mut self, key: impl Into<String>, value: JsonValue) -> Self {
         self.custom_filters.insert(key.into(), value);
         self
@@ -430,12 +436,14 @@ impl RecommendationContext {
     }
 
     /// Set task type
+    #[must_use]
     pub fn with_task_type(mut self, task_type: impl Into<String>) -> Self {
         self.task_type = Some(task_type.into());
         self
     }
 
     /// Set maximum security level
+    #[must_use]
     pub fn with_max_security_level(mut self, level: impl Into<String>) -> Self {
         self.max_security_level = Some(level.into());
         self
@@ -449,6 +457,7 @@ impl RecommendationContext {
     }
 
     /// Add user preference
+    #[must_use]
     pub fn with_preference(mut self, key: impl Into<String>, value: JsonValue) -> Self {
         self.user_preferences.insert(key.into(), value);
         self

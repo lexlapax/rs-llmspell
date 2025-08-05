@@ -27,6 +27,7 @@ impl JSEngine {
     }
 
     /// Get the supported features for JavaScript
+    #[must_use]
     pub fn engine_features() -> EngineFeatures {
         EngineFeatures {
             async_execution: true, // Native async/await

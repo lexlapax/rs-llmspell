@@ -340,11 +340,13 @@ impl ProviderDiscovery {
     }
 
     /// List all available provider types
+    #[must_use]
     pub fn list_provider_types(&self) -> Vec<String> {
         self.provider_types.keys().cloned().collect()
     }
 
     /// Get providers by category
+    #[must_use]
     pub fn get_providers_by_category(&self, category: &str) -> Vec<(String, ProviderTypeInfo)> {
         self.provider_types
             .iter()
@@ -354,6 +356,7 @@ impl ProviderDiscovery {
     }
 
     /// Get providers that support streaming
+    #[must_use]
     pub fn get_streaming_providers(&self) -> Vec<(String, ProviderTypeInfo)> {
         self.provider_types
             .iter()
@@ -363,6 +366,7 @@ impl ProviderDiscovery {
     }
 
     /// Get providers that support multimodal
+    #[must_use]
     pub fn get_multimodal_providers(&self) -> Vec<(String, ProviderTypeInfo)> {
         self.provider_types
             .iter()

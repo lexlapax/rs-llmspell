@@ -502,6 +502,7 @@ impl ErrorContext {
     }
 
     /// Add context data
+    #[must_use]
     pub fn with_data(mut self, key: impl Into<String>, value: JsonValue) -> Self {
         self.context_data.insert(key.into(), value);
         self
@@ -558,6 +559,7 @@ impl ToolErrorHandler {
     }
 
     /// Set tool-specific recovery strategy
+    #[must_use]
     pub fn with_tool_strategy(
         mut self,
         tool_name: impl Into<String>,

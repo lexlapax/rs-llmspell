@@ -145,6 +145,7 @@ impl ToolExecutionContext {
     }
 
     /// Get the context ID
+    #[must_use]
     pub fn context_id(&self) -> &str {
         &self.context_id
     }

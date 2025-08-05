@@ -189,6 +189,7 @@ impl DIContainerBuilder {
     }
 
     /// Add a tool to the container
+    #[must_use]
     pub fn with_tool(self, id: String, tool: Arc<dyn Tool>) -> Self {
         // Use blocking to register during building
         tokio::task::block_in_place(move || {

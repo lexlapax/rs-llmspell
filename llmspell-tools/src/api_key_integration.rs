@@ -97,6 +97,7 @@ impl ApiKeyConfig {
     }
 
     /// Set a default value
+    #[must_use]
     pub fn with_default(mut self, default: impl Into<String>) -> Self {
         self.default = Some(default.into());
         self

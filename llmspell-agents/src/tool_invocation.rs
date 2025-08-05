@@ -191,6 +191,7 @@ impl ValidationError {
     }
 
     /// Add expected value information
+    #[must_use]
     pub fn with_expected(mut self, expected: impl Into<String>) -> Self {
         self.expected = Some(expected.into());
         self

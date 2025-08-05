@@ -170,6 +170,7 @@ pub struct StandardParameterDef {
 }
 
 /// Convert from core ToolSchema to standard schema
+#[must_use]
 pub fn to_standard_schema(schema: ToolSchema) -> StandardToolSchema {
     StandardToolSchema {
         name: schema.name,

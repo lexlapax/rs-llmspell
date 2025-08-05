@@ -541,6 +541,7 @@ impl HierarchicalAgentBuilder {
     }
 
     /// Set the description
+    #[must_use]
     pub fn description(mut self, desc: impl Into<String>) -> Self {
         self.description = Some(desc.into());
         self

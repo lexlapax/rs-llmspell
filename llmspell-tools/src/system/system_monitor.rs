@@ -85,6 +85,7 @@ pub struct StatsCollection {
 
 impl StatsCollection {
     /// Check if a specific stat type is enabled
+    #[must_use]
     pub fn is_enabled(&self, stat_type: StatType) -> bool {
         self.enabled_stats.contains(&stat_type)
     }

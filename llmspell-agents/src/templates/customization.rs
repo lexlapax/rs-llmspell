@@ -188,18 +188,23 @@ impl AgentTemplate for CustomizedTemplate {
 /// Template mixin for adding common functionality
 pub trait TemplateMixin {
     /// Add logging capabilities
+    #[must_use]
     fn with_logging(self) -> Self;
 
     /// Add metrics collection
+    #[must_use]
     fn with_metrics(self) -> Self;
 
     /// Add retry logic
+    #[must_use]
     fn with_retry(self, max_retries: u32) -> Self;
 
     /// Add caching
+    #[must_use]
     fn with_caching(self) -> Self;
 
     /// Add rate limiting
+    #[must_use]
     fn with_rate_limiting(self, requests_per_minute: u32) -> Self;
 }
 

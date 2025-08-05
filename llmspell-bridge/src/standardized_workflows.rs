@@ -16,6 +16,7 @@ pub struct StandardizedWorkflowFactory {
 }
 
 impl StandardizedWorkflowFactory {
+    #[must_use]
     pub fn new() -> Self {
         Self {
             factory: Arc::new(DefaultWorkflowFactory::new()),
@@ -128,6 +129,7 @@ impl StandardizedWorkflowFactory {
     }
 
     /// List available workflow types
+    #[must_use]
     pub fn list_workflow_types(&self) -> Vec<String> {
         self.factory.list_workflow_types()
     }

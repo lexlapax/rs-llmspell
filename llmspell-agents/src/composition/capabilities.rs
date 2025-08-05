@@ -554,12 +554,14 @@ impl CapabilityRequirementBuilder {
     }
 
     /// Set minimum version
+    #[must_use]
     pub fn min_version(mut self, version: impl Into<String>) -> Self {
         self.requirement.min_version = Some(version.into());
         self
     }
 
     /// Add required metadata
+    #[must_use]
     pub fn metadata(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
         self.requirement
             .required_metadata

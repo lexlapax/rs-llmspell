@@ -195,6 +195,7 @@ impl CustomAgentFactory {
     }
 
     /// Add a customizer function
+    #[must_use]
     pub fn with_customizer<F>(mut self, f: F) -> Self
     where
         F: Fn(&mut AgentConfig) + Send + Sync + 'static,

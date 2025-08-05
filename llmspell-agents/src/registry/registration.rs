@@ -304,6 +304,7 @@ impl CompositeRegistrationHook {
     }
 
     /// Add a hook
+    #[must_use]
     pub fn add_hook(mut self, hook: Arc<dyn RegistrationHook>) -> Self {
         self.hooks.push(hook);
         self

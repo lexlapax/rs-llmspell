@@ -28,12 +28,14 @@ impl AgentBuilder {
     }
 
     /// Set the agent description
+    #[must_use]
     pub fn description(mut self, description: impl Into<String>) -> Self {
         self.config.description = description.into();
         self
     }
 
     /// Configure the model for LLM-based agents
+    #[must_use]
     pub fn with_model(mut self, provider: impl Into<String>, model_id: impl Into<String>) -> Self {
         self.config.model = Some(ModelConfig {
             provider: provider.into(),
@@ -76,6 +78,7 @@ impl AgentBuilder {
     /// # Panics
     ///
     /// Will not panic. This function only adds settings if a model config exists.
+    #[must_use]
     pub fn model_setting(mut self, key: impl Into<String>, value: Value) -> Self {
         if let Some(model) = &mut self.config.model {
             model.settings.insert(key.into(), value);
@@ -84,6 +87,7 @@ impl AgentBuilder {
     }
 
     /// Allow access to specific tools
+    #[must_use]
     pub fn allow_tool(mut self, tool_id: impl Into<String>) -> Self {
         self.config.allowed_tools.push(tool_id.into());
         self
@@ -104,6 +108,7 @@ impl AgentBuilder {
     }
 
     /// Add a custom configuration parameter
+    #[must_use]
     pub fn custom(mut self, key: impl Into<String>, value: Value) -> Self {
         self.config.custom_config.insert(key.into(), value);
         self

@@ -299,11 +299,13 @@ pub struct ToolDiscovery {
 
 impl ToolDiscovery {
     /// Create a new tool discovery service
+    #[must_use]
     pub fn new(registry: Arc<ComponentRegistry>) -> Self {
         Self { registry }
     }
 
     /// Get information about a specific tool
+    #[must_use]
     pub fn get_tool_info(&self, tool_name: &str) -> Option<ToolInfo> {
         let tool = self.registry.get_tool(tool_name)?;
         let metadata = tool.metadata();
@@ -325,11 +327,13 @@ impl ToolDiscovery {
     }
 
     /// List all available tool names
+    #[must_use]
     pub fn list_tool_names(&self) -> Vec<String> {
         self.registry.list_tools()
     }
 
     /// Get tools by category
+    #[must_use]
     pub fn get_tools_by_category(&self, category: &str) -> Vec<(String, ToolInfo)> {
         let tool_names = self.registry.list_tools();
         tool_names

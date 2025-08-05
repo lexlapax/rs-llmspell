@@ -213,12 +213,14 @@ impl CompositeAgentBuilder {
     }
 
     /// Set the description
+    #[must_use]
     pub fn description(mut self, desc: impl Into<String>) -> Self {
         self.description = desc.into();
         self
     }
 
     /// Add a component
+    #[must_use]
     pub fn add_component(mut self, component: Arc<dyn BaseAgent>) -> Self {
         self.components.push(component);
         self
@@ -232,6 +234,7 @@ impl CompositeAgentBuilder {
     }
 
     /// Add metadata
+    #[must_use]
     pub fn metadata(mut self, key: impl Into<String>, value: Value) -> Self {
         self.metadata.insert(key.into(), value);
         self
