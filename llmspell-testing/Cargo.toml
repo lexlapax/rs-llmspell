@@ -13,6 +13,10 @@ license.workspace = true
 [features]
 default = []
 
+# Language features
+lua = []
+javascript = []
+
 # Primary test categories (aligned with test_category attributes)
 unit-tests = []
 integration-tests = []

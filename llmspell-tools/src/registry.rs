@@ -2,6 +2,7 @@
 //! ABOUTME: Provides thread-safe tool registration and capability-based discovery
 
 use crate::lifecycle::{ExecutionMetrics, ToolExecutor, ToolLifecycleConfig};
+use crate::lifecycle::hook_integration::HookFeatures;
 use llmspell_core::{
     error::LLMSpellError,
     traits::tool::{ResourceLimits, SecurityLevel, SecurityRequirements, Tool, ToolCategory},
@@ -855,7 +856,7 @@ mod tests {
         let hook_registry = Arc::new(HookRegistry::new());
         let hook_executor = Arc::new(HookExecutorImpl::new());
         let hook_config = ToolLifecycleConfig {
-            features: llmspell_tools::lifecycle::HookFeatures {
+            features: HookFeatures {
                 hooks_enabled: true,
                 ..Default::default()
             },
@@ -954,7 +955,7 @@ mod tests {
         let hook_registry = Arc::new(HookRegistry::new());
         let hook_executor = Arc::new(HookExecutorImpl::new());
         let hook_config = ToolLifecycleConfig {
-            features: llmspell_tools::lifecycle::HookFeatures {
+            features: HookFeatures {
                 hooks_enabled: true,
                 ..Default::default()
             },

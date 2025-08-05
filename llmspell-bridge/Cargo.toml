@@ -52,6 +52,11 @@ default = ["lua"]
 lua = ["dep:mlua"]
 javascript = ["dep:boa_engine"]
 
+# Test categories (to fix cfg warnings)
+integration-tests = []
+bridge-tests = []
+workflow-tests = []
+
 [[bench]]
 name = "workflow_bridge_bench"
 harness = false
