@@ -386,7 +386,7 @@ impl DefaultAgentFactory {
     }
 
     /// Initialize agent lifecycle by calling initialize on the concrete type
-    async fn initialize_agent_lifecycle(&self, agent_type: &str, agent_name: &str) -> Result<()> {
+    fn initialize_agent_lifecycle(&self, agent_type: &str, agent_name: &str) -> Result<()> {
         info!(
             "Agent '{}' of type '{}' created with lifecycle management",
             agent_name, agent_type
@@ -436,8 +436,7 @@ impl AgentFactory for DefaultAgentFactory {
         self.run_after_hooks(&agent).await?;
 
         // Initialize agent lifecycle
-        self.initialize_agent_lifecycle(&agent_type, &agent_name)
-            .await?;
+        self.initialize_agent_lifecycle(&agent_type, &agent_name)?;
 
         Ok(agent)
     }

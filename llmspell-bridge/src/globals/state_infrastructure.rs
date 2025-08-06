@@ -91,7 +91,7 @@ pub async fn get_or_create_state_infrastructure(
         ));
 
         // Get or create event infrastructure
-        let event_bus = get_or_create_event_bus(context).await?;
+        let event_bus = get_or_create_event_bus(context)?;
         let correlation_tracker = get_or_create_correlation_tracker(context)?;
         let hook_executor = get_or_create_hook_executor(context)?;
 
@@ -208,7 +208,7 @@ fn create_backend_type(config: &StatePersistenceConfig) -> Result<StorageBackend
 }
 
 /// Get or create `EventBus`
-async fn get_or_create_event_bus(context: &GlobalContext) -> Result<Arc<EventBus>> {
+fn get_or_create_event_bus(context: &GlobalContext) -> Result<Arc<EventBus>> {
     if let Some(event_bus) = context.get_bridge::<EventBus>("event_bus") {
         return Ok(event_bus);
     }

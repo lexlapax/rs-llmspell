@@ -476,7 +476,7 @@ impl AgentBridge {
                 })?;
 
         // Get health from health checker (mock implementation)
-        match crate::monitoring::check_agent_health(agent_instance).await {
+        match crate::monitoring::check_agent_health(agent_instance) {
             Ok(health_result) => Ok(serde_json::json!({
                 "status": format!("{:?}", health_result.overall_status),
                 "timestamp": health_result.timestamp.to_rfc3339(),
@@ -850,7 +850,7 @@ impl AgentBridge {
                     "from": format!("{:?}", transition.from),
                     "to": format!("{:?}", transition.to),
                     "timestamp": datetime.to_rfc3339(),
-                    "elapsed": transition.duration.map_or(0.0, |d| d.as_secs_f64()),
+                    "elapsed": transition.duration.map(|d| d.as_secs_f64()).unwrap_or(0.0),
                     "reason": transition.reason,
                     "metadata": transition.metadata,
                 })

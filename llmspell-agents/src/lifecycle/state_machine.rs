@@ -539,10 +539,12 @@ impl AgentStateMachine {
         let transition_id = format!("{}-{:?}-{:?}", self.agent_id, from_state, to_state);
 
         let tokens = self.active_cancellation_tokens.lock().await;
-        tokens.get(&transition_id).map_or(false, |token| {
+        if let Some(token) = tokens.get(&transition_id) {
             token.cancel();
             true
-        })
+        } else {
+            false
+        }
     }
 
     /// Transition to new state
@@ -1053,10 +1055,7 @@ impl AgentStateMachine {
     }
 
     /// Get hook executor metrics (if hooks are enabled)
-    pub async fn get_hook_metrics(
-        &self,
-        hook_name: &str,
-    ) -> Option<llmspell_hooks::PerformanceMetrics> {
+    pub fn get_hook_metrics(&self, hook_name: &str) -> Option<llmspell_hooks::PerformanceMetrics> {
         self.hook_executor.as_ref()?.get_metrics(hook_name)
     }
 

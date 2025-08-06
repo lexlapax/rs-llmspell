@@ -206,11 +206,10 @@ impl ToolStateMachine {
         let current_state = *self.state.read().await;
 
         let total_transitions = history.len();
-        let execution_time = if let Some(last_transition) = history.last() {
-            last_transition.duration_since_last
-        } else {
-            Instant::now().duration_since(self.created_at)
-        };
+        let execution_time = history.last().map_or_else(
+            || Instant::now().duration_since(self.created_at),
+            |last_transition| last_transition.duration_since_last,
+        );
 
         // Count state durations
         let mut state_durations = std::collections::HashMap::new();

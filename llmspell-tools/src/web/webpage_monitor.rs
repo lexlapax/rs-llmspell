@@ -235,20 +235,22 @@ impl WebpageMonitorTool {
             // Return full text content
             let document = Html::parse_document(&body);
             let body_selector = Selector::parse("body").unwrap();
-            if let Some(body_element) = document.select(&body_selector).next() {
-                let text: String = body_element.text().collect::<Vec<_>>().join(" ");
-                Ok(text.split_whitespace().collect::<Vec<_>>().join(" "))
-            } else {
-                // Fallback to full document text
-                Ok(document
-                    .root_element()
-                    .text()
-                    .collect::<Vec<_>>()
-                    .join(" ")
-                    .split_whitespace()
-                    .collect::<Vec<_>>()
-                    .join(" "))
-            }
+            document.select(&body_selector).next().map_or_else(
+                || {
+                    Ok(document
+                        .root_element()
+                        .text()
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                        .split_whitespace()
+                        .collect::<Vec<_>>()
+                        .join(" "))
+                },
+                |body_element| {
+                    let text: String = body_element.text().collect::<Vec<_>>().join(" ");
+                    Ok(text.split_whitespace().collect::<Vec<_>>().join(" "))
+                },
+            )
         }
     }
 

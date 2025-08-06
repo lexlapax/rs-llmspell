@@ -55,7 +55,7 @@ impl HealthCheck for HealthCheckImpl {
 /// # Errors
 ///
 /// Returns an error if health check fails
-pub async fn check_agent_health(_agent_id: &str) -> Result<HealthCheckResult> {
+pub fn check_agent_health(_agent_id: &str) -> Result<HealthCheckResult> {
     let mut components = HashMap::new();
     components.insert(
         "agent_health".to_string(),

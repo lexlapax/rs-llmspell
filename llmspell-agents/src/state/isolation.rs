@@ -130,11 +130,9 @@ impl StateAccessControl {
         }
 
         // Check parent scope permissions
-        if let Some(parent) = scope.parent() {
+        scope.parent().map_or(false, |parent| {
             self.has_permission(agent_id, &parent, permission)
-        } else {
-            false
-        }
+        })
     }
 
     pub fn revoke_permissions(&mut self, agent_id: &str, scope: StateScope) {
@@ -330,18 +328,21 @@ impl StateIsolationManager {
     pub fn remove_shared_scope(&self, scope_id: &str) -> Result<()> {
         let mut shared_scopes = self.shared_scopes.write();
 
-        if let Some(config) = shared_scopes.remove(scope_id) {
-            // Revoke permissions from all agents
-            let mut access_control = self.access_control.write();
-            for agent_id in &config.allowed_agents {
-                access_control
-                    .revoke_permissions(agent_id, StateScope::Custom(format!("shared:{scope_id}")));
-            }
-            debug!("Removed shared scope {}", scope_id);
-            Ok(())
-        } else {
-            Err(anyhow::anyhow!("Shared scope {} not found", scope_id))
-        }
+        shared_scopes.remove(scope_id).map_or_else(
+            || Err(anyhow::anyhow!("Shared scope {} not found", scope_id)),
+            |config| {
+                // Revoke permissions from all agents
+                let mut access_control = self.access_control.write();
+                for agent_id in &config.allowed_agents {
+                    access_control.revoke_permissions(
+                        agent_id,
+                        StateScope::Custom(format!("shared:{scope_id}")),
+                    );
+                }
+                debug!("Removed shared scope {}", scope_id);
+                Ok(())
+            },
+        )
     }
 
     /// Grant specific permission to an agent for a scope
@@ -523,12 +524,7 @@ impl IsolatedStateAccessor {
     /// # Errors
     ///
     /// Returns an error if access is denied to the scope
-    pub fn set(
-        &self,
-        scope: StateScope,
-        _key: &str,
-        _value: serde_json::Value,
-    ) -> Result<()> {
+    pub fn set(&self, scope: StateScope, _key: &str, _value: serde_json::Value) -> Result<()> {
         // Check access permission
         if !self
             .isolation_manager

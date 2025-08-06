@@ -30,10 +30,10 @@ pub async fn get_or_create_session_infrastructure(
     let state_manager = get_or_create_state_manager(context).await?;
     let hook_registry = get_or_create_hook_registry(context)?;
     let hook_executor = get_or_create_hook_executor(context)?;
-    let event_bus = get_or_create_event_bus(context).await?;
+    let event_bus = get_or_create_event_bus(context)?;
 
     // Create storage backend based on configuration
-    let storage_backend = create_storage_backend(&config.storage_backend).await?;
+    let storage_backend = create_storage_backend(&config.storage_backend)?;
 
     // Create SessionManagerConfig from runtime config using builder pattern
     let session_config = SessionManagerConfig::builder()
@@ -120,7 +120,7 @@ fn get_or_create_hook_executor(context: &GlobalContext) -> Result<Arc<HookExecut
 }
 
 /// Get or create `EventBus`
-async fn get_or_create_event_bus(context: &GlobalContext) -> Result<Arc<EventBus>> {
+fn get_or_create_event_bus(context: &GlobalContext) -> Result<Arc<EventBus>> {
     if let Some(event_bus) = context.get_bridge::<EventBus>("event_bus") {
         return Ok(event_bus);
     }
@@ -138,7 +138,7 @@ async fn get_or_create_event_bus(context: &GlobalContext) -> Result<Arc<EventBus
 /// Returns an error if:
 /// - Unknown backend type is specified
 /// - Backend creation fails
-async fn create_storage_backend(backend_type: &str) -> Result<Arc<dyn StorageBackend>> {
+fn create_storage_backend(backend_type: &str) -> Result<Arc<dyn StorageBackend>> {
     match backend_type {
         "memory" => {
             debug!("Creating in-memory storage backend for sessions");

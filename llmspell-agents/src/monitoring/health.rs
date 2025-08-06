@@ -312,7 +312,7 @@ impl HealthMonitor {
     }
 
     /// Start periodic health monitoring
-    pub async fn start_monitoring(self: Arc<Self>) {
+    pub fn start_monitoring(self: Arc<Self>) {
         let monitor = self;
         tokio::spawn(async move {
             let mut interval = tokio::time::interval(monitor.check_interval);

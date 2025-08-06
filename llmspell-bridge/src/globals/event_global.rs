@@ -292,13 +292,12 @@ impl GlobalObject for EventGlobal {
                             .is_some();
 
                         // Unsubscribe from the bridge
-                        let unsubscribed =
-                            bridge.unsubscribe(&subscription_id).await.map_err(|e| {
-                                LLMSpellError::Component {
-                                    message: format!("Failed to unsubscribe: {e}"),
-                                    source: None,
-                                }
-                            })?;
+                        let unsubscribed = bridge.unsubscribe(&subscription_id).map_err(|e| {
+                            LLMSpellError::Component {
+                                message: format!("Failed to unsubscribe: {e}"),
+                                source: None,
+                            }
+                        })?;
 
                         Ok(unsubscribed && had_receiver)
                     },
@@ -376,7 +375,7 @@ impl GlobalObject for EventGlobal {
                     "event_get_stats",
                     async move {
                         let bridge = get_or_create_event_bridge(&context)?;
-                        let stats = bridge.get_stats().await;
+                        let stats = bridge.get_stats();
 
                         // Convert JSON stats to Lua value
                         crate::lua::conversion::json_to_lua_value(lua, &stats).map_err(|e| {

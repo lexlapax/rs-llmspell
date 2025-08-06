@@ -178,7 +178,7 @@ impl EventBridge {
     /// # Errors
     ///
     /// Returns an error if unsubscription fails
-    pub async fn unsubscribe(&self, subscription_id: &str) -> Result<bool> {
+    pub fn unsubscribe(&self, subscription_id: &str) -> Result<bool> {
         let mut subscriptions = self.subscriptions.write();
 
         // Note: EventBus doesn't currently support explicit unsubscribe
@@ -207,7 +207,7 @@ impl EventBridge {
     }
 
     /// Get event bus statistics
-    pub async fn get_stats(&self) -> serde_json::Value {
+    pub fn get_stats(&self) -> serde_json::Value {
         let stats = self.event_bus.get_stats();
         let subscription_count = self.subscription_count();
 

@@ -376,21 +376,18 @@ impl AlertManager {
                     operator,
                     threshold,
                     ..
-                } => {
-                    if let Some(metric) = context.metrics.get(metric_name) {
-                        match metric {
-                            MetricValue::Counter(v) => {
-                                #[allow(clippy::cast_precision_loss)]
-                                let v_f64 = *v as f64;
-                                operator.evaluate(v_f64, *threshold)
-                            }
-                            MetricValue::Gauge(v) => operator.evaluate(*v, *threshold),
-                            _ => false,
+                } => context
+                    .metrics
+                    .get(metric_name)
+                    .map_or(false, |metric| match metric {
+                        MetricValue::Counter(v) => {
+                            #[allow(clippy::cast_precision_loss)]
+                            let v_f64 = *v as f64;
+                            operator.evaluate(v_f64, *threshold)
                         }
-                    } else {
-                        false
-                    }
-                }
+                        MetricValue::Gauge(v) => operator.evaluate(*v, *threshold),
+                        _ => false,
+                    }),
                 AlertCondition::HealthStatus { status, .. } => context.health == Some(status),
                 AlertCondition::ErrorRate { rate_percent, .. } => {
                     // Calculate error rate from metrics
@@ -431,12 +428,10 @@ impl AlertManager {
     /// Check if a rule is in cooldown
     fn is_in_cooldown(&self, rule_id: &str) -> bool {
         let last_triggers = self.last_trigger_times.read().unwrap();
-        if let Some(last_trigger) = last_triggers.get(rule_id) {
+        last_triggers.get(rule_id).map_or(false, |last_trigger| {
             let elapsed = (Utc::now() - *last_trigger).to_std().unwrap_or_default();
             elapsed < self.config.default_cooldown
-        } else {
-            false
-        }
+        })
     }
 
     /// Trigger an alert
@@ -537,15 +532,22 @@ impl AlertManager {
     ///
     /// Returns an error if the alert is not found
     pub fn acknowledge_alert(&self, alert_id: &str) -> Result<()> {
-        if let Some(alert) = self.active_alerts.write().unwrap().get_mut(alert_id) {
-            alert.acknowledge();
-            Ok(())
-        } else {
-            Err(llmspell_core::LLMSpellError::Component {
-                message: format!("Alert {alert_id} not found"),
-                source: None,
-            })
-        }
+        self.active_alerts
+            .write()
+            .unwrap()
+            .get_mut(alert_id)
+            .map_or_else(
+                || {
+                    Err(llmspell_core::LLMSpellError::Component {
+                        message: format!("Alert {alert_id} not found"),
+                        source: None,
+                    })
+                },
+                |alert| {
+                    alert.acknowledge();
+                    Ok(())
+                },
+            )
     }
 
     /// Resolve an alert

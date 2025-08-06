@@ -216,7 +216,7 @@ impl PerformanceMetrics {
 }
 
 /// Optimized workflow discovery with caching
-pub async fn get_workflow_info_cached(workflow_type: &str) -> Option<WorkflowTypeInfo> {
+pub fn get_workflow_info_cached(workflow_type: &str) -> Option<WorkflowTypeInfo> {
     // Check cache first
     {
         let cache = WORKFLOW_TYPE_CACHE.read();

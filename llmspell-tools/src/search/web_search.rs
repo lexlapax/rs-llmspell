@@ -79,14 +79,14 @@ impl WebSearchConfig {
         if let Some(api_key) =
             get_api_key("google_search").or_else(|| std::env::var("WEBSEARCH_GOOGLE_API_KEY").ok())
         {
-            let additional_config =
-                if let Ok(engine_id) = std::env::var("WEBSEARCH_GOOGLE_SEARCH_ENGINE_ID") {
+            let additional_config = std::env::var("WEBSEARCH_GOOGLE_SEARCH_ENGINE_ID").map_or(
+                serde_json::Value::Null,
+                |engine_id| {
                     serde_json::json!({
                         "search_engine_id": engine_id
                     })
-                } else {
-                    serde_json::Value::Null
-                };
+                },
+            );
             let google_config = ProviderConfig {
                 api_key: Some(api_key),
                 additional_config,
@@ -312,26 +312,29 @@ impl WebSearchTool {
         let providers = self.providers.lock().await;
 
         // Determine provider order
-        let provider_chain = if let Some(requested) = requested_provider {
-            // If specific provider requested, try it first
-            let mut chain = vec![requested.to_string()];
-            // Then add fallback chain excluding the requested one
-            for fallback in &self.config.fallback_chain {
-                if fallback != requested {
-                    chain.push(fallback.clone());
+        let provider_chain = requested_provider.map_or_else(
+            || {
+                // Use default provider first, then fallback chain
+                let mut chain = vec![self.config.default_provider.clone()];
+                for fallback in &self.config.fallback_chain {
+                    if fallback != &self.config.default_provider {
+                        chain.push(fallback.clone());
+                    }
                 }
-            }
-            chain
-        } else {
-            // Use default provider first, then fallback chain
-            let mut chain = vec![self.config.default_provider.clone()];
-            for fallback in &self.config.fallback_chain {
-                if fallback != &self.config.default_provider {
-                    chain.push(fallback.clone());
+                chain
+            },
+            |requested| {
+                // If specific provider requested, try it first
+                let mut chain = vec![requested.to_string()];
+                // Then add fallback chain excluding the requested one
+                for fallback in &self.config.fallback_chain {
+                    if fallback != requested {
+                        chain.push(fallback.clone());
+                    }
                 }
-            }
-            chain
-        };
+                chain
+            },
+        );
 
         // Try each provider in order
         let mut last_error = None;
@@ -466,12 +469,14 @@ impl BaseAgent for WebSearchTool {
 
         // Parse optional parameters
         let provider = extract_optional_string(params, "provider");
-        let max_results = params
+        let max_results = if let Some(n) = params
             .get("max_results")
             .and_then(serde_json::Value::as_u64)
-            .map_or(self.config.max_results, |n| {
-                usize::try_from(n).unwrap_or(usize::MAX)
-            });
+        {
+            usize::try_from(n).unwrap_or(usize::MAX)
+        } else {
+            self.config.max_results
+        };
         let search_type = Self::parse_search_type(extract_optional_string(params, "search_type"));
         let safe_search = params
             .get("safe_search")
@@ -498,9 +503,11 @@ impl BaseAgent for WebSearchTool {
         let results = self.search_with_fallback(&query, provider, options).await?;
 
         // Create response
-        let provider_used = results
-            .first()
-            .map_or_else(|| "unknown".to_string(), |r| r.provider.clone());
+        let provider_used = if let Some(r) = results.first() {
+            r.provider.clone()
+        } else {
+            "unknown".to_string()
+        };
 
         let message = format!(
             "Found {} results for '{}' using {}",

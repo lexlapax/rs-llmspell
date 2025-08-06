@@ -132,7 +132,7 @@ impl HierarchicalCompositeAgent {
     }
 
     /// Check if adding a child would create a cycle
-    async fn would_create_cycle(&self, child: &Arc<dyn HierarchicalAgent>) -> bool {
+    fn would_create_cycle(&self, child: &Arc<dyn HierarchicalAgent>) -> bool {
         // Check if child is an ancestor of self
         let mut current = self.parent.read().unwrap().clone();
         while let Some(weak_parent) = current {
@@ -225,10 +225,12 @@ impl ToolCapable for HierarchicalCompositeAgent {
 
         for (name, tool) in tools.iter() {
             // Simple filtering based on text search
-            if let Some(ref text) = query.text_search {
-                if !name.contains(text) {
-                    continue;
-                }
+            if query
+                .text_search
+                .as_ref()
+                .map_or(false, |text| !name.contains(text))
+            {
+                continue;
             }
 
             let info = ToolInfo::new(
@@ -250,14 +252,15 @@ impl ToolCapable for HierarchicalCompositeAgent {
         context: ExecutionContext,
     ) -> Result<AgentOutput> {
         let tools = self.tools.read().await;
-        if let Some(tool) = tools.get(tool_name) {
-            let input = AgentInput::text(parameters.to_string());
-            tool.execute(input, context).await
-        } else {
-            Err(LLMSpellError::Component {
+        match tools.get(tool_name) {
+            Some(tool) => {
+                let input = AgentInput::text(parameters.to_string());
+                tool.execute(input, context).await
+            }
+            None => Err(LLMSpellError::Component {
                 message: format!("Tool not found: {tool_name}"),
                 source: None,
-            })
+            }),
         }
     }
 
@@ -448,7 +451,7 @@ impl HierarchicalAgent for HierarchicalCompositeAgent {
         }
 
         // Check for cycles
-        if self.would_create_cycle(&child).await {
+        if self.would_create_cycle(&child) {
             return Err(CompositionError::CycleDetected.into());
         }
 
@@ -505,10 +508,10 @@ impl HierarchicalAgent for HierarchicalCompositeAgent {
             metrics.events_propagated_up += 1;
         }
 
-        if let Some(parent) = self.parent() {
-            parent.propagate_up(event).await?;
+        match self.parent() {
+            Some(parent) => parent.propagate_up(event).await,
+            None => Ok(()),
         }
-        Ok(())
     }
 }
 

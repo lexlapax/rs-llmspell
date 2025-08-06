@@ -94,7 +94,7 @@ impl CapabilityScorer for DefaultCapabilityScorer {
                 #[allow(clippy::cast_precision_loss)]
                 let hours_ago_f64 = hours_ago as f64;
                 (1.0 / (1.0 + hours_ago_f64 / 24.0)).min(1.0)
-            }
+            },
         );
 
         // Weighted average of success rate and recency
@@ -193,16 +193,16 @@ impl CapabilityAggregator {
         let capability_id = format!("{provider_id}::{capability_name}");
 
         let mut capabilities = self.capabilities.write().unwrap();
-        if let Some(entry) = capabilities.remove(&capability_id) {
-            drop(capabilities);
+        let entry_opt = capabilities.remove(&capability_id);
+        drop(capabilities);
+
+        if let Some(entry) = entry_opt {
             // Remove from category index
             let mut index = self.category_index.write().unwrap();
             if let Some(set) = index.get_mut(&entry.capability.category) {
                 set.remove(&capability_id);
             }
             drop(index);
-        } else {
-            drop(capabilities);
         }
 
         Ok(())
@@ -299,19 +299,21 @@ impl CapabilityAggregator {
         }
 
         // Check category
-        if let Some(ref req_category) = requirement.category {
-            if &capability.category != req_category {
-                return false;
-            }
+        if requirement
+            .category
+            .as_ref()
+            .map_or(false, |req_category| &capability.category != req_category)
+        {
+            return false;
         }
 
         // Check version (simplified)
         if let Some(ref min_version) = requirement.min_version {
-            if let Some(ref cap_version) = capability.version {
-                if cap_version < min_version {
-                    return false;
-                }
-            } else {
+            if capability
+                .version
+                .as_ref()
+                .map_or(true, |cap_version| cap_version < min_version)
+            {
                 return false;
             }
         }
@@ -326,10 +328,14 @@ impl CapabilityAggregator {
         // Check score
         if let Some(min_score) = requirement.min_score {
             let cap_id = format!("{}::{}", "unknown", capability.name);
-            if let Some(entry) = self.capabilities.read().unwrap().get(&cap_id) {
-                if entry.score < min_score {
-                    return false;
-                }
+            if self
+                .capabilities
+                .read()
+                .unwrap()
+                .get(&cap_id)
+                .map_or(false, |entry| entry.score < min_score)
+            {
+                return false;
             }
         }
 
@@ -363,10 +369,11 @@ impl CapabilityAggregator {
                     return false;
                 }
 
-                if let Some(pos) = text[text_pos..].find(part) {
-                    text_pos += pos + part.len();
-                } else {
-                    return false;
+                match text[text_pos..].find(part) {
+                    Some(pos) => {
+                        text_pos += pos + part.len();
+                    }
+                    None => return false,
                 }
             }
             true
@@ -394,33 +401,36 @@ impl CapabilityAggregator {
         let capability_id = format!("{provider_id}::{capability_name}");
 
         let mut capabilities = self.capabilities.write().unwrap();
-        if let Some(entry) = capabilities.get_mut(&capability_id) {
-            let stats = &mut entry.usage_stats;
-            stats.invocations += 1;
-            if success {
-                stats.successes += 1;
-            } else {
-                stats.failures += 1;
-            }
+        capabilities.get_mut(&capability_id).map_or_else(
+            || {
+                Err(LLMSpellError::Component {
+                    message: format!("Capability not found: {capability_id}"),
+                    source: None,
+                })
+            },
+            |entry| {
+                let stats = &mut entry.usage_stats;
+                stats.invocations += 1;
+                if success {
+                    stats.successes += 1;
+                } else {
+                    stats.failures += 1;
+                }
 
-            // Update average execution time
-            let total_time =
-                stats.avg_execution_time.as_secs() * stats.invocations + duration.as_secs();
-            stats.avg_execution_time =
-                std::time::Duration::from_secs(total_time / (stats.invocations + 1));
+                // Update average execution time
+                let total_time =
+                    stats.avg_execution_time.as_secs() * stats.invocations + duration.as_secs();
+                stats.avg_execution_time =
+                    std::time::Duration::from_secs(total_time / (stats.invocations + 1));
 
-            stats.last_invocation = Some(chrono::Utc::now());
+                stats.last_invocation = Some(chrono::Utc::now());
 
-            // Recalculate score
-            entry.score = self.scorer.score(&entry.capability, stats);
+                // Recalculate score
+                entry.score = self.scorer.score(&entry.capability, stats);
 
-            Ok(())
-        } else {
-            Err(LLMSpellError::Component {
-                message: format!("Capability not found: {capability_id}"),
-                source: None,
-            })
-        }
+                Ok(())
+            },
+        )
     }
 
     /// Get all capabilities for a provider
@@ -446,14 +456,13 @@ impl CapabilityAggregator {
         let index = self.category_index.read().unwrap();
         let capabilities = self.capabilities.read().unwrap();
 
-        index.get(category).map_or_else(
-            Vec::new,
-            |cap_ids| cap_ids
+        index.get(category).map_or_else(Vec::new, |cap_ids| {
+            cap_ids
                 .iter()
                 .filter_map(|id| capabilities.get(id))
                 .map(|entry| entry.capability.clone())
                 .collect()
-        )
+        })
     }
 
     /// Set availability for a capability
@@ -470,15 +479,18 @@ impl CapabilityAggregator {
         let capability_id = format!("{provider_id}::{capability_name}");
 
         let mut capabilities = self.capabilities.write().unwrap();
-        if let Some(entry) = capabilities.get_mut(&capability_id) {
-            entry.available = available;
-            Ok(())
-        } else {
-            Err(LLMSpellError::Component {
-                message: format!("Capability not found: {capability_id}"),
-                source: None,
-            })
-        }
+        capabilities.get_mut(&capability_id).map_or_else(
+            || {
+                Err(LLMSpellError::Component {
+                    message: format!("Capability not found: {capability_id}"),
+                    source: None,
+                })
+            },
+            |entry| {
+                entry.available = available;
+                Ok(())
+            },
+        )
     }
 
     /// Get statistics for all capabilities

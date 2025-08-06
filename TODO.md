@@ -437,6 +437,31 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
          - `#[allow(clippy::cast_sign_loss)]` for i64→u64 conversions
          - Extracted values to variables before use to properly place attributes
          - **Compilation**: All errors resolved, workspace builds successfully
+         
+    10.4. [ ] **Performance and Style Warnings Cleanup** (4 hours) - 116 warnings total - IN PROGRESS
+        - **Tracking Files**: `clippy_warnings_10_4.txt` and `phase_10_4_work.txt` (created with categorized warnings)
+        - **Progress**: 93/116 warnings fixed (80% COMPLETE)
+        
+        **DETAILED PROGRESS**:
+        - [x] **map_or patterns** (63 warnings) - 57/63 fixed (90% complete):
+          - ✅ Fixed: agent_wrapped_tool(4), capabilities(6), hierarchical(3), tool_composition(3)
+          - ✅ Fixed: inheritance(5), state_machine(4), alerts(3), isolation(2), agent_bridge(1)
+          - ✅ Fixed: lifecycle(2), web_search(3), data_validation(4), web_scraper(1), webpage_monitor(1)
+          - ⏳ Remaining: 6 map_or patterns in various files
+          
+        - [x] **unused async** (43 warnings) - 30/43 fixed (70% complete):
+          - ✅ Fixed: session_infrastructure(3), state_infrastructure(3), event_global(2)
+          - ✅ Fixed: agent_bridge(1), monitoring(1), framework(1), 19 other functions
+          - ⏳ Remaining: 13 unused async functions
+          
+        - [x] **items_after_statements** (10 warnings) - 6/10 fixed (60% complete):
+          - ✅ Fixed: state_global.rs - moved block_on_async use statement to function top
+          - ⏳ Remaining: 4 items_after_statements in templates/base.rs(4), templates/validation.rs(3)
+        
+        **Summary**: 93/116 warnings fixed (80% complete)
+        - All crates compile successfully
+        - Tests run without errors  
+        - Systematic tracking file approach continues to be effective
          - **Notable fixes**:
          - Fixed syntax errors from incorrect attribute placement (inside struct/function calls)
          - Fixed largest files first for maximum impact (26 warnings in performance.rs)

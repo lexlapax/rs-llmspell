@@ -512,7 +512,7 @@ impl SharedMemoryManager {
     /// # Panics
     ///
     /// Panics if the RwLock is poisoned or if duration conversion fails
-    pub async fn cleanup(&self) {
+    pub fn cleanup(&self) {
         let _now = Instant::now();
         let mut regions = self.regions.write().unwrap();
 

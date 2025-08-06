@@ -1120,7 +1120,8 @@ pub fn inject_agent_global(
         let bridge = bridge_clone.clone();
 
         // Use sync wrapper to call async method
-        let agent_info = bridge.get_agent_info(&agent_name)
+        let agent_info = bridge
+            .get_agent_info(&agent_name)
             .map_err(|e| mlua::Error::RuntimeError(format!("Failed to get agent info: {e}")))?;
 
         // Convert AgentInfo to JSON, then to Lua table
@@ -1450,8 +1451,9 @@ pub fn inject_agent_global(
         let value_json = crate::lua::conversion::lua_value_to_json(value)
             .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert value: {e}")))?;
 
-        bridge.set_shared_memory(scope_json, key, value_json)
-        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to set shared memory: {e}")))?;
+        bridge
+            .set_shared_memory(scope_json, key, value_json)
+            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to set shared memory: {e}")))?;
 
         Ok(())
     })?;
@@ -1464,8 +1466,9 @@ pub fn inject_agent_global(
         let scope_json = lua_table_to_json(scope)
             .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert scope: {e}")))?;
 
-        let result = bridge.get_shared_memory(scope_json, &key)
-        .map_err(|e| mlua::Error::RuntimeError(format!("Failed to get shared memory: {e}")))?;
+        let result = bridge
+            .get_shared_memory(scope_json, &key)
+            .map_err(|e| mlua::Error::RuntimeError(format!("Failed to get shared memory: {e}")))?;
 
         result.map_or_else(|| Ok(Value::Nil), |value| json_to_lua_value(lua, &value))
     })?;

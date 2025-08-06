@@ -441,7 +441,7 @@ impl AgentHealthMonitor {
     /// # Errors
     ///
     /// Returns an error if monitoring task spawn fails
-    pub async fn start_monitoring(&self) -> Result<()> {
+    pub fn start_monitoring(&self) -> Result<()> {
         if !self.config.enable_monitoring {
             return Ok(());
         }

@@ -396,7 +396,7 @@ impl OrchestrationRuntime {
     /// # Errors
     ///
     /// Returns an error if orchestration startup fails
-    pub async fn start_orchestration(&mut self, plan: OrchestrationPlan) -> Result<String> {
+    pub fn start_orchestration(&mut self, plan: OrchestrationPlan) -> Result<String> {
         let orchestration_id = format!("orch_{}", uuid::Uuid::new_v4());
 
         // Initialize orchestration state

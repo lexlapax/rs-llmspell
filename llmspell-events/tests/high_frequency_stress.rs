@@ -52,7 +52,7 @@ mod stress_tests {
 
         let mut successful_publishes = 0u64;
         let mut rate_limited_count = 0u64;
-        
+
         for i in 0..target_events {
             let event = create_test_event(i);
             match bus.publish(event).await {
@@ -102,19 +102,24 @@ mod stress_tests {
         // Clean shutdown
         receiver_task.abort();
 
-        println!("  Successful publishes: {}/{}", successful_publishes, target_events);
+        println!(
+            "  Successful publishes: {}/{}",
+            successful_publishes, target_events
+        );
         println!("  Rate limited: {}", rate_limited_count);
-        
+
         // Assertions - adjusted for rate limiting
         assert!(
             successful_publishes >= target_events * 50 / 100,
             "Should successfully publish at least 50% of events, got {}/{}",
-            successful_publishes, target_events
+            successful_publishes,
+            target_events
         );
         assert!(
             final_received >= successful_publishes * 80 / 100,
             "Should receive at least 80% of successfully published events, got {}/{}",
-            final_received, successful_publishes
+            final_received,
+            successful_publishes
         );
     }
     #[tokio::test]
@@ -163,11 +168,11 @@ mod stress_tests {
                     );
 
                     match bus_clone.publish(event).await {
-                        Ok(_) => {},
+                        Ok(_) => {}
                         Err(e) if format!("{:?}", e).contains("RateLimited") => {
                             // Handle rate limiting gracefully
                             tokio::time::sleep(Duration::from_micros(200)).await;
-                        },
+                        }
                         Err(e) => {
                             eprintln!(
                                 "Publisher {} failed at event {}: {:?}",
@@ -278,11 +283,11 @@ mod stress_tests {
                 );
 
                 match bus.publish(event).await {
-                    Ok(_) => {},
+                    Ok(_) => {}
                     Err(e) if format!("{:?}", e).contains("RateLimited") => {
                         // Handle rate limiting gracefully in memory stability test
                         tokio::time::sleep(Duration::from_millis(1)).await;
-                    },
+                    }
                     Err(e) => panic!("Unexpected error in memory stability test: {:?}", e),
                 }
             }
@@ -338,7 +343,8 @@ mod stress_tests {
         assert!(
             final_received >= total_events_u64 * 50 / 100,
             "Should process at least 50% of events under memory pressure, got {}/{}",
-            final_received, total_events_u64
+            final_received,
+            total_events_u64
         );
         assert!(
             total_growth < 50 * 1024 * 1024,

@@ -400,14 +400,12 @@ impl BaseAgent for WebScraperTool {
             }
         }
 
-        let selectors = if let Some(obj) = extract_optional_object(params, "selectors") {
+        let selectors = extract_optional_object(params, "selectors").map_or(None, |obj| {
             serde_json::from_value::<HashMap<String, String>>(serde_json::Value::Object(
                 obj.clone(),
             ))
             .ok()
-        } else {
-            None
-        };
+        });
 
         let wait_for_js = extract_optional_bool(params, "wait_for_js").unwrap_or(false);
 

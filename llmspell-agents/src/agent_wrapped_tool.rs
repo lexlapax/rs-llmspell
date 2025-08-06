@@ -293,7 +293,7 @@ impl AgentWrappedTool {
         // Start with base input text
         let input_text = self.parameter_config.input_template.as_ref().map_or_else(
             || format!("Tool invocation of agent: {}", agent_metadata.name),
-            |template| template.clone()
+            |template| template.clone(),
         );
 
         let mut agent_input = AgentInput::text(input_text);
@@ -320,15 +320,20 @@ impl AgentWrappedTool {
             // Apply default values for missing required transforms
             for (source_name, transform) in &self.parameter_config.parameter_transforms {
                 if transform.required && !tool_parameters.contains_key(source_name) {
-                    if let Some(default_value) = &transform.default_value {
-                        agent_input = agent_input
-                            .with_parameter(transform.target_name.clone(), default_value.clone());
-                    } else {
-                        return Err(LLMSpellError::Validation {
-                            message: format!("Required parameter '{source_name}' not provided"),
-                            field: Some(source_name.clone()),
-                        });
-                    }
+                    agent_input = transform.default_value.as_ref().map_or_else(
+                        || {
+                            Err(LLMSpellError::Validation {
+                                message: format!("Required parameter '{source_name}' not provided"),
+                                field: Some(source_name.clone()),
+                            })
+                        },
+                        |default_value| {
+                            Ok(agent_input.with_parameter(
+                                transform.target_name.clone(),
+                                default_value.clone(),
+                            ))
+                        },
+                    )?;
                 }
             }
         }
@@ -392,22 +397,25 @@ impl AgentWrappedTool {
             }
             TransformType::JsonPath(path) => {
                 // Simple JSON path implementation for basic cases
-                if let Some(field_path) = path.strip_prefix("$.") {
-                    let mut current = value;
-                    for field in field_path.split('.') {
-                        if let JsonValue::Object(obj) = current {
-                            current = obj.get(field).unwrap_or(&JsonValue::Null);
-                        } else {
-                            return Ok(JsonValue::Null);
+                path.strip_prefix("$.").map_or_else(
+                    || {
+                        Err(LLMSpellError::Validation {
+                            message: format!("Unsupported JSON path: {path}"),
+                            field: Some("json_path".to_string()),
+                        })
+                    },
+                    |field_path| {
+                        let mut current = value;
+                        for field in field_path.split('.') {
+                            if let JsonValue::Object(obj) = current {
+                                current = obj.get(field).unwrap_or(&JsonValue::Null);
+                            } else {
+                                return Ok(JsonValue::Null);
+                            }
                         }
-                    }
-                    Ok(current.clone())
-                } else {
-                    Err(LLMSpellError::Validation {
-                        message: format!("Unsupported JSON path: {path}"),
-                        field: Some("json_path".to_string()),
-                    })
-                }
+                        Ok(current.clone())
+                    },
+                )
             }
             TransformType::Custom(function_name) => {
                 // For now, just log that custom transforms are not implemented
@@ -422,26 +430,30 @@ impl AgentWrappedTool {
 
     /// Get the effective tool name
     fn tool_name(&self) -> String {
-        if let Some(metadata) = &self.tool_metadata {
-            if let Some(name) = &metadata.name {
-                return name.clone();
-            }
-        }
-        format!("agent-{}", self.agent.metadata().name)
+        self.tool_metadata
+            .as_ref()
+            .and_then(|metadata| metadata.name.as_ref())
+            .map_or_else(
+                || format!("agent-{}", self.agent.metadata().name),
+                |name| name.clone(),
+            )
     }
 
     /// Get the effective tool description
     fn tool_description(&self) -> String {
-        if let Some(metadata) = &self.tool_metadata {
-            if let Some(description) = &metadata.description {
-                return description.clone();
-            }
-        }
-        format!(
-            "Agent '{}' wrapped as tool: {}",
-            self.agent.metadata().name,
-            self.agent.metadata().description
-        )
+        self.tool_metadata
+            .as_ref()
+            .and_then(|metadata| metadata.description.as_ref())
+            .map_or_else(
+                || {
+                    format!(
+                        "Agent '{}' wrapped as tool: {}",
+                        self.agent.metadata().name,
+                        self.agent.metadata().description
+                    )
+                },
+                |description| description.clone(),
+            )
     }
 }
 

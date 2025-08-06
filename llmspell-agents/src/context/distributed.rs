@@ -249,7 +249,7 @@ impl DistributedContext {
         self.refresh_nodes().await?;
 
         // Start heartbeat task
-        self.start_heartbeat().await;
+        self.start_heartbeat();
 
         Ok(())
     }
@@ -459,7 +459,7 @@ impl DistributedContext {
     }
 
     /// Start heartbeat task
-    async fn start_heartbeat(&self) {
+    fn start_heartbeat(&self) {
         let discovery = self.discovery.clone();
         let node_id = self.local_node.id.clone();
 

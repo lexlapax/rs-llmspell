@@ -1271,9 +1271,7 @@ pub fn inject_workflow_global(
             let workflows = block_on_async::<_, Vec<(String, WorkflowInfo)>, LLMSpellError>(
                 "workflow_list",
                 async move {
-                    Ok::<Vec<(String, WorkflowInfo)>, LLMSpellError>(
-                        bridge.get_all_workflow_info(),
-                    )
+                    Ok::<Vec<(String, WorkflowInfo)>, LLMSpellError>(bridge.get_all_workflow_info())
                 },
                 None,
             )?;

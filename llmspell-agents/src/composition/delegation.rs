@@ -234,7 +234,7 @@ impl DelegatingAgent {
     }
 
     /// Select an agent based on the configured strategy
-    async fn select_agent(
+    fn select_agent(
         &self,
         matching_agents: Vec<String>,
         _request: &DelegationRequest,
@@ -301,7 +301,6 @@ impl DelegatingAgent {
         // Select an agent
         let selected_agent = self
             .select_agent(matching_agents, &request)
-            .await
             .ok_or_else(|| LLMSpellError::Component {
                 message: "No matching agent found for delegation".to_string(),
                 source: None,

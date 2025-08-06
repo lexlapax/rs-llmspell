@@ -142,6 +142,8 @@ impl GlobalObject for StateGlobal {
 
     #[cfg(feature = "lua")]
     fn inject_lua(&self, lua: &mlua::Lua, _context: &GlobalContext) -> Result<(), LLMSpellError> {
+        use crate::lua::sync_utils::block_on_async;
+        
         let state_manager = self.state_manager.clone();
         let fallback_state = self.fallback_state.clone();
 
@@ -170,7 +172,6 @@ impl GlobalObject for StateGlobal {
                 if let Some(state_mgr) = &get_state_manager {
                     let scope = Self::parse_scope(&scope_str);
                     // Use sync_utils to bridge async operation
-                    use crate::lua::sync_utils::block_on_async;
 
                     let result = block_on_async(
                         "state_get",
@@ -250,7 +251,6 @@ impl GlobalObject for StateGlobal {
                     if let Some(state_mgr) = &set_state_manager {
                         let scope = Self::parse_scope(&scope_str);
                         // Use sync_utils to bridge async operation
-                        use crate::lua::sync_utils::block_on_async;
 
                         let result = block_on_async(
                             "state_set",
@@ -306,7 +306,6 @@ impl GlobalObject for StateGlobal {
                 if let Some(state_mgr) = &delete_state_manager {
                     let scope = Self::parse_scope(&scope_str);
                     // Use sync_utils to bridge async operation
-                    use crate::lua::sync_utils::block_on_async;
 
                     let result = block_on_async(
                         "state_delete",
@@ -347,7 +346,6 @@ impl GlobalObject for StateGlobal {
                 if let Some(state_mgr) = &list_state_manager {
                     let scope = Self::parse_scope(&scope_str);
                     // Use sync_utils to bridge async operation
-                    use crate::lua::sync_utils::block_on_async;
 
                     let result = block_on_async(
                         "state_list_keys",
@@ -404,7 +402,6 @@ impl GlobalObject for StateGlobal {
             let migrate_fn = lua
                 .create_function(move |lua, target_version: String| {
                     // Use sync_utils for async operations
-                    use crate::lua::sync_utils::block_on_async;
 
                     // Parse target version
                     let target_ver: SemanticVersion = target_version.parse().map_err(|e| {
@@ -599,7 +596,6 @@ impl GlobalObject for StateGlobal {
             let create_backup_fn = lua
                 .create_function(move |lua, incremental: Option<bool>| {
                     let incremental = incremental.unwrap_or(false);
-                    use crate::lua::sync_utils::block_on_async;
 
                     let backup_mgr = backup_mgr_clone.clone();
                     let result = block_on_async(
@@ -646,7 +642,6 @@ impl GlobalObject for StateGlobal {
             let list_backup_mgr = backup_mgr.clone();
             let list_backups_fn = lua
                 .create_function(move |lua, (): ()| {
-                    use crate::lua::sync_utils::block_on_async;
 
                     let backup_mgr = list_backup_mgr.clone();
                     let result = block_on_async(
@@ -699,7 +694,6 @@ impl GlobalObject for StateGlobal {
             let restore_backup_mgr = backup_mgr.clone();
             let restore_backup_fn = lua
                 .create_function(move |lua, backup_id: String| {
-                    use crate::lua::sync_utils::block_on_async;
 
                     let backup_mgr = restore_backup_mgr.clone();
                     let backup_id_clone = backup_id.clone();
@@ -746,7 +740,6 @@ impl GlobalObject for StateGlobal {
             let validate_backup_mgr = backup_mgr.clone();
             let validate_backup_fn = lua
                 .create_function(move |lua, backup_id: String| {
-                    use crate::lua::sync_utils::block_on_async;
 
                     let backup_mgr = validate_backup_mgr.clone();
                     let backup_id_clone = backup_id.clone();

@@ -381,16 +381,18 @@ impl ToolComposition {
                         let error_msg = e.to_string();
 
                         // Check if we should retry
-                        if let Some(retry_config) = &step.retry_config {
-                            if retry_attempts < retry_config.max_attempts {
-                                retry_attempts += 1;
-                                total_retries += 1;
+                        if step.retry_config.as_ref().map_or(false, |retry_config| {
+                            retry_attempts < retry_config.max_attempts
+                        }) {
+                            retry_attempts += 1;
+                            total_retries += 1;
 
-                                let delay =
-                                    self.calculate_retry_delay(retry_config, retry_attempts);
-                                tokio::time::sleep(delay).await;
-                                continue;
-                            }
+                            let delay = self.calculate_retry_delay(
+                                step.retry_config.as_ref().unwrap(),
+                                retry_attempts,
+                            );
+                            tokio::time::sleep(delay).await;
+                            continue;
                         }
 
                         let step_metrics = StepMetrics {
@@ -425,9 +427,11 @@ impl ToolComposition {
         // Determine final output
         let output = self.steps.last().map_or_else(
             || JsonValue::Null,
-            |last_step| step_results
-                .get(&last_step.id)
-                .map_or(JsonValue::Null, |r| r.output.clone())
+            |last_step| {
+                step_results
+                    .get(&last_step.id)
+                    .map_or(JsonValue::Null, |r| r.output.clone())
+            },
         );
 
         let metrics = CompositionMetrics {
@@ -527,17 +531,17 @@ impl ToolComposition {
                 Ok(context.get_parameter(param_name).unwrap_or(JsonValue::Null))
             }
             DataFlow::StepOutput(step_id, field_name) => {
-                if let Some(step_output) = context.get_step_output(step_id) {
-                    if field_name == "*" {
-                        Ok(step_output.clone())
-                    } else if let JsonValue::Object(obj) = step_output {
-                        Ok(obj.get(field_name).cloned().unwrap_or(JsonValue::Null))
-                    } else {
-                        Ok(JsonValue::Null)
-                    }
-                } else {
-                    Ok(JsonValue::Null)
-                }
+                context
+                    .get_step_output(step_id)
+                    .map_or(Ok(JsonValue::Null), |step_output| {
+                        if field_name == "*" {
+                            Ok(step_output.clone())
+                        } else if let JsonValue::Object(obj) = step_output {
+                            Ok(obj.get(field_name).cloned().unwrap_or(JsonValue::Null))
+                        } else {
+                            Ok(JsonValue::Null)
+                        }
+                    })
             }
             DataFlow::Constant(value) => Ok(value.clone()),
             DataFlow::SharedContext(key) => {
@@ -641,7 +645,9 @@ impl ToolComposition {
             let multiplier = 2_u32.pow(attempt.saturating_sub(1));
             let delay = base_delay * multiplier;
 
-            retry_config.max_delay.map_or(delay, |max_delay| delay.min(max_delay))
+            retry_config
+                .max_delay
+                .map_or(delay, |max_delay| delay.min(max_delay))
         } else {
             base_delay
         }
@@ -785,13 +791,10 @@ mod tests {
         ) -> Result<JsonValue> {
             match tool_name {
                 "echo" => Ok(input),
-                "transform" => {
-                    if let Some(text) = input.get("text").and_then(|v| v.as_str()) {
-                        Ok(json!({"result": text.to_uppercase()}))
-                    } else {
-                        Ok(json!({"result": "NO_TEXT"}))
-                    }
-                }
+                "transform" => Ok(input.get("text").and_then(|v| v.as_str()).map_or_else(
+                    || json!({"result": "NO_TEXT"}),
+                    |text| json!({"result": text.to_uppercase()}),
+                )),
                 _ => Err(LLMSpellError::Component {
                     message: format!("Tool not found: {}", tool_name),
                     source: None,

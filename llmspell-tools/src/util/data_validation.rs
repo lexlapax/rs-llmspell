@@ -191,16 +191,17 @@ impl DataValidationTool {
         self.custom_validators.insert(
             "phone".to_string(),
             Box::new(|value| {
-                if let Some(s) = value.as_str() {
-                    let phone_regex = Regex::new(r"^\+?[1-9]\d{1,14}$").unwrap();
-                    if phone_regex.is_match(s) {
-                        Ok(())
-                    } else {
-                        Err(validation_error("Invalid phone number format", None))
-                    }
-                } else {
-                    Err(validation_error("Value must be a string", None))
-                }
+                value.as_str().map_or_else(
+                    || Err(validation_error("Value must be a string", None)),
+                    |s| {
+                        let phone_regex = Regex::new(r"^\+?[1-9]\d{1,14}$").unwrap();
+                        if phone_regex.is_match(s) {
+                            Ok(())
+                        } else {
+                            Err(validation_error("Invalid phone number format", None))
+                        }
+                    },
+                )
             }),
         );
 
@@ -208,7 +209,10 @@ impl DataValidationTool {
         self.custom_validators.insert(
             "uuid".to_string(),
             Box::new(|value| {
-                if let Some(s) = value.as_str() {
+                value.as_str().map_or_else(|| Err(validation_error(
+                    "Value must be a string",
+                    None,
+                )), |s| {
                     let uuid_regex = Regex::new(
                         r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
                     ).unwrap();
@@ -220,12 +224,7 @@ impl DataValidationTool {
                             None,
                         ))
                     }
-                } else {
-                    Err(validation_error(
-                        "Value must be a string",
-                        None,
-                    ))
-                }
+                })
             }),
         );
 
@@ -561,14 +560,13 @@ impl DataValidationTool {
 
     /// Get custom error message or default
     fn get_error_message(&self, key: &str, field: &str) -> String {
-        if let Some(msg) = self.config.custom_messages.get(key) {
-            msg.replace("{field}", field)
-        } else {
-            match key {
+        self.config.custom_messages.get(key).map_or_else(
+            || match key {
                 "required" => format!("{field} is required"),
                 _ => format!("Validation failed for {field}"),
-            }
-        }
+            },
+            |msg| msg.replace("{field}", field),
+        )
     }
 }
 
