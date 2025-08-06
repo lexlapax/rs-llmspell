@@ -1,7 +1,7 @@
 // ABOUTME: Performance benchmarks for state migration operations
 // ABOUTME: Measures throughput, latency, and scalability of migration engine
 
-#![cfg_attr(test_category = "benchmark")]
+// Benchmark file
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
 use llmspell_state_persistence::{
@@ -18,6 +18,7 @@ fn create_test_state(id: usize) -> SerializableState {
         value: json!({
             "id": id,
             "name": format!("Item {}", id),
+            #[allow(clippy::cast_precision_loss)]
             "price": id as f64 * 10.0,
             "quantity": id % 100,
             "metadata": {
@@ -31,6 +32,7 @@ fn create_test_state(id: usize) -> SerializableState {
                         1 => "medium",
                         _ => "large",
                     },
+                    #[allow(clippy::cast_precision_loss)]
                     "weight": id as f64 * 0.5
                 }
             }

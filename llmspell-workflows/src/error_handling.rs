@@ -90,7 +90,11 @@ impl ErrorHandler {
         let progress = if completed_steps.is_empty() && remaining_steps == 0 {
             0.0
         } else {
-            completed_steps.len() as f64 / (completed_steps.len() + remaining_steps) as f64
+            #[allow(clippy::cast_precision_loss)]
+            let completed_len_f64 = completed_steps.len() as f64;
+            #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
+            let total_steps_f64 = (completed_steps.len() + remaining_steps) as f64;
+            completed_len_f64 / total_steps_f64
         };
 
         let successful_steps = completed_steps.iter().filter(|r| r.success).count();
@@ -101,6 +105,7 @@ impl ErrorHandler {
         Ok(WorkflowErrorAnalysis {
             error_type,
             error_message: error.to_string(),
+            #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
             progress_percentage: (progress * 100.0) as u32,
             successful_steps,
             failed_steps,

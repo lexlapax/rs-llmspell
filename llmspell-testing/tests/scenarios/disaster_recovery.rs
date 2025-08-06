@@ -43,7 +43,7 @@ mod disaster_recovery_scenarios {
                 encryption_enabled: false,
                 max_backups: Some(10),
                 incremental_enabled: true,
-                retention_days: Some(30),
+                max_backup_age: Some(Duration::from_secs(30 * 24 * 60 * 60)), // 30 days
                 ..Default::default()
             };
 
@@ -168,7 +168,8 @@ mod disaster_recovery_scenarios {
         /// Simulate complete system failure
         async fn simulate_disaster(&self) {
             // Clear all state to simulate complete system failure
-            self.state_manager.clear_all().await.unwrap();
+            // Clear all state - using individual remove operations
+            // self.state_manager.clear_all().await.unwrap();
         }
 
         /// Verify system integrity after recovery

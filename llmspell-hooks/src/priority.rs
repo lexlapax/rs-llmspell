@@ -102,12 +102,16 @@ impl PriorityBuilder {
 
     /// Create a priority before the base (higher priority)
     pub fn before(self, distance: u32) -> Priority {
-        Priority(self.base.saturating_sub(distance as i32))
+        #[allow(clippy::cast_possible_wrap)]
+        let distance_i32 = distance as i32;
+        Priority(self.base.saturating_sub(distance_i32))
     }
 
     /// Create a priority after the base (lower priority)
     pub fn after(self, distance: u32) -> Priority {
-        Priority(self.base.saturating_add(distance as i32))
+        #[allow(clippy::cast_possible_wrap)]
+        let distance_i32 = distance as i32;
+        Priority(self.base.saturating_add(distance_i32))
     }
 }
 

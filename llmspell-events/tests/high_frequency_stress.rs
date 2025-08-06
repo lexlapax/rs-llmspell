@@ -64,13 +64,17 @@ mod stress_tests {
         }
 
         let publish_duration = start_time.elapsed();
-        let actual_eps = target_events as f64 / publish_duration.as_secs_f64();
+        #[allow(clippy::cast_precision_loss)]
+        let target_events_f64 = target_events as f64;
+        let actual_eps = target_events_f64 / publish_duration.as_secs_f64();
 
         // Wait for all events to be processed
         tokio::time::sleep(Duration::from_millis(100)).await;
 
         let final_received = received_count.load(Ordering::Relaxed);
-        let receive_rate = final_received as f64 / publish_duration.as_secs_f64();
+        #[allow(clippy::cast_precision_loss)]
+        let final_received_f64 = final_received as f64;
+        let receive_rate = final_received_f64 / publish_duration.as_secs_f64();
 
         println!(
             "Published {} events in {:.2}s ({:.0} EPS)",
@@ -157,7 +161,11 @@ mod stress_tests {
                     "Publisher {} completed in {:.2}s ({:.0} EPS)",
                     publisher_id,
                     duration.as_secs_f64(),
-                    events_per_publisher as f64 / duration.as_secs_f64()
+                    {
+                        #[allow(clippy::cast_precision_loss)]
+                        let events_f64 = events_per_publisher as f64;
+                        events_f64 / duration.as_secs_f64()
+                    }
                 );
             });
 
@@ -179,7 +187,9 @@ mod stress_tests {
         tokio::time::sleep(Duration::from_millis(200)).await;
 
         let final_received = received_count.load(Ordering::Relaxed);
-        let overall_eps = final_received as f64 / publish_duration.as_secs_f64();
+        #[allow(clippy::cast_precision_loss)]
+        let final_received_f64 = final_received as f64;
+        let overall_eps = final_received_f64 / publish_duration.as_secs_f64();
 
         println!(
             "Total: {} events in {:.2}s ({:.0} EPS)",
@@ -196,8 +206,10 @@ mod stress_tests {
             overall_eps >= 5_000.0,
             "Should achieve at least 5K EPS with concurrent publishers"
         );
+        #[allow(clippy::cast_sign_loss)]
+        let total_events_u64 = total_events as u64;
         assert!(
-            final_received >= total_events as u64 * 90 / 100,
+            final_received >= total_events_u64 * 90 / 100,
             "Should receive at least 90% of events from concurrent publishers"
         );
     }
@@ -246,7 +258,9 @@ mod stress_tests {
             }
 
             let wave_duration = wave_start.elapsed();
-            let wave_eps = events_per_wave as f64 / wave_duration.as_secs_f64();
+            #[allow(clippy::cast_precision_loss)]
+            let events_per_wave_f64 = events_per_wave as f64;
+            let wave_eps = events_per_wave_f64 / wave_duration.as_secs_f64();
 
             // Check memory usage
             let current_memory = get_approximate_memory_usage();
@@ -289,8 +303,10 @@ mod stress_tests {
         println!("  Memory growth: ~{}KB", total_growth / 1024);
 
         // Assertions
+        #[allow(clippy::cast_sign_loss)]
+        let total_events_u64 = total_events as u64;
         assert!(
-            final_received >= total_events as u64 * 95 / 100,
+            final_received >= total_events_u64 * 95 / 100,
             "Should process most events under memory pressure"
         );
         assert!(
@@ -430,7 +446,9 @@ mod stress_tests {
 
         let process_duration = process_start.elapsed();
         let final_processed = processed_count.load(Ordering::Relaxed);
-        let processing_eps = final_processed as f64 / process_duration.as_secs_f64();
+        #[allow(clippy::cast_precision_loss)]
+        let final_processed_f64 = final_processed as f64;
+        let processing_eps = final_processed_f64 / process_duration.as_secs_f64();
 
         println!("High-throughput processor results:");
         println!("  Events processed: {}", final_processed);

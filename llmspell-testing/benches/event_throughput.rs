@@ -1,7 +1,7 @@
 // ABOUTME: Performance test for event system throughput measurement
 // ABOUTME: Validates 100K+ events/second capability and event bus performance
 
-#![cfg_attr(test_category = "benchmark")]
+// Benchmark file
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use llmspell_events::{EventBus, Language, UniversalEvent};
@@ -19,7 +19,9 @@ fn bench_event_publishing(c: &mut Criterion) {
     let mut group = c.benchmark_group("event_publishing");
 
     for event_count in [1000, 10000, 100000].iter() {
-        group.throughput(Throughput::Elements(*event_count as u64));
+        #[allow(clippy::cast_sign_loss)]
+        let event_count_u64 = *event_count as u64;
+        group.throughput(Throughput::Elements(event_count_u64));
 
         group.bench_with_input(
             BenchmarkId::from_parameter(event_count),
@@ -325,7 +327,9 @@ fn calculate_throughput_metrics(_c: &mut Criterion) {
         }
         let elapsed = start.elapsed();
 
-        let throughput = events_to_publish as f64 / elapsed.as_secs_f64();
+        #[allow(clippy::cast_lossless)]
+        let events_f64 = events_to_publish as f64;
+        let throughput = events_f64 / elapsed.as_secs_f64();
         println!("Publishing throughput: {:.0} events/sec", throughput);
         throughput
     });
@@ -365,7 +369,9 @@ fn calculate_throughput_metrics(_c: &mut Criterion) {
         let elapsed = start.elapsed();
         publisher.await.unwrap();
 
-        let throughput = received as f64 / elapsed.as_secs_f64();
+        #[allow(clippy::cast_lossless)]
+        let received_f64 = received as f64;
+        let throughput = received_f64 / elapsed.as_secs_f64();
         println!("End-to-end throughput: {:.0} events/sec", throughput);
         throughput
     });

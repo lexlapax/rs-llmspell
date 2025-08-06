@@ -1,7 +1,7 @@
 //! ABOUTME: Performance benchmarks for web tools
 //! ABOUTME: Measures initialization time and basic operations for external integration tools
 
-#![cfg_attr(test_category = "benchmark")]
+// Benchmark file
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use llmspell_core::{types::AgentInput, BaseAgent};

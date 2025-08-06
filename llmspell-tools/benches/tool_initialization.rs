@@ -1,7 +1,7 @@
 // ABOUTME: Tool initialization performance benchmarks for Task 2.10.3
 // ABOUTME: Measures tool creation time to ensure <10ms requirement is met
 
-#![cfg_attr(test_category = "benchmark")]
+// Benchmark file
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use llmspell_security::sandbox::{FileSandbox, SandboxContext};

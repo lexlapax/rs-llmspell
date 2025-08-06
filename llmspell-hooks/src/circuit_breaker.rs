@@ -254,7 +254,7 @@ impl CircuitBreaker {
             // Check if we should open due to slow calls
             if current_state == BreakerState::Closed {
                 let slow_calls = self.stats.slow_calls.load(Ordering::Relaxed);
-                if slow_calls >= self.config.slow_call_threshold as u64 {
+                if slow_calls >= u64::from(self.config.slow_call_threshold) {
                     self.transition_to(BreakerState::Open);
                     return;
                 }
@@ -264,7 +264,7 @@ impl CircuitBreaker {
         // Handle state transitions on success
         if current_state == BreakerState::HalfOpen {
             let successes = self.stats.successes.load(Ordering::Relaxed);
-            if successes >= self.config.success_threshold as u64 {
+            if successes >= u64::from(self.config.success_threshold) {
                 self.transition_to(BreakerState::Closed);
             }
         }
@@ -282,7 +282,7 @@ impl CircuitBreaker {
             BreakerState::Closed => {
                 // Check if we should open the circuit
                 let failures = self.stats.failures.load(Ordering::Relaxed);
-                if failures >= self.config.failure_threshold as u64 {
+                if failures >= u64::from(self.config.failure_threshold) {
                     self.transition_to(BreakerState::Open);
                 }
             }

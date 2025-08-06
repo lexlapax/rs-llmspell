@@ -266,7 +266,10 @@ impl RetryHook {
                 max,
             } => {
                 #[allow(clippy::cast_possible_truncation, clippy::cast_precision_loss)]
-                let delay = base.as_millis() as f64 * multiplier.powf(state.attempts as f64);
+                let base_f64 = base.as_millis() as f64;
+                #[allow(clippy::cast_lossless)]
+                let attempts_f64 = f64::from(state.attempts);
+                let delay = base_f64 * multiplier.powf(attempts_f64);
                 #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
                 let delay_ms = delay.min(max.as_millis() as f64) as u64;
                 Duration::from_millis(delay_ms)

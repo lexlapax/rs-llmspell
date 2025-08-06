@@ -24,7 +24,7 @@ impl TokenBucket {
     /// Create a new token bucket
     pub fn new(config: TokenBucketConfig) -> Self {
         let total_capacity = config.capacity + config.burst_capacity;
-        #[allow(clippy::cast_precision_loss)]
+        #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
         let tokens_f64 = total_capacity as f64;
         Self {
             tokens: tokens_f64,
@@ -43,7 +43,9 @@ impl TokenBucket {
 
         if self.tokens >= requested {
             self.tokens -= requested;
-            self.total_consumed += requested as u64;
+            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+            let requested_u64 = requested as u64;
+            self.total_consumed += requested_u64;
             (true, self.tokens)
         } else {
             (false, self.tokens)
@@ -54,7 +56,9 @@ impl TokenBucket {
     pub fn force_acquire(&mut self, requested: f64) -> f64 {
         self.refill();
         self.tokens -= requested;
-        self.total_consumed += requested as u64;
+        #[allow(clippy::cast_sign_loss)]
+        let requested_u64 = requested as u64;
+        self.total_consumed += requested_u64;
         self.tokens
     }
 
@@ -68,14 +72,21 @@ impl TokenBucket {
     pub fn get_state(&self) -> BucketState {
         let now = Utc::now();
         let elapsed = now.signed_duration_since(self.last_refill);
-        let elapsed_seconds = elapsed.num_milliseconds() as f64 / 1000.0;
+        #[allow(clippy::cast_precision_loss)]
+        let elapsed_millis = elapsed.num_milliseconds() as f64;
+        let elapsed_seconds = elapsed_millis / 1000.0;
 
         // Calculate when next refill will happen
         let refill_interval_seconds = self.config.refill_interval.as_secs_f64();
         let time_until_next_refill =
             refill_interval_seconds - (elapsed_seconds % refill_interval_seconds);
-        let next_refill =
-            now + chrono::Duration::milliseconds((time_until_next_refill * 1000.0) as i64);
+        #[allow(
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss,
+            clippy::cast_precision_loss
+        )]
+        let millis = (time_until_next_refill * 1000.0) as i64;
+        let next_refill = now + chrono::Duration::milliseconds(millis);
 
         BucketState {
             tokens: self.tokens,
@@ -92,7 +103,7 @@ impl TokenBucket {
     /// Reset the bucket to full capacity
     pub fn reset(&mut self) {
         let total_capacity = self.config.capacity + self.config.burst_capacity;
-        #[allow(clippy::cast_precision_loss)]
+        #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
         let tokens_f64 = total_capacity as f64;
         self.tokens = tokens_f64;
         self.last_refill = Utc::now();
@@ -114,6 +125,7 @@ impl TokenBucket {
             let refill_amount = intervals * self.config.refill_rate;
 
             // Add tokens, capping at total capacity
+            #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
             let total_capacity = (self.config.capacity + self.config.burst_capacity) as f64;
             let old_tokens = self.tokens;
             self.tokens = (self.tokens + refill_amount).min(total_capacity);
@@ -121,7 +133,9 @@ impl TokenBucket {
             // Update statistics
             let actual_refilled = self.tokens - old_tokens;
             if actual_refilled > 0.0 {
-                self.total_refilled += actual_refilled as u64;
+                #[allow(clippy::cast_sign_loss, clippy::cast_possible_truncation)]
+                let refilled_u64 = actual_refilled as u64;
+                self.total_refilled += refilled_u64;
                 self.last_refill_amount = actual_refilled;
             }
 

@@ -126,17 +126,29 @@ impl PerformanceReport {
         #[allow(clippy::cast_precision_loss)]
         let count = snapshots.len() as f64;
         let avg_cpu_percent = total_cpu / count;
-        #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
+        #[allow(
+            clippy::cast_precision_loss,
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss
+        )]
         let avg_memory_bytes = (total_memory as f64 / count).round() as u64;
         let avg_response_time = total_response_time / count;
 
         // Calculate percentiles
         response_times.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        #[allow(
+            clippy::cast_precision_loss,
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss
+        )]
         let p95_index = usize::try_from((response_times.len() as f64 * 0.95).round() as u64)
             .unwrap_or(0)
             .min(response_times.len() - 1);
-        #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        #[allow(
+            clippy::cast_precision_loss,
+            clippy::cast_possible_truncation,
+            clippy::cast_sign_loss
+        )]
         let p99_index = usize::try_from((response_times.len() as f64 * 0.99).round() as u64)
             .unwrap_or(0)
             .min(response_times.len() - 1);
@@ -512,6 +524,7 @@ mod tests {
 
         for i in 0..5 {
             let snapshot = PerformanceSnapshot {
+                #[allow(clippy::cast_possible_wrap)]
                 timestamp: Utc::now() + chrono::Duration::seconds(i as i64),
                 resources: ResourceUsage {
                     cpu_percent: 20.0 + (i as f64 * 5.0),

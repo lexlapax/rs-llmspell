@@ -121,8 +121,7 @@ impl ResourceMonitor {
                 }
 
                 if let Some(limit) = resource_limits.max_file_ops_per_sec {
-                    #[allow(clippy::cast_precision_loss)]
-                    let ops_per_sec = current.file_operations as f64
+                    let ops_per_sec = f64::from(current.file_operations)
                         / current.timestamp.elapsed().as_secs_f64().max(1.0);
                     #[allow(clippy::cast_precision_loss)]
                     let limit_f64 = limit as f64;
@@ -214,8 +213,7 @@ impl ResourceMonitor {
         if let Some(limit) = self.context.resource_limits.max_file_ops_per_sec {
             let usage = self.current_usage.read().await;
             let duration = self.start_time.elapsed().as_secs_f64().max(1.0);
-            #[allow(clippy::cast_precision_loss)]
-            let ops_per_sec = usage.file_operations as f64 / duration;
+            let ops_per_sec = f64::from(usage.file_operations) / duration;
 
             #[allow(clippy::cast_precision_loss)]
             let limit_f64 = limit as f64;

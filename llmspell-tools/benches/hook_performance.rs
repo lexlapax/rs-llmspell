@@ -1,7 +1,7 @@
 //! Performance benchmarks for tool hook integration
 //! Measures overhead of hook system across various tools and scenarios
 
-#![cfg_attr(test_category = "benchmark")]
+// Benchmark file
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use llmspell_core::{traits::tool::Tool, types::AgentInput, ExecutionContext};

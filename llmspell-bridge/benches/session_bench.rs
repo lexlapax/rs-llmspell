@@ -1,12 +1,11 @@
 //! ABOUTME: Performance benchmarks for Session and Artifact operations
 //! ABOUTME: Validates <50ms session operations target from Phase 6 requirements
 
-#![cfg_attr(test_category = "benchmark")]
+// Benchmark for llmspell-bridge sessions
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
+use llmspell_bridge::engine::LuaConfig;
 use llmspell_bridge::lua::engine::LuaEngine;
-use llmspell_bridge::runtime::GlobalRuntimeConfig;
-use llmspell_bridge::ComponentRegistry;
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 
@@ -14,13 +13,7 @@ use tokio::runtime::Runtime;
 fn bench_session_creation(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
 
-    let mut runtime_config = GlobalRuntimeConfig::default();
-    runtime_config.runtime.sessions.enabled = true;
-    runtime_config.runtime.sessions.storage_backend = "memory".to_string();
-    runtime_config.runtime.sessions.max_sessions = 1000;
-
-    let registry = Arc::new(ComponentRegistry::new());
-    let engine = rt.block_on(async { LuaEngine::new(registry, runtime_config).unwrap() });
+    let lua_config = LuaConfig::default();
 
     let lua_code = r#"
         return Session.create({
@@ -31,8 +24,8 @@ fn bench_session_creation(c: &mut Criterion) {
 
     c.bench_function("session_creation", |b| {
         b.to_async(&rt).iter(|| async {
-            let mut engine_clone = engine.clone();
-            engine_clone.execute(lua_code).await.unwrap()
+            let engine = LuaEngine::new(&lua_config).unwrap();
+            engine.execute(lua_code).await.unwrap()
         });
     });
 }
@@ -41,15 +34,11 @@ fn bench_session_creation(c: &mut Criterion) {
 fn bench_session_persistence(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
 
-    let mut runtime_config = GlobalRuntimeConfig::default();
-    runtime_config.runtime.sessions.enabled = true;
-    runtime_config.runtime.sessions.storage_backend = "memory".to_string();
-
-    let registry = Arc::new(ComponentRegistry::new());
-    let mut engine = rt.block_on(async { LuaEngine::new(registry, runtime_config).unwrap() });
+    let lua_config = LuaConfig::default();
 
     // Pre-create session
     let session_id = rt.block_on(async {
+        let engine = LuaEngine::new(&lua_config).unwrap();
         let create_code = r#"
             return Session.create({
                 name = "persistence_benchmark"
@@ -75,15 +64,15 @@ fn bench_session_persistence(c: &mut Criterion) {
 
     c.bench_function("session_save", |b| {
         b.to_async(&rt).iter(|| async {
-            let mut engine_clone = engine.clone();
-            engine_clone.execute(&save_code).await.unwrap()
+            let engine = LuaEngine::new(&lua_config).unwrap();
+            engine.execute(&save_code).await.unwrap()
         });
     });
 
     c.bench_function("session_load", |b| {
         b.to_async(&rt).iter(|| async {
-            let mut engine_clone = engine.clone();
-            engine_clone.execute(&load_code).await.unwrap()
+            let engine = LuaEngine::new(&lua_config).unwrap();
+            engine.execute(&load_code).await.unwrap()
         });
     });
 }
@@ -92,15 +81,11 @@ fn bench_session_persistence(c: &mut Criterion) {
 fn bench_artifact_operations(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
 
-    let mut runtime_config = GlobalRuntimeConfig::default();
-    runtime_config.runtime.sessions.enabled = true;
-    runtime_config.runtime.sessions.storage_backend = "memory".to_string();
-
-    let registry = Arc::new(ComponentRegistry::new());
-    let mut engine = rt.block_on(async { LuaEngine::new(registry, runtime_config).unwrap() });
+    let lua_config = LuaConfig::default();
 
     // Pre-create session
     let session_id = rt.block_on(async {
+        let engine = LuaEngine::new(&lua_config).unwrap();
         let create_code = r#"
             return Session.create({
                 name = "artifact_benchmark"
@@ -142,22 +127,22 @@ fn bench_artifact_operations(c: &mut Criterion) {
 
     c.bench_function("artifact_store", |b| {
         b.to_async(&rt).iter(|| async {
-            let mut engine_clone = engine.clone();
-            engine_clone.execute(&store_code).await.unwrap()
+            let engine = LuaEngine::new(&lua_config).unwrap();
+            engine.execute(&store_code).await.unwrap()
         });
     });
 
     c.bench_function("artifact_list", |b| {
         b.to_async(&rt).iter(|| async {
-            let mut engine_clone = engine.clone();
-            engine_clone.execute(&list_code).await.unwrap()
+            let engine = LuaEngine::new(&lua_config).unwrap();
+            engine.execute(&list_code).await.unwrap()
         });
     });
 
     c.bench_function("artifact_query", |b| {
         b.to_async(&rt).iter(|| async {
-            let mut engine_clone = engine.clone();
-            engine_clone.execute(&query_code).await.unwrap()
+            let engine = LuaEngine::new(&lua_config).unwrap();
+            engine.execute(&query_code).await.unwrap()
         });
     });
 }
@@ -166,17 +151,9 @@ fn bench_artifact_operations(c: &mut Criterion) {
 fn bench_batch_operations(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
 
-    let mut runtime_config = GlobalRuntimeConfig::default();
-    runtime_config.runtime.sessions.enabled = true;
-    runtime_config.runtime.sessions.storage_backend = "memory".to_string();
-    runtime_config.runtime.sessions.max_sessions = 1000;
-
-    let registry = Arc::new(ComponentRegistry::new());
+    let lua_config = LuaConfig::default();
 
     for batch_size in [1, 10, 50, 100].iter() {
-        let mut engine = rt
-            .block_on(async { LuaEngine::new(registry.clone(), runtime_config.clone()).unwrap() });
-
         let lua_code = format!(
             r#"
             local session_ids = {{}}
@@ -197,12 +174,119 @@ fn bench_batch_operations(c: &mut Criterion) {
             batch_size,
             |b, &_size| {
                 b.to_async(&rt).iter(|| async {
-                    let mut engine_clone = engine.clone();
-                    engine_clone.execute(&lua_code).await.unwrap()
+                    let engine = LuaEngine::new(&lua_config).unwrap();
+                    engine.execute(&lua_code).await.unwrap()
                 });
             },
         );
     }
+
+    // Benchmark batch artifact storage
+    let session_id = rt.block_on(async {
+        let engine = LuaEngine::new(&lua_config).unwrap();
+        engine
+            .execute(r#"return Session.create({ name = "batch_artifact_test" })"#)
+            .await
+            .unwrap()
+    });
+
+    for batch_size in [10, 50, 100, 500].iter() {
+        let store_batch_code = format!(
+            r#"
+            local artifacts = {{}}
+            for i = 1, {} do
+                local id = Artifact.store(
+                    "{}",
+                    "batch_data",
+                    "batch_" .. i .. ".json",
+                    '{{"index": ' .. i .. ', "data": "test"}}',
+                    {{ category = "batch" }}
+                )
+                table.insert(artifacts, id)
+            end
+            return artifacts
+        "#,
+            batch_size,
+            session_id.as_str().unwrap()
+        );
+
+        c.bench_with_input(
+            BenchmarkId::new("batch_artifact_storage", batch_size),
+            batch_size,
+            |b, &_size| {
+                b.to_async(&rt).iter(|| async {
+                    let engine = LuaEngine::new(&lua_config).unwrap();
+                    engine.execute(&store_batch_code).await.unwrap()
+                });
+            },
+        );
+    }
+}
+
+/// Target validation benchmarks - ensure we meet Phase 6 requirements
+fn bench_target_validation(c: &mut Criterion) {
+    let rt = Runtime::new().unwrap();
+
+    let lua_config = LuaConfig::default();
+
+    // Validate <50ms for session creation
+    c.bench_function("target_session_create_50ms", |b| {
+        b.to_async(&rt).iter(|| async {
+            let engine = LuaEngine::new(&lua_config).unwrap();
+            engine
+                .execute(r#"return Session.create({ name = "perf_test" })"#)
+                .await
+                .unwrap()
+        });
+    });
+
+    // Pre-create session for save/load tests
+    let session_id = rt.block_on(async {
+        let engine = LuaEngine::new(&lua_config).unwrap();
+        engine
+            .execute(r#"return Session.create({ name = "save_load_test" })"#)
+            .await
+            .unwrap()
+    });
+
+    // Validate <50ms for session save
+    let save_code = format!(r#"Session.save("{}")"#, session_id.as_str().unwrap());
+    c.bench_function("target_session_save_50ms", |b| {
+        b.to_async(&rt).iter(|| async {
+            let engine = LuaEngine::new(&lua_config).unwrap();
+            engine.execute(&save_code).await.unwrap()
+        });
+    });
+
+    // Validate <50ms for session load
+    let load_code = format!(r#"return Session.load("{}")"#, session_id.as_str().unwrap());
+    c.bench_function("target_session_load_50ms", |b| {
+        b.to_async(&rt).iter(|| async {
+            let engine = LuaEngine::new(&lua_config).unwrap();
+            engine.execute(&load_code).await.unwrap()
+        });
+    });
+
+    // Validate <5ms for artifact storage (text/JSON)
+    let store_text_code = format!(
+        r#"
+        return Artifact.store(
+            "{}",
+            "text",
+            "quick_text.txt",
+            "Small text content for <5ms validation",
+            {{}}
+        )
+    "#,
+        session_id.as_str().unwrap()
+    );
+
+    c.bench_function("target_artifact_store_text_5ms", |b| {
+        b.to_async(&rt).iter(|| async {
+            let engine = LuaEngine::new(&lua_config).unwrap();
+            engine.execute(&store_text_code).await.unwrap()
+        });
+    });
 }
 
 criterion_group!(
@@ -210,6 +294,7 @@ criterion_group!(
     bench_session_creation,
     bench_session_persistence,
     bench_artifact_operations,
-    bench_batch_operations
+    bench_batch_operations,
+    bench_target_validation
 );
 criterion_main!(benches);

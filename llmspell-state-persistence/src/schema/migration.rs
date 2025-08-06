@@ -530,11 +530,15 @@ impl MigrationPlanner {
         };
 
         let average_migration_complexity = if !self.compatibility_cache.is_empty() {
-            self.compatibility_cache
+            #[allow(clippy::cast_precision_loss)]
+            let sum_f64 = self
+                .compatibility_cache
                 .values()
                 .map(|r| r.field_changes.len())
-                .sum::<usize>() as f64
-                / self.compatibility_cache.len() as f64
+                .sum::<usize>() as f64;
+            #[allow(clippy::cast_precision_loss)]
+            let len_f64 = self.compatibility_cache.len() as f64;
+            sum_f64 / len_f64
         } else {
             0.0
         };

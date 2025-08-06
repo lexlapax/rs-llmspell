@@ -499,7 +499,9 @@ impl CapabilityAggregator {
         }
 
         let avg_score = if total > 0 {
-            capabilities.values().map(|e| e.score).sum::<f64>() / total as f64
+            #[allow(clippy::cast_precision_loss)]
+            let total_f64 = total as f64;
+            capabilities.values().map(|e| e.score).sum::<f64>() / total_f64
         } else {
             0.0
         };

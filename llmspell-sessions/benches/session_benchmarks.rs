@@ -1,7 +1,7 @@
 //! ABOUTME: Comprehensive performance benchmarks for llmspell-sessions crate
 //! ABOUTME: Validates all performance targets from Phase 6 requirements
 
-#![cfg_attr(test_category = "benchmark")]
+// Benchmark file
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
 use llmspell_events::bus::EventBus;

@@ -1,7 +1,7 @@
 // ABOUTME: Tool operation performance benchmarks for Task 2.10.3
 // ABOUTME: Measures tool execution performance for common operations
 
-#![cfg_attr(test_category = "benchmark")]
+// Benchmark file
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};

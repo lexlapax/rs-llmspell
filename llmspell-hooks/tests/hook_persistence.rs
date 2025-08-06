@@ -407,7 +407,11 @@ mod tests {
         );
 
         // Verify overhead is acceptable
-        let overhead_ratio = replay_time.as_millis() as f64 / recording_time.as_millis() as f64;
+        #[allow(clippy::cast_precision_loss)]
+        let replay_millis_f64 = replay_time.as_millis() as f64;
+        #[allow(clippy::cast_precision_loss)]
+        let recording_millis_f64 = recording_time.as_millis() as f64;
+        let overhead_ratio = replay_millis_f64 / recording_millis_f64;
         assert!(
             overhead_ratio < 5.0,
             "Replay overhead too high: {:.2}x",

@@ -78,7 +78,9 @@ impl TraceStorage {
 
         // Only add if it meets duration threshold
         if let Some(duration) = trace.execution_duration {
-            if duration < self.config.min_duration_ms as f64 {
+            #[allow(clippy::cast_precision_loss)]
+            let min_duration_f64 = self.config.min_duration_ms as f64;
+            if duration < min_duration_f64 {
                 return;
             }
         }
@@ -199,7 +201,9 @@ impl TraceStorage {
             let mut duration_stats = serde_json::Map::new();
 
             let sum: f64 = durations.iter().sum();
-            let mean = sum / durations.len() as f64;
+            #[allow(clippy::cast_precision_loss)]
+            let len_f64 = durations.len() as f64;
+            let mean = sum / len_f64;
 
             let mut sorted_durations = durations.clone();
             sorted_durations.sort_by(|a, b| a.partial_cmp(b).unwrap());
@@ -442,6 +446,7 @@ impl MetricHook for DebuggingHook {
         duration: std::time::Duration,
     ) -> Result<()> {
         // Create final trace with execution duration
+        #[allow(clippy::cast_precision_loss)]
         let execution_duration = duration.as_millis() as f64;
         let mut trace = self.create_trace(context, Some(execution_duration));
 
@@ -698,9 +703,12 @@ impl ReplayableHook for DebuggingHook {
             "average_duration": if traces.is_empty() {
                 0.0
             } else {
-                traces.iter()
+                let durations: Vec<f64> = traces.iter()
                     .filter_map(|t| t.execution_duration)
-                    .sum::<f64>() / traces.len() as f64
+                    .collect();
+                #[allow(clippy::cast_precision_loss)]
+                let len_f64 = traces.len() as f64;
+                durations.iter().sum::<f64>() / len_f64
             },
             "component_types": traces.iter().map(|t| &t.component_type).collect::<std::collections::HashSet<_>>(),
             "languages": traces.iter().map(|t| &t.language).collect::<std::collections::HashSet<_>>(),

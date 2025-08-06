@@ -1,7 +1,7 @@
 // ABOUTME: Minimal performance test to verify setup
 // ABOUTME: Simple benchmark to ensure criterion is working correctly
 
-#![cfg_attr(test_category = "benchmark")]
+// Benchmark file
 
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 use std::time::Duration;

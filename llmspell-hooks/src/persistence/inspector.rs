@@ -205,12 +205,17 @@ impl HookInspector {
         #[allow(clippy::cast_precision_loss)]
         let total_exec_f64 = total_executions as f64;
         #[allow(clippy::cast_precision_loss)]
-        let error_rate = *result_counts.get("Cancel").unwrap_or(&0) as f64 / total_exec_f64;
-        #[allow(clippy::cast_precision_loss)]
-        let modification_rate =
-            *result_counts.get("Modified").unwrap_or(&0) as f64 / total_exec_f64;
-        #[allow(clippy::cast_precision_loss)]
-        let cancellation_rate = *result_counts.get("Cancel").unwrap_or(&0) as f64 / total_exec_f64;
+        #[allow(clippy::cast_lossless)]
+        let cancel_count_f64 = *result_counts.get("Cancel").unwrap_or(&0) as f64;
+        let error_rate = cancel_count_f64 / total_exec_f64;
+
+        #[allow(clippy::cast_lossless)]
+        let modified_count_f64 = *result_counts.get("Modified").unwrap_or(&0) as f64;
+        let modification_rate = modified_count_f64 / total_exec_f64;
+
+        #[allow(clippy::cast_lossless)]
+        let cancel_count_f64_2 = *result_counts.get("Cancel").unwrap_or(&0) as f64;
+        let cancellation_rate = cancel_count_f64_2 / total_exec_f64;
 
         // Find peak times
         let peak_hour = hourly_dist

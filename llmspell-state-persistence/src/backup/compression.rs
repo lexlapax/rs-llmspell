@@ -150,7 +150,9 @@ impl BackupCompression {
 
     /// Compress with zstd
     fn compress_zstd(&self, data: &[u8]) -> Result<Vec<u8>, StateError> {
-        zstd::encode_all(data, self.compression_level.0 as i32)
+        #[allow(clippy::cast_possible_wrap)]
+        let level_i32 = self.compression_level.0 as i32;
+        zstd::encode_all(data, level_i32)
             .map_err(|e| StateError::storage(format!("Compression error: {}", e)))
     }
 
@@ -188,6 +190,7 @@ impl BackupCompression {
     fn compress_brotli(&self, data: &[u8]) -> Result<Vec<u8>, StateError> {
         let mut output = Vec::new();
         let params = brotli::enc::BrotliEncoderParams {
+            #[allow(clippy::cast_possible_wrap)]
             quality: self.compression_level.0 as i32,
             ..Default::default()
         };
