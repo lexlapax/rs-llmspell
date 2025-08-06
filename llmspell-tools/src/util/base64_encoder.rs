@@ -169,10 +169,8 @@ impl Base64EncoderTool {
                 "encode" => String::from_utf8_lossy(&result_data).to_string(),
                 "decode" => {
                     // Try to convert to string, otherwise return hex
-                    match String::from_utf8(result_data.clone()) {
-                        Ok(s) => s,
-                        Err(_) => hex::encode(&result_data),
-                    }
+                    String::from_utf8(result_data.clone())
+                        .map_or_else(|_| hex::encode(&result_data), |s| s)
                 }
                 _ => unreachable!(),
             };

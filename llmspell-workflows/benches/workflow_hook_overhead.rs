@@ -4,6 +4,9 @@
 // Benchmark for workflow hook overhead
 
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion};
+use llmspell_core::traits::base_agent::BaseAgent;
+use llmspell_core::types::AgentInput;
+use llmspell_core::ExecutionContext;
 use llmspell_testing::workflow_helpers::create_test_steps;
 use llmspell_workflows::{
     conditional::{ConditionalBranch, ConditionalWorkflow},
@@ -34,7 +37,10 @@ fn benchmark_sequential_workflow(c: &mut Criterion) {
                         .add_steps(create_test_steps(count))
                         .build();
 
-                    let result = workflow.execute().await.unwrap();
+                    let result = workflow
+                        .execute(AgentInput::text("bench"), ExecutionContext::default())
+                        .await
+                        .unwrap();
                     black_box(result);
                 });
             },
@@ -57,7 +63,10 @@ fn benchmark_sequential_workflow(c: &mut Criterion) {
                         .add_steps(create_test_steps(count))
                         .build();
 
-                    let result = workflow.execute().await.unwrap();
+                    let result = workflow
+                        .execute(AgentInput::text("bench"), ExecutionContext::default())
+                        .await
+                        .unwrap();
                     black_box(result);
                 });
             },
@@ -95,7 +104,10 @@ fn benchmark_conditional_workflow(c: &mut Criterion) {
                     }
 
                     let workflow = builder.build();
-                    let result = workflow.execute().await.unwrap();
+                    let result = workflow
+                        .execute(AgentInput::text("bench"), ExecutionContext::default())
+                        .await
+                        .unwrap();
                     black_box(result);
                 });
             },
@@ -128,7 +140,10 @@ fn benchmark_conditional_workflow(c: &mut Criterion) {
                     }
 
                     let workflow = builder.build();
-                    let result = workflow.execute().await.unwrap();
+                    let result = workflow
+                        .execute(AgentInput::text("bench"), ExecutionContext::default())
+                        .await
+                        .unwrap();
                     black_box(result);
                 });
             },
@@ -163,7 +178,10 @@ fn benchmark_loop_workflow(c: &mut Criterion) {
                         .build()
                         .unwrap();
 
-                    let result = workflow.execute().await.unwrap();
+                    let result = workflow
+                        .execute(AgentInput::text("bench"), ExecutionContext::default())
+                        .await
+                        .unwrap();
                     black_box(result);
                 });
             },
@@ -194,7 +212,10 @@ fn benchmark_loop_workflow(c: &mut Criterion) {
                         .build()
                         .unwrap();
 
-                    let result = workflow.execute().await.unwrap();
+                    let result = workflow
+                        .execute(AgentInput::text("bench"), ExecutionContext::default())
+                        .await
+                        .unwrap();
                     black_box(result);
                 });
             },
@@ -233,7 +254,10 @@ fn benchmark_parallel_workflow(c: &mut Criterion) {
                     }
 
                     let workflow = builder.build().unwrap();
-                    let result = workflow.execute().await.unwrap();
+                    let result = workflow
+                        .execute(AgentInput::text("bench"), ExecutionContext::default())
+                        .await
+                        .unwrap();
                     black_box(result);
                 });
             },
@@ -268,7 +292,10 @@ fn benchmark_parallel_workflow(c: &mut Criterion) {
                     }
 
                     let workflow = builder.build().unwrap();
-                    let result = workflow.execute().await.unwrap();
+                    let result = workflow
+                        .execute(AgentInput::text("bench"), ExecutionContext::default())
+                        .await
+                        .unwrap();
                     black_box(result);
                 });
             },

@@ -143,7 +143,7 @@ impl GlobalObject for StateGlobal {
     #[cfg(feature = "lua")]
     fn inject_lua(&self, lua: &mlua::Lua, _context: &GlobalContext) -> Result<(), LLMSpellError> {
         use crate::lua::sync_utils::block_on_async;
-        
+
         let state_manager = self.state_manager.clone();
         let fallback_state = self.fallback_state.clone();
 
@@ -642,7 +642,6 @@ impl GlobalObject for StateGlobal {
             let list_backup_mgr = backup_mgr.clone();
             let list_backups_fn = lua
                 .create_function(move |lua, (): ()| {
-
                     let backup_mgr = list_backup_mgr.clone();
                     let result = block_on_async(
                         "backup_list",
@@ -694,7 +693,6 @@ impl GlobalObject for StateGlobal {
             let restore_backup_mgr = backup_mgr.clone();
             let restore_backup_fn = lua
                 .create_function(move |lua, backup_id: String| {
-
                     let backup_mgr = restore_backup_mgr.clone();
                     let backup_id_clone = backup_id.clone();
                     let result = block_on_async(
@@ -740,7 +738,6 @@ impl GlobalObject for StateGlobal {
             let validate_backup_mgr = backup_mgr.clone();
             let validate_backup_fn = lua
                 .create_function(move |lua, backup_id: String| {
-
                     let backup_mgr = validate_backup_mgr.clone();
                     let backup_id_clone = backup_id.clone();
                     let result = block_on_async(

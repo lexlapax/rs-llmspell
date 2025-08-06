@@ -288,7 +288,7 @@ mod tests {
         assert_eq!(received.language, Language::Rust);
 
         // Unsubscribe
-        let unsubscribed = bridge.unsubscribe(&sub_id).await.unwrap();
+        let unsubscribed = bridge.unsubscribe(&sub_id).unwrap();
         assert!(unsubscribed);
         assert_eq!(bridge.subscription_count(), 0);
     }
@@ -318,7 +318,7 @@ mod tests {
         assert_eq!(sub1_handle.language, Language::Lua);
 
         // Unsubscribe one
-        bridge.unsubscribe(&sub1).await.unwrap();
+        bridge.unsubscribe(&sub1).unwrap();
         assert_eq!(bridge.subscription_count(), 1);
     }
     #[tokio::test]
@@ -340,7 +340,7 @@ mod tests {
             .await
             .unwrap();
 
-        let stats = bridge.get_stats().await;
+        let stats = bridge.get_stats();
 
         // Verify structure
         assert!(stats["event_bus_stats"].is_object());

@@ -1311,6 +1311,9 @@ impl AgentBridge {
         agent_name: &str,
         wrapper_config: serde_json::Value,
     ) -> Result<String> {
+        use llmspell_agents::agent_wrapped_tool::AgentWrappedTool;
+        use llmspell_core::traits::tool::{SecurityLevel, ToolCategory};
+
         // Get the agent instance
         let agent = self
             .get_agent(agent_name)
@@ -1328,8 +1331,6 @@ impl AgentBridge {
             .to_string();
 
         // Create the agent-wrapped tool
-        use llmspell_agents::agent_wrapped_tool::AgentWrappedTool;
-        use llmspell_core::traits::tool::{SecurityLevel, ToolCategory};
 
         let wrapped_tool = AgentWrappedTool::new(
             agent.clone(),
@@ -1881,7 +1882,7 @@ mod tests {
         let bridge = AgentBridge::new(registry, provider_manager);
 
         // List available types
-        let types = bridge.list_agent_types().await;
+        let types = bridge.list_agent_types();
         assert!(!types.is_empty());
     }
     #[tokio::test]
@@ -2166,13 +2167,9 @@ mod tests {
                 "status".to_string(),
                 serde_json::json!("running"),
             )
-            .await
             .unwrap();
 
-        let status = bridge
-            .get_shared_memory(workflow_scope, "status")
-            .await
-            .unwrap();
+        let status = bridge.get_shared_memory(workflow_scope, "status").unwrap();
         assert_eq!(status, Some(serde_json::json!("running")));
 
         // Cleanup

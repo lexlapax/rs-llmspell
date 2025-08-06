@@ -186,7 +186,12 @@ fn bench_workflow_system_overhead(c: &mut Criterion) {
                             builder = builder.add_step(step);
                         }
                         let workflow = builder.build();
-                        let _ = workflow.execute().await;
+                        let _ = workflow
+                            .execute(
+                                AgentInput::text("bench"),
+                                llmspell_core::ExecutionContext::default(),
+                            )
+                            .await;
 
                         start.elapsed()
                     })
@@ -233,7 +238,12 @@ fn bench_workflow_system_overhead(c: &mut Criterion) {
                             .await
                             .unwrap();
 
-                        let _ = workflow.execute().await;
+                        let _ = workflow
+                            .execute(
+                                AgentInput::text("bench"),
+                                llmspell_core::ExecutionContext::default(),
+                            )
+                            .await;
 
                         // Save workflow results
                         for i in 0..test_data.state_operations_per_component {
@@ -409,7 +419,13 @@ fn bench_full_system_integration(c: &mut Criterion) {
                     .unwrap();
 
                 // Execute workflow
-                let workflow_result = workflow.execute().await.unwrap();
+                let workflow_result = workflow
+                    .execute(
+                        AgentInput::text("test"),
+                        llmspell_core::ExecutionContext::default(),
+                    )
+                    .await
+                    .unwrap();
 
                 // Save workflow result
                 state_manager

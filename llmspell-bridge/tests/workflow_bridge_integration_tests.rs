@@ -135,7 +135,7 @@ mod tests {
         let bridge = WorkflowBridge::new(registry);
 
         // List available workflow types
-        let types = bridge.list_workflow_types().await;
+        let types = bridge.list_workflow_types();
         assert_eq!(types.len(), 4);
         assert!(types.contains(&"sequential".to_string()));
         assert!(types.contains(&"parallel".to_string()));
@@ -143,12 +143,12 @@ mod tests {
         assert!(types.contains(&"loop".to_string()));
 
         // Get info for a specific type
-        let info = bridge.get_workflow_info("sequential").await.unwrap();
+        let info = bridge.get_workflow_info("sequential").unwrap();
         assert_eq!(info.workflow_type, "sequential");
         assert!(info.required_params.contains(&"steps".to_string()));
 
         // Get all workflow info
-        let all_info = bridge.get_all_workflow_info().await;
+        let all_info = bridge.get_all_workflow_info();
         assert_eq!(all_info.len(), 4);
     }
 

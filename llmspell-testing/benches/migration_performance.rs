@@ -13,13 +13,16 @@ use std::collections::HashMap;
 use std::time::SystemTime;
 
 fn create_test_state(id: usize) -> SerializableState {
+    #[allow(clippy::cast_precision_loss)]
+    let price = id as f64 * 10.0;
+    #[allow(clippy::cast_precision_loss)]
+    let weight = id as f64 * 0.5;
     SerializableState {
         key: format!("item_{}", id),
         value: json!({
             "id": id,
             "name": format!("Item {}", id),
-            #[allow(clippy::cast_precision_loss)]
-            "price": id as f64 * 10.0,
+            "price": price,
             "quantity": id % 100,
             "metadata": {
                 "created": "2024-01-01T00:00:00Z",
@@ -32,8 +35,7 @@ fn create_test_state(id: usize) -> SerializableState {
                         1 => "medium",
                         _ => "large",
                     },
-                    #[allow(clippy::cast_precision_loss)]
-                    "weight": id as f64 * 0.5
+                    "weight": weight
                 }
             }
         }),

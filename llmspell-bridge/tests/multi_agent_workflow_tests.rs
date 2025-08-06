@@ -100,7 +100,7 @@ async fn test_multi_agent_integration() {
     });
 
     // This would create the workflow using multi-agent patterns
-    let workflow_types = bridge.list_workflow_types().await;
+    let workflow_types = bridge.list_workflow_types();
     assert!(workflow_types.contains(&"sequential".to_string()));
     assert!(workflow_types.contains(&"parallel".to_string()));
 }

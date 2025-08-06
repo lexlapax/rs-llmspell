@@ -61,7 +61,7 @@ fn benchmark_workflow_discovery(c: &mut Criterion) {
     c.bench_function("list_workflow_types", |b| {
         b.iter(|| {
             rt.block_on(async {
-                let types = bridge.list_workflow_types().await;
+                let types = bridge.list_workflow_types();
                 black_box(types);
             })
         })
@@ -70,7 +70,7 @@ fn benchmark_workflow_discovery(c: &mut Criterion) {
     c.bench_function("get_workflow_info", |b| {
         b.iter(|| {
             rt.block_on(async {
-                let info = bridge.get_workflow_info("sequential").await.unwrap();
+                let info = bridge.get_workflow_info("sequential").unwrap();
                 black_box(info);
             })
         })

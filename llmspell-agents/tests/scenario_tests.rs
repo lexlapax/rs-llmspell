@@ -189,7 +189,6 @@ async fn test_scenario_with_harness() {
     };
 
     let test_result = harness
-        .await
         .run_test(agent_config, |agent| async move {
             // Note: Agent starts in Uninitialized state but should handle this gracefully
             // The execute method will initialize automatically if needed

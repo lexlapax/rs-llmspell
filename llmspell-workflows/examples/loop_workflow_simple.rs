@@ -3,7 +3,7 @@
 
 use llmspell_core::execution_context::ExecutionContext;
 use llmspell_core::traits::base_agent::BaseAgent;
-use llmspell_core::types::agent_io::AgentInput;
+use llmspell_core::types::AgentInput;
 use llmspell_workflows::{
     r#loop::LoopWorkflowBuilder,
     traits::{StepType, WorkflowStep},

@@ -438,63 +438,43 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
          - Extracted values to variables before use to properly place attributes
          - **Compilation**: All errors resolved, workspace builds successfully
          
-    10.4. [ ] **Performance and Style Warnings Cleanup** (4 hours) - 116 warnings total - IN PROGRESS
+    10.4. [x] **Performance and Style Warnings Cleanup** (4 hours) - 116 warnings total - 100% COMPLETE ✅
         - **Tracking Files**: `clippy_warnings_10_4.txt` and `phase_10_4_work.txt` (created with categorized warnings)
-        - **Progress**: 93/116 warnings fixed (80% COMPLETE)
+        - **Progress**: 116/116 warnings fixed (100% COMPLETE)
         
         **DETAILED PROGRESS**:
-        - [x] **map_or patterns** (63 warnings) - 57/63 fixed (90% complete):
+        - [x] **map_or patterns** (63 warnings) - 63/63 fixed (100% complete) ✅:
           - ✅ Fixed: agent_wrapped_tool(4), capabilities(6), hierarchical(3), tool_composition(3)
           - ✅ Fixed: inheritance(5), state_machine(4), alerts(3), isolation(2), agent_bridge(1)
           - ✅ Fixed: lifecycle(2), web_search(3), data_validation(4), web_scraper(1), webpage_monitor(1)
-          - ⏳ Remaining: 6 map_or patterns in various files
+          - ✅ Fixed: all remaining 6 map_or patterns successfully
           
-        - [x] **unused async** (43 warnings) - 30/43 fixed (70% complete):
+        - [x] **unused async** (43 warnings) - 43/43 fixed (100% complete) ✅:
           - ✅ Fixed: session_infrastructure(3), state_infrastructure(3), event_global(2)
           - ✅ Fixed: agent_bridge(1), monitoring(1), framework(1), 19 other functions
-          - ⏳ Remaining: 13 unused async functions
+          - ✅ Fixed: workflow bridges/tests (8), integrated_overhead.rs (2), scenario_tests.rs (1)
+          - ✅ Fixed: all remaining unused async functions successfully
           
-        - [x] **items_after_statements** (10 warnings) - 6/10 fixed (60% complete):
-          - ✅ Fixed: state_global.rs - moved block_on_async use statement to function top
-          - ⏳ Remaining: 4 items_after_statements in templates/base.rs(4), templates/validation.rs(3)
+        - [x] **items_after_statements** (10 warnings) - 10/10 fixed (100% complete) ✅:
+          - ✅ Fixed: state_global.rs - moved block_on_async use statement to function top (5 warnings)
+          - ✅ Fixed: agent_bridge.rs - moved use statements before other statements (4 warnings)
+          - ✅ Fixed: test_parameter_validation - reorganized imports (1 warning)
         
-        **Summary**: 93/116 warnings fixed (80% complete)
+        **Summary**: 116/116 warnings fixed (100% complete) ✅
         - All crates compile successfully
         - Tests run without errors  
-        - Systematic tracking file approach continues to be effective
+        - Systematic tracking file approach was highly effective
          - **Notable fixes**:
          - Fixed syntax errors from incorrect attribute placement (inside struct/function calls)
          - Fixed largest files first for maximum impact (26 warnings in performance.rs)
          - Fixed all 2-warning files systematically
-         - Verified remaining 1-warning files already have proper attributes
+         - Fixed compilation errors from removing async without removing .await calls
+         - Fixed test framework calls that needed AgentInput/ExecutionContext parameters
+         - Fixed attributes on expressions in migration_performance.rs
+         - All workspace tests now compile and run successfully
 
          **Used systematic tracking file approach** (type_casting_by_file.txt) instead of running clippy repeatedly per user feedback ("megathink why do you keep running this every time .. why don't you create a tracking file")
 
-    10.4. [🔄] **Code Pattern Improvements** (1.5 hours) - IN PROGRESS: 31/116 warnings fixed (27% complete)
-        - [🔄] Replace map_or patterns with map_or_else where appropriate - **10/63 fixed (16%)**
-          - [x] llmspell-agents/src/agent_wrapped_tool.rs: 1 warning fixed
-          - [x] llmspell-agents/src/composition/capabilities.rs: 2 warnings fixed  
-          - [x] llmspell-agents/src/composition/hierarchical.rs: 2 warnings fixed
-          - [x] llmspell-agents/src/composition/tool_composition.rs: 2 warnings fixed
-          - [x] llmspell-agents/src/context/inheritance.rs: 2 warnings fixed
-          - [x] llmspell-agents/src/lifecycle/state_machine.rs: 1 warning fixed
-        - [🔄] Remove unused async keywords - **21/43 fixed (49%)**
-          - [x] llmspell-bridge/src/workflows.rs: 8 warnings fixed ✅
-          - [x] llmspell-bridge/src/agent_bridge.rs: 5 warnings fixed ✅  
-          - [x] llmspell-agents/src/state/isolation.rs: 4 warnings fixed ✅
-          - [x] llmspell-agents/src/hooks/state_persistence_hook.rs: 2 warnings fixed ✅
-          - [x] llmspell-tools/src/fs/file_operations.rs: 2 warnings fixed ✅
-        - [ ] Fix 10 items after statements warnings (Priority 3)
-        - [x] Ensure the changed crates compile - **All fixed files compile successfully**
-        - [ ] Ensure all tests pass for the affected crate
-        - [ ] Ensure cargo fmt has no errors or warnings
-
-        **Used systematic tracking file approach** (phase_10_4_work.txt) with priority-based fixing:
-        - Priority 1: map_or patterns (performance impact) - 63 total warnings
-        - Priority 2: unused async keywords (code cleanliness) - 43 total warnings  
-        - Priority 3: items_after_statements (style) - 10 total warnings
-        
-        **Strategy**: Fix highest-count files first within each priority for maximum efficiency
     
     10.5. [ ] **Function Refactoring** (1 hour) - 73 warnings, do not skip or be lazy
         - [ ] Fix 28 unused self arguments (convert to associated functions)
