@@ -504,7 +504,7 @@ impl IsolatedStateAccessor {
     /// # Errors
     ///
     /// Returns an error if access is denied to the scope
-    pub async fn get(&self, scope: StateScope, _key: &str) -> Result<Option<serde_json::Value>> {
+    pub fn get(&self, scope: StateScope, _key: &str) -> Result<Option<serde_json::Value>> {
         // Check access permission
         if !self
             .isolation_manager
@@ -523,7 +523,7 @@ impl IsolatedStateAccessor {
     /// # Errors
     ///
     /// Returns an error if access is denied to the scope
-    pub async fn set(
+    pub fn set(
         &self,
         scope: StateScope,
         _key: &str,
@@ -546,7 +546,7 @@ impl IsolatedStateAccessor {
     /// # Errors
     ///
     /// Returns an error if access is denied to the scope
-    pub async fn delete(&self, scope: StateScope, _key: &str) -> Result<()> {
+    pub fn delete(&self, scope: StateScope, _key: &str) -> Result<()> {
         // Check access permission
         if !self
             .isolation_manager
@@ -564,7 +564,7 @@ impl IsolatedStateAccessor {
     /// # Errors
     ///
     /// Returns an error if access is denied to the scope
-    pub async fn list_keys(&self, scope: StateScope) -> Result<Vec<String>> {
+    pub fn list_keys(&self, scope: StateScope) -> Result<Vec<String>> {
         // Check access permission
         if !self
             .isolation_manager

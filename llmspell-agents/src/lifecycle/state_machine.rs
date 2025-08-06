@@ -539,12 +539,10 @@ impl AgentStateMachine {
         let transition_id = format!("{}-{:?}-{:?}", self.agent_id, from_state, to_state);
 
         let tokens = self.active_cancellation_tokens.lock().await;
-        if let Some(token) = tokens.get(&transition_id) {
+        tokens.get(&transition_id).map_or(false, |token| {
             token.cancel();
             true
-        } else {
-            false
-        }
+        })
     }
 
     /// Transition to new state

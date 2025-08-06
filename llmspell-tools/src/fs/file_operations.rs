@@ -483,7 +483,7 @@ impl FileOperationsTool {
     }
 
     /// Get file metadata
-    async fn get_metadata(&self, path: &Path, sandbox: &FileSandbox) -> Result<Value> {
+    fn get_metadata(&self, path: &Path, sandbox: &FileSandbox) -> Result<Value> {
         info!("Getting metadata for: {:?}", path);
 
         // Validate path
@@ -528,7 +528,7 @@ impl FileOperationsTool {
     }
 
     /// Check if file exists
-    async fn file_exists(&self, path: &Path, sandbox: &FileSandbox) -> Result<bool> {
+    fn file_exists(&self, path: &Path, sandbox: &FileSandbox) -> Result<bool> {
         debug!("Checking if file exists: {:?}", path);
 
         // Validate path
@@ -770,7 +770,7 @@ impl BaseAgent for FileOperationsTool {
                     message: "Metadata operation requires 'path' parameter".to_string(),
                     field: Some("path".to_string()),
                 })?;
-                let metadata = self.get_metadata(&path, &sandbox).await?;
+                let metadata = self.get_metadata(&path, &sandbox)?;
                 ResponseBuilder::success("metadata")
                     .with_message(format!("Retrieved metadata for {}", path.display()))
                     .with_result(metadata)
@@ -781,7 +781,7 @@ impl BaseAgent for FileOperationsTool {
                     message: "Exists operation requires 'path' parameter".to_string(),
                     field: Some("path".to_string()),
                 })?;
-                let exists = self.file_exists(&path, &sandbox).await?;
+                let exists = self.file_exists(&path, &sandbox)?;
                 ResponseBuilder::success("exists")
                     .with_message(format!(
                         "Path {} {}",

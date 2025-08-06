@@ -423,13 +423,12 @@ impl ToolComposition {
         }
 
         // Determine final output
-        let output = if let Some(last_step) = self.steps.last() {
-            step_results
+        let output = self.steps.last().map_or_else(
+            || JsonValue::Null,
+            |last_step| step_results
                 .get(&last_step.id)
                 .map_or(JsonValue::Null, |r| r.output.clone())
-        } else {
-            JsonValue::Null
-        };
+        );
 
         let metrics = CompositionMetrics {
             total_execution_time: start_time.elapsed(),
@@ -642,11 +641,7 @@ impl ToolComposition {
             let multiplier = 2_u32.pow(attempt.saturating_sub(1));
             let delay = base_delay * multiplier;
 
-            if let Some(max_delay) = retry_config.max_delay {
-                delay.min(max_delay)
-            } else {
-                delay
-            }
+            retry_config.max_delay.map_or(delay, |max_delay| delay.min(max_delay))
         } else {
             base_delay
         }

@@ -103,12 +103,12 @@ impl AgentBridge {
     }
 
     /// List available agent types
-    pub async fn list_agent_types(&self) -> Vec<String> {
+    pub fn list_agent_types(&self) -> Vec<String> {
         self.discovery.list_agent_types()
     }
 
     /// List available templates
-    pub async fn list_templates(&self) -> Vec<String> {
+    pub fn list_templates(&self) -> Vec<String> {
         self.discovery.list_templates()
     }
 
@@ -117,7 +117,7 @@ impl AgentBridge {
     /// # Errors
     ///
     /// Returns an error if the agent type is not found
-    pub async fn get_agent_info(&self, agent_type: &str) -> Result<AgentInfo> {
+    pub fn get_agent_info(&self, agent_type: &str) -> Result<AgentInfo> {
         self.discovery.get_agent_info(agent_type)
     }
 
@@ -1120,7 +1120,7 @@ impl AgentBridge {
     /// # Errors
     ///
     /// Returns an error if scope parsing fails
-    pub async fn set_shared_memory(
+    pub fn set_shared_memory(
         &self,
         scope: serde_json::Value,
         key: String,
@@ -1136,7 +1136,7 @@ impl AgentBridge {
     /// # Errors
     ///
     /// Returns an error if scope parsing fails
-    pub async fn get_shared_memory(
+    pub fn get_shared_memory(
         &self,
         scope: serde_json::Value,
         key: &str,

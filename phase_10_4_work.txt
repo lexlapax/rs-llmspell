@@ -1,0 +1,75 @@
+# Phase 10.4 Code Pattern Improvements - Work Tracking File
+# Generated from clippy warnings - Focus on systematic fixes
+
+## 1. MAP_OR/OPTION_IF_LET_ELSE PATTERNS (Priority 1 - Performance)
+   12 llmspell-agents/src/agent_wrapped_tool.rs
+    8 llmspell-agents/src/composition/capabilities.rs
+    7 llmspell-agents/src/composition/hierarchical.rs
+    6 llmspell-agents/src/composition/tool_composition.rs
+    5 llmspell-agents/src/context/inheritance.rs
+    4 llmspell-agents/src/lifecycle/state_machine.rs
+    3 llmspell-agents/src/monitoring/alerts.rs
+    3 llmspell-agents/src/state/isolation.rs
+    2 llmspell-bridge/src/agent_bridge.rs
+    2 llmspell-tools/src/lifecycle/state_machine.rs
+    2 llmspell-tools/src/search/web_search.rs
+    2 llmspell-tools/src/util/data_validation.rs
+    1 llmspell-agents/src/hooks/state_persistence_hook.rs
+    1 llmspell-agents/src/lifecycle/resources.rs
+    1 llmspell-agents/src/state/sharing.rs
+    1 llmspell-agents/src/templates/base.rs
+    1 llmspell-agents/src/templates/validation.rs
+    1 llmspell-agents/src/tool_discovery.rs
+    1 llmspell-agents/src/tool_manager.rs
+    1 llmspell-agents/src/testing/mocks.rs
+    1 llmspell-agents/src/testing/utils.rs
+    1 llmspell-bridge/src/globals/state_infrastructure.rs
+    1 llmspell-bridge/src/workflows.rs
+    1 llmspell-bridge/src/lua/conversion.rs
+    1 llmspell-bridge/src/lua/globals/hook.rs
+    1 llmspell-bridge/src/lua/globals/session.rs
+    1 llmspell-bridge/src/lua/sync_utils.rs
+    1 llmspell-tools/src/media/audio_processor.rs
+    1 llmspell-tools/src/media/image_processor.rs
+    1 llmspell-tools/src/util/base64_encoder.rs
+    1 llmspell-tools/src/web/web_scraper.rs
+    1 llmspell-tools/src/web/webpage_monitor.rs
+
+## 2. UNUSED ASYNC KEYWORDS (Priority 2 - Code cleanliness)
+    8 llmspell-bridge/src/workflows.rs
+    3 llmspell-bridge/src/agent_bridge.rs
+    3 llmspell-agents/src/state/isolation.rs
+    2 llmspell-agents/src/hooks/state_persistence_hook.rs
+    2 llmspell-tools/src/fs/file_operations.rs
+    1 llmspell-agents/src/composition/delegation.rs
+    1 llmspell-agents/src/composition/hierarchical.rs
+    1 llmspell-agents/src/context/distributed.rs
+    1 llmspell-agents/src/context/shared_memory.rs
+    1 llmspell-agents/src/factory.rs
+    1 llmspell-agents/src/health.rs
+    1 llmspell-agents/src/lifecycle/state_machine.rs
+    1 llmspell-agents/src/monitoring/health.rs
+    1 llmspell-agents/src/monitoring/performance.rs
+    1 llmspell-agents/src/tool_invocation.rs
+    1 llmspell-agents/src/testing/framework.rs
+    1 llmspell-bridge/src/event_bridge.rs
+    1 llmspell-bridge/src/globals/session_infrastructure.rs
+    1 llmspell-bridge/src/globals/state_infrastructure.rs
+    1 llmspell-bridge/src/monitoring.rs
+    1 llmspell-bridge/src/orchestration.rs
+    1 llmspell-bridge/src/workflow_performance.rs
+
+## 3. ITEMS_AFTER_STATEMENTS (Priority 3 - Style)
+    4 llmspell-agents/src/templates/base.rs
+    3 llmspell-agents/src/templates/validation.rs
+    2 llmspell-sessions/src/session_manager.rs
+    1 llmspell-state-persistence/src/backends/memory.rs
+
+## WORK STRATEGY:
+1. Start with highest count files for map_or patterns
+2. Use clippy --fix where possible for simple cases
+3. Manual fixes for complex pattern replacements
+4. Verify compilation after each file
+5. Run tests after completing each category
+
+CURRENT STATUS: Ready to start with map_or patterns

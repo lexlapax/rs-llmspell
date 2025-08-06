@@ -1083,9 +1083,7 @@ pub fn inject_agent_global(
     // Create Agent.discover() function
     let bridge_clone = bridge.clone();
     let discover_fn = lua.create_function(move |lua, ()| {
-        let agent_types = tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(bridge_clone.list_agent_types())
-        });
+        let agent_types = bridge_clone.list_agent_types();
         let discover_table = lua.create_table()?;
         for (i, agent_type) in agent_types.into_iter().enumerate() {
             let agent_table = lua.create_table()?;
@@ -1122,7 +1120,7 @@ pub fn inject_agent_global(
         let bridge = bridge_clone.clone();
 
         // Use sync wrapper to call async method
-        let agent_info = block_on_async("agent_getInfo", bridge.get_agent_info(&agent_name), None)
+        let agent_info = bridge.get_agent_info(&agent_name)
             .map_err(|e| mlua::Error::RuntimeError(format!("Failed to get agent info: {e}")))?;
 
         // Convert AgentInfo to JSON, then to Lua table
@@ -1296,9 +1294,7 @@ pub fn inject_agent_global(
     // Create Agent.list_templates() function
     let bridge_clone = bridge.clone();
     let list_templates_fn = lua.create_function(move |lua, ()| {
-        let templates = tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(bridge_clone.list_templates())
-        });
+        let templates = bridge_clone.list_templates();
         let list_table = lua.create_table()?;
         for (i, template) in templates.into_iter().enumerate() {
             list_table.set(i + 1, template)?;
@@ -1454,11 +1450,7 @@ pub fn inject_agent_global(
         let value_json = crate::lua::conversion::lua_value_to_json(value)
             .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert value: {e}")))?;
 
-        block_on_async(
-            "agent_setSharedMemory",
-            bridge.set_shared_memory(scope_json, key, value_json),
-            None,
-        )
+        bridge.set_shared_memory(scope_json, key, value_json)
         .map_err(|e| mlua::Error::RuntimeError(format!("Failed to set shared memory: {e}")))?;
 
         Ok(())
@@ -1472,11 +1464,7 @@ pub fn inject_agent_global(
         let scope_json = lua_table_to_json(scope)
             .map_err(|e| mlua::Error::RuntimeError(format!("Failed to convert scope: {e}")))?;
 
-        let result = block_on_async(
-            "agent_getSharedMemory",
-            bridge.get_shared_memory(scope_json, &key),
-            None,
-        )
+        let result = bridge.get_shared_memory(scope_json, &key)
         .map_err(|e| mlua::Error::RuntimeError(format!("Failed to get shared memory: {e}")))?;
 
         result.map_or_else(|| Ok(Value::Nil), |value| json_to_lua_value(lua, &value))

@@ -230,19 +230,19 @@ impl WorkflowFactory {
     ) -> Result<Box<dyn WorkflowExecutor>> {
         match workflow_type {
             "sequential" => {
-                let workflow = create_sequential_workflow(params).await?;
+                let workflow = create_sequential_workflow(params)?;
                 Ok(Box::new(workflow))
             }
             "conditional" => {
-                let workflow = create_conditional_workflow(params).await?;
+                let workflow = create_conditional_workflow(params)?;
                 Ok(Box::new(workflow))
             }
             "loop" => {
-                let workflow = create_loop_workflow(params).await?;
+                let workflow = create_loop_workflow(params)?;
                 Ok(Box::new(workflow))
             }
             "parallel" => {
-                let workflow = create_parallel_workflow(params).await?;
+                let workflow = create_parallel_workflow(params)?;
                 Ok(Box::new(workflow))
             }
             _ => Err(llmspell_core::LLMSpellError::Configuration {
@@ -268,7 +268,7 @@ pub trait WorkflowExecutor: Send + Sync {
 
 // Helper functions to create specific workflow types
 
-async fn create_sequential_workflow(params: serde_json::Value) -> Result<impl WorkflowExecutor> {
+fn create_sequential_workflow(params: serde_json::Value) -> Result<impl WorkflowExecutor> {
     use llmspell_workflows::SequentialWorkflowBuilder;
 
     let name = params
@@ -297,7 +297,7 @@ async fn create_sequential_workflow(params: serde_json::Value) -> Result<impl Wo
     Ok(SequentialWorkflowExecutor { workflow, name })
 }
 
-async fn create_conditional_workflow(params: serde_json::Value) -> Result<impl WorkflowExecutor> {
+fn create_conditional_workflow(params: serde_json::Value) -> Result<impl WorkflowExecutor> {
     use llmspell_workflows::{ConditionalBranch, ConditionalWorkflowBuilder};
 
     let name = params
@@ -413,7 +413,7 @@ async fn create_conditional_workflow(params: serde_json::Value) -> Result<impl W
     Ok(ConditionalWorkflowExecutor { workflow, name })
 }
 
-async fn create_loop_workflow(params: serde_json::Value) -> Result<impl WorkflowExecutor> {
+fn create_loop_workflow(params: serde_json::Value) -> Result<impl WorkflowExecutor> {
     use llmspell_workflows::{LoopIterator, LoopWorkflowBuilder};
 
     let name = params
@@ -450,7 +450,7 @@ async fn create_loop_workflow(params: serde_json::Value) -> Result<impl Workflow
     Ok(LoopWorkflowExecutor { workflow, name })
 }
 
-async fn create_parallel_workflow(params: serde_json::Value) -> Result<impl WorkflowExecutor> {
+fn create_parallel_workflow(params: serde_json::Value) -> Result<impl WorkflowExecutor> {
     use llmspell_workflows::{ParallelBranch, ParallelWorkflowBuilder};
 
     let name = params
@@ -845,17 +845,17 @@ impl WorkflowBridge {
     }
 
     /// List available workflow types
-    pub async fn list_workflow_types(&self) -> Vec<String> {
+    pub fn list_workflow_types(&self) -> Vec<String> {
         self.standardized_factory.list_workflow_types()
     }
 
     /// Get information about a specific workflow type
-    pub async fn get_workflow_info(&self, workflow_type: &str) -> Option<WorkflowInfo> {
+    pub fn get_workflow_info(&self, workflow_type: &str) -> Option<WorkflowInfo> {
         self.discovery.get_workflow_info(workflow_type).cloned()
     }
 
     /// Get information about all workflow types
-    pub async fn get_all_workflow_info(&self) -> Vec<(String, WorkflowInfo)> {
+    pub fn get_all_workflow_info(&self) -> Vec<(String, WorkflowInfo)> {
         self.discovery.get_workflow_types()
     }
 
@@ -944,7 +944,7 @@ impl WorkflowBridge {
                 };
 
                 self.record_execution(record).await;
-                self.update_metrics(true, duration_ms).await;
+                self.update_metrics(true, duration_ms);
 
                 // Cache result
                 self.execution_cache
@@ -975,7 +975,7 @@ impl WorkflowBridge {
                 };
 
                 self.record_execution(record).await;
-                self.update_metrics(false, duration_ms).await;
+                self.update_metrics(false, duration_ms);
 
                 // Record performance even for failures
                 self.perf_metrics.record_operation(duration_ms);
@@ -1148,7 +1148,7 @@ impl WorkflowBridge {
         }
     }
 
-    async fn update_metrics(&self, success: bool, duration_ms: u64) {
+    fn update_metrics(&self, success: bool, duration_ms: u64) {
         self.metrics
             .workflow_executions
             .fetch_add(1, Ordering::Relaxed);

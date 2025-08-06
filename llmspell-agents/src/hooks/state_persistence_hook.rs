@@ -207,7 +207,7 @@ impl StatePersistenceHook {
             let mut backoff = Duration::from_millis(100);
 
             while attempts < self.config.max_retries {
-                match self.try_save_state(&agent, agent_id).await {
+                match self.try_save_state(&agent, agent_id) {
                     Ok(()) => {
                         // Reset failure count on success
                         let mut counts = self.failure_counts.write().await;
@@ -254,7 +254,7 @@ impl StatePersistenceHook {
     }
 
     /// Attempt to save state (single attempt)
-    async fn try_save_state(&self, _agent: &AgentRef, agent_id: &str) -> Result<()> {
+    fn try_save_state(&self, _agent: &AgentRef, agent_id: &str) -> Result<()> {
         // TODO: Once we have proper trait casting, we can do:
         // let agent = agent.lock().await;
         // if let Some(persistent_agent) = agent.as_any().downcast_ref::<dyn StatePersistence>() {
@@ -280,7 +280,7 @@ impl StatePersistenceHook {
         };
 
         if let Some(agent) = agent {
-            match self.try_restore_state(&agent, agent_id).await {
+            match self.try_restore_state(&agent, agent_id) {
                 Ok(restored) => {
                     if restored {
                         self.metrics
@@ -304,7 +304,7 @@ impl StatePersistenceHook {
     }
 
     /// Attempt to restore state (single attempt)
-    async fn try_restore_state(&self, _agent: &AgentRef, agent_id: &str) -> Result<bool> {
+    fn try_restore_state(&self, _agent: &AgentRef, agent_id: &str) -> Result<bool> {
         // TODO: Once we have proper trait casting
         // let mut agent = agent.lock().await;
         // if let Some(persistent_agent) = agent.as_any_mut().downcast_mut::<dyn StatePersistence>() {

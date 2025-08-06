@@ -1272,7 +1272,7 @@ pub fn inject_workflow_global(
                 "workflow_list",
                 async move {
                     Ok::<Vec<(String, WorkflowInfo)>, LLMSpellError>(
-                        bridge.get_all_workflow_info().await,
+                        bridge.get_all_workflow_info(),
                     )
                 },
                 None,
@@ -1304,7 +1304,7 @@ pub fn inject_workflow_global(
                 let info = block_on_async::<_, Option<WorkflowInfo>, LLMSpellError>(
                     "workflow_get_info",
                     async move {
-                        let workflows = bridge.get_all_workflow_info().await;
+                        let workflows = bridge.get_all_workflow_info();
                         Ok::<Option<WorkflowInfo>, LLMSpellError>(
                             workflows
                                 .into_iter()
@@ -1382,7 +1382,7 @@ pub fn inject_workflow_global(
                 "workflow_clear_list",
                 async move {
                     Ok::<Vec<(String, WorkflowInfo)>, LLMSpellError>(
-                        bridge_for_list.get_all_workflow_info().await,
+                        bridge_for_list.get_all_workflow_info(),
                     )
                 },
                 None,

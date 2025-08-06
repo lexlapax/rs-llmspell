@@ -87,14 +87,15 @@ impl CapabilityScorer for DefaultCapabilityScorer {
         #[allow(clippy::cast_precision_loss)]
         let invocations_f64 = stats.invocations as f64;
         let success_rate = successes_f64 / invocations_f64;
-        let recency_score = if let Some(last) = stats.last_invocation {
-            let hours_ago = (chrono::Utc::now() - last).num_hours();
-            #[allow(clippy::cast_precision_loss)]
-            let hours_ago_f64 = hours_ago as f64;
-            (1.0 / (1.0 + hours_ago_f64 / 24.0)).min(1.0)
-        } else {
-            0.0
-        };
+        let recency_score = stats.last_invocation.map_or_else(
+            || 0.0,
+            |last| {
+                let hours_ago = (chrono::Utc::now() - last).num_hours();
+                #[allow(clippy::cast_precision_loss)]
+                let hours_ago_f64 = hours_ago as f64;
+                (1.0 / (1.0 + hours_ago_f64 / 24.0)).min(1.0)
+            }
+        );
 
         // Weighted average of success rate and recency
         success_rate
@@ -445,15 +446,14 @@ impl CapabilityAggregator {
         let index = self.category_index.read().unwrap();
         let capabilities = self.capabilities.read().unwrap();
 
-        if let Some(cap_ids) = index.get(category) {
-            cap_ids
+        index.get(category).map_or_else(
+            Vec::new,
+            |cap_ids| cap_ids
                 .iter()
                 .filter_map(|id| capabilities.get(id))
                 .map(|entry| entry.capability.clone())
                 .collect()
-        } else {
-            Vec::new()
-        }
+        )
     }
 
     /// Set availability for a capability

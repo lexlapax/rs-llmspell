@@ -445,13 +445,31 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
 
          **Used systematic tracking file approach** (type_casting_by_file.txt) instead of running clippy repeatedly per user feedback ("megathink why do you keep running this every time .. why don't you create a tracking file")
 
-    10.4. [ ] **Code Pattern Improvements** (1.5 hours) - 104 warnings, do not skip or be lazy
-        - [ ] Replace 55 map_or patterns with map_or_else where appropriate
-        - [ ] Remove 40 unused async keywords
-        - [ ] Fix 9 items after statements warnings
-        - [ ] Ensure the changed crates compile
+    10.4. [🔄] **Code Pattern Improvements** (1.5 hours) - IN PROGRESS: 31/116 warnings fixed (27% complete)
+        - [🔄] Replace map_or patterns with map_or_else where appropriate - **10/63 fixed (16%)**
+          - [x] llmspell-agents/src/agent_wrapped_tool.rs: 1 warning fixed
+          - [x] llmspell-agents/src/composition/capabilities.rs: 2 warnings fixed  
+          - [x] llmspell-agents/src/composition/hierarchical.rs: 2 warnings fixed
+          - [x] llmspell-agents/src/composition/tool_composition.rs: 2 warnings fixed
+          - [x] llmspell-agents/src/context/inheritance.rs: 2 warnings fixed
+          - [x] llmspell-agents/src/lifecycle/state_machine.rs: 1 warning fixed
+        - [🔄] Remove unused async keywords - **21/43 fixed (49%)**
+          - [x] llmspell-bridge/src/workflows.rs: 8 warnings fixed ✅
+          - [x] llmspell-bridge/src/agent_bridge.rs: 5 warnings fixed ✅  
+          - [x] llmspell-agents/src/state/isolation.rs: 4 warnings fixed ✅
+          - [x] llmspell-agents/src/hooks/state_persistence_hook.rs: 2 warnings fixed ✅
+          - [x] llmspell-tools/src/fs/file_operations.rs: 2 warnings fixed ✅
+        - [ ] Fix 10 items after statements warnings (Priority 3)
+        - [x] Ensure the changed crates compile - **All fixed files compile successfully**
         - [ ] Ensure all tests pass for the affected crate
         - [ ] Ensure cargo fmt has no errors or warnings
+
+        **Used systematic tracking file approach** (phase_10_4_work.txt) with priority-based fixing:
+        - Priority 1: map_or patterns (performance impact) - 63 total warnings
+        - Priority 2: unused async keywords (code cleanliness) - 43 total warnings  
+        - Priority 3: items_after_statements (style) - 10 total warnings
+        
+        **Strategy**: Fix highest-count files first within each priority for maximum efficiency
     
     10.5. [ ] **Function Refactoring** (1 hour) - 73 warnings, do not skip or be lazy
         - [ ] Fix 28 unused self arguments (convert to associated functions)

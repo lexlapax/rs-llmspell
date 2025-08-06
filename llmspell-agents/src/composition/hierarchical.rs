@@ -126,16 +126,9 @@ impl HierarchicalCompositeAgent {
     /// Get the current depth by traversing up the hierarchy
     fn calculate_depth(&self) -> usize {
         let parent_guard = self.parent.read().unwrap();
-        match &*parent_guard {
-            Some(weak_parent) => {
-                if let Some(parent) = weak_parent.upgrade() {
-                    parent.depth() + 1
-                } else {
-                    0
-                }
-            }
-            None => 0,
-        }
+        parent_guard.as_ref().map_or(0, |weak_parent| {
+            weak_parent.upgrade().map_or(0, |parent| parent.depth() + 1)
+        })
     }
 
     /// Check if adding a child would create a cycle

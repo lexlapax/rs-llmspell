@@ -291,11 +291,10 @@ impl AgentWrappedTool {
         let agent_metadata = self.agent.metadata();
 
         // Start with base input text
-        let input_text = if let Some(template) = &self.parameter_config.input_template {
-            template.clone()
-        } else {
-            format!("Tool invocation of agent: {}", agent_metadata.name)
-        };
+        let input_text = self.parameter_config.input_template.as_ref().map_or_else(
+            || format!("Tool invocation of agent: {}", agent_metadata.name),
+            |template| template.clone()
+        );
 
         let mut agent_input = AgentInput::text(input_text);
 
