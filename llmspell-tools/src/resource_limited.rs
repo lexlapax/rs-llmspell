@@ -173,6 +173,7 @@ pub async fn check_file_operation(
 
     if operation == "read" || operation == "write" {
         if let Ok(metadata) = fs::metadata(path) {
+            #[allow(clippy::cast_possible_truncation)]
             let size = metadata.len() as usize;
             tracker.check_file_size(size)?;
         }

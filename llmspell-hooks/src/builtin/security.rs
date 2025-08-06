@@ -326,6 +326,7 @@ impl SecurityStorage {
         stats.insert("by_type".to_string(), serde_json::Value::Object(type_json));
 
         // Blocked events count
+        #[allow(clippy::cast_possible_truncation)]
         let blocked_count = events.iter().filter(|event| event.blocked).count();
         stats.insert(
             "blocked_events".to_string(),

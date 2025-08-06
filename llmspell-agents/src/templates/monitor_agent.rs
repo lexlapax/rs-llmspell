@@ -566,7 +566,9 @@ impl MonitorAgentTemplate {
 
         if let Some(max_alerts) = params.get("max_alerts_per_minute") {
             if let Some(value) = max_alerts.as_u64() {
-                config.max_alerts_per_minute = value as u32;
+                #[allow(clippy::cast_possible_truncation)]
+                let max_alerts = value as u32;
+                config.max_alerts_per_minute = max_alerts;
             }
         }
 

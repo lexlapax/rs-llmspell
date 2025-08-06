@@ -474,7 +474,7 @@ impl SystemMonitorTool {
                             .all(|c| c.is_ascii_digit())
                     })
                     .count();
-                #[allow(clippy::cast_possible_truncation)] 
+                #[allow(clippy::cast_possible_truncation)]
                 let count = count as u32;
                 debug!("Process count: {}", count);
                 return Some(count);

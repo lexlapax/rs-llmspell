@@ -132,11 +132,11 @@ impl PerformanceReport {
 
         // Calculate percentiles
         response_times.sort_by(|a, b| a.partial_cmp(b).unwrap());
-        #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
+        #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         let p95_index = usize::try_from((response_times.len() as f64 * 0.95).round() as u64)
             .unwrap_or(0)
             .min(response_times.len() - 1);
-        #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation)]
+        #[allow(clippy::cast_precision_loss, clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         let p99_index = usize::try_from((response_times.len() as f64 * 0.99).round() as u64)
             .unwrap_or(0)
             .min(response_times.len() - 1);
@@ -162,7 +162,8 @@ impl PerformanceReport {
 
         let availability = if total_requests > 0 {
             #[allow(clippy::cast_precision_loss)]
-            let avail_val = ((total_requests - failed_requests) as f64 / total_requests as f64) * 100.0;
+            let avail_val =
+                ((total_requests - failed_requests) as f64 / total_requests as f64) * 100.0;
             avail_val
         } else {
             100.0
@@ -236,7 +237,8 @@ impl PerformanceReport {
             self.failed_requests,
             {
                 #[allow(clippy::cast_precision_loss)]
-                let success_rate = (self.failed_requests as f64 / self.total_requests.max(1) as f64)
+                let success_rate = (self.failed_requests as f64
+                    / self.total_requests.max(1) as f64)
                     .mul_add(-100.0, 100.0);
                 success_rate
             },
@@ -447,10 +449,9 @@ impl PerformanceMonitor {
                 // Update metrics
                 #[allow(clippy::cast_precision_loss)]
                 let memory_f64 = snapshot.resources.memory_bytes as f64;
-                monitor.metrics.update_resources(
-                    memory_f64,
-                    snapshot.resources.cpu_percent,
-                );
+                monitor
+                    .metrics
+                    .update_resources(memory_f64, snapshot.resources.cpu_percent);
 
                 // Check thresholds
                 let violations = monitor.check_thresholds(&snapshot);

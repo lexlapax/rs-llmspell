@@ -111,6 +111,7 @@ impl BaseAgent for SitemapCrawlerTool {
         let params = extract_parameters(&input)?;
         let url = extract_required_string(params, "input")?;
         let follow_sitemaps = extract_optional_bool(params, "follow_sitemaps").unwrap_or(true);
+        #[allow(clippy::cast_possible_truncation)]
         let max_urls = extract_optional_u64(params, "max_urls").unwrap_or(1000) as usize;
         let timeout_secs = extract_optional_u64(params, "timeout").unwrap_or(30);
 
@@ -270,7 +271,9 @@ impl SitemapCrawlerTool {
 
             // Parse as regular sitemap
             let urls = self.parse_sitemap(&xml_content)?;
-            stats.total_urls_discovered += urls.len() as u32;
+            #[allow(clippy::cast_possible_truncation)]
+            let urls_len_u32 = urls.len() as u32;
+            stats.total_urls_discovered += urls_len_u32;
 
             for url_entry in urls {
                 if all_urls.len() >= options.max_urls {

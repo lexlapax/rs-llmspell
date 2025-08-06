@@ -156,9 +156,13 @@ impl HookStorageAdapter {
         if stats.total_stored == 1 {
             stats.average_metadata_size = size;
         } else {
-            stats.average_metadata_size =
-                ((stats.average_metadata_size * (stats.total_stored - 1) as usize) + size)
-                    / stats.total_stored as usize;
+            #[allow(clippy::cast_possible_truncation)]
+            let total_stored_minus_one = (stats.total_stored - 1) as usize;
+            #[allow(clippy::cast_possible_truncation)]
+            let total_stored_usize = stats.total_stored as usize;
+            stats.average_metadata_size = ((stats.average_metadata_size * total_stored_minus_one)
+                + size)
+                / total_stored_usize;
         }
 
         Ok(())

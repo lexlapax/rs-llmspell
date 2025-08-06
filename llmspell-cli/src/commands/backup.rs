@@ -397,6 +397,7 @@ async fn show_backup_info(
 /// Format bytes to human-readable string
 fn format_bytes(bytes: u64) -> String {
     const UNITS: &[&str] = &["B", "KB", "MB", "GB", "TB"];
+    #[allow(clippy::cast_precision_loss)]
     let mut size = bytes as f64;
     let mut unit_index = 0;
 
@@ -406,7 +407,9 @@ fn format_bytes(bytes: u64) -> String {
     }
 
     if unit_index == 0 {
-        format!("{} {}", size as u64, UNITS[unit_index])
+        #[allow(clippy::cast_possible_truncation)]
+        let size_u64 = size as u64;
+        format!("{} {}", size_u64, UNITS[unit_index])
     } else {
         format!("{:.1} {}", size, UNITS[unit_index])
     }

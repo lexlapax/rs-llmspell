@@ -239,7 +239,9 @@ impl TimelineQueryExecutor {
         }
 
         result.entries = matching_entries;
-        result.execution_time_ms = start_time.elapsed().as_millis() as u64;
+        #[allow(clippy::cast_possible_truncation)]
+        let elapsed_ms = start_time.elapsed().as_millis() as u64;
+        result.execution_time_ms = elapsed_ms;
 
         // Add result metadata
         result.metadata.insert(

@@ -556,20 +556,20 @@ impl HealthCheck for StateMachineHealthCheck {
         let mut result =
             HealthCheckResult::new(agent_id.to_string(), "state_machine".to_string(), status)
                 .with_message(message)
-                .with_duration(start_time.elapsed())
-                {
-                    #[allow(clippy::cast_precision_loss)]
-                    let total_transitions = metrics.total_transitions as f64;
-                    #[allow(clippy::cast_precision_loss)]
-                    let recovery_attempts = metrics.recovery_attempts as f64;
-                    #[allow(clippy::cast_precision_loss)]
-                    let uptime_seconds = metrics.uptime.as_secs() as f64;
-                    result = result
-                        .with_metric("total_transitions", total_transitions)
-                        .with_metric("recovery_attempts", recovery_attempts)
-                        .with_metric("uptime_seconds", uptime_seconds);
-                    result
-                }
+                .with_duration(start_time.elapsed());
+
+        {
+            #[allow(clippy::cast_precision_loss)]
+            let total_transitions = metrics.total_transitions as f64;
+            #[allow(clippy::cast_precision_loss)]
+            let recovery_attempts = metrics.recovery_attempts as f64;
+            #[allow(clippy::cast_precision_loss)]
+            let uptime_seconds = metrics.uptime.as_secs() as f64;
+            result = result
+                .with_metric("total_transitions", total_transitions)
+                .with_metric("recovery_attempts", recovery_attempts)
+                .with_metric("uptime_seconds", uptime_seconds);
+        }
 
         // Add issues for problematic states
         if metrics.recovery_attempts > 0 {
@@ -649,17 +649,17 @@ impl HealthCheck for ResourceHealthCheck {
         let mut result =
             HealthCheckResult::new(agent_id.to_string(), "resources".to_string(), status)
                 .with_message(message)
-                .with_duration(start_time.elapsed())
-                {
-                    #[allow(clippy::cast_precision_loss)]
-                    let alloc_count = allocation_count as f64;
-                    #[allow(clippy::cast_precision_loss)]
-                    let total_allocs = usage_stats.total_allocations as f64;
-                    result = result
-                        .with_metric("allocation_count", alloc_count)
-                        .with_metric("total_allocations", total_allocs);
-                    result
-                }
+                .with_duration(start_time.elapsed());
+
+        {
+            #[allow(clippy::cast_precision_loss)]
+            let alloc_count = allocation_count as f64;
+            #[allow(clippy::cast_precision_loss)]
+            let total_allocs = usage_stats.total_allocations as f64;
+            result = result
+                .with_metric("allocation_count", alloc_count)
+                .with_metric("total_allocations", total_allocs);
+        }
 
         // Add resource-specific metrics
         for (resource_type, usage) in &usage_stats.current_usage_by_type {

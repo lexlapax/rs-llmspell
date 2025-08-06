@@ -334,7 +334,9 @@ impl FlowController {
     fn calculate_current_rate(&self) -> f64 {
         let elapsed = self.start_time.elapsed().as_secs_f64();
         if elapsed > 0.0 {
-            self.stats.read().events_processed as f64 / elapsed
+            #[allow(clippy::cast_precision_loss)]
+            let rate = self.stats.read().events_processed as f64 / elapsed;
+            rate
         } else {
             0.0
         }

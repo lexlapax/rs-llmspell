@@ -162,6 +162,7 @@ impl UniversalEvent {
     /// Check if event has expired
     pub fn is_expired(&self) -> bool {
         if let Some(ttl) = self.metadata.ttl {
+            #[allow(clippy::cast_sign_loss)]
             let elapsed = Utc::now()
                 .signed_duration_since(self.timestamp)
                 .num_seconds() as u64;

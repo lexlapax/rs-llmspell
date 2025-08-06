@@ -428,12 +428,17 @@ impl EventLogger {
             }
         }
 
+        #[allow(clippy::cast_precision_loss)]
+        let buffer_len_f64 = buffer.len() as f64;
+        #[allow(clippy::cast_precision_loss)]
+        let max_buffer_size_f64 = self.max_buffer_size as f64;
+
         EventStatistics {
             total_events: buffer.len(),
             level_counts,
             component_counts,
             error_count,
-            buffer_utilization: (buffer.len() as f64 / self.max_buffer_size as f64) * 100.0,
+            buffer_utilization: (buffer_len_f64 / max_buffer_size_f64) * 100.0,
         }
     }
 }

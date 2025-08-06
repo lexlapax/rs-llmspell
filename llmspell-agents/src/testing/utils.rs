@@ -275,7 +275,9 @@ impl TestReport {
         if self.results.is_empty() {
             return 0.0;
         }
+        #[allow(clippy::cast_precision_loss)]
         let passed = self.results.iter().filter(|r| r.passed).count() as f64;
+        #[allow(clippy::cast_precision_loss)]
         let total = self.results.len() as f64;
         passed / total * 100.0
     }

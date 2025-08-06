@@ -110,9 +110,11 @@ impl ToolState {
         }
 
         // Update average execution time
-        self.execution_stats.average_execution_time_ms =
-            self.execution_stats.total_execution_time_ms as f64
-                / self.execution_stats.total_executions as f64;
+        #[allow(clippy::cast_precision_loss)]
+        let total_time = self.execution_stats.total_execution_time_ms as f64;
+        #[allow(clippy::cast_precision_loss)]
+        let total_execs = self.execution_stats.total_executions as f64;
+        self.execution_stats.average_execution_time_ms = total_time / total_execs;
 
         self.execution_stats.last_execution = Some(SystemTime::now());
         self.last_updated = SystemTime::now();
@@ -172,6 +174,7 @@ impl ToolState {
 
     /// Calculate cache hit ratio
     pub fn update_cache_hit_ratio(&mut self, was_cache_hit: bool) {
+        #[allow(clippy::cast_precision_loss)]
         let total_requests = self.execution_stats.total_executions as f64;
         if total_requests > 0.0 {
             let current_hits =
@@ -435,11 +438,14 @@ impl ToolStateRegistry {
         let average_cache_hit_ratio: f64 = if self.tool_states.is_empty() {
             0.0
         } else {
-            self.tool_states
+            let sum: f64 = self
+                .tool_states
                 .values()
                 .map(|state| state.execution_stats.cache_hit_ratio)
-                .sum::<f64>()
-                / self.tool_states.len() as f64
+                .sum();
+            #[allow(clippy::cast_precision_loss)]
+            let count = self.tool_states.len() as f64;
+            sum / count
         };
 
         RegistryStatistics {

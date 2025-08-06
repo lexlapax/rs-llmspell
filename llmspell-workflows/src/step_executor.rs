@@ -457,7 +457,11 @@ impl StepExecutor {
             step_type: step_type.to_string(),
             input: Some(serde_json::to_value(&step.step_type).unwrap_or(serde_json::Value::Null)),
             output: Some(serde_json::Value::String(result.output.clone())),
-            duration_ms: Some(result.duration.as_millis() as u64),
+            duration_ms: Some({
+                #[allow(clippy::cast_possible_truncation)]
+                let duration_ms_u64 = result.duration.as_millis() as u64;
+                duration_ms_u64
+            }),
         }
     }
 }

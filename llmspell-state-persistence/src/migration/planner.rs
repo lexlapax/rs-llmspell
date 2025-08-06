@@ -302,13 +302,13 @@ impl MigrationPlanner {
         ) {
             let compatibility = CompatibilityChecker::check_compatibility(&from_schema, &to_schema);
 
+            #[allow(clippy::cast_possible_truncation)]
+            let field_changes_count = compatibility.field_changes.len() as u64;
             let complexity = MigrationComplexity {
                 risk_level: compatibility.risk_level.clone(),
                 field_changes: compatibility.field_changes.len(),
                 breaking_changes: compatibility.breaking_changes.len(),
-                estimated_duration: Duration::from_secs(
-                    (compatibility.field_changes.len() * 10 + 60) as u64,
-                ),
+                estimated_duration: Duration::from_secs(field_changes_count * 10 + 60),
                 requires_backup: compatibility.risk_level
                     >= crate::schema::compatibility::RiskLevel::High,
                 complexity_score: self.calculate_complexity_score(&compatibility),
@@ -328,7 +328,9 @@ impl MigrationPlanner {
         let mut score = 0u32;
 
         // Base score for field changes
-        score += compatibility.field_changes.len() as u32 * 10;
+        #[allow(clippy::cast_possible_truncation)]
+        let field_changes_u32 = compatibility.field_changes.len() as u32;
+        score += field_changes_u32 * 10;
 
         // Penalty for breaking changes
         score += compatibility.breaking_changes.len() as u32 * 50;

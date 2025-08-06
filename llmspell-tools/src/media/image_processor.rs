@@ -508,12 +508,12 @@ impl BaseAgent for ImageProcessorTool {
                 let output_path = extract_required_string(params, "target_path")?;
                 let width = extract_optional_u64(params, "width").map(|w| {
                     #[allow(clippy::cast_possible_truncation)]
-                    let width_val = w.min(u32::MAX as u64) as u32;
+                    let width_val = w.min(u64::from(u32::MAX)) as u32;
                     width_val
                 });
                 let height = extract_optional_u64(params, "height").map(|h| {
                     #[allow(clippy::cast_possible_truncation)]
-                    let height_val = h.min(u32::MAX as u64) as u32;
+                    let height_val = h.min(u64::from(u32::MAX)) as u32;
                     height_val
                 });
                 let maintain_aspect_ratio =
@@ -587,7 +587,7 @@ impl BaseAgent for ImageProcessorTool {
                         message: "x is required".to_string(),
                         field: Some("x".to_string()),
                     })?
-                    .min(u32::MAX as u64);
+                    .min(u64::from(u32::MAX));
                 #[allow(clippy::cast_possible_truncation)]
                 let x = x as u32;
 
@@ -598,7 +598,7 @@ impl BaseAgent for ImageProcessorTool {
                         message: "y is required".to_string(),
                         field: Some("y".to_string()),
                     })?
-                    .min(u32::MAX as u64);
+                    .min(u64::from(u32::MAX));
                 #[allow(clippy::cast_possible_truncation)]
                 let y = y as u32;
 
@@ -609,7 +609,7 @@ impl BaseAgent for ImageProcessorTool {
                         message: "width is required".to_string(),
                         field: Some("width".to_string()),
                     })?
-                    .min(u32::MAX as u64);
+                    .min(u64::from(u32::MAX));
                 #[allow(clippy::cast_possible_truncation)]
                 let width = width as u32;
 
@@ -620,7 +620,7 @@ impl BaseAgent for ImageProcessorTool {
                         message: "height is required".to_string(),
                         field: Some("height".to_string()),
                     })?
-                    .min(u32::MAX as u64);
+                    .min(u64::from(u32::MAX));
                 #[allow(clippy::cast_possible_truncation)]
                 let height = height as u32;
 

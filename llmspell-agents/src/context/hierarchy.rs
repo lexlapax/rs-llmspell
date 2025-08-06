@@ -261,7 +261,11 @@ impl HierarchicalContext {
             average_depth: if self.roots.is_empty() {
                 0.0
             } else {
-                total_depth as f64 / self.roots.len() as f64
+                #[allow(clippy::cast_precision_loss)]
+                let total_depth_f64 = total_depth as f64;
+                #[allow(clippy::cast_precision_loss)]
+                let roots_len_f64 = self.roots.len() as f64;
+                total_depth_f64 / roots_len_f64
             },
         }
     }

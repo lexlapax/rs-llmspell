@@ -435,6 +435,7 @@ impl HookExecutor {
             return true;
         }
 
+        #[allow(clippy::cast_precision_loss)]
         let avg_hook_time = total_hook_time.as_secs_f64() / total_executions as f64;
         let overhead_ratio = avg_hook_time / self.config.max_execution_time.as_secs_f64();
 

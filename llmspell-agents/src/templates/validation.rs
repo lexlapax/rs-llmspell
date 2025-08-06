@@ -810,24 +810,35 @@ fn calculate_complexity_score(schema: &TemplateSchema) -> u32 {
     };
 
     // Add points for parameters
-    score += schema.parameters.len() as u32 * 2;
-    score += schema.required_parameters().len() as u32 * 3;
+    #[allow(clippy::cast_possible_truncation)]
+    let param_count = schema.parameters.len() as u32;
+    score += param_count * 2;
+    #[allow(clippy::cast_possible_truncation)]
+    let required_param_count = schema.required_parameters().len() as u32;
+    score += required_param_count * 3;
 
     // Add points for dependencies
-    score += schema.tool_dependencies.len() as u32 * 3;
-    score += schema
+    #[allow(clippy::cast_possible_truncation)]
+    let dep_count = schema.tool_dependencies.len() as u32;
+    score += dep_count * 3;
+    #[allow(clippy::cast_possible_truncation)]
+    let required_dep_count = schema
         .tool_dependencies
         .iter()
         .filter(|t| t.required)
-        .count() as u32
-        * 2;
+        .count() as u32;
+    score += required_dep_count * 2;
 
     // Add points for capabilities
-    score += schema.capability_requirements.len() as u32 * 4;
+    #[allow(clippy::cast_possible_truncation)]
+    let capability_count = schema.capability_requirements.len() as u32;
+    score += capability_count * 4;
 
     // Add points for resource requirements
     if let Some(memory) = schema.resource_requirements.memory {
-        score += (memory / (256 * 1024 * 1024)) as u32; // Points per 256MB
+        #[allow(clippy::cast_possible_truncation)]
+        let memory_points = (memory / (256 * 1024 * 1024)) as u32; // Points per 256MB
+        score += memory_points;
     }
 
     score

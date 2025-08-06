@@ -220,9 +220,11 @@ impl WorkflowExecutor for DefaultWorkflowExecutor {
             match tokio::time::timeout(timeout, agent.execute(agent_input, exec_context)).await {
                 Ok(result) => result,
                 Err(_) => {
+                    #[allow(clippy::cast_possible_truncation)]
+                    let timeout_ms = timeout.as_millis() as u64;
                     return Err(LLMSpellError::Timeout {
                         message: format!("Workflow execution timed out: {}", workflow_name),
-                        duration_ms: Some(timeout.as_millis() as u64),
+                        duration_ms: Some(timeout_ms),
                     });
                 }
             }

@@ -219,10 +219,15 @@ impl SearchProvider for SerpApiProvider {
                                     .unwrap_or_else(|| "No description available".to_string()),
                                 provider: format!("{} ({})", self.name(), self.default_engine),
                                 rank: {
-                                    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+                                    #[allow(
+                                        clippy::cast_possible_truncation,
+                                        clippy::cast_sign_loss,
+                                        clippy::cast_possible_wrap
+                                    )]
                                     let fallback_rank = results.len() as i32 + 1;
                                     #[allow(clippy::cast_sign_loss)]
-                                    let position = result.position.unwrap_or(fallback_rank) as usize;
+                                    let position =
+                                        result.position.unwrap_or(fallback_rank) as usize;
                                     position
                                 },
                             });
@@ -242,10 +247,15 @@ impl SearchProvider for SerpApiProvider {
                                     .unwrap_or_else(|| "No description available".to_string()),
                                 provider: format!("{} ({})", self.name(), self.default_engine),
                                 rank: {
-                                    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+                                    #[allow(
+                                        clippy::cast_possible_truncation,
+                                        clippy::cast_sign_loss,
+                                        clippy::cast_possible_wrap
+                                    )]
                                     let fallback_rank = results.len() as i32 + 1;
                                     #[allow(clippy::cast_sign_loss)]
-                                    let position = result.position.unwrap_or(fallback_rank) as usize;
+                                    let position =
+                                        result.position.unwrap_or(fallback_rank) as usize;
                                     position
                                 },
                             });
@@ -265,10 +275,15 @@ impl SearchProvider for SerpApiProvider {
                                     .unwrap_or_else(|| "Image result".to_string()),
                                 provider: format!("{} ({})", self.name(), self.default_engine),
                                 rank: {
-                                    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+                                    #[allow(
+                                        clippy::cast_possible_truncation,
+                                        clippy::cast_sign_loss,
+                                        clippy::cast_possible_wrap
+                                    )]
                                     let fallback_rank = results.len() as i32 + 1;
                                     #[allow(clippy::cast_sign_loss)]
-                                    let position = result.position.unwrap_or(fallback_rank) as usize;
+                                    let position =
+                                        result.position.unwrap_or(fallback_rank) as usize;
                                     position
                                 },
                             });

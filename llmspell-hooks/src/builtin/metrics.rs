@@ -116,7 +116,9 @@ impl Histogram {
         if self.count == 0 {
             0.0
         } else {
-            self.sum / self.count as f64
+            #[allow(clippy::cast_precision_loss)]
+            let count_f64 = self.count as f64;
+            self.sum / count_f64
         }
     }
 
@@ -125,7 +127,10 @@ impl Histogram {
             return 0.0;
         }
 
-        let target_count = (self.count as f64 * p / 100.0).ceil() as u64;
+        #[allow(clippy::cast_precision_loss)]
+        let count_f64 = self.count as f64;
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let target_count = (count_f64 * p / 100.0).ceil() as u64;
 
         for bucket in &self.buckets {
             if bucket.count >= target_count {
@@ -241,7 +246,11 @@ impl MetricsStorage {
         if total == 0 {
             0.0
         } else {
-            success_count as f64 / total as f64
+            #[allow(clippy::cast_precision_loss)]
+            let success_f64 = success_count as f64;
+            #[allow(clippy::cast_precision_loss)]
+            let total_f64 = total as f64;
+            success_f64 / total_f64
         }
     }
 

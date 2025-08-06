@@ -334,7 +334,9 @@ impl PerformanceBenchmark {
         let mut total_hook_executions = 0;
         for (logging_hook, metrics_hook) in hook_instances {
             total_hook_executions += logging_hook.get_log_count();
-            total_hook_executions += metrics_hook.get_metrics_count() as u64;
+            #[allow(clippy::cast_possible_truncation)]
+            let metrics_count_u64 = metrics_hook.get_metrics_count() as u64;
+            total_hook_executions += metrics_count_u64;
         }
 
         Ok((duration, total_transitions, total_hook_executions))
@@ -376,8 +378,12 @@ impl PerformanceBenchmark {
         let overhead_ratio = with_hooks_duration.as_secs_f64() / baseline_duration.as_secs_f64();
         let overhead_percentage = (overhead_ratio - 1.0) * 100.0;
 
-        let throughput_baseline = baseline_transitions as f64 / baseline_duration.as_secs_f64();
-        let throughput_with_hooks = hooks_transitions as f64 / with_hooks_duration.as_secs_f64();
+        #[allow(clippy::cast_precision_loss)]
+        let baseline_transitions_f64 = baseline_transitions as f64;
+        let throughput_baseline = baseline_transitions_f64 / baseline_duration.as_secs_f64();
+        #[allow(clippy::cast_precision_loss)]
+        let hooks_transitions_f64 = hooks_transitions as f64;
+        let throughput_with_hooks = hooks_transitions_f64 / with_hooks_duration.as_secs_f64();
 
         Ok(BenchmarkResults {
             baseline_duration,

@@ -673,7 +673,9 @@ impl LifecycleMiddleware for MetricsMiddleware {
         let completed_key = format!("{}_{}_completed", context.agent_id, context.phase.name());
 
         let mut metrics = self.metrics.write().await;
-        metrics.insert(duration_key, context.elapsed().as_millis() as f64);
+        #[allow(clippy::cast_precision_loss)]
+        let duration_ms = context.elapsed().as_millis() as f64;
+        metrics.insert(duration_key, duration_ms);
         *metrics.entry(completed_key).or_insert(0.0) += 1.0;
         Ok(())
     }

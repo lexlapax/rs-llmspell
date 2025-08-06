@@ -482,11 +482,16 @@ impl TraceAnalyzer {
 
         let service_durations = Self::calculate_service_durations(spans);
 
+        #[allow(clippy::cast_precision_loss)]
+        let error_count_f64 = error_count as f64;
+        #[allow(clippy::cast_precision_loss)]
+        let span_count_f64 = spans.len() as f64;
+
         TraceStatistics {
             span_count: spans.len(),
             total_duration,
             error_count,
-            error_rate: (error_count as f64 / spans.len() as f64) * 100.0,
+            error_rate: (error_count_f64 / span_count_f64) * 100.0,
             service_durations,
         }
     }

@@ -173,7 +173,9 @@ impl CausalityChain {
             self.end_time = timestamp;
             self.duration = self.end_time.signed_duration_since(self.start_time);
         }
-        self.depth = self.events.len() as u32 - 1;
+        #[allow(clippy::cast_possible_truncation)]
+        let event_count = self.events.len() as u32;
+        self.depth = event_count.saturating_sub(1);
     }
 
     /// Get the root event (first in chain)
@@ -320,8 +322,11 @@ impl EventTimeline {
             .unwrap_or(0);
 
         if self.duration.num_seconds() > 0 {
-            self.stats.events_per_second =
-                self.stats.total_events as f64 / self.duration.num_seconds() as f64;
+            #[allow(clippy::cast_precision_loss)]
+            let total_events_f64 = self.stats.total_events as f64;
+            #[allow(clippy::cast_precision_loss)]
+            let duration_seconds = self.duration.num_seconds() as f64;
+            self.stats.events_per_second = total_events_f64 / duration_seconds;
         }
 
         self.stats.root_causes = self.entries.iter().filter(|e| e.is_root_cause()).count();

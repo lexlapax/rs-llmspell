@@ -148,8 +148,11 @@ impl PersistentAgentState {
 
         performance.invocation_count += 1;
         performance.total_duration_ms += duration_ms;
-        performance.average_duration_ms =
-            performance.total_duration_ms as f64 / performance.invocation_count as f64;
+        #[allow(clippy::cast_precision_loss)]
+        let total_duration_f64 = performance.total_duration_ms as f64;
+        #[allow(clippy::cast_precision_loss)]
+        let invocation_count_f64 = performance.invocation_count as f64;
+        performance.average_duration_ms = total_duration_f64 / invocation_count_f64;
         performance.last_used = SystemTime::now();
 
         self.touch();

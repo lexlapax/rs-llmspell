@@ -455,11 +455,17 @@ impl MigrationPlanner {
         transformations: &[DataTransformation],
     ) -> std::time::Duration {
         let base_duration = std::time::Duration::from_secs(60); // 1 minute base
-        let step_duration = std::time::Duration::from_secs(30 * steps.len() as u64);
+        #[allow(clippy::cast_possible_truncation)]
+        let steps_len_u64 = steps.len() as u64;
+        let step_duration = std::time::Duration::from_secs(30 * steps_len_u64);
         let transform_duration = std::time::Duration::from_secs(
             transformations
                 .iter()
-                .map(|t| t.field_mappings.len() as u64 * 10)
+                .map(|t| {
+                    #[allow(clippy::cast_possible_truncation)]
+                    let field_mappings_len_u64 = t.field_mappings.len() as u64;
+                    field_mappings_len_u64 * 10
+                })
                 .sum(),
         );
 

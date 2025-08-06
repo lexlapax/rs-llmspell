@@ -344,8 +344,10 @@ impl EventCorrelationTracker {
         let contexts_count = self.contexts.read().unwrap().len();
 
         // Rough estimate: each event ~1KB, each link ~200B, each context ~500B
+        #[allow(clippy::cast_possible_truncation)]
+        let total_events_usize = stats.total_events as usize;
         stats.estimated_memory_usage =
-            (stats.total_events as usize * 1024) + (links_count * 200) + (contexts_count * 500);
+            (total_events_usize * 1024) + (links_count * 200) + (contexts_count * 500);
 
         stats
     }

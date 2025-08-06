@@ -129,9 +129,11 @@ impl AsyncHookProcessor {
                     if !success {
                         stats.events_failed.fetch_add(1, Ordering::Relaxed);
                     }
+                    #[allow(clippy::cast_possible_truncation)]
+                    let duration_micros = duration.as_micros() as u64;
                     stats
                         .total_processing_time_micros
-                        .fetch_add(duration.as_micros() as u64, Ordering::Relaxed);
+                        .fetch_add(duration_micros, Ordering::Relaxed);
 
                     // Send completion notification if configured
                     if let Some(tx) = &completion_tx {
@@ -241,7 +243,11 @@ impl HookProcessorStatsSnapshot {
         if self.events_processed == 0 {
             0.0
         } else {
-            self.total_processing_time_micros as f64 / self.events_processed as f64
+            #[allow(clippy::cast_precision_loss)]
+            let total_time = self.total_processing_time_micros as f64;
+            #[allow(clippy::cast_precision_loss)]
+            let processed = self.events_processed as f64;
+            total_time / processed
         }
     }
 
@@ -250,8 +256,11 @@ impl HookProcessorStatsSnapshot {
         if self.events_processed == 0 {
             100.0
         } else {
-            ((self.events_processed - self.events_failed) as f64 / self.events_processed as f64)
-                * 100.0
+            #[allow(clippy::cast_precision_loss)]
+            let successful = (self.events_processed - self.events_failed) as f64;
+            #[allow(clippy::cast_precision_loss)]
+            let processed = self.events_processed as f64;
+            (successful / processed) * 100.0
         }
     }
 }

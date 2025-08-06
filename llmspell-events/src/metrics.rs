@@ -289,7 +289,8 @@ impl MetricsCollector {
             throughput_trend: metrics.real_time_analytics.throughput_trend,
             memory_usage_mb: {
                 #[allow(clippy::cast_precision_loss)]
-                let memory_mb = metrics.real_time_analytics.memory_usage_bytes as f64 / 1024.0 / 1024.0;
+                let memory_mb =
+                    metrics.real_time_analytics.memory_usage_bytes as f64 / 1024.0 / 1024.0;
                 memory_mb
             },
             uptime_seconds: self.start_time.elapsed().as_secs(),

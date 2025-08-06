@@ -85,7 +85,11 @@ impl BackupCompression {
 
         let compressed_size = compressed.len();
         let ratio = if start_size > 0 && compressed_size < start_size {
-            ((start_size - compressed_size) as f64 / start_size as f64) * 100.0
+            #[allow(clippy::cast_precision_loss)]
+            let size_diff = (start_size - compressed_size) as f64;
+            #[allow(clippy::cast_precision_loss)]
+            let start_size_f64 = start_size as f64;
+            (size_diff / start_size_f64) * 100.0
         } else {
             0.0
         };
@@ -233,7 +237,11 @@ impl BackupCompression {
         let decompression_time = decompress_start.elapsed();
 
         let compression_ratio = if original_size > 0 && compressed_size < original_size {
-            ((original_size - compressed_size) as f64 / original_size as f64) * 100.0
+            #[allow(clippy::cast_precision_loss)]
+            let size_diff = (original_size - compressed_size) as f64;
+            #[allow(clippy::cast_precision_loss)]
+            let original_size_f64 = original_size as f64;
+            (size_diff / original_size_f64) * 100.0
         } else {
             0.0
         };
@@ -242,7 +250,9 @@ impl BackupCompression {
             original_size,
             compressed_size,
             compression_ratio,
+            #[allow(clippy::cast_possible_truncation)]
             compression_time_ms: compression_time.as_millis() as u64,
+            #[allow(clippy::cast_possible_truncation)]
             estimated_decompression_time_ms: decompression_time.as_millis() as u64,
             algorithm: self.compression_type,
             level: self.compression_level,

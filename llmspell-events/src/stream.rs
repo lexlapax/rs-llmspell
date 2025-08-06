@@ -299,6 +299,7 @@ impl StreamUtils {
         }
 
         let elapsed = start_time.elapsed();
+        #[allow(clippy::cast_precision_loss)]
         let events_per_second = event_count as f64 / elapsed.as_secs_f64();
 
         ThroughputMeasurement {

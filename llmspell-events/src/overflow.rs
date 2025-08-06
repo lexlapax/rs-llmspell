@@ -233,8 +233,12 @@ impl Default for OverflowConfig {
 impl OverflowConfig {
     /// Create a new overflow configuration
     pub fn new(strategy: OverflowStrategy, max_buffer_size: usize) -> Self {
-        let high_water_mark = (max_buffer_size as f64 * 0.8) as usize;
-        let low_water_mark = (max_buffer_size as f64 * 0.2) as usize;
+        #[allow(clippy::cast_precision_loss)]
+        let max_size_f64 = max_buffer_size as f64;
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let high_water_mark = (max_size_f64 * 0.8) as usize;
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let low_water_mark = (max_size_f64 * 0.2) as usize;
 
         Self {
             strategy,

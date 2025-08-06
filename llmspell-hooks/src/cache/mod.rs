@@ -166,7 +166,11 @@ impl CacheStats {
         if self.total_requests == 0 {
             0.0
         } else {
-            self.cache_hits as f64 / self.total_requests as f64
+            #[allow(clippy::cast_precision_loss)]
+            let cache_hits_f64 = self.cache_hits as f64;
+            #[allow(clippy::cast_precision_loss)]
+            let total_requests_f64 = self.total_requests as f64;
+            cache_hits_f64 / total_requests_f64
         }
     }
 
@@ -364,7 +368,9 @@ impl Cache {
 
         if expired_count > 0 {
             let mut stats = self.stats.write().unwrap();
-            stats.expired_entries += expired_count as u64;
+            #[allow(clippy::cast_possible_truncation)]
+            let expired_count_u64 = expired_count as u64;
+            stats.expired_entries += expired_count_u64;
             stats.current_size = entries.len();
         }
     }

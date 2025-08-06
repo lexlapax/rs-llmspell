@@ -129,7 +129,7 @@ impl ResourceMonitor {
                     if ops_per_sec > limit_f64 {
                         viols.push(SandboxViolation::ResourceLimit {
                             resource: "file_operations".to_string(),
-                            limit: limit,
+                            limit: u64::from(limit),
                             #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
                             actual: ops_per_sec as u64,
                             reason: "File operations per second exceeded limit".to_string(),
@@ -222,7 +222,7 @@ impl ResourceMonitor {
             if ops_per_sec > limit_f64 {
                 let violation = SandboxViolation::ResourceLimit {
                     resource: "file_operations".to_string(),
-                    limit,
+                    limit: u64::from(limit),
                     #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
                     actual: ops_per_sec as u64,
                     reason: "File operations per second exceeded limit".to_string(),

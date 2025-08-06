@@ -116,7 +116,11 @@ impl TtlCacheStats {
         if self.total_gets == 0 {
             0.0
         } else {
-            self.cache_hits as f64 / self.total_gets as f64
+            #[allow(clippy::cast_precision_loss)]
+            let cache_hits_f64 = self.cache_hits as f64;
+            #[allow(clippy::cast_precision_loss)]
+            let total_gets_f64 = self.total_gets as f64;
+            cache_hits_f64 / total_gets_f64
         }
     }
 
@@ -321,7 +325,9 @@ where
 
         if !expired_keys.is_empty() {
             let mut stats = self.stats.write().unwrap();
-            stats.expired_entries += expired_keys.len() as u64;
+            #[allow(clippy::cast_possible_truncation)]
+            let expired_len_u64 = expired_keys.len() as u64;
+            stats.expired_entries += expired_len_u64;
             stats.total_entries = entries.len();
         }
 
@@ -353,6 +359,7 @@ where
             }
         }
 
+        #[allow(clippy::cast_possible_truncation)]
         let expired_count = expired_keys.len() as u64;
 
         for key in expired_keys {

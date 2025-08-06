@@ -379,7 +379,11 @@ impl AlertManager {
                 } => {
                     if let Some(metric) = context.metrics.get(metric_name) {
                         match metric {
-                            MetricValue::Counter(v) => operator.evaluate(*v as f64, *threshold),
+                            MetricValue::Counter(v) => {
+                                #[allow(clippy::cast_precision_loss)]
+                                let v_f64 = *v as f64;
+                                operator.evaluate(v_f64, *threshold)
+                            }
                             MetricValue::Gauge(v) => operator.evaluate(*v, *threshold),
                             _ => false,
                         }
@@ -397,7 +401,11 @@ impl AlertManager {
                         match (total, failed) {
                             (MetricValue::Counter(t), MetricValue::Counter(f)) => {
                                 if *t > 0 {
-                                    let rate = (*f as f64 / *t as f64) * 100.0;
+                                    #[allow(clippy::cast_precision_loss)]
+                                    let f_f64 = *f as f64;
+                                    #[allow(clippy::cast_precision_loss)]
+                                    let t_f64 = *t as f64;
+                                    let rate = (f_f64 / t_f64) * 100.0;
                                     rate >= *rate_percent
                                 } else {
                                     false
@@ -580,7 +588,9 @@ impl AlertManager {
             let resolved_count = history.iter().filter(|a| a.resolved_at.is_some()).count();
 
             if resolved_count > 0 {
-                Some(total_duration / u32::try_from(resolved_count).unwrap_or(1))
+                #[allow(clippy::cast_possible_truncation)]
+                let resolved_count_u32 = resolved_count as u32;
+                Some(total_duration / resolved_count_u32)
             } else {
                 None
             }

@@ -343,7 +343,9 @@ impl ToolAgentTemplate {
     ) {
         if let Some(max_tools) = params.get("max_tools") {
             if let Some(value) = max_tools.as_u64() {
-                config.max_tools = value as usize;
+                #[allow(clippy::cast_possible_truncation)]
+                let max_tools_usize = value as usize;
+                config.max_tools = max_tools_usize;
             }
         }
 
@@ -361,7 +363,9 @@ impl ToolAgentTemplate {
 
         if let Some(max_concurrent) = params.get("max_concurrent_tools") {
             if let Some(value) = max_concurrent.as_u64() {
-                config.max_concurrent_tools = value as usize;
+                #[allow(clippy::cast_possible_truncation)]
+                let max_concurrent_usize = value as usize;
+                config.max_concurrent_tools = max_concurrent_usize;
             }
         }
 
@@ -405,18 +409,19 @@ impl AgentTemplate for ToolAgentTemplate {
         // Build final configuration
         let mut final_config = HashMap::new();
         final_config.insert("agent_type".to_string(), "tool_agent".into());
-        final_config.insert(
-            "max_tools".to_string(),
-            (agent_config.max_tools as u64).into(),
-        );
+        #[allow(clippy::cast_possible_truncation)]
+        let max_tools_u64 = agent_config.max_tools as u64;
+        final_config.insert("max_tools".to_string(), max_tools_u64.into());
         final_config.insert("tool_timeout".to_string(), agent_config.tool_timeout.into());
         final_config.insert(
             "enable_caching".to_string(),
             agent_config.enable_caching.into(),
         );
+        #[allow(clippy::cast_possible_truncation)]
+        let max_concurrent_u64 = agent_config.max_concurrent_tools as u64;
         final_config.insert(
             "max_concurrent_tools".to_string(),
-            (agent_config.max_concurrent_tools as u64).into(),
+            max_concurrent_u64.into(),
         );
         final_config.insert(
             "enable_error_recovery".to_string(),

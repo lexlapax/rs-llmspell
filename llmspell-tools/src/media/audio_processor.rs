@@ -292,7 +292,10 @@ impl AudioProcessorTool {
                     })?;
 
                 let channels_u16 = u16::from_le_bytes([fmt_data[2], fmt_data[3]]);
-                let channels = channels_u16.min(u8::MAX as u16) as u8;
+                #[allow(clippy::cast_lossless)]
+                let u8_max_u16 = u8::MAX as u16;
+                #[allow(clippy::cast_possible_truncation)]
+                let channels = channels_u16.min(u8_max_u16) as u8;
                 let sample_rate =
                     u32::from_le_bytes([fmt_data[4], fmt_data[5], fmt_data[6], fmt_data[7]]);
                 let byte_rate =

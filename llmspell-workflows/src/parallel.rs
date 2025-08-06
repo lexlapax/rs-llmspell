@@ -857,8 +857,10 @@ impl BaseAgent for ParallelWorkflow {
         };
 
         // Build AgentOutput with execution metadata
+        #[allow(clippy::cast_possible_truncation)]
+        let execution_time_ms = workflow_result.duration.as_millis() as u64;
         let mut metadata = llmspell_core::types::OutputMetadata {
-            execution_time_ms: Some(workflow_result.duration.as_millis() as u64),
+            execution_time_ms: Some(execution_time_ms),
             ..Default::default()
         };
         metadata

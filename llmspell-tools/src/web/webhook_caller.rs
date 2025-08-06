@@ -129,6 +129,7 @@ impl BaseAgent for WebhookCallerTool {
         let method = extract_optional_string(params, "method")
             .unwrap_or("POST")
             .to_uppercase();
+        #[allow(clippy::cast_possible_truncation)]
         let max_retries = extract_optional_u64(params, "max_retries").unwrap_or(3) as u32;
         let timeout = extract_optional_u64(params, "timeout").unwrap_or(30);
 

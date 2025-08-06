@@ -82,10 +82,16 @@ impl CapabilityScorer for DefaultCapabilityScorer {
             return 0.5; // Neutral score for unused capabilities
         }
 
-        let success_rate = stats.successes as f64 / stats.invocations as f64;
+        #[allow(clippy::cast_precision_loss)]
+        let successes_f64 = stats.successes as f64;
+        #[allow(clippy::cast_precision_loss)]
+        let invocations_f64 = stats.invocations as f64;
+        let success_rate = successes_f64 / invocations_f64;
         let recency_score = if let Some(last) = stats.last_invocation {
             let hours_ago = (chrono::Utc::now() - last).num_hours();
-            (1.0 / (1.0 + hours_ago as f64 / 24.0)).min(1.0)
+            #[allow(clippy::cast_precision_loss)]
+            let hours_ago_f64 = hours_ago as f64;
+            (1.0 / (1.0 + hours_ago_f64 / 24.0)).min(1.0)
         } else {
             0.0
         };

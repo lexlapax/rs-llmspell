@@ -222,7 +222,9 @@ impl CostTrackingMetrics {
         if self.total_requests == 0 {
             0.0
         } else {
-            self.total_cost / self.total_requests as f64
+            #[allow(clippy::cast_precision_loss)]
+            let requests_f64 = self.total_requests as f64;
+            self.total_cost / requests_f64
         }
     }
 
@@ -230,7 +232,11 @@ impl CostTrackingMetrics {
         if self.total_requests == 0 {
             0.0
         } else {
-            (self.total_input_tokens + self.total_output_tokens) as f64 / self.total_requests as f64
+            #[allow(clippy::cast_precision_loss)]
+            let total_tokens = (self.total_input_tokens + self.total_output_tokens) as f64;
+            #[allow(clippy::cast_precision_loss)]
+            let requests_f64 = self.total_requests as f64;
+            total_tokens / requests_f64
         }
     }
 }
@@ -423,8 +429,12 @@ impl CostTrackingHook {
                 )
             })?;
 
-        let input_cost = (usage.input_tokens as f64 / 1000.0) * model_pricing.input_cost_per_1k;
-        let output_cost = (usage.output_tokens as f64 / 1000.0) * model_pricing.output_cost_per_1k;
+        #[allow(clippy::cast_precision_loss)]
+        let input_tokens_f64 = usage.input_tokens as f64;
+        let input_cost = (input_tokens_f64 / 1000.0) * model_pricing.input_cost_per_1k;
+        #[allow(clippy::cast_precision_loss)]
+        let output_tokens_f64 = usage.output_tokens as f64;
+        let output_cost = (output_tokens_f64 / 1000.0) * model_pricing.output_cost_per_1k;
         let mut total_cost = input_cost + output_cost;
 
         // Apply minimum charge if applicable

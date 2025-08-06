@@ -207,7 +207,8 @@ impl HookInspector {
         #[allow(clippy::cast_precision_loss)]
         let error_rate = *result_counts.get("Cancel").unwrap_or(&0) as f64 / total_exec_f64;
         #[allow(clippy::cast_precision_loss)]
-        let modification_rate = *result_counts.get("Modified").unwrap_or(&0) as f64 / total_exec_f64;
+        let modification_rate =
+            *result_counts.get("Modified").unwrap_or(&0) as f64 / total_exec_f64;
         #[allow(clippy::cast_precision_loss)]
         let cancellation_rate = *result_counts.get("Cancel").unwrap_or(&0) as f64 / total_exec_f64;
 

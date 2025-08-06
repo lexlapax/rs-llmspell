@@ -478,7 +478,9 @@ impl OrchestratorAgentTemplate {
     ) {
         if let Some(max_agents) = params.get("max_managed_agents") {
             if let Some(value) = max_agents.as_u64() {
-                config.max_managed_agents = value as usize;
+                #[allow(clippy::cast_possible_truncation)]
+                let max_agents_usize = value as usize;
+                config.max_managed_agents = max_agents_usize;
             }
         }
 
@@ -515,7 +517,9 @@ impl OrchestratorAgentTemplate {
 
         if let Some(max_concurrent) = params.get("max_concurrent_workflows") {
             if let Some(value) = max_concurrent.as_u64() {
-                config.max_concurrent_workflows = value as usize;
+                #[allow(clippy::cast_possible_truncation)]
+                let max_concurrent_usize = value as usize;
+                config.max_concurrent_workflows = max_concurrent_usize;
             }
         }
 
@@ -527,7 +531,9 @@ impl OrchestratorAgentTemplate {
 
         if let Some(max_retries) = params.get("max_retries") {
             if let Some(value) = max_retries.as_u64() {
-                config.max_retries = value as u32;
+                #[allow(clippy::cast_possible_truncation)]
+                let max_retries_u32 = value as u32;
+                config.max_retries = max_retries_u32;
             }
         }
 
@@ -568,9 +574,11 @@ impl AgentTemplate for OrchestratorAgentTemplate {
         // Build final configuration
         let mut final_config = HashMap::new();
         final_config.insert("agent_type".to_string(), "orchestrator_agent".into());
+        #[allow(clippy::cast_sign_loss)]
+        let max_managed_agents_u64 = agent_config.max_managed_agents as u64;
         final_config.insert(
             "max_managed_agents".to_string(),
-            (agent_config.max_managed_agents as u64).into(),
+            max_managed_agents_u64.into(),
         );
         final_config.insert(
             "orchestration_strategy".to_string(),
@@ -588,9 +596,11 @@ impl AgentTemplate for OrchestratorAgentTemplate {
             "health_check_interval".to_string(),
             agent_config.health_check_interval.into(),
         );
+        #[allow(clippy::cast_sign_loss)]
+        let max_concurrent_workflows_u64 = agent_config.max_concurrent_workflows as u64;
         final_config.insert(
             "max_concurrent_workflows".to_string(),
-            (agent_config.max_concurrent_workflows as u64).into(),
+            max_concurrent_workflows_u64.into(),
         );
         final_config.insert(
             "enable_rollback".to_string(),

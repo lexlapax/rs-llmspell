@@ -165,7 +165,11 @@ impl MigrationContext {
         if self.total_steps == 0 {
             0.0
         } else {
-            self.current_step as f64 / self.total_steps as f64
+            #[allow(clippy::cast_precision_loss)]
+            let current_step_f64 = self.current_step as f64;
+            #[allow(clippy::cast_precision_loss)]
+            let total_steps_f64 = self.total_steps as f64;
+            current_step_f64 / total_steps_f64
         }
     }
 

@@ -95,7 +95,11 @@ impl CachingMetrics {
         if self.total_cache_attempts == 0 {
             0.0
         } else {
-            self.cache_hits as f64 / self.total_cache_attempts as f64
+            #[allow(clippy::cast_precision_loss)]
+            let hits = self.cache_hits as f64;
+            #[allow(clippy::cast_precision_loss)]
+            let attempts = self.total_cache_attempts as f64;
+            hits / attempts
         }
     }
 
@@ -103,7 +107,11 @@ impl CachingMetrics {
         if self.cache_hits == 0 {
             0.0
         } else {
-            self.time_saved_ms as f64 / self.cache_hits as f64
+            #[allow(clippy::cast_precision_loss)]
+            let time_saved = self.time_saved_ms as f64;
+            #[allow(clippy::cast_precision_loss)]
+            let hits = self.cache_hits as f64;
+            time_saved / hits
         }
     }
 }
@@ -333,15 +341,22 @@ impl CachingHook {
             Ok(()) => {
                 let mut metrics = self.metrics.write().unwrap();
                 metrics.cache_puts += 1;
-                metrics.time_saved_ms += execution_time.as_millis() as u64;
+                #[allow(clippy::cast_possible_truncation)]
+                let time_saved = execution_time.as_millis() as u64;
+                metrics.time_saved_ms += time_saved;
 
                 // Update average execution times
                 let total_ops = metrics.cache_puts + metrics.cache_hits;
                 if total_ops > 0 {
                     let current_avg = metrics.average_execution_time_ms;
+                    #[allow(clippy::cast_precision_loss)]
                     let new_time = execution_time.as_millis() as f64;
+                    #[allow(clippy::cast_precision_loss)]
+                    let total_ops_minus_one = (total_ops - 1) as f64;
+                    #[allow(clippy::cast_precision_loss)]
+                    let total_ops_f64 = total_ops as f64;
                     metrics.average_execution_time_ms =
-                        (current_avg * (total_ops - 1) as f64 + new_time) / total_ops as f64;
+                        (current_avg * total_ops_minus_one + new_time) / total_ops_f64;
                 }
             }
             Err(e) => {

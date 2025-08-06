@@ -380,6 +380,7 @@ impl BaseAgent for SequentialWorkflow {
 
         // Build AgentOutput with execution metadata
         let mut metadata = llmspell_core::types::OutputMetadata {
+            #[allow(clippy::cast_possible_truncation)]
             execution_time_ms: Some(workflow_result.duration.as_millis() as u64),
             ..Default::default()
         };
@@ -652,7 +653,11 @@ impl SequentialWorkflowResult {
         if self.total_steps() == 0 {
             0.0
         } else {
-            (self.successful_steps.len() as f64 / self.total_steps() as f64) * 100.0
+            #[allow(clippy::cast_precision_loss)]
+            let successful_f64 = self.successful_steps.len() as f64;
+            #[allow(clippy::cast_precision_loss)]
+            let total_f64 = self.total_steps() as f64;
+            (successful_f64 / total_f64) * 100.0
         }
     }
 

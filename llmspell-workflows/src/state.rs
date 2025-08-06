@@ -346,7 +346,9 @@ impl StateManager {
             .fold(Duration::ZERO, |acc, d| acc + d);
 
         let average_duration = if total_steps > 0 {
-            total_duration / total_steps as u32
+            #[allow(clippy::cast_possible_truncation)]
+            let total_steps_u32 = total_steps as u32;
+            total_duration / total_steps_u32
         } else {
             Duration::ZERO
         };
@@ -501,7 +503,11 @@ impl ExecutionStats {
         if self.total_steps == 0 {
             0.0
         } else {
-            (self.successful_steps as f64 / self.total_steps as f64) * 100.0
+            #[allow(clippy::cast_precision_loss)]
+            let successful_f64 = self.successful_steps as f64;
+            #[allow(clippy::cast_precision_loss)]
+            let total_f64 = self.total_steps as f64;
+            (successful_f64 / total_f64) * 100.0
         }
     }
 

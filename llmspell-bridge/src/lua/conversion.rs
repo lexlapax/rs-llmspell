@@ -448,7 +448,11 @@ impl FromScriptValue<LuaValue<'_>> for ScriptValue {
         match value {
             LuaValue::Nil => Ok(Self::Null),
             LuaValue::Boolean(b) => Ok(Self::Bool(b)),
-            LuaValue::Integer(i) => Ok(Self::Number(i as f64)),
+            LuaValue::Integer(i) => {
+                #[allow(clippy::cast_precision_loss)]
+                let num = i as f64;
+                Ok(Self::Number(num))
+            }
             LuaValue::Number(n) => Ok(Self::Number(n)),
             LuaValue::String(s) => Ok(Self::String(
                 s.to_str()

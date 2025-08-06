@@ -381,6 +381,7 @@ impl DatabaseConnectorTool {
 
             match sqlx::query(query).fetch_all(&pool).await {
                 Ok(rows) => {
+                    #[allow(clippy::cast_possible_truncation)]
                     let execution_time = start.elapsed().as_millis() as u64;
                     let results: Vec<serde_json::Value> = rows
                         .iter()

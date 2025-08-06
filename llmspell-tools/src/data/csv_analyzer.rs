@@ -1379,12 +1379,15 @@ impl BaseAgent for CsvAnalyzerTool {
                 Value::String(filtered)
             }
             CsvOperation::Sample => {
-                let sample_size = options
+                #[allow(clippy::cast_possible_truncation)]
+                let sample_size_u64 = options
                     .as_ref()
                     .and_then(|o| o.get("size"))
                     .and_then(serde_json::Value::as_u64)
                     .unwrap_or(10)
-                    .min(usize::MAX as u64) as usize;
+                    .min(usize::MAX as u64);
+                #[allow(clippy::cast_possible_truncation)]
+                let sample_size = sample_size_u64 as usize;
 
                 let sampled = self.sample_csv(&content, sample_size).await?;
                 Value::String(sampled)

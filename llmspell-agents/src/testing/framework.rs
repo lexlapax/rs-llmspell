@@ -256,11 +256,15 @@ impl TestHarness {
             metrics.max_response_time = metrics.max_response_time.max(duration);
             metrics.min_response_time = metrics.min_response_time.min(duration);
 
-            let total_time = metrics.avg_response_time.as_nanos()
-                * (metrics.execution_count - 1) as u128
-                + duration.as_nanos();
-            metrics.avg_response_time =
-                Duration::from_nanos((total_time / metrics.execution_count as u128) as u64);
+            #[allow(clippy::cast_possible_truncation)]
+            let count_minus_one = (metrics.execution_count - 1) as u128;
+            let total_time =
+                metrics.avg_response_time.as_nanos() * count_minus_one + duration.as_nanos();
+            #[allow(clippy::cast_possible_truncation)]
+            let execution_count_u128 = metrics.execution_count as u128;
+            #[allow(clippy::cast_possible_truncation)]
+            let avg_nanos = (total_time / execution_count_u128) as u64;
+            metrics.avg_response_time = Duration::from_nanos(avg_nanos);
         }
 
         result
@@ -341,7 +345,9 @@ impl AgentAssertions {
     /// - Memory usage exceeds the limit
     /// - Tool call count exceeds the limit
     pub fn assert_resource_usage(usage: &ResourceUsage, limits: &ResourceLimits) -> Result<()> {
-        if usage.peak_memory > (limits.max_memory_mb as usize * 1024 * 1024) {
+        #[allow(clippy::cast_possible_truncation)]
+        let max_memory_bytes = limits.max_memory_mb as usize * 1024 * 1024;
+        if usage.peak_memory > max_memory_bytes {
             return Err(anyhow::anyhow!(
                 "Memory usage {} bytes exceeds limit of {} MB",
                 usage.peak_memory,
@@ -349,7 +355,9 @@ impl AgentAssertions {
             ));
         }
 
-        if usage.tool_calls > limits.max_tool_calls as usize {
+        #[allow(clippy::cast_possible_truncation)]
+        let max_tool_calls_usize = limits.max_tool_calls as usize;
+        if usage.tool_calls > max_tool_calls_usize {
             return Err(anyhow::anyhow!(
                 "Tool calls {} exceeds limit of {}",
                 usage.tool_calls,

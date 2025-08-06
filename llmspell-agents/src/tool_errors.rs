@@ -250,7 +250,8 @@ impl ToolIntegrationError {
                 if *retry_count < 3 {
                     vec![RecoveryAction::Retry {
                         max_attempts: 3,
-                        delay: Duration::from_millis(1000 * u64::from(retry_count + 1)),
+                        #[allow(clippy::cast_lossless)]
+                        delay: Duration::from_millis(1000 * (retry_count + 1) as u64),
                     }]
                 } else {
                     vec![RecoveryAction::RequestUserIntervention {

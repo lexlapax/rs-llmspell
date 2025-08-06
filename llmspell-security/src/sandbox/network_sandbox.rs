@@ -60,7 +60,9 @@ impl RateLimiter {
         self.requests.retain(|&timestamp| timestamp > window_start);
 
         // Check if we're under the limit
-        if self.requests.len() < self.config.max_requests as usize {
+        #[allow(clippy::cast_lossless)]
+        let max_requests_usize = self.config.max_requests as usize;
+        if self.requests.len() < max_requests_usize {
             self.requests.push(now);
             true
         } else {
@@ -152,7 +154,8 @@ impl NetworkSandbox {
         if !limiter.check_and_record() {
             let violation = SandboxViolation::ResourceLimit {
                 resource: "network_requests".to_string(),
-                limit: self.default_rate_limit.max_requests as u64,
+                limit: u64::from(self.default_rate_limit.max_requests),
+                #[allow(clippy::cast_possible_truncation)]
                 actual: limiter.requests.len() as u64,
                 reason: format!("Rate limit exceeded for domain: {}", domain),
             };

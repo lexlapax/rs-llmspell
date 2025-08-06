@@ -24,8 +24,10 @@ impl TokenBucket {
     /// Create a new token bucket
     pub fn new(config: TokenBucketConfig) -> Self {
         let total_capacity = config.capacity + config.burst_capacity;
+        #[allow(clippy::cast_precision_loss)]
+        let tokens_f64 = total_capacity as f64;
         Self {
-            tokens: total_capacity as f64,
+            tokens: tokens_f64,
             config,
             last_refill: Utc::now(),
             total_consumed: 0,
@@ -90,7 +92,9 @@ impl TokenBucket {
     /// Reset the bucket to full capacity
     pub fn reset(&mut self) {
         let total_capacity = self.config.capacity + self.config.burst_capacity;
-        self.tokens = total_capacity as f64;
+        #[allow(clippy::cast_precision_loss)]
+        let tokens_f64 = total_capacity as f64;
+        self.tokens = tokens_f64;
         self.last_refill = Utc::now();
         self.total_consumed = 0;
         self.total_refilled = 0;

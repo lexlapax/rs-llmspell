@@ -205,7 +205,11 @@ impl EphemeralCacheStats {
         if self.cache_limit == 0 {
             0.0
         } else {
-            (self.entry_count as f64 / self.cache_limit as f64) * 100.0
+            #[allow(clippy::cast_precision_loss)]
+            let entry_count_f64 = self.entry_count as f64;
+            #[allow(clippy::cast_precision_loss)]
+            let cache_limit_f64 = self.cache_limit as f64;
+            (entry_count_f64 / cache_limit_f64) * 100.0
         }
     }
 }
@@ -259,8 +263,11 @@ mod tests {
         );
 
         // Calculate improvement over JSON
-        let improvement =
-            ((json_baseline.as_nanos() as f64 / fast_path.as_nanos() as f64) - 1.0) * 100.0;
+        #[allow(clippy::cast_precision_loss)]
+        let json_nanos = json_baseline.as_nanos() as f64;
+        #[allow(clippy::cast_precision_loss)]
+        let fast_nanos = fast_path.as_nanos() as f64;
+        let improvement = ((json_nanos / fast_nanos) - 1.0) * 100.0;
         println!("MessagePack is {:.1}% faster than JSON", improvement);
 
         // MessagePack can be slightly slower than JSON for small payloads due to binary encoding overhead

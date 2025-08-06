@@ -183,7 +183,11 @@ impl PerformanceMetrics {
         if metrics.total_operations == 0 {
             0.0
         } else {
-            metrics.total_duration_ms as f64 / metrics.total_operations as f64
+            #[allow(clippy::cast_precision_loss)]
+            let total_duration = metrics.total_duration_ms as f64;
+            #[allow(clippy::cast_precision_loss)]
+            let total_ops = metrics.total_operations as f64;
+            total_duration / total_ops
         }
     }
 
@@ -197,7 +201,10 @@ impl PerformanceMetrics {
 
         let mut durations = metrics.operation_durations.clone();
         durations.sort_unstable();
-        let idx = (durations.len() as f64 * 0.99) as usize;
+        #[allow(clippy::cast_precision_loss)]
+        let len_f64 = durations.len() as f64;
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+        let idx = (len_f64 * 0.99) as usize;
         durations.get(idx).copied().unwrap_or(0)
     }
 
