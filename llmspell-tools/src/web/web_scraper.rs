@@ -87,6 +87,7 @@ impl WebScraperTool {
         }
     }
 
+    #[allow(clippy::too_many_lines)]
     async fn scrape_page(
         &self,
         url: &str,

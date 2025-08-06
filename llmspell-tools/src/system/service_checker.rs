@@ -683,8 +683,8 @@ impl Tool for ServiceCheckerTool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use llmspell_testing::tool_helpers::{create_test_tool, create_test_tool_input};
-    use std::collections::HashMap;
+    use llmspell_testing::tool_helpers::create_test_tool_input;
+    
 
     fn create_test_service_checker() -> ServiceCheckerTool {
         let config = ServiceCheckerConfig::default();

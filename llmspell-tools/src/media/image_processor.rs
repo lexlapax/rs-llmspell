@@ -850,7 +850,7 @@ impl Tool for ImageProcessorTool {
 mod tests {
     use super::*;
     use llmspell_testing::tool_helpers::create_test_tool_input;
-    use std::collections::HashMap;
+    
     use std::fs;
     use tempfile::TempDir;
 

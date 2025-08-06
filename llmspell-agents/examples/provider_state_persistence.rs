@@ -24,6 +24,7 @@ use tempfile::TempDir;
 use tracing::{info, Level};
 
 #[tokio::main]
+#[allow(clippy::too_many_lines)]
 async fn main() -> Result<()> {
     // Initialize logging
     tracing_subscriber::fmt().with_max_level(Level::INFO).init();

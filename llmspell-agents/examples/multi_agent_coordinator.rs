@@ -13,6 +13,7 @@ use tracing::{info, Level};
 /// Example demonstrating multi-agent coordination where specialized agents
 /// work together under an orchestrator to accomplish complex research tasks.
 #[tokio::main]
+#[allow(clippy::too_many_lines)]
 async fn main() -> anyhow::Result<()> {
     // Initialize logging
     tracing_subscriber::fmt().with_max_level(Level::INFO).init();

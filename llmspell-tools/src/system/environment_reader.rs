@@ -495,9 +495,7 @@ impl Tool for EnvironmentReaderTool {
 mod tests {
     use super::*;
     use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
-    use llmspell_testing::tool_helpers::{
-        create_test_tool, create_test_tool_input, create_test_tool_input_json,
-    };
+    use llmspell_testing::tool_helpers::create_test_tool_input;
     use std::collections::HashMap;
 
     fn create_test_environment_reader() -> EnvironmentReaderTool {

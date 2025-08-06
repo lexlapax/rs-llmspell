@@ -13,6 +13,7 @@ use tracing::{info, Level};
 /// Example demonstrating how to build a library of reusable agent templates
 /// and patterns that can be customized for specific use cases.
 #[tokio::main]
+#[allow(clippy::too_many_lines)]
 async fn main() -> anyhow::Result<()> {
     // Initialize logging
     tracing_subscriber::fmt().with_max_level(Level::INFO).init();

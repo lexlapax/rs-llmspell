@@ -329,7 +329,7 @@ impl CompositeLifecycleManager {
         let current = self.state.read().await.clone();
 
         // Validate transition
-        if !self.is_valid_transition(&current, &new_state) {
+        if !Self::is_valid_transition(&current, &new_state) {
             return Err(LLMSpellError::Component {
                 message: format!("Invalid state transition: {current:?} -> {new_state:?}"),
                 source: None,
@@ -359,7 +359,7 @@ impl CompositeLifecycleManager {
     }
 
     /// Check if a state transition is valid
-    const fn is_valid_transition(&self, from: &LifecycleState, to: &LifecycleState) -> bool {
+    const fn is_valid_transition(from: &LifecycleState, to: &LifecycleState) -> bool {
         matches!(
             (from, to),
             (LifecycleState::Initializing, LifecycleState::Ready)
@@ -659,8 +659,8 @@ impl HierarchicalLifecycleManager {
                 self.base
                     .emit_event(LifecycleEvent::StateTransition {
                         component_id: component_id.to_string(),
-                        from: self.parse_lifecycle_state(old_state),
-                        to: self.parse_lifecycle_state(new_state),
+                        from: Self::parse_lifecycle_state(old_state),
+                        to: Self::parse_lifecycle_state(new_state),
                         timestamp: chrono::Utc::now(),
                     })
                     .await?;
@@ -678,7 +678,7 @@ impl HierarchicalLifecycleManager {
     }
 
     /// Parse lifecycle state from string
-    fn parse_lifecycle_state(&self, state: &str) -> LifecycleState {
+    fn parse_lifecycle_state(state: &str) -> LifecycleState {
         match state {
             "initializing" => LifecycleState::Initializing,
             "active" => LifecycleState::Active,

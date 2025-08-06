@@ -1094,8 +1094,8 @@ impl CsvAnalyzerTool {
         if expr.contains(" * ") {
             let parts: Vec<&str> = expr.split(" * ").collect();
             if parts.len() == 2 {
-                let left_val = self.get_column_value(parts[0].trim(), headers, record)?;
-                let right_val = self.get_column_value(parts[1].trim(), headers, record)?;
+                let left_val = Self::get_column_value(parts[0].trim(), headers, record)?;
+                let right_val = Self::get_column_value(parts[1].trim(), headers, record)?;
 
                 if let (Ok(left), Ok(right)) = (left_val.parse::<f64>(), right_val.parse::<f64>()) {
                     return Ok(format!("{:.2}", left * right));
@@ -1109,7 +1109,6 @@ impl CsvAnalyzerTool {
 
     /// Get column value by name or return literal value
     fn get_column_value(
-        &self,
         name: &str,
         headers: &csv::StringRecord,
         record: &csv::StringRecord,

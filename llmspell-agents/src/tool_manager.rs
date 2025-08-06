@@ -129,7 +129,7 @@ impl ToolManager {
             let categories: Vec<ToolCategory> = query
                 .categories
                 .iter()
-                .map(|cat| self.string_to_tool_category(cat))
+                .map(|cat| Self::string_to_tool_category(cat))
                 .collect();
             if !categories.is_empty() {
                 matcher = matcher.with_categories(categories);
@@ -143,7 +143,7 @@ impl ToolManager {
 
         // Add security level filters
         if let Some(max_level) = &query.max_security_level {
-            if let Some(security_level) = self.string_to_security_level(max_level) {
+            if let Some(security_level) = Self::string_to_security_level(max_level) {
                 matcher = matcher.with_max_security_level(security_level);
             }
         }
@@ -171,7 +171,7 @@ impl ToolManager {
 
             // Apply min_security_level filter manually
             if let Some(min_level) = &query.min_security_level {
-                if let Some(min_security) = self.string_to_security_level(min_level) {
+                if let Some(min_security) = Self::string_to_security_level(min_level) {
                     if registry_info.security_level < min_security {
                         continue;
                     }
@@ -179,7 +179,7 @@ impl ToolManager {
             }
 
             // Convert registry ToolInfo to our ToolInfo
-            let tool_info = self.registry_info_to_tool_info(&registry_info);
+            let tool_info = Self::registry_info_to_tool_info(&registry_info);
             tools.push(tool_info);
         }
 
@@ -295,7 +295,7 @@ impl ToolManager {
         };
 
         // Convert to our ToolInfo format
-        let tool_info = self.registry_info_to_tool_info(&registry_info);
+        let tool_info = Self::registry_info_to_tool_info(&registry_info);
 
         // Update cache if enabled
         if self.config.enable_metadata_cache {
@@ -430,7 +430,7 @@ impl ToolManager {
             ContextMode::Previous => {
                 // Replace ${previous.output} with actual previous output
                 if let Some(prev_output) = previous_output {
-                    parameters = self.substitute_previous_output(parameters, prev_output);
+                    parameters = Self::substitute_previous_output(parameters, prev_output);
                 }
             }
             ContextMode::Selective(_fields) => {
@@ -444,7 +444,6 @@ impl ToolManager {
 
     /// Substitute ${previous.output} references with actual output
     fn substitute_previous_output(
-        &self,
         mut parameters: JsonValue,
         previous_output: &AgentOutput,
     ) -> JsonValue {
@@ -462,7 +461,7 @@ impl ToolManager {
     }
 
     /// Convert registry `ToolInfo` to our `ToolInfo` format
-    fn registry_info_to_tool_info(&self, registry_info: &RegistryToolInfo) -> ToolInfo {
+    fn registry_info_to_tool_info(registry_info: &RegistryToolInfo) -> ToolInfo {
         // Convert SecurityLevel to string
         let security_level_str = match registry_info.security_level {
             SecurityLevel::Safe => "safe",
@@ -483,7 +482,7 @@ impl ToolManager {
     }
 
     /// Convert string to `ToolCategory`
-    fn string_to_tool_category(&self, category_str: &str) -> ToolCategory {
+    fn string_to_tool_category(category_str: &str) -> ToolCategory {
         match category_str.to_lowercase().as_str() {
             "filesystem" => ToolCategory::Filesystem,
             "web" => ToolCategory::Web,
@@ -498,7 +497,7 @@ impl ToolManager {
     }
 
     /// Convert string to `SecurityLevel`
-    fn string_to_security_level(&self, level_str: &str) -> Option<SecurityLevel> {
+    fn string_to_security_level(level_str: &str) -> Option<SecurityLevel> {
         match level_str.to_lowercase().as_str() {
             "safe" => Some(SecurityLevel::Safe),
             "restricted" => Some(SecurityLevel::Restricted),
@@ -615,7 +614,7 @@ mod tests {
     #[tokio::test]
     async fn test_parameter_substitution() {
         let registry = Arc::new(ToolRegistry::new());
-        let manager = ToolManager::new(registry);
+        let _manager = ToolManager::new(registry);
 
         let parameters = json!({
             "input": "${previous.output}",
@@ -623,7 +622,7 @@ mod tests {
         });
 
         let previous_output = AgentOutput::text("test_output".to_string());
-        let result = manager.substitute_previous_output(parameters, &previous_output);
+        let result = ToolManager::substitute_previous_output(parameters, &previous_output);
 
         assert_eq!(
             result["input"],

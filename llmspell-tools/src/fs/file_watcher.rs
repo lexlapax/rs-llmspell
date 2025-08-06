@@ -452,7 +452,7 @@ mod tests {
     use super::*;
     use llmspell_core::traits::tool::{ResourceLimits, SecurityRequirements};
     use llmspell_security::sandbox::SandboxContext;
-    use llmspell_testing::tool_helpers::{create_test_tool, create_test_tool_input};
+    use llmspell_testing::tool_helpers::create_test_tool_input;
     use tempfile::TempDir;
 
     fn create_test_file_watcher() -> (FileWatcherTool, TempDir) {

@@ -160,7 +160,7 @@ impl HashCalculatorTool {
         validate_enum(&input_type, &["string", "file"], "input_type")?;
         validate_enum(&expected_format, &["hex", "base64"], "expected_format")?;
 
-        let expected_hash = self.decode_expected_hash(expected_hash_str, &expected_format)?;
+        let expected_hash = Self::decode_expected_hash(expected_hash_str, &expected_format)?;
         let actual_hash = self.compute_hash(params, &input_type, algorithm).await?;
         let matches = actual_hash == expected_hash;
 
@@ -213,11 +213,7 @@ impl HashCalculatorTool {
         }
     }
 
-    fn decode_expected_hash(
-        &self,
-        expected_hash_str: &str,
-        expected_format: &str,
-    ) -> Result<Vec<u8>> {
+    fn decode_expected_hash(expected_hash_str: &str, expected_format: &str) -> Result<Vec<u8>> {
         match expected_format {
             "hex" => from_hex_string(expected_hash_str).map_err(|_| {
                 validation_error(
@@ -360,7 +356,7 @@ impl Tool for HashCalculatorTool {
 mod tests {
     use super::*;
     use llmspell_core::LLMSpellError;
-    use llmspell_testing::tool_helpers::{create_test_tool, create_test_tool_input};
+    use llmspell_testing::tool_helpers::create_test_tool_input;
     use llmspell_utils::file_utils::write_file;
     use tempfile::TempDir;
 

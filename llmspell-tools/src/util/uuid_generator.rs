@@ -94,7 +94,6 @@ impl UuidGeneratorTool {
     }
 
     fn generate_uuid(
-        &self,
         version: UuidVersion,
         namespace: Option<&str>,
         name: Option<&str>,
@@ -236,7 +235,7 @@ impl BaseAgent for UuidGeneratorTool {
                 let name = extract_optional_string(params, "name");
 
                 // Generate UUID
-                let uuid = self.generate_uuid(version, namespace, name)?;
+                let uuid = Self::generate_uuid(version, namespace, name)?;
 
                 // Extract format
                 let format = extract_optional_string(params, "format").map_or(

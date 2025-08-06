@@ -686,7 +686,7 @@ mod tests {
     }
     #[test]
     fn test_query_depth_estimation() {
-        let tool = GraphQLQueryTool::default();
+        let _tool = GraphQLQueryTool::default();
 
         let simple_query = "{ user { name } }";
         assert_eq!(GraphQLQueryTool::estimate_query_depth(simple_query), 2);

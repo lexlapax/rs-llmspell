@@ -10,6 +10,7 @@ use tracing::{info, Level};
 /// Example demonstrating a research agent that gathers information from multiple sources,
 /// analyzes data, and synthesizes findings into comprehensive reports.
 #[tokio::main]
+#[allow(clippy::too_many_lines)]
 async fn main() -> anyhow::Result<()> {
     // Initialize logging
     tracing_subscriber::fmt().with_max_level(Level::INFO).init();

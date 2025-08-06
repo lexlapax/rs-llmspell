@@ -745,7 +745,7 @@ impl ProcessExecutorTool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use llmspell_testing::tool_helpers::{create_test_tool, create_test_tool_input};
+    use llmspell_testing::tool_helpers::create_test_tool_input;
     use tempfile::TempDir;
 
     fn create_test_process_executor() -> ProcessExecutorTool {
@@ -820,7 +820,7 @@ mod tests {
     async fn test_execute_with_environment_vars() {
         let tool = create_test_process_executor();
 
-        let env = json!({
+        let _env = json!({
             "TEST_VAR": "test_value"
         });
 

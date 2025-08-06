@@ -309,10 +309,7 @@ impl JsonProcessorTool {
     /// # Errors
     ///
     /// Returns an error if the operation string cannot be parsed
-    fn parse_parameters(
-        &self,
-        params: &Value,
-    ) -> Result<(JsonOperation, Option<Value>, Option<String>)> {
+    fn parse_parameters(params: &Value) -> Result<(JsonOperation, Option<Value>, Option<String>)> {
         let operation_str = params
             .get("operation")
             .and_then(|v| v.as_str())
@@ -367,7 +364,7 @@ impl BaseAgent for JsonProcessorTool {
         // Get parameters using shared utility
         let params = extract_parameters(&input)?;
 
-        let (operation, input_json, query) = self.parse_parameters(params)?;
+        let (operation, input_json, query) = Self::parse_parameters(params)?;
 
         info!("Executing JSON {} operation", operation);
         eprintln!("DEBUG: input_json = {:?}", input_json);

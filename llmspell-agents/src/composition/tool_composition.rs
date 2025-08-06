@@ -387,7 +387,7 @@ impl ToolComposition {
                             retry_attempts += 1;
                             total_retries += 1;
 
-                            let delay = self.calculate_retry_delay(
+                            let delay = Self::calculate_retry_delay(
                                 step.retry_config.as_ref().unwrap(),
                                 retry_attempts,
                             );
@@ -549,17 +549,13 @@ impl ToolComposition {
             }
             DataFlow::Transform { source, transform } => {
                 let source_value = self.resolve_data_flow(source, context)?;
-                self.apply_data_transform(&source_value, transform)
+                Self::apply_data_transform(&source_value, transform)
             }
         }
     }
 
     /// Apply a data transformation
-    fn apply_data_transform(
-        &self,
-        value: &JsonValue,
-        transform: &DataTransform,
-    ) -> Result<JsonValue> {
+    fn apply_data_transform(value: &JsonValue, transform: &DataTransform) -> Result<JsonValue> {
         match transform {
             DataTransform::ExtractField(field_name) => {
                 if let JsonValue::Object(obj) = value {
@@ -638,7 +634,7 @@ impl ToolComposition {
     }
 
     /// Calculate retry delay
-    fn calculate_retry_delay(&self, retry_config: &RetryConfig, attempt: u32) -> Duration {
+    fn calculate_retry_delay(retry_config: &RetryConfig, attempt: u32) -> Duration {
         let base_delay = retry_config.base_delay;
 
         if retry_config.exponential_backoff {
@@ -883,27 +879,24 @@ mod tests {
     }
     #[tokio::test]
     async fn test_data_transforms() {
-        let composition = ToolComposition::new("test");
+        let _composition = ToolComposition::new("test");
 
         // Test ToString transform
-        let result = composition
-            .apply_data_transform(&json!(123), &DataTransform::ToString)
-            .unwrap();
+        let result =
+            ToolComposition::apply_data_transform(&json!(123), &DataTransform::ToString).unwrap();
         assert_eq!(result, json!("123"));
 
         // Test ExtractField transform
-        let result = composition
-            .apply_data_transform(
-                &json!({"field1": "value1", "field2": "value2"}),
-                &DataTransform::ExtractField("field1".to_string()),
-            )
-            .unwrap();
+        let result = ToolComposition::apply_data_transform(
+            &json!({"field1": "value1", "field2": "value2"}),
+            &DataTransform::ExtractField("field1".to_string()),
+        )
+        .unwrap();
         assert_eq!(result, json!("value1"));
 
         // Test ToNumber transform
-        let result = composition
-            .apply_data_transform(&json!("42"), &DataTransform::ToNumber)
-            .unwrap();
+        let result =
+            ToolComposition::apply_data_transform(&json!("42"), &DataTransform::ToNumber).unwrap();
         assert_eq!(result.as_f64(), Some(42.0));
     }
 }

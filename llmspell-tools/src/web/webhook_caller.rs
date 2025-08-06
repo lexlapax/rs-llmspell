@@ -121,6 +121,7 @@ impl BaseAgent for WebhookCallerTool {
         Ok(AgentOutput::text(format!("WebhookCaller error: {error}")))
     }
 
+    #[allow(clippy::too_many_lines)]
     async fn execute(&self, input: AgentInput, _context: ExecutionContext) -> Result<AgentOutput> {
         let params = extract_parameters(&input)?;
         let url = extract_required_string(params, "input")?;

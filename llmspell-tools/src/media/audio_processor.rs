@@ -657,8 +657,8 @@ impl Tool for AudioProcessorTool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use llmspell_testing::tool_helpers::{create_test_tool, create_test_tool_input};
-    use std::collections::HashMap;
+    use llmspell_testing::tool_helpers::create_test_tool_input;
+    
     use std::fs;
     use tempfile::TempDir;
 

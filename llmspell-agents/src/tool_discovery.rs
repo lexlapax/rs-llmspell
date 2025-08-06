@@ -149,7 +149,7 @@ impl ToolDiscovery {
     /// Returns an error if registry access fails
     pub async fn get_tool_info(&self, name: &str) -> Result<Option<ToolInfo>> {
         if let Some(registry_info) = self.registry.get_tool_info(name).await {
-            Ok(Some(self.convert_registry_info(&registry_info)))
+            Ok(Some(Self::convert_registry_info(&registry_info)))
         } else {
             Ok(None)
         }
@@ -237,7 +237,7 @@ impl ToolDiscovery {
             let categories: Vec<ToolCategory> = query
                 .categories
                 .iter()
-                .map(|cat| self.string_to_tool_category(cat))
+                .map(|cat| Self::string_to_tool_category(cat))
                 .collect();
             if !categories.is_empty() {
                 matcher = matcher.with_categories(categories);
@@ -251,7 +251,7 @@ impl ToolDiscovery {
 
         // Add security level filters
         if let Some(max_level) = &query.max_security_level {
-            if let Some(security_level) = self.string_to_security_level(max_level) {
+            if let Some(security_level) = Self::string_to_security_level(max_level) {
                 matcher = matcher.with_max_security_level(security_level);
             }
         }
@@ -276,7 +276,7 @@ impl ToolDiscovery {
 
             // Apply min_security_level filter manually
             if let Some(min_level) = &query.min_security_level {
-                if let Some(min_security) = self.string_to_security_level(min_level) {
+                if let Some(min_security) = Self::string_to_security_level(min_level) {
                     if registry_info.security_level < min_security {
                         continue;
                     }
@@ -284,7 +284,7 @@ impl ToolDiscovery {
             }
 
             // Convert registry ToolInfo to our ToolInfo
-            let tool_info = self.convert_registry_info(&registry_info);
+            let tool_info = Self::convert_registry_info(&registry_info);
             tools.push(tool_info);
         }
 
@@ -292,10 +292,7 @@ impl ToolDiscovery {
     }
 
     /// Convert registry `ToolInfo` to our `ToolInfo` format
-    fn convert_registry_info(
-        &self,
-        registry_info: &llmspell_tools::registry::ToolInfo,
-    ) -> ToolInfo {
+    fn convert_registry_info(registry_info: &llmspell_tools::registry::ToolInfo) -> ToolInfo {
         let security_level_str = match registry_info.security_level {
             SecurityLevel::Safe => "safe",
             SecurityLevel::Restricted => "restricted",
@@ -315,7 +312,7 @@ impl ToolDiscovery {
     }
 
     /// Convert string to `ToolCategory`
-    fn string_to_tool_category(&self, category_str: &str) -> ToolCategory {
+    fn string_to_tool_category(category_str: &str) -> ToolCategory {
         match category_str.to_lowercase().as_str() {
             "filesystem" => ToolCategory::Filesystem,
             "web" => ToolCategory::Web,
@@ -330,7 +327,7 @@ impl ToolDiscovery {
     }
 
     /// Convert string to `SecurityLevel`
-    fn string_to_security_level(&self, level_str: &str) -> Option<SecurityLevel> {
+    fn string_to_security_level(level_str: &str) -> Option<SecurityLevel> {
         match level_str.to_lowercase().as_str() {
             "safe" => Some(SecurityLevel::Safe),
             "restricted" => Some(SecurityLevel::Restricted),
