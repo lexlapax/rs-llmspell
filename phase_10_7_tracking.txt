@@ -1,0 +1,79 @@
+# Phase 10.7 Remaining Issues Tracking File
+# Total warnings: 737 (analyzed 718 unique warnings across 4 crates)
+# Generated from full workspace clippy scan with --all-targets --all-features
+
+## SUMMARY BY CRATE
+- llmspell-agents: 363 warnings
+- llmspell-bridge: 267 warnings
+- llmspell-tools: 87 warnings
+- llmspell-testing: 1 warning
+
+## CATEGORY BREAKDOWN
+
+### Priority 1: Early Drop Issues (164 warnings)
+- Temporary values with significant Drop can be optimized
+- Most in llmspell-agents (116) and llmspell-bridge (46)
+- These can improve performance
+
+### Priority 2: Identical Match Arms (63 warnings)
+- Match arms with identical bodies that can be combined
+- Most in llmspell-agents (57)
+- Reduces code duplication
+
+### Priority 3: Option/Result Patterns (58 warnings)
+- map_or, unwrap_or patterns that can be improved
+- Spread across agents (32), bridge (15), tools (11)
+- Better idiomatic Rust
+
+### Priority 4: Pass by Value Issues (49 warnings)
+- Arguments passed by value but not consumed
+- Most in llmspell-bridge (32) and llmspell-agents (14)
+- Can improve performance
+
+### Priority 5: Default Trait Usage (45 warnings)
+- Using Default::default() instead of Type::default()
+- Spread across bridge (23), tools (20)
+- Simple style fixes
+
+### Priority 6: Panic Issues (45 warnings)
+- All in llmspell-agents
+- Panic messages that could be improved
+
+### Priority 7: Format String Issues (23 warnings)
+- Variables that can be directly interpolated
+- Most in llmspell-tools (16)
+- Cleaner code
+
+### Priority 8: Redundant Code (22 warnings)
+- Redundant closures and patterns
+- Most in llmspell-bridge (15)
+
+### Priority 9: Unnecessary Result Wrapping (13 warnings)
+- Functions that always return Ok
+- Spread across crates
+
+### Priority 10: Cast Issues (12 warnings)
+- Unnecessary or improper casts
+- Spread across crates
+
+### Priority 11: Cognitive Complexity (8 warnings)
+- Functions that are too complex
+- In llmspell-tools (6) and llmspell-bridge (2)
+
+### Priority 12: Other Issues (198 warnings)
+- Various pedantic warnings
+- Includes bool logic, assertions, etc.
+
+## FIXING STRATEGY
+
+1. Start with llmspell-tools (87 warnings) - smallest crate
+2. Move to llmspell-agents (363 warnings) - most warnings
+3. Then llmspell-bridge (267 warnings)
+4. Finally llmspell-testing (1 warning)
+
+For each crate, fix in priority order:
+1. Errors that prevent compilation
+2. Performance issues (early drop, pass by value)
+3. Code quality (identical match arms, redundant code)
+4. Style issues (format strings, default trait)
+5. Pedantic warnings

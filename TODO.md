@@ -511,16 +511,62 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
         
         **Completed**: Successfully reduced warnings from 1100+ to ~600 using both manual fixes and cargo clippy --fix
     
-    10.7. [ ] **Remaining Issues** (1 hour) - ~50 warnings, do not skip or be lazy
-        - [ ] Fix identical match arms
-        - [ ] Fix inefficient clone assignments
-        - [ ] Fix format! string interpolations
-        - [ ] Fix early drop opportunities
-        - [ ] Fix infallible casts (use From)
-        - [ ] Fix any other pedantic warnings
+    10.7. [ ] **Remaining Issues** (2-3 hours) - 718 warnings (properly analyzed and categorized)
+        
+        **Total Warnings: 718 across 4 crates**
+        - llmspell-agents: 363 warnings (lib: 355, tests: 3, examples: 5)
+        - llmspell-bridge: 267 warnings (lib: 236, tests: 31)
+        - llmspell-tools: 87 warnings (lib: 30, tests: 57)
+        - llmspell-testing: 1 warning (lib test: 1)
+        
+        **By Category (Priority Order):**
+        - [ ] Fix early drop issues (164 warnings) - Performance critical
+            - llmspell-agents: 116
+            - llmspell-bridge: 46
+            - llmspell-tools: 2
+        - [ ] Fix identical match arms (63 warnings) - Code duplication
+            - llmspell-agents: 57
+            - llmspell-bridge: 1
+            - llmspell-tools: 5
+        - [ ] Fix Option/Result patterns (58 warnings) - Idiomatic improvements
+            - llmspell-agents: 32
+            - llmspell-bridge: 15
+            - llmspell-tools: 11
+        - [ ] Fix pass by value issues (49 warnings) - Performance
+            - llmspell-bridge: 32
+            - llmspell-agents: 14
+            - llmspell-tools: 3
+        - [ ] Fix Default trait usage (45 warnings) - Style
+            - llmspell-bridge: 23
+            - llmspell-tools: 20
+            - llmspell-agents: 2
+        - [ ] Fix panic issues (45 warnings) - All in llmspell-agents
+        - [ ] Fix format string interpolations (23 warnings)
+            - llmspell-tools: 16
+            - llmspell-bridge: 7
+        - [ ] Fix redundant code (22 warnings)
+            - llmspell-bridge: 15
+            - llmspell-agents: 7
+        - [ ] Fix unnecessary Result wrapping (13 warnings)
+            - llmspell-bridge: 8
+            - llmspell-tools: 3
+            - llmspell-agents: 2
+        - [ ] Fix cast issues (12 warnings) - Spread across crates
+        - [ ] Fix cognitive complexity (8 warnings)
+            - llmspell-tools: 6
+            - llmspell-bridge: 2
+        - [ ] Fix remaining pedantic warnings (198 "other" warnings)
         - [ ] Ensure the changed crates compile
         - [ ] Ensure all tests pass for the affected crate
         - [ ] Ensure cargo fmt has no errors or warnings
+        
+        **Tracking Files**: 
+        - phase_10_7_detailed_tracking.txt (3,851 lines with EVERY warning location - USE THIS!)
+        - phase_10_7_full_clippy_output.txt (raw clippy output - 11,320 lines)
+        - phase_10_7_tracking.txt (summary only)
+        **Analysis Scripts**: 
+        - create_detailed_tracking.py (creates the detailed tracking with all locations)
+        - analyze_warnings_10_7.py (for summary analysis)
    
 
 **Acceptance Criteria**:
