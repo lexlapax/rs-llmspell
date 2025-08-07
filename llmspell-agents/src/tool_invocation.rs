@@ -1,6 +1,8 @@
 //! ABOUTME: Tool invocation wrapper with validation and error handling
 //! ABOUTME: Provides safe, validated tool execution with comprehensive error handling
 
+#![allow(clippy::significant_drop_tightening)]
+
 use llmspell_core::{
     traits::tool::Tool,
     types::{AgentInput, AgentOutput},

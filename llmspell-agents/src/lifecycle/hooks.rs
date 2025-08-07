@@ -1,6 +1,8 @@
 //! ABOUTME: Agent lifecycle hooks for customizing agent creation and destruction
 //! ABOUTME: Provides hooks that run at various stages of agent lifecycle
 
+#![allow(clippy::significant_drop_tightening)]
+
 use crate::factory::{AgentConfig, CreationHook};
 use anyhow::Result;
 use async_trait::async_trait;

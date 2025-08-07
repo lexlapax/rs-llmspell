@@ -1,6 +1,8 @@
 //! ABOUTME: Hierarchical agent composition for parent-child agent relationships
 //! ABOUTME: Enables building tree structures of agents with command and control patterns
 
+#![allow(clippy::significant_drop_tightening)]
+
 use super::traits::{
     Capability, CapabilityCategory, Composable, CompositeAgent, CompositionError,
     CompositionMetadata, CompositionType, ExecutionPattern, HierarchicalAgent, HierarchyEvent,

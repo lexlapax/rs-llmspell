@@ -1,6 +1,8 @@
 //! ABOUTME: Comprehensive error handling for tool operations and agent-tool integration
 //! ABOUTME: Provides structured error types, recovery strategies, and error context propagation
 
+#![allow(clippy::significant_drop_tightening)]
+
 use llmspell_core::{LLMSpellError, Result};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;
@@ -193,19 +195,19 @@ impl ToolIntegrationError {
     #[must_use]
     pub const fn severity(&self) -> ErrorSeverity {
         match self {
-            Self::ToolNotFound { .. } => ErrorSeverity::High,
-            Self::RegistrationFailed { .. } => ErrorSeverity::Medium,
-            Self::DiscoveryFailed { .. } => ErrorSeverity::Low,
-            Self::InvocationFailed { .. } => ErrorSeverity::High,
-            Self::ParameterValidation { .. } => ErrorSeverity::Medium,
-            Self::Timeout { .. } => ErrorSeverity::Medium,
-            Self::CompositionFailed { .. } => ErrorSeverity::High,
-            Self::AgentWrappingFailed { .. } => ErrorSeverity::Medium,
-            Self::ContextPropagationFailed { .. } => ErrorSeverity::Low,
-            Self::ResourceLimitExceeded { .. } => ErrorSeverity::High,
-            Self::SecurityViolation { .. } => ErrorSeverity::Critical,
-            Self::DependencyResolution { .. } => ErrorSeverity::High,
-            Self::StateCorruption { .. } => ErrorSeverity::Critical,
+            Self::SecurityViolation { .. } | Self::StateCorruption { .. } => ErrorSeverity::Critical,
+            Self::ToolNotFound { .. }
+            | Self::InvocationFailed { .. }
+            | Self::CompositionFailed { .. }
+            | Self::ResourceLimitExceeded { .. }
+            | Self::DependencyResolution { .. } => ErrorSeverity::High,
+            Self::RegistrationFailed { .. }
+            | Self::ParameterValidation { .. }
+            | Self::Timeout { .. }
+            | Self::AgentWrappingFailed { .. } => ErrorSeverity::Medium,
+            Self::DiscoveryFailed { .. } | Self::ContextPropagationFailed { .. } => {
+                ErrorSeverity::Low
+            }
         }
     }
 

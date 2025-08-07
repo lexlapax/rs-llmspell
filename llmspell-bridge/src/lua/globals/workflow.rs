@@ -1,6 +1,8 @@
 //! ABOUTME: Lua-specific Workflow global implementation
 //! ABOUTME: Provides comprehensive Lua bindings for all workflow patterns
 
+#![allow(clippy::significant_drop_tightening)]
+
 use crate::globals::GlobalContext;
 use crate::lua::conversion::{json_to_lua_value, lua_value_to_json};
 use crate::lua::sync_utils::block_on_async;

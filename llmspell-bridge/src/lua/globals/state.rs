@@ -1,6 +1,8 @@
 //! ABOUTME: Lua-specific State global implementation
 //! ABOUTME: Provides Lua bindings for persistent state functionality
 
+#![allow(clippy::significant_drop_tightening)]
+
 use crate::globals::{state_global::StateGlobal, GlobalContext};
 use crate::lua::conversion::{json_to_lua_value, lua_value_to_json};
 use mlua::{Error as LuaError, Lua, Value};

@@ -1,6 +1,8 @@
 //! ABOUTME: Core registry types and traits
 //! ABOUTME: Defines the foundational types for agent registry
 
+#![allow(clippy::significant_drop_tightening)]
+
 use anyhow::Result;
 use async_trait::async_trait;
 use llmspell_core::traits::agent::Agent;

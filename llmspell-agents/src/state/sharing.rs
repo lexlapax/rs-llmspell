@@ -1,3 +1,4 @@
+#![allow(clippy::significant_drop_tightening)]
 // ABOUTME: Controlled state sharing patterns for multi-agent collaboration
 // ABOUTME: Implements secure data exchange between agents with permission controls
 

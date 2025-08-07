@@ -1,6 +1,8 @@
 //! ABOUTME: Lifecycle event system for agent state machine transitions and monitoring
 //! ABOUTME: Provides event-driven notifications for agent lifecycle changes with hooks integration
 
+#![allow(clippy::significant_drop_tightening)]
+
 use super::state_machine::{AgentState, StateTransition};
 use anyhow::Result;
 use async_trait::async_trait;

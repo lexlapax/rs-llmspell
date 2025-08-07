@@ -1,6 +1,8 @@
 //! ABOUTME: Event bus integration for context-aware event handling
 //! ABOUTME: Provides event publishing, subscription, and context propagation
 
+#![allow(clippy::significant_drop_tightening)]
+
 use async_trait::async_trait;
 use llmspell_core::execution_context::{ContextScope, ExecutionContext};
 use llmspell_core::{EventMetadata, Result};

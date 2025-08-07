@@ -1,6 +1,8 @@
 //! ABOUTME: Performance optimizations for workflow bridge operations
 //! ABOUTME: Ensures workflow bridge overhead stays under 10ms requirement
 
+#![allow(clippy::significant_drop_tightening)]
+
 use lazy_static::lazy_static;
 use parking_lot::RwLock;
 use serde_json::Value;

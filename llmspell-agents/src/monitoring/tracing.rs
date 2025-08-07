@@ -1,6 +1,8 @@
 //! ABOUTME: Distributed tracing for agent operations
 //! ABOUTME: Provides span tracking, context propagation, and trace collection
 
+#![allow(clippy::significant_drop_tightening)]
+
 use chrono::{DateTime, Utc};
 use llmspell_core::Result;
 use serde::{Deserialize, Serialize};

@@ -1,6 +1,8 @@
 //! ABOUTME: Lifecycle hook for automatic agent state persistence
 //! ABOUTME: Automatically saves and restores agent state on lifecycle events
 
+#![allow(clippy::significant_drop_tightening)]
+
 use crate::lifecycle::events::{LifecycleEvent, LifecycleEventType};
 use anyhow::Result;
 use llmspell_core::traits::agent::Agent;

@@ -1,6 +1,8 @@
 //! ABOUTME: Resource management for agent lifecycle with allocation and deallocation hooks
 //! ABOUTME: Provides resource tracking, limits enforcement, and cleanup during agent state transitions
 
+#![allow(clippy::significant_drop_tightening)]
+
 use super::events::{LifecycleEvent, LifecycleEventData, LifecycleEventSystem, LifecycleEventType};
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;

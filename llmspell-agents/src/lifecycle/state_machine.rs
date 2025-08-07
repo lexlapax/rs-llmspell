@@ -1,6 +1,8 @@
 //! ABOUTME: Agent state machine implementation for comprehensive lifecycle management
 //! ABOUTME: Provides deterministic state transitions for agent initialization, execution, pausing, and termination
 
+#![allow(clippy::significant_drop_tightening)]
+
 use anyhow::{anyhow, Result};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};

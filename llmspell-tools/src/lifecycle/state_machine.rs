@@ -1,6 +1,8 @@
 //! ABOUTME: Tool execution state machine for tracking tool lifecycle states
 //! ABOUTME: Provides state transitions and validation for tool execution phases
 
+#![allow(clippy::significant_drop_tightening)]
+
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;

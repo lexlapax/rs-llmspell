@@ -1,6 +1,8 @@
 //! ABOUTME: Workflow discovery and management for script integration
 //! ABOUTME: Provides workflow type information and factory methods
 
+#![allow(clippy::significant_drop_tightening)]
+
 use crate::discovery::BridgeDiscovery;
 use crate::standardized_workflows::StandardizedWorkflowFactory;
 use crate::workflow_performance::{ExecutionCache, OptimizedConverter, PerformanceMetrics};

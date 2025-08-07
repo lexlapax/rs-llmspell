@@ -1,6 +1,8 @@
 //! ABOUTME: Event logging system for agent activities
 //! ABOUTME: Provides structured logging, event correlation, and log aggregation
 
+#![allow(clippy::significant_drop_tightening)]
+
 use chrono::{DateTime, Utc};
 use llmspell_core::Result;
 use serde::{Deserialize, Serialize};

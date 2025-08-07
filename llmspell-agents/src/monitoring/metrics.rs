@@ -1,6 +1,8 @@
 //! ABOUTME: Agent metrics collection and reporting
 //! ABOUTME: Provides counters, gauges, histograms for monitoring agent behavior
 
+#![allow(clippy::significant_drop_tightening)]
+
 use llmspell_core::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

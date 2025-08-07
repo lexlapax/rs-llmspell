@@ -100,9 +100,8 @@ pub trait StatePersistence: Agent {
         for msg in &state.state.conversation_history {
             let role = match msg.role {
                 MessageRole::User => CoreMessageRole::User,
-                MessageRole::Assistant => CoreMessageRole::Assistant,
+                MessageRole::Assistant | MessageRole::Tool => CoreMessageRole::Assistant, // Map Tool to Assistant for now
                 MessageRole::System => CoreMessageRole::System,
-                MessageRole::Tool => CoreMessageRole::Assistant, // Map Tool to Assistant for now
             };
             self.add_message(ConversationMessage::new(role, msg.content.clone()))
                 .await?;

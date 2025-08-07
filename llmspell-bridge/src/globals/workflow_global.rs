@@ -1,6 +1,8 @@
 //! ABOUTME: Workflow global object implementation for script engines
 //! ABOUTME: Provides Workflow creation and orchestration functionality
 
+#![allow(clippy::significant_drop_tightening)]
+
 use super::types::{GlobalContext, GlobalMetadata, GlobalObject};
 use crate::workflows::WorkflowBridge;
 use crate::ComponentRegistry;

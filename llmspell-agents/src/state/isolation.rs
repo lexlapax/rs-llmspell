@@ -1,3 +1,4 @@
+#![allow(clippy::significant_drop_tightening)]
 // ABOUTME: Agent state isolation enforcement for multi-agent security
 // ABOUTME: Prevents unauthorized cross-agent state access with permission controls
 

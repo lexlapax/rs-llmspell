@@ -1,6 +1,8 @@
 //! ABOUTME: Agent global object implementation for script engines
 //! ABOUTME: Provides Agent creation and management functionality
 
+#![allow(clippy::significant_drop_tightening)]
+
 use super::types::{GlobalContext, GlobalMetadata, GlobalObject};
 use crate::agent_bridge::AgentBridge;
 use crate::ComponentRegistry;

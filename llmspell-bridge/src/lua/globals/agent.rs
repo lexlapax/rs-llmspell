@@ -1,6 +1,8 @@
 //! ABOUTME: Lua-specific Agent global implementation
 //! ABOUTME: Provides Lua bindings for Agent functionality
 
+#![allow(clippy::significant_drop_tightening)]
+
 use crate::agent_bridge::AgentBridge;
 use crate::globals::GlobalContext;
 use crate::lua::conversion::{

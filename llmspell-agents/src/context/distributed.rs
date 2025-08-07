@@ -1,6 +1,8 @@
 //! ABOUTME: Distributed context synchronization for multi-node deployments
 //! ABOUTME: Provides context replication, consistency, and node discovery
 
+#![allow(clippy::significant_drop_tightening)]
+
 use async_trait::async_trait;
 use llmspell_core::execution_context::{ContextScope, ExecutionContext};
 use llmspell_core::{LLMSpellError, Result};

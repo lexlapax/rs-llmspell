@@ -1,6 +1,8 @@
 //! ABOUTME: Tool execution context integration for enhanced context propagation
 //! ABOUTME: Provides context enrichment, inheritance, and tool-specific context handling
 
+#![allow(clippy::significant_drop_tightening)]
+
 use llmspell_core::{ExecutionContext, Result};
 use serde_json::Value as JsonValue;
 use std::collections::HashMap;

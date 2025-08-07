@@ -1,6 +1,8 @@
 //! ABOUTME: Workflow-based orchestration patterns for complex agent systems
 //! ABOUTME: Provides high-level orchestration capabilities using workflow primitives
 
+#![allow(clippy::significant_drop_tightening)]
+
 use llmspell_core::Result;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

@@ -1,6 +1,8 @@
 //! ABOUTME: Event global object providing cross-language event bus functionality
 //! ABOUTME: Full implementation with `EventBridge` integration for Phase 4
 
+#![allow(clippy::significant_drop_tightening)]
+
 use crate::event_bridge::EventBridge;
 use crate::event_serialization::EventSerialization;
 use crate::globals::types::{GlobalContext, GlobalMetadata, GlobalObject};

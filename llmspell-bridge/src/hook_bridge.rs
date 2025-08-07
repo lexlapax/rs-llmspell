@@ -1,6 +1,8 @@
 //! ABOUTME: Hook bridge for cross-language hook execution system
 //! ABOUTME: Provides unified interface for scripts to register and execute hooks
 
+#![allow(clippy::significant_drop_tightening)]
+
 use crate::globals::types::GlobalContext;
 use llmspell_core::error::LLMSpellError;
 use llmspell_events::{

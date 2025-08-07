@@ -1,6 +1,8 @@
 //! ABOUTME: State global object providing persistent state management
 //! ABOUTME: Integrates with `StateManager` for full persistent state functionality
 
+#![allow(clippy::significant_drop_tightening)]
+
 use crate::globals::types::{GlobalContext, GlobalMetadata, GlobalObject};
 use llmspell_core::error::LLMSpellError;
 use llmspell_state_persistence::{

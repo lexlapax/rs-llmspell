@@ -1,6 +1,8 @@
 //! ABOUTME: Hook global object providing cross-language hook system
 //! ABOUTME: Full implementation integrating with llmspell-hooks infrastructure
 
+#![allow(clippy::significant_drop_tightening)]
+
 use crate::globals::types::{GlobalContext, GlobalMetadata, GlobalObject};
 use crate::hook_bridge::HookBridge;
 use llmspell_core::error::LLMSpellError;

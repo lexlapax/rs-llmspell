@@ -1,6 +1,8 @@
 //! ABOUTME: Delegation patterns for agent composition
 //! ABOUTME: Enables agents to delegate tasks to other agents based on capabilities
 
+#![allow(clippy::significant_drop_tightening)]
+
 use super::traits::{
     Capability, CapabilityCategory, Composable, CompositionMetadata, CompositionType,
 };
@@ -254,9 +256,12 @@ impl DelegatingAgent {
             }
 
             DelegationStrategy::RoundRobin => {
-                let mut index = self.round_robin_index.write().unwrap();
-                let selected = matching_agents[*index % matching_agents.len()].clone();
-                *index += 1;
+                let selected = {
+                    let mut index = self.round_robin_index.write().unwrap();
+                    let selected = matching_agents[*index % matching_agents.len()].clone();
+                    *index += 1;
+                    selected
+                };
                 Some(selected)
             }
 
@@ -342,13 +347,15 @@ impl DelegatingAgent {
         // Update metrics and create result
         match result {
             Ok(output) => {
-                let mut metrics = self.metrics.write().unwrap();
-                metrics.successful_delegations += 1;
-                metrics.avg_delegation_time = std::time::Duration::from_secs(
-                    (metrics.avg_delegation_time.as_secs() * (metrics.successful_delegations - 1)
-                        + duration.as_secs())
-                        / metrics.successful_delegations,
-                );
+                {
+                    let mut metrics = self.metrics.write().unwrap();
+                    metrics.successful_delegations += 1;
+                    metrics.avg_delegation_time = std::time::Duration::from_secs(
+                        (metrics.avg_delegation_time.as_secs() * (metrics.successful_delegations - 1)
+                            + duration.as_secs())
+                            / metrics.successful_delegations,
+                    );
+                }
 
                 Ok(DelegationResult {
                     task_id: request.task_id,
@@ -360,8 +367,10 @@ impl DelegatingAgent {
                 })
             }
             Err(e) => {
-                let mut metrics = self.metrics.write().unwrap();
-                metrics.failed_delegations += 1;
+                {
+                    let mut metrics = self.metrics.write().unwrap();
+                    metrics.failed_delegations += 1;
+                }
 
                 if self.config.retry_on_failure && request.priority > 5 {
                     // Could implement retry logic here

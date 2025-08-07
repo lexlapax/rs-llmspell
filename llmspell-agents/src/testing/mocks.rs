@@ -1,6 +1,8 @@
 //! ABOUTME: Mock implementations for testing agent infrastructure
 //! ABOUTME: Provides configurable mock agents, tools, and providers for unit and integration testing
 
+#![allow(clippy::significant_drop_tightening)]
+
 use crate::factory::{AgentConfig, ResourceLimits};
 use crate::lifecycle::{
     events::{LifecycleEvent, LifecycleEventData, LifecycleEventType},

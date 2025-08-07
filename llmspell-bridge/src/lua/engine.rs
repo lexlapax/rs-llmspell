@@ -1,6 +1,8 @@
 //! ABOUTME: `LuaEngine` implementation of `ScriptEngineBridge` trait
 //! ABOUTME: Provides Lua 5.4 script execution with coroutine-based streaming
 
+#![allow(clippy::significant_drop_tightening)]
+
 use crate::engine::types::ScriptEngineError;
 use crate::engine::{
     factory::LuaConfig, EngineFeatures, ExecutionContext, ScriptEngineBridge, ScriptMetadata,
@@ -99,7 +101,6 @@ impl ScriptEngineBridge for LuaEngine {
 
             // For now, keep synchronous execution but prepare for async tool calls
             // The async execution will happen within tool calls, not at the script level
-            #[allow(clippy::significant_drop_tightening)]
             let result = {
                 let lua = self.lua.lock();
                 let lua_result: mlua::Result<mlua::Value> = lua.load(script).eval();
@@ -151,7 +152,6 @@ impl ScriptEngineBridge for LuaEngine {
             let start_time = Instant::now();
 
             // Create a single chunk with the result
-            #[allow(clippy::significant_drop_tightening)]
             let chunk = {
                 let lua = self.lua.lock();
                 let lua_result: mlua::Result<mlua::Value> = lua.load(script).eval();

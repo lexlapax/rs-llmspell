@@ -1,6 +1,8 @@
 //! ABOUTME: Orchestrator Agent template for creating agents that coordinate other agents and workflows
 //! ABOUTME: Provides standardized template for orchestration-focused agents with workflow management capabilities
 
+#![allow(clippy::significant_drop_tightening)]
+
 use super::base::{AgentTemplate, TemplateInstantiationParams, TemplateInstantiationResult};
 use super::schema::{
     CapabilityRequirement, ComplexityLevel, ParameterConstraint, ParameterDefinition,

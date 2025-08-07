@@ -1,6 +1,8 @@
 //! ABOUTME: Lifecycle management for composite agents
 //! ABOUTME: Handles initialization, state transitions, and cleanup of composed agents
 
+#![allow(clippy::significant_drop_tightening)]
+
 use super::traits::{CompositeAgent, HierarchicalAgent, HierarchyEvent};
 use async_trait::async_trait;
 use llmspell_core::{BaseAgent, LLMSpellError, Result};

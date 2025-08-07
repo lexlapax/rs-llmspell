@@ -1,6 +1,8 @@
 //! ABOUTME: Monitor Agent template for creating agents that monitor systems, agents, and resources
 //! ABOUTME: Provides standardized template for monitoring-focused agents with alerting and metrics collection
 
+#![allow(clippy::significant_drop_tightening)]
+
 use super::base::{AgentTemplate, TemplateInstantiationParams, TemplateInstantiationResult};
 use super::schema::{
     CapabilityRequirement, ComplexityLevel, ParameterConstraint, ParameterDefinition,

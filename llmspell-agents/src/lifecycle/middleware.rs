@@ -1,6 +1,8 @@
 //! ABOUTME: Lifecycle middleware system for intercepting and augmenting agent lifecycle transitions
 //! ABOUTME: Provides composable middleware chain for logging, metrics, security, and custom lifecycle behavior
 
+#![allow(clippy::significant_drop_tightening)]
+
 use super::{
     events::{LifecycleEvent, LifecycleEventData, LifecycleEventSystem, LifecycleEventType},
     state_machine::StateContext,

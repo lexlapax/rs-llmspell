@@ -1,6 +1,8 @@
 //! ABOUTME: Factory registry for managing multiple agent factories
 //! ABOUTME: Allows registration and discovery of different factory implementations
 
+#![allow(clippy::significant_drop_tightening)]
+
 use crate::factory::{AgentConfig, AgentFactory};
 use anyhow::Result;
 use async_trait::async_trait;

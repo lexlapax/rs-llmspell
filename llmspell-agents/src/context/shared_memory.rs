@@ -1,6 +1,8 @@
 //! ABOUTME: Shared memory system for inter-agent communication
 //! ABOUTME: Provides thread-safe memory regions with access control and monitoring
 
+#![allow(clippy::significant_drop_tightening)]
+
 use llmspell_core::execution_context::ContextScope;
 use llmspell_core::{ComponentId, LLMSpellError, Result};
 use serde::{Deserialize, Serialize};

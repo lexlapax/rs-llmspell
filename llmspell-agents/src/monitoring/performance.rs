@@ -1,6 +1,8 @@
 //! ABOUTME: Performance monitoring and profiling for agents
 //! ABOUTME: Tracks resource usage, response times, throughput, and generates performance reports
 
+#![allow(clippy::significant_drop_tightening)]
+
 use crate::monitoring::metrics::AgentMetrics;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

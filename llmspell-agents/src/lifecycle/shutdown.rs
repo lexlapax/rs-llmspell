@@ -1,6 +1,8 @@
 //! ABOUTME: Graceful shutdown mechanism for agents with resource cleanup and state preservation
 //! ABOUTME: Provides coordinated shutdown across multiple agents with configurable timeouts and priorities
 
+#![allow(clippy::significant_drop_tightening)]
+
 use super::events::{LifecycleEvent, LifecycleEventData, LifecycleEventSystem, LifecycleEventType};
 use super::resources::ResourceManager;
 use super::state_machine::{AgentState, AgentStateMachine};

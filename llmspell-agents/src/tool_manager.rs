@@ -1,6 +1,8 @@
 //! ABOUTME: `ToolManager` for managing tool discovery, invocation, and composition
 //! ABOUTME: Core implementation that enables `ToolCapable` components to interact with tools
 
+#![allow(clippy::significant_drop_tightening)]
+
 use llmspell_core::traits::tool::{SecurityLevel, ToolCategory};
 use llmspell_core::{
     traits::tool_capable::{

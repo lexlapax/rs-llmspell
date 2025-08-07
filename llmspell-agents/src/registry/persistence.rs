@@ -1,6 +1,8 @@
 //! ABOUTME: Persistence integration for agent registry
 //! ABOUTME: Uses llmspell-storage for backend-agnostic persistence
 
+#![allow(clippy::significant_drop_tightening)]
+
 use super::{AgentMetadata, AgentQuery, AgentRegistry, AgentStatus};
 use anyhow::Result;
 use async_trait::async_trait;

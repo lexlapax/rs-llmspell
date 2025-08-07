@@ -1,6 +1,8 @@
 //! ABOUTME: Health monitoring system for agent lifecycle management and operational status tracking
 //! ABOUTME: Provides comprehensive health checks, metrics collection, and alerting for agent wellness
 
+#![allow(clippy::significant_drop_tightening)]
+
 use crate::lifecycle::{
     events::{LifecycleEvent, LifecycleEventData, LifecycleEventSystem, LifecycleEventType},
     resources::ResourceManager,

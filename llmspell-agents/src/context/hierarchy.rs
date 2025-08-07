@@ -1,6 +1,8 @@
 //! ABOUTME: Hierarchical context support for parent-child relationships
 //! ABOUTME: Enables context trees with traversal and management capabilities
 
+#![allow(clippy::significant_drop_tightening)]
+
 use llmspell_core::execution_context::{ContextScope, ExecutionContext, InheritancePolicy};
 use llmspell_core::{LLMSpellError, Result};
 use serde::{Deserialize, Serialize};

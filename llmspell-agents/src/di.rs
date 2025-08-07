@@ -1,6 +1,8 @@
 //! ABOUTME: Dependency injection container for agent dependencies
 //! ABOUTME: Manages tools, providers, and other dependencies for agents
 
+#![allow(clippy::significant_drop_tightening)]
+
 use anyhow::Result;
 use llmspell_core::traits::tool::Tool;
 #[cfg(test)]

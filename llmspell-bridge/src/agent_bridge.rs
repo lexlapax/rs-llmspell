@@ -1,6 +1,8 @@
 //! ABOUTME: Agent bridge for script-to-agent communication
 //! ABOUTME: Provides unified interface for scripts to interact with agents
 
+#![allow(clippy::significant_drop_tightening)]
+
 use crate::agents::{AgentDiscovery, AgentInfo};
 use crate::ComponentRegistry;
 use llmspell_agents::lifecycle::{AgentState, AgentStateMachine};

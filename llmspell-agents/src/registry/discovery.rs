@@ -1,6 +1,8 @@
 //! ABOUTME: Agent discovery and search capabilities
 //! ABOUTME: Provides advanced search, filtering, and recommendation features
 
+#![allow(clippy::significant_drop_tightening)]
+
 use super::{
     metadata::{CapabilityType, ExtendedAgentMetadata, HealthState},
     AgentMetadata, AgentQuery, AgentRegistry, AgentStatus,

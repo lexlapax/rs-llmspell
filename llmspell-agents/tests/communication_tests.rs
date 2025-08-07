@@ -1,6 +1,8 @@
 //! ABOUTME: Integration tests for agent communication patterns and message passing
 //! ABOUTME: Tests agent-to-agent communication, tool invocation, and coordination protocols
 
+#![allow(clippy::significant_drop_tightening)]
+
 use llmspell_agents::testing::mocks;
 
 use llmspell_agents::AgentState;
