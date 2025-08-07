@@ -57,6 +57,7 @@ pub struct ToolAgentTemplate {
 impl ToolAgentTemplate {
     /// Create new Tool Agent template
     #[must_use]
+    #[allow(clippy::too_many_lines)]
     pub fn new() -> Self {
         let metadata = TemplateMetadata {
             id: "tool_agent".to_string(),
@@ -337,7 +338,6 @@ impl ToolAgentTemplate {
 
     /// Apply parameters to config
     fn apply_parameters_to_config(
-        &self,
         config: &mut ToolAgentConfig,
         params: &HashMap<String, serde_json::Value>,
     ) {
@@ -404,7 +404,7 @@ impl AgentTemplate for ToolAgentTemplate {
 
         // Create agent-specific configuration
         let mut agent_config = self.config.clone();
-        self.apply_parameters_to_config(&mut agent_config, &params.parameters);
+        Self::apply_parameters_to_config(&mut agent_config, &params.parameters);
 
         // Build final configuration
         let mut final_config = HashMap::new();

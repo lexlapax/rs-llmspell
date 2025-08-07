@@ -242,7 +242,7 @@ impl ToolInvoker {
         // Validate parameters if enabled
         if self.config.validate_parameters {
             let validation_start = Instant::now();
-            match self.validate_tool_parameters(tool.as_ref(), &parameters) {
+            match Self::validate_tool_parameters(tool.as_ref(), &parameters) {
                 Ok(validation_warnings) => {
                     warnings.extend(validation_warnings);
                 }
@@ -337,7 +337,6 @@ impl ToolInvoker {
 
     /// Validate tool parameters against the tool's schema
     fn validate_tool_parameters(
-        &self,
         tool: &dyn Tool,
         parameters: &JsonValue,
     ) -> Result<Vec<String>> {

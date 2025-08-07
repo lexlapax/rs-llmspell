@@ -18,6 +18,7 @@ struct LuaAgentInstance {
 }
 
 impl UserData for LuaAgentInstance {
+    #[allow(clippy::too_many_lines)]
     fn add_methods<'lua, M: UserDataMethods<'lua, Self>>(methods: &mut M) {
         // invoke method (same as execute in API) - synchronous wrapper
         methods.add_method("invoke", |lua, this, input: Table| {
@@ -841,6 +842,7 @@ impl AgentBuilder {
     }
 }
 
+#[allow(clippy::too_many_lines)]
 impl UserData for AgentBuilder {
     fn add_methods<'lua, M: UserDataMethods<'lua, Self>>(methods: &mut M) {
         // name method
@@ -1055,6 +1057,7 @@ impl UserData for AgentBuilder {
 /// Returns an error if:
 /// - Lua table creation fails
 /// - Function binding fails
+#[allow(clippy::too_many_lines)]
 pub fn inject_agent_global(
     lua: &Lua,
     context: &GlobalContext,

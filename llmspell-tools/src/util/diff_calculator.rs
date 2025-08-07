@@ -85,6 +85,7 @@ impl DiffCalculatorTool {
 
     /// Calculate text diff
     #[allow(clippy::unused_self)]
+    #[allow(clippy::too_many_lines)]
     fn calculate_text_diff(&self, old: &str, new: &str, format: DiffFormat) -> Result<String> {
         use std::fmt::Write;
 
@@ -325,6 +326,7 @@ fn compare_json_values(old: &Value, new: &Value, path: &str, diff: &mut Value) -
 impl DiffCalculatorTool {
     /// Process diff operation
     #[allow(clippy::unused_async)]
+    #[allow(clippy::too_many_lines)]
     async fn process_operation(&self, params: &Value) -> Result<Value> {
         let diff_type = extract_string_with_default(params, "type", "text");
 

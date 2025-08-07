@@ -233,6 +233,7 @@ impl ShutdownCoordinator {
     /// - Agent is already shutting down
     /// - Shutdown process fails
     /// - Timeout occurs and force shutdown is disabled
+    #[allow(clippy::too_many_lines)]
     pub async fn shutdown_agent(
         &self,
         request: ShutdownRequest,

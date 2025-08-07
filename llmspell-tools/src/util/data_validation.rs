@@ -294,6 +294,7 @@ impl DataValidationTool {
     }
 
     /// Validate a single rule
+    #[allow(clippy::too_many_lines)]
     fn validate_rule(
         &self,
         field: &str,

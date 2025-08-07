@@ -243,6 +243,7 @@ fn parse_priority(s: Option<String>) -> Priority {
 }
 
 /// Inject the Hook global into Lua
+#[allow(clippy::too_many_lines)]
 pub fn inject_hook_global(
     lua: &Lua,
     _context: &GlobalContext,

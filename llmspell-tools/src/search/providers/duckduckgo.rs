@@ -42,6 +42,7 @@ impl SearchProvider for DuckDuckGoProvider {
         None // No official rate limit, but we should be respectful
     }
 
+    #[allow(clippy::too_many_lines)]
     async fn search(&self, query: &str, options: &SearchOptions) -> Result<Vec<SearchResult>> {
         // DuckDuckGo Instant Answer API only supports web search
         if options.search_type != SearchType::Web {

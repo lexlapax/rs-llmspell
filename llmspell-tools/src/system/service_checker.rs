@@ -206,6 +206,7 @@ impl ServiceCheckerTool {
     }
 
     /// Check TCP port connectivity
+    #[allow(clippy::too_many_lines)]
     async fn check_tcp_port(
         &self,
         host: &str,
@@ -328,6 +329,7 @@ impl ServiceCheckerTool {
     }
 
     /// Check HTTP/HTTPS service health
+    #[allow(clippy::too_many_lines)]
     async fn check_http_service(
         &self,
         url: &str,
@@ -472,6 +474,7 @@ impl BaseAgent for ServiceCheckerTool {
         &self.metadata
     }
 
+    #[allow(clippy::too_many_lines)]
     async fn execute(
         &self,
         input: AgentInput,

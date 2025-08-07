@@ -17,6 +17,7 @@ use std::sync::Arc;
 use tracing::{debug, info, warn};
 
 /// Helper function to get or create state infrastructure from `GlobalContext`
+#[allow(clippy::too_many_lines)]
 pub async fn get_or_create_state_infrastructure(
     context: &GlobalContext,
     config: &StatePersistenceConfig,

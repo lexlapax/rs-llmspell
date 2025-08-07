@@ -230,6 +230,7 @@ impl UserData for WorkflowInstance {
         fields.add_field_method_get("id", |_, this| Ok(this.workflow_id.clone()));
     }
 
+    #[allow(clippy::too_many_lines)]
     fn add_methods<'lua, M: UserDataMethods<'lua, Self>>(methods: &mut M) {
         // execute method
         methods.add_method("execute", |lua, this, input: Option<Table>| {
@@ -478,6 +479,7 @@ impl WorkflowBuilder {
     }
 }
 
+#[allow(clippy::too_many_lines)]
 impl UserData for WorkflowBuilder {
     fn add_methods<'lua, M: UserDataMethods<'lua, Self>>(methods: &mut M) {
         // Set workflow type
@@ -745,6 +747,7 @@ impl Clone for WorkflowBuilder {
 /// # Panics
 ///
 /// Panics if the Lua table creation or function binding fails
+#[allow(clippy::too_many_lines)]
 pub fn inject_workflow_global(
     lua: &Lua,
     _context: &GlobalContext,

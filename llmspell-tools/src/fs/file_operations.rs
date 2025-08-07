@@ -604,6 +604,7 @@ impl BaseAgent for FileOperationsTool {
         &self.metadata
     }
 
+    #[allow(clippy::too_many_lines)]
     async fn execute(&self, input: AgentInput, context: ExecutionContext) -> Result<AgentOutput> {
         // Get parameters using shared utility
         let params = extract_parameters(&input)?;

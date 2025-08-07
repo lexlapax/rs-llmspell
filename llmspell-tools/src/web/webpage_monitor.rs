@@ -151,7 +151,7 @@ impl BaseAgent for WebpageMonitorTool {
         };
 
         // Compare content
-        let changes = self.compare_content(prev_content, &current_content, ignore_whitespace);
+        let changes = Self::compare_content(prev_content, &current_content, ignore_whitespace);
         let has_changes = !changes.is_empty();
 
         let result = json!({
@@ -255,7 +255,6 @@ impl WebpageMonitorTool {
     }
 
     fn compare_content(
-        &self,
         old_content: &str,
         new_content: &str,
         ignore_whitespace: bool,

@@ -103,7 +103,7 @@ impl ToolStateMachine {
         let current_state = *state_guard;
 
         // Validate transition
-        if !self.is_valid_transition(current_state, new_state) {
+        if !Self::is_valid_transition(current_state, new_state) {
             return Err(anyhow::anyhow!(
                 "Invalid state transition for tool '{}': {:?} -> {:?}",
                 self.tool_name,
@@ -240,7 +240,7 @@ impl ToolStateMachine {
     }
 
     /// Validate if a state transition is allowed
-    const fn is_valid_transition(&self, from: ToolExecutionState, to: ToolExecutionState) -> bool {
+    const fn is_valid_transition(from: ToolExecutionState, to: ToolExecutionState) -> bool {
         use ToolExecutionState::{
             CleaningUp, Completed, Executing, Failed, Initializing, Ready, Terminated,
             Uninitialized,

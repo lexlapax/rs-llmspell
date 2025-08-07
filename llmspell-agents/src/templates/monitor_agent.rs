@@ -141,6 +141,7 @@ pub struct MonitorAgentTemplate {
 impl MonitorAgentTemplate {
     /// Create new Monitor Agent template
     #[must_use]
+    #[allow(clippy::too_many_lines)]
     pub fn new() -> Self {
         let metadata = TemplateMetadata {
             id: "monitor_agent".to_string(),
@@ -505,7 +506,6 @@ impl MonitorAgentTemplate {
 
     /// Apply parameters to config
     fn apply_parameters_to_config(
-        &self,
         config: &mut MonitorAgentConfig,
         params: &HashMap<String, serde_json::Value>,
     ) {
@@ -625,7 +625,7 @@ impl AgentTemplate for MonitorAgentTemplate {
 
         // Create agent-specific configuration
         let mut agent_config = self.config.clone();
-        self.apply_parameters_to_config(&mut agent_config, &params.parameters);
+        Self::apply_parameters_to_config(&mut agent_config, &params.parameters);
 
         // Build final configuration
         let mut final_config = HashMap::new();

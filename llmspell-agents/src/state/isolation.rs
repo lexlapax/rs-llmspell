@@ -204,7 +204,7 @@ impl StateIsolationManager {
         let start_time = std::time::Instant::now();
 
         // Check if agent owns the scope
-        if self.agent_owns_scope(agent_id, target_scope) {
+        if Self::agent_owns_scope(agent_id, target_scope) {
             self.audit_access(
                 agent_id,
                 target_scope,
@@ -228,11 +228,11 @@ impl StateIsolationManager {
             }
             IsolationBoundary::ReadOnlyShared => {
                 // Allow read-only access to shared scopes
-                matches!(operation, StateOperation::Read) && self.is_shared_scope(target_scope)
+                matches!(operation, StateOperation::Read) && Self::is_shared_scope(target_scope)
             }
             IsolationBoundary::SharedAccess => {
                 // Allow full access to shared scopes
-                self.is_shared_scope(target_scope)
+                Self::is_shared_scope(target_scope)
             }
             IsolationBoundary::Custom(policy) => {
                 // Check custom policy
@@ -386,7 +386,7 @@ impl StateIsolationManager {
 
     // Private helper methods
 
-    fn agent_owns_scope(&self, agent_id: &str, scope: &StateScope) -> bool {
+    fn agent_owns_scope(agent_id: &str, scope: &StateScope) -> bool {
         match scope {
             StateScope::Agent(id) => id == agent_id,
             StateScope::Custom(s) if s.starts_with(&format!("agent:{agent_id}:")) => true,
@@ -394,7 +394,7 @@ impl StateIsolationManager {
         }
     }
 
-    fn is_shared_scope(&self, scope: &StateScope) -> bool {
+    fn is_shared_scope(scope: &StateScope) -> bool {
         match scope {
             StateScope::Global => true,
             StateScope::Custom(s) if s.starts_with("shared:") => {
@@ -418,7 +418,7 @@ impl StateIsolationManager {
         match policy {
             "read-all" => matches!(operation, StateOperation::Read),
             "write-shared" => {
-                matches!(operation, StateOperation::Write) && self.is_shared_scope(target_scope)
+                matches!(operation, StateOperation::Write) && Self::is_shared_scope(target_scope)
             }
             _ => false,
         }

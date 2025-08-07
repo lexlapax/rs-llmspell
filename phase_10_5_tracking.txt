@@ -3,20 +3,20 @@
 
 ## UNUSED_SELF WARNINGS
 # Count: 34
-[ ] llmspell-agents/src/composition/capabilities.rs:346:24
+[x] llmspell-agents/src/composition/capabilities.rs:346:24
 [x] llmspell-agents/src/composition/lifecycle.rs:362:34
 [x] llmspell-agents/src/composition/lifecycle.rs:681:30
 [x] llmspell-agents/src/composition/tool_composition.rs:559:9
 [x] llmspell-agents/src/composition/tool_composition.rs:641:30
-[ ] llmspell-agents/src/context/inheritance.rs:327:21
-[ ] llmspell-agents/src/factory.rs:389:35
-[ ] llmspell-agents/src/hooks/state_persistence_hook.rs:257:23
-[ ] llmspell-agents/src/hooks/state_persistence_hook.rs:307:26
+[x] llmspell-agents/src/context/inheritance.rs:327:21
+[x] llmspell-agents/src/factory.rs:389:35
+[x] llmspell-agents/src/hooks/state_persistence_hook.rs:257:23
+[x] llmspell-agents/src/hooks/state_persistence_hook.rs:307:26
 [ ] llmspell-agents/src/registry/discovery.rs:313:9
 [ ] llmspell-agents/src/state/isolation.rs:389:25
 [ ] llmspell-agents/src/state/sharing.rs:553:9
-[ ] llmspell-agents/src/templates/monitor_agent.rs:508:9
-[ ] llmspell-agents/src/templates/orchestrator_agent.rs:475:9
+[x] llmspell-agents/src/templates/monitor_agent.rs:508:9
+[x] llmspell-agents/src/templates/orchestrator_agent.rs:475:9
 [ ] llmspell-agents/src/templates/tool_agent.rs:340:9
 [ ] llmspell-agents/src/templates/validation.rs:433:9
 [x] llmspell-agents/src/tool_discovery.rs:296:9
@@ -44,10 +44,10 @@
 [x] llmspell-agents/examples/multi_agent_coordinator.rs:16:7 (123/100 lines)
 [x] llmspell-agents/examples/provider_state_persistence.rs:27:7 (107/100 lines)
 [x] llmspell-agents/examples/research_agent.rs:13:7 (138/100 lines)
-[ ] llmspell-agents/src/health.rs:292:5 (121/100 lines)
-[ ] llmspell-agents/src/lifecycle/shutdown.rs:236:5 (145/100 lines)
+[x] llmspell-agents/src/health.rs:292:5 (121/100 lines)
+[x] llmspell-agents/src/lifecycle/shutdown.rs:236:5 (145/100 lines)
 [ ] llmspell-agents/src/lifecycle/state_machine.rs:651:5 (128/100 lines)
-[ ] llmspell-agents/src/templates/base.rs:140:5 (124/100 lines)
+[x] llmspell-agents/src/templates/base.rs:140:5 (124/100 lines)
 [ ] llmspell-agents/src/templates/monitor_agent.rs:144:5 (154/100 lines)
 [ ] llmspell-agents/src/templates/orchestrator_agent.rs:104:5 (227/100 lines)
 [ ] llmspell-agents/src/templates/tool_agent.rs:60:5 (145/100 lines)

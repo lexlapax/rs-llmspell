@@ -129,6 +129,7 @@ impl SearchProvider for BraveSearchProvider {
         Some(2000) // 2000 queries per month for free tier
     }
 
+    #[allow(clippy::too_many_lines)]
     async fn search(&self, query: &str, options: &SearchOptions) -> Result<Vec<SearchResult>> {
         let api_key = self
             .api_key

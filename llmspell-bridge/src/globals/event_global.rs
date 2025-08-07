@@ -52,6 +52,7 @@ impl GlobalObject for EventGlobal {
     }
 
     #[cfg(feature = "lua")]
+    #[allow(clippy::too_many_lines)]
     fn inject_lua(&self, lua: &mlua::Lua, context: &GlobalContext) -> Result<(), LLMSpellError> {
         use crate::lua::sync_utils::block_on_async;
         use std::time::Duration;

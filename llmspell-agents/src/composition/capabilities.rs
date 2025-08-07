@@ -294,7 +294,7 @@ impl CapabilityAggregator {
         requirement: &CapabilityRequirement,
     ) -> bool {
         // Check name pattern
-        if !self.matches_pattern(&capability.name, &requirement.name_pattern) {
+        if !Self::matches_pattern(&capability.name, &requirement.name_pattern) {
             return false;
         }
 
@@ -343,7 +343,7 @@ impl CapabilityAggregator {
     }
 
     /// Simple pattern matching (supports * wildcard)
-    fn matches_pattern(&self, text: &str, pattern: &str) -> bool {
+    fn matches_pattern(text: &str, pattern: &str) -> bool {
         if pattern == "*" {
             return true;
         }
@@ -638,11 +638,11 @@ mod tests {
     fn test_pattern_matching() {
         let aggregator = CapabilityAggregator::new();
 
-        assert!(aggregator.matches_pattern("text-processing", "text-processing"));
-        assert!(aggregator.matches_pattern("text-processing", "text-*"));
-        assert!(aggregator.matches_pattern("text-processing", "*-processing"));
-        assert!(aggregator.matches_pattern("text-processing", "*"));
-        assert!(!aggregator.matches_pattern("text-processing", "image-*"));
+        assert!(CapabilityAggregator::matches_pattern("text-processing", "text-processing"));
+        assert!(CapabilityAggregator::matches_pattern("text-processing", "text-*"));
+        assert!(CapabilityAggregator::matches_pattern("text-processing", "*-processing"));
+        assert!(CapabilityAggregator::matches_pattern("text-processing", "*"));
+        assert!(!CapabilityAggregator::matches_pattern("text-processing", "image-*"));
     }
     #[test]
     fn test_capability_matching() {

@@ -432,7 +432,7 @@ impl OrchestrationRuntime {
                 failed_nodes: state.failed_nodes.len(),
                 total_nodes: count_nodes(&state.plan.root_workflow),
                 is_complete: Self::is_orchestration_complete(state),
-                is_successful: self.is_orchestration_successful(state),
+                is_successful: Self::is_orchestration_successful(state),
             })
     }
 
@@ -443,7 +443,7 @@ impl OrchestrationRuntime {
     }
 
     /// Check if orchestration is successful
-    fn is_orchestration_successful(&self, state: &OrchestrationState) -> bool {
+    fn is_orchestration_successful(state: &OrchestrationState) -> bool {
         if !Self::is_orchestration_complete(state) {
             return false;
         }

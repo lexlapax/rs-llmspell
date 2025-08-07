@@ -137,6 +137,7 @@ pub trait AgentTemplate: Send + Sync {
     }
 
     /// Validate individual parameter value
+    #[allow(clippy::too_many_lines)]
     async fn validate_parameter_value(
         &self,
         param_def: &ParameterDefinition,

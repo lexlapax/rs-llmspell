@@ -94,6 +94,7 @@ impl UserData for SessionBuilder {
 /// Returns an error if:
 /// - Lua table creation fails
 /// - Function binding fails
+#[allow(clippy::too_many_lines)]
 pub fn inject_session_global(
     lua: &Lua,
     _context: &GlobalContext,

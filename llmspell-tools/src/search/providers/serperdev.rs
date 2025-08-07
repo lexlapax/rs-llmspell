@@ -143,6 +143,7 @@ impl SearchProvider for SerperDevProvider {
         Some(2500) // 2,500 searches per month for free tier
     }
 
+    #[allow(clippy::too_many_lines)]
     async fn search(&self, query: &str, options: &SearchOptions) -> Result<Vec<SearchResult>> {
         let api_key = self
             .api_key

@@ -309,7 +309,7 @@ impl InheritanceRules {
                     ctx.set(field, value);
                 }
                 ConflictResolution::Merge => {
-                    let merged = self.merge_values(existing, &value);
+                    let merged = Self::merge_values(existing, &value);
                     ctx.set(field, merged);
                 }
                 ConflictResolution::KeepBoth => {
@@ -324,7 +324,7 @@ impl InheritanceRules {
         Ok(())
     }
 
-    fn merge_values(&self, existing: &Value, new: &Value) -> Value {
+    fn merge_values(existing: &Value, new: &Value) -> Value {
         match (existing, new) {
             (Value::Object(existing_obj), Value::Object(new_obj)) => {
                 let mut merged = existing_obj.clone();

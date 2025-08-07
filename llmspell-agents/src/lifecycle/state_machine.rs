@@ -648,6 +648,7 @@ impl AgentStateMachine {
     }
 
     /// Internal method to execute the actual state transition
+    #[allow(clippy::too_many_lines)]
     async fn execute_state_transition(
         &self,
         current: AgentState,

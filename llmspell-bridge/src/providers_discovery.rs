@@ -41,6 +41,7 @@ pub struct ProviderDiscovery {
 impl ProviderDiscovery {
     /// Create a new provider discovery service
     #[must_use]
+    #[allow(clippy::too_many_lines)]
     pub fn new() -> Self {
         let mut provider_types = HashMap::new();
 

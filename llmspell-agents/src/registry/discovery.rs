@@ -199,7 +199,7 @@ impl<R: AgentRegistry> Discovery<R> {
         }
 
         // Sort results
-        self.sort_results(&mut scored_results, &criteria.sort_by, &criteria.sort_order);
+        Self::sort_results(&mut scored_results, &criteria.sort_by, &criteria.sort_order);
 
         Ok(scored_results)
     }
@@ -310,7 +310,6 @@ impl<R: AgentRegistry> Discovery<R> {
 
     /// Sort search results
     fn sort_results(
-        &self,
         results: &mut [SearchResult],
         sort_by: &Option<SortField>,
         order: &SortOrder,

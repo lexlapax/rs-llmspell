@@ -12,6 +12,7 @@ use mlua::{Error as LuaError, Lua, Value};
 /// Returns an error if:
 /// - Lua table creation fails
 /// - Function binding fails
+#[allow(clippy::too_many_lines)]
 pub fn inject_state_global(
     lua: &Lua,
     _context: &GlobalContext,

@@ -283,6 +283,7 @@ impl ToolExecutor {
     /// - Tool execution fails
     /// - Resource limits are exceeded
     /// - Circuit breaker trips due to repeated failures
+    #[allow(clippy::too_many_lines)]
     pub async fn execute_tool_with_hooks(
         &self,
         tool: &dyn Tool,

@@ -355,6 +355,7 @@ pub enum ErrorSeverity {
 }
 
 impl fmt::Display for ToolIntegrationError {
+    #[allow(clippy::too_many_lines)]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::ToolNotFound {

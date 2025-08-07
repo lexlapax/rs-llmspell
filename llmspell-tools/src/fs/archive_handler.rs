@@ -914,6 +914,7 @@ impl ArchiveHandlerTool {
 
     /// List archive contents
     #[allow(clippy::unused_async)]
+    #[allow(clippy::too_many_lines)]
     async fn list_archive(&self, params: &Value) -> Result<Value> {
         let archive_path = params.get("path").and_then(|v| v.as_str()).ok_or_else(|| {
             LLMSpellError::Validation {

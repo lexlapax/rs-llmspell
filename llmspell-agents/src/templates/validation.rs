@@ -424,13 +424,12 @@ impl TemplateValidator {
 
         // Constraint validation
         for constraint in &param_def.constraints {
-            self.validate_constraint(&param_def.name, constraint, value, result);
+            Self::validate_constraint(&param_def.name, constraint, value, result);
         }
     }
 
     /// Validate a single constraint
     fn validate_constraint(
-        &self,
         param_name: &str,
         constraint: &ParameterConstraint,
         value: &serde_json::Value,
@@ -980,7 +979,7 @@ mod tests {
         let mut result = ValidationResult::success();
 
         // Test MinValue constraint
-        validator.validate_constraint(
+        ValidationAgent::validate_constraint(
             "test",
             &ParameterConstraint::MinValue(10.0),
             &5.into(),
@@ -990,7 +989,7 @@ mod tests {
 
         // Test Pattern constraint
         let mut result = ValidationResult::success();
-        validator.validate_constraint(
+        ValidationAgent::validate_constraint(
             "email",
             &ParameterConstraint::Pattern(r"^[^@]+@[^@]+\.[^@]+$".to_string()),
             &"invalid-email".into(),

@@ -260,6 +260,7 @@ impl BaseAgent for FileConverterTool {
         &self.metadata
     }
 
+    #[allow(clippy::too_many_lines)]
     async fn execute(
         &self,
         input: AgentInput,

@@ -92,13 +92,13 @@ impl VideoResolution {
     /// Get aspect ratio as a string
     #[must_use]
     pub fn aspect_ratio(&self) -> String {
-        let gcd = self.gcd(self.width, self.height);
+        let gcd = Self::gcd(self.width, self.height);
         let w = self.width / gcd;
         let h = self.height / gcd;
         format!("{w}:{h}")
     }
 
-    const fn gcd(&self, a: u32, b: u32) -> u32 {
+    const fn gcd(a: u32, b: u32) -> u32 {
         let mut a = a;
         let mut b = b;
         while b != 0 {

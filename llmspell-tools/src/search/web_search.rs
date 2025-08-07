@@ -174,6 +174,7 @@ impl WebSearchTool {
     /// # Errors
     ///
     /// Returns an error if provider initialization fails
+    #[allow(clippy::too_many_lines)]
     pub fn new(config: WebSearchConfig) -> Result<Self> {
         let mut providers = HashMap::new();
 

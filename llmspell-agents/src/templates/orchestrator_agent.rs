@@ -101,6 +101,7 @@ pub struct OrchestratorAgentTemplate {
 impl OrchestratorAgentTemplate {
     /// Create new Orchestrator Agent template
     #[must_use]
+    #[allow(clippy::too_many_lines)]
     pub fn new() -> Self {
         let metadata = TemplateMetadata {
             id: "orchestrator_agent".to_string(),
@@ -472,7 +473,6 @@ impl OrchestratorAgentTemplate {
 
     /// Apply parameters to config
     fn apply_parameters_to_config(
-        &self,
         config: &mut OrchestratorAgentConfig,
         params: &HashMap<String, serde_json::Value>,
     ) {
@@ -569,7 +569,7 @@ impl AgentTemplate for OrchestratorAgentTemplate {
 
         // Create agent-specific configuration
         let mut agent_config = self.config.clone();
-        self.apply_parameters_to_config(&mut agent_config, &params.parameters);
+        Self::apply_parameters_to_config(&mut agent_config, &params.parameters);
 
         // Build final configuration
         let mut final_config = HashMap::new();

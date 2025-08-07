@@ -289,6 +289,7 @@ impl AgentHealthMonitor {
     /// # Errors
     ///
     /// Returns an error if any health check fails to execute
+    #[allow(clippy::too_many_lines)]
     pub async fn check_health(&self) -> Result<HealthCheckResult> {
         let start_time = Instant::now();
 

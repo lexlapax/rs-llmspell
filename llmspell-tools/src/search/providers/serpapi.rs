@@ -127,6 +127,7 @@ impl SearchProvider for SerpApiProvider {
         Some(100) // Base plan: 100 searches/month
     }
 
+    #[allow(clippy::too_many_lines)]
     async fn search(&self, query: &str, options: &SearchOptions) -> Result<Vec<SearchResult>> {
         let api_key = self
             .api_key

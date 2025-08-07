@@ -213,7 +213,7 @@ impl StateSharingManager {
         }
 
         // Validate pattern permissions
-        self.validate_pattern_permissions(&channel.pattern, sender_agent_id, channel)?;
+        Self::validate_pattern_permissions(&channel.pattern, sender_agent_id, channel)?;
 
         let message = StateMessage {
             message_id: Uuid::new_v4(),
@@ -550,7 +550,6 @@ impl StateSharingManager {
     // Private helper methods
 
     fn validate_pattern_permissions(
-        &self,
         pattern: &SharingPattern,
         agent_id: &str,
         channel: &SharedStateChannel,
