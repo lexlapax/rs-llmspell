@@ -1009,7 +1009,6 @@ mod tests {
     }
     #[tokio::test]
     async fn test_hookable_tool_execution_trait() {
-        
         use crate::lifecycle::{HookableToolExecution, ToolExecutor, ToolLifecycleConfig};
 
         let tool = CalculatorTool::new();

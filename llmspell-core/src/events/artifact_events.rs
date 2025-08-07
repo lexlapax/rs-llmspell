@@ -434,10 +434,10 @@ mod tests {
             artifact_id.clone(),
             "test".to_string(),
             "test.txt".to_string(),
-            component_id.clone(),
+            component_id,
         );
 
-        let event = ArtifactEventBuilder::new(component_id.clone())
+        let event = ArtifactEventBuilder::new(component_id)
             .with_context("user", serde_json::json!("test-user"))
             .created(
                 metadata,
@@ -458,12 +458,12 @@ mod tests {
                     ArtifactId::new("test"),
                     "test".to_string(),
                     "test.txt".to_string(),
-                    component_id.clone(),
+                    component_id,
                 ),
                 storage_location: None,
                 content_hash: None,
             }),
-            component_id.clone(),
+            component_id,
         );
         assert_eq!(created.event_name(), "artifact.created");
 

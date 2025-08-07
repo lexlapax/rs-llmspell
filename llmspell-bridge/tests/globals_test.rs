@@ -59,7 +59,7 @@ mod lua_globals {
         )
         .exec()
         .map_err(|e| llmspell_core::LLMSpellError::Component {
-            message: format!("Lua test failed: {}", e),
+            message: format!("Lua test failed: {e}"),
             source: None,
         })?;
 
@@ -92,7 +92,7 @@ mod lua_globals {
         )
         .exec()
         .map_err(|e| llmspell_core::LLMSpellError::Component {
-            message: format!("Agent Lua test failed: {}", e),
+            message: format!("Agent Lua test failed: {e}"),
             source: None,
         })?;
 
@@ -207,7 +207,7 @@ mod lua_globals {
         )
         .exec()
         .map_err(|e| llmspell_core::LLMSpellError::Component {
-            message: format!("Tool Lua test failed: {}", e),
+            message: format!("Tool Lua test failed: {e}"),
             source: None,
         })?;
 
@@ -320,7 +320,7 @@ mod lua_globals {
         )
         .exec()
         .map_err(|e| llmspell_core::LLMSpellError::Component {
-            message: format!("Workflow Lua test failed: {}", e),
+            message: format!("Workflow Lua test failed: {e}"),
             source: None,
         })?;
 
@@ -394,7 +394,7 @@ mod lua_globals {
         )
         .exec()
         .map_err(|e| llmspell_core::LLMSpellError::Component {
-            message: format!("JSON Lua test failed: {}", e),
+            message: format!("JSON Lua test failed: {e}"),
             source: None,
         })?;
 
@@ -428,7 +428,7 @@ mod lua_globals {
         )
         .exec()
         .map_err(|e| llmspell_core::LLMSpellError::Component {
-            message: format!("Hook Lua test failed: {}", e),
+            message: format!("Hook Lua test failed: {e}"),
             source: None,
         })?;
 
@@ -474,7 +474,7 @@ mod lua_globals {
         )
         .exec()
         .map_err(|e| llmspell_core::LLMSpellError::Component {
-            message: format!("Event Lua test failed: {}", e),
+            message: format!("Event Lua test failed: {e}"),
             source: None,
         })?;
 
@@ -535,7 +535,7 @@ mod lua_globals {
         )
         .exec()
         .map_err(|e| llmspell_core::LLMSpellError::Component {
-            message: format!("State Lua test failed: {}", e),
+            message: format!("State Lua test failed: {e}"),
             source: None,
         })?;
 
@@ -601,7 +601,7 @@ mod lua_globals {
         )
         .exec()
         .map_err(|e| llmspell_core::LLMSpellError::Component {
-            message: format!("Streaming Lua test failed: {}", e),
+            message: format!("Streaming Lua test failed: {e}"),
             source: None,
         })?;
 

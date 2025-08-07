@@ -309,11 +309,7 @@ impl<R: AgentRegistry> Discovery<R> {
     }
 
     /// Sort search results
-    fn sort_results(
-        results: &mut [SearchResult],
-        sort_by: &Option<SortField>,
-        order: &SortOrder,
-    ) {
+    fn sort_results(results: &mut [SearchResult], sort_by: &Option<SortField>, order: &SortOrder) {
         let field = sort_by.as_ref().unwrap_or(&SortField::Name);
 
         results.sort_by(|a, b| {

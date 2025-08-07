@@ -171,7 +171,7 @@ impl Base64EncoderTool {
                 "decode" => {
                     // Try to convert to string, otherwise return hex
                     String::from_utf8(result_data.clone())
-                        .map_or_else(|_| hex::encode(&result_data), |s| s)
+                        .unwrap_or_else(|_| hex::encode(&result_data))
                 }
                 _ => unreachable!(),
             };

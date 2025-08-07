@@ -401,7 +401,7 @@ impl BaseAgent for WebScraperTool {
             }
         }
 
-        let selectors = extract_optional_object(params, "selectors").map_or(None, |obj| {
+        let selectors = extract_optional_object(params, "selectors").and_then(|obj| {
             serde_json::from_value::<HashMap<String, String>>(serde_json::Value::Object(
                 obj.clone(),
             ))

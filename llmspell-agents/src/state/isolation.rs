@@ -228,11 +228,11 @@ impl StateIsolationManager {
             }
             IsolationBoundary::ReadOnlyShared => {
                 // Allow read-only access to shared scopes
-                matches!(operation, StateOperation::Read) && Self::is_shared_scope(target_scope)
+                matches!(operation, StateOperation::Read) && self.is_shared_scope(target_scope)
             }
             IsolationBoundary::SharedAccess => {
                 // Allow full access to shared scopes
-                Self::is_shared_scope(target_scope)
+                self.is_shared_scope(target_scope)
             }
             IsolationBoundary::Custom(policy) => {
                 // Check custom policy
@@ -394,7 +394,7 @@ impl StateIsolationManager {
         }
     }
 
-    fn is_shared_scope(scope: &StateScope) -> bool {
+    fn is_shared_scope(&self, scope: &StateScope) -> bool {
         match scope {
             StateScope::Global => true,
             StateScope::Custom(s) if s.starts_with("shared:") => {
@@ -418,7 +418,7 @@ impl StateIsolationManager {
         match policy {
             "read-all" => matches!(operation, StateOperation::Read),
             "write-shared" => {
-                matches!(operation, StateOperation::Write) && Self::is_shared_scope(target_scope)
+                matches!(operation, StateOperation::Write) && self.is_shared_scope(target_scope)
             }
             _ => false,
         }

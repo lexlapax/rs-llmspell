@@ -638,11 +638,26 @@ mod tests {
     fn test_pattern_matching() {
         let aggregator = CapabilityAggregator::new();
 
-        assert!(CapabilityAggregator::matches_pattern("text-processing", "text-processing"));
-        assert!(CapabilityAggregator::matches_pattern("text-processing", "text-*"));
-        assert!(CapabilityAggregator::matches_pattern("text-processing", "*-processing"));
-        assert!(CapabilityAggregator::matches_pattern("text-processing", "*"));
-        assert!(!CapabilityAggregator::matches_pattern("text-processing", "image-*"));
+        assert!(CapabilityAggregator::matches_pattern(
+            "text-processing",
+            "text-processing"
+        ));
+        assert!(CapabilityAggregator::matches_pattern(
+            "text-processing",
+            "text-*"
+        ));
+        assert!(CapabilityAggregator::matches_pattern(
+            "text-processing",
+            "*-processing"
+        ));
+        assert!(CapabilityAggregator::matches_pattern(
+            "text-processing",
+            "*"
+        ));
+        assert!(!CapabilityAggregator::matches_pattern(
+            "text-processing",
+            "image-*"
+        ));
     }
     #[test]
     fn test_capability_matching() {

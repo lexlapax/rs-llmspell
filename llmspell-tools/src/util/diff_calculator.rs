@@ -86,17 +86,17 @@ impl DiffCalculatorTool {
     /// Calculate text diff
     #[allow(clippy::unused_self)]
     #[allow(clippy::too_many_lines)]
-    fn calculate_text_diff(&self, old: &str, new: &str, format: DiffFormat) -> Result<String> {
+    fn calculate_text_diff(&self, old: &str, new: &str, format: DiffFormat) -> String {
         use std::fmt::Write;
 
         let diff = TextDiff::from_lines(old, new);
 
         match format {
-            DiffFormat::Unified => Ok(diff
+            DiffFormat::Unified => diff
                 .unified_diff()
                 .context_radius(3)
                 .header("old", "new")
-                .to_string()),
+                .to_string(),
             DiffFormat::Context => {
                 // Context format - show more surrounding lines
                 let mut output = String::new();
@@ -155,7 +155,7 @@ impl DiffCalculatorTool {
                     }
                     output.push_str("***************\n");
                 }
-                Ok(output)
+                output
             }
             DiffFormat::Inline => {
                 // For inline diff, we'll use iter_all_changes to show inline changes
@@ -168,7 +168,7 @@ impl DiffCalculatorTool {
                     };
                     let _ = write!(output, "{sign}{change}");
                 }
-                Ok(output)
+                output
             }
             DiffFormat::Simple => {
                 let mut output = String::new();
@@ -210,7 +210,7 @@ impl DiffCalculatorTool {
                 }
 
                 output.insert_str(0, &format!("Total changes: {changes}\n\n"));
-                Ok(output)
+                output
             }
         }
     }
@@ -368,7 +368,7 @@ impl DiffCalculatorTool {
                 let format = DiffFormat::from_str(format_str)?;
 
                 // Calculate diff
-                let diff_output = self.calculate_text_diff(&old_text, &new_text, format)?;
+                let diff_output = self.calculate_text_diff(&old_text, &new_text, format);
 
                 let response = ResponseBuilder::success("text_diff")
                     .with_message("Text diff calculated successfully")

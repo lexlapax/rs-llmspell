@@ -1,4 +1,4 @@
-//! ABOUTME: Integration tests for WorkflowBridge with standardized factory
+//! ABOUTME: Integration tests for `WorkflowBridge` with standardized factory
 //! ABOUTME: Tests end-to-end workflow lifecycle through the bridge
 
 use llmspell_bridge::{workflows::WorkflowBridge, ComponentRegistry};

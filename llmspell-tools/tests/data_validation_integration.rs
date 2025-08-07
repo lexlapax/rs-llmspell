@@ -1,4 +1,4 @@
-//! ABOUTME: Integration tests for DataValidationTool
+//! ABOUTME: Integration tests for `DataValidationTool`
 //! ABOUTME: Tests comprehensive validation scenarios with multiple rule types
 
 use llmspell_core::{

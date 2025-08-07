@@ -1,4 +1,4 @@
-//! ABOUTME: Integration tests for WebpageMonitorTool
+//! ABOUTME: Integration tests for `WebpageMonitorTool`
 //! ABOUTME: Tests webpage monitoring and change detection functionality
 
 mod common;
@@ -38,11 +38,11 @@ async fn test_webpage_monitor_initial_check() {
         Err(e) => {
             // If it's a network error, skip the test
             if e.to_string().contains("Failed to fetch URL") {
-                eprintln!("Skipping test due to network error: {}", e);
+                eprintln!("Skipping test due to network error: {e}");
                 return;
             }
             // Otherwise, propagate the error
-            panic!("Unexpected error: {}", e);
+            panic!("Unexpected error: {e}");
         }
     }
 }
@@ -76,11 +76,11 @@ async fn test_webpage_monitor_with_selector() {
         Err(e) => {
             // If it's a network error, skip the test
             if e.to_string().contains("Failed to fetch URL") {
-                eprintln!("Skipping test due to network error: {}", e);
+                eprintln!("Skipping test due to network error: {e}");
                 return;
             }
             // Otherwise, propagate the error
-            panic!("Unexpected error: {}", e);
+            panic!("Unexpected error: {e}");
         }
     }
 }
@@ -109,11 +109,11 @@ async fn test_webpage_monitor_metadata_changes() {
         Err(e) => {
             // If it's a network error, skip the test
             if e.to_string().contains("Failed to fetch URL") {
-                eprintln!("Skipping test due to network error: {}", e);
+                eprintln!("Skipping test due to network error: {e}");
                 return;
             }
             // Otherwise, propagate the error
-            panic!("Unexpected error: {}", e);
+            panic!("Unexpected error: {e}");
         }
     }
 }
@@ -157,21 +157,21 @@ async fn test_webpage_monitor_content_diff() {
                 }
                 Err(e) => {
                     if e.to_string().contains("Failed to fetch URL") {
-                        eprintln!("Skipping second fetch due to network error: {}", e);
+                        eprintln!("Skipping second fetch due to network error: {e}");
                         return;
                     }
-                    panic!("Unexpected error on second fetch: {}", e);
+                    panic!("Unexpected error on second fetch: {e}");
                 }
             }
         }
         Err(e) => {
             // If it's a network error, skip the test
             if e.to_string().contains("Failed to fetch URL") {
-                eprintln!("Skipping test due to network error: {}", e);
+                eprintln!("Skipping test due to network error: {e}");
                 return;
             }
             // Otherwise, propagate the error
-            panic!("Unexpected error: {}", e);
+            panic!("Unexpected error: {e}");
         }
     }
 }
@@ -201,11 +201,11 @@ async fn test_webpage_monitor_alert_threshold() {
         Err(e) => {
             // If it's a network error, skip the test
             if e.to_string().contains("Failed to fetch URL") {
-                eprintln!("Skipping test due to network error: {}", e);
+                eprintln!("Skipping test due to network error: {e}");
                 return;
             }
             // Otherwise, propagate the error
-            panic!("Unexpected error: {}", e);
+            panic!("Unexpected error: {e}");
         }
     }
 }

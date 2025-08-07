@@ -327,11 +327,11 @@ async fn test_large_text_diff() {
     let mut new_lines = vec![];
 
     for i in 0..1000 {
-        old_lines.push(format!("Line {}", i));
+        old_lines.push(format!("Line {i}"));
         if i % 10 == 0 {
-            new_lines.push(format!("Modified line {}", i));
+            new_lines.push(format!("Modified line {i}"));
         } else {
-            new_lines.push(format!("Line {}", i));
+            new_lines.push(format!("Line {i}"));
         }
     }
 

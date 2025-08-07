@@ -217,7 +217,7 @@ async fn test_web_search_basic() {
     // Get schema to understand parameters
     let schema = tool.schema();
     let param_names: Vec<String> = schema.parameters.iter().map(|p| p.name.clone()).collect();
-    println!("WebSearchTool parameters: {:?}", param_names);
+    println!("WebSearchTool parameters: {param_names:?}");
 
     let input = AgentInput::text("search test").with_parameter(
         "parameters",
@@ -228,7 +228,7 @@ async fn test_web_search_basic() {
     );
 
     let result = tool.execute(input, ExecutionContext::default()).await;
-    assert!(result.is_ok(), "Tool execution failed: {:?}", result);
+    assert!(result.is_ok(), "Tool execution failed: {result:?}");
 
     let response = result.unwrap();
     println!("WebSearchTool response: {}", response.text);
@@ -269,13 +269,12 @@ fn test_tool_creation_performance() {
     let duration = start.elapsed();
     let avg_duration = duration / iterations;
 
-    println!("Average time to create all 14 tools: {:?}", avg_duration);
+    println!("Average time to create all 14 tools: {avg_duration:?}");
 
     // Relaxed performance requirement: 50ms is reasonable for creating 14 tools
     // This accounts for system variations and CI environments
     assert!(
         avg_duration.as_millis() < 50,
-        "Tool creation took too long: {:?} (expected < 50ms)",
-        avg_duration
+        "Tool creation took too long: {avg_duration:?} (expected < 50ms)"
     );
 }

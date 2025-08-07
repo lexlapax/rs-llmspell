@@ -519,7 +519,7 @@ impl ToolExecutor {
             for (key, value) in &tool_context.resource_metrics {
                 hook_context
                     .data
-                    .insert(format!("resource_{}", key), value.clone());
+                    .insert(format!("resource_{key}"), value.clone());
             }
 
             // Execute hooks

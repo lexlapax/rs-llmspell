@@ -35,7 +35,7 @@ fn bench_base64_operations(c: &mut Criterion) {
                 let result = tool.execute(input, ExecutionContext::default()).await;
                 black_box(result)
             })
-        })
+        });
     });
 
     let encoded_data =
@@ -54,7 +54,7 @@ fn bench_base64_operations(c: &mut Criterion) {
                 let result = tool.execute(input, ExecutionContext::default()).await;
                 black_box(result)
             })
-        })
+        });
     });
 
     group.finish();
@@ -78,7 +78,7 @@ fn bench_calculator_operations(c: &mut Criterion) {
                 let result = tool.execute(input, ExecutionContext::default()).await;
                 black_box(result)
             })
-        })
+        });
     });
 
     group.bench_function("complex_expression", |b| {
@@ -93,7 +93,7 @@ fn bench_calculator_operations(c: &mut Criterion) {
                 let result = tool.execute(input, ExecutionContext::default()).await;
                 black_box(result)
             })
-        })
+        });
     });
 
     group.finish();
@@ -123,7 +123,7 @@ fn bench_hash_operations(c: &mut Criterion) {
                 let result = tool.execute(input, ExecutionContext::default()).await;
                 black_box(result)
             })
-        })
+        });
     });
 
     group.bench_function("sha256_medium", |b| {
@@ -140,7 +140,7 @@ fn bench_hash_operations(c: &mut Criterion) {
                 let result = tool.execute(input, ExecutionContext::default()).await;
                 black_box(result)
             })
-        })
+        });
     });
 
     group.bench_function("sha256_large", |b| {
@@ -157,7 +157,7 @@ fn bench_hash_operations(c: &mut Criterion) {
                 let result = tool.execute(input, ExecutionContext::default()).await;
                 black_box(result)
             })
-        })
+        });
     });
 
     group.finish();
@@ -183,7 +183,7 @@ fn bench_text_operations(c: &mut Criterion) {
                 let result = tool.execute(input, ExecutionContext::default()).await;
                 black_box(result)
             })
-        })
+        });
     });
 
     group.bench_function("replace_operation", |b| {
@@ -201,7 +201,7 @@ fn bench_text_operations(c: &mut Criterion) {
                 let result = tool.execute(input, ExecutionContext::default()).await;
                 black_box(result)
             })
-        })
+        });
     });
 
     group.finish();
@@ -247,7 +247,7 @@ fn bench_json_operations(c: &mut Criterion) {
                 let result = tool.execute(input, ExecutionContext::default()).await;
                 black_box(result)
             })
-        })
+        });
     });
 
     group.bench_function("complex_query", |b| {
@@ -264,7 +264,7 @@ fn bench_json_operations(c: &mut Criterion) {
                 let result = tool.execute(input, ExecutionContext::default()).await;
                 black_box(result)
             })
-        })
+        });
     });
 
     group.finish();
@@ -289,7 +289,7 @@ fn bench_uuid_generation(c: &mut Criterion) {
                 let result = tool.execute(input, ExecutionContext::default()).await;
                 black_box(result)
             })
-        })
+        });
     });
 
     group.bench_function("uuid_bulk_generation", |b| {
@@ -306,7 +306,7 @@ fn bench_uuid_generation(c: &mut Criterion) {
                 let result = tool.execute(input, ExecutionContext::default()).await;
                 black_box(result)
             })
-        })
+        });
     });
 
     group.finish();
@@ -367,7 +367,7 @@ fn bench_mixed_operations(c: &mut Criterion) {
 
                 black_box((json_result, text_result, hash_result))
             })
-        })
+        });
     });
 
     group.finish();

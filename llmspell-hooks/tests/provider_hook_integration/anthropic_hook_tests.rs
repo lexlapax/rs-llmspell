@@ -134,7 +134,7 @@ async fn test_anthropic_conversation_tracking() -> Result<()> {
     info!("Testing conversation tracking with hooks");
 
     // Run a series of interactions
-    let interactions = vec![
+    let interactions = [
         "Hello! My name is Alice.",
         "What's the weather like?",
         "Do you remember my name?",

@@ -336,10 +336,7 @@ impl ToolInvoker {
     }
 
     /// Validate tool parameters against the tool's schema
-    fn validate_tool_parameters(
-        tool: &dyn Tool,
-        parameters: &JsonValue,
-    ) -> Result<Vec<String>> {
+    fn validate_tool_parameters(tool: &dyn Tool, parameters: &JsonValue) -> Result<Vec<String>> {
         let mut warnings = Vec::new();
 
         // Get tool schema

@@ -1,4 +1,4 @@
-//! ABOUTME: Integration tests for LuaEngine implementation
+//! ABOUTME: Integration tests for `LuaEngine` implementation
 //! ABOUTME: Validates basic script execution and API injection
 
 #[cfg(feature = "lua")]
@@ -43,7 +43,7 @@ mod tests {
             Ok(result) => {
                 assert_eq!(result.output.as_i64(), Some(42));
             }
-            Err(e) => panic!("Script execution failed: {:?}", e),
+            Err(e) => panic!("Script execution failed: {e:?}"),
         }
     }
 
@@ -72,7 +72,7 @@ mod tests {
                     "Agent global not found"
                 );
             }
-            Err(e) => panic!("Script execution failed: {:?}", e),
+            Err(e) => panic!("Script execution failed: {e:?}"),
         }
     }
 }

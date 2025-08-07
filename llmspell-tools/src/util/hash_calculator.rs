@@ -129,7 +129,7 @@ impl HashCalculatorTool {
         // Validate input type
         validate_enum(&input_type, &["string", "file"], "input_type")?;
 
-        let hash = self.compute_hash(params, &input_type, algorithm).await?;
+        let hash = self.compute_hash(params, input_type, algorithm).await?;
         let formatted = self.format_hash(&hash, &format);
 
         let response = ResponseBuilder::success("hash")
@@ -160,8 +160,8 @@ impl HashCalculatorTool {
         validate_enum(&input_type, &["string", "file"], "input_type")?;
         validate_enum(&expected_format, &["hex", "base64"], "expected_format")?;
 
-        let expected_hash = Self::decode_expected_hash(expected_hash_str, &expected_format)?;
-        let actual_hash = self.compute_hash(params, &input_type, algorithm).await?;
+        let expected_hash = Self::decode_expected_hash(expected_hash_str, expected_format)?;
+        let actual_hash = self.compute_hash(params, input_type, algorithm).await?;
         let matches = actual_hash == expected_hash;
 
         let response = if matches {
@@ -177,8 +177,8 @@ impl HashCalculatorTool {
                 .with_result(json!({
                     "verified": false,
                     "algorithm": algorithm.to_string(),
-                    "expected": self.format_hash(&expected_hash, &self.parse_format(Some(&expected_format))),
-                    "actual": self.format_hash(&actual_hash, &self.parse_format(Some(&expected_format))),
+                    "expected": self.format_hash(&expected_hash, &self.parse_format(Some(expected_format))),
+                    "actual": self.format_hash(&actual_hash, &self.parse_format(Some(expected_format))),
                 }))
         }
         .build();

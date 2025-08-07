@@ -687,7 +687,6 @@ impl Tool for ServiceCheckerTool {
 mod tests {
     use super::*;
     use llmspell_testing::tool_helpers::create_test_tool_input;
-    
 
     fn create_test_service_checker() -> ServiceCheckerTool {
         let config = ServiceCheckerConfig::default();

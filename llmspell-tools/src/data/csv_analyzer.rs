@@ -1059,7 +1059,7 @@ impl CsvAnalyzerTool {
                 // Calculate new columns
                 for expr in &new_column_expressions {
                     // Simple expression evaluation (supports basic arithmetic)
-                    let value = self.evaluate_expression(expr, &headers, &record)?;
+                    let value = Self::evaluate_expression(expr, &headers, &record)?;
                     new_record.push(value);
                 }
 
@@ -1082,7 +1082,6 @@ impl CsvAnalyzerTool {
 
     /// Evaluate a simple arithmetic expression for CSV transformation
     fn evaluate_expression(
-        &self,
         expr: &str,
         headers: &csv::StringRecord,
         record: &csv::StringRecord,
@@ -1094,8 +1093,8 @@ impl CsvAnalyzerTool {
         if expr.contains(" * ") {
             let parts: Vec<&str> = expr.split(" * ").collect();
             if parts.len() == 2 {
-                let left_val = Self::get_column_value(parts[0].trim(), headers, record)?;
-                let right_val = Self::get_column_value(parts[1].trim(), headers, record)?;
+                let left_val = Self::get_column_value(parts[0].trim(), headers, record);
+                let right_val = Self::get_column_value(parts[1].trim(), headers, record);
 
                 if let (Ok(left), Ok(right)) = (left_val.parse::<f64>(), right_val.parse::<f64>()) {
                     return Ok(format!("{:.2}", left * right));
@@ -1112,16 +1111,16 @@ impl CsvAnalyzerTool {
         name: &str,
         headers: &csv::StringRecord,
         record: &csv::StringRecord,
-    ) -> Result<String> {
+    ) -> String {
         // Try to find column by name
         for (i, header) in headers.iter().enumerate() {
             if header == name {
-                return Ok(record.get(i).unwrap_or("").to_string());
+                return record.get(i).unwrap_or("").to_string();
             }
         }
 
         // If not a column name, return as literal
-        Ok(name.to_string())
+        name.to_string()
     }
 
     /// Validate CSV data against rules

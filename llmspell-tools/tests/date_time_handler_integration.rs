@@ -41,18 +41,14 @@ async fn test_parse_multiple_formats() {
         let result = tool
             .execute(input, ExecutionContext::default())
             .await
-            .unwrap_or_else(|e| panic!("Failed to parse {} ({}): {}", date_str, description, e));
+            .unwrap_or_else(|e| panic!("Failed to parse {date_str} ({description}): {e}"));
 
         let output = extract_result(&result.text);
         // Operation might not be in result anymore
         // assert_eq!(output["operation"], "parse");
-        assert_eq!(
-            output["parsed"]["year"], 2024,
-            "Failed for: {}",
-            description
-        );
-        assert_eq!(output["parsed"]["month"], 1, "Failed for: {}", description);
-        assert_eq!(output["parsed"]["day"], 15, "Failed for: {}", description);
+        assert_eq!(output["parsed"]["year"], 2024, "Failed for: {description}");
+        assert_eq!(output["parsed"]["month"], 1, "Failed for: {description}");
+        assert_eq!(output["parsed"]["day"], 15, "Failed for: {description}");
     }
 }
 #[tokio::test]

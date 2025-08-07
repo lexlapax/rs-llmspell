@@ -36,7 +36,7 @@ mod tests {
                     "Streaming global not found"
                 );
             }
-            Err(e) => panic!("Script execution failed: {:?}", e),
+            Err(e) => panic!("Script execution failed: {e:?}"),
         }
     }
 
@@ -74,12 +74,28 @@ mod tests {
         match output {
             Ok(result) => {
                 let obj = result.output.as_object().expect("Expected object result");
-                assert_eq!(obj.get("exists").and_then(|v| v.as_bool()), Some(true));
-                assert_eq!(obj.get("hasNext").and_then(|v| v.as_bool()), Some(true));
-                assert_eq!(obj.get("hasIsDone").and_then(|v| v.as_bool()), Some(true));
-                assert_eq!(obj.get("hasCollect").and_then(|v| v.as_bool()), Some(true));
+                assert_eq!(
+                    obj.get("exists")
+                        .and_then(serde_json::value::Value::as_bool),
+                    Some(true)
+                );
+                assert_eq!(
+                    obj.get("hasNext")
+                        .and_then(serde_json::value::Value::as_bool),
+                    Some(true)
+                );
+                assert_eq!(
+                    obj.get("hasIsDone")
+                        .and_then(serde_json::value::Value::as_bool),
+                    Some(true)
+                );
+                assert_eq!(
+                    obj.get("hasCollect")
+                        .and_then(serde_json::value::Value::as_bool),
+                    Some(true)
+                );
             }
-            Err(e) => panic!("Script execution failed: {:?}", e),
+            Err(e) => panic!("Script execution failed: {e:?}"),
         }
     }
 
@@ -124,11 +140,23 @@ mod tests {
         match output {
             Ok(result) => {
                 let obj = result.output.as_object().expect("Expected object result");
-                assert_eq!(obj.get("toolExists").and_then(|v| v.as_bool()), Some(true));
-                assert_eq!(obj.get("hasTools").and_then(|v| v.as_bool()), Some(true));
-                assert_eq!(obj.get("toolWorks").and_then(|v| v.as_bool()), Some(true));
+                assert_eq!(
+                    obj.get("toolExists")
+                        .and_then(serde_json::value::Value::as_bool),
+                    Some(true)
+                );
+                assert_eq!(
+                    obj.get("hasTools")
+                        .and_then(serde_json::value::Value::as_bool),
+                    Some(true)
+                );
+                assert_eq!(
+                    obj.get("toolWorks")
+                        .and_then(serde_json::value::Value::as_bool),
+                    Some(true)
+                );
             }
-            Err(e) => panic!("Script execution failed: {:?}", e),
+            Err(e) => panic!("Script execution failed: {e:?}"),
         }
     }
 
@@ -188,7 +216,8 @@ mod tests {
             Ok(result) => {
                 let obj = result.output.as_object().expect("Expected object result");
                 assert_eq!(
-                    obj.get("workflowExists").and_then(|v| v.as_bool()),
+                    obj.get("workflowExists")
+                        .and_then(serde_json::value::Value::as_bool),
                     Some(true)
                 );
                 assert_eq!(
@@ -200,15 +229,17 @@ mod tests {
                     Some("parallel")
                 );
                 assert_eq!(
-                    obj.get("seqHasExecute").and_then(|v| v.as_bool()),
+                    obj.get("seqHasExecute")
+                        .and_then(serde_json::value::Value::as_bool),
                     Some(true)
                 );
                 assert_eq!(
-                    obj.get("parHasExecute").and_then(|v| v.as_bool()),
+                    obj.get("parHasExecute")
+                        .and_then(serde_json::value::Value::as_bool),
                     Some(true)
                 );
             }
-            Err(e) => panic!("Script execution failed: {:?}", e),
+            Err(e) => panic!("Script execution failed: {e:?}"),
         }
     }
 
@@ -232,7 +263,7 @@ mod tests {
         // For now, this should work as we have a basic implementation
         match stream_result {
             Ok(_) => println!("Streaming execution succeeded"),
-            Err(e) => panic!("Streaming execution failed: {:?}", e),
+            Err(e) => panic!("Streaming execution failed: {e:?}"),
         }
     }
 }

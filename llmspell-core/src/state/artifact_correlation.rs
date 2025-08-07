@@ -367,7 +367,7 @@ mod tests {
 
         // Create correlation
         let correlation_id = manager
-            .correlate_creation(artifact_id.clone(), component_id.clone(), None)
+            .correlate_creation(artifact_id.clone(), component_id, None)
             .await;
 
         // Verify correlation exists
@@ -390,17 +390,13 @@ mod tests {
         // Create parent artifact
         let parent_id = ArtifactId::new("parent");
         manager
-            .correlate_creation(parent_id.clone(), component_id.clone(), None)
+            .correlate_creation(parent_id.clone(), component_id, None)
             .await;
 
         // Create child artifact
         let child_id = ArtifactId::new("child");
         manager
-            .correlate_creation(
-                child_id.clone(),
-                component_id.clone(),
-                Some(parent_id.clone()),
-            )
+            .correlate_creation(child_id.clone(), component_id, Some(parent_id.clone()))
             .await;
 
         // Create grandchild artifact

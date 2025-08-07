@@ -155,7 +155,7 @@ impl HookTestContext {
             return Ok(None);
         }
 
-        let config = AgentBuilder::new(&format!("{}-anthropic", &self.agent_id), "llm")
+        let config = AgentBuilder::new(format!("{}-anthropic", &self.agent_id), "llm")
             .description("Test agent for Anthropic hook integration")
             .with_model("anthropic", "claude-3-5-sonnet-latest")
             .temperature(0.7)

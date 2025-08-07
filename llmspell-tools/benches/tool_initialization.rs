@@ -40,63 +40,63 @@ fn bench_utility_tools_init(c: &mut Criterion) {
         b.iter(|| {
             let tool = Base64EncoderTool::new();
             black_box(tool)
-        })
+        });
     });
 
     group.bench_function("calculator", |b| {
         b.iter(|| {
             let tool = CalculatorTool::new();
             black_box(tool)
-        })
+        });
     });
 
     group.bench_function("data_validation", |b| {
         b.iter(|| {
             let tool = DataValidationTool::new();
             black_box(tool)
-        })
+        });
     });
 
     group.bench_function("date_time_handler", |b| {
         b.iter(|| {
             let tool = DateTimeHandlerTool::new();
             black_box(tool)
-        })
+        });
     });
 
     group.bench_function("diff_calculator", |b| {
         b.iter(|| {
             let tool = DiffCalculatorTool::new();
             black_box(tool)
-        })
+        });
     });
 
     group.bench_function("hash_calculator", |b| {
         b.iter(|| {
             let tool = HashCalculatorTool::new(Default::default());
             black_box(tool)
-        })
+        });
     });
 
     group.bench_function("template_engine", |b| {
         b.iter(|| {
             let tool = TemplateEngineTool::new();
             black_box(tool)
-        })
+        });
     });
 
     group.bench_function("text_manipulator", |b| {
         b.iter(|| {
             let tool = TextManipulatorTool::new(Default::default());
             black_box(tool)
-        })
+        });
     });
 
     group.bench_function("uuid_generator", |b| {
         b.iter(|| {
             let tool = UuidGeneratorTool::new(Default::default());
             black_box(tool)
-        })
+        });
     });
 
     group.finish();
@@ -109,14 +109,14 @@ fn bench_data_tools_init(c: &mut Criterion) {
         b.iter(|| {
             let tool = CsvAnalyzerTool::new(Default::default());
             black_box(tool)
-        })
+        });
     });
 
     group.bench_function("json_processor", |b| {
         b.iter(|| {
             let tool = JsonProcessorTool::new(Default::default());
             black_box(tool)
-        })
+        });
     });
 
     group.bench_function("graphql_query", |b| {
@@ -124,7 +124,7 @@ fn bench_data_tools_init(c: &mut Criterion) {
             let tool =
                 GraphQLQueryTool::new(Default::default()).expect("Failed to create GraphQL tool");
             black_box(tool)
-        })
+        });
     });
 
     group.bench_function("http_request", |b| {
@@ -132,7 +132,7 @@ fn bench_data_tools_init(c: &mut Criterion) {
             let tool =
                 HttpRequestTool::new(Default::default()).expect("Failed to create HTTP tool");
             black_box(tool)
-        })
+        });
     });
 
     group.finish();
@@ -145,7 +145,7 @@ fn bench_file_system_tools_init(c: &mut Criterion) {
         b.iter(|| {
             let tool = ArchiveHandlerTool::new();
             black_box(tool)
-        })
+        });
     });
 
     group.bench_function("file_converter", |b| {
@@ -153,14 +153,14 @@ fn bench_file_system_tools_init(c: &mut Criterion) {
         b.iter(|| {
             let tool = FileConverterTool::new(Default::default(), sandbox.clone());
             black_box(tool)
-        })
+        });
     });
 
     group.bench_function("file_operations", |b| {
         b.iter(|| {
             let tool = FileOperationsTool::new(Default::default());
             black_box(tool)
-        })
+        });
     });
 
     group.bench_function("file_search", |b| {
@@ -168,7 +168,7 @@ fn bench_file_system_tools_init(c: &mut Criterion) {
         b.iter(|| {
             let tool = FileSearchTool::new(Default::default(), sandbox.clone());
             black_box(tool)
-        })
+        });
     });
 
     group.bench_function("file_watcher", |b| {
@@ -176,7 +176,7 @@ fn bench_file_system_tools_init(c: &mut Criterion) {
         b.iter(|| {
             let tool = FileWatcherTool::new(Default::default(), sandbox.clone());
             black_box(tool)
-        })
+        });
     });
 
     group.finish();
@@ -189,28 +189,28 @@ fn bench_system_tools_init(c: &mut Criterion) {
         b.iter(|| {
             let tool = EnvironmentReaderTool::new(Default::default());
             black_box(tool)
-        })
+        });
     });
 
     group.bench_function("process_executor", |b| {
         b.iter(|| {
             let tool = ProcessExecutorTool::new(Default::default());
             black_box(tool)
-        })
+        });
     });
 
     group.bench_function("service_checker", |b| {
         b.iter(|| {
             let tool = ServiceCheckerTool::new(Default::default());
             black_box(tool)
-        })
+        });
     });
 
     group.bench_function("system_monitor", |b| {
         b.iter(|| {
             let tool = SystemMonitorTool::new(Default::default());
             black_box(tool)
-        })
+        });
     });
 
     group.finish();
@@ -223,7 +223,7 @@ fn bench_search_tools_init(c: &mut Criterion) {
         b.iter(|| {
             let tool = WebSearchTool::new(Default::default());
             black_box(tool)
-        })
+        });
     });
 
     group.finish();
@@ -270,8 +270,8 @@ fn bench_all_tools_sequential(c: &mut Criterion) {
             // Search tools
             let _web_search = WebSearchTool::new(Default::default());
 
-            black_box(())
-        })
+            black_box(());
+        });
     });
 
     group.finish();

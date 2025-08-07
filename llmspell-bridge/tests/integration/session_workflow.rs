@@ -8,7 +8,6 @@ use llmspell_bridge::{
 };
 use std::sync::Arc;
 use std::time::Instant;
-use tokio;
 
 /// Test basic API availability for Session/Artifact workflows
 #[tokio::test(flavor = "multi_thread")]
@@ -25,7 +24,7 @@ async fn test_api_availability_for_workflows() {
     // Try basic API injection (may fail for some APIs)
     let _ = engine.inject_apis(&registry, &providers);
 
-    let lua_code = r#"
+    let lua_code = r"
         -- Test API availability for workflows
         local workflow_result = {}
         
@@ -51,7 +50,7 @@ async fn test_api_availability_for_workflows() {
         workflow_result.total_available = available_count
         
         return workflow_result
-    "#;
+    ";
 
     let result = engine.execute_script(lua_code).await;
     assert!(
@@ -89,7 +88,7 @@ async fn test_api_availability_for_workflows() {
         "Should have at least 3 APIs available (Agent, Tool, Workflow)"
     );
 
-    println!("Available APIs: {}/7", available_count);
+    println!("Available APIs: {available_count}/7");
 }
 
 /// Test state management integration patterns
@@ -247,10 +246,7 @@ async fn test_memory_leak_prevention() {
             .unwrap()
             .as_f64()
             .unwrap();
-        println!(
-            "Memory usage after GC (iteration {}): {:.2} KB",
-            i, memory_usage
-        );
+        println!("Memory usage after GC (iteration {i}): {memory_usage:.2} KB");
 
         // Memory should be reasonable (less than 50MB for this test)
         assert!(memory_usage < 50000.0, "Memory usage should be reasonable");
@@ -328,9 +324,9 @@ async fn test_performance_requirements() {
     let operation_time = perf_result.get("operation_time").unwrap().as_f64().unwrap();
     let string_time = perf_result.get("string_time").unwrap().as_f64().unwrap();
 
-    println!("Operation time: {:.4}s", operation_time);
-    println!("String operation time: {:.4}s", string_time);
-    println!("Total test execution time: {:?}", total_time);
+    println!("Operation time: {operation_time:.4}s");
+    println!("String operation time: {string_time:.4}s");
+    println!("Total test execution time: {total_time:?}");
 
     // Performance targets (generous for script operations)
     assert!(operation_time < 2.0, "1000 operations should be < 2s");
@@ -432,9 +428,9 @@ async fn test_concurrent_operations() {
             let _ = engine.inject_apis(&registry, &providers);
 
             let lua_code = format!(
-                r#"
-                -- Concurrent operations test {}
-                local thread_id = {}
+                r"
+                -- Concurrent operations test {i}
+                local thread_id = {i}
                 
                 -- Perform operations that might conflict if not thread-safe
                 local results = {{}}
@@ -455,8 +451,7 @@ async fn test_concurrent_operations() {
                     success = true,
                     last_computed = results[#results].computed
                 }}
-            "#,
-                i, i
+            "
             );
 
             engine.execute_script(&lua_code).await
@@ -503,7 +498,7 @@ async fn test_comprehensive_api_methods() {
 
     let _ = engine.inject_apis(&registry, &providers);
 
-    let lua_code = r#"
+    let lua_code = r"
         -- Comprehensive API method availability test
         local api_test = {}
         
@@ -586,7 +581,7 @@ async fn test_comprehensive_api_methods() {
         end
         
         return api_test
-    "#;
+    ";
 
     let result = engine.execute_script(lua_code).await;
     assert!(
@@ -600,8 +595,8 @@ async fn test_comprehensive_api_methods() {
 
     // Log all API method availability for debugging
     println!("API Method Availability:");
-    for (key, value) in api_test.iter() {
-        println!("  {}: {:?}", key, value);
+    for (key, value) in api_test {
+        println!("  {key}: {value:?}");
     }
 
     // Core APIs should be available - Agent.create should be available
@@ -622,8 +617,8 @@ async fn test_comprehensive_api_methods() {
         .unwrap()
         .as_bool()
         .unwrap_or(false);
-    println!("Tool.create available: {}", tool_create);
-    println!("Workflow.create available: {}", workflow_create);
+    println!("Tool.create available: {tool_create}");
+    println!("Workflow.create available: {workflow_create}");
 
     // Each API should have multiple methods regardless of create availability
     assert!(

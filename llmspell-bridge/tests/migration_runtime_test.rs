@@ -36,15 +36,12 @@ async fn test_migration_api_available_when_configured() -> Result<(), Box<dyn st
 
     // Verify the script succeeded
     let result = output.output.as_object().unwrap();
-    assert_eq!(result.get("success").unwrap().as_bool().unwrap(), true);
-    assert_eq!(
-        result
-            .get("migration_available")
-            .unwrap()
-            .as_bool()
-            .unwrap(),
-        true
-    );
+    assert!(result.get("success").unwrap().as_bool().unwrap());
+    assert!(result
+        .get("migration_available")
+        .unwrap()
+        .as_bool()
+        .unwrap());
 
     Ok(())
 }
@@ -79,11 +76,8 @@ async fn test_migration_api_not_available_when_disabled() -> Result<(), Box<dyn 
 
     // Verify the script succeeded
     let result = output.output.as_object().unwrap();
-    assert_eq!(result.get("success").unwrap().as_bool().unwrap(), true);
-    assert_eq!(
-        result.get("has_migration_api").unwrap().as_bool().unwrap(),
-        false
-    );
+    assert!(result.get("success").unwrap().as_bool().unwrap());
+    assert!(!result.get("has_migration_api").unwrap().as_bool().unwrap());
 
     Ok(())
 }
@@ -125,12 +119,9 @@ async fn test_state_persistence_without_migration() -> Result<(), Box<dyn std::e
 
     // Verify the script succeeded
     let result = output.output.as_object().unwrap();
-    assert_eq!(result.get("success").unwrap().as_bool().unwrap(), true);
-    assert_eq!(result.get("state_works").unwrap().as_bool().unwrap(), true);
-    assert_eq!(
-        result.get("has_migration_api").unwrap().as_bool().unwrap(),
-        false
-    );
+    assert!(result.get("success").unwrap().as_bool().unwrap());
+    assert!(result.get("state_works").unwrap().as_bool().unwrap());
+    assert!(!result.get("has_migration_api").unwrap().as_bool().unwrap());
 
     Ok(())
 }
