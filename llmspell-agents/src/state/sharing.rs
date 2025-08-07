@@ -562,12 +562,9 @@ impl StateSharingManager {
                     return Err(anyhow::anyhow!("Only channel creator can broadcast"));
                 }
             }
-            SharingPattern::Pipeline => {
-                // Agents can only publish when it's their turn
-                // This is enforced by process_pipeline_stage
-            }
-            _ => {
-                // Other patterns allow any participant to publish
+            SharingPattern::Pipeline | _ => {
+                // Pipeline: Agents can only publish when it's their turn (enforced by process_pipeline_stage)
+                // Other patterns: Allow any participant to publish
             }
         }
         Ok(())

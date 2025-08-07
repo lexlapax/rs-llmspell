@@ -276,11 +276,8 @@ impl StateHandler for DefaultStateHandler {
             | (Recovering, Ready | Error | Terminating)
             | (Terminating, Terminated | Error) => true,
 
-            // From Terminated (final state)
-            (Terminated, _) => false,
-
-            // All others not allowed
-            _ => false,
+            // From Terminated (final state) and all other transitions not allowed
+            (Terminated, _) | _ => false,
         }
     }
 }

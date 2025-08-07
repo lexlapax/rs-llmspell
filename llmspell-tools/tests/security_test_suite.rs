@@ -126,11 +126,8 @@ async fn test_ssrf_prevention() {
                         "Tool {tool_name} may be vulnerable to SSRF with URL: {url}"
                     );
                 }
-                Ok(Err(_)) => {
-                    // Tool rejected the URL - this is good
-                }
-                Err(_) => {
-                    // Timeout - this is also acceptable for SSRF prevention
+                Ok(Err(_)) | Err(_) => {
+                    // Tool rejected the URL or timed out - both are acceptable for SSRF prevention
                 }
             }
         }

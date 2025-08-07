@@ -133,8 +133,7 @@ impl ExpectedOutput {
     #[must_use]
     pub fn validate(&self, output: &Result<AgentOutput, llmspell_core::LLMSpellError>) -> bool {
         match (self, output) {
-            (Self::Error, Err(_)) => true,
-            (Self::Success, Ok(_)) => true,
+            (Self::Error, Err(_)) | (Self::Success, Ok(_)) => true,
             (Self::Contains(text), Ok(output)) => output.text.contains(text),
             (Self::Exact(text), Ok(output)) => output.text == *text,
             (Self::ToolCalled(tool), Ok(output)) => {

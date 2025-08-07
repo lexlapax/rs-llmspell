@@ -109,10 +109,10 @@ impl UuidGeneratorTool {
                     Some("agent") => *NAMESPACE_AGENT,
                     Some("tool") => *NAMESPACE_TOOL,
                     Some("workflow") => *NAMESPACE_WORKFLOW,
-                    Some("dns") => Uuid::NAMESPACE_DNS,
                     Some("url") => Uuid::NAMESPACE_URL,
                     Some("oid") => Uuid::NAMESPACE_OID,
                     Some("x500") => Uuid::NAMESPACE_X500,
+                    Some("dns") | None => Uuid::NAMESPACE_DNS, // DNS is the default namespace
                     Some(custom) => {
                         // Try to parse as UUID
                         Uuid::parse_str(custom).map_err(|_| {
@@ -122,7 +122,6 @@ impl UuidGeneratorTool {
                             )
                         })?
                     }
-                    None => Uuid::NAMESPACE_DNS, // Default namespace
                 };
 
                 let name = name.ok_or_else(|| {
@@ -297,10 +296,9 @@ impl BaseAgent for UuidGeneratorTool {
                 let name = extract_required_string(params, "name")?;
 
                 let namespace_uuid = match namespace {
-                    "agent" => *NAMESPACE_AGENT,
                     "tool" => *NAMESPACE_TOOL,
                     "workflow" => *NAMESPACE_WORKFLOW,
-                    _ => *NAMESPACE_AGENT,
+                    _ => *NAMESPACE_AGENT, // Default to agent namespace
                 };
 
                 let id = generate_deterministic_id(&namespace_uuid, name);

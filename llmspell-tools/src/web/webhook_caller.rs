@@ -164,12 +164,11 @@ impl BaseAgent for WebhookCallerTool {
 
             let mut request = match method.as_str() {
                 "GET" => client.get(url),
-                "POST" => client.post(url),
                 "PUT" => client.put(url),
                 "DELETE" => client.delete(url),
                 "PATCH" => client.patch(url),
                 "HEAD" => client.head(url),
-                _ => client.post(url), // Default to POST for unknown methods
+                "POST" | _ => client.post(url), // Default to POST for unknown methods
             };
 
             // Add payload for methods that support it

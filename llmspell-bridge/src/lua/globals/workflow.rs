@@ -104,8 +104,7 @@ fn _parse_error_strategy(strategy: &str) -> ErrorStrategy {
             max_attempts: 3,
             backoff_ms: 1000,
         },
-        "fail_fast" | "failfast" => ErrorStrategy::FailFast,
-        _ => ErrorStrategy::FailFast,
+        "fail_fast" | "failfast" | _ => ErrorStrategy::FailFast,
     }
 }
 

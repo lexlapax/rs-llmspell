@@ -566,10 +566,8 @@ impl StatePersistence for MockAgent {
                 llmspell_state_persistence::agent_state::MessageRole::User => {
                     llmspell_core::traits::agent::MessageRole::User
                 }
-                llmspell_state_persistence::agent_state::MessageRole::Assistant => {
-                    llmspell_core::traits::agent::MessageRole::Assistant
-                }
-                llmspell_state_persistence::agent_state::MessageRole::Tool => {
+                llmspell_state_persistence::agent_state::MessageRole::Assistant
+                | llmspell_state_persistence::agent_state::MessageRole::Tool => {
                     llmspell_core::traits::agent::MessageRole::Assistant
                 } // Map Tool to Assistant
             };

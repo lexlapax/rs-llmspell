@@ -215,18 +215,18 @@ impl ToolIntegrationError {
     #[must_use]
     pub fn is_recoverable(&self) -> bool {
         match self {
-            Self::ToolNotFound { .. } => false,
-            Self::RegistrationFailed { .. } => false,
-            Self::DiscoveryFailed { .. } => true,
-            Self::InvocationFailed { .. } => true,
-            Self::ParameterValidation { .. } => true,
-            Self::Timeout { .. } => true,
-            Self::CompositionFailed { .. } => true,
-            Self::AgentWrappingFailed { .. } => false,
-            Self::ContextPropagationFailed { .. } => true,
-            Self::ResourceLimitExceeded { .. } => true,
-            Self::SecurityViolation { .. } => false,
-            Self::DependencyResolution { .. } => true,
+            Self::ToolNotFound { .. }
+            | Self::RegistrationFailed { .. }
+            | Self::AgentWrappingFailed { .. }
+            | Self::SecurityViolation { .. } => false,
+            Self::DiscoveryFailed { .. }
+            | Self::InvocationFailed { .. }
+            | Self::ParameterValidation { .. }
+            | Self::Timeout { .. }
+            | Self::CompositionFailed { .. }
+            | Self::ContextPropagationFailed { .. }
+            | Self::ResourceLimitExceeded { .. }
+            | Self::DependencyResolution { .. } => true,
             Self::StateCorruption {
                 recovery_attempted, ..
             } => !recovery_attempted,
