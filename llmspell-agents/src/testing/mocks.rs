@@ -9,6 +9,7 @@ use crate::lifecycle::{
     state_machine::{AgentState, AgentStateMachine},
 };
 use crate::state::{StateManagerHolder, StatePersistence};
+use crate::StateMachineConfig;
 use anyhow::Result;
 use async_trait::async_trait;
 use llmspell_core::{
@@ -23,6 +24,7 @@ use llmspell_core::{
     },
     BaseAgent, ExecutionContext, LLMSpellError,
 };
+use llmspell_state_persistence::ToolUsageStats;
 use llmspell_state_persistence::{PersistentAgentState, StateManager};
 use std::{
     collections::HashMap,
@@ -116,8 +118,10 @@ impl MockAgent {
             updated_at: chrono::Utc::now(),
         };
 
-        let state_machine =
-            AgentStateMachine::new(config.agent_config.name.clone(), Default::default());
+        let state_machine = AgentStateMachine::new(
+            config.agent_config.name.clone(),
+            StateMachineConfig::default(),
+        );
 
         let core_config = CoreAgentConfig {
             max_conversation_length: Some(100),
@@ -526,7 +530,7 @@ impl StatePersistence for MockAgent {
         let state_data = llmspell_state_persistence::agent_state::AgentStateData {
             conversation_history,
             context_variables: HashMap::new(),
-            tool_usage_stats: Default::default(),
+            tool_usage_stats: ToolUsageStats::default(),
             execution_state: llmspell_state_persistence::agent_state::ExecutionState::Idle,
             custom_data: HashMap::new(),
         };

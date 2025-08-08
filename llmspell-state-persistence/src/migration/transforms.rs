@@ -2,7 +2,7 @@
 // ABOUTME: Handles field mappings, type conversions, and data validation during migrations
 
 use crate::manager::SerializableState;
-use crate::sensitive_data::SensitiveDataProtector;
+use crate::sensitive_data::{SensitiveDataConfig, SensitiveDataProtector};
 use llmspell_state_traits::{StateError, StateResult};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -186,7 +186,7 @@ pub struct DataTransformer {
 impl DataTransformer {
     pub fn new() -> Self {
         Self {
-            sensitive_data_protector: SensitiveDataProtector::new(Default::default()),
+            sensitive_data_protector: SensitiveDataProtector::new(SensitiveDataConfig::default()),
         }
     }
 

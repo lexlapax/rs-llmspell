@@ -18,6 +18,24 @@ use llmspell_tools::{
     TextManipulatorTool, UrlAnalyzerTool, UuidGeneratorTool, VideoProcessorTool, WebScraperTool,
     WebSearchTool, WebhookCallerTool, WebpageMonitorTool,
 };
+
+// Import Config types from submodules
+use llmspell_tools::api::graphql_query::GraphQLConfig;
+use llmspell_tools::api::http_request::HttpRequestConfig;
+use llmspell_tools::communication::database_connector::DatabaseConnectorConfig;
+use llmspell_tools::communication::email_sender::EmailSenderConfig;
+use llmspell_tools::data::csv_analyzer::CsvAnalyzerConfig;
+use llmspell_tools::data::json_processor::JsonProcessorConfig;
+use llmspell_tools::fs::{
+    FileConverterConfig, FileOperationsConfig, FileSearchConfig, FileWatcherConfig,
+};
+use llmspell_tools::media::{AudioProcessorConfig, ImageProcessorConfig, VideoProcessorConfig};
+use llmspell_tools::search::WebSearchConfig;
+use llmspell_tools::system::{
+    EnvironmentReaderConfig, ProcessExecutorConfig, ServiceCheckerConfig, SystemMonitorConfig,
+};
+use llmspell_tools::util::{HashCalculatorConfig, TextManipulatorConfig, UuidGeneratorConfig};
+use llmspell_tools::web::web_scraper::WebScraperConfig;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
@@ -26,7 +44,6 @@ use std::sync::Arc;
 /// # Errors
 ///
 /// Returns an error if tool registration fails
-#[allow(clippy::default_trait_access)]
 pub fn register_all_tools(
     registry: Arc<ComponentRegistry>,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -123,21 +140,17 @@ fn register_utility_tools(
     register_tool(registry, "base64_encoder", Base64EncoderTool::new)?;
     register_tool(registry, "calculator", CalculatorTool::new)?;
     register_tool(registry, "data_validation", DataValidationTool::new)?;
-    register_tool(
-        registry,
-        "date_time_handler",
-        DateTimeHandlerTool::new,
-    )?;
+    register_tool(registry, "date_time_handler", DateTimeHandlerTool::new)?;
     register_tool(registry, "diff_calculator", DiffCalculatorTool::new)?;
     register_tool(registry, "hash_calculator", || {
-        HashCalculatorTool::new(Default::default())
+        HashCalculatorTool::new(HashCalculatorConfig::default())
     })?;
     register_tool(registry, "template_engine", TemplateEngineTool::new)?;
     register_tool(registry, "text_manipulator", || {
-        TextManipulatorTool::new(Default::default())
+        TextManipulatorTool::new(TextManipulatorConfig::default())
     })?;
     register_tool(registry, "uuid_generator", || {
-        UuidGeneratorTool::new(Default::default())
+        UuidGeneratorTool::new(UuidGeneratorConfig::default())
     })?;
     Ok(())
 }
@@ -147,16 +160,16 @@ fn register_data_processing_tools(
     registry: &Arc<ComponentRegistry>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     register_tool(registry, "csv_analyzer", || {
-        CsvAnalyzerTool::new(Default::default())
+        CsvAnalyzerTool::new(CsvAnalyzerConfig::default())
     })?;
     register_tool(registry, "json_processor", || {
-        JsonProcessorTool::new(Default::default())
+        JsonProcessorTool::new(JsonProcessorConfig::default())
     })?;
     register_tool_result(registry, "graphql_query", || {
-        GraphQLQueryTool::new(Default::default())
+        GraphQLQueryTool::new(GraphQLConfig::default())
     })?;
     register_tool_result(registry, "http_request", || {
-        HttpRequestTool::new(Default::default())
+        HttpRequestTool::new(HttpRequestConfig::default())
     })?;
     Ok(())
 }
@@ -174,11 +187,11 @@ fn register_file_system_tools(
         registry,
         "file_converter",
         file_sandbox_converter.clone(),
-        move || FileConverterTool::new(Default::default(), file_sandbox_converter),
+        move || FileConverterTool::new(FileConverterConfig::default(), file_sandbox_converter),
     )?;
 
     register_tool(registry, "file_operations", || {
-        FileOperationsTool::new(Default::default())
+        FileOperationsTool::new(FileOperationsConfig::default())
     })?;
 
     // File search with sandbox
@@ -187,7 +200,7 @@ fn register_file_system_tools(
         registry,
         "file_search",
         file_sandbox_search.clone(),
-        move || FileSearchTool::new(Default::default(), file_sandbox_search),
+        move || FileSearchTool::new(FileSearchConfig::default(), file_sandbox_search),
     )?;
 
     // File watcher with sandbox
@@ -196,7 +209,7 @@ fn register_file_system_tools(
         registry,
         "file_watcher",
         file_sandbox_watcher.clone(),
-        move || FileWatcherTool::new(Default::default(), file_sandbox_watcher),
+        move || FileWatcherTool::new(FileWatcherConfig::default(), file_sandbox_watcher),
     )?;
     Ok(())
 }
@@ -206,16 +219,16 @@ fn register_system_tools(
     registry: &Arc<ComponentRegistry>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     register_tool(registry, "environment_reader", || {
-        EnvironmentReaderTool::new(Default::default())
+        EnvironmentReaderTool::new(EnvironmentReaderConfig::default())
     })?;
     register_tool(registry, "process_executor", || {
-        ProcessExecutorTool::new(Default::default())
+        ProcessExecutorTool::new(ProcessExecutorConfig::default())
     })?;
     register_tool(registry, "service_checker", || {
-        ServiceCheckerTool::new(Default::default())
+        ServiceCheckerTool::new(ServiceCheckerConfig::default())
     })?;
     register_tool(registry, "system_monitor", || {
-        SystemMonitorTool::new(Default::default())
+        SystemMonitorTool::new(SystemMonitorConfig::default())
     })?;
     Ok(())
 }
@@ -225,13 +238,13 @@ fn register_media_tools(
     registry: &Arc<ComponentRegistry>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     register_tool(registry, "audio_processor", || {
-        AudioProcessorTool::new(Default::default())
+        AudioProcessorTool::new(AudioProcessorConfig::default())
     })?;
     register_tool(registry, "image_processor", || {
-        ImageProcessorTool::new(Default::default())
+        ImageProcessorTool::new(ImageProcessorConfig::default())
     })?;
     register_tool(registry, "video_processor", || {
-        VideoProcessorTool::new(Default::default())
+        VideoProcessorTool::new(VideoProcessorConfig::default())
     })?;
     Ok(())
 }
@@ -241,7 +254,7 @@ fn register_search_tools(
     registry: &Arc<ComponentRegistry>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     register_tool_result(registry, "web_search", || {
-        WebSearchTool::new(Default::default())
+        WebSearchTool::new(WebSearchConfig::default())
     })?;
     Ok(())
 }
@@ -250,7 +263,7 @@ fn register_search_tools(
 fn register_web_tools(registry: &Arc<ComponentRegistry>) -> Result<(), Box<dyn std::error::Error>> {
     register_tool(registry, "url-analyzer", UrlAnalyzerTool::new)?;
     register_tool(registry, "web-scraper", || {
-        WebScraperTool::new(Default::default())
+        WebScraperTool::new(WebScraperConfig::default())
     })?;
     register_tool(registry, "api-tester", ApiTesterTool::new)?;
     register_tool(registry, "webhook-caller", WebhookCallerTool::new)?;
@@ -264,10 +277,10 @@ fn register_communication_tools(
     registry: &Arc<ComponentRegistry>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     register_tool_result(registry, "email-sender", || {
-        EmailSenderTool::new(Default::default())
+        EmailSenderTool::new(EmailSenderConfig::default())
     })?;
     register_tool_result(registry, "database-connector", || {
-        DatabaseConnectorTool::new(Default::default())
+        DatabaseConnectorTool::new(DatabaseConnectorConfig::default())
     })?;
     Ok(())
 }

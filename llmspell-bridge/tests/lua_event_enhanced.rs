@@ -3,14 +3,18 @@
 
 use llmspell_bridge::globals::types::GlobalContext;
 use llmspell_bridge::lua::globals::event::inject_event_global;
-use llmspell_bridge::{ComponentRegistry, ProviderManager};
+use llmspell_bridge::{ComponentRegistry, ProviderManager, ProviderManagerConfig};
 use mlua::Lua;
 use std::sync::Arc;
 
 async fn create_test_environment() -> (Lua, GlobalContext) {
     let lua = Lua::new();
     let registry = Arc::new(ComponentRegistry::new());
-    let providers = Arc::new(ProviderManager::new(Default::default()).await.unwrap());
+    let providers = Arc::new(
+        ProviderManager::new(ProviderManagerConfig::default())
+            .await
+            .unwrap(),
+    );
     let context = GlobalContext::new(registry, providers);
 
     inject_event_global(&lua, &context).unwrap();

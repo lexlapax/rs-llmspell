@@ -536,7 +536,7 @@ async fn execute_tool_raw(tool_name: &str, params: Value) -> Result<AgentOutput,
     match tool_name {
         // File system tools
         "file-operations" => {
-            FileOperationsTool::new(Default::default())
+            FileOperationsTool::new(FileOperationsConfig::default())
                 .execute(input, context)
                 .await
         }
@@ -551,7 +551,7 @@ async fn execute_tool_raw(tool_name: &str, params: Value) -> Result<AgentOutput,
                 allowed_env_vars: vec![],
             };
             let sandbox = Arc::new(FileSandbox::new(sandbox_context)?);
-            FileSearchTool::new(Default::default(), sandbox)
+            FileSearchTool::new(FileSearchConfig::default(), sandbox)
                 .execute(input, context)
                 .await
         }
@@ -559,7 +559,7 @@ async fn execute_tool_raw(tool_name: &str, params: Value) -> Result<AgentOutput,
 
         // Web tools
         "web-scraper" => {
-            WebScraperTool::new(Default::default())
+            WebScraperTool::new(WebScraperConfig::default())
                 .execute(input, context)
                 .await
         }
@@ -568,26 +568,26 @@ async fn execute_tool_raw(tool_name: &str, params: Value) -> Result<AgentOutput,
         "url-analyzer" => UrlAnalyzerTool::new().execute(input, context).await,
         "sitemap-crawler" => SitemapCrawlerTool::new().execute(input, context).await,
         "web_search" => {
-            WebSearchTool::new(Default::default())?
+            WebSearchTool::new(WebSearchConfig::default())?
                 .execute(input, context)
                 .await
         }
 
         // System tools
         "process-executor" => {
-            ProcessExecutorTool::new(Default::default())
+            ProcessExecutorTool::new(ProcessExecutorConfig::default())
                 .execute(input, context)
                 .await
         }
 
         // Data processing tools
         "json-processor" => {
-            JsonProcessorTool::new(Default::default())
+            JsonProcessorTool::new(JsonProcessorConfig::default())
                 .execute(input, context)
                 .await
         }
         "database-connector" => {
-            DatabaseConnectorTool::new(Default::default())?
+            DatabaseConnectorTool::new(DatabaseConnectorConfig::default())?
                 .execute(input, context)
                 .await
         }
@@ -595,19 +595,19 @@ async fn execute_tool_raw(tool_name: &str, params: Value) -> Result<AgentOutput,
         // Utility tools
         "template-engine" => TemplateEngineTool::new().execute(input, context).await,
         "text-manipulator" => {
-            TextManipulatorTool::new(Default::default())
+            TextManipulatorTool::new(TextManipulatorConfig::default())
                 .execute(input, context)
                 .await
         }
         "uuid-generator" => {
-            UuidGeneratorTool::new(Default::default())
+            UuidGeneratorTool::new(UuidGeneratorConfig::default())
                 .execute(input, context)
                 .await
         }
 
         // Communication tools
         "email-sender" => {
-            EmailSenderTool::new(Default::default())?
+            EmailSenderTool::new(EmailSenderConfig::default())?
                 .execute(input, context)
                 .await
         }

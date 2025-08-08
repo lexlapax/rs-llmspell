@@ -9,6 +9,7 @@ use llmspell_core::{
 };
 use rig::{completion::CompletionModel, providers};
 use serde_json::json;
+use std::collections::HashMap;
 
 /// Enum to hold different provider models
 enum RigModel {
@@ -107,7 +108,7 @@ impl RigProvider {
             }),
             max_output_tokens: Some(4096),
             available_models: vec![config.model.clone()],
-            custom_features: Default::default(),
+            custom_features: HashMap::default(),
         };
 
         // Extract max_tokens from custom_config, with defaults based on provider

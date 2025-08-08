@@ -223,7 +223,8 @@ pub fn create_collaboration_workflow(
     collaboration_rounds: usize,
     initial_context: &Value,
 ) -> Result<llmspell_workflows::LoopWorkflow> {
-    let mut builder = LoopWorkflowBuilder::new(name.to_string()).with_range(0, collaboration_rounds as i64, 1);
+    let mut builder =
+        LoopWorkflowBuilder::new(name.to_string()).with_range(0, collaboration_rounds as i64, 1);
 
     // Each round, agents collaborate
     for (i, agent_id) in collaborating_agents.iter().enumerate() {

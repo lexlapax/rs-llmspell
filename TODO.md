@@ -511,7 +511,7 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
         
         **Completed**: Successfully reduced warnings from 1100+ to ~600 using both manual fixes and cargo clippy --fix
     
-    10.7. [IN PROGRESS] **Remaining Issues** (2-3 hours) - 718 warnings → ~550 remaining
+    10.7. [IN PROGRESS] **Remaining Issues** (2-3 hours) - 718 warnings → ~381 remaining
         
         **Tracking Files Created**:
         - `phase_10_7_full_clippy_output.txt` - Complete clippy output
@@ -522,8 +522,13 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
         - Fixed 165 early drop warnings (100% complete) ✅
         - Fixed 63 identical match arms (100% complete) ✅
         - Fixed 58 Option/Result patterns (100% complete) ✅
-        - **Total fixed**: 286 warnings  
-        - **Current total**: ~432 warnings remaining
+        - Fixed 49 pass by value issues (100% complete) ✅
+        - Fixed 45 Default trait issues (100% complete) ✅
+        - **Total fixed**: 380 warnings  
+        - **Current total**: ~338 warnings remaining
+        - **Tests**: All workspace tests passing ✅
+        - **Format**: cargo fmt clean ✅
+        - **Compilation**: Builds successfully ✅
         - llmspell-agents: 363 warnings (lib: 355, tests: 3, examples: 5)
         - llmspell-bridge: 267 warnings (lib: 236, tests: 31)
         - llmspell-tools: 87 warnings (lib: 30, tests: 57)
@@ -564,14 +569,37 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
             - Fixed resources.rs:505 - converted if let/else to map_or (1 warning)
             - Fixed sharing.rs:334 - converted if let/else to map_or (1 warning)
             - **Result**: All major patterns fixed from tracking file
-        - [ ] Fix pass by value issues (49 warnings) - Performance
-            - llmspell-bridge: 32
-            - llmspell-agents: 14
-            - llmspell-tools: 3
-        - [ ] Fix Default trait usage (45 warnings) - Style
-            - llmspell-bridge: 23
-            - llmspell-tools: 20
-            - llmspell-agents: 2
+        - [x] Fix pass by value issues (49 warnings → 0) - Performance ✅ COMPLETE
+            - Fixed llmspell-agents (14 warnings):
+                - composition/tool_composition.rs - Changed CompositionExecutionContext::new() to take &JsonValue
+                - state/isolation.rs - Changed scope parameters to &StateScope, added Copy trait to StatePermission
+                - lifecycle/events.rs - Added Copy trait to LifecycleEventType enum
+                - state/sharing.rs - Changed create_pipeline() to take &[String] for stages
+                - state/isolation.rs - Fixed IsolatedStateAccessor methods to take references
+            - Fixed llmspell-bridge (32 warnings):
+                - tools.rs - Changed all register functions to take &Arc<ComponentRegistry>
+                - multi_agent.rs - Changed all workflow creation functions to take references
+                - workflows.rs - Changed workflow factory functions to take &serde_json::Value
+                - Fixed all call sites in tests and example functions
+            - Fixed llmspell-tools (3 warnings):
+                - util/diff_calculator.rs - Changed calculate_text_diff() to take &DiffFormat
+            - **Result**: All 49 pass by value warnings fixed (100% complete)
+        - [x] Fix Default trait usage (45 warnings → ALL FIXED) - Style ✅ COMPLETE
+            - Fixed llmspell-agents (2 warnings):
+                - testing/mocks.rs:120 - Changed to StateMachineConfig::default()
+                - testing/mocks.rs:529 - Changed to ToolUsageStats::default()
+            - Fixed llmspell-bridge/src/tools.rs (22 warnings):
+                - Made submodules public in llmspell-tools (api, communication, data, web)
+                - Imported Config types from submodules (e.g., llmspell_tools::api::http_request::HttpRequestConfig)
+                - Replaced all Default::default() with specific Config types (e.g., HashCalculatorConfig::default())
+            - Fixed llmspell-state-persistence (2 warnings):
+                - manager.rs:1522 - Added import for ToolUsageStats and changed to ToolUsageStats::default()
+                - migration/transforms.rs:189 - Added import for SensitiveDataConfig and changed to SensitiveDataConfig::default()
+            - Fixed llmspell-providers (1 warning):
+                - rig.rs:110 - Added HashMap import and changed to HashMap::default()
+            - Fixed remaining warnings in various test files
+            - **Solution**: Made submodules public rather than re-exporting Config types at module level
+            - **Result**: All 45 Default trait warnings fixed (100% complete)
         - [ ] Fix panic issues (45 warnings) - All in llmspell-agents
         - [ ] Fix format string interpolations (23 warnings)
             - llmspell-tools: 16

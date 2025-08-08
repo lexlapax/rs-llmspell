@@ -5,6 +5,7 @@ use llmspell_core::traits::base_agent::BaseAgent;
 use llmspell_core::types::AgentInput;
 use llmspell_core::ExecutionContext;
 use llmspell_tools::util::*;
+use llmspell_tools::{HashCalculatorConfig, TextManipulatorConfig, UuidGeneratorConfig};
 use serde_json::{json, Value};
 use std::collections::HashMap;
 
@@ -33,7 +34,7 @@ async fn test_all_refactored_tools_response_format() {
     // Test that all refactored tools use consistent response format
 
     // HashCalculatorTool
-    let tool = HashCalculatorTool::new(Default::default());
+    let tool = HashCalculatorTool::new(HashCalculatorConfig::default());
     let input = create_test_input(
         "test",
         json!({
@@ -70,7 +71,7 @@ async fn test_all_refactored_tools_response_format() {
     assert!(output["result"].is_object());
 
     // UuidGeneratorTool
-    let tool = UuidGeneratorTool::new(Default::default());
+    let tool = UuidGeneratorTool::new(UuidGeneratorConfig::default());
     let input = create_test_input("test", json!({}));
     let result = tool
         .execute(input, ExecutionContext::default())
@@ -82,7 +83,7 @@ async fn test_all_refactored_tools_response_format() {
     assert!(output["result"].is_object());
 
     // TextManipulatorTool
-    let tool = TextManipulatorTool::new(Default::default());
+    let tool = TextManipulatorTool::new(TextManipulatorConfig::default());
     let input = create_test_input(
         "test",
         json!({
@@ -260,7 +261,7 @@ async fn test_refactored_tools_functionality() {
     // Test actual functionality of refactored tools
 
     // HashCalculatorTool - verify hash values
-    let tool = HashCalculatorTool::new(Default::default());
+    let tool = HashCalculatorTool::new(HashCalculatorConfig::default());
     let input = create_test_input(
         "test",
         json!({
@@ -293,7 +294,7 @@ async fn test_refactored_tools_functionality() {
     assert_eq!(output["output"], "SGVsbG8sIEJhc2U2NCE=");
 
     // UuidGeneratorTool - verify UUID format
-    let tool = UuidGeneratorTool::new(Default::default());
+    let tool = UuidGeneratorTool::new(UuidGeneratorConfig::default());
     let input = create_test_input("test", json!({}));
     let result = tool
         .execute(input, ExecutionContext::default())
@@ -304,7 +305,7 @@ async fn test_refactored_tools_functionality() {
     assert_eq!(uuid_str.len(), 36); // Standard UUID length
 
     // TextManipulatorTool - verify text operations
-    let tool = TextManipulatorTool::new(Default::default());
+    let tool = TextManipulatorTool::new(TextManipulatorConfig::default());
     let input = create_test_input(
         "test",
         json!({

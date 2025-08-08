@@ -1,6 +1,7 @@
 // ABOUTME: Core StateManager implementation with persistent backend support
 // ABOUTME: Integrates Phase 4 hooks and Phase 3.3 storage for state persistence
 
+use crate::agent_state::ToolUsageStats;
 use crate::backend_adapter::{create_storage_backend, StateStorageAdapter};
 use crate::config::{PersistenceConfig, StateSchema};
 use crate::key_manager::KeyManager;
@@ -1519,7 +1520,7 @@ impl StateManager {
         let state_data = crate::agent_state::AgentStateData {
             conversation_history: vec![],
             context_variables: HashMap::new(),
-            tool_usage_stats: Default::default(),
+            tool_usage_stats: ToolUsageStats::default(),
             execution_state: crate::agent_state::ExecutionState::Idle,
             custom_data: agent_state
                 .as_object()

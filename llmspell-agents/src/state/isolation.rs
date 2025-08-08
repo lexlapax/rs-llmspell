@@ -348,7 +348,12 @@ impl StateIsolationManager {
 
     /// Grant specific permission to an agent for a scope
     #[instrument(skip(self))]
-    pub fn grant_permission(&self, agent_id: &str, scope: &StateScope, permission: StatePermission) {
+    pub fn grant_permission(
+        &self,
+        agent_id: &str,
+        scope: &StateScope,
+        permission: StatePermission,
+    ) {
         let mut access_control = self.access_control.write();
         access_control.grant_permission(agent_id, scope.clone(), permission.clone());
         debug!(
