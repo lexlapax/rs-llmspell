@@ -232,19 +232,19 @@ impl WorkflowFactory {
     ) -> Result<Box<dyn WorkflowExecutor>> {
         match workflow_type {
             "sequential" => {
-                let workflow = create_sequential_workflow(params)?;
+                let workflow = create_sequential_workflow(&params)?;
                 Ok(Box::new(workflow))
             }
             "conditional" => {
-                let workflow = create_conditional_workflow(params)?;
+                let workflow = create_conditional_workflow(&params)?;
                 Ok(Box::new(workflow))
             }
             "loop" => {
-                let workflow = create_loop_workflow(params)?;
+                let workflow = create_loop_workflow(&params)?;
                 Ok(Box::new(workflow))
             }
             "parallel" => {
-                let workflow = create_parallel_workflow(params)?;
+                let workflow = create_parallel_workflow(&params)?;
                 Ok(Box::new(workflow))
             }
             _ => Err(llmspell_core::LLMSpellError::Configuration {
@@ -270,7 +270,7 @@ pub trait WorkflowExecutor: Send + Sync {
 
 // Helper functions to create specific workflow types
 
-fn create_sequential_workflow(params: serde_json::Value) -> Result<impl WorkflowExecutor> {
+fn create_sequential_workflow(params: &serde_json::Value) -> Result<impl WorkflowExecutor> {
     use llmspell_workflows::SequentialWorkflowBuilder;
 
     let name = params
@@ -299,7 +299,7 @@ fn create_sequential_workflow(params: serde_json::Value) -> Result<impl Workflow
     Ok(SequentialWorkflowExecutor { workflow, name })
 }
 
-fn create_conditional_workflow(params: serde_json::Value) -> Result<impl WorkflowExecutor> {
+fn create_conditional_workflow(params: &serde_json::Value) -> Result<impl WorkflowExecutor> {
     use llmspell_workflows::{ConditionalBranch, ConditionalWorkflowBuilder};
 
     let name = params
@@ -415,7 +415,7 @@ fn create_conditional_workflow(params: serde_json::Value) -> Result<impl Workflo
     Ok(ConditionalWorkflowExecutor { workflow, name })
 }
 
-fn create_loop_workflow(params: serde_json::Value) -> Result<impl WorkflowExecutor> {
+fn create_loop_workflow(params: &serde_json::Value) -> Result<impl WorkflowExecutor> {
     use llmspell_workflows::{LoopIterator, LoopWorkflowBuilder};
 
     let name = params
@@ -452,7 +452,7 @@ fn create_loop_workflow(params: serde_json::Value) -> Result<impl WorkflowExecut
     Ok(LoopWorkflowExecutor { workflow, name })
 }
 
-fn create_parallel_workflow(params: serde_json::Value) -> Result<impl WorkflowExecutor> {
+fn create_parallel_workflow(params: &serde_json::Value) -> Result<impl WorkflowExecutor> {
     use llmspell_workflows::{ParallelBranch, ParallelWorkflowBuilder};
 
     let name = params

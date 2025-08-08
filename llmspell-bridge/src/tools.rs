@@ -40,21 +40,21 @@ pub fn register_all_tools(
     let file_sandbox = Arc::new(FileSandbox::new(sandbox_context)?);
 
     // Register different tool categories
-    register_utility_tools(registry.clone())?;
-    register_data_processing_tools(registry.clone())?;
-    register_file_system_tools(registry.clone(), file_sandbox)?;
-    register_system_tools(registry.clone())?;
-    register_media_tools(registry.clone())?;
-    register_search_tools(registry.clone())?;
-    register_web_tools(registry.clone())?;
-    register_communication_tools(registry)?;
+    register_utility_tools(&registry)?;
+    register_data_processing_tools(&registry)?;
+    register_file_system_tools(&registry, file_sandbox)?;
+    register_system_tools(&registry)?;
+    register_media_tools(&registry)?;
+    register_search_tools(&registry)?;
+    register_web_tools(&registry)?;
+    register_communication_tools(&registry)?;
 
     Ok(())
 }
 
 /// Register a single tool with the bridge registry
 fn register_tool<T, F>(
-    registry: Arc<ComponentRegistry>,
+    registry: &Arc<ComponentRegistry>,
     name: &str,
     tool_factory: F,
 ) -> Result<(), Box<dyn std::error::Error>>
@@ -71,7 +71,7 @@ where
 
 /// Register a tool that requires a sandbox with the bridge registry
 fn register_tool_with_sandbox<T, F>(
-    registry: Arc<ComponentRegistry>,
+    registry: &Arc<ComponentRegistry>,
     name: &str,
     _sandbox: Arc<FileSandbox>,
     tool_factory: F,
@@ -89,7 +89,7 @@ where
 
 /// Register a tool that returns a Result
 fn register_tool_result<T, F>(
-    registry: Arc<ComponentRegistry>,
+    registry: &Arc<ComponentRegistry>,
     name: &str,
     tool_factory: F,
 ) -> Result<(), Box<dyn std::error::Error>>
@@ -106,34 +106,34 @@ where
 
 /// Get all registered tool names
 #[must_use]
-pub fn get_all_tool_names(registry: Arc<ComponentRegistry>) -> Vec<String> {
+pub fn get_all_tool_names(registry: &Arc<ComponentRegistry>) -> Vec<String> {
     registry.list_tools()
 }
 
 /// Get a tool by name from the registry
 #[must_use]
-pub fn get_tool_by_name(registry: Arc<ComponentRegistry>, name: &str) -> Option<Arc<dyn Tool>> {
+pub fn get_tool_by_name(registry: &Arc<ComponentRegistry>, name: &str) -> Option<Arc<dyn Tool>> {
     registry.get_tool(name)
 }
 
 /// Register utility tools
 fn register_utility_tools(
-    registry: Arc<ComponentRegistry>,
+    registry: &Arc<ComponentRegistry>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    register_tool(registry.clone(), "base64_encoder", Base64EncoderTool::new)?;
-    register_tool(registry.clone(), "calculator", CalculatorTool::new)?;
-    register_tool(registry.clone(), "data_validation", DataValidationTool::new)?;
+    register_tool(registry, "base64_encoder", Base64EncoderTool::new)?;
+    register_tool(registry, "calculator", CalculatorTool::new)?;
+    register_tool(registry, "data_validation", DataValidationTool::new)?;
     register_tool(
-        registry.clone(),
+        registry,
         "date_time_handler",
         DateTimeHandlerTool::new,
     )?;
-    register_tool(registry.clone(), "diff_calculator", DiffCalculatorTool::new)?;
-    register_tool(registry.clone(), "hash_calculator", || {
+    register_tool(registry, "diff_calculator", DiffCalculatorTool::new)?;
+    register_tool(registry, "hash_calculator", || {
         HashCalculatorTool::new(Default::default())
     })?;
-    register_tool(registry.clone(), "template_engine", TemplateEngineTool::new)?;
-    register_tool(registry.clone(), "text_manipulator", || {
+    register_tool(registry, "template_engine", TemplateEngineTool::new)?;
+    register_tool(registry, "text_manipulator", || {
         TextManipulatorTool::new(Default::default())
     })?;
     register_tool(registry, "uuid_generator", || {
@@ -144,15 +144,15 @@ fn register_utility_tools(
 
 /// Register data processing tools
 fn register_data_processing_tools(
-    registry: Arc<ComponentRegistry>,
+    registry: &Arc<ComponentRegistry>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    register_tool(registry.clone(), "csv_analyzer", || {
+    register_tool(registry, "csv_analyzer", || {
         CsvAnalyzerTool::new(Default::default())
     })?;
-    register_tool(registry.clone(), "json_processor", || {
+    register_tool(registry, "json_processor", || {
         JsonProcessorTool::new(Default::default())
     })?;
-    register_tool_result(registry.clone(), "graphql_query", || {
+    register_tool_result(registry, "graphql_query", || {
         GraphQLQueryTool::new(Default::default())
     })?;
     register_tool_result(registry, "http_request", || {
@@ -163,28 +163,28 @@ fn register_data_processing_tools(
 
 /// Register file system tools
 fn register_file_system_tools(
-    registry: Arc<ComponentRegistry>,
+    registry: &Arc<ComponentRegistry>,
     file_sandbox: Arc<FileSandbox>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    register_tool(registry.clone(), "archive_handler", ArchiveHandlerTool::new)?;
+    register_tool(registry, "archive_handler", ArchiveHandlerTool::new)?;
 
     // File converter with sandbox
     let file_sandbox_converter = file_sandbox.clone();
     register_tool_with_sandbox(
-        registry.clone(),
+        registry,
         "file_converter",
         file_sandbox_converter.clone(),
         move || FileConverterTool::new(Default::default(), file_sandbox_converter),
     )?;
 
-    register_tool(registry.clone(), "file_operations", || {
+    register_tool(registry, "file_operations", || {
         FileOperationsTool::new(Default::default())
     })?;
 
     // File search with sandbox
     let file_sandbox_search = file_sandbox.clone();
     register_tool_with_sandbox(
-        registry.clone(),
+        registry,
         "file_search",
         file_sandbox_search.clone(),
         move || FileSearchTool::new(Default::default(), file_sandbox_search),
@@ -203,15 +203,15 @@ fn register_file_system_tools(
 
 /// Register system integration tools
 fn register_system_tools(
-    registry: Arc<ComponentRegistry>,
+    registry: &Arc<ComponentRegistry>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    register_tool(registry.clone(), "environment_reader", || {
+    register_tool(registry, "environment_reader", || {
         EnvironmentReaderTool::new(Default::default())
     })?;
-    register_tool(registry.clone(), "process_executor", || {
+    register_tool(registry, "process_executor", || {
         ProcessExecutorTool::new(Default::default())
     })?;
-    register_tool(registry.clone(), "service_checker", || {
+    register_tool(registry, "service_checker", || {
         ServiceCheckerTool::new(Default::default())
     })?;
     register_tool(registry, "system_monitor", || {
@@ -222,12 +222,12 @@ fn register_system_tools(
 
 /// Register media processing tools
 fn register_media_tools(
-    registry: Arc<ComponentRegistry>,
+    registry: &Arc<ComponentRegistry>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    register_tool(registry.clone(), "audio_processor", || {
+    register_tool(registry, "audio_processor", || {
         AudioProcessorTool::new(Default::default())
     })?;
-    register_tool(registry.clone(), "image_processor", || {
+    register_tool(registry, "image_processor", || {
         ImageProcessorTool::new(Default::default())
     })?;
     register_tool(registry, "video_processor", || {
@@ -238,7 +238,7 @@ fn register_media_tools(
 
 /// Register search tools
 fn register_search_tools(
-    registry: Arc<ComponentRegistry>,
+    registry: &Arc<ComponentRegistry>,
 ) -> Result<(), Box<dyn std::error::Error>> {
     register_tool_result(registry, "web_search", || {
         WebSearchTool::new(Default::default())
@@ -247,23 +247,23 @@ fn register_search_tools(
 }
 
 /// Register web tools
-fn register_web_tools(registry: Arc<ComponentRegistry>) -> Result<(), Box<dyn std::error::Error>> {
-    register_tool(registry.clone(), "url-analyzer", UrlAnalyzerTool::new)?;
-    register_tool(registry.clone(), "web-scraper", || {
+fn register_web_tools(registry: &Arc<ComponentRegistry>) -> Result<(), Box<dyn std::error::Error>> {
+    register_tool(registry, "url-analyzer", UrlAnalyzerTool::new)?;
+    register_tool(registry, "web-scraper", || {
         WebScraperTool::new(Default::default())
     })?;
-    register_tool(registry.clone(), "api-tester", ApiTesterTool::new)?;
-    register_tool(registry.clone(), "webhook-caller", WebhookCallerTool::new)?;
-    register_tool(registry.clone(), "webpage-monitor", WebpageMonitorTool::new)?;
+    register_tool(registry, "api-tester", ApiTesterTool::new)?;
+    register_tool(registry, "webhook-caller", WebhookCallerTool::new)?;
+    register_tool(registry, "webpage-monitor", WebpageMonitorTool::new)?;
     register_tool(registry, "sitemap-crawler", SitemapCrawlerTool::new)?;
     Ok(())
 }
 
 /// Register communication tools
 fn register_communication_tools(
-    registry: Arc<ComponentRegistry>,
+    registry: &Arc<ComponentRegistry>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    register_tool_result(registry.clone(), "email-sender", || {
+    register_tool_result(registry, "email-sender", || {
         EmailSenderTool::new(Default::default())
     })?;
     register_tool_result(registry, "database-connector", || {

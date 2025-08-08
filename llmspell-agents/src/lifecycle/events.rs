@@ -15,7 +15,7 @@ use tracing::{debug, error, info, warn};
 use uuid::Uuid;
 
 /// Lifecycle event types
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum LifecycleEventType {
     /// Agent state changed
     StateChanged,

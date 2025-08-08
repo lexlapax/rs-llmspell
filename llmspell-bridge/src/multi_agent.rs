@@ -44,11 +44,11 @@ pub struct MultiAgentConfig {
 ///
 /// Returns an error if workflow creation fails
 pub fn create_pipeline_workflow(
-    name: String,
-    agents: Vec<String>,
-    initial_input: Value,
+    name: &str,
+    agents: &[String],
+    initial_input: &Value,
 ) -> Result<llmspell_workflows::SequentialWorkflow> {
-    let mut builder = SequentialWorkflowBuilder::new(name);
+    let mut builder = SequentialWorkflowBuilder::new(name.to_string());
 
     // Add each agent as a sequential step
     for (i, agent_id) in agents.iter().enumerate() {
@@ -84,14 +84,14 @@ pub fn create_pipeline_workflow(
 ///
 /// Returns an error if workflow creation fails
 pub fn create_fork_join_workflow(
-    name: String,
-    agent_tasks: Vec<(String, String, Value)>, // (agent_id, task_name, input)
-    #[allow(unused_variables)] aggregation_agent: Option<String>,
+    name: &str,
+    agent_tasks: &[(String, String, Value)], // (agent_id, task_name, input)
+    #[allow(unused_variables)] aggregation_agent: Option<&str>,
 ) -> Result<llmspell_workflows::ParallelWorkflow> {
-    let mut builder = ParallelWorkflowBuilder::new(name);
+    let mut builder = ParallelWorkflowBuilder::new(name.to_string());
 
     // Create parallel branches for each agent task
-    for (agent_id, task_name, input) in agent_tasks {
+    for (agent_id, task_name, input) in agent_tasks.iter() {
         let branch = ParallelBranch::new(task_name.clone())
             .with_description(format!("Task handled by agent: {agent_id}"))
             .add_step(WorkflowStep::new(
@@ -118,12 +118,12 @@ pub fn create_fork_join_workflow(
 ///
 /// Returns an error if workflow creation fails
 pub fn create_consensus_workflow(
-    name: String,
-    evaluator_agents: Vec<String>,
+    name: &str,
+    evaluator_agents: &[String],
     #[allow(unused_variables)] consensus_threshold: f64,
-    options: Value,
+    options: &Value,
 ) -> Result<llmspell_workflows::ParallelWorkflow> {
-    let mut builder = ParallelWorkflowBuilder::new(name);
+    let mut builder = ParallelWorkflowBuilder::new(name.to_string());
 
     // Each agent evaluates options in parallel
     for agent_id in evaluator_agents {
@@ -156,18 +156,18 @@ pub fn create_consensus_workflow(
 ///
 /// Returns an error if workflow creation fails
 pub fn create_delegation_workflow(
-    name: String,
-    coordinator_agent: String,
-    worker_agents: Vec<(String, String)>, // (agent_id, specialization)
-    task: Value,
+    name: &str,
+    coordinator_agent: &str,
+    worker_agents: &[(String, String)], // (agent_id, specialization)
+    task: &Value,
 ) -> Result<llmspell_workflows::SequentialWorkflow> {
-    let mut builder = SequentialWorkflowBuilder::new(name);
+    let mut builder = SequentialWorkflowBuilder::new(name.to_string());
 
     // Step 1: Coordinator analyzes task and creates delegation plan
     builder = builder.add_step(WorkflowStep::new(
         "task_analysis".to_string(),
         StepType::Agent {
-            agent_id: ComponentId::from_name(&coordinator_agent),
+            agent_id: ComponentId::from_name(coordinator_agent),
             input: serde_json::json!({
                 "task": task,
                 "available_workers": worker_agents.iter().map(|(id, spec)| {
@@ -218,12 +218,12 @@ pub fn create_delegation_workflow(
 ///
 /// Returns an error if workflow creation fails
 pub fn create_collaboration_workflow(
-    name: String,
-    collaborating_agents: Vec<String>,
+    name: &str,
+    collaborating_agents: &[String],
     collaboration_rounds: usize,
-    initial_context: Value,
+    initial_context: &Value,
 ) -> Result<llmspell_workflows::LoopWorkflow> {
-    let mut builder = LoopWorkflowBuilder::new(name).with_range(0, collaboration_rounds as i64, 1);
+    let mut builder = LoopWorkflowBuilder::new(name.to_string()).with_range(0, collaboration_rounds as i64, 1);
 
     // Each round, agents collaborate
     for (i, agent_id) in collaborating_agents.iter().enumerate() {
@@ -261,19 +261,19 @@ pub fn create_collaboration_workflow(
 ///
 /// Returns an error if workflow creation fails
 pub fn create_hierarchical_workflow(
-    name: String,
-    manager_agent: String,
-    team_leads: Vec<String>,
-    workers: Vec<Vec<String>>, // Workers per team lead
-    task: Value,
+    name: &str,
+    manager_agent: &str,
+    team_leads: &[String],
+    workers: &[Vec<String>], // Workers per team lead
+    task: &Value,
 ) -> Result<llmspell_workflows::SequentialWorkflow> {
-    let mut builder = SequentialWorkflowBuilder::new(name);
+    let mut builder = SequentialWorkflowBuilder::new(name.to_string());
 
     // Step 1: Manager creates high-level plan
     builder = builder.add_step(WorkflowStep::new(
         "manager_planning".to_string(),
         StepType::Agent {
-            agent_id: ComponentId::from_name(&manager_agent),
+            agent_id: ComponentId::from_name(manager_agent),
             input: serde_json::json!({
                 "task": task,
                 "team_structure": {
@@ -316,7 +316,7 @@ pub fn create_hierarchical_workflow(
     builder = builder.add_step(WorkflowStep::new(
         "final_report".to_string(),
         StepType::Agent {
-            agent_id: ComponentId::from_name(&manager_agent),
+            agent_id: ComponentId::from_name(manager_agent),
             input: serde_json::json!({
                 "action": "create_final_report",
                 "team_reports": "$consolidate_reports_output",
@@ -340,14 +340,14 @@ impl MultiAgentExamples {
     /// Returns an error if workflow creation fails
     pub fn research_pipeline_example() -> Result<llmspell_workflows::SequentialWorkflow> {
         create_pipeline_workflow(
-            "research_paper_pipeline".to_string(),
-            vec![
+            "research_paper_pipeline",
+            &vec![
                 "paper_reader_agent".to_string(),
                 "concept_extractor_agent".to_string(),
                 "critic_agent".to_string(),
                 "summary_writer_agent".to_string(),
             ],
-            serde_json::json!({
+            &serde_json::json!({
                 "paper_url": "https://example.com/paper.pdf",
                 "analysis_depth": "detailed"
             }),
@@ -361,8 +361,8 @@ impl MultiAgentExamples {
     /// Returns an error if workflow creation fails
     pub fn multi_perspective_analysis() -> Result<llmspell_workflows::ParallelWorkflow> {
         create_fork_join_workflow(
-            "multi_perspective_analysis".to_string(),
-            vec![
+            "multi_perspective_analysis",
+            &vec![
                 (
                     "technical_analyst".to_string(),
                     "technical_review".to_string(),
@@ -379,7 +379,7 @@ impl MultiAgentExamples {
                     serde_json::json!({"focus": "security_implications"}),
                 ),
             ],
-            Some("integration_agent".to_string()),
+            Some("integration_agent"),
         )
     }
 
@@ -390,15 +390,15 @@ impl MultiAgentExamples {
     /// Returns an error if workflow creation fails
     pub fn investment_consensus() -> Result<llmspell_workflows::ParallelWorkflow> {
         create_consensus_workflow(
-            "investment_decision".to_string(),
-            vec![
+            "investment_decision",
+            &vec![
                 "fundamental_analyst".to_string(),
                 "technical_analyst".to_string(),
                 "risk_analyst".to_string(),
                 "market_analyst".to_string(),
             ],
             0.75, // 75% consensus required
-            serde_json::json!({
+            &serde_json::json!({
                 "investment_options": [
                     {"ticker": "AAPL", "action": "buy"},
                     {"ticker": "GOOGL", "action": "hold"},
@@ -415,9 +415,9 @@ mod tests {
     #[test]
     fn test_pipeline_workflow_creation() {
         let workflow = create_pipeline_workflow(
-            "test_pipeline".to_string(),
-            vec!["agent1".to_string(), "agent2".to_string()],
-            serde_json::json!({"data": "test"}),
+            "test_pipeline",
+            &vec!["agent1".to_string(), "agent2".to_string()],
+            &serde_json::json!({"data": "test"}),
         )
         .unwrap();
 
@@ -426,8 +426,8 @@ mod tests {
     #[test]
     fn test_fork_join_workflow_creation() {
         let workflow = create_fork_join_workflow(
-            "test_fork_join".to_string(),
-            vec![
+            "test_fork_join",
+            &vec![
                 (
                     "agent1".to_string(),
                     "task1".to_string(),

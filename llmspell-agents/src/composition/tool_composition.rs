@@ -326,7 +326,7 @@ impl ToolComposition {
         let mut step_results = HashMap::new();
         let mut errors = Vec::new();
         let mut execution_context =
-            CompositionExecutionContext::new(initial_parameters, &self.shared_context);
+            CompositionExecutionContext::new(&initial_parameters, &self.shared_context);
 
         let mut steps_executed = 0;
         let mut steps_failed = 0;
@@ -713,7 +713,7 @@ struct CompositionExecutionContext {
 }
 
 impl CompositionExecutionContext {
-    fn new(parameters: JsonValue, shared_context: &HashMap<String, JsonValue>) -> Self {
+    fn new(parameters: &JsonValue, shared_context: &HashMap<String, JsonValue>) -> Self {
         let parameters = parameters.as_object().cloned().unwrap_or_default();
         Self {
             parameters,
@@ -855,7 +855,7 @@ mod tests {
     async fn test_data_flow_transforms() {
         let composition = ToolComposition::new("test");
         let context = CompositionExecutionContext::new(
-            json!({"nested": {"field": "value"}}),
+            &json!({"nested": {"field": "value"}}),
             &HashMap::new(),
         );
 

@@ -417,7 +417,7 @@ impl StateSharingManager {
     pub fn create_pipeline(
         &self,
         pipeline_id: &str,
-        stages: Vec<String>, // Agent IDs in order
+        stages: &[String], // Agent IDs in order
     ) -> Result<()> {
         if stages.is_empty() {
             return Err(anyhow::anyhow!("Pipeline must have at least one stage"));
@@ -427,7 +427,7 @@ impl StateSharingManager {
         self.create_channel(pipeline_id, SharingPattern::Pipeline, &stages[0], None)?;
 
         // Subscribe all stages
-        for agent_id in &stages {
+        for agent_id in stages {
             self.subscribe_agent(agent_id, pipeline_id)?;
         }
 
@@ -775,7 +775,7 @@ mod tests {
             "writer".to_string(),
         ];
         sharing_manager
-            .create_pipeline("data-pipeline", stages)
+            .create_pipeline("data-pipeline", &stages)
             .unwrap();
 
         // First stage processes
