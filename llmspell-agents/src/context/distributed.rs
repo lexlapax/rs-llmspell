@@ -444,20 +444,23 @@ impl DistributedContext {
     async fn send_to_node(&self, node_id: &str, _message: SyncMessage) -> Result<()> {
         let nodes = self.nodes.read().await;
 
-        if let Some(node) = nodes.get(node_id) {
-            // In real implementation, would send over network
-            tracing::info!(
-                target_node = %node_id,
-                address = %node.address,
-                "Sending sync message"
-            );
-            Ok(())
-        } else {
-            Err(LLMSpellError::Component {
-                message: format!("Node not found: {node_id}"),
-                source: None,
-            })
-        }
+        nodes.get(node_id).map_or_else(
+            || {
+                Err(LLMSpellError::Component {
+                    message: format!("Node not found: {node_id}"),
+                    source: None,
+                })
+            },
+            |node| {
+                // In real implementation, would send over network
+                tracing::info!(
+                    target_node = %node_id,
+                    address = %node.address,
+                    "Sending sync message"
+                );
+                Ok(())
+            },
+        )
     }
 
     /// Start heartbeat task

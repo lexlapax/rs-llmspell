@@ -636,7 +636,7 @@ mod tests {
     }
     #[test]
     fn test_pattern_matching() {
-        let aggregator = CapabilityAggregator::new();
+        let _aggregator = CapabilityAggregator::new();
 
         assert!(CapabilityAggregator::matches_pattern(
             "text-processing",

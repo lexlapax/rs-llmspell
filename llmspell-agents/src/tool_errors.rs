@@ -195,7 +195,9 @@ impl ToolIntegrationError {
     #[must_use]
     pub const fn severity(&self) -> ErrorSeverity {
         match self {
-            Self::SecurityViolation { .. } | Self::StateCorruption { .. } => ErrorSeverity::Critical,
+            Self::SecurityViolation { .. } | Self::StateCorruption { .. } => {
+                ErrorSeverity::Critical
+            }
             Self::ToolNotFound { .. }
             | Self::InvocationFailed { .. }
             | Self::CompositionFailed { .. }

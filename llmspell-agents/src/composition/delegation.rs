@@ -351,7 +351,8 @@ impl DelegatingAgent {
                     let mut metrics = self.metrics.write().unwrap();
                     metrics.successful_delegations += 1;
                     metrics.avg_delegation_time = std::time::Duration::from_secs(
-                        (metrics.avg_delegation_time.as_secs() * (metrics.successful_delegations - 1)
+                        (metrics.avg_delegation_time.as_secs()
+                            * (metrics.successful_delegations - 1)
                             + duration.as_secs())
                             / metrics.successful_delegations,
                     );

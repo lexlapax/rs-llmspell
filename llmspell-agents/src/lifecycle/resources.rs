@@ -504,15 +504,13 @@ impl ResourceManager {
     /// Get current resource usage for agent
     async fn get_agent_usage(&self, agent_id: &str, resource_type: &ResourceType) -> u64 {
         let allocations = self.allocations.read().await;
-        if let Some(agent_allocations) = allocations.get(agent_id) {
+        allocations.get(agent_id).map_or(0, |agent_allocations| {
             agent_allocations
                 .iter()
                 .filter(|a| a.resource_type == *resource_type)
                 .map(|a| a.amount)
                 .sum()
-        } else {
-            0
-        }
+        })
     }
 
     /// Get global resource usage

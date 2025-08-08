@@ -975,11 +975,11 @@ mod tests {
     }
     #[test]
     fn test_constraint_validation() {
-        let validator = TemplateValidator::new();
+        let _validator = TemplateValidator::new();
         let mut result = ValidationResult::success();
 
         // Test MinValue constraint
-        ValidationAgent::validate_constraint(
+        TemplateValidator::validate_constraint(
             "test",
             &ParameterConstraint::MinValue(10.0),
             &5.into(),
@@ -989,7 +989,7 @@ mod tests {
 
         // Test Pattern constraint
         let mut result = ValidationResult::success();
-        ValidationAgent::validate_constraint(
+        TemplateValidator::validate_constraint(
             "email",
             &ParameterConstraint::Pattern(r"^[^@]+@[^@]+\.[^@]+$".to_string()),
             &"invalid-email".into(),

@@ -144,15 +144,18 @@ impl Alert {
     /// Get alert duration
     #[must_use]
     pub fn duration(&self) -> Duration {
-        if let Some(resolved_at) = self.resolved_at {
-            (resolved_at - self.triggered_at)
-                .to_std()
-                .unwrap_or_default()
-        } else {
-            (Utc::now() - self.triggered_at)
-                .to_std()
-                .unwrap_or_default()
-        }
+        self.resolved_at.map_or_else(
+            || {
+                (Utc::now() - self.triggered_at)
+                    .to_std()
+                    .unwrap_or_default()
+            },
+            |resolved_at| {
+                (resolved_at - self.triggered_at)
+                    .to_std()
+                    .unwrap_or_default()
+            },
+        )
     }
 }
 
@@ -556,16 +559,23 @@ impl AlertManager {
     ///
     /// Returns an error if the alert is not found
     pub fn resolve_alert(&self, alert_id: &str) -> Result<()> {
-        if let Some(mut alert) = self.active_alerts.write().unwrap().remove(alert_id) {
-            alert.resolve();
-            self.add_to_history(alert);
-            Ok(())
-        } else {
-            Err(llmspell_core::LLMSpellError::Component {
-                message: format!("Alert {alert_id} not found"),
-                source: None,
-            })
-        }
+        self.active_alerts
+            .write()
+            .unwrap()
+            .remove(alert_id)
+            .map_or_else(
+                || {
+                    Err(llmspell_core::LLMSpellError::Component {
+                        message: format!("Alert {alert_id} not found"),
+                        source: None,
+                    })
+                },
+                |mut alert| {
+                    alert.resolve();
+                    self.add_to_history(alert);
+                    Ok(())
+                },
+            )
     }
 
     /// Get alert statistics

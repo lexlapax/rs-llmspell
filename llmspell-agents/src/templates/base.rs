@@ -414,14 +414,14 @@ impl TemplateFactory {
         &self,
         category: &super::schema::TemplateCategory,
     ) -> Vec<&dyn AgentTemplate> {
-        if let Some(template_ids) = self.templates_by_category.get(category) {
-            template_ids
-                .iter()
-                .filter_map(|id| self.get_template(id))
-                .collect()
-        } else {
-            Vec::new()
-        }
+        self.templates_by_category
+            .get(category)
+            .map_or_else(Vec::new, |template_ids| {
+                template_ids
+                    .iter()
+                    .filter_map(|id| self.get_template(id))
+                    .collect()
+            })
     }
 
     /// Get all template IDs

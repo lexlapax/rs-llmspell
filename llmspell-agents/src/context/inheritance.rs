@@ -267,20 +267,14 @@ impl InheritanceRules {
 
     fn transform_value(&self, field: &str, value: &Value) -> Value {
         match self.field_rules.transforms.get(field) {
-            Some(FieldTransform::Prefix(prefix)) => {
-                if let Some(str_val) = value.as_str() {
-                    Value::String(format!("{prefix}{str_val}"))
-                } else {
-                    value.clone()
-                }
-            }
-            Some(FieldTransform::Suffix(suffix)) => {
-                if let Some(str_val) = value.as_str() {
-                    Value::String(format!("{str_val}{suffix}"))
-                } else {
-                    value.clone()
-                }
-            }
+            Some(FieldTransform::Prefix(prefix)) => value.as_str().map_or_else(
+                || value.clone(),
+                |str_val| Value::String(format!("{prefix}{str_val}")),
+            ),
+            Some(FieldTransform::Suffix(suffix)) => value.as_str().map_or_else(
+                || value.clone(),
+                |str_val| Value::String(format!("{str_val}{suffix}")),
+            ),
             Some(FieldTransform::Copy) | Some(FieldTransform::Custom(_)) | None => value.clone(),
         }
     }
@@ -360,11 +354,9 @@ impl InheritanceValidator for SecurityFieldValidator {
 
     fn validate_value(&self, field: &str, value: &Value) -> bool {
         if field == "security_level" {
-            if let Some(level) = value.as_str() {
+            value.as_str().map_or(false, |level| {
                 ["low", "medium", "high", "critical"].contains(&level)
-            } else {
-                false
-            }
+            })
         } else {
             true
         }

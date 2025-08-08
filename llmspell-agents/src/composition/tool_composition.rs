@@ -584,16 +584,12 @@ impl ToolComposition {
             }
             DataTransform::ToNumber => match value {
                 JsonValue::Number(n) => Ok(JsonValue::Number(n.clone())),
-                JsonValue::String(s) => {
-                    if let Ok(n) = s.parse::<f64>() {
-                        Ok(JsonValue::Number(
-                            serde_json::Number::from_f64(n)
-                                .unwrap_or_else(|| serde_json::Number::from(0)),
-                        ))
-                    } else {
-                        Ok(JsonValue::Number(serde_json::Number::from(0)))
-                    }
-                }
+                JsonValue::String(s) => Ok(JsonValue::Number(
+                    s.parse::<f64>()
+                        .ok()
+                        .and_then(serde_json::Number::from_f64)
+                        .unwrap_or_else(|| serde_json::Number::from(0)),
+                )),
                 _ => Ok(JsonValue::Number(serde_json::Number::from(0))),
             },
             DataTransform::Custom(function_name) => {

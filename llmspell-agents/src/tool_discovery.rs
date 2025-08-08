@@ -148,11 +148,11 @@ impl ToolDiscovery {
     ///
     /// Returns an error if registry access fails
     pub async fn get_tool_info(&self, name: &str) -> Result<Option<ToolInfo>> {
-        if let Some(registry_info) = self.registry.get_tool_info(name).await {
-            Ok(Some(Self::convert_registry_info(&registry_info)))
-        } else {
-            Ok(None)
-        }
+        Ok(self
+            .registry
+            .get_tool_info(name)
+            .await
+            .map(|registry_info| Self::convert_registry_info(&registry_info)))
     }
 
     /// Check if a tool exists

@@ -538,12 +538,10 @@ impl AgentStateMachine {
         let transition_id = format!("{}-{:?}-{:?}", self.agent_id, from_state, to_state);
 
         let tokens = self.active_cancellation_tokens.lock().await;
-        if let Some(token) = tokens.get(&transition_id) {
+        tokens.get(&transition_id).map_or(false, |token| {
             token.cancel();
             true
-        } else {
-            false
-        }
+        })
     }
 
     /// Transition to new state
@@ -811,13 +809,15 @@ impl AgentStateMachine {
         }
 
         // Handle timeout
-        match timeout_result {
-            Ok(result) => result,
-            Err(_) => Err(anyhow!(
-                "State transition timed out after {:?}",
-                self.config.max_transition_time
-            )),
-        }
+        timeout_result.map_or_else(
+            |_| {
+                Err(anyhow!(
+                    "State transition timed out after {:?}",
+                    self.config.max_transition_time
+                ))
+            },
+            |result| result,
+        )
     }
 
     /// Initialize agent (transition from Uninitialized to Ready)

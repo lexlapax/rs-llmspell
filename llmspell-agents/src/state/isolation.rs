@@ -372,10 +372,10 @@ impl StateIsolationManager {
     #[must_use]
     pub fn get_audit_log(&self, limit: Option<usize>) -> Vec<StateAccessAudit> {
         let audit_log = self.audit_log.read();
-        match limit {
-            Some(n) => audit_log.iter().rev().take(n).cloned().collect(),
-            None => audit_log.clone(),
-        }
+        limit.map_or_else(
+            || audit_log.clone(),
+            |n| audit_log.iter().rev().take(n).cloned().collect(),
+        )
     }
 
     /// Clear old audit log entries

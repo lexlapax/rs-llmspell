@@ -145,13 +145,14 @@ impl StatePersistenceHook {
                 agents
                     .keys()
                     .filter_map(|agent_id| {
-                        let should_save = if let Some(last_save) = last_saves.get(agent_id) {
-                            now.duration_since(*last_save)
-                                .unwrap_or(Duration::from_secs(0))
-                                >= interval
-                        } else {
-                            true // Never saved
-                        };
+                        let should_save = last_saves.get(agent_id).map_or(
+                            true, // Never saved
+                            |last_save| {
+                                now.duration_since(*last_save)
+                                    .unwrap_or(Duration::from_secs(0))
+                                    >= interval
+                            },
+                        );
 
                         if should_save {
                             Some(agent_id.clone())
@@ -282,31 +283,20 @@ impl StatePersistenceHook {
         };
 
         if let Some(agent) = agent {
-            match Self::try_restore_state(&agent, agent_id) {
-                Ok(restored) => {
-                    if restored {
-                        self.metrics
-                            .restores_succeeded
-                            .fetch_add(1, Ordering::Relaxed);
-                        info!("Successfully restored state for agent {}", agent_id);
-                    } else {
-                        debug!("No saved state found for agent {}", agent_id);
-                    }
-                    Ok(())
-                }
-                Err(e) => {
-                    error!("Failed to restore state for agent {}: {}", agent_id, e);
-                    self.metrics.restores_failed.fetch_add(1, Ordering::Relaxed);
-                    Err(e)
-                }
+            if Self::try_restore_state(&agent, agent_id) {
+                self.metrics
+                    .restores_succeeded
+                    .fetch_add(1, Ordering::Relaxed);
+                info!("Successfully restored state for agent {}", agent_id);
+            } else {
+                debug!("No saved state found for agent {}", agent_id);
             }
-        } else {
-            Ok(())
         }
+        Ok(())
     }
 
     /// Attempt to restore state (single attempt)
-    fn try_restore_state(_agent: &AgentRef, agent_id: &str) -> Result<bool> {
+    fn try_restore_state(_agent: &AgentRef, agent_id: &str) -> bool {
         // TODO: Once we have proper trait casting
         // let mut agent = agent.lock().await;
         // if let Some(persistent_agent) = agent.as_any_mut().downcast_mut::<dyn StatePersistence>() {
@@ -315,7 +305,7 @@ impl StatePersistenceHook {
 
         debug!("Attempting to restore state for agent {}", agent_id);
 
-        Ok(false)
+        false
     }
 
     /// Get persistence metrics

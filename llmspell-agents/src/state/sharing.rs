@@ -332,11 +332,7 @@ impl StateSharingManager {
                     .iter()
                     .filter(|m| {
                         // Filter by time if specified
-                        if let Some(since_time) = since {
-                            m.timestamp > since_time
-                        } else {
-                            true
-                        }
+                        since.map_or(true, |since_time| m.timestamp > since_time)
                     })
                     .filter(|m| {
                         // Don't show agent their own messages
