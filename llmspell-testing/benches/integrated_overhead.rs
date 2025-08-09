@@ -394,7 +394,7 @@ fn bench_full_system_integration(c: &mut Criterion) {
                     let branch = ParallelBranch {
                         name: format!("branch_{}", i),
                         description: format!("Branch {}", i),
-                        steps: vec![step.into()],
+                        steps: vec![step],
                         required: true,
                         timeout: None,
                     };

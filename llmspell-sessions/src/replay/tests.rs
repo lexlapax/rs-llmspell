@@ -2,7 +2,7 @@
 //! ABOUTME: Tests the `ReplayEngine` and `SessionReplayAdapter` with existing infrastructure
 
 #[cfg(test)]
-mod tests {
+mod replay_tests {
     use super::super::{
         session_adapter::{SessionReplayAdapter, SessionReplayConfig, SessionReplayStatus},
         HookReplayBridge, ReplayEngine,
@@ -15,7 +15,7 @@ mod tests {
     use std::sync::Arc;
     use std::time::{Duration, SystemTime};
 
-    async fn create_test_replay_components() -> (
+    fn create_test_replay_components() -> (
         Arc<ReplayManager>,
         Arc<HookReplayManager>,
         Arc<dyn llmspell_storage::StorageBackend>,
@@ -72,7 +72,7 @@ mod tests {
     #[tokio::test]
     async fn test_replay_engine_creation() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
-            create_test_replay_components().await;
+            create_test_replay_components();
 
         let replay_engine = ReplayEngine::new(
             replay_manager,
@@ -92,7 +92,7 @@ mod tests {
     #[tokio::test]
     async fn test_session_replay_adapter_creation() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
-            create_test_replay_components().await;
+            create_test_replay_components();
 
         let adapter = SessionReplayAdapter::new(
             replay_manager,
@@ -188,7 +188,7 @@ mod tests {
     #[tokio::test]
     async fn test_replay_adapter_timeline_empty_session() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
-            create_test_replay_components().await;
+            create_test_replay_components();
 
         let adapter = SessionReplayAdapter::new(
             replay_manager,
@@ -220,7 +220,7 @@ mod tests {
     #[tokio::test]
     async fn test_replay_adapter_with_correlation_id() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
-            create_test_replay_components().await;
+            create_test_replay_components();
 
         let adapter = SessionReplayAdapter::new(
             replay_manager,
@@ -268,7 +268,7 @@ mod tests {
     #[tokio::test]
     async fn test_replay_status_tracking() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
-            create_test_replay_components().await;
+            create_test_replay_components();
 
         let adapter = SessionReplayAdapter::new(
             replay_manager,
@@ -309,7 +309,7 @@ mod tests {
     #[tokio::test]
     async fn test_replay_stop() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
-            create_test_replay_components().await;
+            create_test_replay_components();
 
         let adapter = SessionReplayAdapter::new(
             replay_manager,
@@ -352,7 +352,7 @@ mod tests {
     #[tokio::test]
     async fn test_replay_progress_update() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
-            create_test_replay_components().await;
+            create_test_replay_components();
 
         let adapter = SessionReplayAdapter::new(
             replay_manager,
@@ -390,7 +390,7 @@ mod tests {
     #[tokio::test]
     async fn test_clear_completed_replays() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
-            create_test_replay_components().await;
+            create_test_replay_components();
 
         let adapter = SessionReplayAdapter::new(
             replay_manager,
@@ -486,7 +486,7 @@ mod tests {
     #[tokio::test]
     async fn test_query_session_hooks() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
-            create_test_replay_components().await;
+            create_test_replay_components();
 
         let adapter = SessionReplayAdapter::new(
             replay_manager,
@@ -525,7 +525,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_session_replay_metadata() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
-            create_test_replay_components().await;
+            create_test_replay_components();
 
         let adapter = SessionReplayAdapter::new(
             replay_manager,
@@ -566,7 +566,7 @@ mod tests {
     #[tokio::test]
     async fn test_list_replayable_sessions() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
-            create_test_replay_components().await;
+            create_test_replay_components();
 
         let adapter = SessionReplayAdapter::new(
             replay_manager,
@@ -681,7 +681,7 @@ mod tests {
     #[tokio::test]
     async fn test_query_functionality_with_filters() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
-            create_test_replay_components().await;
+            create_test_replay_components();
 
         let adapter = SessionReplayAdapter::new(
             replay_manager,
@@ -756,7 +756,7 @@ mod tests {
     #[tokio::test]
     async fn test_session_replay_scheduling() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
-            create_test_replay_components().await;
+            create_test_replay_components();
 
         let adapter = SessionReplayAdapter::new(
             replay_manager,
@@ -794,7 +794,7 @@ mod tests {
     #[tokio::test]
     async fn test_replay_pause_resume() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
-            create_test_replay_components().await;
+            create_test_replay_components();
 
         let adapter = SessionReplayAdapter::new(
             replay_manager,
@@ -817,17 +817,17 @@ mod tests {
 
         // Test speed control directly
         let mut speed = SessionReplaySpeed::default();
-        assert_eq!(speed.multiplier(), 1.0);
+        assert!((speed.multiplier() - 1.0).abs() < f64::EPSILON);
 
         speed.set_speed(2.0);
-        assert_eq!(speed.multiplier(), 2.0);
+        assert!((speed.multiplier() - 2.0).abs() < f64::EPSILON);
 
         // Test extreme speeds with clamping
         speed.set_speed(0.05);
-        assert_eq!(speed.multiplier(), 0.1); // Clamped to min
+        assert!((speed.multiplier() - 0.1).abs() < f64::EPSILON); // Clamped to min
 
         speed.set_speed(20.0);
-        assert_eq!(speed.multiplier(), 10.0); // Clamped to max
+        assert!((speed.multiplier() - 10.0).abs() < f64::EPSILON); // Clamped to max
 
         // Test duration application
         let duration = Duration::from_secs(10);
@@ -840,7 +840,7 @@ mod tests {
         use super::super::session_controls::{SessionBreakpoint, SessionBreakpointCondition};
 
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
-            create_test_replay_components().await;
+            create_test_replay_components();
 
         let adapter = SessionReplayAdapter::new(
             replay_manager,
@@ -874,7 +874,7 @@ mod tests {
     #[tokio::test]
     async fn test_step_debugging() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
-            create_test_replay_components().await;
+            create_test_replay_components();
 
         let adapter = SessionReplayAdapter::new(
             replay_manager,
@@ -892,7 +892,7 @@ mod tests {
     #[tokio::test]
     async fn test_replay_progress_tracking() {
         let (replay_manager, hook_replay_manager, storage_backend, event_bus) =
-            create_test_replay_components().await;
+            create_test_replay_components();
 
         let adapter = SessionReplayAdapter::new(
             replay_manager,

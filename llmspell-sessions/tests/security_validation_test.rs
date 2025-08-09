@@ -147,11 +147,13 @@ mod tests {
     }
     #[tokio::test]
     async fn test_dos_prevention_max_artifacts() {
-        let mut config = SessionManagerConfig::default();
         // Set a low limit for testing
         // Note: This would require implementing artifact limits in the config
         // For now, we'll test with the existing max_storage_size_bytes
-        config.max_storage_size_bytes = 5 * 1024; // 5KB total
+        let config = SessionManagerConfig {
+            max_storage_size_bytes: 5 * 1024, // 5KB total
+            ..Default::default()
+        };
 
         let manager = create_test_manager_with_config(config).await;
         let session_id = manager.create_session(Default::default()).await.unwrap();
@@ -178,9 +180,11 @@ mod tests {
     }
     #[tokio::test]
     async fn test_dos_prevention_storage_quota() {
-        let mut config = SessionManagerConfig::default();
         // Set a low storage quota for testing (10KB)
-        config.max_storage_size_bytes = 10 * 1024;
+        let config = SessionManagerConfig {
+            max_storage_size_bytes: 10 * 1024,
+            ..Default::default()
+        };
 
         let manager = create_test_manager_with_config(config).await;
         let session_id = manager.create_session(Default::default()).await.unwrap();

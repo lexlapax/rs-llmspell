@@ -245,7 +245,7 @@ mod tests {
                 .record_version(
                     &session_id,
                     name,
-                    i as u32,
+                    u32::try_from(i).expect("version number should fit in u32"),
                     &artifact_id,
                     &format!("hash{}", i),
                 )

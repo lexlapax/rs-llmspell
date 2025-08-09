@@ -553,8 +553,10 @@ mod tests {
     }
     #[tokio::test]
     async fn test_privacy_mode() {
-        let mut config = SessionAnalyticsConfig::default();
-        config.privacy_mode = true;
+        let config = SessionAnalyticsConfig {
+            privacy_mode: true,
+            ..Default::default()
+        };
 
         let analytics = SessionAnalytics::new(config);
 

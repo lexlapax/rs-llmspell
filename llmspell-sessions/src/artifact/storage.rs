@@ -1250,8 +1250,10 @@ mod tests {
     #[tokio::test]
     async fn test_storage_limits() {
         let backend = Arc::new(MemoryBackend::new());
-        let mut config = ArtifactStorageConfig::default();
-        config.max_artifact_size = 1024; // 1KB limit for testing
+        let config = ArtifactStorageConfig {
+            max_artifact_size: 1024, // 1KB limit for testing
+            ..Default::default()
+        };
 
         let storage = ArtifactStorage::new(backend, config);
         let session_id = SessionId::new();
@@ -1384,8 +1386,10 @@ mod tests {
     #[tokio::test]
     async fn test_store_large_artifact() {
         let backend = Arc::new(MemoryBackend::new());
-        let mut config = ArtifactStorageConfig::default();
-        config.chunk_size = 1024; // 1KB chunks for testing
+        let config = ArtifactStorageConfig {
+            chunk_size: 1024, // 1KB chunks for testing
+            ..Default::default()
+        };
 
         let storage = Arc::new(ArtifactStorage::new(backend, config));
 
@@ -1662,8 +1666,8 @@ mod tests {
         let session_id = SessionId::new();
 
         // Initially empty
-        let artifacts = storage.list_session_artifacts(&session_id).await.unwrap();
-        assert_eq!(artifacts.len(), 0);
+        let initial_artifacts = storage.list_session_artifacts(&session_id).await.unwrap();
+        assert_eq!(initial_artifacts.len(), 0);
 
         // Store some artifacts
         let artifact1 = SessionArtifact::new(
@@ -1687,11 +1691,11 @@ mod tests {
         let _id2 = storage.store_artifact(&artifact2).await.unwrap();
 
         // List should now return 2 artifacts
-        let artifacts = storage.list_session_artifacts(&session_id).await.unwrap();
-        assert_eq!(artifacts.len(), 2);
+        let updated_artifacts = storage.list_session_artifacts(&session_id).await.unwrap();
+        assert_eq!(updated_artifacts.len(), 2);
 
         // Verify metadata content
-        let names: Vec<String> = artifacts.iter().map(|a| a.name.clone()).collect();
+        let names: Vec<String> = updated_artifacts.iter().map(|a| a.name.clone()).collect();
         assert!(names.contains(&"input.txt".to_string()));
         assert!(names.contains(&"result.json".to_string()));
     }

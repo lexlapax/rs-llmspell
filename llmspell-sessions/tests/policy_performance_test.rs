@@ -6,7 +6,10 @@ use llmspell_hooks::{
     types::{ComponentId, ComponentType},
     HookContext, HookExecutor, HookPoint, HookRegistry,
 };
-use llmspell_sessions::policies::{PolicyComposition, SessionPolicyConfig, SessionPolicyManager};
+use llmspell_sessions::policies::{
+    PolicyComposition, SessionPolicyConfig, SessionPolicyManager, 
+    timeout::TimeoutConfig, rate_limit::RateLimitConfig
+};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -148,14 +151,21 @@ async fn test_composition_performance() -> Result<()> {
         let hook_registry = Arc::new(HookRegistry::new());
         let hook_executor = Arc::new(HookExecutor::new());
 
-        let mut policy_config = SessionPolicyConfig::default();
-        policy_config.composition_pattern = pattern;
-        // Increase timeouts for performance testing
-        policy_config.timeout_config.idle_timeout = Duration::from_secs(3600);
-        policy_config.timeout_config.max_session_duration = Duration::from_secs(7200);
-        // Increase rate limits for performance testing
-        policy_config.rate_limit_config.global_rpm = 100_000;
-        policy_config.rate_limit_config.per_session_rpm = 100_000;
+        // Increase timeouts and rate limits for performance testing
+        let policy_config = SessionPolicyConfig {
+            composition_pattern: pattern,
+            timeout_config: TimeoutConfig {
+                idle_timeout: Duration::from_secs(3600),
+                max_session_duration: Duration::from_secs(7200),
+                ..Default::default()
+            },
+            rate_limit_config: RateLimitConfig {
+                global_rpm: 100_000,
+                per_session_rpm: 100_000,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
 
         let policy_manager =
             SessionPolicyManager::new(policy_config, hook_registry.clone(), hook_executor.clone());

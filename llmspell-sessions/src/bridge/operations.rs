@@ -239,10 +239,10 @@ mod tests {
             name: Some("test-session".to_string()),
             description: Some("Test session for unit tests".to_string()),
             tags: vec!["test".to_string(), "unit".to_string()],
-            created_by: None,
-            parent_session_id: None,
+            created_by: Option::default(),
+            parent_session_id: Option::default(),
             config: None,
-            metadata: Default::default(),
+            metadata: HashMap::default(),
         };
 
         let session_id = session_manager
@@ -354,7 +354,7 @@ mod tests {
                     crate::artifact::ArtifactType::UserInput,
                     format!("test_artifact_{}.txt", i),
                     format!("Test content {}", i).as_bytes().to_vec(),
-                    Default::default(),
+                    None,
                 )
                 .await
                 .expect("Failed to store artifact");
@@ -384,7 +384,7 @@ mod tests {
                 crate::artifact::ArtifactType::ToolResult,
                 "export_test.json".to_string(),
                 r#"{"test": "data"}"#.as_bytes().to_vec(),
-                Default::default(),
+                None,
             )
             .await
             .expect("Failed to store artifact");

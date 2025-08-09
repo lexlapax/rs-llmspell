@@ -110,11 +110,16 @@ async fn test_rate_limit_policy_enforcement() -> Result<()> {
     let hook_executor = Arc::new(HookExecutor::new());
 
     // Create policy config with low rate limits
-    let mut policy_config = SessionPolicyConfig::default();
-    policy_config.enable_timeout = false;
-    policy_config.enable_resource_limits = false;
-    policy_config.enable_rate_limiting = true;
-    policy_config.rate_limit_config.global_rpm = 1; // Very low for testing
+    let policy_config = SessionPolicyConfig {
+        enable_timeout: false,
+        enable_resource_limits: false,
+        enable_rate_limiting: true,
+        rate_limit_config: llmspell_sessions::policies::rate_limit::RateLimitConfig {
+            global_rpm: 1, // Very low for testing
+            ..Default::default()
+        },
+        ..Default::default()
+    };
 
     let policy_manager =
         SessionPolicyManager::new(policy_config, hook_registry.clone(), hook_executor.clone());
@@ -281,9 +286,11 @@ async fn test_policy_configuration_update() -> Result<()> {
     assert!(policy_manager.is_policy_enabled(PolicyType::RateLimit));
 
     // Update configuration
-    let mut new_config = SessionPolicyConfig::default();
-    new_config.enable_timeout = false;
-    new_config.enable_resource_limits = false;
+    let new_config = SessionPolicyConfig {
+        enable_timeout: false,
+        enable_resource_limits: false,
+        ..Default::default()
+    };
 
     policy_manager.update_config(new_config);
 

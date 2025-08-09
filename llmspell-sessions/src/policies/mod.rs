@@ -287,8 +287,10 @@ mod tests {
     #[tokio::test]
     async fn test_policy_composition_patterns() {
         // Test sequential composition
-        let mut config = SessionPolicyConfig::default();
-        config.composition_pattern = PolicyComposition::Sequential;
+        let config = SessionPolicyConfig {
+            composition_pattern: PolicyComposition::Sequential,
+            ..Default::default()
+        };
 
         let hook_registry = Arc::new(HookRegistry::new());
         let hook_executor = Arc::new(HookExecutor::new());
@@ -296,8 +298,10 @@ mod tests {
         manager.register_policies().unwrap();
 
         // Test parallel composition
-        let mut config = SessionPolicyConfig::default();
-        config.composition_pattern = PolicyComposition::Parallel;
+        let config = SessionPolicyConfig {
+            composition_pattern: PolicyComposition::Parallel,
+            ..Default::default()
+        };
 
         let hook_registry = Arc::new(HookRegistry::new());
         let hook_executor = Arc::new(HookExecutor::new());
@@ -305,8 +309,10 @@ mod tests {
         manager.register_policies().unwrap();
 
         // Test voting composition
-        let mut config = SessionPolicyConfig::default();
-        config.composition_pattern = PolicyComposition::Voting { threshold: 0.6 };
+        let config = SessionPolicyConfig {
+            composition_pattern: PolicyComposition::Voting { threshold: 0.6 },
+            ..Default::default()
+        };
 
         let hook_registry = Arc::new(HookRegistry::new());
         let hook_executor = Arc::new(HookExecutor::new());

@@ -40,21 +40,22 @@ fn create_test_replay_session(_session_id: SessionId) -> ReplaySession {
         ));
     }
 
-    let mut errors = Vec::new();
-    errors.push(ReplayError {
-        timestamp: SystemTime::now(),
-        execution_id: Uuid::new_v4(),
-        hook_id: "hook_1".to_string(),
-        error_message: "Test error 1".to_string(),
-        error_type: ReplayErrorType::ExecutionError,
-    });
-    errors.push(ReplayError {
-        timestamp: SystemTime::now(),
-        execution_id: Uuid::new_v4(),
-        hook_id: "hook_2".to_string(),
-        error_message: "Test error 2".to_string(),
-        error_type: ReplayErrorType::ValidationError,
-    });
+    let errors = vec![
+        ReplayError {
+            timestamp: SystemTime::now(),
+            execution_id: Uuid::new_v4(),
+            hook_id: "hook_1".to_string(),
+            error_message: "Test error 1".to_string(),
+            error_type: ReplayErrorType::ExecutionError,
+        },
+        ReplayError {
+            timestamp: SystemTime::now(),
+            execution_id: Uuid::new_v4(),
+            hook_id: "hook_2".to_string(),
+            error_message: "Test error 2".to_string(),
+            error_type: ReplayErrorType::ValidationError,
+        },
+    ];
 
     ReplaySession {
         config: llmspell_hooks::persistence::ReplaySessionConfig::default(),
@@ -198,15 +199,15 @@ fn test_compare_states_at_different_times() {
 
     let mut states = VecDeque::new();
 
-    let mut state1 = create_test_captured_state("hook_1", Uuid::new_v4());
-    state1.timestamp = time1;
-    state1.context_snapshot = json!({"value": 1});
-    states.push_back(state1);
+    let mut first_state = create_test_captured_state("hook_1", Uuid::new_v4());
+    first_state.timestamp = time1;
+    first_state.context_snapshot = json!({"value": 1});
+    states.push_back(first_state);
 
-    let mut state2 = create_test_captured_state("hook_2", Uuid::new_v4());
-    state2.timestamp = time2;
-    state2.context_snapshot = json!({"value": 2});
-    states.push_back(state2);
+    let mut second_state = create_test_captured_state("hook_2", Uuid::new_v4());
+    second_state.timestamp = time2;
+    second_state.context_snapshot = json!({"value": 2});
+    states.push_back(second_state);
 
     // Import states
     {
