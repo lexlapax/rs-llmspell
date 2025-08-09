@@ -258,16 +258,22 @@ pub struct StateInfrastructure {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ComponentRegistry, ProviderManager};
+    use crate::{ComponentRegistry, ProviderManager, ProviderManagerConfig};
     #[tokio::test]
     async fn test_state_infrastructure_creation() {
         let context = GlobalContext::new(
             Arc::new(ComponentRegistry::new()),
-            Arc::new(ProviderManager::new(Default::default()).await.unwrap()),
+            Arc::new(
+                ProviderManager::new(ProviderManagerConfig::default())
+                    .await
+                    .unwrap(),
+            ),
         );
 
-        let mut config = StatePersistenceConfig::default();
-        config.enabled = true;
+        let config = StatePersistenceConfig {
+            enabled: true,
+            ..Default::default()
+        };
 
         let infrastructure = get_or_create_state_infrastructure(&context, &config)
             .await
@@ -289,12 +295,18 @@ mod tests {
     async fn test_migration_infrastructure_creation() {
         let context = GlobalContext::new(
             Arc::new(ComponentRegistry::new()),
-            Arc::new(ProviderManager::new(Default::default()).await.unwrap()),
+            Arc::new(
+                ProviderManager::new(ProviderManagerConfig::default())
+                    .await
+                    .unwrap(),
+            ),
         );
 
-        let mut config = StatePersistenceConfig::default();
-        config.enabled = true;
-        config.migration_enabled = true;
+        let config = StatePersistenceConfig {
+            enabled: true,
+            migration_enabled: true,
+            ..Default::default()
+        };
 
         let infrastructure = get_or_create_state_infrastructure(&context, &config)
             .await

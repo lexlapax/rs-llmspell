@@ -169,12 +169,16 @@ pub struct SessionInfrastructure {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ComponentRegistry, ProviderManager};
+    use crate::{ComponentRegistry, ProviderManager, ProviderManagerConfig};
     #[tokio::test]
     async fn test_session_infrastructure_creation() {
         let context = GlobalContext::new(
             Arc::new(ComponentRegistry::new()),
-            Arc::new(ProviderManager::new(Default::default()).await.unwrap()),
+            Arc::new(
+                ProviderManager::new(ProviderManagerConfig::default())
+                    .await
+                    .unwrap(),
+            ),
         );
 
         let config = SessionConfig {

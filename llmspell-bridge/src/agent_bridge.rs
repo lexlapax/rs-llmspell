@@ -2073,7 +2073,9 @@ mod tests {
             Some("Running")
         );
         assert_eq!(
-            metrics.get("total_transitions").and_then(|v| v.as_u64()),
+            metrics
+                .get("total_transitions")
+                .and_then(serde_json::Value::as_u64),
             Some(5)
         );
 

@@ -59,12 +59,16 @@ impl GlobalObject for HookGlobal {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ComponentRegistry, ProviderManager};
+    use crate::{ComponentRegistry, ProviderManager, ProviderManagerConfig};
     #[tokio::test]
     async fn test_hook_global_metadata() {
         let context = Arc::new(GlobalContext::new(
             Arc::new(ComponentRegistry::new()),
-            Arc::new(ProviderManager::new(Default::default()).await.unwrap()),
+            Arc::new(
+                ProviderManager::new(ProviderManagerConfig::default())
+                    .await
+                    .unwrap(),
+            ),
         ));
         let hook_bridge = Arc::new(HookBridge::new(context).unwrap());
         let global = HookGlobal::new(hook_bridge);

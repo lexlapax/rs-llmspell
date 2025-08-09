@@ -4,6 +4,7 @@
 use crate::globals::types::GlobalContext;
 use llmspell_core::Result;
 
+use crate::providers::ProviderManagerConfig;
 /// Inject the Hook global into JavaScript (stub for Phase 15)
 ///
 /// # Errors
@@ -38,7 +39,7 @@ mod tests {
         let context = GlobalContext::new(
             std::sync::Arc::new(crate::ComponentRegistry::new()),
             std::sync::Arc::new(
-                crate::ProviderManager::new(Default::default())
+                crate::ProviderManager::new(ProviderManagerConfig::default())
                     .await
                     .unwrap(),
             ),

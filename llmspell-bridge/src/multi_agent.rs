@@ -199,7 +199,7 @@ pub fn create_delegation_workflow(
     builder = builder.add_step(WorkflowStep::new(
         "aggregate_results".to_string(),
         StepType::Agent {
-            agent_id: ComponentId::from_name(&coordinator_agent),
+            agent_id: ComponentId::from_name(coordinator_agent),
             input: serde_json::json!({
                 "task": "aggregate_delegated_results",
                 "delegation_results": "$execute_delegations_output"

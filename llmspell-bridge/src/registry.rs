@@ -211,7 +211,7 @@ mod tests {
         }
 
         async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput, LLMSpellError> {
-            Ok(AgentOutput::text(format!("Error: {}", error)))
+            Ok(AgentOutput::text(format!("Error: {error}")))
         }
     }
 

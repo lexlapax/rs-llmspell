@@ -936,7 +936,8 @@ async fn test_tool_performance() {
         }
         let elapsed = start.elapsed();
 
-        let per_op_ms = elapsed.as_micros() as f64 / f64::from(iterations) / 1000.0;
+        // Use as_secs_f64() to avoid u128 to f64 precision loss
+        let per_op_ms = elapsed.as_secs_f64() * 1000.0 / f64::from(iterations);
 
         println!("{name:<20} {per_op_ms:>8.3} ms/op");
 

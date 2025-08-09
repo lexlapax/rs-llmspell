@@ -38,7 +38,7 @@ impl StandardizedWorkflowFactory {
         let name = params
             .get("name")
             .and_then(|v| v.as_str())
-            .unwrap_or_else(|| workflow_type)
+            .unwrap_or(workflow_type)
             .to_string();
 
         // Build workflow configuration

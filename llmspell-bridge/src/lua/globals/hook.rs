@@ -482,6 +482,7 @@ pub fn inject_hook_global(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::providers::ProviderManagerConfig;
     use crate::{ComponentRegistry, ProviderManager};
 
     #[tokio::test(flavor = "multi_thread")]
@@ -489,7 +490,11 @@ mod tests {
         let lua = Lua::new();
         let context = Arc::new(GlobalContext::new(
             Arc::new(ComponentRegistry::new()),
-            Arc::new(ProviderManager::new(Default::default()).await.unwrap()),
+            Arc::new(
+                ProviderManager::new(ProviderManagerConfig::default())
+                    .await
+                    .unwrap(),
+            ),
         ));
         let hook_bridge = Arc::new(HookBridge::new(context.clone()).unwrap());
 

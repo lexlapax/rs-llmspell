@@ -18,13 +18,17 @@ pub fn inject_event_global(lua: &mlua::Lua, context: &GlobalContext) -> Result<(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ComponentRegistry, ProviderManager};
+    use crate::{ComponentRegistry, ProviderManager, ProviderManagerConfig};
     use mlua::Lua;
     use std::sync::Arc;
 
     async fn create_test_context() -> GlobalContext {
         let registry = Arc::new(ComponentRegistry::new());
-        let providers = Arc::new(ProviderManager::new(Default::default()).await.unwrap());
+        let providers = Arc::new(
+            ProviderManager::new(ProviderManagerConfig::default())
+                .await
+                .unwrap(),
+        );
         GlobalContext::new(registry, providers)
     }
     #[tokio::test]

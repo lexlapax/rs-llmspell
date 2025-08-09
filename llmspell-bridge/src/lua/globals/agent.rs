@@ -1538,7 +1538,7 @@ pub fn inject_agent_global(
     })?;
 
     // Add builder() method
-    let bridge_for_builder = bridge.clone();
+    let bridge_for_builder = bridge;
     let builder_fn =
         lua.create_function(move |_lua, ()| Ok(AgentBuilder::new(bridge_for_builder.clone())))?;
     agent_table.set("builder", builder_fn)?;

@@ -456,12 +456,13 @@ impl HookBridge {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::ProviderManagerConfig;
     #[tokio::test]
     async fn test_hook_bridge_creation() {
         let context = Arc::new(GlobalContext::new(
             Arc::new(crate::ComponentRegistry::new()),
             Arc::new(
-                crate::ProviderManager::new(Default::default())
+                crate::ProviderManager::new(ProviderManagerConfig::default())
                     .await
                     .unwrap(),
             ),
@@ -474,7 +475,7 @@ mod tests {
         let context = Arc::new(GlobalContext::new(
             Arc::new(crate::ComponentRegistry::new()),
             Arc::new(
-                crate::ProviderManager::new(Default::default())
+                crate::ProviderManager::new(ProviderManagerConfig::default())
                     .await
                     .unwrap(),
             ),
