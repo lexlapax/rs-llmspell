@@ -168,7 +168,7 @@ impl BaseAgent for WebhookCallerTool {
                 "DELETE" => client.delete(url),
                 "PATCH" => client.patch(url),
                 "HEAD" => client.head(url),
-                "POST" | _ => client.post(url), // Default to POST for unknown methods
+                _ => client.post(url), // Default to POST for unknown methods
             };
 
             // Add payload for methods that support it
@@ -219,13 +219,14 @@ impl BaseAgent for WebhookCallerTool {
                         }
                     }
 
+                    let body_value = body_json.clone().unwrap_or_else(|| json!(body_text));
                     let result = json!({
                         "success": status.is_success(),
                         "webhook_url": url,
                         "status_code": status.as_u16(),
                         "status_text": status.canonical_reason().unwrap_or("Unknown"),
                         "response": {
-                            "body": body_json.as_ref().unwrap_or(&json!(body_text)),
+                            "body": body_value,
                             "json": body_json,
                             "headers": headers_map,
                             "body_is_json": body_json.is_some(),

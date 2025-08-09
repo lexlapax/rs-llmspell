@@ -198,6 +198,7 @@ impl BaseAgent for ApiTesterTool {
         let body_text = response.text().await.unwrap_or_default();
         let body_json: Option<Value> = serde_json::from_str(&body_text).ok();
 
+        let body_value = body_json.clone().unwrap_or_else(|| json!(body_text));
         let result = json!({
             "request": {
                 "method": method_str,
@@ -209,7 +210,7 @@ impl BaseAgent for ApiTesterTool {
                 "status_text": status.canonical_reason().unwrap_or("Unknown"),
                 "is_success": status.is_success(),
                 "headers": response_headers,
-                "body": body_json.as_ref().unwrap_or(&json!(body_text)),
+                "body": body_value,
                 "body_is_json": body_json.is_some(),
             },
             "timing": {

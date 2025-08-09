@@ -375,7 +375,9 @@ impl ToolExecutor {
                         // Log successful completion
                         audit_entry.execution_phase = ToolExecutionPhase::PostExecution;
                         audit_entry.success = Some(true);
-                        audit_entry.resource_metrics = tool_context.resource_metrics.clone();
+                        audit_entry
+                            .resource_metrics
+                            .clone_from(&tool_context.resource_metrics);
                         self.log_audit_entry(&audit_entry);
 
                         Ok(output)
@@ -392,7 +394,9 @@ impl ToolExecutor {
                         audit_entry.execution_phase = ToolExecutionPhase::ErrorHandling;
                         audit_entry.success = Some(false);
                         audit_entry.error_message = Some(error.to_string());
-                        audit_entry.resource_metrics = tool_context.resource_metrics.clone();
+                        audit_entry
+                            .resource_metrics
+                            .clone_from(&tool_context.resource_metrics);
                         self.log_audit_entry(&audit_entry);
 
                         // Try to handle the error through the tool's error handler
@@ -431,7 +435,9 @@ impl ToolExecutor {
 
         // Final audit log entry for cleanup phase
         audit_entry.execution_phase = ToolExecutionPhase::ResourceCleanup;
-        audit_entry.resource_metrics = tool_context.resource_metrics.clone();
+        audit_entry
+            .resource_metrics
+            .clone_from(&tool_context.resource_metrics);
         self.log_audit_entry(&audit_entry);
 
         // Log execution metrics

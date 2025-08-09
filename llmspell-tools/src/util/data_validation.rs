@@ -271,7 +271,7 @@ impl DataValidationTool {
         value: &Value,
         rules: &ValidationRules,
         errors: &mut Vec<ValidationError>,
-    ) -> Result<()> {
+    ) {
         for rule in &rules.rules {
             if errors.len() >= self.config.max_errors {
                 break;
@@ -290,11 +290,10 @@ impl DataValidationTool {
                 }
             }
         }
-        Ok(())
     }
 
     /// Validate a single rule
-    #[allow(clippy::too_many_lines)]
+    #[allow(clippy::too_many_lines, clippy::cognitive_complexity)]
     fn validate_rule(
         &self,
         field: &str,
@@ -508,7 +507,7 @@ impl DataValidationTool {
                         if let Some(rules) = item_rules {
                             for (i, item) in arr.iter().enumerate() {
                                 let item_field = format!("{field}[{i}]");
-                                self.validate_value(&item_field, item, rules, errors)?;
+                                self.validate_value(&item_field, item, rules, errors);
                             }
                         }
                     }
@@ -548,7 +547,7 @@ impl DataValidationTool {
                         for (prop, rules) in properties {
                             if let Some(prop_value) = obj.get(prop) {
                                 let prop_field = format!("{field}.{prop}");
-                                self.validate_value(&prop_field, prop_value, rules, errors)?;
+                                self.validate_value(&prop_field, prop_value, rules, errors);
                             }
                         }
                     }
@@ -566,7 +565,7 @@ impl DataValidationTool {
                 "required" => format!("{field} is required"),
                 _ => format!("Validation failed for {field}"),
             },
-            |msg| msg.replace("{field}", field),
+            |msg| msg.replace(&format!("{}{}{}", "{", "field", "}"), field),
         )
     }
 }
@@ -612,7 +611,7 @@ impl BaseAgent for DataValidationTool {
 
         // Perform validation
         let mut errors = Vec::new();
-        self.validate_value("input", data, &validation_rules, &mut errors)?;
+        self.validate_value("input", data, &validation_rules, &mut errors);
 
         let result = ValidationResult {
             valid: errors.is_empty(),

@@ -103,7 +103,7 @@ fn bench_hash_operations(c: &mut Criterion) {
     let mut group = c.benchmark_group("hash_operations");
     let rt = Runtime::new().unwrap();
 
-    let tool = HashCalculatorTool::new(Default::default());
+    let tool = HashCalculatorTool::new(HashCalculatorConfig::default());
 
     let small_data = "Hello, World!";
     let medium_data = "A".repeat(1000); // 1KB
@@ -167,7 +167,7 @@ fn bench_text_operations(c: &mut Criterion) {
     let mut group = c.benchmark_group("text_operations");
     let rt = Runtime::new().unwrap();
 
-    let tool = TextManipulatorTool::new(Default::default());
+    let tool = TextManipulatorTool::new(TextManipulatorConfig::default());
     let test_text = "Lorem ipsum dolor sit amet, consectetur adipiscing elit. ".repeat(1000);
 
     group.bench_function("uppercase_1kb", |b| {
@@ -211,7 +211,7 @@ fn bench_json_operations(c: &mut Criterion) {
     let mut group = c.benchmark_group("json_operations");
     let rt = Runtime::new().unwrap();
 
-    let tool = JsonProcessorTool::new(Default::default());
+    let tool = JsonProcessorTool::new(JsonProcessorConfig::default());
 
     // Create test JSON data
     let simple_json = json!({
@@ -274,7 +274,7 @@ fn bench_uuid_generation(c: &mut Criterion) {
     let mut group = c.benchmark_group("uuid_operations");
     let rt = Runtime::new().unwrap();
 
-    let tool = UuidGeneratorTool::new(Default::default());
+    let tool = UuidGeneratorTool::new(UuidGeneratorConfig::default());
 
     group.bench_function("uuid_v4_generation", |b| {
         b.iter(|| {
@@ -318,9 +318,9 @@ fn bench_mixed_operations(c: &mut Criterion) {
 
     // Simulate a realistic workflow using multiple tools
     group.bench_function("data_processing_workflow", |b| {
-        let json_tool = JsonProcessorTool::new(Default::default());
-        let hash_tool = HashCalculatorTool::new(Default::default());
-        let text_tool = TextManipulatorTool::new(Default::default());
+        let json_tool = JsonProcessorTool::new(JsonProcessorConfig::default());
+        let hash_tool = HashCalculatorTool::new(HashCalculatorConfig::default());
+        let text_tool = TextManipulatorTool::new(TextManipulatorConfig::default());
 
         b.iter(|| {
             rt.block_on(async {

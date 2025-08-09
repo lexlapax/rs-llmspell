@@ -137,7 +137,7 @@ impl UuidGeneratorTool {
     }
 
     #[allow(clippy::unused_self)]
-    fn format_uuid(&self, uuid: Uuid, format: &UuidFormat) -> String {
+    fn format_uuid(&self, uuid: Uuid, format: UuidFormat) -> String {
         match format {
             UuidFormat::Standard | UuidFormat::Hyphenated => uuid.to_string(),
             UuidFormat::Simple => uuid.simple().to_string(),
@@ -249,7 +249,7 @@ impl BaseAgent for UuidGeneratorTool {
                     },
                 );
 
-                let formatted = self.format_uuid(uuid, &format);
+                let formatted = self.format_uuid(uuid, format);
                 let response = ResponseBuilder::success("generate")
                     .with_message("UUID generated successfully")
                     .with_result(json!({

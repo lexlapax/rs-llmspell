@@ -546,15 +546,16 @@ impl BaseAgent for ImageProcessorTool {
             "convert" => {
                 let input_path = extract_required_string(params, "source_path")?;
                 let output_path = extract_required_string(params, "target_path")?;
-                let target_format = extract_optional_string(params, "target_format")
-                    .map(|s| match s.to_lowercase().as_str() {
+                let target_format = extract_optional_string(params, "target_format").map_or_else(
+                    || ImageFormat::from_extension(Path::new(output_path)),
+                    |s| match s.to_lowercase().as_str() {
                         "png" => ImageFormat::Png,
                         "jpeg" | "jpg" => ImageFormat::Jpeg,
                         "gif" => ImageFormat::Gif,
                         "webp" => ImageFormat::Webp,
                         _ => ImageFormat::Unknown,
-                    })
-                    .unwrap_or_else(|| ImageFormat::from_extension(Path::new(output_path)));
+                    },
+                );
 
                 self.convert_format(
                     Path::new(input_path),

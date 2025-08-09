@@ -3,8 +3,12 @@
 
 use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
 use llmspell_tools::{
-    data::JsonProcessorTool,
-    system::{EnvironmentReaderTool, ProcessExecutorTool},
+    api::http_request::HttpRequestConfig,
+    data::{json_processor::JsonProcessorConfig, JsonProcessorTool},
+    system::{
+        environment_reader::EnvironmentReaderConfig, process_executor::ProcessExecutorConfig,
+        EnvironmentReaderTool, ProcessExecutorTool,
+    },
     util::{DataValidationTool, TemplateEngineTool},
     GraphQLQueryTool, HttpRequestTool,
 };
@@ -66,7 +70,7 @@ async fn test_template_engine_code_injection() {
 }
 #[tokio::test]
 async fn test_json_processor_jq_injection() {
-    let json_tool = JsonProcessorTool::new(Default::default());
+    let json_tool = JsonProcessorTool::new(JsonProcessorConfig::default());
 
     // Attempt jq injection attacks
     let injection_queries = vec![
@@ -193,7 +197,7 @@ async fn test_graphql_query_injection() {
 }
 #[tokio::test]
 async fn test_process_executor_argument_injection() {
-    let process_tool = ProcessExecutorTool::new(Default::default());
+    let process_tool = ProcessExecutorTool::new(ProcessExecutorConfig::default());
 
     // Command argument injection attempts
     let dangerous_args = vec![
@@ -282,7 +286,8 @@ async fn test_data_validation_regex_dos() {
 }
 #[tokio::test]
 async fn test_http_request_header_injection() {
-    let http_tool = HttpRequestTool::new(Default::default()).expect("Failed to create HTTP tool");
+    let http_tool =
+        HttpRequestTool::new(HttpRequestConfig::default()).expect("Failed to create HTTP tool");
 
     // HTTP header injection attempts
     let dangerous_headers = vec![
@@ -331,7 +336,7 @@ async fn test_http_request_header_injection() {
 }
 #[tokio::test]
 async fn test_environment_reader_information_leak() {
-    let env_tool = EnvironmentReaderTool::new(Default::default());
+    let env_tool = EnvironmentReaderTool::new(EnvironmentReaderConfig::default());
 
     // Try to read sensitive environment variables
     let sensitive_vars = vec![

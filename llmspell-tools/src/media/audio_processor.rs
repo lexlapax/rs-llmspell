@@ -552,13 +552,14 @@ impl BaseAgent for AudioProcessorTool {
                 let source_path = extract_required_string(params, "source_path")?;
                 let target_path = extract_required_string(params, "target_path")?;
 
-                let target_format = extract_optional_string(params, "target_format")
-                    .map(|s| match s.to_lowercase().as_str() {
+                let target_format = extract_optional_string(params, "target_format").map_or_else(
+                    || AudioFormat::from_extension(Path::new(target_path)),
+                    |s| match s.to_lowercase().as_str() {
                         "wav" => AudioFormat::Wav,
                         "mp3" => AudioFormat::Mp3,
                         _ => AudioFormat::Unknown,
-                    })
-                    .unwrap_or_else(|| AudioFormat::from_extension(Path::new(target_path)));
+                    },
+                );
 
                 let input = Path::new(source_path);
                 let output = Path::new(target_path);

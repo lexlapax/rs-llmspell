@@ -3,8 +3,11 @@
 
 use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
 use llmspell_tools::{
-    data::JsonProcessorTool,
-    util::{Base64EncoderTool, DateTimeHandlerTool, HashCalculatorTool, UuidGeneratorTool},
+    data::{json_processor::JsonProcessorConfig, JsonProcessorTool},
+    util::{
+        Base64EncoderTool, DateTimeHandlerTool, HashCalculatorConfig, HashCalculatorTool,
+        UuidGeneratorConfig, UuidGeneratorTool,
+    },
 };
 use serde_json::{json, Value};
 
@@ -14,7 +17,7 @@ mod dry_principle_tests {
     #[tokio::test]
     async fn test_hash_consistency_across_tools() {
         // Test that hash operations produce consistent results
-        let hash_tool = HashCalculatorTool::new(Default::default());
+        let hash_tool = HashCalculatorTool::new(HashCalculatorConfig::default());
         let test_data = "Hello, DRY Principle!";
 
         // Test SHA256
@@ -76,7 +79,7 @@ mod dry_principle_tests {
     #[tokio::test]
     async fn test_uuid_format_consistency() {
         // Test that UUID generation follows consistent patterns
-        let uuid_tool = UuidGeneratorTool::new(Default::default());
+        let uuid_tool = UuidGeneratorTool::new(UuidGeneratorConfig::default());
 
         // Generate UUID v4
         let input = AgentInput::text("generate").with_parameter(
@@ -112,7 +115,7 @@ mod dry_principle_tests {
     #[tokio::test]
     async fn test_json_processing_consistency() {
         // Test that JSON operations are consistent
-        let json_tool = JsonProcessorTool::new(Default::default());
+        let json_tool = JsonProcessorTool::new(JsonProcessorConfig::default());
         let test_json = json!({
             "name": "test",
             "value": 42,
@@ -173,7 +176,7 @@ mod dry_principle_tests {
     #[tokio::test]
     async fn test_error_handling_consistency() {
         // Test that error handling is consistent across tools
-        let hash_tool = HashCalculatorTool::new(Default::default());
+        let hash_tool = HashCalculatorTool::new(HashCalculatorConfig::default());
         let base64_tool = Base64EncoderTool::new();
 
         // Test missing required parameter in hash tool
@@ -218,9 +221,9 @@ mod dry_principle_tests {
     async fn test_parameter_extraction_consistency() {
         // Test that all tools use consistent parameter extraction
         let tools: Vec<Box<dyn BaseAgent>> = vec![
-            Box::new(HashCalculatorTool::new(Default::default())),
+            Box::new(HashCalculatorTool::new(HashCalculatorConfig::default())),
             Box::new(Base64EncoderTool::new()),
-            Box::new(UuidGeneratorTool::new(Default::default())),
+            Box::new(UuidGeneratorTool::new(UuidGeneratorConfig::default())),
         ];
 
         // Test with no parameters wrapper

@@ -470,14 +470,12 @@ impl BaseAgent for WebSearchTool {
 
         // Parse optional parameters
         let provider = extract_optional_string(params, "provider");
-        let max_results = if let Some(n) = params
+        let max_results = params
             .get("max_results")
             .and_then(serde_json::Value::as_u64)
-        {
-            usize::try_from(n).unwrap_or(usize::MAX)
-        } else {
-            self.config.max_results
-        };
+            .map_or(self.config.max_results, |n| {
+                usize::try_from(n).unwrap_or(usize::MAX)
+            });
         let search_type = Self::parse_search_type(extract_optional_string(params, "search_type"));
         let safe_search = params
             .get("safe_search")
@@ -504,11 +502,9 @@ impl BaseAgent for WebSearchTool {
         let results = self.search_with_fallback(&query, provider, options).await?;
 
         // Create response
-        let provider_used = if let Some(r) = results.first() {
-            r.provider.clone()
-        } else {
-            "unknown".to_string()
-        };
+        let provider_used = results
+            .first()
+            .map_or_else(|| "unknown".to_string(), |r| r.provider.clone());
 
         let message = format!(
             "Found {} results for '{}' using {}",

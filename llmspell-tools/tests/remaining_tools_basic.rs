@@ -8,10 +8,22 @@ use llmspell_security::sandbox::file_sandbox::FileSandbox;
 use llmspell_security::sandbox::SandboxContext;
 use llmspell_tools::{
     fs::{FileConverterTool, FileSearchTool, FileWatcherTool},
-    media::{AudioProcessorTool, ImageProcessorTool, VideoProcessorTool},
-    search::WebSearchTool,
-    system::{EnvironmentReaderTool, ProcessExecutorTool, ServiceCheckerTool, SystemMonitorTool},
-    util::{HashCalculatorTool, TextManipulatorTool, UuidGeneratorTool},
+    media::{
+        audio_processor::AudioProcessorConfig, image_processor::ImageProcessorConfig,
+        video_processor::VideoProcessorConfig, AudioProcessorTool, ImageProcessorTool,
+        VideoProcessorTool,
+    },
+    search::{web_search::WebSearchConfig, WebSearchTool},
+    system::{
+        environment_reader::EnvironmentReaderConfig, process_executor::ProcessExecutorConfig,
+        service_checker::ServiceCheckerConfig, system_monitor::SystemMonitorConfig,
+        EnvironmentReaderTool, ProcessExecutorTool, ServiceCheckerTool, SystemMonitorTool,
+    },
+    util::{
+        hash_calculator::HashCalculatorConfig, text_manipulator::TextManipulatorConfig,
+        uuid_generator::UuidGeneratorConfig, HashCalculatorTool, TextManipulatorTool,
+        UuidGeneratorTool,
+    },
 };
 use serde_json::{json, Value};
 use std::sync::Arc;
@@ -56,25 +68,25 @@ fn test_file_system_tools_creation() {
 #[test]
 fn test_system_integration_tools_creation() {
     // EnvironmentReaderTool
-    let tool = EnvironmentReaderTool::new(Default::default());
+    let tool = EnvironmentReaderTool::new(EnvironmentReaderConfig::default());
     let schema = tool.schema();
     assert_eq!(schema.name, "environment_reader");
     assert!(!schema.description.is_empty());
 
     // ProcessExecutorTool
-    let tool = ProcessExecutorTool::new(Default::default());
+    let tool = ProcessExecutorTool::new(ProcessExecutorConfig::default());
     let schema = tool.schema();
     assert_eq!(schema.name, "process_executor");
     assert!(!schema.description.is_empty());
 
     // ServiceCheckerTool
-    let tool = ServiceCheckerTool::new(Default::default());
+    let tool = ServiceCheckerTool::new(ServiceCheckerConfig::default());
     let schema = tool.schema();
     assert_eq!(schema.name, "service_checker");
     assert!(!schema.description.is_empty());
 
     // SystemMonitorTool
-    let tool = SystemMonitorTool::new(Default::default());
+    let tool = SystemMonitorTool::new(SystemMonitorConfig::default());
     let schema = tool.schema();
     assert_eq!(schema.name, "system_monitor");
     assert!(!schema.description.is_empty());
@@ -82,26 +94,26 @@ fn test_system_integration_tools_creation() {
 #[test]
 fn test_media_processing_tools_creation() {
     // AudioProcessorTool
-    let tool = AudioProcessorTool::new(Default::default());
+    let tool = AudioProcessorTool::new(AudioProcessorConfig::default());
     let schema = tool.schema();
     assert_eq!(schema.name, "audio_processor");
     assert!(!schema.description.is_empty());
 
     // VideoProcessorTool
-    let tool = VideoProcessorTool::new(Default::default());
+    let tool = VideoProcessorTool::new(VideoProcessorConfig::default());
     let schema = tool.schema();
     assert_eq!(schema.name, "video_processor");
     assert!(!schema.description.is_empty());
 
     // ImageProcessorTool
-    let tool = ImageProcessorTool::new(Default::default());
+    let tool = ImageProcessorTool::new(ImageProcessorConfig::default());
     let schema = tool.schema();
     assert_eq!(schema.name, "image_processor");
     assert!(!schema.description.is_empty());
 }
 #[test]
 fn test_search_tool_creation() {
-    let tool = WebSearchTool::new(Default::default()).unwrap();
+    let tool = WebSearchTool::new(WebSearchConfig::default()).unwrap();
     let schema = tool.schema();
     assert_eq!(schema.name, "web_search");
     assert!(!schema.description.is_empty());
@@ -109,19 +121,19 @@ fn test_search_tool_creation() {
 #[test]
 fn test_utility_tools_creation() {
     // HashCalculatorTool
-    let tool = HashCalculatorTool::new(Default::default());
+    let tool = HashCalculatorTool::new(HashCalculatorConfig::default());
     let schema = tool.schema();
     assert_eq!(schema.name, "hash_calculator");
     assert!(!schema.description.is_empty());
 
     // TextManipulatorTool
-    let tool = TextManipulatorTool::new(Default::default());
+    let tool = TextManipulatorTool::new(TextManipulatorConfig::default());
     let schema = tool.schema();
     assert_eq!(schema.name, "text_manipulator");
     assert!(!schema.description.is_empty());
 
     // UuidGeneratorTool
-    let tool = UuidGeneratorTool::new(Default::default());
+    let tool = UuidGeneratorTool::new(UuidGeneratorConfig::default());
     let schema = tool.schema();
     assert_eq!(schema.name, "uuid_generator");
     assert!(!schema.description.is_empty());
@@ -137,17 +149,19 @@ fn test_tool_schemas_have_required_fields() {
         Box::new(FileWatcherTool::new(Default::default(), sandbox.clone())),
         Box::new(FileConverterTool::new(Default::default(), sandbox.clone())),
         Box::new(FileSearchTool::new(Default::default(), sandbox)),
-        Box::new(EnvironmentReaderTool::new(Default::default())),
-        Box::new(ProcessExecutorTool::new(Default::default())),
-        Box::new(ServiceCheckerTool::new(Default::default())),
-        Box::new(SystemMonitorTool::new(Default::default())),
-        Box::new(AudioProcessorTool::new(Default::default())),
-        Box::new(VideoProcessorTool::new(Default::default())),
-        Box::new(ImageProcessorTool::new(Default::default())),
-        Box::new(WebSearchTool::new(Default::default()).unwrap()),
-        Box::new(HashCalculatorTool::new(Default::default())),
-        Box::new(TextManipulatorTool::new(Default::default())),
-        Box::new(UuidGeneratorTool::new(Default::default())),
+        Box::new(EnvironmentReaderTool::new(
+            EnvironmentReaderConfig::default(),
+        )),
+        Box::new(ProcessExecutorTool::new(ProcessExecutorConfig::default())),
+        Box::new(ServiceCheckerTool::new(ServiceCheckerConfig::default())),
+        Box::new(SystemMonitorTool::new(SystemMonitorConfig::default())),
+        Box::new(AudioProcessorTool::new(AudioProcessorConfig::default())),
+        Box::new(VideoProcessorTool::new(VideoProcessorConfig::default())),
+        Box::new(ImageProcessorTool::new(ImageProcessorConfig::default())),
+        Box::new(WebSearchTool::new(WebSearchConfig::default()).unwrap()),
+        Box::new(HashCalculatorTool::new(HashCalculatorConfig::default())),
+        Box::new(TextManipulatorTool::new(TextManipulatorConfig::default())),
+        Box::new(UuidGeneratorTool::new(UuidGeneratorConfig::default())),
     ];
 
     for tool in tools {
@@ -171,7 +185,7 @@ fn test_tool_schemas_have_required_fields() {
 // ===== Basic Execution Tests =====
 #[tokio::test]
 async fn test_hash_calculator_basic() {
-    let tool = HashCalculatorTool::new(Default::default());
+    let tool = HashCalculatorTool::new(HashCalculatorConfig::default());
 
     // Test with correct parameters based on schema
     let input = AgentInput::text("hash test").with_parameter(
@@ -192,7 +206,7 @@ async fn test_hash_calculator_basic() {
 }
 #[tokio::test]
 async fn test_uuid_generator_basic() {
-    let tool = UuidGeneratorTool::new(Default::default());
+    let tool = UuidGeneratorTool::new(UuidGeneratorConfig::default());
 
     let input = AgentInput::text("generate uuid").with_parameter(
         "parameters",
@@ -212,7 +226,7 @@ async fn test_uuid_generator_basic() {
 }
 #[tokio::test]
 async fn test_web_search_basic() {
-    let tool = WebSearchTool::new(Default::default()).unwrap();
+    let tool = WebSearchTool::new(WebSearchConfig::default()).unwrap();
 
     // Get schema to understand parameters
     let schema = tool.schema();
@@ -253,17 +267,17 @@ fn test_tool_creation_performance() {
         let _ = FileWatcherTool::new(Default::default(), sandbox.clone());
         let _ = FileConverterTool::new(Default::default(), sandbox.clone());
         let _ = FileSearchTool::new(Default::default(), sandbox);
-        let _ = EnvironmentReaderTool::new(Default::default());
-        let _ = ProcessExecutorTool::new(Default::default());
-        let _ = ServiceCheckerTool::new(Default::default());
-        let _ = SystemMonitorTool::new(Default::default());
-        let _ = AudioProcessorTool::new(Default::default());
-        let _ = VideoProcessorTool::new(Default::default());
-        let _ = ImageProcessorTool::new(Default::default());
-        let _ = WebSearchTool::new(Default::default()).unwrap();
-        let _ = HashCalculatorTool::new(Default::default());
-        let _ = TextManipulatorTool::new(Default::default());
-        let _ = UuidGeneratorTool::new(Default::default());
+        let _ = EnvironmentReaderTool::new(EnvironmentReaderConfig::default());
+        let _ = ProcessExecutorTool::new(ProcessExecutorConfig::default());
+        let _ = ServiceCheckerTool::new(ServiceCheckerConfig::default());
+        let _ = SystemMonitorTool::new(SystemMonitorConfig::default());
+        let _ = AudioProcessorTool::new(AudioProcessorConfig::default());
+        let _ = VideoProcessorTool::new(VideoProcessorConfig::default());
+        let _ = ImageProcessorTool::new(ImageProcessorConfig::default());
+        let _ = WebSearchTool::new(WebSearchConfig::default()).unwrap();
+        let _ = HashCalculatorTool::new(HashCalculatorConfig::default());
+        let _ = TextManipulatorTool::new(TextManipulatorConfig::default());
+        let _ = UuidGeneratorTool::new(UuidGeneratorConfig::default());
     }
 
     let duration = start.elapsed();

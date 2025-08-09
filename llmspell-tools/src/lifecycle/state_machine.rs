@@ -258,7 +258,7 @@ impl ToolStateMachine {
             | (CleaningUp, Terminated) => true,
 
             // Terminal states cannot transition
-            (Terminated, _) | _ => false,
+            _ => false,
         }
     }
 }

@@ -270,7 +270,7 @@ impl SitemapCrawlerTool {
             }
 
             // Parse as regular sitemap
-            let urls = self.parse_sitemap(&xml_content)?;
+            let urls = self.parse_sitemap(&xml_content);
             #[allow(clippy::cast_possible_truncation)]
             let urls_len_u32 = urls.len() as u32;
             stats.total_urls_discovered += urls_len_u32;
@@ -327,7 +327,7 @@ impl SitemapCrawlerTool {
     }
 
     #[allow(clippy::unused_self)]
-    fn parse_sitemap(&self, xml_content: &str) -> Result<Vec<Value>> {
+    fn parse_sitemap(&self, xml_content: &str) -> Vec<Value> {
         let mut urls = Vec::new();
         let lines: Vec<&str> = xml_content.lines().collect();
 
@@ -402,6 +402,6 @@ impl SitemapCrawlerTool {
             }
         }
 
-        Ok(urls)
+        urls
     }
 }

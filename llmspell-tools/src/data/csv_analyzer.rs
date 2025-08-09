@@ -1059,7 +1059,7 @@ impl CsvAnalyzerTool {
                 // Calculate new columns
                 for expr in &new_column_expressions {
                     // Simple expression evaluation (supports basic arithmetic)
-                    let value = Self::evaluate_expression(expr, &headers, &record)?;
+                    let value = Self::evaluate_expression(expr, &headers, &record);
                     new_record.push(value);
                 }
 
@@ -1085,7 +1085,7 @@ impl CsvAnalyzerTool {
         expr: &str,
         headers: &csv::StringRecord,
         record: &csv::StringRecord,
-    ) -> Result<String> {
+    ) -> String {
         // Simple expression evaluator for basic arithmetic
         // Supports: column_name * column_name, column_name + number, etc.
 
@@ -1097,13 +1097,13 @@ impl CsvAnalyzerTool {
                 let right_val = Self::get_column_value(parts[1].trim(), headers, record);
 
                 if let (Ok(left), Ok(right)) = (left_val.parse::<f64>(), right_val.parse::<f64>()) {
-                    return Ok(format!("{:.2}", left * right));
+                    return format!("{:.2}", left * right);
                 }
             }
         }
 
         // Default: return the expression as-is
-        Ok(expr.to_string())
+        expr.to_string()
     }
 
     /// Get column value by name or return literal value

@@ -180,7 +180,7 @@ impl FileWatcherTool {
             notify::EventKind::Create(_) => FileEventType::Create,
             notify::EventKind::Modify(_) => FileEventType::Modify,
             notify::EventKind::Remove(_) => FileEventType::Delete,
-            notify::EventKind::Other | _ => FileEventType::Other,
+            _ => FileEventType::Other,
         };
 
         // Handle paths
