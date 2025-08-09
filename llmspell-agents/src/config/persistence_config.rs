@@ -48,6 +48,7 @@ impl PersistenceConfigBuilder {
 
     /// Configure whether to save on pause
     #[must_use]
+    #[allow(clippy::missing_const_for_fn)] // Cannot be const due to mutation
     pub fn save_on_pause(mut self, enabled: bool) -> Self {
         self.config.event_settings.save_on_pause = enabled;
         self
@@ -55,6 +56,7 @@ impl PersistenceConfigBuilder {
 
     /// Configure whether to save on stop
     #[must_use]
+    #[allow(clippy::missing_const_for_fn)] // Cannot be const due to mutation
     pub fn save_on_stop(mut self, enabled: bool) -> Self {
         self.config.event_settings.save_on_stop = enabled;
         self
@@ -62,6 +64,7 @@ impl PersistenceConfigBuilder {
 
     /// Configure whether to restore on resume
     #[must_use]
+    #[allow(clippy::missing_const_for_fn)] // Cannot be const due to mutation
     pub fn restore_on_resume(mut self, enabled: bool) -> Self {
         self.config.event_settings.restore_on_resume = enabled;
         self
@@ -69,6 +72,7 @@ impl PersistenceConfigBuilder {
 
     /// Configure whether saves should be non-blocking
     #[must_use]
+    #[allow(clippy::missing_const_for_fn)] // Cannot be const due to mutation
     pub fn non_blocking(mut self, enabled: bool) -> Self {
         self.config.event_settings.non_blocking = enabled;
         self

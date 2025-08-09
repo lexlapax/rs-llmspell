@@ -321,6 +321,7 @@ impl ToolComposition {
     /// # Panics
     ///
     /// Panics if a `RwLock` is poisoned
+    #[allow(clippy::future_not_send)] // Tool provider may not be Send
     pub async fn execute<T>(
         &self,
         tool_provider: &T,
@@ -367,7 +368,7 @@ impl ToolComposition {
                         .await
                     {
                         Ok(output) => {
-                            let result = self.handle_step_success(
+                            let result = Self::handle_step_success(
                                 &step.id,
                                 output.clone(),
                                 step_start_time.elapsed(),
@@ -506,6 +507,7 @@ impl ToolComposition {
     }
 
     /// Resolve a data flow to a concrete value
+    #[allow(clippy::only_used_in_recursion)]
     fn resolve_data_flow(
         &self,
         data_flow: &DataFlow,
@@ -586,6 +588,7 @@ impl ToolComposition {
     }
 
     /// Execute a single step
+    #[allow(clippy::future_not_send)]
     async fn execute_step<T>(
         &self,
         tool_provider: &T,
@@ -602,8 +605,8 @@ impl ToolComposition {
     }
 
     /// Helper to handle successful step execution
+    #[allow(clippy::missing_const_for_fn)] // Cannot be const due to struct creation
     fn handle_step_success(
-        &self,
         _step_id: &str,
         output: JsonValue,
         execution_time: Duration,

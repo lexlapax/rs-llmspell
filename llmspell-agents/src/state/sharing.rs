@@ -438,10 +438,9 @@ impl StateSharingManager {
         // Store pipeline configuration
         let mut channels = self.channels.write();
         if let Some(channel) = channels.get_mut(pipeline_id) {
-            channel.metadata.insert(
-                "pipeline_stages".to_string(),
-                serde_json::to_value(&stages)?,
-            );
+            channel
+                .metadata
+                .insert("pipeline_stages".to_string(), serde_json::to_value(stages)?);
         }
 
         info!(
@@ -664,6 +663,7 @@ mod tests {
         });
     }
     #[tokio::test]
+    #[allow(clippy::items_after_statements)] // Inner items for test organization
     async fn test_broadcast_channel() {
         init_tracing();
         // Mock state manager for testing
@@ -716,6 +716,7 @@ mod tests {
         assert!(result.is_err());
     }
     #[tokio::test]
+    #[allow(clippy::items_after_statements)] // Inner items for test organization
     async fn test_collaborative_workspace() {
         init_tracing();
         // Mock state manager for testing
@@ -764,6 +765,7 @@ mod tests {
         assert_eq!(lead_msgs[0].sender_agent_id, "dev1");
     }
     #[tokio::test]
+    #[allow(clippy::items_after_statements)] // Inner items for test organization
     async fn test_pipeline_processing() {
         init_tracing();
         // Mock state manager for testing

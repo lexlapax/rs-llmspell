@@ -263,8 +263,8 @@ async fn test_metrics_update() {
     // Verify metrics updated
     let updated = registry.get_metadata("metrics-1").await.unwrap().unwrap();
     assert_eq!(updated.metrics.execution_count, 100);
-    assert_eq!(updated.metrics.success_rate, 0.95);
-    assert_eq!(updated.metrics.avg_execution_time_ms, 50.0);
+    assert!((updated.metrics.success_rate - 0.95).abs() < f64::EPSILON);
+    assert!((updated.metrics.avg_execution_time_ms - 50.0).abs() < f64::EPSILON);
 }
 
 #[tokio::test]

@@ -420,7 +420,7 @@ mod tests {
             complexity: ComplexityLevel::Basic,
         };
 
-        let schema = TemplateSchema::new(metadata.clone());
+        let schema = TemplateSchema::new(metadata);
         assert_eq!(schema.metadata.id, "test_template");
         assert_eq!(schema.schema_version, SchemaVersion::V1);
         assert!(schema.parameters.is_empty());
@@ -463,7 +463,7 @@ mod tests {
     #[test]
     fn test_schema_validation_empty_id() {
         let metadata = TemplateMetadata {
-            id: "".to_string(),
+            id: String::new(),
             name: "Test Template".to_string(),
             version: "1.0.0".to_string(),
             description: "A test template".to_string(),

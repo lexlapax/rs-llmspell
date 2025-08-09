@@ -93,7 +93,7 @@ impl TraceSpan {
     ///
     /// # Panics
     ///
-    /// Panics if the end_time calculation results in a negative duration
+    /// Panics if the `end_time` calculation results in a negative `duration`
     pub fn complete(&mut self, status: SpanStatus) {
         self.end_time = Some(Utc::now());
         self.duration = Some(
@@ -211,7 +211,7 @@ pub struct TraceCollector {
 impl std::fmt::Debug for TraceCollector {
     /// # Panics
     ///
-    /// Panics if any RwLock is poisoned
+    /// Panics if any `RwLock` is poisoned
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TraceCollector")
             .field(
@@ -249,7 +249,7 @@ impl TraceCollector {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     #[must_use]
     pub fn start_span(self: &Arc<Self>, span: TraceSpan) -> SpanHandle {
         let span_id = span.span_id.clone();
@@ -268,7 +268,7 @@ impl TraceCollector {
     ///
     /// # Panics
     ///
-    /// Panics if any RwLock is poisoned
+    /// Panics if any `RwLock` is poisoned
     fn complete_span(&self, span_id: &str, status: SpanStatus) -> Result<()> {
         let mut active = self.active_spans.write().unwrap();
 
@@ -295,7 +295,7 @@ impl TraceCollector {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     #[must_use]
     pub fn active_span_count(&self) -> usize {
         self.active_spans.read().unwrap().len()
@@ -305,7 +305,7 @@ impl TraceCollector {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     #[must_use]
     pub fn get_trace(&self, trace_id: &str) -> Vec<TraceSpan> {
         self.completed_spans
@@ -321,7 +321,7 @@ impl TraceCollector {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     pub fn get_all_traces(&self) -> HashMap<String, Vec<TraceSpan>> {
         let mut traces = HashMap::new();
 
@@ -339,7 +339,7 @@ impl TraceCollector {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     pub fn clear_completed(&self) {
         self.completed_spans.write().unwrap().clear();
     }
@@ -356,7 +356,7 @@ impl SpanHandle {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     pub fn add_tag(&self, key: String, value: String) {
         if let Some(span) = self
             .collector
@@ -373,7 +373,7 @@ impl SpanHandle {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     pub fn add_event(&self, event: TraceEvent) {
         if let Some(span) = self
             .collector
@@ -607,7 +607,7 @@ mod tests {
 
         let child = context.child_span("child-op".to_string());
         assert_eq!(child.trace_id, span.trace_id);
-        assert_eq!(child.parent_span_id, Some(span.span_id.clone()));
+        assert_eq!(child.parent_span_id, Some(span.span_id));
     }
     #[test]
     fn test_trace_analyzer() {

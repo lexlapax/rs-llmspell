@@ -178,6 +178,7 @@ async fn example_monitor_agent() -> Result<()> {
 }
 
 /// Example 4: Using Template Factory
+#[allow(clippy::items_after_statements)] // Inner items for test organization
 fn example_template_factory() -> Result<()> {
     println!("=== Example 4: Template Factory ===\n");
 

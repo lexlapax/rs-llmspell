@@ -139,6 +139,7 @@ pub struct TestHarness {
 
 impl TestHarness {
     /// Create new test harness with default factory
+    #[must_use]
     pub fn new(config: TestConfig) -> Self {
         // Create a mock provider manager for testing
         let provider_manager = Arc::new(llmspell_providers::ProviderManager::new());

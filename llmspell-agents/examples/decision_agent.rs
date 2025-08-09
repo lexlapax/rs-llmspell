@@ -10,6 +10,7 @@ use tracing::{info, Level};
 /// Example demonstrating a decision-making agent that evaluates multiple criteria,
 /// weighs options, and makes informed decisions with confidence scoring.
 #[tokio::main]
+#[allow(clippy::too_many_lines)]
 async fn main() -> anyhow::Result<()> {
     // Initialize logging
     tracing_subscriber::fmt().with_max_level(Level::INFO).init();

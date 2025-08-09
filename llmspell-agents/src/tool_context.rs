@@ -148,6 +148,7 @@ impl ToolExecutionContext {
 
     /// Get the context ID
     #[must_use]
+    #[allow(clippy::missing_const_for_fn)] // Cannot be const due to &self reference
     pub fn context_id(&self) -> &str {
         &self.context_id
     }

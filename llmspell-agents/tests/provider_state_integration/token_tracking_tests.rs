@@ -211,6 +211,7 @@ async fn test_anthropic_token_cost_tracking() -> Result<()> {
 }
 #[tokio::test]
 #[ignore = "requires OPENAI_API_KEY or ANTHROPIC_API_KEY"]
+#[allow(clippy::too_many_lines)] // Comprehensive test
 async fn test_token_usage_aggregation() -> Result<()> {
     // This test demonstrates how token usage could be aggregated across sessions
 

@@ -634,7 +634,7 @@ mod tests {
         };
 
         aggregator
-            .register_capability(cap.clone(), "agent-1")
+            .register_capability(cap, "agent-1")
             .unwrap();
 
         // Check it was registered

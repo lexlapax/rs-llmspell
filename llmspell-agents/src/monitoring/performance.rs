@@ -388,7 +388,7 @@ impl PerformanceMonitor {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     fn store_snapshot(&self, snapshot: PerformanceSnapshot) {
         let mut snapshots = self.snapshots.write().unwrap();
 
@@ -404,7 +404,7 @@ impl PerformanceMonitor {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     #[must_use]
     pub fn generate_report(&self) -> PerformanceReport {
         let snapshots = self.snapshots.read().unwrap();
@@ -541,7 +541,7 @@ mod tests {
                 #[allow(clippy::cast_possible_wrap)]
                 timestamp: Utc::now() + chrono::Duration::seconds(i64::from(i)),
                 resources: ResourceUsage {
-                    cpu_percent: 20.0 + (f64::from(i) * 5.0),
+                    cpu_percent: f64::from(i).mul_add(5.0, 20.0),
                     memory_bytes: 100 * 1024 * 1024
                         + (u64::try_from(i).unwrap_or(0) * 10 * 1024 * 1024),
                     thread_count: 8,
@@ -550,7 +550,7 @@ mod tests {
                     network_recv_bytes: 0,
                 },
                 request_rate: 100.0,
-                avg_response_time: 50.0 + (f64::from(i) * 10.0),
+                avg_response_time: f64::from(i).mul_add(10.0, 50.0),
                 error_rate: 1.0,
                 active_requests: 10,
                 queue_depth: 5,
@@ -560,11 +560,15 @@ mod tests {
 
         let report = PerformanceReport::from_snapshots(&snapshots);
 
+        #[allow(clippy::float_cmp)] // Test assertion on float values
         assert_eq!(report.avg_cpu_percent, 30.0); // (20 + 25 + 30 + 35 + 40) / 5
+        #[allow(clippy::float_cmp)] // Test assertion on float values
         assert_eq!(report.peak_cpu_percent, 40.0);
         assert_eq!(report.avg_memory_bytes, 120 * 1024 * 1024); // Average of the memory values
         assert_eq!(report.peak_memory_bytes, 140 * 1024 * 1024);
+        #[allow(clippy::float_cmp)] // Test assertion on float values
         assert_eq!(report.p95_response_time, 90.0); // 5th element (index 4)
+        #[allow(clippy::float_cmp)] // Test assertion on float values
         assert_eq!(report.p99_response_time, 90.0); // Same for small dataset
 
         let summary = report.summary();
@@ -633,8 +637,11 @@ mod tests {
         // Should only have 3 snapshots (oldest removed)
         let snapshots = monitor.snapshots.read().unwrap();
         assert_eq!(snapshots.len(), 3);
+        #[allow(clippy::float_cmp)] // Test assertion on float values
         assert_eq!(snapshots[0].request_rate, 2.0); // First two were removed
+        #[allow(clippy::float_cmp)] // Test assertion on float values
         assert_eq!(snapshots[1].request_rate, 3.0);
+        #[allow(clippy::float_cmp)] // Test assertion on float values
         assert_eq!(snapshots[2].request_rate, 4.0);
     }
 }

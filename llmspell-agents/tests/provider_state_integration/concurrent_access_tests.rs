@@ -12,6 +12,7 @@ use tokio::time::{sleep, timeout};
 use tracing::{info, warn};
 #[tokio::test]
 #[ignore = "requires OPENAI_API_KEY"]
+#[allow(clippy::too_many_lines)] // Comprehensive test
 async fn test_concurrent_openai_agents_shared_state() -> Result<()> {
     // Skip if no API key
     if !check_api_key("openai") {
@@ -296,6 +297,7 @@ async fn test_concurrent_anthropic_agents_race_conditions() -> Result<()> {
     Ok(())
 }
 #[tokio::test]
+#[allow(clippy::too_many_lines)] // Comprehensive test
 #[ignore = "requires OPENAI_API_KEY and ANTHROPIC_API_KEY"]
 async fn test_concurrent_mixed_providers() -> Result<()> {
     // Skip if missing API keys
@@ -448,6 +450,7 @@ async fn test_concurrent_mixed_providers() -> Result<()> {
     info!("Mixed provider concurrent test completed");
     Ok(())
 }
+#[allow(clippy::too_many_lines)] // Comprehensive test
 #[tokio::test]
 #[ignore = "requires OPENAI_API_KEY or ANTHROPIC_API_KEY"]
 async fn test_concurrent_state_conflict_resolution() -> Result<()> {

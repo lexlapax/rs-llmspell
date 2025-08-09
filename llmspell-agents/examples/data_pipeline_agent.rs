@@ -10,6 +10,7 @@ use tracing::{info, Level};
 /// Example demonstrating a data pipeline agent that processes data through
 /// Extract-Transform-Load (ETL) operations with intelligent routing and validation.
 #[tokio::main]
+#[allow(clippy::too_many_lines)] // Complex pipeline example
 async fn main() -> anyhow::Result<()> {
     // Initialize logging
     tracing_subscriber::fmt().with_max_level(Level::INFO).init();

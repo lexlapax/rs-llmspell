@@ -606,6 +606,7 @@ mod tests {
         assert_eq!(agent.depth(), 0);
     }
     #[tokio::test]
+    #[allow(clippy::items_after_statements)] // Inner items for test organization
     async fn test_component_management() {
         let mut agent = HierarchicalCompositeAgent::new("parent", HierarchicalConfig::default());
 

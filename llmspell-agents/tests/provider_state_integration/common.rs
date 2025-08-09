@@ -366,6 +366,10 @@ pub fn check_api_key(provider: &str) -> bool {
 }
 
 /// Skip test if API key is not available
+///
+/// # Panics
+///
+/// Panics if the required API key environment variable is not set for the specified provider.
 pub fn skip_if_no_api_key(provider: &str) {
     if !check_api_key(provider) {
         let key_name = match provider {
@@ -392,8 +396,8 @@ mod tests {
         let has_openai = check_api_key("openai");
         let has_anthropic = check_api_key("anthropic");
 
-        // Just verify the function doesn't panic
-        assert!(has_openai || !has_openai);
-        assert!(has_anthropic || !has_anthropic);
+        // Just verify the function doesn't panic and returns a boolean
+        assert!(has_openai || !has_openai); // Always true - just checking it's a bool
+        assert!(has_anthropic || !has_anthropic); // Always true - just checking it's a bool
     }
 }

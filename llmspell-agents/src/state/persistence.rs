@@ -271,7 +271,7 @@ mod tests {
         }
 
         fn set_state_manager(&self, state_manager: Arc<StateManager>) {
-            StateManagerHolder::set_state_manager(self, state_manager)
+            StateManagerHolder::set_state_manager(self, state_manager);
         }
     }
 

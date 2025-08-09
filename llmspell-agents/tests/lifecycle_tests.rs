@@ -160,6 +160,11 @@ async fn test_complete_lifecycle_workflow() {
 }
 #[tokio::test]
 async fn test_event_system_integration() {
+    use llmspell_agents::lifecycle::events::{
+        LifecycleEvent, LifecycleEventData, LifecycleEventType,
+    };
+    use llmspell_agents::lifecycle::state_machine::AgentState;
+
     let event_system = Arc::new(LifecycleEventSystem::new(EventSystemConfig::default()));
 
     // Setup event listeners
@@ -185,10 +190,6 @@ async fn test_event_system_integration() {
 
     // Manually emit events to test the event system
     // (State machine doesn't currently integrate with event system)
-    use llmspell_agents::lifecycle::events::{
-        LifecycleEvent, LifecycleEventData, LifecycleEventType,
-    };
-    use llmspell_agents::lifecycle::state_machine::AgentState;
 
     // Emit state change event
     let event = LifecycleEvent::new(

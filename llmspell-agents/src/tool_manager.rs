@@ -291,9 +291,8 @@ impl ToolManager {
         }
 
         // Get tool info from registry
-        let registry_info = match self.registry.get_tool_info(tool_name).await {
-            Some(info) => info,
-            None => return Ok(None),
+        let Some(registry_info) = self.registry.get_tool_info(tool_name).await else {
+            return Ok(None);
         };
 
         // Convert to our ToolInfo format
@@ -314,19 +313,19 @@ impl ToolManager {
     ///
     /// Returns an error if:
     /// - Tool composition execution fails
-    /// - Any step fails with ErrorStrategy::Fail
+    /// - Any step fails with `ErrorStrategy::Fail`
     /// - Retry attempts are exhausted
     pub async fn compose_tools(
         &self,
         composition: &ToolComposition,
-        mut context: ExecutionContext,
+        context: ExecutionContext,
     ) -> Result<AgentOutput> {
         let mut previous_output: Option<AgentOutput> = None;
         let mut results = Vec::new();
 
         for (step_index, step) in composition.steps.iter().enumerate() {
             let step_result = self
-                .execute_composition_step(step, step_index, &mut context, previous_output.as_ref())
+                .execute_composition_step(step, step_index, &context, previous_output.as_ref())
                 .await;
 
             match step_result {
@@ -346,16 +345,19 @@ impl ToolManager {
                         }
                         ErrorStrategy::Retry(max_attempts) => {
                             // Implement retry logic
-                            let mut attempts = 0;
-                            let mut _last_error = error;
+                            if max_attempts <= 1 {
+                                return Err(error);
+                            }
+
+                            let mut last_error;
+                            let mut attempts = 1; // Already tried once
 
                             while attempts < max_attempts {
-                                attempts += 1;
                                 match self
                                     .execute_composition_step(
                                         step,
                                         step_index,
-                                        &mut context,
+                                        &context,
                                         previous_output.as_ref(),
                                     )
                                     .await
@@ -366,9 +368,10 @@ impl ToolManager {
                                         break;
                                     }
                                     Err(e) => {
-                                        _last_error = e;
+                                        last_error = e;
+                                        attempts += 1;
                                         if attempts >= max_attempts {
-                                            return Err(_last_error);
+                                            return Err(last_error);
                                         }
                                     }
                                 }
@@ -394,11 +397,11 @@ impl ToolManager {
         &self,
         step: &ToolCompositionStep,
         _step_index: usize,
-        context: &mut ExecutionContext,
+        context: &ExecutionContext,
         previous_output: Option<&AgentOutput>,
     ) -> Result<AgentOutput> {
         // Prepare parameters for this step
-        let parameters = self.prepare_step_parameters(
+        let parameters = Self::prepare_step_parameters(
             &step.parameters,
             &step.context_mode,
             context,
@@ -412,7 +415,6 @@ impl ToolManager {
 
     /// Prepare parameters for a composition step
     fn prepare_step_parameters(
-        &self,
         base_parameters: &JsonValue,
         context_mode: &ContextMode,
         _context: &ExecutionContext,

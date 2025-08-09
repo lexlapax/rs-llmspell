@@ -1,5 +1,7 @@
-//! ABOUTME: Agent templates system for pre-configured agent patterns
-//! ABOUTME: Provides schema, base traits, implementations, customization, and validation for agent templates
+//! ABOUTME: Agent templates system for pre-configured patterns
+//! ABOUTME: Schema, traits, implementations, and validation
+
+#![allow(clippy::too_long_first_doc_paragraph)] // Module doc comments are intentionally brief
 
 /// Template schema definitions
 pub mod schema;

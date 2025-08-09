@@ -501,20 +501,20 @@ mod tests {
         assert_eq!(limits.max_recursion_depth, 10);
     }
 
-    async fn create_test_factory() -> DefaultAgentFactory {
+    fn create_test_factory() -> DefaultAgentFactory {
         let provider_manager = Arc::new(ProviderManager::new());
         DefaultAgentFactory::new(provider_manager)
     }
     #[tokio::test]
     async fn test_factory_templates() {
-        let factory = create_test_factory().await;
+        let factory = create_test_factory();
         let templates = factory.list_templates();
         assert!(templates.contains(&"basic"));
         assert!(templates.contains(&"llm"));
     }
     #[tokio::test]
     async fn test_config_validation() {
-        let factory = create_test_factory().await;
+        let factory = create_test_factory();
 
         // Valid config
         let valid_config = AgentConfig {
@@ -530,7 +530,7 @@ mod tests {
 
         // Invalid config - empty name
         let invalid_config = AgentConfig {
-            name: "".to_string(),
+            name: String::new(),
             ..valid_config.clone()
         };
         assert!(factory.validate_config(&invalid_config).is_err());
@@ -558,19 +558,19 @@ mod tests {
         // Invalid model config - empty provider
         let invalid_config = AgentConfig {
             model: Some(ModelConfig {
-                provider: "".to_string(),
+                provider: String::new(),
                 model_id: "gpt-4".to_string(),
                 temperature: None,
                 max_tokens: None,
                 settings: serde_json::Map::new(),
             }),
-            ..valid_config.clone()
+            ..valid_config
         };
         assert!(factory.validate_config(&invalid_config).is_err());
     }
     #[tokio::test]
     async fn test_agent_creation() {
-        let factory = create_test_factory().await;
+        let factory = create_test_factory();
 
         let config = AgentConfig {
             name: "test-basic".to_string(),
@@ -587,7 +587,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_agent_creation_unknown_type() {
-        let factory = create_test_factory().await;
+        let factory = create_test_factory();
 
         let config = AgentConfig {
             name: "test-unknown".to_string(),
@@ -606,7 +606,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_create_from_template() {
-        let factory = create_test_factory().await;
+        let factory = create_test_factory();
 
         let agent = factory.create_from_template("basic").await.unwrap();
         assert_eq!(agent.metadata().name, "basic-agent");
@@ -637,7 +637,7 @@ mod tests {
             }
         }
 
-        let mut factory = create_test_factory().await;
+        let mut factory = create_test_factory();
         let before_called = Arc::new(AtomicBool::new(false));
         let after_called = Arc::new(AtomicBool::new(false));
 
@@ -665,7 +665,7 @@ mod tests {
     }
     #[tokio::test]
     async fn test_add_custom_template() {
-        let mut factory = create_test_factory().await;
+        let mut factory = create_test_factory();
 
         let custom_config = AgentConfig {
             name: "custom-agent".to_string(),

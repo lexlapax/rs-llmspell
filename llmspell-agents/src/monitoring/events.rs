@@ -175,11 +175,12 @@ pub struct EventLogger {
 impl std::fmt::Debug for EventLogger {
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("EventLogger")
             .field("agent_id", &self.agent_id)
             .field("min_level", &*self.min_level.read().unwrap())
+            .field("buffer_size", &self.buffer.read().unwrap().len())
             .field("max_buffer_size", &self.max_buffer_size)
             .field("exporters_count", &self.exporters.len())
             .field("filters_count", &self.filters.len())
@@ -205,7 +206,7 @@ impl EventLogger {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     pub fn set_level(&self, level: LogLevel) {
         *self.min_level.write().unwrap() = level;
     }
@@ -214,7 +215,7 @@ impl EventLogger {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     pub fn get_level(&self) -> LogLevel {
         *self.min_level.read().unwrap()
     }
@@ -237,7 +238,7 @@ impl EventLogger {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     pub fn log(&self, event: LogEvent) -> Result<()> {
         // Check minimum level
         if !event.level.should_log(self.get_level()) {
@@ -370,7 +371,7 @@ impl EventLogger {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     pub fn get_recent_events(&self, count: usize) -> Vec<LogEvent> {
         let buffer = self.buffer.read().unwrap();
         buffer.iter().rev().take(count).cloned().collect()
@@ -380,7 +381,7 @@ impl EventLogger {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     pub fn get_events_by_level(&self, level: LogLevel) -> Vec<LogEvent> {
         let buffer = self.buffer.read().unwrap();
         buffer
@@ -394,7 +395,7 @@ impl EventLogger {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     pub fn get_events_by_trace(&self, trace_id: &str) -> Vec<LogEvent> {
         let buffer = self.buffer.read().unwrap();
         buffer
@@ -408,7 +409,7 @@ impl EventLogger {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     pub fn clear_buffer(&self) {
         self.buffer.write().unwrap().clear();
     }
@@ -417,7 +418,7 @@ impl EventLogger {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     pub fn get_statistics(&self) -> EventStatistics {
         let buffer = self.buffer.read().unwrap();
 

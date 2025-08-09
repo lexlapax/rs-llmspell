@@ -561,6 +561,7 @@ mod tests {
         assert_eq!(agent.metadata().name, "test-delegator");
     }
     #[tokio::test]
+    #[allow(clippy::items_after_statements)] // Inner items for test organization
     async fn test_agent_registration() {
         let delegator = DelegatingAgent::new("delegator", DelegationConfig::default());
 

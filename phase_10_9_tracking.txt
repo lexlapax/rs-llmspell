@@ -1,0 +1,96 @@
+# Phase 10.9 - Additional 81 Warnings Cleanup
+# Total: 81 warnings remaining in llmspell-agents
+
+## Categories Breakdown:
+
+### 1. const fn warnings (6):
+[ ] llmspell-agents/src/composition/tool_composition.rs:607 - this could be a const fn
+[ ] llmspell-agents/src/config/persistence_config.rs:51 - this could be a const fn
+[ ] llmspell-agents/src/config/persistence_config.rs:58 - this could be a const fn
+[ ] llmspell-agents/src/config/persistence_config.rs:65 - this could be a const fn
+[ ] llmspell-agents/src/config/persistence_config.rs:72 - this could be a const fn
+[ ] llmspell-agents/src/tool_context.rs:151 - this could be a const fn
+
+### 2. Documentation paragraph too long (5):
+[ ] llmspell-agents/src/templates/mod.rs:7 - first doc comment paragraph is too long
+[ ] llmspell-agents/src/templates/mod.rs:13 - first doc comment paragraph is too long
+[ ] llmspell-agents/src/templates/mod.rs:16 - first doc comment paragraph is too long
+[ ] llmspell-agents/src/templates/mod.rs:19 - first doc comment paragraph is too long
+[ ] llmspell-agents/src/templates/mod.rs:22 - first doc comment paragraph is too long
+
+### 3. Items after statements (21):
+[ ] llmspell-agents/examples/composition_patterns.rs:83
+[ ] llmspell-agents/examples/composition_patterns.rs:165
+[ ] llmspell-agents/examples/template_usage.rs:215
+[ ] llmspell-agents/src/composition/delegation.rs:568
+[ ] llmspell-agents/src/composition/delegation.rs:573
+[ ] llmspell-agents/src/composition/hierarchical.rs:613
+[ ] llmspell-agents/src/composition/hierarchical.rs:618
+[ ] llmspell-agents/src/lifecycle/shutdown.rs:808
+[ ] llmspell-agents/src/lifecycle/shutdown.rs:811
+[ ] llmspell-agents/src/registry/persistence.rs:337
+[ ] llmspell-agents/src/registry/persistence.rs:340
+[ ] llmspell-agents/src/registry/persistence.rs:369
+[ ] llmspell-agents/src/registry/persistence.rs:450
+[ ] llmspell-agents/src/registry/persistence.rs:452
+[ ] llmspell-agents/src/registry/persistence.rs:481
+[ ] llmspell-agents/src/state/sharing.rs:669
+[ ] llmspell-agents/src/state/sharing.rs:721
+[ ] llmspell-agents/src/state/sharing.rs:769
+[ ] llmspell-agents/tests/integration_tests.rs:100
+[ ] llmspell-agents/tests/integration_tests.rs:158
+[ ] llmspell-agents/tests/integration_tests.rs:242
+
+### 4. Float comparison warnings (16):
+[ ] llmspell-agents/src/hooks/state_persistence_hook.rs:337 - strict comparison of f32 or f64
+[ ] llmspell-agents/src/monitoring/metrics.rs:544 - strict comparison of f32 or f64
+[ ] llmspell-agents/src/monitoring/metrics.rs:547 - strict comparison of f32 or f64
+[ ] llmspell-agents/src/monitoring/metrics.rs:550 - strict comparison of f32 or f64
+[ ] llmspell-agents/src/monitoring/metrics.rs:553 - strict comparison of f32 or f64
+[ ] llmspell-agents/src/monitoring/metrics.rs:556 - strict comparison of f32 or f64
+[ ] llmspell-agents/src/monitoring/metrics.rs:589 - strict comparison of f32 or f64
+[ ] llmspell-agents/src/monitoring/metrics.rs:592 - strict comparison of f32 or f64
+[ ] llmspell-agents/src/monitoring/metrics.rs:609 - strict comparison of f32 or f64
+[ ] llmspell-agents/src/monitoring/metrics.rs:610 - strict comparison of f32 or f64
+[ ] llmspell-agents/src/monitoring/performance.rs:563 - strict comparison of f32 or f64
+[ ] llmspell-agents/src/monitoring/performance.rs:564 - strict comparison of f32 or f64
+[ ] llmspell-agents/src/monitoring/performance.rs:567 - strict comparison of f32 or f64
+[ ] llmspell-agents/src/monitoring/performance.rs:568 - strict comparison of f32 or f64
+[ ] llmspell-agents/src/monitoring/performance.rs:636 - strict comparison of f32 or f64
+[ ] llmspell-agents/src/monitoring/performance.rs:637 - strict comparison of f32 or f64
+[ ] llmspell-agents/src/monitoring/performance.rs:638 - strict comparison of f32 or f64
+[ ] llmspell-agents/src/registry/types.rs:351 - strict comparison of f32 or f64
+
+### 5. Too many lines (6 functions):
+[ ] llmspell-agents/examples/auto_save_agent.rs:30 - 215 lines (limit 100)
+[ ] llmspell-agents/examples/data_pipeline_agent.rs:13 - 150 lines (limit 100)
+[ ] llmspell-agents/tests/provider_state_integration/concurrent_access_tests.rs:15 - 101 lines
+[ ] llmspell-agents/tests/provider_state_integration/concurrent_access_tests.rs:300 - 104 lines
+[ ] llmspell-agents/tests/provider_state_integration/concurrent_access_tests.rs:453 - 118 lines
+[ ] llmspell-agents/tests/provider_state_integration/token_tracking_tests.rs:214 - 121 lines
+
+### 6. Other warnings:
+[ ] llmspell-agents/src/composition/tool_composition.rs:324 - future cannot be sent between threads safely
+[ ] llmspell-agents/src/context/distributed.rs:625 - binding's name is too similar to existing binding
+[ ] llmspell-agents/src/registry/categories.rs:482 - binding's name is too similar to existing binding
+[ ] llmspell-agents/src/templates/customization.rs:539 - binding's name is too similar to existing binding
+[ ] llmspell-agents/src/templates/customization.rs:661 - binding's name is too similar to existing binding
+[ ] llmspell-agents/src/factory.rs:533 - empty String is being created manually
+[ ] llmspell-agents/src/factory.rs:561 - empty String is being created manually
+[ ] llmspell-agents/src/templates/schema.rs:466 - empty String is being created manually
+[ ] llmspell-agents/src/monitoring/performance.rs:544 - multiply and add expressions can be calculated more efficiently
+[ ] llmspell-agents/src/monitoring/performance.rs:553 - multiply and add expressions can be calculated more efficiently
+[ ] llmspell-agents/src/state/persistence.rs:274 - consider adding a ; to the last statement
+[ ] llmspell-agents/tests/provider_state_integration/openai_tests.rs:197 - long literal lacking separators
+[ ] llmspell-agents/tests/provider_state_integration/common.rs:396 - boolean expression contains a logic bug
+[ ] llmspell-agents/tests/provider_state_integration/common.rs:397 - boolean expression contains a logic bug
+[ ] llmspell-agents/tests/communication_tests.rs:1 - formatting argument but not in macro
+
+## Priority Order:
+1. Fix const fn warnings (easy, quick wins)
+2. Fix documentation paragraphs (easy)
+3. Fix empty String creation (easy)
+4. Fix float comparisons (use epsilon comparison)
+5. Fix items after statements
+6. Add #[allow(clippy::too_many_lines)] to long functions
+7. Fix remaining misc warnings

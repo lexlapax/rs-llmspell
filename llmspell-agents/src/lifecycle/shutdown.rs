@@ -794,6 +794,7 @@ mod tests {
         assert_eq!(results[2].agent_id, "background-agent");
     }
     #[tokio::test]
+    #[allow(clippy::items_after_statements)] // Inner items for test organization
     async fn test_shutdown_timeout() {
         let event_system = Arc::new(LifecycleEventSystem::new(EventSystemConfig::default()));
         let resource_manager = Arc::new(ResourceManager::new(

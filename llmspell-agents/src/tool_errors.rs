@@ -577,6 +577,10 @@ impl ToolErrorHandler {
     }
 
     /// Handle a tool integration error
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the error handler fails or if the error is unrecoverable
     pub async fn handle_error(
         &self,
         error: ToolIntegrationError,

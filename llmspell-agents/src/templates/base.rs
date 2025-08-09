@@ -596,7 +596,7 @@ mod tests {
         }
 
         fn clone_template(&self) -> Box<dyn AgentTemplate> {
-            Box::new(MockTemplate {
+            Box::new(Self {
                 schema: self.schema.clone(),
             })
         }

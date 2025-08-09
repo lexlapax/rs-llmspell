@@ -194,7 +194,7 @@ async fn test_openai_error_recovery() -> Result<()> {
     agent.save_state().await?;
 
     // Try to trigger an error with a very large request (this might not always fail)
-    let large_input = "A".repeat(100000); // Very large input
+    let large_input = "A".repeat(100_000); // Very large input
     let input2 = AgentInput::text(&large_input);
 
     // This might succeed or fail, we just want to ensure state remains intact

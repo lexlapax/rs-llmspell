@@ -165,7 +165,7 @@ async fn test_request_response_pattern() {
 async fn test_pipeline_communication() {
     // Create pipeline stages
     let stage1 = MockAgentBuilder::new("preprocessor")
-        .with_response(None, "Preprocessed: {input}")
+        .with_response(None, "Preprocessed: {{input}}")
         .build();
 
     let stage2 = MockAgentBuilder::new("analyzer")

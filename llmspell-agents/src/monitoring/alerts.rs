@@ -333,7 +333,7 @@ impl AlertManager {
     ///
     /// # Panics
     ///
-    /// Panics if creating Arc<RwLock<_>> fails (should never happen)
+    /// Panics if creating `Arc<RwLock<_>>` fails (should never happen)
     #[must_use]
     pub fn new(config: AlertConfig) -> Self {
         Self {
@@ -350,7 +350,7 @@ impl AlertManager {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     pub fn register_rule(&self, rule: AlertRule) {
         self.rules.write().unwrap().insert(rule.id.clone(), rule);
     }
@@ -359,7 +359,7 @@ impl AlertManager {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned.
+    /// Panics if the `RwLock` is poisoned.
     pub fn register_channel(&self, name: String, channel: Arc<dyn NotificationChannel>) {
         self.channels.write().unwrap().insert(name, channel);
     }
@@ -375,7 +375,7 @@ impl AlertManager {
     ///
     /// # Panics
     ///
-    /// Panics if a RwLock is poisoned
+    /// Panics if a `RwLock` is poisoned
     pub async fn evaluate_rules(&self, context: AlertContext<'_>) -> Result<()> {
         let rules_to_evaluate: Vec<AlertRule> = {
             let rules = self.rules.read().unwrap();
@@ -525,7 +525,7 @@ impl AlertManager {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned or if Duration conversion fails
+    /// Panics if the `RwLock` is poisoned or if `Duration` conversion fails
     fn add_to_history(&self, alert: Alert) {
         let mut history = self.history.write().unwrap();
 
@@ -542,7 +542,7 @@ impl AlertManager {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     #[must_use]
     pub fn get_active_alerts(&self) -> Vec<Alert> {
         self.active_alerts
@@ -561,7 +561,7 @@ impl AlertManager {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     pub fn acknowledge_alert(&self, alert_id: &str) -> Result<()> {
         self.active_alerts
             .write()
@@ -589,7 +589,7 @@ impl AlertManager {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     pub fn resolve_alert(&self, alert_id: &str) -> Result<()> {
         self.active_alerts
             .write()
@@ -614,7 +614,7 @@ impl AlertManager {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned.
+    /// Panics if the `RwLock` is poisoned.
     #[must_use]
     pub fn get_statistics(&self) -> AlertStatistics {
         let active = self.active_alerts.read().unwrap();

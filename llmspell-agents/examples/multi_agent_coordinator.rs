@@ -50,8 +50,7 @@ async fn main() -> anyhow::Result<()> {
         )
         .with_parameter("tool_selection_strategy", "capability_based".into());
 
-    let data_agent_result = data_agent_template.instantiate(data_agent_params).await?;
-    let _data_agent = data_agent_result.agent;
+    let _data_agent_result = data_agent_template.instantiate(data_agent_params).await?;
 
     // 2. Analysis Agent - specialized in processing and analyzing data
     let analysis_agent_template = ToolAgentTemplate::new();
@@ -63,10 +62,9 @@ async fn main() -> anyhow::Result<()> {
         )
         .with_parameter("enable_caching", true.into());
 
-    let analysis_agent_result = analysis_agent_template
+    let _analysis_agent_result = analysis_agent_template
         .instantiate(analysis_agent_params)
         .await?;
-    let _analysis_agent = analysis_agent_result.agent;
 
     // 3. Monitoring Agent - tracks the health and progress of other agents
     let monitor_template = MonitorAgentTemplate::new();
@@ -76,8 +74,7 @@ async fn main() -> anyhow::Result<()> {
         .with_parameter("alert_threshold", 0.8.into())
         .with_parameter("enable_performance_tracking", true.into());
 
-    let monitor_result = monitor_template.instantiate(monitor_params).await?;
-    let _monitor_agent = monitor_result.agent;
+    let _monitor_result = monitor_template.instantiate(monitor_params).await?;
 
     // Example 1: Parallel Task Execution
     println!("\n=== Example 1: Parallel Task Execution ===");

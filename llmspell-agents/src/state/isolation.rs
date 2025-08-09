@@ -306,7 +306,7 @@ impl StateIsolationManager {
                     access_control.grant_permission(
                         agent_id,
                         StateScope::Custom(format!("shared:{scope_id}")),
-                        permission.clone(),
+                        *permission,
                     );
                 }
             }
@@ -355,7 +355,7 @@ impl StateIsolationManager {
         permission: StatePermission,
     ) {
         let mut access_control = self.access_control.write();
-        access_control.grant_permission(agent_id, scope.clone(), permission.clone());
+        access_control.grant_permission(agent_id, scope.clone(), permission);
         debug!(
             "Granted {:?} permission to agent {} for scope {:?}",
             permission, agent_id, scope

@@ -315,6 +315,7 @@ mod tests {
     use super::*;
     use llmspell_storage::MemoryBackend;
     #[tokio::test]
+    #[allow(clippy::items_after_statements)] // Inner items for test organization
     async fn test_persistent_registry_basic_operations() {
         let storage = Arc::new(MemoryBackend::new());
         let registry = PersistentAgentRegistry::new(storage).await.unwrap();
@@ -357,6 +358,7 @@ mod tests {
                 panic!("Not implemented for test")
             }
 
+            #[allow(clippy::items_after_statements)] // Inner items for test organization
             async fn handle_error(
                 &self,
                 _error: llmspell_core::LLMSpellError,
@@ -427,6 +429,7 @@ mod tests {
         assert!(!registry.exists("test-agent").await.unwrap());
     }
     #[tokio::test]
+    #[allow(clippy::items_after_statements)] // Inner items for test organization
     async fn test_persistent_registry_persistence() {
         let storage = Arc::new(MemoryBackend::new());
 
@@ -469,6 +472,7 @@ mod tests {
                     panic!("Not implemented for test")
                 }
 
+                #[allow(clippy::items_after_statements)] // Inner items for test organization
                 async fn handle_error(
                     &self,
                     _error: llmspell_core::LLMSpellError,

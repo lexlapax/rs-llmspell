@@ -1,5 +1,5 @@
-//! ABOUTME: Lifecycle middleware system for intercepting and augmenting agent lifecycle transitions
-//! ABOUTME: Provides composable middleware chain for logging, metrics, security, and custom lifecycle behavior
+//! ABOUTME: Lifecycle middleware system for agent transitions
+//! ABOUTME: Composable middleware chain for logging, metrics, and custom behavior
 
 #![allow(clippy::significant_drop_tightening)]
 

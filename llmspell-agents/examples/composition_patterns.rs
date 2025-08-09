@@ -37,6 +37,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Example 1: Hierarchical Agent Composition
+#[allow(clippy::items_after_statements)] // Inner items for test organization
 async fn hierarchical_composition_example() -> Result<(), Box<dyn std::error::Error>> {
     println!("1️⃣ Hierarchical Agent Composition");
     println!("================================");
@@ -154,6 +155,7 @@ async fn delegation_pattern_example() -> Result<(), Box<dyn std::error::Error>> 
 }
 
 /// Example 3: Capability-Based Composition
+#[allow(clippy::items_after_statements)] // Inner items for test organization
 fn capability_based_example() -> Result<(), Box<dyn std::error::Error>> {
     println!("3️⃣ Capability-Based Composition");
     println!("===============================");

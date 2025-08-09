@@ -92,6 +92,7 @@ async fn test_agent_lifecycle() {
 
 /// Test agent template instantiation
 #[tokio::test]
+#[allow(clippy::items_after_statements)] // Inner items for test organization
 async fn test_agent_templates() {
     let template = OrchestratorAgentTemplate::default();
     let provider_manager = Arc::new(llmspell_providers::ProviderManager::new());
@@ -149,6 +150,7 @@ async fn test_resource_limits() {
 
 /// Test agent with tool integration
 #[tokio::test]
+#[allow(clippy::items_after_statements)] // Inner items for test organization
 async fn test_agent_with_tools() {
     use mocks::TestDoubles;
 
@@ -222,6 +224,7 @@ async fn test_agent_error_handling() {
 
 /// Test agent state persistence across operations
 #[tokio::test]
+#[allow(clippy::items_after_statements)] // Inner items for test organization
 async fn test_agent_state_persistence() {
     use mocks::MockAgentBuilder;
 

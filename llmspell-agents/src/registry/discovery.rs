@@ -201,7 +201,11 @@ impl<R: AgentRegistry> Discovery<R> {
         }
 
         // Sort results
-        Self::sort_results(&mut scored_results, &criteria.sort_by, &criteria.sort_order);
+        Self::sort_results(
+            &mut scored_results,
+            criteria.sort_by.as_ref(),
+            &criteria.sort_order,
+        );
 
         Ok(scored_results)
     }
@@ -215,9 +219,8 @@ impl<R: AgentRegistry> Discovery<R> {
     /// - Agent similarity search fails
     pub async fn find_similar(&self, agent_id: &str, limit: usize) -> Result<Vec<SearchResult>> {
         // Get the reference agent
-        let reference = match self.registry.get_metadata(agent_id).await? {
-            Some(metadata) => metadata,
-            None => anyhow::bail!("Agent '{}' not found", agent_id),
+        let Some(reference) = self.registry.get_metadata(agent_id).await? else {
+            anyhow::bail!("Agent '{}' not found", agent_id);
         };
 
         // Build search criteria based on reference
@@ -246,7 +249,7 @@ impl<R: AgentRegistry> Discovery<R> {
     ///
     /// # Panics
     ///
-    /// Panics if DateTime conversion fails
+    /// Panics if `DateTime` conversion fails
     pub async fn get_recommendations(
         &self,
         context: &RecommendationContext,
@@ -315,8 +318,8 @@ impl<R: AgentRegistry> Discovery<R> {
     }
 
     /// Sort search results
-    fn sort_results(results: &mut [SearchResult], sort_by: &Option<SortField>, order: &SortOrder) {
-        let field = sort_by.as_ref().unwrap_or(&SortField::Name);
+    fn sort_results(results: &mut [SearchResult], sort_by: Option<&SortField>, order: &SortOrder) {
+        let field = sort_by.unwrap_or(&SortField::Name);
 
         results.sort_by(|a, b| {
             let cmp = match field {

@@ -600,7 +600,7 @@ mod tests {
     #[tokio::test]
     async fn test_specialized_tool_agent() {
         let tools = vec!["calculator".to_string(), "file_reader".to_string()];
-        let template = ToolAgentTemplate::specialized(tools.clone());
+        let template = ToolAgentTemplate::specialized(tools);
 
         assert!(template.schema().metadata.name.contains("calculator"));
         assert!(template.schema().metadata.name.contains("file_reader"));

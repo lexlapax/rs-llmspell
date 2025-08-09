@@ -310,7 +310,7 @@ impl TemplateValidator {
         // Validate parameter values
         for (name, value) in &params.parameters {
             if let Some(param_def) = schema.get_parameter(name) {
-                self.validate_parameter_value(param_def, value, &mut result);
+                Self::validate_parameter_value(param_def, value, &mut result);
             } else {
                 result.add_warning(ValidationWarning::Custom {
                     message: format!("Unknown parameter '{name}' provided"),
@@ -333,7 +333,6 @@ impl TemplateValidator {
 
     /// Validate parameter value against definition
     fn validate_parameter_value(
-        &self,
         param_def: &ParameterDefinition,
         value: &serde_json::Value,
         result: &mut ValidationResult,
