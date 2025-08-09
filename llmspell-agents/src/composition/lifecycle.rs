@@ -60,6 +60,7 @@ impl std::fmt::Debug for ComponentLifecycle {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ComponentLifecycle")
             .field("id", &self.id)
+            .field("component", &"<dyn BaseAgent>")
             .field("state", &self.state)
             .field("initialized_at", &self.initialized_at)
             .field("last_active", &self.last_active)
@@ -734,7 +735,7 @@ mod tests {
         }
 
         async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
-            Ok(AgentOutput::text(format!("Error: {}", error)))
+            Ok(AgentOutput::text(format!("Error: {error}")))
         }
     }
 

@@ -361,9 +361,12 @@ impl DefaultAgentFactory {
     #[must_use]
     pub fn with_enhanced_lifecycle(mut self) -> Self {
         self.default_state_config = StateMachineConfig {
-            enable_logging: true,
-            enable_hooks: true,
-            enable_circuit_breaker: true,
+            feature_flags: crate::lifecycle::state_machine::StateMachineFeatureFlags {
+                enable_logging: true,
+                enable_hooks: true,
+                enable_circuit_breaker: true,
+                ..Default::default()
+            },
             ..StateMachineConfig::default()
         };
         self

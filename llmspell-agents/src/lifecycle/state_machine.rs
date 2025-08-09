@@ -113,42 +113,58 @@ pub struct StateTransition {
 pub struct StateMachineConfig {
     /// Maximum time allowed for state transitions
     pub max_transition_time: Duration,
-    /// Enable automatic recovery from error states
-    pub auto_recovery: bool,
     /// Maximum number of recovery attempts
     pub max_recovery_attempts: usize,
     /// Timeout for initialization process
     pub initialization_timeout: Duration,
     /// Timeout for graceful termination
     pub termination_timeout: Duration,
+    /// Hook executor configuration (if hooks enabled)
+    pub hook_executor_config: Option<HookExecutorConfig>,
+    /// Circuit breaker configuration
+    pub circuit_breaker_config: BreakerConfig,
+    /// Feature flags for state machine behavior
+    pub feature_flags: StateMachineFeatureFlags,
+}
+
+/// Feature flags for state machine behavior
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(clippy::struct_excessive_bools)]
+pub struct StateMachineFeatureFlags {
+    /// Enable automatic recovery from error states
+    pub auto_recovery: bool,
     /// Enable state transition logging
     pub enable_logging: bool,
     /// Enable state persistence
     pub enable_persistence: bool,
     /// Enable hook execution during state transitions
     pub enable_hooks: bool,
-    /// Hook executor configuration (if hooks enabled)
-    pub hook_executor_config: Option<HookExecutorConfig>,
     /// Enable circuit breaker protection for state transitions
     pub enable_circuit_breaker: bool,
-    /// Circuit breaker configuration
-    pub circuit_breaker_config: BreakerConfig,
 }
 
 impl Default for StateMachineConfig {
     fn default() -> Self {
         Self {
             max_transition_time: Duration::from_millis(5000), // 5 seconds
-            auto_recovery: true,
             max_recovery_attempts: 3,
             initialization_timeout: Duration::from_secs(30),
             termination_timeout: Duration::from_secs(10),
+            hook_executor_config: None,
+            circuit_breaker_config: BreakerConfig::default(),
+            feature_flags: StateMachineFeatureFlags::default(),
+        }
+    }
+}
+
+impl Default for StateMachineFeatureFlags {
+    fn default() -> Self {
+        Self {
+            auto_recovery: true,
             enable_logging: true,
             enable_persistence: false,
             enable_hooks: false, // Disabled by default for backward compatibility
-            hook_executor_config: None,
             enable_circuit_breaker: true, // Enabled by default for protection
-            circuit_breaker_config: BreakerConfig::default(),
         }
     }
 }
@@ -158,8 +174,11 @@ impl StateMachineConfig {
     #[must_use]
     pub fn with_hooks(_hook_registry: Arc<HookRegistry>) -> Self {
         Self {
-            enable_hooks: true,
             hook_executor_config: Some(HookExecutorConfig::default()),
+            feature_flags: StateMachineFeatureFlags {
+                enable_hooks: true,
+                ..StateMachineFeatureFlags::default()
+            },
             ..Default::default()
         }
     }
@@ -168,8 +187,11 @@ impl StateMachineConfig {
     #[must_use]
     pub fn with_hook_config(hook_config: HookExecutorConfig) -> Self {
         Self {
-            enable_hooks: true,
             hook_executor_config: Some(hook_config),
+            feature_flags: StateMachineFeatureFlags {
+                enable_hooks: true,
+                ..StateMachineFeatureFlags::default()
+            },
             ..Default::default()
         }
     }
@@ -277,8 +299,8 @@ impl StateHandler for DefaultStateHandler {
             | (Recovering, Ready | Error | Terminating)
             | (Terminating, Terminated | Error) => true,
 
-            // From Terminated (final state) and all other transitions not allowed
-            (Terminated, _) | _ => false,
+            // All other transitions not allowed (including from Terminated state)
+            _ => false,
         }
     }
 }
@@ -304,7 +326,7 @@ impl AgentStateMachine {
     /// Create new state machine for agent
     #[must_use]
     pub fn new(agent_id: String, config: StateMachineConfig) -> Self {
-        let transition_circuit_breaker = if config.enable_circuit_breaker {
+        let transition_circuit_breaker = if config.feature_flags.enable_circuit_breaker {
             Some(Arc::new(CircuitBreaker::with_config(
                 format!("{agent_id}-state-transitions"),
                 config.circuit_breaker_config.clone(),
@@ -339,14 +361,14 @@ impl AgentStateMachine {
         config: StateMachineConfig,
         hook_registry: Arc<HookRegistry>,
     ) -> Self {
-        let hook_executor = if config.enable_hooks {
+        let hook_executor = if config.feature_flags.enable_hooks {
             let executor_config = config.hook_executor_config.clone().unwrap_or_default();
             Some(Arc::new(HookExecutor::with_config(executor_config)))
         } else {
             None
         };
 
-        let transition_circuit_breaker = if config.enable_circuit_breaker {
+        let transition_circuit_breaker = if config.feature_flags.enable_circuit_breaker {
             Some(Arc::new(CircuitBreaker::with_config(
                 format!("{agent_id}-state-transitions"),
                 config.circuit_breaker_config.clone(),
@@ -421,13 +443,14 @@ impl AgentStateMachine {
         context: &StateContext,
     ) -> Result<()> {
         // Only execute hooks if enabled and components are available
-        if !self.config.enable_hooks {
+        if !self.config.feature_flags.enable_hooks {
             return Ok(());
         }
 
-        let (hook_executor, hook_registry) = match (&self.hook_executor, &self.hook_registry) {
-            (Some(executor), Some(registry)) => (executor, registry),
-            _ => return Ok(()), // No hooks configured
+        let Some((hook_executor, hook_registry)) =
+            self.hook_executor.as_ref().zip(self.hook_registry.as_ref())
+        else {
+            return Ok(()); // No hooks configured
         };
 
         let hook_point = state_to_hook_point(state, is_entering);
@@ -682,7 +705,7 @@ impl AgentStateMachine {
                 context = context.with_metadata("transition_reason", r);
             }
 
-            if self.config.enable_logging {
+            if self.config.feature_flags.enable_logging {
                 info!(
                     "Agent {} transitioning from {:?} to {:?}{}",
                     self.agent_id,
@@ -790,7 +813,7 @@ impl AgentStateMachine {
                 *attempts = 0;
             }
 
-            if self.config.enable_logging {
+            if self.config.feature_flags.enable_logging {
                 debug!(
                     "Agent {} successfully transitioned to {:?} in {:?}",
                     self.agent_id,
@@ -1053,6 +1076,7 @@ impl AgentStateMachine {
     }
 
     /// Get hook executor metrics (if hooks are enabled)
+    #[must_use]
     pub fn get_hook_metrics(&self, hook_name: &str) -> Option<llmspell_hooks::PerformanceMetrics> {
         self.hook_executor.as_ref()?.get_metrics(hook_name)
     }
@@ -1060,7 +1084,9 @@ impl AgentStateMachine {
     /// Check if hooks are enabled
     #[must_use]
     pub const fn has_hooks(&self) -> bool {
-        self.config.enable_hooks && self.hook_executor.is_some() && self.hook_registry.is_some()
+        self.config.feature_flags.enable_hooks
+            && self.hook_executor.is_some()
+            && self.hook_registry.is_some()
     }
 
     /// Get state machine metrics

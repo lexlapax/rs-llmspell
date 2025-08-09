@@ -28,6 +28,14 @@ pub struct PersistenceConfig {
     pub backoff_multiplier: f64,
     /// Number of failures before circuit breaker opens
     pub failure_threshold: u32,
+    /// Event-based save settings
+    pub event_settings: EventPersistenceSettings,
+}
+
+/// Settings for event-based persistence
+#[derive(Debug, Clone)]
+#[allow(clippy::struct_excessive_bools)]
+pub struct EventPersistenceSettings {
     /// Save on pause events
     pub save_on_pause: bool,
     /// Save on stop events
@@ -45,6 +53,14 @@ impl Default for PersistenceConfig {
             max_retries: 3,
             backoff_multiplier: 2.0,
             failure_threshold: 5,
+            event_settings: EventPersistenceSettings::default(),
+        }
+    }
+}
+
+impl Default for EventPersistenceSettings {
+    fn default() -> Self {
+        Self {
             save_on_pause: true,
             save_on_stop: true,
             restore_on_resume: true,
@@ -109,17 +125,17 @@ impl StatePersistenceHook {
     pub async fn handle_event(&self, event: &LifecycleEvent) -> Result<()> {
         match &event.event_type {
             LifecycleEventType::AgentPaused => {
-                if self.config.save_on_pause {
+                if self.config.event_settings.save_on_pause {
                     self.save_state(&event.agent_id).await?;
                 }
             }
             LifecycleEventType::TerminationStarted => {
-                if self.config.save_on_stop {
+                if self.config.event_settings.save_on_stop {
                     self.save_state(&event.agent_id).await?;
                 }
             }
             LifecycleEventType::AgentResumed => {
-                if self.config.restore_on_resume {
+                if self.config.event_settings.restore_on_resume {
                     self.restore_state(&event.agent_id).await?;
                 }
             }
@@ -169,7 +185,7 @@ impl StatePersistenceHook {
 
             // Save agents without holding locks
             for agent_id in agents_to_save {
-                if self.config.non_blocking {
+                if self.config.event_settings.non_blocking {
                     let self_clone = self.clone();
                     tokio::spawn(async move {
                         if let Err(e) = self_clone.save_state(&agent_id).await {
@@ -320,10 +336,10 @@ mod tests {
         assert_eq!(config.max_retries, 3);
         assert_eq!(config.backoff_multiplier, 2.0);
         assert_eq!(config.failure_threshold, 5);
-        assert!(config.save_on_pause);
-        assert!(config.save_on_stop);
-        assert!(config.restore_on_resume);
-        assert!(config.non_blocking);
+        assert!(config.event_settings.save_on_pause);
+        assert!(config.event_settings.save_on_stop);
+        assert!(config.event_settings.restore_on_resume);
+        assert!(config.event_settings.non_blocking);
     }
     #[tokio::test]
     async fn test_state_persistence_hook_creation() {

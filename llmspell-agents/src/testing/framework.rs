@@ -14,6 +14,7 @@ use llmspell_core::{
     types::{AgentInput, AgentOutput},
     ExecutionContext, LLMSpellError,
 };
+use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     sync::{Arc, Mutex},
@@ -26,6 +27,16 @@ use tokio::sync::broadcast;
 pub struct TestConfig {
     /// Maximum test duration before timeout
     pub timeout: Duration,
+    /// Custom test metadata
+    pub metadata: HashMap<String, serde_json::Value>,
+    /// Feature flags for testing behavior
+    pub feature_flags: TestFeatureFlags,
+}
+
+/// Feature flags for testing behavior
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(clippy::struct_excessive_bools)]
+pub struct TestFeatureFlags {
     /// Enable debug logging
     pub debug: bool,
     /// Record all interactions
@@ -34,19 +45,25 @@ pub struct TestConfig {
     pub profile_performance: bool,
     /// Validate resource usage
     pub validate_resources: bool,
-    /// Custom test metadata
-    pub metadata: HashMap<String, serde_json::Value>,
 }
 
 impl Default for TestConfig {
     fn default() -> Self {
         Self {
             timeout: Duration::from_secs(30),
+            metadata: HashMap::new(),
+            feature_flags: TestFeatureFlags::default(),
+        }
+    }
+}
+
+impl Default for TestFeatureFlags {
+    fn default() -> Self {
+        Self {
             debug: false,
             record_interactions: true,
             profile_performance: false,
             validate_resources: true,
-            metadata: HashMap::new(),
         }
     }
 }
@@ -227,7 +244,7 @@ impl TestHarness {
         let duration = start.elapsed();
 
         // Record interaction
-        if self.config.record_interactions {
+        if self.config.feature_flags.record_interactions {
             let output_record = match &result {
                 Ok(output) => Ok(output.clone()),
                 Err(e) => Err(LLMSpellError::Component {
@@ -616,6 +633,7 @@ impl LifecycleEventRecorder {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use llmspell_core::types::OutputMetadata;
     #[tokio::test]
     async fn test_harness_creation() {
         let config = TestConfig::default();
@@ -628,7 +646,7 @@ mod tests {
             text: "Hello, world!".to_string(),
             media: vec![],
             tool_calls: vec![],
-            metadata: Default::default(),
+            metadata: OutputMetadata::default(),
             transfer_to: None,
         };
 

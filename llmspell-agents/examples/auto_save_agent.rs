@@ -16,7 +16,10 @@ use llmspell_core::{
     types::AgentInput,
     ExecutionContext,
 };
-use llmspell_state_persistence::{PersistenceConfig, StateManager, StorageBackendType};
+use llmspell_state_persistence::{
+    PerformanceConfig, PersistenceConfig, StateManager, StorageBackendType,
+};
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use tempfile::TempDir;
@@ -49,7 +52,7 @@ async fn main() -> Result<()> {
                 encryption: None,
                 backup_retention: Duration::from_secs(3600),
                 backup: None,
-                performance: Default::default(),
+                performance: PerformanceConfig::default(),
             },
         )
         .await?,
@@ -175,7 +178,7 @@ async fn main() -> Result<()> {
             agent1_id.clone(),
             llmspell_agents::lifecycle::events::LifecycleEventData::Generic {
                 message: "Agent paused by user".to_string(),
-                details: Default::default(),
+                details: HashMap::default(),
             },
             "example".to_string(),
         ))
@@ -219,7 +222,7 @@ async fn main() -> Result<()> {
             agent2_id.clone(),
             llmspell_agents::lifecycle::events::LifecycleEventData::Generic {
                 message: "Agent resumed by user".to_string(),
-                details: Default::default(),
+                details: HashMap::default(),
             },
             "example".to_string(),
         ))
@@ -251,7 +254,7 @@ async fn main() -> Result<()> {
             agent2_id,
             llmspell_agents::lifecycle::events::LifecycleEventData::Generic {
                 message: "Agent stopped by user".to_string(),
-                details: Default::default(),
+                details: HashMap::default(),
             },
             "example".to_string(),
         ))

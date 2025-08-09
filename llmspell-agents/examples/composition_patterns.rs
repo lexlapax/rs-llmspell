@@ -168,21 +168,21 @@ fn capability_based_example() -> Result<(), Box<dyn std::error::Error>> {
         name: "text-processing".to_string(),
         category: CapabilityCategory::DataProcessing,
         version: Some("2.0.0".to_string()),
-        metadata: Default::default(),
+        metadata: HashMap::default(),
     };
 
     let calc_cap = Capability {
         name: "mathematical-operations".to_string(),
         category: CapabilityCategory::DataProcessing,
         version: Some("1.5.0".to_string()),
-        metadata: Default::default(),
+        metadata: HashMap::default(),
     };
 
     let monitor_cap = Capability {
         name: "system-monitoring".to_string(),
         category: CapabilityCategory::Monitoring,
         version: Some("1.0.0".to_string()),
-        metadata: Default::default(),
+        metadata: HashMap::default(),
     };
 
     aggregator.register_capability(text_cap, "agent-1")?;

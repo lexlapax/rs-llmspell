@@ -9,6 +9,7 @@ use llmspell_core::{
     traits::{
         base_agent::BaseAgent,
         tool::{ParameterDef, ParameterType, SecurityLevel, Tool, ToolCategory, ToolSchema},
+        tool_capable::ToolQuery,
     },
     types::{AgentInput, AgentOutput},
     ComponentMetadata, ExecutionContext, Result,
@@ -285,7 +286,7 @@ async fn test_tool_manager_performance() {
 
     // Benchmark tool discovery
     let discovery_start = Instant::now();
-    let tools = manager.discover_tools(&Default::default()).await.unwrap();
+    let tools = manager.discover_tools(&ToolQuery::default()).await.unwrap();
     let discovery_time = discovery_start.elapsed();
 
     // Benchmark tool invocation
@@ -450,7 +451,7 @@ async fn test_full_integration_performance() {
     let integration_start = Instant::now();
 
     // 1. Discover tools
-    let tools = manager.discover_tools(&Default::default()).await.unwrap();
+    let tools = manager.discover_tools(&ToolQuery::default()).await.unwrap();
 
     // 2. Invoke calculator tool
     let calc_result = manager

@@ -651,8 +651,8 @@ mod tests {
         // Register some nodes
         for i in 1..4 {
             let node = NodeInfo {
-                id: format!("node{}", i),
-                address: format!("localhost:808{}", i),
+                id: format!("node{i}"),
+                address: format!("localhost:808{i}"),
                 capabilities: vec!["context_sync".to_string()],
                 status: if i == 3 {
                     NodeStatus::Overloaded

@@ -149,6 +149,10 @@ impl InheritanceRules {
     }
 
     /// Apply inheritance rules to create child context data
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if validation fails
     pub fn apply(
         &self,
         parent_ctx: &ExecutionContext,

@@ -4,8 +4,11 @@
 use llmspell_agents::testing::{framework, mocks, scenarios};
 
 use framework::{TestConfig, TestHarness};
+use llmspell_agents::factory::ResourceLimits;
 use mocks::MockAgentBuilder;
 use scenarios::{ScenarioRunner, TestScenarios};
+use serde_json::Map;
+use std::collections::HashMap;
 
 /// Test echo scenario
 #[tokio::test]
@@ -165,11 +168,13 @@ async fn test_state_transition_scenario() {
 async fn test_scenario_with_harness() {
     let config = TestConfig {
         timeout: std::time::Duration::from_secs(10),
-        debug: true,
-        record_interactions: true,
-        profile_performance: true,
-        validate_resources: true,
-        metadata: Default::default(),
+        metadata: HashMap::default(),
+        feature_flags: llmspell_agents::testing::framework::TestFeatureFlags {
+            debug: true,
+            record_interactions: true,
+            profile_performance: true,
+            validate_resources: true,
+        },
     };
 
     let harness = TestHarness::new(config);
@@ -184,8 +189,8 @@ async fn test_scenario_with_harness() {
         agent_type: "basic".to_string(),
         model: None,
         allowed_tools: vec![],
-        custom_config: Default::default(),
-        resource_limits: Default::default(),
+        custom_config: Map::default(),
+        resource_limits: ResourceLimits::default(),
     };
 
     let test_result = harness

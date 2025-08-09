@@ -656,7 +656,11 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
         **Analysis Scripts**: 
         - create_detailed_tracking.py (creates the detailed tracking with all locations)
         - analyze_warnings_10_7.py (for summary analysis)
-   
+
+ 10.7. **Remaining Issues** (2-3 hours) - Manual , crate by crate
+   - [ ] llmspell-agents crate warnings 
+      - [ ] 
+      - [ ]       
 
 **Acceptance Criteria**:
 - [ ] All clippy warnings resolved or explicitly allowed with justification

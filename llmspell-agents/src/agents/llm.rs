@@ -100,9 +100,12 @@ impl LLMAgent {
 
         // Create state machine configuration optimized for LLM agents
         let state_config = StateMachineConfig {
-            enable_logging: true,
-            enable_hooks: true,           // Enable hooks for LLM agents
-            enable_circuit_breaker: true, // Critical for LLM reliability
+            feature_flags: crate::lifecycle::state_machine::StateMachineFeatureFlags {
+                enable_logging: true,
+                enable_hooks: true,           // Enable hooks for LLM agents
+                enable_circuit_breaker: true, // Critical for LLM reliability
+                ..Default::default()
+            },
             max_transition_time: std::time::Duration::from_secs(30), // Longer for LLM operations
             ..StateMachineConfig::default()
         };

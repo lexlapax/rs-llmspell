@@ -8,6 +8,7 @@ use llmspell_core::{
     types::{AgentInput, AgentOutput},
     ExecutionContext, LLMSpellError, Result,
 };
+use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -47,30 +48,46 @@ pub struct ToolInvoker {
 pub struct InvocationConfig {
     /// Maximum execution time per tool call
     pub max_execution_time: Duration,
+    /// Maximum memory usage per tool call (in bytes)
+    pub max_memory_bytes: Option<u64>,
+    /// Custom validation rules
+    pub custom_validators: Vec<String>,
+    /// Feature flags for tool invocation behavior
+    pub feature_flags: InvocationFeatureFlags,
+}
+
+/// Feature flags for tool invocation behavior
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(clippy::struct_excessive_bools)]
+pub struct InvocationFeatureFlags {
     /// Whether to validate parameters before invocation
     pub validate_parameters: bool,
     /// Whether to track execution metrics
     pub track_metrics: bool,
     /// Whether to enable debug logging
     pub debug_logging: bool,
-    /// Maximum memory usage per tool call (in bytes)
-    pub max_memory_bytes: Option<u64>,
     /// Whether to sandbox tool execution
     pub enable_sandboxing: bool,
-    /// Custom validation rules
-    pub custom_validators: Vec<String>,
 }
 
 impl Default for InvocationConfig {
     fn default() -> Self {
         Self {
             max_execution_time: Duration::from_secs(30),
+            max_memory_bytes: Some(100 * 1024 * 1024), // 100MB
+            custom_validators: Vec::new(),
+            feature_flags: InvocationFeatureFlags::default(),
+        }
+    }
+}
+
+impl Default for InvocationFeatureFlags {
+    fn default() -> Self {
+        Self {
             validate_parameters: true,
             track_metrics: true,
             debug_logging: false,
-            max_memory_bytes: Some(100 * 1024 * 1024), // 100MB
             enable_sandboxing: true,
-            custom_validators: Vec::new(),
         }
     }
 }
@@ -92,21 +109,21 @@ impl InvocationConfig {
     /// Enable or disable parameter validation
     #[must_use]
     pub const fn with_parameter_validation(mut self, enabled: bool) -> Self {
-        self.validate_parameters = enabled;
+        self.feature_flags.validate_parameters = enabled;
         self
     }
 
     /// Enable or disable metrics tracking
     #[must_use]
     pub const fn with_metrics_tracking(mut self, enabled: bool) -> Self {
-        self.track_metrics = enabled;
+        self.feature_flags.track_metrics = enabled;
         self
     }
 
     /// Enable or disable debug logging
     #[must_use]
     pub const fn with_debug_logging(mut self, enabled: bool) -> Self {
-        self.debug_logging = enabled;
+        self.feature_flags.debug_logging = enabled;
         self
     }
 
@@ -120,7 +137,7 @@ impl InvocationConfig {
     /// Enable or disable sandboxing
     #[must_use]
     pub const fn with_sandboxing(mut self, enabled: bool) -> Self {
-        self.enable_sandboxing = enabled;
+        self.feature_flags.enable_sandboxing = enabled;
         self
     }
 }
@@ -242,7 +259,7 @@ impl ToolInvoker {
         .to_string();
 
         // Validate parameters if enabled
-        if self.config.validate_parameters {
+        if self.config.feature_flags.validate_parameters {
             let validation_start = Instant::now();
             match Self::validate_tool_parameters(tool.as_ref(), &parameters) {
                 Ok(validation_warnings) => {
@@ -297,7 +314,7 @@ impl ToolInvoker {
         metrics.execution_time = start_time.elapsed();
 
         // Log execution if debug logging is enabled
-        if self.config.debug_logging {
+        if self.config.feature_flags.debug_logging {
             tracing::debug!(
                 "Tool {} executed in {:?}",
                 tool.metadata().name,
@@ -493,7 +510,7 @@ mod tests {
                 .and_then(|v| v.as_str())
                 .unwrap_or("default");
 
-            Ok(AgentOutput::text(format!("Processed: {}", text)))
+            Ok(AgentOutput::text(format!("Processed: {text}")))
         }
 
         async fn validate_input(&self, _input: &AgentInput) -> Result<()> {
@@ -501,7 +518,7 @@ mod tests {
         }
 
         async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
-            Ok(AgentOutput::text(format!("Error: {}", error)))
+            Ok(AgentOutput::text(format!("Error: {error}")))
         }
     }
 
@@ -533,7 +550,7 @@ mod tests {
         let invoker = ToolInvoker::new(config);
 
         assert_eq!(invoker.config().max_execution_time, Duration::from_secs(30));
-        assert!(invoker.config().validate_parameters);
+        assert!(invoker.config().feature_flags.validate_parameters);
     }
     #[tokio::test]
     async fn test_invocation_config_builder() {
@@ -543,8 +560,8 @@ mod tests {
             .with_debug_logging(true);
 
         assert_eq!(config.max_execution_time, Duration::from_secs(10));
-        assert!(!config.validate_parameters);
-        assert!(config.debug_logging);
+        assert!(!config.feature_flags.validate_parameters);
+        assert!(config.feature_flags.debug_logging);
     }
     #[tokio::test]
     async fn test_successful_tool_invocation() {

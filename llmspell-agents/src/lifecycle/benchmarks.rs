@@ -220,9 +220,13 @@ impl PerformanceBenchmark {
                     let state_machine = AgentStateMachine::new(
                         format!("baseline-{iteration}-{agent_id}"),
                         StateMachineConfig {
-                            enable_hooks: false,
-                            enable_circuit_breaker: false,
-                            enable_logging: false,
+                            feature_flags:
+                                crate::lifecycle::state_machine::StateMachineFeatureFlags {
+                                    enable_hooks: false,
+                                    enable_circuit_breaker: false,
+                                    enable_logging: false,
+                                    ..Default::default()
+                                },
                             ..StateMachineConfig::default()
                         },
                     );
@@ -299,9 +303,13 @@ impl PerformanceBenchmark {
                     let state_machine = AgentStateMachine::with_hooks(
                         format!("with-hooks-{iteration}-{agent_id}"),
                         StateMachineConfig {
-                            enable_hooks: true,
-                            enable_circuit_breaker: true,
-                            enable_logging: false, // Disable debug logging for clean measurement
+                            feature_flags:
+                                crate::lifecycle::state_machine::StateMachineFeatureFlags {
+                                    enable_hooks: true,
+                                    enable_circuit_breaker: true,
+                                    enable_logging: false, // Disable debug logging for clean measurement
+                                    ..Default::default()
+                                },
                             ..StateMachineConfig::default()
                         },
                         registry,

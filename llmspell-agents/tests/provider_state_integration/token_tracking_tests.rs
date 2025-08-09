@@ -166,7 +166,9 @@ async fn test_anthropic_token_cost_tracking() -> Result<()> {
 
     // Calculate approximate cost (Claude 3.5 Sonnet pricing as example)
     // Input: $3 per million tokens, Output: $15 per million tokens
+    #[allow(clippy::cast_precision_loss)]
     let input_cost = (estimated_input_tokens as f64 / 1_000_000.0) * 3.0;
+    #[allow(clippy::cast_precision_loss)]
     let output_cost = (estimated_output_tokens as f64 / 1_000_000.0) * 15.0;
     let total_cost = input_cost + output_cost;
 

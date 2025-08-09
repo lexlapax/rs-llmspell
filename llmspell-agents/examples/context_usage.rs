@@ -41,12 +41,12 @@ async fn main() -> Result<()> {
 
     // Example 1: Basic Context Creation
     println!("1. Basic Context Creation:");
-    basic_context_example()?;
+    basic_context_example();
     println!();
 
     // Example 2: Hierarchical Contexts
     println!("2. Hierarchical Context Management:");
-    hierarchical_context_example().await?;
+    hierarchical_context_example()?;
     println!();
 
     // Example 3: Context Inheritance
@@ -56,7 +56,7 @@ async fn main() -> Result<()> {
 
     // Example 4: Shared Memory
     println!("4. Shared Memory for Inter-Agent Communication:");
-    shared_memory_example().await?;
+    shared_memory_example()?;
     println!();
 
     // Example 5: Event Integration
@@ -71,7 +71,7 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-fn basic_context_example() -> Result<()> {
+fn basic_context_example() {
     // Create context with builder
     let context = ExecutionContextBuilder::new()
         .conversation_id("conv-123".to_string())
@@ -86,11 +86,9 @@ fn basic_context_example() -> Result<()> {
     println!("  Scope: {:?}", context.scope);
     println!("  Language: {:?}", context.get("language"));
     println!("  Theme: {:?}", context.get("theme"));
-
-    Ok(())
 }
 
-async fn hierarchical_context_example() -> Result<()> {
+fn hierarchical_context_example() -> Result<()> {
     let mut hierarchy = HierarchicalContext::new();
 
     // Create root context for a workflow
@@ -179,7 +177,7 @@ fn inheritance_example() -> Result<()> {
     Ok(())
 }
 
-async fn shared_memory_example() -> Result<()> {
+fn shared_memory_example() -> Result<()> {
     let memory_manager = SharedMemoryManager::new();
 
     let agent1 = ComponentId::from_name("agent-1");

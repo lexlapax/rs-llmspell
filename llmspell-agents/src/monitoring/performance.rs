@@ -539,17 +539,18 @@ mod tests {
         for i in 0..5 {
             let snapshot = PerformanceSnapshot {
                 #[allow(clippy::cast_possible_wrap)]
-                timestamp: Utc::now() + chrono::Duration::seconds(i as i64),
+                timestamp: Utc::now() + chrono::Duration::seconds(i64::from(i)),
                 resources: ResourceUsage {
-                    cpu_percent: 20.0 + (i as f64 * 5.0),
-                    memory_bytes: 100 * 1024 * 1024 + (i as u64 * 10 * 1024 * 1024),
+                    cpu_percent: 20.0 + (f64::from(i) * 5.0),
+                    memory_bytes: 100 * 1024 * 1024
+                        + (u64::try_from(i).unwrap_or(0) * 10 * 1024 * 1024),
                     thread_count: 8,
                     fd_count: Some(42),
                     network_sent_bytes: 0,
                     network_recv_bytes: 0,
                 },
                 request_rate: 100.0,
-                avg_response_time: 50.0 + (i as f64 * 10.0),
+                avg_response_time: 50.0 + (f64::from(i) * 10.0),
                 error_rate: 1.0,
                 active_requests: 10,
                 queue_depth: 5,
@@ -620,7 +621,7 @@ mod tests {
             let snapshot = PerformanceSnapshot {
                 timestamp: Utc::now(),
                 resources: ResourceUsage::snapshot(),
-                request_rate: i as f64,
+                request_rate: f64::from(i),
                 avg_response_time: 50.0,
                 error_rate: 0.0,
                 active_requests: 0,

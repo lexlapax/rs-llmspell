@@ -9,7 +9,9 @@ use llmspell_core::{
     ExecutionContext,
 };
 use llmspell_providers::ProviderManager;
-use llmspell_state_persistence::{PersistenceConfig, StateManager, StorageBackendType};
+use llmspell_state_persistence::{
+    PerformanceConfig, PersistenceConfig, StateManager, StorageBackendType,
+};
 use std::env;
 use std::sync::Arc;
 use std::time::Duration;
@@ -52,7 +54,7 @@ impl ProviderTestContext {
                     encryption: None,
                     backup_retention: Duration::from_secs(300),
                     backup: None,
-                    performance: Default::default(),
+                    performance: PerformanceConfig::default(),
                 },
             )
             .await?,

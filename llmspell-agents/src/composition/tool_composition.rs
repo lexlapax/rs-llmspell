@@ -314,9 +314,13 @@ impl ToolComposition {
 
     /// Execute the composition with the given tool provider
     ///
+    /// # Errors
+    ///
+    /// Returns an error if tool execution fails
+    ///
     /// # Panics
     ///
-    /// Panics if a RwLock is poisoned
+    /// Panics if a `RwLock` is poisoned
     pub async fn execute<T>(
         &self,
         tool_provider: &T,
@@ -363,27 +367,17 @@ impl ToolComposition {
                         .await
                     {
                         Ok(output) => {
-                            let step_metrics = StepMetrics {
-                                execution_time: step_start_time.elapsed(),
+                            let result = self.handle_step_success(
+                                &step.id,
+                                output.clone(),
+                                step_start_time.elapsed(),
                                 retry_attempts,
-                                memory_used: None,
-                            };
-
-                            let result = StepResult {
-                                success: true,
-                                output: output.clone(),
-                                error: None,
-                                metrics: step_metrics,
-                            };
-
-                            // Update execution context with step output
+                            );
                             execution_context.set_step_output(&step.id, output);
-
                             break result;
                         }
                         Err(e) => {
                             steps_failed += 1;
-                            let error_msg = e.to_string();
 
                             // Check if we should retry
                             if step.retry_config.as_ref().is_some_and(|retry_config| {
@@ -400,27 +394,13 @@ impl ToolComposition {
                                 continue;
                             }
 
-                            let step_metrics = StepMetrics {
-                                execution_time: step_start_time.elapsed(),
+                            let result = self.handle_step_error_result(
+                                step,
+                                &e,
+                                step_start_time.elapsed(),
                                 retry_attempts,
-                                memory_used: None,
-                            };
-
-                            let result = StepResult {
-                                success: false,
-                                output: JsonValue::Null,
-                                error: Some(error_msg.clone()),
-                                metrics: step_metrics,
-                            };
-
-                            // Handle step error based on strategy
-                            let fatal = self.handle_step_error(step, &e);
-                            errors.push(CompositionError {
-                                step_id: step.id.clone(),
-                                message: error_msg,
-                                fatal,
-                            });
-
+                                &mut errors,
+                            );
                             break result;
                         }
                     }
@@ -621,6 +601,60 @@ impl ToolComposition {
             .await
     }
 
+    /// Helper to handle successful step execution
+    fn handle_step_success(
+        &self,
+        _step_id: &str,
+        output: JsonValue,
+        execution_time: Duration,
+        retry_attempts: u32,
+    ) -> StepResult {
+        let step_metrics = StepMetrics {
+            execution_time,
+            retry_attempts,
+            memory_used: None,
+        };
+
+        StepResult {
+            success: true,
+            output,
+            error: None,
+            metrics: step_metrics,
+        }
+    }
+
+    /// Helper to handle step error result
+    fn handle_step_error_result(
+        &self,
+        step: &CompositionStep,
+        error: &LLMSpellError,
+        execution_time: Duration,
+        retry_attempts: u32,
+        errors: &mut Vec<CompositionError>,
+    ) -> StepResult {
+        let error_msg = error.to_string();
+        let fatal = self.handle_step_error(step, error);
+
+        errors.push(CompositionError {
+            step_id: step.id.clone(),
+            message: error_msg.clone(),
+            fatal,
+        });
+
+        let step_metrics = StepMetrics {
+            execution_time,
+            retry_attempts,
+            memory_used: None,
+        };
+
+        StepResult {
+            success: false,
+            output: JsonValue::Null,
+            error: Some(error_msg),
+            metrics: step_metrics,
+        }
+    }
+
     /// Handle step error based on strategy
     const fn handle_step_error(&self, step: &CompositionStep, _error: &LLMSpellError) -> bool {
         match step.error_strategy {
@@ -793,7 +827,7 @@ mod tests {
                     |text| json!({"result": text.to_uppercase()}),
                 )),
                 _ => Err(LLMSpellError::Component {
-                    message: format!("Tool not found: {}", tool_name),
+                    message: format!("Tool not found: {tool_name}"),
                     source: None,
                 }),
             }

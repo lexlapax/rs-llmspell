@@ -247,6 +247,10 @@ impl ContextEventBus {
     }
 
     /// Subscribe to events
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if subscription fails
     pub async fn subscribe(
         &self,
         context_scope: ContextScope,

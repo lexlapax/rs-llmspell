@@ -48,29 +48,29 @@ impl PersistenceConfigBuilder {
 
     /// Configure whether to save on pause
     #[must_use]
-    pub const fn save_on_pause(mut self, enabled: bool) -> Self {
-        self.config.save_on_pause = enabled;
+    pub fn save_on_pause(mut self, enabled: bool) -> Self {
+        self.config.event_settings.save_on_pause = enabled;
         self
     }
 
     /// Configure whether to save on stop
     #[must_use]
-    pub const fn save_on_stop(mut self, enabled: bool) -> Self {
-        self.config.save_on_stop = enabled;
+    pub fn save_on_stop(mut self, enabled: bool) -> Self {
+        self.config.event_settings.save_on_stop = enabled;
         self
     }
 
     /// Configure whether to restore on resume
     #[must_use]
-    pub const fn restore_on_resume(mut self, enabled: bool) -> Self {
-        self.config.restore_on_resume = enabled;
+    pub fn restore_on_resume(mut self, enabled: bool) -> Self {
+        self.config.event_settings.restore_on_resume = enabled;
         self
     }
 
     /// Configure whether saves should be non-blocking
     #[must_use]
-    pub const fn non_blocking(mut self, enabled: bool) -> Self {
-        self.config.non_blocking = enabled;
+    pub fn non_blocking(mut self, enabled: bool) -> Self {
+        self.config.event_settings.non_blocking = enabled;
         self
     }
 
@@ -152,7 +152,7 @@ mod tests {
         let config = PersistenceConfigBuilder::new().build();
         assert!(config.auto_save_interval.is_none());
         assert_eq!(config.max_retries, 3);
-        assert!(config.save_on_pause);
+        assert!(config.event_settings.save_on_pause);
     }
     #[test]
     fn test_builder_custom() {
@@ -164,17 +164,17 @@ mod tests {
 
         assert_eq!(config.auto_save_interval, Some(Duration::from_secs(120)));
         assert_eq!(config.max_retries, 5);
-        assert!(!config.save_on_pause);
+        assert!(!config.event_settings.save_on_pause);
     }
     #[test]
     fn test_presets() {
         let dev = presets::development();
         assert_eq!(dev.auto_save_interval, Some(Duration::from_secs(60)));
-        assert!(!dev.non_blocking);
+        assert!(!dev.event_settings.non_blocking);
 
         let prod = presets::production();
         assert_eq!(prod.auto_save_interval, Some(Duration::from_secs(300)));
-        assert!(prod.non_blocking);
+        assert!(prod.event_settings.non_blocking);
 
         let test = presets::testing();
         assert_eq!(test.auto_save_interval, Some(Duration::from_millis(100)));
@@ -182,7 +182,7 @@ mod tests {
 
         let minimal = presets::minimal();
         assert!(minimal.auto_save_interval.is_none());
-        assert!(!minimal.save_on_pause);
-        assert!(minimal.save_on_stop);
+        assert!(!minimal.event_settings.save_on_pause);
+        assert!(minimal.event_settings.save_on_stop);
     }
 }

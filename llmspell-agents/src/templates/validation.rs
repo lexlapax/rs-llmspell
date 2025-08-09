@@ -1000,7 +1000,7 @@ mod tests {
         // Add complexity
         for i in 0..5 {
             schema = schema.with_parameter(ParameterDefinition {
-                name: format!("param_{}", i),
+                name: format!("param_{i}"),
                 description: "Test".to_string(),
                 param_type: ParameterType::String,
                 required: i < 3,

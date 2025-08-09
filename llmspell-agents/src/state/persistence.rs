@@ -213,7 +213,7 @@ mod tests {
             &self,
             error: llmspell_core::LLMSpellError,
         ) -> llmspell_core::Result<AgentOutput> {
-            Ok(AgentOutput::text(format!("Error: {}", error)))
+            Ok(AgentOutput::text(format!("Error: {error}")))
         }
     }
 

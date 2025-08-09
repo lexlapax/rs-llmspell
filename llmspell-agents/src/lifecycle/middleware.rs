@@ -190,16 +190,24 @@ pub struct LifecycleMiddlewareChain {
 /// Middleware configuration
 #[derive(Debug, Clone)]
 pub struct MiddlewareConfig {
-    /// Enable middleware execution
-    pub enabled: bool,
     /// Maximum execution time per middleware
     pub max_execution_time: Duration,
+    /// Maximum history size
+    pub max_history_size: usize,
+    /// Runtime behavior flags
+    pub behavior_flags: MiddlewareBehaviorFlags,
+}
+
+/// Middleware behavior flags
+#[derive(Debug, Clone)]
+#[allow(clippy::struct_excessive_bools)]
+pub struct MiddlewareBehaviorFlags {
+    /// Enable middleware execution
+    pub enabled: bool,
     /// Enable detailed logging
     pub enable_logging: bool,
     /// Continue chain on middleware errors
     pub continue_on_error: bool,
-    /// Maximum history size
-    pub max_history_size: usize,
     /// Emit events for middleware execution
     pub emit_events: bool,
 }
@@ -207,11 +215,19 @@ pub struct MiddlewareConfig {
 impl Default for MiddlewareConfig {
     fn default() -> Self {
         Self {
-            enabled: true,
             max_execution_time: Duration::from_secs(5),
+            max_history_size: 1000,
+            behavior_flags: MiddlewareBehaviorFlags::default(),
+        }
+    }
+}
+
+impl Default for MiddlewareBehaviorFlags {
+    fn default() -> Self {
+        Self {
+            enabled: true,
             enable_logging: true,
             continue_on_error: false,
-            max_history_size: 1000,
             emit_events: false, // Usually too verbose
         }
     }
@@ -241,7 +257,7 @@ impl LifecycleMiddlewareChain {
         // Sort by priority
         chain.sort_by_key(|m| m.priority());
 
-        if self.config.enable_logging {
+        if self.config.behavior_flags.enable_logging {
             debug!(
                 "Added middleware '{}' with priority {}",
                 chain.last().unwrap().name(),
@@ -258,7 +274,7 @@ impl LifecycleMiddlewareChain {
     /// and stored in the context data. The Result type is provided for future
     /// extensibility (e.g., critical system-level middleware failures).
     pub async fn execute(&self, mut context: MiddlewareContext) -> Result<MiddlewareContext> {
-        if !self.config.enabled {
+        if !self.config.behavior_flags.enabled {
             return Ok(context);
         }
 
@@ -272,7 +288,7 @@ impl LifecycleMiddlewareChain {
                 .collect::<Vec<_>>()
         };
 
-        if self.config.enable_logging && !middleware_list.is_empty() {
+        if self.config.behavior_flags.enable_logging && !middleware_list.is_empty() {
             debug!(
                 "Executing {} middleware for phase {:?} on agent {}",
                 middleware_list.len(),
@@ -288,7 +304,8 @@ impl LifecycleMiddlewareChain {
                 .await;
             self.record_execution(execution_result).await;
 
-            if !self.config.continue_on_error && context.get_data("_error").is_some() {
+            if !self.config.behavior_flags.continue_on_error && context.get_data("_error").is_some()
+            {
                 break;
             }
         }
@@ -301,14 +318,16 @@ impl LifecycleMiddlewareChain {
                     .await;
                 self.record_execution(execution_result).await;
 
-                if !self.config.continue_on_error && context.get_data("_error").is_some() {
+                if !self.config.behavior_flags.continue_on_error
+                    && context.get_data("_error").is_some()
+                {
                     break;
                 }
             }
         }
 
         // Emit event if configured
-        if self.config.emit_events {
+        if self.config.behavior_flags.emit_events {
             let event = LifecycleEvent::new(
                 LifecycleEventType::ExecutionCompleted,
                 context.agent_id.clone(),
@@ -343,7 +362,7 @@ impl LifecycleMiddlewareChain {
         mut context: MiddlewareContext,
         error: &anyhow::Error,
     ) -> MiddlewareContext {
-        if !self.config.enabled {
+        if !self.config.behavior_flags.enabled {
             return context;
         }
 
@@ -386,7 +405,7 @@ impl LifecycleMiddlewareChain {
                 metrics: HashMap::new(),
             },
             Ok(Err(e)) => {
-                if self.config.enable_logging {
+                if self.config.behavior_flags.enable_logging {
                     error!("Middleware '{}' before hook failed: {}", middleware_name, e);
                 }
                 context.set_data("_error", &e.to_string());
@@ -401,7 +420,7 @@ impl LifecycleMiddlewareChain {
             }
             Err(_) => {
                 let error_msg = format!("Middleware '{middleware_name}' before hook timed out");
-                if self.config.enable_logging {
+                if self.config.behavior_flags.enable_logging {
                     error!("{}", error_msg);
                 }
                 context.set_data("_error", &error_msg);
@@ -437,7 +456,7 @@ impl LifecycleMiddlewareChain {
                 metrics: HashMap::new(),
             },
             Ok(Err(e)) => {
-                if self.config.enable_logging {
+                if self.config.behavior_flags.enable_logging {
                     error!("Middleware '{}' after hook failed: {}", middleware_name, e);
                 }
                 MiddlewareExecutionResult {
@@ -451,7 +470,7 @@ impl LifecycleMiddlewareChain {
             }
             Err(_) => {
                 let error_msg = format!("Middleware '{middleware_name}' after hook timed out");
-                if self.config.enable_logging {
+                if self.config.behavior_flags.enable_logging {
                     error!("{}", error_msg);
                 }
                 MiddlewareExecutionResult {
@@ -491,7 +510,7 @@ impl LifecycleMiddlewareChain {
                 metrics: HashMap::new(),
             },
             Ok(Err(e)) => {
-                if self.config.enable_logging {
+                if self.config.behavior_flags.enable_logging {
                     error!("Middleware '{}' error hook failed: {}", middleware_name, e);
                 }
                 MiddlewareExecutionResult {
@@ -505,7 +524,7 @@ impl LifecycleMiddlewareChain {
             }
             Err(_) => {
                 let error_msg = format!("Middleware '{middleware_name}' error hook timed out");
-                if self.config.enable_logging {
+                if self.config.behavior_flags.enable_logging {
                     error!("{}", error_msg);
                 }
                 MiddlewareExecutionResult {
@@ -913,8 +932,11 @@ mod tests {
 
         let event_system = Arc::new(LifecycleEventSystem::new(EventSystemConfig::default()));
         let config = MiddlewareConfig {
-            continue_on_error: false,
-            ..Default::default()
+            behavior_flags: MiddlewareBehaviorFlags {
+                continue_on_error: false,
+                ..MiddlewareBehaviorFlags::default()
+            },
+            ..MiddlewareConfig::default()
         };
         let chain = LifecycleMiddlewareChain::new(event_system, config);
 

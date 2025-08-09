@@ -589,12 +589,11 @@ mod tests {
             let params = input
                 .parameters
                 .get("parameters")
-                .map(|v| format!(" with params: {}", v))
+                .map(|v| format!(" with params: {v}"))
                 .unwrap_or_default();
 
             Ok(AgentOutput::text(format!(
-                "MockAgent executed: {}{}",
-                text, params
+                "MockAgent executed: {text}{params}"
             )))
         }
 
@@ -603,7 +602,7 @@ mod tests {
         }
 
         async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
-            Ok(AgentOutput::text(format!("Error handled: {}", error)))
+            Ok(AgentOutput::text(format!("Error handled: {error}")))
         }
     }
     #[tokio::test]

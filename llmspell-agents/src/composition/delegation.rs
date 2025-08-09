@@ -588,7 +588,7 @@ mod tests {
             }
 
             async fn handle_error(&self, error: LLMSpellError) -> Result<AgentOutput> {
-                Ok(AgentOutput::text(format!("Error: {}", error)))
+                Ok(AgentOutput::text(format!("Error: {error}")))
             }
         }
 
@@ -617,11 +617,11 @@ mod tests {
 
         for strategy in strategies {
             match strategy {
-                DelegationStrategy::FirstMatch => {}
-                DelegationStrategy::BestMatch => {}
-                DelegationStrategy::RoundRobin => {}
-                DelegationStrategy::Random => {}
-                DelegationStrategy::LoadBalanced => {}
+                DelegationStrategy::FirstMatch
+                | DelegationStrategy::BestMatch
+                | DelegationStrategy::RoundRobin
+                | DelegationStrategy::Random
+                | DelegationStrategy::LoadBalanced => {}
                 DelegationStrategy::Custom(s) => assert_eq!(s, "test"),
             }
         }

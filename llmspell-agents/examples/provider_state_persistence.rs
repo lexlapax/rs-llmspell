@@ -16,7 +16,9 @@ use anyhow::Result;
 use llmspell_agents::{agents::llm::LLMAgent, builder::AgentBuilder, StatePersistence};
 use llmspell_core::{traits::base_agent::BaseAgent, types::AgentInput, ExecutionContext};
 use llmspell_providers::ProviderManager;
-use llmspell_state_persistence::{PersistenceConfig, StateManager, StorageBackendType};
+use llmspell_state_persistence::{
+    PerformanceConfig, PersistenceConfig, StateManager, StorageBackendType,
+};
 use std::env;
 use std::sync::Arc;
 use std::time::Duration;
@@ -67,7 +69,7 @@ async fn main() -> Result<()> {
                 encryption: None,
                 backup_retention: Duration::from_secs(3600),
                 backup: None,
-                performance: Default::default(),
+                performance: PerformanceConfig::default(),
             },
         )
         .await?,

@@ -383,10 +383,7 @@ impl LifecycleEventSystem {
         {
             let mut stats = self.event_stats.lock().await;
             stats.total_events += 1;
-            *stats
-                .events_by_type
-                .entry(event.event_type.clone())
-                .or_insert(0) += 1;
+            *stats.events_by_type.entry(event.event_type).or_insert(0) += 1;
             *stats
                 .events_by_agent
                 .entry(event.agent_id.clone())
@@ -918,9 +915,9 @@ mod tests {
         for i in 0..5 {
             let event = LifecycleEvent::new(
                 LifecycleEventType::StateChanged,
-                format!("agent-{}", i),
+                format!("agent-{i}"),
                 LifecycleEventData::Generic {
-                    message: format!("Event {}", i),
+                    message: format!("Event {i}"),
                     details: HashMap::new(),
                 },
                 "test".to_string(),
@@ -966,7 +963,7 @@ mod tests {
                 LifecycleEventType::StateChanged,
                 "test-agent".to_string(),
                 LifecycleEventData::Generic {
-                    message: format!("Event {}", i),
+                    message: format!("Event {i}"),
                     details: HashMap::new(),
                 },
                 "test".to_string(),
