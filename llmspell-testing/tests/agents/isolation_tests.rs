@@ -2,14 +2,13 @@
 // ABOUTME: Validates isolation boundaries and permission enforcement
 
 use llmspell_agents::state::{
-    IsolationBoundary, SharedScopeConfig, SharingPattern, StateIsolationManager, StateMessage,
+    IsolationBoundary, SharedScopeConfig, SharingPattern, StateIsolationManager,
     StateOperation, StatePermission, StateScope, StateSharingManager,
 };
 use serde_json::json;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
-use tokio::time::timeout;
 
 // Mock state manager for testing
 struct MockStateManager;

@@ -808,4 +808,3 @@ mod tests {
         assert_eq!(hook.config.min_execution_time, Duration::from_millis(25));
     }
 }
-

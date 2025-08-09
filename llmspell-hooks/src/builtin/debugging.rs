@@ -475,7 +475,6 @@ impl MetricHook for DebuggingHook {
     }
 }
 
-
 #[async_trait]
 impl ReplayableHook for DebuggingHook {
     fn is_replayable(&self) -> bool {
@@ -761,4 +760,3 @@ mod tests {
         assert!(metadata.tags.contains(&"debugging".to_string()));
     }
 }
-

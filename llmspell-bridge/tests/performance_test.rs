@@ -187,7 +187,8 @@ async fn test_operation_benchmarks() {
         }
 
         let duration = start.elapsed();
-        let avg_micros = duration.as_micros() / u128::try_from(iterations).expect("iterations should be positive");
+        let avg_micros = duration.as_micros()
+            / u128::try_from(iterations).expect("iterations should be positive");
 
         println!("Operation '{name}': avg {avg_micros}μs");
 
@@ -295,7 +296,11 @@ async fn test_large_script_memory() {
     let mut large_script = String::new();
     large_script.push_str("local data = {\n");
     for i in 0..10000 {
-        write!(large_script, "  ['key_{i}'] = 'value_{i}_with_some_padding',\n").unwrap();
+        write!(
+            large_script,
+            "  ['key_{i}'] = 'value_{i}_with_some_padding',\n"
+        )
+        .unwrap();
     }
     large_script.push_str("}\nreturn #data");
 

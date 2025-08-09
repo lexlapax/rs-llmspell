@@ -524,7 +524,6 @@ impl MetricHook for RetryHook {
     }
 }
 
-
 #[async_trait]
 impl ReplayableHook for RetryHook {
     fn is_replayable(&self) -> bool {
@@ -816,4 +815,3 @@ mod tests {
         assert!(config.retryable_errors.contains("connection_error"));
     }
 }
-

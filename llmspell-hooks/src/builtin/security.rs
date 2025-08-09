@@ -667,7 +667,6 @@ impl MetricHook for SecurityHook {
     }
 }
 
-
 #[async_trait]
 impl ReplayableHook for SecurityHook {
     fn is_replayable(&self) -> bool {
@@ -968,4 +967,3 @@ mod tests {
         assert!(metadata.tags.contains(&"security".to_string()));
     }
 }
-

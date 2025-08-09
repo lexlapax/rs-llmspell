@@ -671,7 +671,6 @@ impl MetricHook for CostTrackingHook {
     }
 }
 
-
 #[async_trait]
 impl ReplayableHook for CostTrackingHook {
     fn is_replayable(&self) -> bool {
@@ -973,4 +972,3 @@ mod tests {
         assert_eq!(hook.config.budget_alerts[2].threshold, 100.0);
     }
 }
-

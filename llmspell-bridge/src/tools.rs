@@ -140,11 +140,7 @@ fn register_utility_tools(
     register_tool(registry, "base64_encoder", Base64EncoderTool::new)?;
     register_tool(registry, "calculator", CalculatorTool::new)?;
     register_tool(registry, "data_validation", DataValidationTool::new)?;
-    register_tool(
-        registry,
-        "date_time_handler",
-        DateTimeHandlerTool::new,
-    )?;
+    register_tool(registry, "date_time_handler", DateTimeHandlerTool::new)?;
     register_tool(registry, "diff_calculator", DiffCalculatorTool::new)?;
     register_tool(registry, "hash_calculator", || {
         HashCalculatorTool::new(HashCalculatorConfig::default())
