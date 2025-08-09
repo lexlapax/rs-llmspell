@@ -81,7 +81,7 @@ pub enum ConflictResolution {
 /// Trait for custom inheritance validation
 pub trait InheritanceValidator: Send + Sync {
     /// Validate whether a field should be inherited
-    fn should_inherit(&self, field: &str, value: &Value, policy: &InheritancePolicy) -> bool;
+    fn should_inherit(&self, field: &str, value: &Value, policy: InheritancePolicy) -> bool;
 
     /// Validate the inherited value
     fn validate_value(&self, field: &str, value: &Value) -> bool;
@@ -190,7 +190,7 @@ impl InheritanceRules {
         child: &mut ExecutionContext,
     ) -> Result<(), String> {
         for (field, value) in &parent.data {
-            if self.should_inherit_field(field, value, &child.inheritance) {
+            if self.should_inherit_field(field, value, child.inheritance) {
                 let transformed_value = self.transform_value(field, value);
                 self.set_field_value(child, field.clone(), transformed_value)?;
             }
@@ -237,7 +237,7 @@ impl InheritanceRules {
         Ok(())
     }
 
-    fn should_inherit_field(&self, field: &str, value: &Value, policy: &InheritancePolicy) -> bool {
+    fn should_inherit_field(&self, field: &str, value: &Value, policy: InheritancePolicy) -> bool {
         // Check never_inherit first
         if self.field_rules.never_inherit.contains(field) {
             return false;
@@ -250,7 +250,7 @@ impl InheritanceRules {
 
         // Check conditional inheritance
         if let Some(policies) = self.field_rules.conditional_inherit.get(field) {
-            if !policies.contains(policy) {
+            if !policies.contains(&policy) {
                 return false;
             }
         }
@@ -275,7 +275,7 @@ impl InheritanceRules {
                 || value.clone(),
                 |str_val| Value::String(format!("{str_val}{suffix}")),
             ),
-            Some(FieldTransform::Copy) | Some(FieldTransform::Custom(_)) | None => value.clone(),
+            Some(FieldTransform::Copy | FieldTransform::Custom(_)) | None => value.clone(),
         }
     }
 
@@ -347,16 +347,16 @@ impl Default for InheritanceRules {
 pub struct SecurityFieldValidator;
 
 impl InheritanceValidator for SecurityFieldValidator {
-    fn should_inherit(&self, field: &str, _value: &Value, _policy: &InheritancePolicy) -> bool {
+    fn should_inherit(&self, field: &str, _value: &Value, _policy: InheritancePolicy) -> bool {
         // Security fields should generally be inherited
         field.starts_with("security_") || field == "permissions"
     }
 
     fn validate_value(&self, field: &str, value: &Value) -> bool {
         if field == "security_level" {
-            value.as_str().map_or(false, |level| {
-                ["low", "medium", "high", "critical"].contains(&level)
-            })
+            value
+                .as_str()
+                .is_some_and(|level| ["low", "medium", "high", "critical"].contains(&level))
         } else {
             true
         }

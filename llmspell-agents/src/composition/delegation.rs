@@ -298,7 +298,7 @@ impl DelegatingAgent {
     ///
     /// # Panics
     ///
-    /// Panics if a RwLock is poisoned
+    /// Panics if a `RwLock` is poisoned
     pub async fn delegate(&self, request: DelegationRequest) -> Result<DelegationResult> {
         let start_time = std::time::Instant::now();
 
@@ -397,7 +397,7 @@ impl DelegatingAgent {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     pub fn set_strategy(&self, strategy: DelegationStrategy) {
         *self.strategy.write().unwrap() = strategy;
     }
@@ -406,7 +406,7 @@ impl DelegatingAgent {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     pub fn metrics(&self) -> DelegationMetrics {
         self.metrics.read().unwrap().clone()
     }

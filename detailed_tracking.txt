@@ -2,96 +2,42 @@
 # Generated from full workspace clippy scan
 # Each warning includes exact file location for efficient fixing
 
-## TOTAL WARNINGS: 468
+## TOTAL WARNINGS: 354
 
 ## WARNINGS BY CATEGORY (Priority Order)
 
-### OPTION_RESULT_PATTERNS (49 warnings)
+### IDENTICAL_MATCH_ARMS (1 warnings)
+Description: Code Quality - Match arms with identical bodies
+
+#### llmspell-agents (1 warnings)
+
+1. llmspell-agents/src/lifecycle/state_machine.rs:281:13
+   Message: this match arm has an identical body to the `_` wildcard arm
+   Suggestion: or try changing either arm body
+
+
+### OPTION_RESULT_PATTERNS (32 warnings)
 Description: Idiomatic - Better use of Option/Result combinators
 
-#### llmspell-agents (21 warnings)
+#### llmspell-agents (5 warnings)
 
-1. llmspell-agents/src/composition/capabilities.rs:302:12
+1. llmspell-agents/src/composition/capabilities.rs:312:16
    Message: this `map_or` can be simplified
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_map_or
 
-2. llmspell-agents/src/composition/capabilities.rs:312:16
+2. llmspell-agents/src/hooks/state_persistence_hook.rs:148:43
    Message: this `map_or` can be simplified
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_map_or
 
-3. llmspell-agents/src/composition/capabilities.rs:331:16
-   Message: this `map_or` can be simplified
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_map_or
-
-4. llmspell-agents/src/composition/hierarchical.rs:234:16
-   Message: this `map_or` can be simplified
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_map_or
-
-5. llmspell-agents/src/composition/tool_composition.rs:388:28
-   Message: this `map_or` can be simplified
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_map_or
-
-6. llmspell-agents/src/context/inheritance.rs:357:13
-   Message: this `map_or` can be simplified
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_map_or
-
-7. llmspell-agents/src/hooks/state_persistence_hook.rs:148:43
-   Message: this `map_or` can be simplified
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_map_or
-
-8. llmspell-agents/src/lifecycle/shutdown.rs:372:30
-   Message: function call inside of `unwrap_or`
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#or_fun_call
-
-9. llmspell-agents/src/lifecycle/shutdown.rs:408:26
-   Message: function call inside of `unwrap_or`
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#or_fun_call
-
-10. llmspell-agents/src/lifecycle/shutdown.rs:712:22
-   Message: function call inside of `unwrap_or`
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#or_fun_call
-
-11. llmspell-agents/src/lifecycle/state_machine.rs:541:9
-   Message: this `map_or` can be simplified
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_map_or
-
-12. llmspell-agents/src/lifecycle/state_machine.rs:812:9
-   Message: unused "map closure" when calling `Result::map_or_else` value
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_result_map_or_else
-
-13. llmspell-agents/src/monitoring/alerts.rs:394:22
-   Message: this `map_or` can be simplified
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_map_or
-
-14. llmspell-agents/src/monitoring/alerts.rs:446:9
-   Message: this `map_or` can be simplified
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_map_or
-
-15. llmspell-agents/src/state/isolation.rs:134:9
-   Message: this `map_or` can be simplified
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_map_or
-
-16. llmspell-agents/src/state/sharing.rs:335:25
-   Message: this `map_or` can be simplified
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_map_or
-
-17. llmspell-agents/src/templates/validation.rs:462:30
+3. llmspell-agents/src/lifecycle/state_machine.rs:815:9
    Message: use Option::map_or_else instead of an if let/else
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#option_if_let_else
 
-18. llmspell-agents/src/templates/validation.rs:478:30
-   Message: use Option::map_or_else instead of an if let/else
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#option_if_let_else
+4. llmspell-agents/src/state/sharing.rs:335:25
+   Message: this `map_or` can be simplified
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_map_or
 
-19. llmspell-agents/src/tool_manager.rs:386:9
-   Message: use Option::map_or_else instead of an if let/else
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#option_if_let_else
-
-20. llmspell-agents/src/testing/mocks.rs:690:27
-   Message: use Option::map_or_else instead of an if let/else
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#option_if_let_else
-
-21. llmspell-agents/src/testing/utils.rs:190:9
+5. llmspell-agents/src/testing/utils.rs:190:9
    Message: use Option::map_or_else instead of an if let/else
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#option_if_let_else
 
@@ -157,7 +103,7 @@ Description: Idiomatic - Better use of Option/Result combinators
    Message: use Option::map_or_else instead of an if let/else
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#option_if_let_else
 
-#### llmspell-tools (13 warnings)
+#### llmspell-tools (12 warnings)
 
 1. llmspell-tools/src/media/audio_processor.rs:555:37
    Message: called `map(<f>).unwrap_or_else(<g>)` on an `Option` value
@@ -191,39 +137,25 @@ Description: Idiomatic - Better use of Option/Result combinators
    Message: use Option::map_or_else instead of an if let/else
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#option_if_let_else
 
-9. llmspell-tools/tests/web_tools_error_scenarios.rs:37:33
-   Message: use Option::map_or_else instead of an if let/else
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#option_if_let_else
+9. llmspell-tools/tests/security_injection_attack_tests.rs:179:52
+   Message: function call inside of `unwrap_or`
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#or_fun_call
 
-10. llmspell-tools/tests/web_tools_error_scenarios.rs:40:21
-   Message: use Option::map_or_else instead of an if let/else
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#option_if_let_else
+10. llmspell-tools/tests/security_injection_attack_tests.rs:225:52
+   Message: function call inside of `unwrap_or`
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#or_fun_call
 
-11. llmspell-tools/tests/web_tools_error_scenarios.rs:49:21
-   Message: use Option::map_or_else instead of an if let/else
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#option_if_let_else
+11. llmspell-tools/tests/security_injection_attack_tests.rs:318:52
+   Message: function call inside of `unwrap_or`
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#or_fun_call
 
-12. llmspell-tools/tests/web_tools_error_scenarios.rs:129:41
-   Message: use Option::map_or_else instead of an if let/else
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#option_if_let_else
-
-13. llmspell-tools/tests/web_tools_error_scenarios.rs:132:29
-   Message: use Option::map_or_else instead of an if let/else
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#option_if_let_else
+12. llmspell-tools/tests/security_injection_attack_tests.rs:360:52
+   Message: function call inside of `unwrap_or`
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#or_fun_call
 
 
-### PASS_BY_VALUE (14 warnings)
+### PASS_BY_VALUE (12 warnings)
 Description: Performance - Arguments passed by value but not consumed
-
-#### llmspell-agents (2 warnings)
-
-1. llmspell-agents/src/context/inheritance.rs:240:72
-   Message: this argument (1 byte) is passed by reference, but would be more efficient if passed by value (limit: 8 byte)
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#trivially_copy_pass_by_ref
-
-2. llmspell-agents/src/state/sharing.rs:550:18
-   Message: this argument (1 byte) is passed by reference, but would be more efficient if passed by value (limit: 8 byte)
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#trivially_copy_pass_by_ref
 
 #### llmspell-bridge (11 warnings)
 
@@ -278,390 +210,156 @@ Description: Performance - Arguments passed by value but not consumed
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#trivially_copy_pass_by_ref
 
 
-### DEFAULT_TRAIT (75 warnings)
+### DEFAULT_TRAIT (20 warnings)
 Description: Style - Using Default::default() instead of Type::default()
-
-#### llmspell-agents (3 warnings)
-
-1. llmspell-agents/tests/integration_tests.rs:57:78
-   Message: calling `StateMachineConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-2. llmspell-agents/tests/integration_tests.rs:110:27
-   Message: calling `HashMap::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-3. llmspell-agents/tests/integration_tests.rs:111:22
-   Message: calling `HashMap::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-#### llmspell-hooks (5 warnings)
-
-1. llmspell-hooks/src/collectors/agent_output.rs:233:9
-   Message: field assignment outside of initializer for an instance created with Default::default()
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
-
-2. llmspell-hooks/src/collectors/agent_output.rs:271:9
-   Message: field assignment outside of initializer for an instance created with Default::default()
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
-
-3. llmspell-hooks/src/collectors/agent_output.rs:293:9
-   Message: field assignment outside of initializer for an instance created with Default::default()
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
-
-4. llmspell-hooks/src/collectors/tool_result.rs:215:9
-   Message: field assignment outside of initializer for an instance created with Default::default()
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
-
-5. llmspell-hooks/src/persistence/tests.rs:333:9
-   Message: field assignment outside of initializer for an instance created with Default::default()
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
-
-#### llmspell-tools (67 warnings)
-
-1. llmspell-tools/tests/http_request_integration.rs:12:37
-   Message: calling `HttpRequestConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-2. llmspell-tools/tests/http_request_integration.rs:23:37
-   Message: calling `HttpRequestConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-3. llmspell-tools/tests/http_request_integration.rs:66:37
-   Message: calling `HttpRequestConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-4. llmspell-tools/tests/http_request_integration.rs:92:37
-   Message: calling `HttpRequestConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-5. llmspell-tools/tests/http_request_integration.rs:118:37
-   Message: calling `HttpRequestConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-6. llmspell-tools/tests/http_request_integration.rs:143:37
-   Message: calling `HttpRequestConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-7. llmspell-tools/tests/http_request_integration.rs:177:37
-   Message: calling `HttpRequestConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-8. llmspell-tools/tests/http_request_integration.rs:197:37
-   Message: calling `HttpRequestConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-9. llmspell-tools/tests/http_request_integration.rs:235:37
-   Message: calling `HttpRequestConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-10. llmspell-tools/tests/http_request_integration.rs:257:37
-   Message: calling `HttpRequestConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-11. llmspell-tools/tests/http_request_integration.rs:280:37
-   Message: calling `HttpRequestConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-12. llmspell-tools/tests/http_request_integration.rs:307:37
-   Message: calling `HttpRequestConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-13. llmspell-tools/tests/http_request_integration.rs:331:37
-   Message: calling `HttpRequestConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-14. llmspell-tools/tests/http_request_integration.rs:357:37
-   Message: calling `HttpRequestConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-15. llmspell-tools/tests/http_request_integration.rs:372:37
-   Message: calling `HttpRequestConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-16. llmspell-tools/benches/tool_operations.rs:106:40
-   Message: calling `HashCalculatorConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-17. llmspell-tools/benches/tool_operations.rs:170:41
-   Message: calling `TextManipulatorConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-18. llmspell-tools/benches/tool_operations.rs:214:39
-   Message: calling `JsonProcessorConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-19. llmspell-tools/benches/tool_operations.rs:277:39
-   Message: calling `UuidGeneratorConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-20. llmspell-tools/benches/tool_operations.rs:321:48
-   Message: calling `JsonProcessorConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-21. llmspell-tools/benches/tool_operations.rs:322:49
-   Message: calling `HashCalculatorConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-22. llmspell-tools/benches/tool_operations.rs:323:50
-   Message: calling `TextManipulatorConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-23. llmspell-tools/tests/remaining_tools_basic.rs:38:37
-   Message: calling `FileWatcherConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-24. llmspell-tools/tests/remaining_tools_basic.rs:45:39
-   Message: calling `FileConverterConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-25. llmspell-tools/tests/remaining_tools_basic.rs:51:36
-   Message: calling `FileSearchConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-26. llmspell-tools/tests/remaining_tools_basic.rs:59:43
-   Message: calling `EnvironmentReaderConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-27. llmspell-tools/tests/remaining_tools_basic.rs:65:41
-   Message: calling `ProcessExecutorConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-28. llmspell-tools/tests/remaining_tools_basic.rs:71:40
-   Message: calling `ServiceCheckerConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-29. llmspell-tools/tests/remaining_tools_basic.rs:77:39
-   Message: calling `SystemMonitorConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-30. llmspell-tools/tests/remaining_tools_basic.rs:85:40
-   Message: calling `AudioProcessorConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-31. llmspell-tools/tests/remaining_tools_basic.rs:91:40
-   Message: calling `VideoProcessorConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-32. llmspell-tools/tests/remaining_tools_basic.rs:97:40
-   Message: calling `ImageProcessorConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-33. llmspell-tools/tests/remaining_tools_basic.rs:104:35
-   Message: calling `WebSearchConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-34. llmspell-tools/tests/remaining_tools_basic.rs:112:40
-   Message: calling `HashCalculatorConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-35. llmspell-tools/tests/remaining_tools_basic.rs:118:41
-   Message: calling `TextManipulatorConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-36. llmspell-tools/tests/remaining_tools_basic.rs:124:39
-   Message: calling `UuidGeneratorConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-37. llmspell-tools/tests/remaining_tools_basic.rs:137:39
-   Message: calling `FileWatcherConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-38. llmspell-tools/tests/remaining_tools_basic.rs:138:41
-   Message: calling `FileConverterConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-39. llmspell-tools/tests/remaining_tools_basic.rs:139:38
-   Message: calling `FileSearchConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-40. llmspell-tools/tests/remaining_tools_basic.rs:140:45
-   Message: calling `EnvironmentReaderConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-41. llmspell-tools/tests/remaining_tools_basic.rs:141:43
-   Message: calling `ProcessExecutorConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-42. llmspell-tools/tests/remaining_tools_basic.rs:142:42
-   Message: calling `ServiceCheckerConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-43. llmspell-tools/tests/remaining_tools_basic.rs:143:41
-   Message: calling `SystemMonitorConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-44. llmspell-tools/tests/remaining_tools_basic.rs:144:42
-   Message: calling `AudioProcessorConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-45. llmspell-tools/tests/remaining_tools_basic.rs:145:42
-   Message: calling `VideoProcessorConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-46. llmspell-tools/tests/remaining_tools_basic.rs:146:42
-   Message: calling `ImageProcessorConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-47. llmspell-tools/tests/remaining_tools_basic.rs:147:37
-   Message: calling `WebSearchConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-48. llmspell-tools/tests/remaining_tools_basic.rs:148:42
-   Message: calling `HashCalculatorConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-49. llmspell-tools/tests/remaining_tools_basic.rs:149:43
-   Message: calling `TextManipulatorConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-50. llmspell-tools/tests/remaining_tools_basic.rs:150:41
-   Message: calling `UuidGeneratorConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-51. llmspell-tools/tests/remaining_tools_basic.rs:174:40
-   Message: calling `HashCalculatorConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-52. llmspell-tools/tests/remaining_tools_basic.rs:195:39
-   Message: calling `UuidGeneratorConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-53. llmspell-tools/tests/remaining_tools_basic.rs:215:35
-   Message: calling `WebSearchConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-54. llmspell-tools/tests/remaining_tools_basic.rs:253:38
-   Message: calling `FileWatcherConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-55. llmspell-tools/tests/remaining_tools_basic.rs:254:40
-   Message: calling `FileConverterConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-56. llmspell-tools/tests/remaining_tools_basic.rs:255:37
-   Message: calling `FileSearchConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-57. llmspell-tools/tests/remaining_tools_basic.rs:256:44
-   Message: calling `EnvironmentReaderConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-58. llmspell-tools/tests/remaining_tools_basic.rs:257:42
-   Message: calling `ProcessExecutorConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-59. llmspell-tools/tests/remaining_tools_basic.rs:258:41
-   Message: calling `ServiceCheckerConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-60. llmspell-tools/tests/remaining_tools_basic.rs:259:40
-   Message: calling `SystemMonitorConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-61. llmspell-tools/tests/remaining_tools_basic.rs:260:41
-   Message: calling `AudioProcessorConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-62. llmspell-tools/tests/remaining_tools_basic.rs:261:41
-   Message: calling `VideoProcessorConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-63. llmspell-tools/tests/remaining_tools_basic.rs:262:41
-   Message: calling `ImageProcessorConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-64. llmspell-tools/tests/remaining_tools_basic.rs:263:36
-   Message: calling `WebSearchConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-65. llmspell-tools/tests/remaining_tools_basic.rs:264:41
-   Message: calling `HashCalculatorConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-66. llmspell-tools/tests/remaining_tools_basic.rs:265:42
-   Message: calling `TextManipulatorConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-67. llmspell-tools/tests/remaining_tools_basic.rs:266:40
-   Message: calling `UuidGeneratorConfig::default()` is more clear than this expression
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
-
-
-### PANIC_ISSUES (6 warnings)
-Description: Error Handling - Panic message improvements
 
 #### llmspell-agents (6 warnings)
 
-1. llmspell-agents/src/lifecycle/shutdown.rs:215:5
-   Message: docs for function which may panic missing `# Panics` section
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_panics_doc
+1. llmspell-agents/examples/composition_patterns.rs:55:23
+   Message: calling `HashMap::default()` is more clear than this expression
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
 
-2. llmspell-agents/src/monitoring/alerts.rs:359:5
-   Message: docs for function which may panic missing `# Panics` section
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_panics_doc
+2. llmspell-agents/examples/composition_patterns.rs:65:23
+   Message: calling `HashMap::default()` is more clear than this expression
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
 
-3. llmspell-agents/src/monitoring/alerts.rs:611:5
-   Message: docs for function which may panic missing `# Panics` section
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_panics_doc
+3. llmspell-agents/examples/composition_patterns.rs:170:19
+   Message: calling `HashMap::default()` is more clear than this expression
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
 
-4. llmspell-agents/src/monitoring/performance.rs:100:5
-   Message: docs for function which may panic missing `# Panics` section
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_panics_doc
+4. llmspell-agents/examples/composition_patterns.rs:177:19
+   Message: calling `HashMap::default()` is more clear than this expression
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
 
-5. llmspell-agents/src/templates/mod.rs:51:1
-   Message: docs for function which may panic missing `# Panics` section
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_panics_doc
+5. llmspell-agents/examples/composition_patterns.rs:184:19
+   Message: calling `HashMap::default()` is more clear than this expression
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
 
-6. llmspell-agents/src/testing/mocks.rs:625:5
-   Message: docs for function which may panic missing `# Panics` section
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_panics_doc
+6. llmspell-agents/tests/multi_agent_state.rs:20:9
+   Message: field assignment outside of initializer for an instance created with Default::default()
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+
+#### llmspell-bridge (1 warnings)
+
+1. llmspell-bridge/tests/lua_hook_enhanced.rs:14:51
+   Message: calling `ProviderManagerConfig::default()` is more clear than this expression
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+#### llmspell-sessions (1 warnings)
+
+1. llmspell-sessions/tests/policy_performance_test.rs:152:9
+   Message: field assignment outside of initializer for an instance created with Default::default()
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+
+#### llmspell-tools (12 warnings)
+
+1. llmspell-tools/tests/security_sandbox_escape_tests.rs:13:45
+   Message: calling `FileOperationsConfig::default()` is more clear than this expression
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+2. llmspell-tools/tests/security_sandbox_escape_tests.rs:57:45
+   Message: calling `FileOperationsConfig::default()` is more clear than this expression
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+3. llmspell-tools/tests/security_sandbox_escape_tests.rs:83:49
+   Message: calling `ProcessExecutorConfig::default()` is more clear than this expression
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+4. llmspell-tools/tests/security_sandbox_escape_tests.rs:136:43
+   Message: calling `FileSearchConfig::default()` is more clear than this expression
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+5. llmspell-tools/tests/security_sandbox_escape_tests.rs:173:47
+   Message: calling `SystemMonitorConfig::default()` is more clear than this expression
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+6. llmspell-tools/tests/security_sandbox_escape_tests.rs:206:45
+   Message: calling `FileOperationsConfig::default()` is more clear than this expression
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+7. llmspell-tools/tests/security_sandbox_escape_tests.rs:246:49
+   Message: calling `ProcessExecutorConfig::default()` is more clear than this expression
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+8. llmspell-tools/tests/security_injection_attack_tests.rs:69:44
+   Message: calling `JsonProcessorConfig::default()` is more clear than this expression
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+9. llmspell-tools/tests/security_injection_attack_tests.rs:118:31
+   Message: calling `GraphQLConfig::default()` is more clear than this expression
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+10. llmspell-tools/tests/security_injection_attack_tests.rs:196:49
+   Message: calling `ProcessExecutorConfig::default()` is more clear than this expression
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+11. llmspell-tools/tests/security_injection_attack_tests.rs:285:42
+   Message: calling `HttpRequestConfig::default()` is more clear than this expression
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
+
+12. llmspell-tools/tests/security_injection_attack_tests.rs:334:47
+   Message: calling `EnvironmentReaderConfig::default()` is more clear than this expression
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
 
 
-### FORMAT_STRING (8 warnings)
+### FORMAT_STRING (5 warnings)
 Description: Style - Variables can be directly interpolated
 
-#### llmspell-agents (1 warnings)
+#### llmspell-bridge (1 warnings)
 
-1. llmspell-agents/tests/integration_tests.rs:183:42
+1. llmspell-bridge/tests/performance_test.rs:295:9
+   Message: `format!(..)` appended to existing `String`
+   Suggestion: consider using `write!` to avoid the extra allocation
+
+#### llmspell-tools (4 warnings)
+
+1. llmspell-tools/tests/hook_integration_tests.rs:269:5
    Message: variables can be used directly in the `format!` string
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
 
-#### llmspell-tools (7 warnings)
-
-1. llmspell-tools/tests/http_request_integration.rs:59:13
+2. llmspell-tools/tests/hook_integration_tests.rs:275:5
    Message: variables can be used directly in the `format!` string
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
 
-2. llmspell-tools/tests/http_request_integration.rs:166:13
+3. llmspell-tools/tests/hook_integration_tests.rs:299:38
    Message: variables can be used directly in the `format!` string
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
 
-3. llmspell-tools/tests/http_request_integration.rs:224:13
-   Message: variables can be used directly in the `format!` string
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
-
-4. llmspell-tools/tests/hook_integration_tests.rs:269:5
-   Message: variables can be used directly in the `format!` string
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
-
-5. llmspell-tools/tests/hook_integration_tests.rs:275:5
-   Message: variables can be used directly in the `format!` string
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
-
-6. llmspell-tools/tests/hook_integration_tests.rs:299:38
-   Message: variables can be used directly in the `format!` string
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
-
-7. llmspell-tools/tests/hook_integration_tests.rs:353:38
+4. llmspell-tools/tests/hook_integration_tests.rs:353:38
    Message: variables can be used directly in the `format!` string
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
 
 
-### REDUNDANT_CODE (6 warnings)
+### REDUNDANT_CODE (11 warnings)
 Description: Code Quality - Redundant closures and patterns
 
-#### llmspell-bridge (6 warnings)
+#### llmspell-agents (6 warnings)
+
+1. llmspell-agents/src/templates/validation.rs:464:26
+   Message: redundant closure
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_closure_for_method_calls
+
+2. llmspell-agents/src/templates/validation.rs:465:54
+   Message: redundant closure
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_closure_for_method_calls
+
+3. llmspell-agents/src/templates/validation.rs:478:26
+   Message: redundant closure
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_closure_for_method_calls
+
+4. llmspell-agents/src/templates/validation.rs:479:54
+   Message: redundant closure
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_closure_for_method_calls
+
+5. llmspell-agents/src/tool_manager.rs:388:13
+   Message: redundant closure
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_closure_for_method_calls
+
+6. llmspell-agents/src/testing/mocks.rs:709:13
+   Message: redundant closure
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_closure_for_method_calls
+
+#### llmspell-bridge (5 warnings)
 
 1. llmspell-bridge/src/lua/globals/agent.rs:1059:45
    Message: redundant clone
@@ -683,19 +381,9 @@ Description: Code Quality - Redundant closures and patterns
    Message: redundant clone
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_clone
 
-6. llmspell-bridge/benches/workflow_bridge_bench.rs:176:55
-   Message: redundant clone
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_clone
 
-
-### UNNECESSARY_RESULT (11 warnings)
+### UNNECESSARY_RESULT (10 warnings)
 Description: API Design - Functions that always return Ok
-
-#### llmspell-agents (1 warnings)
-
-1. llmspell-agents/src/tool_manager.rs:417:5
-   Message: this function's return value is unnecessarily wrapped by `Result`
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_wraps
 
 #### llmspell-bridge (8 warnings)
 
@@ -760,32 +448,10 @@ Description: Performance - Use clone_from() instead of assignment
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#assigning_clones
 
 
-### CAST_ISSUES (16 warnings)
+### CAST_ISSUES (11 warnings)
 Description: Type Safety - Unnecessary or improper casts
 
-#### llmspell-agents (5 warnings)
-
-1. llmspell-agents/src/monitoring/performance.rs:346:31
-   Message: casting `f64` to `usize` may lose the sign of the value
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_sign_loss
-
-2. llmspell-agents/src/tool_errors.rs:333:35
-   Message: casting `u128` to `u64` may truncate the value
-   Suggestion: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
-
-3. llmspell-agents/examples/monitoring_setup.rs:164:13
-   Message: casting `u64` to `f64` causes a loss of precision (`u64` is 64 bits wide, but `f64`'s mantissa is only 52 bits wide)
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
-
-4. llmspell-agents/examples/monitoring_setup.rs:165:13
-   Message: casting `u64` to `f64` causes a loss of precision (`u64` is 64 bits wide, but `f64`'s mantissa is only 52 bits wide)
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
-
-5. llmspell-agents/examples/monitoring_setup.rs:173:13
-   Message: casting `u64` to `f64` causes a loss of precision (`u64` is 64 bits wide, but `f64`'s mantissa is only 52 bits wide)
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
-
-#### llmspell-bridge (4 warnings)
+#### llmspell-bridge (8 warnings)
 
 1. llmspell-bridge/src/globals/session_infrastructure.rs:42:13
    Message: casting `u64` to `i64` may wrap around the value
@@ -803,33 +469,33 @@ Description: Type Safety - Unnecessary or improper casts
    Message: casting `u64` to `u32` may truncate the value
    Suggestion: if this is intentional allow the lint with `#[allow(clippy::cast_possible_truncation)]` ...
 
-#### llmspell-tools (7 warnings)
-
-1. llmspell-tools/tests/simple_performance_check.rs:57:23
+5. llmspell-bridge/tests/performance_test.rs:88:23
    Message: casting `u128` to `f64` causes a loss of precision (`u128` is 128 bits wide, but `f64`'s mantissa is only 52 bits wide)
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
 
-2. llmspell-tools/tests/simple_performance_check.rs:57:64
+6. llmspell-bridge/tests/performance_test.rs:88:45
    Message: casting `u128` to `f64` causes a loss of precision (`u128` is 128 bits wide, but `f64`'s mantissa is only 52 bits wide)
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
 
-3. llmspell-tools/tests/simple_performance_check.rs:59:24
-   Message: casting `u128` to `f64` causes a loss of precision (`u128` is 128 bits wide, but `f64`'s mantissa is only 52 bits wide)
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
-
-4. llmspell-tools/tests/web_tools_error_scenarios.rs:293:39
-   Message: casting `i32` to `u64` may lose the sign of the value
+7. llmspell-bridge/tests/performance_test.rs:188:49
+   Message: casting `i32` to `u128` may lose the sign of the value
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_sign_loss
 
-5. llmspell-tools/tests/hook_integration_tests.rs:262:23
+8. llmspell-bridge/tests/performance_test.rs:299:26
+   Message: casting `usize` to `f64` causes a loss of precision on targets with 64-bit wide pointers (`usize` is 64 bits wide, but `f64`'s mantissa is only 52 bits wide)
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
+
+#### llmspell-tools (3 warnings)
+
+1. llmspell-tools/tests/hook_integration_tests.rs:262:23
    Message: casting `u128` to `f64` causes a loss of precision (`u128` is 128 bits wide, but `f64`'s mantissa is only 52 bits wide)
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
 
-6. llmspell-tools/tests/hook_integration_tests.rs:262:64
+2. llmspell-tools/tests/hook_integration_tests.rs:262:64
    Message: casting `u128` to `f64` causes a loss of precision (`u128` is 128 bits wide, but `f64`'s mantissa is only 52 bits wide)
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
 
-7. llmspell-tools/tests/hook_integration_tests.rs:264:24
+3. llmspell-tools/tests/hook_integration_tests.rs:264:24
    Message: casting `u128` to `f64` causes a loss of precision (`u128` is 128 bits wide, but `f64`'s mantissa is only 52 bits wide)
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
 
@@ -862,20 +528,16 @@ Description: Style - Unnecessary reference/dereference
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_borrow
 
 
-### WILDCARD_PATTERNS (7 warnings)
+### WILDCARD_PATTERNS (6 warnings)
 Description: Code Quality - Wildcard pattern issues
 
-#### llmspell-agents (3 warnings)
+#### llmspell-agents (2 warnings)
 
 1. llmspell-agents/src/composition/lifecycle.rs:690:13
    Message: wildcard pattern covers any other pattern as it will match anyway
    Suggestion: consider handling `_` separately
 
-2. llmspell-agents/src/lifecycle/state_machine.rs:280:13
-   Message: wildcard pattern covers any other pattern as it will match anyway
-   Suggestion: consider handling `_` separately
-
-3. llmspell-agents/src/state/sharing.rs:561:13
+2. llmspell-agents/src/state/sharing.rs:561:13
    Message: wildcard pattern covers any other pattern as it will match anyway
    Suggestion: consider handling `_` separately
 
@@ -900,34 +562,36 @@ Description: Code Quality - Wildcard pattern issues
    Suggestion: consider handling `_` separately
 
 
-### UNUSED_ASYNC (2 warnings)
+### UNUSED_ASYNC (6 warnings)
 Description: Performance - Async functions without await
 
-#### llmspell-agents (1 warnings)
+#### llmspell-agents (3 warnings)
 
-1. llmspell-agents/examples/monitoring_setup.rs:239:1
+1. llmspell-agents/examples/composition_patterns.rs:156:1
    Message: unused `async` for function with no await statements
    Suggestion: consider removing the `async` from this function
 
-#### llmspell-bridge (1 warnings)
+2. llmspell-agents/examples/composition_patterns.rs:220:1
+   Message: unused `async` for function with no await statements
+   Suggestion: consider removing the `async` from this function
+
+3. llmspell-agents/examples/template_usage.rs:181:1
+   Message: unused `async` for function with no await statements
+   Suggestion: consider removing the `async` from this function
+
+#### llmspell-bridge (3 warnings)
 
 1. llmspell-bridge/src/workflows.rs:229:5
    Message: unused `async` for function with no await statements
    Suggestion: consider removing the `async` from this function
 
+2. llmspell-bridge/tests/sync_behavior_test.rs:12:1
+   Message: unused `async` for function with no await statements
+   Suggestion: consider removing the `async` from this function
 
-### OR_PATTERNS (2 warnings)
-Description: Style - Unnested or-patterns
-
-#### llmspell-agents (2 warnings)
-
-1. llmspell-agents/src/context/inheritance.rs:278:13
-   Message: unnested or-patterns
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnested_or_patterns
-
-2. llmspell-agents/src/lifecycle/state_machine.rs:270:13
-   Message: unnested or-patterns
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnested_or_patterns
+3. llmspell-bridge/tests/sync_behavior_test.rs:31:1
+   Message: unused `async` for function with no await statements
+   Suggestion: consider removing the `async` from this function
 
 
 ### ASSERTION_ISSUES (1 warnings)
@@ -940,46 +604,14 @@ Description: Testing - Assertion improvements
    Suggestion: remove it
 
 
-### UNNECESSARY_CODE (9 warnings)
+### UNNECESSARY_CODE (2 warnings)
 Description: Code Quality - Generally unnecessary code
-
-#### llmspell-agents (2 warnings)
-
-1. llmspell-agents/src/factory.rs:389:5
-   Message: this function's return value is unnecessary
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_wraps
-
-2. llmspell-agents/src/hooks/state_persistence_hook.rs:260:5
-   Message: this function's return value is unnecessary
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_wraps
 
 #### llmspell-bridge (1 warnings)
 
 1. llmspell-bridge/src/standardized_workflows.rs:38:20
    Message: unnecessary closure used to substitute value for `Option::None`
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_lazy_evaluations
-
-#### llmspell-hooks (5 warnings)
-
-1. llmspell-hooks/src/builtin/logging.rs:431:35
-   Message: unnecessary use of `get("_logging_config").is_none()`
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_get_then_check
-
-2. llmspell-hooks/src/builtin/metrics.rs:729:35
-   Message: unnecessary use of `get("_metrics_config").is_none()`
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_get_then_check
-
-3. llmspell-hooks/src/builtin/metrics.rs:730:35
-   Message: unnecessary use of `get("_metrics_snapshot").is_none()`
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_get_then_check
-
-4. llmspell-hooks/src/builtin/rate_limit.rs:796:35
-   Message: unnecessary use of `get("_rate_limit_config").is_none()`
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_get_then_check
-
-5. llmspell-hooks/src/builtin/rate_limit.rs:797:35
-   Message: unnecessary use of `get("_rate_limit_metrics").is_none()`
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_get_then_check
 
 #### llmspell-tools (1 warnings)
 
@@ -988,526 +620,510 @@ Description: Code Quality - Generally unnecessary code
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_wraps
 
 
-### OTHER (255 warnings)
+### OTHER (230 warnings)
 Description: Miscellaneous - Various other warnings
 
-#### llmspell-agents (128 warnings)
+#### llmspell-agents (124 warnings)
 
-1. llmspell-agents/src/context/inheritance.rs:278:13
+1. llmspell-agents/src/composition/capabilities.rs:312:16
    Message: `llmspell-tools` (lib) generated 18 warnings
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnested_or_patterns
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unnecessary_map_or
 
-2. llmspell-agents/src/composition/capabilities.rs:145:23
+2. llmspell-agents/src/composition/delegation.rs:301:21
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-3. llmspell-agents/src/composition/capabilities.rs:191:23
+3. llmspell-agents/src/composition/delegation.rs:400:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-4. llmspell-agents/src/composition/capabilities.rs:215:23
+4. llmspell-agents/src/composition/delegation.rs:409:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-5. llmspell-agents/src/composition/capabilities.rs:225:23
+5. llmspell-agents/src/composition/hierarchical.rs:124:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-6. llmspell-agents/src/composition/capabilities.rs:236:23
+6. llmspell-agents/src/composition/hierarchical.rs:577:32
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-7. llmspell-agents/src/composition/capabilities.rs:248:22
-   Message: it is more concise to loop over references to containers instead of using explicit iteration methods
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#explicit_iter_loop
-
-8. llmspell-agents/src/composition/capabilities.rs:290:23
-   Message: item in documentation is missing backticks
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
-
-9. llmspell-agents/src/composition/capabilities.rs:393:23
-   Message: item in documentation is missing backticks
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
-
-10. llmspell-agents/src/composition/capabilities.rs:440:23
-   Message: item in documentation is missing backticks
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
-
-11. llmspell-agents/src/composition/capabilities.rs:454:23
-   Message: item in documentation is missing backticks
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
-
-12. llmspell-agents/src/composition/capabilities.rs:476:23
-   Message: item in documentation is missing backticks
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
-
-13. llmspell-agents/src/composition/capabilities.rs:504:23
-   Message: item in documentation is missing backticks
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
-
-14. llmspell-agents/src/composition/delegation.rs:301:21
-   Message: item in documentation is missing backticks
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
-
-15. llmspell-agents/src/composition/delegation.rs:400:23
-   Message: item in documentation is missing backticks
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
-
-16. llmspell-agents/src/composition/delegation.rs:409:23
-   Message: item in documentation is missing backticks
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
-
-17. llmspell-agents/src/composition/hierarchical.rs:124:23
-   Message: item in documentation is missing backticks
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
-
-18. llmspell-agents/src/composition/hierarchical.rs:577:32
-   Message: item in documentation is missing backticks
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
-
-19. llmspell-agents/src/composition/lifecycle.rs:59:1
+7. llmspell-agents/src/composition/lifecycle.rs:59:1
    Message: manual `Debug` impl does not include all fields
    Suggestion: consider including all fields in this `Debug` impl
 
-20. llmspell-agents/src/composition/tool_composition.rs:319:21
+8. llmspell-agents/src/composition/tool_composition.rs:319:21
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-21. llmspell-agents/src/composition/tool_composition.rs:320:5
+9. llmspell-agents/src/composition/tool_composition.rs:320:5
    Message: docs for function returning `Result` missing `# Errors` section
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
 
-22. llmspell-agents/src/composition/tool_composition.rs:320:5
+10. llmspell-agents/src/composition/tool_composition.rs:320:5
+   Message: this function has too many lines (101/100)
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_many_lines
+
+11. llmspell-agents/src/composition/tool_composition.rs:320:5
    Message: future cannot be sent between threads safely
 
-23. llmspell-agents/src/composition/tool_composition.rs:529:10
+12. llmspell-agents/src/composition/tool_composition.rs:530:10
    Message: parameter is only used in recursion
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#only_used_in_recursion
 
-24. llmspell-agents/src/composition/tool_composition.rs:608:5
+13. llmspell-agents/src/composition/tool_composition.rs:609:5
    Message: future cannot be sent between threads safely
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#future_not_send
 
-25. llmspell-agents/src/context/event_integration.rs:250:5
+14. llmspell-agents/src/context/event_integration.rs:250:5
    Message: docs for function returning `Result` missing `# Errors` section
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
 
-26. llmspell-agents/src/context/hierarchy.rs:71:21
+15. llmspell-agents/src/context/hierarchy.rs:71:21
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-27. llmspell-agents/src/context/hierarchy.rs:98:21
+16. llmspell-agents/src/context/hierarchy.rs:98:21
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-28. llmspell-agents/src/context/hierarchy.rs:146:21
+17. llmspell-agents/src/context/hierarchy.rs:146:21
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-29. llmspell-agents/src/context/hierarchy.rs:170:21
+18. llmspell-agents/src/context/hierarchy.rs:170:21
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-30. llmspell-agents/src/context/hierarchy.rs:208:21
+19. llmspell-agents/src/context/hierarchy.rs:208:21
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-31. llmspell-agents/src/context/hierarchy.rs:227:21
+20. llmspell-agents/src/context/hierarchy.rs:227:21
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-32. llmspell-agents/src/context/hierarchy.rs:259:21
+21. llmspell-agents/src/context/hierarchy.rs:259:21
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-33. llmspell-agents/src/context/hierarchy.rs:276:21
+22. llmspell-agents/src/context/hierarchy.rs:276:21
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-34. llmspell-agents/src/context/inheritance.rs:152:5
+23. llmspell-agents/src/context/inheritance.rs:152:5
    Message: docs for function returning `Result` missing `# Errors` section
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
 
-35. llmspell-agents/src/context/shared_memory.rs:125:23
+24. llmspell-agents/src/context/shared_memory.rs:125:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-36. llmspell-agents/src/context/shared_memory.rs:135:23
+25. llmspell-agents/src/context/shared_memory.rs:135:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-37. llmspell-agents/src/context/shared_memory.rs:145:23
+26. llmspell-agents/src/context/shared_memory.rs:145:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-38. llmspell-agents/src/context/shared_memory.rs:165:23
+27. llmspell-agents/src/context/shared_memory.rs:165:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-39. llmspell-agents/src/context/shared_memory.rs:190:23
+28. llmspell-agents/src/context/shared_memory.rs:190:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-40. llmspell-agents/src/context/shared_memory.rs:233:23
+29. llmspell-agents/src/context/shared_memory.rs:233:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-41. llmspell-agents/src/context/shared_memory.rs:278:23
+30. llmspell-agents/src/context/shared_memory.rs:278:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-42. llmspell-agents/src/context/shared_memory.rs:302:23
+31. llmspell-agents/src/context/shared_memory.rs:302:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-43. llmspell-agents/src/context/shared_memory.rs:408:23
+32. llmspell-agents/src/context/shared_memory.rs:408:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-44. llmspell-agents/src/context/shared_memory.rs:439:23
+33. llmspell-agents/src/context/shared_memory.rs:439:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-45. llmspell-agents/src/context/shared_memory.rs:456:23
+34. llmspell-agents/src/context/shared_memory.rs:456:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-46. llmspell-agents/src/context/shared_memory.rs:482:23
+35. llmspell-agents/src/context/shared_memory.rs:482:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-47. llmspell-agents/src/context/shared_memory.rs:497:23
+36. llmspell-agents/src/context/shared_memory.rs:497:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-48. llmspell-agents/src/context/shared_memory.rs:516:23
+37. llmspell-agents/src/context/shared_memory.rs:516:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-49. llmspell-agents/src/di.rs:197:23
+38. llmspell-agents/src/di.rs:197:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-50. llmspell-agents/src/hooks/state_persistence_hook.rs:22:1
+39. llmspell-agents/src/hooks/state_persistence_hook.rs:22:1
    Message: more than 3 bools in a struct
    Suggestion: consider using a state machine or refactoring bools into two-variant enums
 
-51. llmspell-agents/src/lifecycle/events.rs:388:24
+40. llmspell-agents/src/lifecycle/events.rs:388:24
    Message: using `clone` on type `LifecycleEventType` which implements the `Copy` trait
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#clone_on_copy
 
-52. llmspell-agents/src/lifecycle/middleware.rs:1:1
+41. llmspell-agents/src/lifecycle/middleware.rs:1:1
    Message: first doc comment paragraph is too long
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_long_first_doc_paragraph
 
-53. llmspell-agents/src/lifecycle/middleware.rs:192:1
+42. llmspell-agents/src/lifecycle/middleware.rs:192:1
    Message: more than 3 bools in a struct
    Suggestion: consider using a state machine or refactoring bools into two-variant enums
 
-54. llmspell-agents/src/lifecycle/state_machine.rs:113:1
+43. llmspell-agents/src/lifecycle/shutdown.rs:218:23
+   Message: item in documentation is missing backticks
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+
+44. llmspell-agents/src/lifecycle/state_machine.rs:113:1
    Message: more than 3 bools in a struct
    Suggestion: consider using a state machine or refactoring bools into two-variant enums
 
-55. llmspell-agents/src/lifecycle/state_machine.rs:427:9
+45. llmspell-agents/src/lifecycle/state_machine.rs:430:9
    Message: this could be rewritten as `let...else`
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#manual_let_else
 
-56. llmspell-agents/src/lifecycle/state_machine.rs:1058:5
+46. llmspell-agents/src/lifecycle/state_machine.rs:1059:5
    Message: this method could have a `#[must_use]` attribute
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
 
-57. llmspell-agents/src/monitoring/alerts.rs:336:32
+47. llmspell-agents/src/monitoring/alerts.rs:336:32
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-58. llmspell-agents/src/monitoring/alerts.rs:353:23
+48. llmspell-agents/src/monitoring/alerts.rs:353:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-59. llmspell-agents/src/monitoring/alerts.rs:374:21
+49. llmspell-agents/src/monitoring/alerts.rs:362:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-60. llmspell-agents/src/monitoring/alerts.rs:524:23
+50. llmspell-agents/src/monitoring/alerts.rs:378:21
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-61. llmspell-agents/src/monitoring/alerts.rs:541:23
+51. llmspell-agents/src/monitoring/alerts.rs:528:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-62. llmspell-agents/src/monitoring/alerts.rs:560:23
+52. llmspell-agents/src/monitoring/alerts.rs:545:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-63. llmspell-agents/src/monitoring/alerts.rs:588:23
+53. llmspell-agents/src/monitoring/alerts.rs:564:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-64. llmspell-agents/src/monitoring/events.rs:175:1
+54. llmspell-agents/src/monitoring/alerts.rs:592:23
+   Message: item in documentation is missing backticks
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+
+55. llmspell-agents/src/monitoring/alerts.rs:617:23
+   Message: item in documentation is missing backticks
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+
+56. llmspell-agents/src/monitoring/events.rs:175:1
    Message: manual `Debug` impl does not include all fields
    Suggestion: consider including all fields in this `Debug` impl
 
-65. llmspell-agents/src/monitoring/events.rs:178:23
+57. llmspell-agents/src/monitoring/events.rs:178:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-66. llmspell-agents/src/monitoring/events.rs:208:23
+58. llmspell-agents/src/monitoring/events.rs:208:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-67. llmspell-agents/src/monitoring/events.rs:217:23
+59. llmspell-agents/src/monitoring/events.rs:217:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-68. llmspell-agents/src/monitoring/events.rs:240:23
+60. llmspell-agents/src/monitoring/events.rs:240:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-69. llmspell-agents/src/monitoring/events.rs:373:23
+61. llmspell-agents/src/monitoring/events.rs:373:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-70. llmspell-agents/src/monitoring/events.rs:383:23
+62. llmspell-agents/src/monitoring/events.rs:383:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-71. llmspell-agents/src/monitoring/events.rs:397:23
+63. llmspell-agents/src/monitoring/events.rs:397:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-72. llmspell-agents/src/monitoring/events.rs:411:23
+64. llmspell-agents/src/monitoring/events.rs:411:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-73. llmspell-agents/src/monitoring/events.rs:420:23
+65. llmspell-agents/src/monitoring/events.rs:420:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-74. llmspell-agents/src/monitoring/metrics.rs:422:23
+66. llmspell-agents/src/monitoring/metrics.rs:422:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-75. llmspell-agents/src/monitoring/metrics.rs:433:23
+67. llmspell-agents/src/monitoring/metrics.rs:433:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-76. llmspell-agents/src/monitoring/metrics.rs:443:23
+68. llmspell-agents/src/monitoring/metrics.rs:443:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-77. llmspell-agents/src/monitoring/performance.rs:387:23
+69. llmspell-agents/src/monitoring/performance.rs:391:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-78. llmspell-agents/src/monitoring/performance.rs:403:23
+70. llmspell-agents/src/monitoring/performance.rs:407:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-79. llmspell-agents/src/monitoring/tracing.rs:96:23
+71. llmspell-agents/src/monitoring/tracing.rs:96:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-80. llmspell-agents/src/monitoring/tracing.rs:214:23
+72. llmspell-agents/src/monitoring/tracing.rs:214:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-81. llmspell-agents/src/monitoring/tracing.rs:252:23
+73. llmspell-agents/src/monitoring/tracing.rs:252:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-82. llmspell-agents/src/monitoring/tracing.rs:271:23
+74. llmspell-agents/src/monitoring/tracing.rs:271:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-83. llmspell-agents/src/monitoring/tracing.rs:298:23
+75. llmspell-agents/src/monitoring/tracing.rs:298:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-84. llmspell-agents/src/monitoring/tracing.rs:308:23
+76. llmspell-agents/src/monitoring/tracing.rs:308:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-85. llmspell-agents/src/monitoring/tracing.rs:324:23
+77. llmspell-agents/src/monitoring/tracing.rs:324:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-86. llmspell-agents/src/monitoring/tracing.rs:342:23
+78. llmspell-agents/src/monitoring/tracing.rs:342:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-87. llmspell-agents/src/monitoring/tracing.rs:359:23
+79. llmspell-agents/src/monitoring/tracing.rs:359:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-88. llmspell-agents/src/monitoring/tracing.rs:376:23
+80. llmspell-agents/src/monitoring/tracing.rs:376:23
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-89. llmspell-agents/src/registry/discovery.rs:218:9
+81. llmspell-agents/src/registry/discovery.rs:218:9
    Message: this could be rewritten as `let...else`
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#manual_let_else
 
-90. llmspell-agents/src/registry/discovery.rs:249:19
+82. llmspell-agents/src/registry/discovery.rs:249:19
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-91. llmspell-agents/src/registry/discovery.rs:318:5
+83. llmspell-agents/src/registry/discovery.rs:318:5
    Message: it is more idiomatic to use `Option<&T>` instead of `&Option<T>`
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#ref_option
 
-92. llmspell-agents/src/state/isolation.rs:309:25
+84. llmspell-agents/src/state/isolation.rs:309:25
    Message: using `clone` on type `StatePermission` which implements the `Copy` trait
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#clone_on_copy
 
-93. llmspell-agents/src/state/isolation.rs:358:66
+85. llmspell-agents/src/state/isolation.rs:358:66
    Message: using `clone` on type `StatePermission` which implements the `Copy` trait
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#clone_on_copy
 
-94. llmspell-agents/src/state/sharing.rs:439:38
+86. llmspell-agents/src/state/sharing.rs:439:38
    Message: the borrowed expression implements the required traits
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_borrows_for_generic_args
 
-95. llmspell-agents/src/state/sharing.rs:554:9
+87. llmspell-agents/src/state/sharing.rs:554:9
    Message: you seem to be trying to use `match` for an equality check. Consider using `if`
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#single_match_else
 
-96. llmspell-agents/src/templates/mod.rs:7:1
+88. llmspell-agents/src/templates/mod.rs:7:1
    Message: first doc comment paragraph is too long
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_long_first_doc_paragraph
 
-97. llmspell-agents/src/templates/mod.rs:13:1
+89. llmspell-agents/src/templates/mod.rs:13:1
    Message: first doc comment paragraph is too long
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_long_first_doc_paragraph
 
-98. llmspell-agents/src/templates/mod.rs:16:1
+90. llmspell-agents/src/templates/mod.rs:16:1
    Message: first doc comment paragraph is too long
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_long_first_doc_paragraph
 
-99. llmspell-agents/src/templates/monitor_agent.rs:78:1
+91. llmspell-agents/src/templates/monitor_agent.rs:78:1
    Message: more than 3 bools in a struct
    Suggestion: consider using a state machine or refactoring bools into two-variant enums
 
-100. llmspell-agents/src/templates/mod.rs:19:1
+92. llmspell-agents/src/templates/mod.rs:19:1
    Message: first doc comment paragraph is too long
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_long_first_doc_paragraph
 
-101. llmspell-agents/src/templates/mod.rs:22:1
+93. llmspell-agents/src/templates/mod.rs:22:1
    Message: first doc comment paragraph is too long
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_long_first_doc_paragraph
 
-102. llmspell-agents/src/templates/validation.rs:336:9
+94. llmspell-agents/src/templates/validation.rs:336:9
    Message: unused `self` argument
    Suggestion: consider refactoring to an associated function
 
-103. llmspell-agents/src/tool_context.rs:151:5
+95. llmspell-agents/src/tool_context.rs:151:5
    Message: this could be a `const fn`
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_const_for_fn
 
-104. llmspell-agents/src/tool_errors.rs:579:5
+96. llmspell-agents/src/tool_errors.rs:580:5
    Message: docs for function returning `Result` missing `# Errors` section
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#missing_errors_doc
 
-105. llmspell-agents/src/tool_invocation.rs:47:1
+97. llmspell-agents/src/tool_invocation.rs:47:1
    Message: more than 3 bools in a struct
    Suggestion: consider using a state machine or refactoring bools into two-variant enums
 
-106. llmspell-agents/src/tool_manager.rs:294:9
+98. llmspell-agents/src/tool_manager.rs:294:9
    Message: this could be rewritten as `let...else`
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#manual_let_else
 
-107. llmspell-agents/src/tool_manager.rs:317:31
+99. llmspell-agents/src/tool_manager.rs:317:31
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-108. llmspell-agents/src/tool_manager.rs:371:56
+100. llmspell-agents/src/tool_manager.rs:371:56
    Message: used underscore-prefixed binding
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#used_underscore_binding
 
-109. llmspell-agents/src/tool_manager.rs:418:9
+101. llmspell-agents/src/tool_manager.rs:415:9
    Message: unused `self` argument
    Suggestion: consider refactoring to an associated function
 
-110. llmspell-agents/src/testing/framework.rs:26:1
+102. llmspell-agents/src/testing/framework.rs:26:1
    Message: more than 3 bools in a struct
    Suggestion: consider using a state machine or refactoring bools into two-variant enums
 
-111. llmspell-agents/src/testing/framework.rs:125:5
+103. llmspell-agents/src/testing/framework.rs:125:5
    Message: this method could have a `#[must_use]` attribute
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#must_use_candidate
 
-112. llmspell-agents/src/tool_manager.rs:400:18
+104. llmspell-agents/src/tool_manager.rs:397:18
    Message: this argument is a mutable reference, but not used mutably
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#needless_pass_by_ref_mut
 
-113. llmspell-agents/examples/data_pipeline_agent.rs:13:7
-   Message: `llmspell-tools` (test "simple_performance_check") generated 3 warnings
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_many_lines
-
-114. llmspell-agents/examples/data_pipeline_agent.rs:13:7
-   Message: this function has too many lines (150/100)
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_many_lines
-
-115. llmspell-agents/tests/integration_tests.rs:97:5
-   Message: adding items after statements is confusing, since items exist from the start of the scope
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
-
-116. llmspell-agents/tests/integration_tests.rs:155:5
-   Message: adding items after statements is confusing, since items exist from the start of the scope
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
-
-117. llmspell-agents/tests/registry_basic.rs:266:5
+105. llmspell-agents/tests/registry_basic.rs:266:5
    Message: strict comparison of `f32` or `f64`
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#float_cmp
 
-118. llmspell-agents/tests/registry_basic.rs:267:5
+106. llmspell-agents/tests/registry_basic.rs:267:5
    Message: strict comparison of `f32` or `f64`
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#float_cmp
 
-119. llmspell-agents/tests/integration_tests.rs:239:5
+107. llmspell-agents/examples/composition_patterns.rs:82:5
+   Message: `llmspell-bridge` (bench "session_bench") generated 1 warning
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
+
+108. llmspell-agents/examples/composition_patterns.rs:82:5
    Message: adding items after statements is confusing, since items exist from the start of the scope
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
 
-120. llmspell-agents/examples/code_gen_agent.rs:13:7
-   Message: this function has too many lines (144/100)
+109. llmspell-agents/examples/decision_agent.rs:13:7
+   Message: this function has too many lines (217/100)
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_many_lines
 
-121. llmspell-agents/examples/monitoring_setup.rs:227:5
+110. llmspell-agents/examples/composition_patterns.rs:164:5
    Message: adding items after statements is confusing, since items exist from the start of the scope
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
 
-122. llmspell-agents/examples/monitoring_setup.rs:245:5
+111. llmspell-agents/examples/monitoring_setup.rs:230:5
    Message: adding items after statements is confusing, since items exist from the start of the scope
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
 
-123. llmspell-agents/examples/monitoring_setup.rs:245:27
+112. llmspell-agents/examples/monitoring_setup.rs:248:5
    Message: adding items after statements is confusing, since items exist from the start of the scope
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
 
-124. llmspell-agents/examples/monitoring_setup.rs:245:44
+113. llmspell-agents/examples/monitoring_setup.rs:248:27
    Message: adding items after statements is confusing, since items exist from the start of the scope
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
 
-125. llmspell-agents/examples/monitoring_setup.rs:258:5
+114. llmspell-agents/examples/monitoring_setup.rs:248:44
    Message: adding items after statements is confusing, since items exist from the start of the scope
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
 
-126. llmspell-agents/examples/monitoring_setup.rs:329:5
+115. llmspell-agents/examples/monitoring_setup.rs:261:5
    Message: adding items after statements is confusing, since items exist from the start of the scope
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
 
-127. llmspell-agents/examples/monitoring_setup.rs:329:27
+116. llmspell-agents/examples/template_usage.rs:215:5
    Message: adding items after statements is confusing, since items exist from the start of the scope
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
 
-128. llmspell-agents/examples/monitoring_setup.rs:329:41
+117. llmspell-agents/examples/monitoring_setup.rs:332:5
    Message: adding items after statements is confusing, since items exist from the start of the scope
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
 
-#### llmspell-bridge (102 warnings)
+118. llmspell-agents/examples/monitoring_setup.rs:332:27
+   Message: adding items after statements is confusing, since items exist from the start of the scope
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
+
+119. llmspell-agents/examples/monitoring_setup.rs:332:41
+   Message: adding items after statements is confusing, since items exist from the start of the scope
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_statements
+
+120. llmspell-agents/tests/multi_agent_state.rs:20:9
+   Message: `llmspell-agents` (example "template_usage") generated 2 warnings
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+
+121. llmspell-agents/tests/multi_agent_state.rs:20:9
+   Message: `llmspell-testing` (bench "integrated_overhead") generated 1 warning (run `cargo clippy --fix --bench "integrated_overhead"` to apply 1 suggestion)
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+
+122. llmspell-agents/tests/multi_agent_state.rs:20:9
+   Message: `llmspell-agents` (example "composition_patterns") generated 9 warnings
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+
+123. llmspell-agents/tests/multi_agent_state.rs:20:9
+   Message: `llmspell-agents` (example "monitoring_setup") generated 8 warnings
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+
+124. llmspell-agents/tests/multi_agent_state.rs:20:9
+   Message: `llmspell-bridge` (test "lua_hook_enhanced") generated 1 warning
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#field_reassign_with_default
+
+#### llmspell-bridge (86 warnings)
 
 1. llmspell-bridge/src/engine/factory.rs:391:25
-   Message: `llmspell-agents` (lib) generated 150 warnings (run `cargo clippy --fix --lib -p llmspell-agents` to apply 97 suggestions)
+   Message: `llmspell-agents` (lib) generated 117 warnings (run `cargo clippy --fix --lib -p llmspell-agents` to apply 82 suggestions)
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#type_complexity
 
 2. llmspell-bridge/src/engine/factory.rs:391:25
@@ -1809,147 +1425,45 @@ Description: Miscellaneous - Various other warnings
 76. llmspell-bridge/benches/session_bench.rs:9:5
    Message: unused import: `std::sync::Arc`
 
-77. llmspell-bridge/benches/session_bench.rs:94:16
+77. llmspell-bridge/tests/performance_test.rs:88:23
+   Message: `llmspell-tools` (test "web_scraper_integration") generated 7 warnings (run `cargo clippy --fix --test "web_scraper_integration"` to apply 1 suggestion)
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
+
+78. llmspell-bridge/benches/session_bench.rs:47:16
+   Message: `llmspell-sessions` (test "policy_performance_test") generated 1 warning
+   Suggestion: there is a method `execute_script` with a similar name
+
+79. llmspell-bridge/benches/session_bench.rs:47:16
+   Message: `llmspell-tools` (test "hook_integration_tests") generated 9 warnings (run `cargo clippy --fix --test "hook_integration_tests"` to apply 6 suggestions)
+   Suggestion: there is a method `execute_script` with a similar name
+
+80. llmspell-bridge/benches/session_bench.rs:68:20
+   Message: `llmspell-bridge` (test "sync_behavior_test") generated 2 warnings
+   Suggestion: there is a method `execute_script` with a similar name
+
+81. llmspell-bridge/benches/session_bench.rs:68:20
+   Message: `llmspell-tools` (test "security_sandbox_escape_tests") generated 7 warnings
+   Suggestion: there is a method `execute_script` with a similar name
+
+82. llmspell-bridge/benches/session_bench.rs:75:20
    Message: `llmspell-agents` (test "registry_basic") generated 2 warnings
    Suggestion: there is a method `execute_script` with a similar name
 
-78. llmspell-bridge/benches/session_bench.rs:138:20
-   Message: `llmspell-tools` (test "webpage_monitor_integration") generated 3 warnings
+83. llmspell-bridge/benches/session_bench.rs:94:16
+   Message: `llmspell-bridge` (test "performance_test") generated 5 warnings
    Suggestion: there is a method `execute_script` with a similar name
 
-79. llmspell-bridge/benches/session_bench.rs:145:20
-   Message: `llmspell-tools` (test "http_request_integration") generated 19 warnings (run `cargo clippy --fix --test "http_request_integration"` to apply 4 suggestions)
+84. llmspell-bridge/benches/session_bench.rs:94:16
+   Message: `llmspell-tools` (test "web_tools_integration") generated 1 warning
    Suggestion: there is a method `execute_script` with a similar name
 
-80. llmspell-bridge/benches/session_bench.rs:178:28
-   Message: `llmspell-tools` (test "web_tools_error_scenarios") generated 8 warnings (2 duplicates)
+85. llmspell-bridge/benches/session_bench.rs:131:20
+   Message: `llmspell-tools` (test "json_processor_integration") generated 7 warnings (run `cargo clippy --fix --test "json_processor_integration"` to apply 1 suggestion)
    Suggestion: there is a method `execute_script` with a similar name
 
-81. llmspell-bridge/tests/session_global_test.rs:1:36
-   Message: item in documentation is missing backticks
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
-
-82. llmspell-bridge/benches/workflow_bridge_bench.rs:19:9
-   Message: `llmspell-tools` (bench "tool_operations") generated 7 warnings
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
-
-83. llmspell-bridge/benches/workflow_bridge_bench.rs:19:9
-   Message: consider adding a `;` to the last statement for consistent formatting
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
-
-84. llmspell-bridge/benches/workflow_bridge_bench.rs:20:13
-   Message: consider adding a `;` to the last statement for consistent formatting
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
-
-85. llmspell-bridge/benches/workflow_bridge_bench.rs:37:9
-   Message: consider adding a `;` to the last statement for consistent formatting
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
-
-86. llmspell-bridge/benches/workflow_bridge_bench.rs:38:13
-   Message: consider adding a `;` to the last statement for consistent formatting
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
-
-87. llmspell-bridge/benches/workflow_bridge_bench.rs:62:9
-   Message: consider adding a `;` to the last statement for consistent formatting
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
-
-88. llmspell-bridge/benches/workflow_bridge_bench.rs:63:13
-   Message: consider adding a `;` to the last statement for consistent formatting
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
-
-89. llmspell-bridge/benches/workflow_bridge_bench.rs:71:9
-   Message: consider adding a `;` to the last statement for consistent formatting
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
-
-90. llmspell-bridge/benches/workflow_bridge_bench.rs:72:13
-   Message: consider adding a `;` to the last statement for consistent formatting
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
-
-91. llmspell-bridge/benches/workflow_bridge_bench.rs:93:9
-   Message: consider adding a `;` to the last statement for consistent formatting
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
-
-92. llmspell-bridge/benches/workflow_bridge_bench.rs:117:9
-   Message: consider adding a `;` to the last statement for consistent formatting
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
-
-93. llmspell-bridge/benches/workflow_bridge_bench.rs:118:13
-   Message: consider adding a `;` to the last statement for consistent formatting
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
-
-94. llmspell-bridge/benches/workflow_bridge_bench.rs:137:9
-   Message: consider adding a `;` to the last statement for consistent formatting
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
-
-95. llmspell-bridge/benches/workflow_bridge_bench.rs:138:13
-   Message: consider adding a `;` to the last statement for consistent formatting
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
-
-96. llmspell-bridge/benches/workflow_bridge_bench.rs:164:1
-   Message: this function has too many lines (140/100)
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#too_many_lines
-
-97. llmspell-bridge/benches/workflow_bridge_bench.rs:184:9
-   Message: consider adding a `;` to the last statement for consistent formatting
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
-
-98. llmspell-bridge/benches/workflow_bridge_bench.rs:208:9
-   Message: consider adding a `;` to the last statement for consistent formatting
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
-
-99. llmspell-bridge/benches/workflow_bridge_bench.rs:238:9
-   Message: consider adding a `;` to the last statement for consistent formatting
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
-
-100. llmspell-bridge/benches/workflow_bridge_bench.rs:266:9
-   Message: consider adding a `;` to the last statement for consistent formatting
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
-
-101. llmspell-bridge/benches/workflow_bridge_bench.rs:296:9
-   Message: consider adding a `;` to the last statement for consistent formatting
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
-
-102. llmspell-bridge/benches/workflow_bridge_bench.rs:310:9
-   Message: consider adding a `;` to the last statement for consistent formatting
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#semicolon_if_nothing_returned
-
-#### llmspell-hooks (9 warnings)
-
-1. llmspell-hooks/src/artifact_hooks.rs:127:13
-   Message: `llmspell-bridge` (bench "session_bench") generated 1 warning
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#clone_on_copy
-
-2. llmspell-hooks/src/artifact_hooks.rs:127:13
+86. llmspell-bridge/benches/session_bench.rs:287:20
    Message: build failed, waiting for other jobs to finish...
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#clone_on_copy
-
-3. llmspell-hooks/src/artifact_hooks.rs:127:13
-   Message: using `clone` on type `ComponentId` which implements the `Copy` trait
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#clone_on_copy
-
-4. llmspell-hooks/src/builtin/caching.rs:457:1
-   Message: items after a test module
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_test_module
-
-5. llmspell-hooks/src/builtin/cost_tracking.rs:675:1
-   Message: items after a test module
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_test_module
-
-6. llmspell-hooks/src/builtin/debugging.rs:479:1
-   Message: items after a test module
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_test_module
-
-7. llmspell-hooks/src/builtin/retry.rs:528:1
-   Message: items after a test module
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_test_module
-
-8. llmspell-hooks/src/builtin/security.rs:671:1
-   Message: items after a test module
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#items_after_test_module
-
-9. llmspell-hooks/src/persistence/tests.rs:5:1
-   Message: module has the same name as its containing module
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#module_inception
+   Suggestion: there is a method `execute_script` with a similar name
 
 #### llmspell-testing (2 warnings)
 
@@ -1961,123 +1475,103 @@ Description: Miscellaneous - Various other warnings
    Message: useless conversion to the same type: `llmspell_workflows::WorkflowStep`
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#useless_conversion
 
-#### llmspell-tools (9 warnings)
+#### llmspell-tools (18 warnings)
 
 1. llmspell-tools/src/util/data_validation.rs:569:32
    Message: this looks like a formatting argument but it is not part of a formatting macro
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#literal_string_with_formatting_args
 
-2. llmspell-tools/tests/simple_performance_check.rs:57:23
+2. llmspell-tools/tests/web_scraper_integration.rs:28:9
    Message: `llmspell-testing` (lib test) generated 1 warning
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_precision_loss
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#similar_names
 
-3. llmspell-tools/tests/webpage_monitor_integration.rs:149:25
+3. llmspell-tools/tests/web_scraper_integration.rs:28:9
    Message: binding's name is too similar to existing binding
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#similar_names
 
-4. llmspell-tools/tests/http_request_integration.rs:1:27
-   Message: `llmspell-agents` (example "data_pipeline_agent") generated 1 warning
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
+4. llmspell-tools/tests/web_scraper_integration.rs:52:9
+   Message: binding's name is too similar to existing binding
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#similar_names
 
-5. llmspell-tools/tests/http_request_integration.rs:1:27
+5. llmspell-tools/tests/web_scraper_integration.rs:74:9
+   Message: binding's name is too similar to existing binding
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#similar_names
+
+6. llmspell-tools/tests/web_scraper_integration.rs:96:9
+   Message: binding's name is too similar to existing binding
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#similar_names
+
+7. llmspell-tools/tests/json_processor_integration.rs:19:74
+   Message: long literal lacking separators
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unreadable_literal
+
+8. llmspell-tools/tests/json_processor_integration.rs:21:76
+   Message: long literal lacking separators
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unreadable_literal
+
+9. llmspell-tools/tests/json_processor_integration.rs:24:43
+   Message: long literal lacking separators
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unreadable_literal
+
+10. llmspell-tools/tests/json_processor_integration.rs:25:37
+   Message: long literal lacking separators
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unreadable_literal
+
+11. llmspell-tools/tests/json_processor_integration.rs:355:31
+   Message: long literal lacking separators
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unreadable_literal
+
+12. llmspell-tools/tests/json_processor_integration.rs:359:31
+   Message: long literal lacking separators
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#unreadable_literal
+
+13. llmspell-tools/tests/web_scraper_integration.rs:1:36
    Message: item in documentation is missing backticks
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-6. llmspell-tools/tests/web_tools_error_scenarios.rs:293:39
-   Message: `llmspell-agents` (test "integration_tests") generated 7 warnings (run `cargo clippy --fix --test "integration_tests"` to apply 1 suggestion)
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#cast_sign_loss
-
-7. llmspell-tools/tests/hook_integration_tests.rs:52:34
+14. llmspell-tools/tests/hook_integration_tests.rs:52:34
    Message: single-character string constant used as pattern
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#single_char_pattern
 
-8. llmspell-tools/tests/hook_integration_tests.rs:299:38
-   Message: `llmspell-agents` (example "code_gen_agent") generated 1 warning
-   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#uninlined_format_args
-
-9. llmspell-tools/tests/hook_integration_tests.rs:413:34
+15. llmspell-tools/tests/hook_integration_tests.rs:413:34
    Message: single-character string constant used as pattern
    Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#single_char_pattern
 
-#### llmspell-workflows (5 warnings)
+16. llmspell-tools/tests/json_processor_integration.rs:1:27
+   Message: item in documentation is missing backticks
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#doc_markdown
 
-1. llmspell-workflows/benches/workflow_hook_overhead.rs:322:35
-   Message: `llmspell-agents` (example "monitoring_setup") generated 12 warnings
-   Suggestion: provide the arguments
+17. llmspell-tools/tests/web_tools_integration.rs:276:9
+   Message: binding to `_` prefixed variable with no side-effect
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#no_effect_underscore_binding
 
-2. llmspell-workflows/benches/workflow_hook_overhead.rs:322:35
-   Message: `llmspell-tools` (test "hook_integration_tests") generated 9 warnings (run `cargo clippy --fix --test "hook_integration_tests"` to apply 6 suggestions)
-   Suggestion: provide the arguments
-
-3. llmspell-workflows/benches/workflow_hook_overhead.rs:340:35
-   Message: `llmspell-bridge` (bench "workflow_bridge_bench") generated 21 warnings (run `cargo clippy --fix --bench "workflow_bridge_bench"` to apply 20 suggestions)
-   Suggestion: provide the arguments
-
-4. llmspell-workflows/benches/workflow_hook_overhead.rs:340:35
-   Message: `llmspell-bridge` (test "session_global_test") generated 1 warning (run `cargo clippy --fix --test "session_global_test"` to apply 1 suggestion)
-   Suggestion: provide the arguments
-
-5. llmspell-workflows/benches/workflow_hook_overhead.rs:340:35
-   Message: `llmspell-tools` (test "remaining_tools_basic") generated 45 warnings
-   Suggestion: provide the arguments
+18. llmspell-tools/tests/security_injection_attack_tests.rs:69:44
+   Message: `llmspell-agents` (example "decision_agent") generated 1 warning
+   Suggestion: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#default_trait_access
 
 
 
 ## WARNINGS BY CRATE
 
-### llmspell-agents (175 warnings)
+### llmspell-agents (147 warnings)
 
-#### cast_issues (5 warnings)
-- llmspell-agents/src/monitoring/performance.rs:346:31: casting `f64` to `usize` may lose the sign of the value...
-- llmspell-agents/src/tool_errors.rs:333:35: casting `u128` to `u64` may truncate the value...
-- llmspell-agents/examples/monitoring_setup.rs:164:13: casting `u64` to `f64` causes a loss of precision (`u64` is 64 bits wide, but `f...
-- llmspell-agents/examples/monitoring_setup.rs:165:13: casting `u64` to `f64` causes a loss of precision (`u64` is 64 bits wide, but `f...
-- llmspell-agents/examples/monitoring_setup.rs:173:13: casting `u64` to `f64` causes a loss of precision (`u64` is 64 bits wide, but `f...
-#### default_trait (3 warnings)
-- llmspell-agents/tests/integration_tests.rs:57:78: calling `StateMachineConfig::default()` is more clear than this expression...
-- llmspell-agents/tests/integration_tests.rs:110:27: calling `HashMap::default()` is more clear than this expression...
-- llmspell-agents/tests/integration_tests.rs:111:22: calling `HashMap::default()` is more clear than this expression...
-#### format_string (1 warnings)
-- llmspell-agents/tests/integration_tests.rs:183:42: variables can be used directly in the `format!` string...
-#### option_result_patterns (21 warnings)
-- llmspell-agents/src/composition/capabilities.rs:302:12: this `map_or` can be simplified...
+#### default_trait (6 warnings)
+- llmspell-agents/examples/composition_patterns.rs:55:23: calling `HashMap::default()` is more clear than this expression...
+- llmspell-agents/examples/composition_patterns.rs:65:23: calling `HashMap::default()` is more clear than this expression...
+- llmspell-agents/examples/composition_patterns.rs:170:19: calling `HashMap::default()` is more clear than this expression...
+- llmspell-agents/examples/composition_patterns.rs:177:19: calling `HashMap::default()` is more clear than this expression...
+- llmspell-agents/examples/composition_patterns.rs:184:19: calling `HashMap::default()` is more clear than this expression...
+- llmspell-agents/tests/multi_agent_state.rs:20:9: field assignment outside of initializer for an instance created with Default::de...
+#### identical_match_arms (1 warnings)
+- llmspell-agents/src/lifecycle/state_machine.rs:281:13: this match arm has an identical body to the `_` wildcard arm...
+#### option_result_patterns (5 warnings)
 - llmspell-agents/src/composition/capabilities.rs:312:16: this `map_or` can be simplified...
-- llmspell-agents/src/composition/capabilities.rs:331:16: this `map_or` can be simplified...
-- llmspell-agents/src/composition/hierarchical.rs:234:16: this `map_or` can be simplified...
-- llmspell-agents/src/composition/tool_composition.rs:388:28: this `map_or` can be simplified...
-- llmspell-agents/src/context/inheritance.rs:357:13: this `map_or` can be simplified...
 - llmspell-agents/src/hooks/state_persistence_hook.rs:148:43: this `map_or` can be simplified...
-- llmspell-agents/src/lifecycle/shutdown.rs:372:30: function call inside of `unwrap_or`...
-- llmspell-agents/src/lifecycle/shutdown.rs:408:26: function call inside of `unwrap_or`...
-- llmspell-agents/src/lifecycle/shutdown.rs:712:22: function call inside of `unwrap_or`...
-- llmspell-agents/src/lifecycle/state_machine.rs:541:9: this `map_or` can be simplified...
-- llmspell-agents/src/lifecycle/state_machine.rs:812:9: unused "map closure" when calling `Result::map_or_else` value...
-- llmspell-agents/src/monitoring/alerts.rs:394:22: this `map_or` can be simplified...
-- llmspell-agents/src/monitoring/alerts.rs:446:9: this `map_or` can be simplified...
-- llmspell-agents/src/state/isolation.rs:134:9: this `map_or` can be simplified...
+- llmspell-agents/src/lifecycle/state_machine.rs:815:9: use Option::map_or_else instead of an if let/else...
 - llmspell-agents/src/state/sharing.rs:335:25: this `map_or` can be simplified...
-- llmspell-agents/src/templates/validation.rs:462:30: use Option::map_or_else instead of an if let/else...
-- llmspell-agents/src/templates/validation.rs:478:30: use Option::map_or_else instead of an if let/else...
-- llmspell-agents/src/tool_manager.rs:386:9: use Option::map_or_else instead of an if let/else...
-- llmspell-agents/src/testing/mocks.rs:690:27: use Option::map_or_else instead of an if let/else...
 - llmspell-agents/src/testing/utils.rs:190:9: use Option::map_or_else instead of an if let/else...
-#### or_patterns (2 warnings)
-- llmspell-agents/src/context/inheritance.rs:278:13: unnested or-patterns...
-- llmspell-agents/src/lifecycle/state_machine.rs:270:13: unnested or-patterns...
-#### other (128 warnings)
-- llmspell-agents/src/context/inheritance.rs:278:13: `llmspell-tools` (lib) generated 18 warnings...
-- llmspell-agents/src/composition/capabilities.rs:145:23: item in documentation is missing backticks...
-- llmspell-agents/src/composition/capabilities.rs:191:23: item in documentation is missing backticks...
-- llmspell-agents/src/composition/capabilities.rs:215:23: item in documentation is missing backticks...
-- llmspell-agents/src/composition/capabilities.rs:225:23: item in documentation is missing backticks...
-- llmspell-agents/src/composition/capabilities.rs:236:23: item in documentation is missing backticks...
-- llmspell-agents/src/composition/capabilities.rs:248:22: it is more concise to loop over references to containers instead of using explic...
-- llmspell-agents/src/composition/capabilities.rs:290:23: item in documentation is missing backticks...
-- llmspell-agents/src/composition/capabilities.rs:393:23: item in documentation is missing backticks...
-- llmspell-agents/src/composition/capabilities.rs:440:23: item in documentation is missing backticks...
-- llmspell-agents/src/composition/capabilities.rs:454:23: item in documentation is missing backticks...
-- llmspell-agents/src/composition/capabilities.rs:476:23: item in documentation is missing backticks...
-- llmspell-agents/src/composition/capabilities.rs:504:23: item in documentation is missing backticks...
+#### other (124 warnings)
+- llmspell-agents/src/composition/capabilities.rs:312:16: `llmspell-tools` (lib) generated 18 warnings...
 - llmspell-agents/src/composition/delegation.rs:301:21: item in documentation is missing backticks...
 - llmspell-agents/src/composition/delegation.rs:400:23: item in documentation is missing backticks...
 - llmspell-agents/src/composition/delegation.rs:409:23: item in documentation is missing backticks...
@@ -2086,9 +1580,10 @@ Description: Miscellaneous - Various other warnings
 - llmspell-agents/src/composition/lifecycle.rs:59:1: manual `Debug` impl does not include all fields...
 - llmspell-agents/src/composition/tool_composition.rs:319:21: item in documentation is missing backticks...
 - llmspell-agents/src/composition/tool_composition.rs:320:5: docs for function returning `Result` missing `# Errors` section...
+- llmspell-agents/src/composition/tool_composition.rs:320:5: this function has too many lines (101/100)...
 - llmspell-agents/src/composition/tool_composition.rs:320:5: future cannot be sent between threads safely...
-- llmspell-agents/src/composition/tool_composition.rs:529:10: parameter is only used in recursion...
-- llmspell-agents/src/composition/tool_composition.rs:608:5: future cannot be sent between threads safely...
+- llmspell-agents/src/composition/tool_composition.rs:530:10: parameter is only used in recursion...
+- llmspell-agents/src/composition/tool_composition.rs:609:5: future cannot be sent between threads safely...
 - llmspell-agents/src/context/event_integration.rs:250:5: docs for function returning `Result` missing `# Errors` section...
 - llmspell-agents/src/context/hierarchy.rs:71:21: item in documentation is missing backticks...
 - llmspell-agents/src/context/hierarchy.rs:98:21: item in documentation is missing backticks...
@@ -2118,16 +1613,19 @@ Description: Miscellaneous - Various other warnings
 - llmspell-agents/src/lifecycle/events.rs:388:24: using `clone` on type `LifecycleEventType` which implements the `Copy` trait...
 - llmspell-agents/src/lifecycle/middleware.rs:1:1: first doc comment paragraph is too long...
 - llmspell-agents/src/lifecycle/middleware.rs:192:1: more than 3 bools in a struct...
+- llmspell-agents/src/lifecycle/shutdown.rs:218:23: item in documentation is missing backticks...
 - llmspell-agents/src/lifecycle/state_machine.rs:113:1: more than 3 bools in a struct...
-- llmspell-agents/src/lifecycle/state_machine.rs:427:9: this could be rewritten as `let...else`...
-- llmspell-agents/src/lifecycle/state_machine.rs:1058:5: this method could have a `#[must_use]` attribute...
+- llmspell-agents/src/lifecycle/state_machine.rs:430:9: this could be rewritten as `let...else`...
+- llmspell-agents/src/lifecycle/state_machine.rs:1059:5: this method could have a `#[must_use]` attribute...
 - llmspell-agents/src/monitoring/alerts.rs:336:32: item in documentation is missing backticks...
 - llmspell-agents/src/monitoring/alerts.rs:353:23: item in documentation is missing backticks...
-- llmspell-agents/src/monitoring/alerts.rs:374:21: item in documentation is missing backticks...
-- llmspell-agents/src/monitoring/alerts.rs:524:23: item in documentation is missing backticks...
-- llmspell-agents/src/monitoring/alerts.rs:541:23: item in documentation is missing backticks...
-- llmspell-agents/src/monitoring/alerts.rs:560:23: item in documentation is missing backticks...
-- llmspell-agents/src/monitoring/alerts.rs:588:23: item in documentation is missing backticks...
+- llmspell-agents/src/monitoring/alerts.rs:362:23: item in documentation is missing backticks...
+- llmspell-agents/src/monitoring/alerts.rs:378:21: item in documentation is missing backticks...
+- llmspell-agents/src/monitoring/alerts.rs:528:23: item in documentation is missing backticks...
+- llmspell-agents/src/monitoring/alerts.rs:545:23: item in documentation is missing backticks...
+- llmspell-agents/src/monitoring/alerts.rs:564:23: item in documentation is missing backticks...
+- llmspell-agents/src/monitoring/alerts.rs:592:23: item in documentation is missing backticks...
+- llmspell-agents/src/monitoring/alerts.rs:617:23: item in documentation is missing backticks...
 - llmspell-agents/src/monitoring/events.rs:175:1: manual `Debug` impl does not include all fields...
 - llmspell-agents/src/monitoring/events.rs:178:23: item in documentation is missing backticks...
 - llmspell-agents/src/monitoring/events.rs:208:23: item in documentation is missing backticks...
@@ -2141,8 +1639,8 @@ Description: Miscellaneous - Various other warnings
 - llmspell-agents/src/monitoring/metrics.rs:422:23: item in documentation is missing backticks...
 - llmspell-agents/src/monitoring/metrics.rs:433:23: item in documentation is missing backticks...
 - llmspell-agents/src/monitoring/metrics.rs:443:23: item in documentation is missing backticks...
-- llmspell-agents/src/monitoring/performance.rs:387:23: item in documentation is missing backticks...
-- llmspell-agents/src/monitoring/performance.rs:403:23: item in documentation is missing backticks...
+- llmspell-agents/src/monitoring/performance.rs:391:23: item in documentation is missing backticks...
+- llmspell-agents/src/monitoring/performance.rs:407:23: item in documentation is missing backticks...
 - llmspell-agents/src/monitoring/tracing.rs:96:23: item in documentation is missing backticks...
 - llmspell-agents/src/monitoring/tracing.rs:214:23: item in documentation is missing backticks...
 - llmspell-agents/src/monitoring/tracing.rs:252:23: item in documentation is missing backticks...
@@ -2168,60 +1666,65 @@ Description: Miscellaneous - Various other warnings
 - llmspell-agents/src/templates/mod.rs:22:1: first doc comment paragraph is too long...
 - llmspell-agents/src/templates/validation.rs:336:9: unused `self` argument...
 - llmspell-agents/src/tool_context.rs:151:5: this could be a `const fn`...
-- llmspell-agents/src/tool_errors.rs:579:5: docs for function returning `Result` missing `# Errors` section...
+- llmspell-agents/src/tool_errors.rs:580:5: docs for function returning `Result` missing `# Errors` section...
 - llmspell-agents/src/tool_invocation.rs:47:1: more than 3 bools in a struct...
 - llmspell-agents/src/tool_manager.rs:294:9: this could be rewritten as `let...else`...
 - llmspell-agents/src/tool_manager.rs:317:31: item in documentation is missing backticks...
 - llmspell-agents/src/tool_manager.rs:371:56: used underscore-prefixed binding...
-- llmspell-agents/src/tool_manager.rs:418:9: unused `self` argument...
+- llmspell-agents/src/tool_manager.rs:415:9: unused `self` argument...
 - llmspell-agents/src/testing/framework.rs:26:1: more than 3 bools in a struct...
 - llmspell-agents/src/testing/framework.rs:125:5: this method could have a `#[must_use]` attribute...
-- llmspell-agents/src/tool_manager.rs:400:18: this argument is a mutable reference, but not used mutably...
-- llmspell-agents/examples/data_pipeline_agent.rs:13:7: `llmspell-tools` (test "simple_performance_check") generated 3 warnings...
-- llmspell-agents/examples/data_pipeline_agent.rs:13:7: this function has too many lines (150/100)...
-- llmspell-agents/tests/integration_tests.rs:97:5: adding items after statements is confusing, since items exist from the start of ...
-- llmspell-agents/tests/integration_tests.rs:155:5: adding items after statements is confusing, since items exist from the start of ...
+- llmspell-agents/src/tool_manager.rs:397:18: this argument is a mutable reference, but not used mutably...
 - llmspell-agents/tests/registry_basic.rs:266:5: strict comparison of `f32` or `f64`...
 - llmspell-agents/tests/registry_basic.rs:267:5: strict comparison of `f32` or `f64`...
-- llmspell-agents/tests/integration_tests.rs:239:5: adding items after statements is confusing, since items exist from the start of ...
-- llmspell-agents/examples/code_gen_agent.rs:13:7: this function has too many lines (144/100)...
-- llmspell-agents/examples/monitoring_setup.rs:227:5: adding items after statements is confusing, since items exist from the start of ...
-- llmspell-agents/examples/monitoring_setup.rs:245:5: adding items after statements is confusing, since items exist from the start of ...
-- llmspell-agents/examples/monitoring_setup.rs:245:27: adding items after statements is confusing, since items exist from the start of ...
-- llmspell-agents/examples/monitoring_setup.rs:245:44: adding items after statements is confusing, since items exist from the start of ...
-- llmspell-agents/examples/monitoring_setup.rs:258:5: adding items after statements is confusing, since items exist from the start of ...
-- llmspell-agents/examples/monitoring_setup.rs:329:5: adding items after statements is confusing, since items exist from the start of ...
-- llmspell-agents/examples/monitoring_setup.rs:329:27: adding items after statements is confusing, since items exist from the start of ...
-- llmspell-agents/examples/monitoring_setup.rs:329:41: adding items after statements is confusing, since items exist from the start of ...
-#### panic_issues (6 warnings)
-- llmspell-agents/src/lifecycle/shutdown.rs:215:5: docs for function which may panic missing `# Panics` section...
-- llmspell-agents/src/monitoring/alerts.rs:359:5: docs for function which may panic missing `# Panics` section...
-- llmspell-agents/src/monitoring/alerts.rs:611:5: docs for function which may panic missing `# Panics` section...
-- llmspell-agents/src/monitoring/performance.rs:100:5: docs for function which may panic missing `# Panics` section...
-- llmspell-agents/src/templates/mod.rs:51:1: docs for function which may panic missing `# Panics` section...
-- llmspell-agents/src/testing/mocks.rs:625:5: docs for function which may panic missing `# Panics` section...
-#### pass_by_value (2 warnings)
-- llmspell-agents/src/context/inheritance.rs:240:72: this argument (1 byte) is passed by reference, but would be more efficient if pa...
-- llmspell-agents/src/state/sharing.rs:550:18: this argument (1 byte) is passed by reference, but would be more efficient if pa...
-#### unnecessary_code (2 warnings)
-- llmspell-agents/src/factory.rs:389:5: this function's return value is unnecessary...
-- llmspell-agents/src/hooks/state_persistence_hook.rs:260:5: this function's return value is unnecessary...
-#### unnecessary_result (1 warnings)
-- llmspell-agents/src/tool_manager.rs:417:5: this function's return value is unnecessarily wrapped by `Result`...
-#### unused_async (1 warnings)
-- llmspell-agents/examples/monitoring_setup.rs:239:1: unused `async` for function with no await statements...
-#### wildcard_patterns (3 warnings)
+- llmspell-agents/examples/composition_patterns.rs:82:5: `llmspell-bridge` (bench "session_bench") generated 1 warning...
+- llmspell-agents/examples/composition_patterns.rs:82:5: adding items after statements is confusing, since items exist from the start of ...
+- llmspell-agents/examples/decision_agent.rs:13:7: this function has too many lines (217/100)...
+- llmspell-agents/examples/composition_patterns.rs:164:5: adding items after statements is confusing, since items exist from the start of ...
+- llmspell-agents/examples/monitoring_setup.rs:230:5: adding items after statements is confusing, since items exist from the start of ...
+- llmspell-agents/examples/monitoring_setup.rs:248:5: adding items after statements is confusing, since items exist from the start of ...
+- llmspell-agents/examples/monitoring_setup.rs:248:27: adding items after statements is confusing, since items exist from the start of ...
+- llmspell-agents/examples/monitoring_setup.rs:248:44: adding items after statements is confusing, since items exist from the start of ...
+- llmspell-agents/examples/monitoring_setup.rs:261:5: adding items after statements is confusing, since items exist from the start of ...
+- llmspell-agents/examples/template_usage.rs:215:5: adding items after statements is confusing, since items exist from the start of ...
+- llmspell-agents/examples/monitoring_setup.rs:332:5: adding items after statements is confusing, since items exist from the start of ...
+- llmspell-agents/examples/monitoring_setup.rs:332:27: adding items after statements is confusing, since items exist from the start of ...
+- llmspell-agents/examples/monitoring_setup.rs:332:41: adding items after statements is confusing, since items exist from the start of ...
+- llmspell-agents/tests/multi_agent_state.rs:20:9: `llmspell-agents` (example "template_usage") generated 2 warnings...
+- llmspell-agents/tests/multi_agent_state.rs:20:9: `llmspell-testing` (bench "integrated_overhead") generated 1 warning (run `cargo...
+- llmspell-agents/tests/multi_agent_state.rs:20:9: `llmspell-agents` (example "composition_patterns") generated 9 warnings...
+- llmspell-agents/tests/multi_agent_state.rs:20:9: `llmspell-agents` (example "monitoring_setup") generated 8 warnings...
+- llmspell-agents/tests/multi_agent_state.rs:20:9: `llmspell-bridge` (test "lua_hook_enhanced") generated 1 warning...
+#### redundant_code (6 warnings)
+- llmspell-agents/src/templates/validation.rs:464:26: redundant closure...
+- llmspell-agents/src/templates/validation.rs:465:54: redundant closure...
+- llmspell-agents/src/templates/validation.rs:478:26: redundant closure...
+- llmspell-agents/src/templates/validation.rs:479:54: redundant closure...
+- llmspell-agents/src/tool_manager.rs:388:13: redundant closure...
+- llmspell-agents/src/testing/mocks.rs:709:13: redundant closure...
+#### unused_async (3 warnings)
+- llmspell-agents/examples/composition_patterns.rs:156:1: unused `async` for function with no await statements...
+- llmspell-agents/examples/composition_patterns.rs:220:1: unused `async` for function with no await statements...
+- llmspell-agents/examples/template_usage.rs:181:1: unused `async` for function with no await statements...
+#### wildcard_patterns (2 warnings)
 - llmspell-agents/src/composition/lifecycle.rs:690:13: wildcard pattern covers any other pattern as it will match anyway...
-- llmspell-agents/src/lifecycle/state_machine.rs:280:13: wildcard pattern covers any other pattern as it will match anyway...
 - llmspell-agents/src/state/sharing.rs:561:13: wildcard pattern covers any other pattern as it will match anyway...
 
-### llmspell-bridge (152 warnings)
+### llmspell-bridge (143 warnings)
 
-#### cast_issues (4 warnings)
+#### cast_issues (8 warnings)
 - llmspell-bridge/src/globals/session_infrastructure.rs:42:13: casting `u64` to `i64` may wrap around the value...
 - llmspell-bridge/src/globals/state_global.rs:663:37: casting `u64` to `i64` may wrap around the value...
 - llmspell-bridge/src/multi_agent.rs:227:66: casting `usize` to `i64` may wrap around the value on targets with 64-bit wide p...
 - llmspell-bridge/src/standardized_workflows.rs:65:45: casting `u64` to `u32` may truncate the value...
+- llmspell-bridge/tests/performance_test.rs:88:23: casting `u128` to `f64` causes a loss of precision (`u128` is 128 bits wide, but...
+- llmspell-bridge/tests/performance_test.rs:88:45: casting `u128` to `f64` causes a loss of precision (`u128` is 128 bits wide, but...
+- llmspell-bridge/tests/performance_test.rs:188:49: casting `i32` to `u128` may lose the sign of the value...
+- llmspell-bridge/tests/performance_test.rs:299:26: casting `usize` to `f64` causes a loss of precision on targets with 64-bit wide ...
+#### default_trait (1 warnings)
+- llmspell-bridge/tests/lua_hook_enhanced.rs:14:51: calling `ProviderManagerConfig::default()` is more clear than this expression...
+#### format_string (1 warnings)
+- llmspell-bridge/tests/performance_test.rs:295:9: `format!(..)` appended to existing `String`...
 #### option_result_patterns (15 warnings)
 - llmspell-bridge/src/globals/state_infrastructure.rs:124:29: use Option::map_or_else instead of an if let/else...
 - llmspell-bridge/src/agent_bridge.rs:855:32: called `map(<f>).unwrap_or(<a>)` on an `Option` value...
@@ -2238,8 +1741,8 @@ Description: Miscellaneous - Various other warnings
 - llmspell-bridge/src/lua/globals/hook.rs:440:13: use Option::map_or_else instead of an if let/else...
 - llmspell-bridge/src/lua/globals/session.rs:164:29: use Option::map_or_else instead of an if let/else...
 - llmspell-bridge/src/lua/sync_utils.rs:194:21: use Option::map_or_else instead of an if let/else...
-#### other (102 warnings)
-- llmspell-bridge/src/engine/factory.rs:391:25: `llmspell-agents` (lib) generated 150 warnings (run `cargo clippy --fix --lib -p...
+#### other (86 warnings)
+- llmspell-bridge/src/engine/factory.rs:391:25: `llmspell-agents` (lib) generated 117 warnings (run `cargo clippy --fix --lib -p...
 - llmspell-bridge/src/engine/factory.rs:391:25: very complex type used. Consider factoring parts into `type` definitions...
 - llmspell-bridge/src/runtime.rs:394:5: this could be a `const fn`...
 - llmspell-bridge/src/runtime.rs:491:5: this could be a `const fn`...
@@ -2315,32 +1818,16 @@ Description: Miscellaneous - Various other warnings
 - llmspell-bridge/src/multi_agent.rs:345:13: useless use of `vec!`...
 - llmspell-bridge/src/multi_agent.rs:395:13: useless use of `vec!`...
 - llmspell-bridge/benches/session_bench.rs:9:5: unused import: `std::sync::Arc`...
-- llmspell-bridge/benches/session_bench.rs:94:16: `llmspell-agents` (test "registry_basic") generated 2 warnings...
-- llmspell-bridge/benches/session_bench.rs:138:20: `llmspell-tools` (test "webpage_monitor_integration") generated 3 warnings...
-- llmspell-bridge/benches/session_bench.rs:145:20: `llmspell-tools` (test "http_request_integration") generated 19 warnings (run `c...
-- llmspell-bridge/benches/session_bench.rs:178:28: `llmspell-tools` (test "web_tools_error_scenarios") generated 8 warnings (2 dupl...
-- llmspell-bridge/tests/session_global_test.rs:1:36: item in documentation is missing backticks...
-- llmspell-bridge/benches/workflow_bridge_bench.rs:19:9: `llmspell-tools` (bench "tool_operations") generated 7 warnings...
-- llmspell-bridge/benches/workflow_bridge_bench.rs:19:9: consider adding a `;` to the last statement for consistent formatting...
-- llmspell-bridge/benches/workflow_bridge_bench.rs:20:13: consider adding a `;` to the last statement for consistent formatting...
-- llmspell-bridge/benches/workflow_bridge_bench.rs:37:9: consider adding a `;` to the last statement for consistent formatting...
-- llmspell-bridge/benches/workflow_bridge_bench.rs:38:13: consider adding a `;` to the last statement for consistent formatting...
-- llmspell-bridge/benches/workflow_bridge_bench.rs:62:9: consider adding a `;` to the last statement for consistent formatting...
-- llmspell-bridge/benches/workflow_bridge_bench.rs:63:13: consider adding a `;` to the last statement for consistent formatting...
-- llmspell-bridge/benches/workflow_bridge_bench.rs:71:9: consider adding a `;` to the last statement for consistent formatting...
-- llmspell-bridge/benches/workflow_bridge_bench.rs:72:13: consider adding a `;` to the last statement for consistent formatting...
-- llmspell-bridge/benches/workflow_bridge_bench.rs:93:9: consider adding a `;` to the last statement for consistent formatting...
-- llmspell-bridge/benches/workflow_bridge_bench.rs:117:9: consider adding a `;` to the last statement for consistent formatting...
-- llmspell-bridge/benches/workflow_bridge_bench.rs:118:13: consider adding a `;` to the last statement for consistent formatting...
-- llmspell-bridge/benches/workflow_bridge_bench.rs:137:9: consider adding a `;` to the last statement for consistent formatting...
-- llmspell-bridge/benches/workflow_bridge_bench.rs:138:13: consider adding a `;` to the last statement for consistent formatting...
-- llmspell-bridge/benches/workflow_bridge_bench.rs:164:1: this function has too many lines (140/100)...
-- llmspell-bridge/benches/workflow_bridge_bench.rs:184:9: consider adding a `;` to the last statement for consistent formatting...
-- llmspell-bridge/benches/workflow_bridge_bench.rs:208:9: consider adding a `;` to the last statement for consistent formatting...
-- llmspell-bridge/benches/workflow_bridge_bench.rs:238:9: consider adding a `;` to the last statement for consistent formatting...
-- llmspell-bridge/benches/workflow_bridge_bench.rs:266:9: consider adding a `;` to the last statement for consistent formatting...
-- llmspell-bridge/benches/workflow_bridge_bench.rs:296:9: consider adding a `;` to the last statement for consistent formatting...
-- llmspell-bridge/benches/workflow_bridge_bench.rs:310:9: consider adding a `;` to the last statement for consistent formatting...
+- llmspell-bridge/tests/performance_test.rs:88:23: `llmspell-tools` (test "web_scraper_integration") generated 7 warnings (run `car...
+- llmspell-bridge/benches/session_bench.rs:47:16: `llmspell-sessions` (test "policy_performance_test") generated 1 warning...
+- llmspell-bridge/benches/session_bench.rs:47:16: `llmspell-tools` (test "hook_integration_tests") generated 9 warnings (run `carg...
+- llmspell-bridge/benches/session_bench.rs:68:20: `llmspell-bridge` (test "sync_behavior_test") generated 2 warnings...
+- llmspell-bridge/benches/session_bench.rs:68:20: `llmspell-tools` (test "security_sandbox_escape_tests") generated 7 warnings...
+- llmspell-bridge/benches/session_bench.rs:75:20: `llmspell-agents` (test "registry_basic") generated 2 warnings...
+- llmspell-bridge/benches/session_bench.rs:94:16: `llmspell-bridge` (test "performance_test") generated 5 warnings...
+- llmspell-bridge/benches/session_bench.rs:94:16: `llmspell-tools` (test "web_tools_integration") generated 1 warning...
+- llmspell-bridge/benches/session_bench.rs:131:20: `llmspell-tools` (test "json_processor_integration") generated 7 warnings (run `...
+- llmspell-bridge/benches/session_bench.rs:287:20: build failed, waiting for other jobs to finish......
 #### pass_by_value (11 warnings)
 - llmspell-bridge/src/tools.rs:48:15: this argument is passed by value, but not consumed in the function body...
 - llmspell-bridge/src/agent_bridge.rs:1127:16: this argument is passed by value, but not consumed in the function body...
@@ -2353,13 +1840,12 @@ Description: Miscellaneous - Various other warnings
 - llmspell-bridge/src/lua/globals/session.rs:101:21: this argument is passed by value, but not consumed in the function body...
 - llmspell-bridge/src/lua/globals/workflow.rs:20:49: this argument is passed by value, but not consumed in the function body...
 - llmspell-bridge/src/lua/globals/workflow.rs:755:22: this argument is passed by value, but not consumed in the function body...
-#### redundant_code (6 warnings)
+#### redundant_code (5 warnings)
 - llmspell-bridge/src/lua/globals/agent.rs:1059:45: redundant clone...
 - llmspell-bridge/src/lua/globals/agent.rs:1541:36: redundant clone...
 - llmspell-bridge/src/lua/globals/session.rs:420:44: redundant clone...
 - llmspell-bridge/src/lua/globals/workflow.rs:696:37: redundant clone...
 - llmspell-bridge/src/lua/globals/workflow.rs:1409:45: redundant clone...
-- llmspell-bridge/benches/workflow_bridge_bench.rs:176:55: redundant clone...
 #### unnecessary_code (1 warnings)
 - llmspell-bridge/src/standardized_workflows.rs:38:20: unnecessary closure used to substitute value for `Option::None`...
 #### unnecessary_deref (3 warnings)
@@ -2375,35 +1861,17 @@ Description: Miscellaneous - Various other warnings
 - llmspell-bridge/src/globals/state_infrastructure.rs:224:1: this function's return value is unnecessarily wrapped by `Result`...
 - llmspell-bridge/src/globals/state_infrastructure.rs:238:1: this function's return value is unnecessarily wrapped by `Result`...
 - llmspell-bridge/src/hook_bridge.rs:417:5: this function's return value is unnecessarily wrapped by `Result`...
-#### unused_async (1 warnings)
+#### unused_async (3 warnings)
 - llmspell-bridge/src/workflows.rs:229:5: unused `async` for function with no await statements...
+- llmspell-bridge/tests/sync_behavior_test.rs:12:1: unused `async` for function with no await statements...
+- llmspell-bridge/tests/sync_behavior_test.rs:31:1: unused `async` for function with no await statements...
 #### wildcard_patterns (1 warnings)
 - llmspell-bridge/src/lua/globals/workflow.rs:107:9: wildcard pattern covers any other pattern as it will match anyway...
 
-### llmspell-hooks (19 warnings)
+### llmspell-sessions (1 warnings)
 
-#### default_trait (5 warnings)
-- llmspell-hooks/src/collectors/agent_output.rs:233:9: field assignment outside of initializer for an instance created with Default::de...
-- llmspell-hooks/src/collectors/agent_output.rs:271:9: field assignment outside of initializer for an instance created with Default::de...
-- llmspell-hooks/src/collectors/agent_output.rs:293:9: field assignment outside of initializer for an instance created with Default::de...
-- llmspell-hooks/src/collectors/tool_result.rs:215:9: field assignment outside of initializer for an instance created with Default::de...
-- llmspell-hooks/src/persistence/tests.rs:333:9: field assignment outside of initializer for an instance created with Default::de...
-#### other (9 warnings)
-- llmspell-hooks/src/artifact_hooks.rs:127:13: `llmspell-bridge` (bench "session_bench") generated 1 warning...
-- llmspell-hooks/src/artifact_hooks.rs:127:13: build failed, waiting for other jobs to finish......
-- llmspell-hooks/src/artifact_hooks.rs:127:13: using `clone` on type `ComponentId` which implements the `Copy` trait...
-- llmspell-hooks/src/builtin/caching.rs:457:1: items after a test module...
-- llmspell-hooks/src/builtin/cost_tracking.rs:675:1: items after a test module...
-- llmspell-hooks/src/builtin/debugging.rs:479:1: items after a test module...
-- llmspell-hooks/src/builtin/retry.rs:528:1: items after a test module...
-- llmspell-hooks/src/builtin/security.rs:671:1: items after a test module...
-- llmspell-hooks/src/persistence/tests.rs:5:1: module has the same name as its containing module...
-#### unnecessary_code (5 warnings)
-- llmspell-hooks/src/builtin/logging.rs:431:35: unnecessary use of `get("_logging_config").is_none()`...
-- llmspell-hooks/src/builtin/metrics.rs:729:35: unnecessary use of `get("_metrics_config").is_none()`...
-- llmspell-hooks/src/builtin/metrics.rs:730:35: unnecessary use of `get("_metrics_snapshot").is_none()`...
-- llmspell-hooks/src/builtin/rate_limit.rs:796:35: unnecessary use of `get("_rate_limit_config").is_none()`...
-- llmspell-hooks/src/builtin/rate_limit.rs:797:35: unnecessary use of `get("_rate_limit_metrics").is_none()`...
+#### default_trait (1 warnings)
+- llmspell-sessions/tests/policy_performance_test.rs:152:9: field assignment outside of initializer for an instance created with Default::de...
 
 ### llmspell-testing (3 warnings)
 
@@ -2413,90 +1881,28 @@ Description: Miscellaneous - Various other warnings
 - llmspell-testing/src/macros.rs:169:9: `llmspell-bridge` (lib) generated 123 warnings (run `cargo clippy --fix --lib -p...
 - llmspell-testing/benches/integrated_overhead.rs:397:37: useless conversion to the same type: `llmspell_workflows::WorkflowStep`...
 
-### llmspell-tools (114 warnings)
+### llmspell-tools (60 warnings)
 
-#### cast_issues (7 warnings)
-- llmspell-tools/tests/simple_performance_check.rs:57:23: casting `u128` to `f64` causes a loss of precision (`u128` is 128 bits wide, but...
-- llmspell-tools/tests/simple_performance_check.rs:57:64: casting `u128` to `f64` causes a loss of precision (`u128` is 128 bits wide, but...
-- llmspell-tools/tests/simple_performance_check.rs:59:24: casting `u128` to `f64` causes a loss of precision (`u128` is 128 bits wide, but...
-- llmspell-tools/tests/web_tools_error_scenarios.rs:293:39: casting `i32` to `u64` may lose the sign of the value...
+#### cast_issues (3 warnings)
 - llmspell-tools/tests/hook_integration_tests.rs:262:23: casting `u128` to `f64` causes a loss of precision (`u128` is 128 bits wide, but...
 - llmspell-tools/tests/hook_integration_tests.rs:262:64: casting `u128` to `f64` causes a loss of precision (`u128` is 128 bits wide, but...
 - llmspell-tools/tests/hook_integration_tests.rs:264:24: casting `u128` to `f64` causes a loss of precision (`u128` is 128 bits wide, but...
 #### cognitive_complexity (1 warnings)
 - llmspell-tools/src/util/data_validation.rs:298:8: the function has a cognitive complexity of (31/25)...
-#### default_trait (67 warnings)
-- llmspell-tools/tests/http_request_integration.rs:12:37: calling `HttpRequestConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/http_request_integration.rs:23:37: calling `HttpRequestConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/http_request_integration.rs:66:37: calling `HttpRequestConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/http_request_integration.rs:92:37: calling `HttpRequestConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/http_request_integration.rs:118:37: calling `HttpRequestConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/http_request_integration.rs:143:37: calling `HttpRequestConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/http_request_integration.rs:177:37: calling `HttpRequestConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/http_request_integration.rs:197:37: calling `HttpRequestConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/http_request_integration.rs:235:37: calling `HttpRequestConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/http_request_integration.rs:257:37: calling `HttpRequestConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/http_request_integration.rs:280:37: calling `HttpRequestConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/http_request_integration.rs:307:37: calling `HttpRequestConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/http_request_integration.rs:331:37: calling `HttpRequestConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/http_request_integration.rs:357:37: calling `HttpRequestConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/http_request_integration.rs:372:37: calling `HttpRequestConfig::default()` is more clear than this expression...
-- llmspell-tools/benches/tool_operations.rs:106:40: calling `HashCalculatorConfig::default()` is more clear than this expression...
-- llmspell-tools/benches/tool_operations.rs:170:41: calling `TextManipulatorConfig::default()` is more clear than this expression...
-- llmspell-tools/benches/tool_operations.rs:214:39: calling `JsonProcessorConfig::default()` is more clear than this expression...
-- llmspell-tools/benches/tool_operations.rs:277:39: calling `UuidGeneratorConfig::default()` is more clear than this expression...
-- llmspell-tools/benches/tool_operations.rs:321:48: calling `JsonProcessorConfig::default()` is more clear than this expression...
-- llmspell-tools/benches/tool_operations.rs:322:49: calling `HashCalculatorConfig::default()` is more clear than this expression...
-- llmspell-tools/benches/tool_operations.rs:323:50: calling `TextManipulatorConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:38:37: calling `FileWatcherConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:45:39: calling `FileConverterConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:51:36: calling `FileSearchConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:59:43: calling `EnvironmentReaderConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:65:41: calling `ProcessExecutorConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:71:40: calling `ServiceCheckerConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:77:39: calling `SystemMonitorConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:85:40: calling `AudioProcessorConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:91:40: calling `VideoProcessorConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:97:40: calling `ImageProcessorConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:104:35: calling `WebSearchConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:112:40: calling `HashCalculatorConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:118:41: calling `TextManipulatorConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:124:39: calling `UuidGeneratorConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:137:39: calling `FileWatcherConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:138:41: calling `FileConverterConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:139:38: calling `FileSearchConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:140:45: calling `EnvironmentReaderConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:141:43: calling `ProcessExecutorConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:142:42: calling `ServiceCheckerConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:143:41: calling `SystemMonitorConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:144:42: calling `AudioProcessorConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:145:42: calling `VideoProcessorConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:146:42: calling `ImageProcessorConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:147:37: calling `WebSearchConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:148:42: calling `HashCalculatorConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:149:43: calling `TextManipulatorConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:150:41: calling `UuidGeneratorConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:174:40: calling `HashCalculatorConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:195:39: calling `UuidGeneratorConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:215:35: calling `WebSearchConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:253:38: calling `FileWatcherConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:254:40: calling `FileConverterConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:255:37: calling `FileSearchConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:256:44: calling `EnvironmentReaderConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:257:42: calling `ProcessExecutorConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:258:41: calling `ServiceCheckerConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:259:40: calling `SystemMonitorConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:260:41: calling `AudioProcessorConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:261:41: calling `VideoProcessorConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:262:41: calling `ImageProcessorConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:263:36: calling `WebSearchConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:264:41: calling `HashCalculatorConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:265:42: calling `TextManipulatorConfig::default()` is more clear than this expression...
-- llmspell-tools/tests/remaining_tools_basic.rs:266:40: calling `UuidGeneratorConfig::default()` is more clear than this expression...
-#### format_string (7 warnings)
-- llmspell-tools/tests/http_request_integration.rs:59:13: variables can be used directly in the `format!` string...
-- llmspell-tools/tests/http_request_integration.rs:166:13: variables can be used directly in the `format!` string...
-- llmspell-tools/tests/http_request_integration.rs:224:13: variables can be used directly in the `format!` string...
+#### default_trait (12 warnings)
+- llmspell-tools/tests/security_sandbox_escape_tests.rs:13:45: calling `FileOperationsConfig::default()` is more clear than this expression...
+- llmspell-tools/tests/security_sandbox_escape_tests.rs:57:45: calling `FileOperationsConfig::default()` is more clear than this expression...
+- llmspell-tools/tests/security_sandbox_escape_tests.rs:83:49: calling `ProcessExecutorConfig::default()` is more clear than this expression...
+- llmspell-tools/tests/security_sandbox_escape_tests.rs:136:43: calling `FileSearchConfig::default()` is more clear than this expression...
+- llmspell-tools/tests/security_sandbox_escape_tests.rs:173:47: calling `SystemMonitorConfig::default()` is more clear than this expression...
+- llmspell-tools/tests/security_sandbox_escape_tests.rs:206:45: calling `FileOperationsConfig::default()` is more clear than this expression...
+- llmspell-tools/tests/security_sandbox_escape_tests.rs:246:49: calling `ProcessExecutorConfig::default()` is more clear than this expression...
+- llmspell-tools/tests/security_injection_attack_tests.rs:69:44: calling `JsonProcessorConfig::default()` is more clear than this expression...
+- llmspell-tools/tests/security_injection_attack_tests.rs:118:31: calling `GraphQLConfig::default()` is more clear than this expression...
+- llmspell-tools/tests/security_injection_attack_tests.rs:196:49: calling `ProcessExecutorConfig::default()` is more clear than this expression...
+- llmspell-tools/tests/security_injection_attack_tests.rs:285:42: calling `HttpRequestConfig::default()` is more clear than this expression...
+- llmspell-tools/tests/security_injection_attack_tests.rs:334:47: calling `EnvironmentReaderConfig::default()` is more clear than this expression...
+#### format_string (4 warnings)
 - llmspell-tools/tests/hook_integration_tests.rs:269:5: variables can be used directly in the `format!` string...
 - llmspell-tools/tests/hook_integration_tests.rs:275:5: variables can be used directly in the `format!` string...
 - llmspell-tools/tests/hook_integration_tests.rs:299:38: variables can be used directly in the `format!` string...
@@ -2505,7 +1911,7 @@ Description: Miscellaneous - Various other warnings
 - llmspell-tools/src/lifecycle/hook_integration.rs:378:25: assigning the result of `Clone::clone()` may be inefficient...
 - llmspell-tools/src/lifecycle/hook_integration.rs:395:25: assigning the result of `Clone::clone()` may be inefficient...
 - llmspell-tools/src/lifecycle/hook_integration.rs:434:9: assigning the result of `Clone::clone()` may be inefficient...
-#### option_result_patterns (13 warnings)
+#### option_result_patterns (12 warnings)
 - llmspell-tools/src/media/audio_processor.rs:555:37: called `map(<f>).unwrap_or_else(<g>)` on an `Option` value...
 - llmspell-tools/src/media/image_processor.rs:549:37: called `map(<f>).unwrap_or_else(<g>)` on an `Option` value...
 - llmspell-tools/src/search/web_search.rs:473:27: use Option::map_or instead of an if let/else...
@@ -2514,21 +1920,29 @@ Description: Miscellaneous - Various other warnings
 - llmspell-tools/src/web/webhook_caller.rs:228:56: function call inside of `unwrap_or`...
 - llmspell-tools/tests/common/mod.rs:64:21: use Option::map_or_else instead of an if let/else...
 - llmspell-tools/tests/common/mod.rs:69:9: use Option::map_or_else instead of an if let/else...
-- llmspell-tools/tests/web_tools_error_scenarios.rs:37:33: use Option::map_or_else instead of an if let/else...
-- llmspell-tools/tests/web_tools_error_scenarios.rs:40:21: use Option::map_or_else instead of an if let/else...
-- llmspell-tools/tests/web_tools_error_scenarios.rs:49:21: use Option::map_or_else instead of an if let/else...
-- llmspell-tools/tests/web_tools_error_scenarios.rs:129:41: use Option::map_or_else instead of an if let/else...
-- llmspell-tools/tests/web_tools_error_scenarios.rs:132:29: use Option::map_or_else instead of an if let/else...
-#### other (9 warnings)
+- llmspell-tools/tests/security_injection_attack_tests.rs:179:52: function call inside of `unwrap_or`...
+- llmspell-tools/tests/security_injection_attack_tests.rs:225:52: function call inside of `unwrap_or`...
+- llmspell-tools/tests/security_injection_attack_tests.rs:318:52: function call inside of `unwrap_or`...
+- llmspell-tools/tests/security_injection_attack_tests.rs:360:52: function call inside of `unwrap_or`...
+#### other (18 warnings)
 - llmspell-tools/src/util/data_validation.rs:569:32: this looks like a formatting argument but it is not part of a formatting macro...
-- llmspell-tools/tests/simple_performance_check.rs:57:23: `llmspell-testing` (lib test) generated 1 warning...
-- llmspell-tools/tests/webpage_monitor_integration.rs:149:25: binding's name is too similar to existing binding...
-- llmspell-tools/tests/http_request_integration.rs:1:27: `llmspell-agents` (example "data_pipeline_agent") generated 1 warning...
-- llmspell-tools/tests/http_request_integration.rs:1:27: item in documentation is missing backticks...
-- llmspell-tools/tests/web_tools_error_scenarios.rs:293:39: `llmspell-agents` (test "integration_tests") generated 7 warnings (run `cargo cl...
+- llmspell-tools/tests/web_scraper_integration.rs:28:9: `llmspell-testing` (lib test) generated 1 warning...
+- llmspell-tools/tests/web_scraper_integration.rs:28:9: binding's name is too similar to existing binding...
+- llmspell-tools/tests/web_scraper_integration.rs:52:9: binding's name is too similar to existing binding...
+- llmspell-tools/tests/web_scraper_integration.rs:74:9: binding's name is too similar to existing binding...
+- llmspell-tools/tests/web_scraper_integration.rs:96:9: binding's name is too similar to existing binding...
+- llmspell-tools/tests/json_processor_integration.rs:19:74: long literal lacking separators...
+- llmspell-tools/tests/json_processor_integration.rs:21:76: long literal lacking separators...
+- llmspell-tools/tests/json_processor_integration.rs:24:43: long literal lacking separators...
+- llmspell-tools/tests/json_processor_integration.rs:25:37: long literal lacking separators...
+- llmspell-tools/tests/json_processor_integration.rs:355:31: long literal lacking separators...
+- llmspell-tools/tests/json_processor_integration.rs:359:31: long literal lacking separators...
+- llmspell-tools/tests/web_scraper_integration.rs:1:36: item in documentation is missing backticks...
 - llmspell-tools/tests/hook_integration_tests.rs:52:34: single-character string constant used as pattern...
-- llmspell-tools/tests/hook_integration_tests.rs:299:38: `llmspell-agents` (example "code_gen_agent") generated 1 warning...
 - llmspell-tools/tests/hook_integration_tests.rs:413:34: single-character string constant used as pattern...
+- llmspell-tools/tests/json_processor_integration.rs:1:27: item in documentation is missing backticks...
+- llmspell-tools/tests/web_tools_integration.rs:276:9: binding to `_` prefixed variable with no side-effect...
+- llmspell-tools/tests/security_injection_attack_tests.rs:69:44: `llmspell-agents` (example "decision_agent") generated 1 warning...
 #### pass_by_value (1 warnings)
 - llmspell-tools/src/util/uuid_generator.rs:140:47: this argument (1 byte) is passed by reference, but would be more efficient if pa...
 #### unnecessary_code (1 warnings)
@@ -2540,13 +1954,4 @@ Description: Miscellaneous - Various other warnings
 - llmspell-tools/src/fs/file_watcher.rs:183:13: wildcard pattern covers any other pattern as it will match anyway...
 - llmspell-tools/src/lifecycle/state_machine.rs:261:13: wildcard pattern covers any other pattern as it will match anyway...
 - llmspell-tools/src/web/webhook_caller.rs:171:17: wildcard pattern covers any other pattern as it will match anyway...
-
-### llmspell-workflows (5 warnings)
-
-#### other (5 warnings)
-- llmspell-workflows/benches/workflow_hook_overhead.rs:322:35: `llmspell-agents` (example "monitoring_setup") generated 12 warnings...
-- llmspell-workflows/benches/workflow_hook_overhead.rs:322:35: `llmspell-tools` (test "hook_integration_tests") generated 9 warnings (run `carg...
-- llmspell-workflows/benches/workflow_hook_overhead.rs:340:35: `llmspell-bridge` (bench "workflow_bridge_bench") generated 21 warnings (run `ca...
-- llmspell-workflows/benches/workflow_hook_overhead.rs:340:35: `llmspell-bridge` (test "session_global_test") generated 1 warning (run `cargo c...
-- llmspell-workflows/benches/workflow_hook_overhead.rs:340:35: `llmspell-tools` (test "remaining_tools_basic") generated 45 warnings...
 

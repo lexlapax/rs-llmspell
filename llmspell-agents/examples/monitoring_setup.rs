@@ -51,7 +51,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 5. Event Logging
     println!("\n5️⃣ Setting up Event Logging");
     println!("===========================");
-    setup_logging(&agent).await?;
+    setup_logging(&agent)?;
 
     // 6. Alerting
     println!("\n6️⃣ Setting up Alerting Framework");
@@ -160,17 +160,20 @@ async fn setup_performance_tracking(
         // Simulate varying load
         metrics.requests_total.inc_by(20 + i * 5);
         metrics.requests_failed.inc_by(i);
-        metrics.update_resources(
-            (i as f64).mul_add(10.0, 100.0) * 1024.0 * 1024.0, // Memory
-            (i as f64).mul_add(5.0, 20.0),                     // CPU
-        );
+        #[allow(clippy::cast_precision_loss)]
+        let memory = (i as f64).mul_add(10.0, 100.0) * 1024.0 * 1024.0;
+        #[allow(clippy::cast_precision_loss)]
+        let cpu = (i as f64).mul_add(5.0, 20.0);
+        metrics.update_resources(memory, cpu);
 
         let snapshot = monitor.take_snapshot();
+        #[allow(clippy::cast_precision_loss)]
+        let memory_mb = snapshot.resources.memory_bytes as f64 / (1024.0 * 1024.0);
         println!(
             "📸 Snapshot {}: CPU={:.1}%, Memory={:.1}MB, Rate={:.1} req/s",
             i + 1,
             snapshot.resources.cpu_percent,
-            snapshot.resources.memory_bytes as f64 / (1024.0 * 1024.0),
+            memory_mb,
             snapshot.request_rate
         );
 
@@ -236,7 +239,7 @@ async fn setup_tracing(agent: &Arc<BasicAgent>) -> Result<(), Box<dyn std::error
     Ok(())
 }
 
-async fn setup_logging(agent: &Arc<BasicAgent>) -> Result<(), Box<dyn std::error::Error>> {
+fn setup_logging(agent: &Arc<BasicAgent>) -> Result<(), Box<dyn std::error::Error>> {
     let mut logger = EventLogger::new(agent.metadata().id.to_string(), 1000);
     logger.set_level(LogLevel::Debug);
     logger.add_exporter(Box::new(ConsoleLogExporter));

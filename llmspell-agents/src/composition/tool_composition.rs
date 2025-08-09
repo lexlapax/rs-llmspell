@@ -350,80 +350,81 @@ impl ToolComposition {
             let step_start_time = Instant::now();
             let mut retry_attempts = 0;
 
-            let step_result = loop {
-                steps_executed += 1;
+            let step_result =
+                loop {
+                    steps_executed += 1;
 
-                // Prepare step input
-                let step_input = self.prepare_step_input(step, &execution_context)?;
+                    // Prepare step input
+                    let step_input = self.prepare_step_input(step, &execution_context)?;
 
-                // Execute the step
-                match self
-                    .execute_step(tool_provider, step, step_input, context.clone())
-                    .await
-                {
-                    Ok(output) => {
-                        let step_metrics = StepMetrics {
-                            execution_time: step_start_time.elapsed(),
-                            retry_attempts,
-                            memory_used: None,
-                        };
-
-                        let result = StepResult {
-                            success: true,
-                            output: output.clone(),
-                            error: None,
-                            metrics: step_metrics,
-                        };
-
-                        // Update execution context with step output
-                        execution_context.set_step_output(&step.id, output);
-
-                        break result;
-                    }
-                    Err(e) => {
-                        steps_failed += 1;
-                        let error_msg = e.to_string();
-
-                        // Check if we should retry
-                        if step.retry_config.as_ref().map_or(false, |retry_config| {
-                            retry_attempts < retry_config.max_attempts
-                        }) {
-                            retry_attempts += 1;
-                            total_retries += 1;
-
-                            let delay = Self::calculate_retry_delay(
-                                step.retry_config.as_ref().unwrap(),
+                    // Execute the step
+                    match self
+                        .execute_step(tool_provider, step, step_input, context.clone())
+                        .await
+                    {
+                        Ok(output) => {
+                            let step_metrics = StepMetrics {
+                                execution_time: step_start_time.elapsed(),
                                 retry_attempts,
-                            );
-                            tokio::time::sleep(delay).await;
-                            continue;
+                                memory_used: None,
+                            };
+
+                            let result = StepResult {
+                                success: true,
+                                output: output.clone(),
+                                error: None,
+                                metrics: step_metrics,
+                            };
+
+                            // Update execution context with step output
+                            execution_context.set_step_output(&step.id, output);
+
+                            break result;
                         }
+                        Err(e) => {
+                            steps_failed += 1;
+                            let error_msg = e.to_string();
 
-                        let step_metrics = StepMetrics {
-                            execution_time: step_start_time.elapsed(),
-                            retry_attempts,
-                            memory_used: None,
-                        };
+                            // Check if we should retry
+                            if step.retry_config.as_ref().is_some_and(|retry_config| {
+                                retry_attempts < retry_config.max_attempts
+                            }) {
+                                retry_attempts += 1;
+                                total_retries += 1;
 
-                        let result = StepResult {
-                            success: false,
-                            output: JsonValue::Null,
-                            error: Some(error_msg.clone()),
-                            metrics: step_metrics,
-                        };
+                                let delay = Self::calculate_retry_delay(
+                                    step.retry_config.as_ref().unwrap(),
+                                    retry_attempts,
+                                );
+                                tokio::time::sleep(delay).await;
+                                continue;
+                            }
 
-                        // Handle step error based on strategy
-                        let fatal = self.handle_step_error(step, &e);
-                        errors.push(CompositionError {
-                            step_id: step.id.clone(),
-                            message: error_msg,
-                            fatal,
-                        });
+                            let step_metrics = StepMetrics {
+                                execution_time: step_start_time.elapsed(),
+                                retry_attempts,
+                                memory_used: None,
+                            };
 
-                        break result;
+                            let result = StepResult {
+                                success: false,
+                                output: JsonValue::Null,
+                                error: Some(error_msg.clone()),
+                                metrics: step_metrics,
+                            };
+
+                            // Handle step error based on strategy
+                            let fatal = self.handle_step_error(step, &e);
+                            errors.push(CompositionError {
+                                step_id: step.id.clone(),
+                                message: error_msg,
+                                fatal,
+                            });
+
+                            break result;
+                        }
                     }
-                }
-            };
+                };
 
             step_results.insert(step.id.clone(), step_result);
         }

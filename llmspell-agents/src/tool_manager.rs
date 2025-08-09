@@ -383,13 +383,10 @@ impl ToolManager {
         }
 
         // Return the final result
-        if let Some(final_output) = results.last() {
-            Ok(final_output.clone())
-        } else {
-            Ok(AgentOutput::text(
-                "Composition completed with no output".to_string(),
-            ))
-        }
+        Ok(results.last().map_or_else(
+            || AgentOutput::text("Composition completed with no output".to_string()),
+            Clone::clone,
+        ))
     }
 
     /// Execute a single composition step
@@ -406,7 +403,7 @@ impl ToolManager {
             &step.context_mode,
             context,
             previous_output,
-        )?;
+        );
 
         // Invoke the tool
         self.invoke_tool(&step.tool_name, parameters, context.clone())
@@ -420,7 +417,7 @@ impl ToolManager {
         context_mode: &ContextMode,
         _context: &ExecutionContext,
         previous_output: Option<&AgentOutput>,
-    ) -> Result<JsonValue> {
+    ) -> JsonValue {
         let mut parameters = base_parameters.clone();
 
         // Handle parameter substitution based on context mode
@@ -441,7 +438,7 @@ impl ToolManager {
             }
         }
 
-        Ok(parameters)
+        parameters
     }
 
     /// Substitute ${previous.output} references with actual output

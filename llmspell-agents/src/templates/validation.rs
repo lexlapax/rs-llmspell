@@ -459,13 +459,11 @@ impl TemplateValidator {
                 }
             }
             ParameterConstraint::MinLength(min_len) => {
-                let length = if let Some(s) = value.as_str() {
-                    s.len()
-                } else if let Some(arr) = value.as_array() {
-                    arr.len()
-                } else {
-                    0
-                };
+                let length = value
+                    .as_str()
+                    .map(str::len)
+                    .or_else(|| value.as_array().map(Vec::len))
+                    .unwrap_or(0);
                 if length < *min_len {
                     result.add_error(ValidationError::ConstraintViolation {
                         field: param_name.to_string(),
@@ -475,13 +473,11 @@ impl TemplateValidator {
                 }
             }
             ParameterConstraint::MaxLength(max_len) => {
-                let length = if let Some(s) = value.as_str() {
-                    s.len()
-                } else if let Some(arr) = value.as_array() {
-                    arr.len()
-                } else {
-                    0
-                };
+                let length = value
+                    .as_str()
+                    .map(str::len)
+                    .or_else(|| value.as_array().map(Vec::len))
+                    .unwrap_or(0);
                 if length > *max_len {
                     result.add_error(ValidationError::ConstraintViolation {
                         field: param_name.to_string(),

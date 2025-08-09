@@ -96,6 +96,10 @@ pub struct PerformanceReport {
 
 impl PerformanceReport {
     /// Generate a report from snapshots
+    ///
+    /// # Panics
+    ///
+    /// Panics if snapshots is empty (though this is guarded against).
     #[must_use]
     pub fn from_snapshots(snapshots: &[PerformanceSnapshot]) -> Self {
         if snapshots.is_empty() {
@@ -342,7 +346,7 @@ impl PerformanceMonitor {
         // Calculate rates from metrics
         let total_requests = self.metrics.requests_total.get();
         let failed_requests = self.metrics.requests_failed.get();
-        #[allow(clippy::cast_possible_truncation)]
+        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
         let active_requests = self.metrics.requests_active.get() as usize;
 
         #[allow(clippy::cast_precision_loss)]

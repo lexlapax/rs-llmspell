@@ -11,6 +11,7 @@ use llmspell_agents::composition::{
 use llmspell_agents::di::DIContainer;
 use llmspell_agents::factory::{AgentConfig, ResourceLimits};
 use llmspell_core::ExecutionContext;
+use std::collections::HashMap;
 use std::sync::Arc;
 
 #[tokio::main]
@@ -24,10 +25,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     delegation_pattern_example().await?;
 
     // Example 3: Capability-Based Composition
-    capability_based_example().await?;
+    capability_based_example()?;
 
     // Example 4: Tool Composition with Agents
-    tool_composition_example().await?;
+    tool_composition_example()?;
 
     // Example 5: Composite Lifecycle Management
     lifecycle_management_example().await?;
@@ -52,7 +53,7 @@ async fn hierarchical_composition_example() -> Result<(), Box<dyn std::error::Er
             name: "data-processing".to_string(),
             category: CapabilityCategory::DataProcessing,
             version: Some("1.0.0".to_string()),
-            metadata: Default::default(),
+            metadata: HashMap::default(),
         })
         .build();
 
@@ -62,7 +63,7 @@ async fn hierarchical_composition_example() -> Result<(), Box<dyn std::error::Er
             name: "analysis".to_string(),
             category: CapabilityCategory::Custom("analysis".to_string()),
             version: Some("1.0.0".to_string()),
-            metadata: Default::default(),
+            metadata: HashMap::default(),
         })
         .build();
 
@@ -153,7 +154,7 @@ async fn delegation_pattern_example() -> Result<(), Box<dyn std::error::Error>> 
 }
 
 /// Example 3: Capability-Based Composition
-async fn capability_based_example() -> Result<(), Box<dyn std::error::Error>> {
+fn capability_based_example() -> Result<(), Box<dyn std::error::Error>> {
     println!("3️⃣ Capability-Based Composition");
     println!("===============================");
 
@@ -217,7 +218,7 @@ async fn capability_based_example() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Example 4: Tool Composition with Agents
-async fn tool_composition_example() -> Result<(), Box<dyn std::error::Error>> {
+fn tool_composition_example() -> Result<(), Box<dyn std::error::Error>> {
     println!("4️⃣ Tool Composition with Agents");
     println!("===============================");
 

@@ -386,7 +386,7 @@ impl DefaultAgentFactory {
     }
 
     /// Initialize agent lifecycle by calling initialize on the concrete type
-    fn initialize_agent_lifecycle(agent_type: &str, agent_name: &str) -> Result<()> {
+    fn initialize_agent_lifecycle(agent_type: &str, agent_name: &str) {
         info!(
             "Agent '{}' of type '{}' created with lifecycle management",
             agent_name, agent_type
@@ -394,7 +394,6 @@ impl DefaultAgentFactory {
         // Note: Individual agents are responsible for calling initialize() when they're ready
         // The factory creates them with state machines but doesn't auto-initialize
         // This allows for more controlled startup sequences
-        Ok(())
     }
 }
 
@@ -436,7 +435,7 @@ impl AgentFactory for DefaultAgentFactory {
         self.run_after_hooks(&agent).await?;
 
         // Initialize agent lifecycle
-        Self::initialize_agent_lifecycle(&agent_type, &agent_name)?;
+        Self::initialize_agent_lifecycle(&agent_type, &agent_name);
 
         Ok(agent)
     }

@@ -194,7 +194,7 @@ impl DIContainerBuilder {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     #[must_use]
     pub fn with_tool(self, id: String, tool: Arc<dyn Tool>) -> Self {
         // Use blocking to register during building

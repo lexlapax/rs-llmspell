@@ -21,7 +21,7 @@ async fn main() -> Result<()> {
     example_monitor_agent().await?;
 
     // Example 4: Using Template Factory
-    example_template_factory().await?;
+    example_template_factory()?;
 
     // Example 5: Template Validation
     example_template_validation().await?;
@@ -178,7 +178,7 @@ async fn example_monitor_agent() -> Result<()> {
 }
 
 /// Example 4: Using Template Factory
-async fn example_template_factory() -> Result<()> {
+fn example_template_factory() -> Result<()> {
     println!("=== Example 4: Template Factory ===\n");
 
     // Create factory and register templates

@@ -622,6 +622,10 @@ impl MockTool {
     }
 
     /// Set response for specific input
+    ///
+    /// # Panics
+    ///
+    /// Panics if the Mutex is poisoned.
     pub fn set_response(&self, input_key: &str, output: ToolOutput) {
         self.responses
             .lock()
@@ -687,22 +691,23 @@ impl BaseAgent for MockTool {
         let input_str = serde_json::to_string(params).unwrap_or_default();
         let responses = self.responses.lock().unwrap();
 
-        let tool_output = if let Some(response) = responses.get(&input_str) {
-            response.clone()
-        } else {
-            // Default response
-            ToolOutput {
-                success: true,
-                data: serde_json::json!({
-                    "mock": true,
-                    "tool": self.metadata.name,
-                    "input": params,
-                    "timestamp": chrono::Utc::now().to_rfc3339(),
-                }),
-                error: None,
-                execution_time_ms: Some(10),
-            }
-        };
+        let tool_output = responses.get(&input_str).map_or_else(
+            || {
+                // Default response
+                ToolOutput {
+                    success: true,
+                    data: serde_json::json!({
+                        "mock": true,
+                        "tool": self.metadata.name,
+                        "input": params,
+                        "timestamp": chrono::Utc::now().to_rfc3339(),
+                    }),
+                    error: None,
+                    execution_time_ms: Some(10),
+                }
+            },
+            Clone::clone,
+        );
 
         // Convert tool output to agent output
         Ok(AgentOutput {

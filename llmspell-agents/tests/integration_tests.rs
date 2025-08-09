@@ -54,7 +54,10 @@ async fn test_agent_builder() {
 /// Test agent lifecycle transitions
 #[tokio::test]
 async fn test_agent_lifecycle() {
-    let state_machine = AgentStateMachine::new("lifecycle_test".to_string(), Default::default());
+    let state_machine = AgentStateMachine::new(
+        "lifecycle_test".to_string(),
+        llmspell_agents::lifecycle::state_machine::StateMachineConfig::default(),
+    );
 
     // Initial state should be Uninitialized
     assert_eq!(
@@ -107,8 +110,8 @@ async fn test_agent_templates() {
         parameters,
         resource_manager: None,
         event_system: None,
-        config_overrides: Default::default(),
-        environment: Default::default(),
+        config_overrides: std::collections::HashMap::default(),
+        environment: std::collections::HashMap::default(),
     };
 
     let result = template.instantiate(params).await.unwrap();
@@ -180,7 +183,7 @@ async fn test_concurrent_agent_execution() {
     for i in 0..10 {
         let agent_clone = agent.clone();
         let handle = tokio::spawn(async move {
-            let input = AgentInput::text(format!("Request {}", i));
+            let input = AgentInput::text(format!("Request {i}"));
             agent_clone
                 .execute(input, ExecutionContext::default())
                 .await

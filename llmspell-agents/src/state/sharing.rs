@@ -214,7 +214,7 @@ impl StateSharingManager {
         }
 
         // Validate pattern permissions
-        Self::validate_pattern_permissions(&channel.pattern, sender_agent_id, channel)?;
+        Self::validate_pattern_permissions(channel.pattern, sender_agent_id, channel)?;
 
         let message = StateMessage {
             message_id: Uuid::new_v4(),
@@ -332,6 +332,10 @@ impl StateSharingManager {
                     .iter()
                     .filter(|m| {
                         // Filter by time if specified
+                        // This map_or is correct: if no since time is specified (None),
+                        // include all messages (true). Otherwise, only include messages
+                        // with timestamps after the specified time.
+                        #[allow(clippy::unnecessary_map_or)]
                         since.map_or(true, |since_time| m.timestamp > since_time)
                     })
                     .filter(|m| {
@@ -547,7 +551,7 @@ impl StateSharingManager {
     // Private helper methods
 
     fn validate_pattern_permissions(
-        pattern: &SharingPattern,
+        pattern: SharingPattern,
         agent_id: &str,
         channel: &SharedStateChannel,
     ) -> Result<()> {
@@ -558,10 +562,9 @@ impl StateSharingManager {
                     return Err(anyhow::anyhow!("Only channel creator can broadcast"));
                 }
             }
-            SharingPattern::Pipeline | _ => {
-                // Pipeline: Agents can only publish when it's their turn (enforced by process_pipeline_stage)
-                // Other patterns: Allow any participant to publish
-            }
+            // Pipeline: Agents can only publish when it's their turn (enforced by process_pipeline_stage)
+            // RequestResponse, Collaborative, Hierarchical: Allow any participant to publish
+            _ => {}
         }
         Ok(())
     }

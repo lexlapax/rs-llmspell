@@ -47,6 +47,10 @@ pub mod prelude {
 }
 
 /// Create and register all built-in templates
+///
+/// # Panics
+///
+/// Panics if template registration fails (e.g., duplicate template IDs).
 #[must_use]
 pub fn create_builtin_templates() -> TemplateFactory {
     let mut factory = TemplateFactory::new();

@@ -687,7 +687,8 @@ impl HierarchicalLifecycleManager {
             "paused" => LifecycleState::Paused,
             "shutting_down" => LifecycleState::ShuttingDown,
             "terminated" => LifecycleState::Terminated,
-            "ready" | _ => LifecycleState::Ready,
+            // "ready" and any other unrecognized state defaults to Ready
+            _ => LifecycleState::Ready,
         }
     }
 }

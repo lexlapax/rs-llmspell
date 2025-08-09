@@ -122,7 +122,7 @@ impl MemoryRegion {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     pub fn grant_permission(&self, component: ComponentId, permission: MemoryPermission) {
         let mut acl = self.acl.write().unwrap();
         acl.insert(component, permission);
@@ -132,7 +132,7 @@ impl MemoryRegion {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     pub fn revoke_permission(&self, component: &ComponentId) {
         let mut acl = self.acl.write().unwrap();
         acl.remove(component);
@@ -142,7 +142,7 @@ impl MemoryRegion {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     #[must_use]
     pub fn has_permission(&self, component: &ComponentId, required: MemoryPermission) -> bool {
         let acl = self.acl.read().unwrap();
@@ -162,7 +162,7 @@ impl MemoryRegion {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     pub fn get(&self, key: &str, accessor: &ComponentId) -> Result<Option<Value>> {
         if !self.has_permission(accessor, MemoryPermission::Read) {
             return Err(LLMSpellError::Security {
@@ -187,7 +187,7 @@ impl MemoryRegion {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     pub fn set(&self, key: String, value: Value, accessor: &ComponentId) -> Result<()> {
         if !self.has_permission(accessor, MemoryPermission::Write) {
             return Err(LLMSpellError::Security {
@@ -230,7 +230,7 @@ impl MemoryRegion {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     pub fn remove(&self, key: &str, accessor: &ComponentId) -> Result<Option<Value>> {
         if !self.has_permission(accessor, MemoryPermission::Write) {
             return Err(LLMSpellError::Security {
@@ -275,7 +275,7 @@ impl MemoryRegion {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     pub fn keys(&self, accessor: &ComponentId) -> Result<Vec<String>> {
         if !self.has_permission(accessor, MemoryPermission::Read) {
             return Err(LLMSpellError::Security {
@@ -299,7 +299,7 @@ impl MemoryRegion {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     pub fn clear(&self, accessor: &ComponentId) -> Result<()> {
         if !self.has_permission(accessor, MemoryPermission::Write) {
             return Err(LLMSpellError::Security {
@@ -405,7 +405,7 @@ impl SharedMemoryManager {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     pub fn create_region(&self, id: String, scope: ContextScope, owner: ComponentId) -> Result<()> {
         let mut regions = self.regions.write().unwrap();
 
@@ -436,7 +436,7 @@ impl SharedMemoryManager {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     #[must_use]
     pub fn get_region(&self, id: &str) -> Option<MemoryRegion> {
         let regions = self.regions.read().unwrap();
@@ -453,7 +453,7 @@ impl SharedMemoryManager {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     pub fn delete_region(&self, id: &str, requester: &ComponentId) -> Result<()> {
         let mut regions = self.regions.write().unwrap();
 
@@ -479,7 +479,7 @@ impl SharedMemoryManager {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     #[must_use]
     pub fn list_regions(&self, accessor: &ComponentId) -> Vec<String> {
         let regions = self.regions.read().unwrap();
@@ -494,7 +494,7 @@ impl SharedMemoryManager {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     #[must_use]
     pub fn stats(&self) -> MemoryStats {
         let regions = self.regions.read().unwrap();
@@ -513,7 +513,7 @@ impl SharedMemoryManager {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned or if duration conversion fails
+    /// Panics if the `RwLock` is poisoned or if duration conversion fails
     pub fn cleanup(&self) {
         let _now = Instant::now();
         let mut regions = self.regions.write().unwrap();

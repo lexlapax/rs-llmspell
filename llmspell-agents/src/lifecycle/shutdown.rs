@@ -212,6 +212,10 @@ impl ShutdownCoordinator {
     }
 
     /// Add shutdown hook
+    ///
+    /// # Panics
+    ///
+    /// Panics if the `RwLock` is poisoned.
     pub async fn add_hook(&self, hook: Arc<dyn ShutdownHook>) {
         let mut hooks = self.hooks.write().await;
         hooks.push(hook);
@@ -366,10 +370,7 @@ impl ShutdownCoordinator {
                 } else {
                     format!(
                         "Shutdown failed: {}",
-                        result
-                            .error
-                            .as_ref()
-                            .unwrap_or(&"Unknown error".to_string())
+                        result.error.as_deref().unwrap_or("Unknown error")
                     )
                 },
                 details: HashMap::from([
@@ -402,10 +403,7 @@ impl ShutdownCoordinator {
                     "Failed to shut down agent {} after {:?}: {}",
                     agent_id,
                     result.duration,
-                    result
-                        .error
-                        .as_ref()
-                        .unwrap_or(&"Unknown error".to_string())
+                    result.error.as_deref().unwrap_or("Unknown error")
                 );
             }
         }
@@ -706,10 +704,7 @@ impl ShutdownHook for LoggingShutdownHook {
                 "Agent {} shutdown failed after {:?}: {}",
                 result.agent_id,
                 result.duration,
-                result
-                    .error
-                    .as_ref()
-                    .unwrap_or(&"Unknown error".to_string())
+                result.error.as_deref().unwrap_or("Unknown error")
             );
         }
         Ok(())

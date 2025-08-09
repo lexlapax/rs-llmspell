@@ -68,7 +68,7 @@ impl ContextNode {
     ///
     /// # Panics
     ///
-    /// Panics if a RwLock is poisoned
+    /// Panics if a `RwLock` is poisoned
     #[must_use]
     pub fn find_by_id(&self, id: &str) -> Option<Arc<RwLock<Self>>> {
         // Check self
@@ -95,7 +95,7 @@ impl ContextNode {
     ///
     /// # Panics
     ///
-    /// Panics if a RwLock is poisoned
+    /// Panics if a `RwLock` is poisoned
     #[must_use]
     pub fn descendants(&self) -> Vec<Arc<RwLock<Self>>> {
         let mut result = Vec::new();
@@ -143,7 +143,7 @@ impl HierarchicalContext {
     ///
     /// # Panics
     ///
-    /// Panics if a RwLock is poisoned
+    /// Panics if a `RwLock` is poisoned
     pub fn create_root(&mut self, name: String, context: ExecutionContext) -> Result<String> {
         let node = ContextNode::new(context.clone());
         let node_arc = Arc::new(RwLock::new(node));
@@ -167,7 +167,7 @@ impl HierarchicalContext {
     ///
     /// # Panics
     ///
-    /// Panics if a RwLock is poisoned
+    /// Panics if a `RwLock` is poisoned
     pub fn create_child(
         &self,
         parent_id: &str,
@@ -205,7 +205,7 @@ impl HierarchicalContext {
     ///
     /// # Panics
     ///
-    /// Panics if a RwLock is poisoned
+    /// Panics if a `RwLock` is poisoned
     #[must_use]
     pub fn get(&self, id: &str) -> Option<ExecutionContext> {
         let index = self.index.read().unwrap();
@@ -224,7 +224,7 @@ impl HierarchicalContext {
     ///
     /// # Panics
     ///
-    /// Panics if a RwLock is poisoned
+    /// Panics if a `RwLock` is poisoned
     pub fn remove(&mut self, id: &str) -> Result<()> {
         let mut index = self.index.write().unwrap();
 
@@ -256,7 +256,7 @@ impl HierarchicalContext {
     ///
     /// # Panics
     ///
-    /// Panics if a RwLock is poisoned
+    /// Panics if a `RwLock` is poisoned
     #[must_use]
     pub fn roots(&self) -> HashMap<String, ExecutionContext> {
         self.roots
@@ -273,7 +273,7 @@ impl HierarchicalContext {
     ///
     /// # Panics
     ///
-    /// Panics if a RwLock is poisoned
+    /// Panics if a `RwLock` is poisoned
     #[must_use]
     pub fn stats(&self) -> ContextStats {
         let index = self.index.read().unwrap();

@@ -142,7 +142,7 @@ impl CapabilityAggregator {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     pub fn register_capability(
         &self,
         capability: Capability,
@@ -188,7 +188,7 @@ impl CapabilityAggregator {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     pub fn unregister_capability(&self, provider_id: &str, capability_name: &str) -> Result<()> {
         let capability_id = format!("{provider_id}::{capability_name}");
 
@@ -212,7 +212,7 @@ impl CapabilityAggregator {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     pub fn add_requirement(&self, requirement: CapabilityRequirement) {
         let mut requirements = self.requirements.write().unwrap();
         requirements.push(requirement);
@@ -222,7 +222,7 @@ impl CapabilityAggregator {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     pub fn clear_requirements(&self) {
         let mut requirements = self.requirements.write().unwrap();
         requirements.clear();
@@ -233,7 +233,7 @@ impl CapabilityAggregator {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     pub fn find_matches(&self) -> Vec<CapabilityMatch> {
         let capabilities = self.capabilities.read().unwrap();
         let capabilities_vec: Vec<_> = capabilities.values().cloned().collect();
@@ -245,7 +245,7 @@ impl CapabilityAggregator {
 
         let mut matches = Vec::new();
 
-        for entry in capabilities_vec.iter() {
+        for entry in &capabilities_vec {
             if !entry.available {
                 continue;
             }
@@ -287,7 +287,7 @@ impl CapabilityAggregator {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     fn matches_requirement(
         &self,
         capability: &Capability,
@@ -302,13 +302,17 @@ impl CapabilityAggregator {
         if requirement
             .category
             .as_ref()
-            .map_or(false, |req_category| &capability.category != req_category)
+            .is_some_and(|req_category| &capability.category != req_category)
         {
             return false;
         }
 
         // Check version (simplified)
         if let Some(ref min_version) = requirement.min_version {
+            // This map_or is correct: if capability has no version (None), we consider it
+            // as not meeting the requirement (true = fails check). If it has a version,
+            // we check if it's less than the minimum required version.
+            #[allow(clippy::unnecessary_map_or)]
             if capability
                 .version
                 .as_ref()
@@ -333,7 +337,7 @@ impl CapabilityAggregator {
                 .read()
                 .unwrap()
                 .get(&cap_id)
-                .map_or(false, |entry| entry.score < min_score)
+                .is_some_and(|entry| entry.score < min_score)
             {
                 return false;
             }
@@ -390,7 +394,7 @@ impl CapabilityAggregator {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     pub fn update_usage(
         &self,
         provider_id: &str,
@@ -437,7 +441,7 @@ impl CapabilityAggregator {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     pub fn get_provider_capabilities(&self, provider_id: &str) -> Vec<Capability> {
         let capabilities = self.capabilities.read().unwrap();
         capabilities
@@ -451,7 +455,7 @@ impl CapabilityAggregator {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     pub fn get_by_category(&self, category: &CapabilityCategory) -> Vec<Capability> {
         let index = self.category_index.read().unwrap();
         let capabilities = self.capabilities.read().unwrap();
@@ -473,7 +477,7 @@ impl CapabilityAggregator {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     pub fn set_availability(
         &self,
         provider_id: &str,
@@ -501,7 +505,7 @@ impl CapabilityAggregator {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     pub fn get_statistics(&self) -> CapabilityStatistics {
         let capabilities = self.capabilities.read().unwrap();
         let total = capabilities.len();

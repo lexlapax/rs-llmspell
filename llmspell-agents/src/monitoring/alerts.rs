@@ -356,6 +356,10 @@ impl AlertManager {
     }
 
     /// Register a notification channel
+    ///
+    /// # Panics
+    ///
+    /// Panics if the RwLock is poisoned.
     pub fn register_channel(&self, name: String, channel: Arc<dyn NotificationChannel>) {
         self.channels.write().unwrap().insert(name, channel);
     }
@@ -394,7 +398,7 @@ impl AlertManager {
                 } => context
                     .metrics
                     .get(metric_name)
-                    .map_or(false, |metric| match metric {
+                    .is_some_and(|metric| match metric {
                         MetricValue::Counter(v) => {
                             #[allow(clippy::cast_precision_loss)]
                             let v_f64 = *v as f64;
@@ -443,7 +447,7 @@ impl AlertManager {
     /// Check if a rule is in cooldown
     fn is_in_cooldown(&self, rule_id: &str) -> bool {
         let last_triggers = self.last_trigger_times.read().unwrap();
-        last_triggers.get(rule_id).map_or(false, |last_trigger| {
+        last_triggers.get(rule_id).is_some_and(|last_trigger| {
             let elapsed = (Utc::now() - *last_trigger).to_std().unwrap_or_default();
             elapsed < self.config.default_cooldown
         })
@@ -607,6 +611,10 @@ impl AlertManager {
     }
 
     /// Get alert statistics
+    ///
+    /// # Panics
+    ///
+    /// Panics if the RwLock is poisoned.
     #[must_use]
     pub fn get_statistics(&self) -> AlertStatistics {
         let active = self.active_alerts.read().unwrap();

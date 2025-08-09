@@ -121,7 +121,7 @@ impl HierarchicalCompositeAgent {
     ///
     /// # Panics
     ///
-    /// Panics if the RwLock is poisoned
+    /// Panics if the `RwLock` is poisoned
     pub fn set_parent(&self, parent: Weak<dyn HierarchicalAgent>) -> Result<()> {
         let mut parent_guard = self.parent.write().unwrap();
         *parent_guard = Some(parent);
@@ -234,7 +234,7 @@ impl ToolCapable for HierarchicalCompositeAgent {
             if query
                 .text_search
                 .as_ref()
-                .map_or(false, |text| !name.contains(text))
+                .is_some_and(|text| !name.contains(text))
             {
                 continue;
             }
@@ -574,7 +574,7 @@ impl HierarchicalAgentBuilder {
     ///
     /// # Panics
     ///
-    /// Panics if creating Arc<RwLock<_>> fails
+    /// Panics if creating `Arc<RwLock<_>>` fails
     #[must_use]
     pub fn build(self) -> HierarchicalCompositeAgent {
         let name = self.name.clone();

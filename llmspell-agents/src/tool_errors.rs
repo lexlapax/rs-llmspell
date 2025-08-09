@@ -330,6 +330,7 @@ impl ToolIntegrationError {
                 ..
             } => LLMSpellError::Timeout {
                 message: format!("Tool execution: {tool_name} timed out"),
+                #[allow(clippy::cast_possible_truncation)]
                 duration_ms: Some(duration.as_millis() as u64),
             },
             Self::SecurityViolation {

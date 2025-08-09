@@ -131,9 +131,9 @@ impl StateAccessControl {
         }
 
         // Check parent scope permissions
-        scope.parent().map_or(false, |parent| {
-            self.has_permission(agent_id, &parent, permission)
-        })
+        scope
+            .parent()
+            .is_some_and(|parent| self.has_permission(agent_id, &parent, permission))
     }
 
     pub fn revoke_permissions(&mut self, agent_id: &str, scope: StateScope) {

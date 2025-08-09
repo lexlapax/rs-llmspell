@@ -187,10 +187,9 @@ impl TestEnvironment {
     where
         F: std::future::Future<Output = T>,
     {
-        match tokio::time::timeout(duration, future).await {
-            Ok(result) => Ok(result),
-            Err(_) => Err(format!("Operation timed out after {duration:?}")),
-        }
+        tokio::time::timeout(duration, future)
+            .await
+            .map_err(|_| format!("Operation timed out after {duration:?}"))
     }
 }
 

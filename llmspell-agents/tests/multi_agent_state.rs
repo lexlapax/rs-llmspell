@@ -16,9 +16,10 @@ mod tests {
     use super::*;
 
     fn enabled_persistence_config() -> PersistenceConfig {
-        let mut config = PersistenceConfig::default();
-        config.enabled = true;
-        config
+        PersistenceConfig {
+            enabled: true,
+            ..PersistenceConfig::default()
+        }
     }
     #[tokio::test]
     async fn test_multi_agent_state_isolation() -> Result<()> {

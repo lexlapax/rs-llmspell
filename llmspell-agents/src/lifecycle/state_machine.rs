@@ -265,6 +265,7 @@ impl StateHandler for DefaultStateHandler {
             Uninitialized,
         };
 
+        #[allow(clippy::unnested_or_patterns)]
         match (self.state, target) {
             // Valid transitions
             (Uninitialized, Initializing | Error)
@@ -538,7 +539,7 @@ impl AgentStateMachine {
         let transition_id = format!("{}-{:?}-{:?}", self.agent_id, from_state, to_state);
 
         let tokens = self.active_cancellation_tokens.lock().await;
-        tokens.get(&transition_id).map_or(false, |token| {
+        tokens.get(&transition_id).is_some_and(|token| {
             token.cancel();
             true
         })
@@ -809,15 +810,12 @@ impl AgentStateMachine {
         }
 
         // Handle timeout
-        timeout_result.map_or_else(
-            |_| {
-                Err(anyhow!(
-                    "State transition timed out after {:?}",
-                    self.config.max_transition_time
-                ))
-            },
-            |result| result,
-        )
+        timeout_result.map_err(|_| {
+            anyhow!(
+                "State transition timed out after {:?}",
+                self.config.max_transition_time
+            )
+        })?
     }
 
     /// Initialize agent (transition from Uninitialized to Ready)
