@@ -1295,7 +1295,6 @@ pub fn inject_workflow_global(
     )?;
 
     // Workflow.get() - get a specific workflow by ID
-    let _bridge_clone = workflow_bridge.clone();
     workflow_table.set(
         "get",
         lua.create_function({

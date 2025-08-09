@@ -109,7 +109,7 @@ impl HookContext {
 
     /// Get metadata
     pub fn get_metadata(&self, key: &str) -> Option<&str> {
-        self.metadata.get(key).map(|s| s.as_str())
+        self.metadata.get(key).map(String::as_str)
     }
 
     /// Check if this is an error context

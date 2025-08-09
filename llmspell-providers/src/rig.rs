@@ -115,7 +115,7 @@ impl RigProvider {
         let max_tokens = config
             .custom_config
             .get("max_tokens")
-            .and_then(|v| v.as_u64())
+            .and_then(serde_json::Value::as_u64)
             .unwrap_or(match config.provider_type.as_str() {
                 "anthropic" => 4096, // Anthropic requires max_tokens
                 _ => 2048,           // Default for others

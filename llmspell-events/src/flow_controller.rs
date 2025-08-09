@@ -327,7 +327,7 @@ impl FlowController {
         self.token_bucket
             .write()
             .as_mut()
-            .map(|bucket| bucket.available_tokens())
+            .map(TokenBucket::available_tokens)
     }
 
     /// Calculate current processing rate

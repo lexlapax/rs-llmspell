@@ -641,12 +641,11 @@ impl ConditionEvaluator {
                     Some(actual_value) => {
                         if actual_value == &expected_value {
                             return Some(ConditionResult::success_true(description));
-                        } else {
-                            return Some(ConditionResult::success_false(format!(
-                                "Custom: shared_data.{} is {:?}, expected {}",
-                                key, actual_value, right
-                            )));
                         }
+                        return Some(ConditionResult::success_false(format!(
+                            "Custom: shared_data.{} is {:?}, expected {}",
+                            key, actual_value, right
+                        )));
                     }
                     None => {
                         return Some(ConditionResult::success_false(format!(
@@ -682,17 +681,15 @@ impl ConditionEvaluator {
                             let description = format!("Custom: step.{}.success", step_id_str);
                             if first_result.success {
                                 return Some(ConditionResult::success_true(description));
-                            } else {
-                                return Some(ConditionResult::success_false(description));
                             }
+                            return Some(ConditionResult::success_false(description));
                         }
                         "failed" => {
                             let description = format!("Custom: step.{}.failed", step_id_str);
                             if !first_result.success {
                                 return Some(ConditionResult::success_true(description));
-                            } else {
-                                return Some(ConditionResult::success_false(description));
                             }
+                            return Some(ConditionResult::success_false(description));
                         }
                         _ => {
                             return Some(ConditionResult::error(

@@ -640,13 +640,12 @@ impl ConditionalWorkflow {
                         if matches!(self.error_strategy, ErrorStrategy::Continue) {
                             warn!("All retries exhausted for step {}, continuing", step.name);
                             continue;
-                        } else {
-                            warn!(
-                                "All retries exhausted for step {}, stopping branch",
-                                step.name
-                            );
-                            break;
                         }
+                        warn!(
+                            "All retries exhausted for step {}, stopping branch",
+                            step.name
+                        );
+                        break;
                     }
                 }
             }

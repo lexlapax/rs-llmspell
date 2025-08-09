@@ -217,7 +217,7 @@ impl TimelineQueryExecutor {
         // Apply filters to each correlation
         let mut matching_entries = Vec::new();
         let correlations_count = correlations.len();
-        let total_events_examined = correlations.values().map(|v| v.len()).sum::<usize>();
+        let total_events_examined = correlations.values().map(Vec::len).sum::<usize>();
 
         for (correlation_id, events) in correlations {
             let timeline_entries = self.build_timeline_entries(events, correlation_id);

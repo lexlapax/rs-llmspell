@@ -238,7 +238,7 @@ impl ProviderRegistry {
 
     /// Get list of registered provider names
     pub fn available_providers(&self) -> Vec<&str> {
-        self.factories.keys().map(|s| s.as_str()).collect()
+        self.factories.keys().map(String::as_str).collect()
     }
 }
 
@@ -530,7 +530,7 @@ impl ProviderManager {
         registry
             .available_providers()
             .into_iter()
-            .map(|s| s.to_string())
+            .map(str::to_string)
             .collect()
     }
 }

@@ -579,11 +579,9 @@ impl LoopWorkflow {
                                 "Continuing after failure in iteration {} step: {}",
                                 iteration, step.name
                             );
-                            continue;
                         }
                         ErrorAction::RetryStep => {
                             // Already handled by execute_step_with_retry
-                            continue;
                         }
                     }
                 }

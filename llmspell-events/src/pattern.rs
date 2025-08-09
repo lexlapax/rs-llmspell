@@ -19,9 +19,7 @@ impl EventPattern {
         }
 
         let is_wildcard = pattern.contains('*');
-        let prefix = pattern
-            .strip_suffix('*')
-            .map(|stripped| stripped.to_string());
+        let prefix = pattern.strip_suffix('*').map(str::to_string);
 
         Ok(Self {
             pattern: pattern.to_string(),

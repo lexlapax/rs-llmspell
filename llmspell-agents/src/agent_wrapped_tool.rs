@@ -293,7 +293,7 @@ impl AgentWrappedTool {
         // Start with base input text
         let input_text = self.parameter_config.input_template.as_ref().map_or_else(
             || format!("Tool invocation of agent: {}", agent_metadata.name),
-            |template| template.clone(),
+            String::clone,
         );
 
         let mut agent_input = AgentInput::text(input_text);
@@ -435,7 +435,7 @@ impl AgentWrappedTool {
             .and_then(|metadata| metadata.name.as_ref())
             .map_or_else(
                 || format!("agent-{}", self.agent.metadata().name),
-                |name| name.clone(),
+                String::clone,
             )
     }
 
@@ -452,7 +452,7 @@ impl AgentWrappedTool {
                         self.agent.metadata().description
                     )
                 },
-                |description| description.clone(),
+                String::clone,
             )
     }
 }

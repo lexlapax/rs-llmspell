@@ -89,10 +89,10 @@ impl FieldTransform {
             FieldTransform::Remove { field } => vec![field],
             FieldTransform::Split { from_field, .. } => vec![from_field],
             FieldTransform::Merge { from_fields, .. } => {
-                from_fields.iter().map(|s| s.as_str()).collect()
+                from_fields.iter().map(String::as_str).collect()
             }
             FieldTransform::Custom { from_fields, .. } => {
-                from_fields.iter().map(|s| s.as_str()).collect()
+                from_fields.iter().map(String::as_str).collect()
             }
         }
     }
@@ -105,11 +105,11 @@ impl FieldTransform {
             FieldTransform::Default { field, .. } => vec![field],
             FieldTransform::Remove { .. } => vec![],
             FieldTransform::Split { to_fields, .. } => {
-                to_fields.iter().map(|s| s.as_str()).collect()
+                to_fields.iter().map(String::as_str).collect()
             }
             FieldTransform::Merge { to_field, .. } => vec![to_field],
             FieldTransform::Custom { to_fields, .. } => {
-                to_fields.iter().map(|s| s.as_str()).collect()
+                to_fields.iter().map(String::as_str).collect()
             }
         }
     }
@@ -539,7 +539,7 @@ impl DataTransformer {
         match splitter {
             "comma_split" => {
                 if let Some(s) = value.as_str() {
-                    let parts: Vec<&str> = s.split(',').map(|s| s.trim()).collect();
+                    let parts: Vec<&str> = s.split(',').map(str::trim).collect();
                     let mut result = Vec::new();
                     for (i, field) in to_fields.iter().enumerate() {
                         let value = if i < parts.len() {
@@ -574,7 +574,7 @@ impl DataTransformer {
                 let strings: Vec<String> = values
                     .iter()
                     .filter_map(|v| v.as_str())
-                    .map(|s| s.to_string())
+                    .map(str::to_string)
                     .collect();
                 Ok(Value::String(strings.join(" ")))
             }

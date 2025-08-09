@@ -291,7 +291,7 @@ impl ResourceMonitor {
 
     /// Get all violations
     pub async fn get_violations(&self) -> Vec<String> {
-        self.violations.iter().map(|v| v.to_string()).collect()
+        self.violations.iter().map(ToString::to_string).collect()
     }
 
     /// Get detailed resource statistics

@@ -51,7 +51,7 @@ def categorize_warning(warning_msg):
         return 'other'
 
 # Parse the clippy output file
-with open('/Users/spuri/projects/lexlapax/rs-llmspell/phase_10_7_full_clippy_output.txt', 'r') as f:
+with open('/Users/spuri/projects/lexlapax/rs-llmspell/full_clippy_output.txt', 'r') as f:
     lines = f.readlines()
 
 # Dictionary to store warnings with full details
@@ -118,7 +118,7 @@ while i < len(lines):
     i += 1
 
 # Write detailed tracking file
-with open('/Users/spuri/projects/lexlapax/rs-llmspell/phase_10_7_detailed_tracking.txt', 'w') as f:
+with open('/Users/spuri/projects/lexlapax/rs-llmspell/detailed_tracking.txt', 'w') as f:
     f.write("# Phase 10.7 Detailed Warning Tracking File\n")
     f.write("# Generated from full workspace clippy scan\n")
     f.write("# Each warning includes exact file location for efficient fixing\n\n")
@@ -187,4 +187,4 @@ with open('/Users/spuri/projects/lexlapax/rs-llmspell/phase_10_7_detailed_tracki
         f.write("\n")
 
 print(f"Created detailed tracking file with {total_warnings} warnings")
-print("File: phase_10_7_detailed_tracking.txt")
+print("File: detailed_tracking.txt")

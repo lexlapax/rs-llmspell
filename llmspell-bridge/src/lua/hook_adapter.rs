@@ -172,7 +172,7 @@ impl HookAdapter for LuaHookAdapter {
     fn adapt_result(&self, result: Self::Result) -> HookResult {
         result
             .downcast_ref::<HookResult>()
-            .map_or(HookResult::Continue, |hook_result| hook_result.clone())
+            .map_or(HookResult::Continue, Clone::clone)
     }
 
     fn extract_error(&self, result: &Self::Result) -> Option<String> {

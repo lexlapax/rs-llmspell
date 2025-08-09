@@ -46,21 +46,21 @@ impl StandardizedWorkflowFactory {
 
         params
             .get("timeout")
-            .and_then(|v| v.as_u64())
+            .and_then(serde_json::Value::as_u64)
             .map(|timeout_ms| {
                 config.max_execution_time = Some(Duration::from_millis(timeout_ms));
             });
 
         params
             .get("continue_on_error")
-            .and_then(|v| v.as_bool())
+            .and_then(serde_json::Value::as_bool)
             .map(|continue_on_error| {
                 config.continue_on_error = continue_on_error;
             });
 
         params
             .get("max_retry_attempts")
-            .and_then(|v| v.as_u64())
+            .and_then(serde_json::Value::as_u64)
             .map(|max_retries| {
                 config.max_retry_attempts = max_retries as u32;
             });
@@ -73,9 +73,9 @@ impl StandardizedWorkflowFactory {
             }
             "parallel" => {
                 serde_json::json!({
-                    "max_concurrency": params.get("max_concurrency").and_then(|v| v.as_u64()).unwrap_or(4),
-                    "fail_fast": params.get("fail_fast").and_then(|v| v.as_bool()).unwrap_or(false),
-                    "continue_on_optional_failure": params.get("continue_on_optional_failure").and_then(|v| v.as_bool()).unwrap_or(true),
+                    "max_concurrency": params.get("max_concurrency").and_then(serde_json::Value::as_u64).unwrap_or(4),
+                    "fail_fast": params.get("fail_fast").and_then(serde_json::Value::as_bool).unwrap_or(false),
+                    "continue_on_optional_failure": params.get("continue_on_optional_failure").and_then(serde_json::Value::as_bool).unwrap_or(true),
                 })
             }
             "conditional" => {
@@ -86,8 +86,8 @@ impl StandardizedWorkflowFactory {
                 let mut loop_config = serde_json::json!({
                     "body": [],
                     "break_conditions": [],
-                    "aggregation": params.get("aggregation").and_then(|v| v.as_str()).unwrap_or("collect_all"),
-                    "continue_on_error": params.get("continue_on_error").and_then(|v| v.as_bool()).unwrap_or(false),
+                    "aggregation": params.get("aggregation").and_then(serde_json::Value::as_str).unwrap_or("collect_all"),
+                    "continue_on_error": params.get("continue_on_error").and_then(serde_json::Value::as_bool).unwrap_or(false),
                 });
 
                 // Handle iterator configuration
@@ -98,8 +98,9 @@ impl StandardizedWorkflowFactory {
                         "type": "collection",
                         "items": collection
                     });
-                } else if let Some(max_iterations) =
-                    params.get("max_iterations").and_then(|v| v.as_u64())
+                } else if let Some(max_iterations) = params
+                    .get("max_iterations")
+                    .and_then(serde_json::Value::as_u64)
                 {
                     loop_config["iterator"] = serde_json::json!({
                         "type": "range",

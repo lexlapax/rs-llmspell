@@ -1198,7 +1198,7 @@ impl StateManager {
         // Extract agent IDs from keys
         Ok(keys
             .into_iter()
-            .filter_map(|k| k.strip_prefix(prefix).map(|s| s.to_string()))
+            .filter_map(|k| k.strip_prefix(prefix).map(str::to_string))
             .collect())
     }
 

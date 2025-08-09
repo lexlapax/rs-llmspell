@@ -339,7 +339,7 @@ impl EventCorrelationTracker {
             .read()
             .unwrap()
             .values()
-            .map(|v| v.len())
+            .map(Vec::len)
             .sum::<usize>();
         let contexts_count = self.contexts.read().unwrap().len();
 

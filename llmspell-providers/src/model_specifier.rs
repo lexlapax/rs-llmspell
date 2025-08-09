@@ -126,7 +126,7 @@ impl ModelSpecifier {
     /// ```
     pub fn parse_with_base_url(spec: &str, base_url: Option<&str>) -> Result<Self, LLMSpellError> {
         let mut model_spec = Self::parse(spec)?;
-        model_spec.base_url = base_url.map(|url| url.to_string());
+        model_spec.base_url = base_url.map(str::to_string);
         Ok(model_spec)
     }
 

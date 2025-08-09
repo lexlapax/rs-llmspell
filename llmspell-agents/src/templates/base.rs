@@ -226,7 +226,7 @@ pub trait AgentTemplate: Send + Sync {
                 ParameterConstraint::MinLength(min_len) => {
                     let length = value
                         .as_str()
-                        .map_or_else(|| value.as_array().map_or(0, |arr| arr.len()), |s| s.len());
+                        .map_or_else(|| value.as_array().map_or(0, Vec::len), str::len);
                     if length < *min_len {
                         return Err(anyhow!(
                             "Parameter '{}' must have minimum length {}",
@@ -238,7 +238,7 @@ pub trait AgentTemplate: Send + Sync {
                 ParameterConstraint::MaxLength(max_len) => {
                     let length = value
                         .as_str()
-                        .map_or_else(|| value.as_array().map_or(0, |arr| arr.len()), |s| s.len());
+                        .map_or_else(|| value.as_array().map_or(0, Vec::len), str::len);
                     if length > *max_len {
                         return Err(anyhow!(
                             "Parameter '{}' must have maximum length {}",

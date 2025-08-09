@@ -242,7 +242,6 @@ impl SequentialWorkflow {
                             step.name
                         );
                         self.state_manager.advance_step().await?;
-                        continue;
                     }
                     ErrorAction::RetryStep => {
                         // This is handled by execute_step_with_retry, so if we're here,

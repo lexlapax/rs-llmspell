@@ -174,13 +174,16 @@ impl UserData for LuaAgentInstance {
             if let Some(metadata) = this.bridge.get_tool_metadata(&tool_name) {
                 // Convert JSON to Lua table
                 let metadata_table = lua.create_table()?;
-                if let Some(name) = metadata.get("name").and_then(|v| v.as_str()) {
+                if let Some(name) = metadata.get("name").and_then(serde_json::Value::as_str) {
                     metadata_table.set("name", name)?;
                 }
-                if let Some(desc) = metadata.get("description").and_then(|v| v.as_str()) {
+                if let Some(desc) = metadata
+                    .get("description")
+                    .and_then(serde_json::Value::as_str)
+                {
                     metadata_table.set("description", desc)?;
                 }
-                if let Some(version) = metadata.get("version").and_then(|v| v.as_str()) {
+                if let Some(version) = metadata.get("version").and_then(serde_json::Value::as_str) {
                     metadata_table.set("version", version)?;
                 }
                 Ok(Some(metadata_table))
@@ -241,13 +244,16 @@ impl UserData for LuaAgentInstance {
 
             for (tool_name, metadata) in all_metadata {
                 let tool_metadata_table = lua.create_table()?;
-                if let Some(name) = metadata.get("name").and_then(|v| v.as_str()) {
+                if let Some(name) = metadata.get("name").and_then(serde_json::Value::as_str) {
                     tool_metadata_table.set("name", name)?;
                 }
-                if let Some(desc) = metadata.get("description").and_then(|v| v.as_str()) {
+                if let Some(desc) = metadata
+                    .get("description")
+                    .and_then(serde_json::Value::as_str)
+                {
                     tool_metadata_table.set("description", desc)?;
                 }
-                if let Some(version) = metadata.get("version").and_then(|v| v.as_str()) {
+                if let Some(version) = metadata.get("version").and_then(serde_json::Value::as_str) {
                     tool_metadata_table.set("version", version)?;
                 }
                 metadata_table.set(tool_name, tool_metadata_table)?;
@@ -306,13 +312,22 @@ impl UserData for LuaAgentInstance {
                 Ok(health_json) => {
                     // Convert JSON to Lua table
                     let health_table = lua.create_table()?;
-                    if let Some(status) = health_json.get("status").and_then(|v| v.as_str()) {
+                    if let Some(status) = health_json
+                        .get("status")
+                        .and_then(serde_json::Value::as_str)
+                    {
                         health_table.set("status", status)?;
                     }
-                    if let Some(message) = health_json.get("message").and_then(|v| v.as_str()) {
+                    if let Some(message) = health_json
+                        .get("message")
+                        .and_then(serde_json::Value::as_str)
+                    {
                         health_table.set("message", message)?;
                     }
-                    if let Some(timestamp) = health_json.get("timestamp").and_then(|v| v.as_str()) {
+                    if let Some(timestamp) = health_json
+                        .get("timestamp")
+                        .and_then(serde_json::Value::as_str)
+                    {
                         health_table.set("timestamp", timestamp)?;
                     }
                     Ok(Some(health_table))
@@ -422,13 +437,19 @@ impl UserData for LuaAgentInstance {
                     let alerts_table = lua.create_table()?;
                     for (i, alert) in alerts.iter().enumerate() {
                         let alert_item = lua.create_table()?;
-                        if let Some(severity) = alert.get("severity").and_then(|v| v.as_str()) {
+                        if let Some(severity) =
+                            alert.get("severity").and_then(serde_json::Value::as_str)
+                        {
                             alert_item.set("severity", severity)?;
                         }
-                        if let Some(message) = alert.get("message").and_then(|v| v.as_str()) {
+                        if let Some(message) =
+                            alert.get("message").and_then(serde_json::Value::as_str)
+                        {
                             alert_item.set("message", message)?;
                         }
-                        if let Some(timestamp) = alert.get("timestamp").and_then(|v| v.as_str()) {
+                        if let Some(timestamp) =
+                            alert.get("timestamp").and_then(serde_json::Value::as_str)
+                        {
                             alert_item.set("timestamp", timestamp)?;
                         }
                         #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
@@ -609,14 +630,17 @@ impl UserData for LuaAgentInstance {
                     let history_table = lua.create_table()?;
                     for (i, transition) in history.iter().enumerate() {
                         let transition_table = lua.create_table()?;
-                        if let Some(from) = transition.get("from").and_then(|v| v.as_str()) {
+                        if let Some(from) =
+                            transition.get("from").and_then(serde_json::Value::as_str)
+                        {
                             transition_table.set("from", from)?;
                         }
-                        if let Some(to) = transition.get("to").and_then(|v| v.as_str()) {
+                        if let Some(to) = transition.get("to").and_then(serde_json::Value::as_str) {
                             transition_table.set("to", to)?;
                         }
-                        if let Some(timestamp) =
-                            transition.get("timestamp").and_then(|v| v.as_str())
+                        if let Some(timestamp) = transition
+                            .get("timestamp")
+                            .and_then(serde_json::Value::as_str)
                         {
                             transition_table.set("timestamp", timestamp)?;
                         }
@@ -626,7 +650,9 @@ impl UserData for LuaAgentInstance {
                         {
                             transition_table.set("elapsed", elapsed)?;
                         }
-                        if let Some(reason) = transition.get("reason").and_then(|v| v.as_str()) {
+                        if let Some(reason) =
+                            transition.get("reason").and_then(serde_json::Value::as_str)
+                        {
                             transition_table.set("reason", reason)?;
                         }
                         #[allow(clippy::cast_possible_truncation, clippy::cast_possible_wrap)]
@@ -704,7 +730,9 @@ impl UserData for LuaAgentInstance {
             match metrics_result {
                 Ok(metrics_json) => {
                     let metrics_table = lua.create_table()?;
-                    if let Some(state) = metrics_json.get("current_state").and_then(|v| v.as_str())
+                    if let Some(state) = metrics_json
+                        .get("current_state")
+                        .and_then(serde_json::Value::as_str)
                     {
                         metrics_table.set("current_state", state)?;
                     }
@@ -738,14 +766,15 @@ impl UserData for LuaAgentInstance {
                     {
                         metrics_table.set("uptime", uptime)?;
                     }
-                    if let Some(last_transition) =
-                        metrics_json.get("last_transition").and_then(|v| v.as_str())
+                    if let Some(last_transition) = metrics_json
+                        .get("last_transition")
+                        .and_then(serde_json::Value::as_str)
                     {
                         metrics_table.set("last_transition", last_transition)?;
                     }
                     if let Some(state_dist) = metrics_json
                         .get("state_time_distribution")
-                        .and_then(|v| v.as_object())
+                        .and_then(serde_json::Value::as_object)
                     {
                         let dist_table = lua.create_table()?;
                         for (state, time) in state_dist {
