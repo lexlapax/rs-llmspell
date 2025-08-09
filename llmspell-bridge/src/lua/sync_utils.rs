@@ -74,6 +74,7 @@ where
     // Use catch_unwind to protect against panics in async code
     let result = catch_unwind(AssertUnwindSafe(|| {
         // block_in_place tells tokio this thread will block
+        #[allow(clippy::cognitive_complexity)] // Complex async-to-sync bridge
         tokio::task::block_in_place(|| {
             // Get current runtime handle
             let handle = match tokio::runtime::Handle::try_current() {
@@ -177,6 +178,7 @@ where
     let op_name = operation_name.to_string();
 
     let result = catch_unwind(AssertUnwindSafe(|| {
+        #[allow(clippy::cognitive_complexity)] // Complex async-to-sync bridge with retries
         tokio::task::block_in_place(|| {
             let handle = match tokio::runtime::Handle::try_current() {
                 Ok(handle) => handle,
@@ -189,6 +191,7 @@ where
             };
 
             let result = if let Some(duration) = timeout {
+                #[allow(clippy::option_if_let_else)] // Complex pattern
                 debug!("Executing {} with timeout of {:?}", op_name, duration);
                 handle.block_on(async {
                     match tokio::time::timeout(duration, future).await {

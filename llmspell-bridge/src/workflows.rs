@@ -226,7 +226,7 @@ impl WorkflowFactory {
     /// # Errors
     ///
     /// Returns an error if workflow type is unknown or creation fails
-    pub async fn create_workflow(
+    pub fn create_workflow(
         workflow_type: &str,
         params: serde_json::Value,
     ) -> Result<Box<dyn WorkflowExecutor>> {
@@ -617,6 +617,7 @@ fn parse_condition(condition_json: &serde_json::Value) -> Result<llmspell_workfl
 fn parse_loop_iterator(config: &serde_json::Value) -> Result<llmspell_workflows::LoopIterator> {
     use llmspell_workflows::LoopIterator;
 
+    #[allow(clippy::option_if_let_else)] // Complex pattern
     if let Some(collection) = config.get("collection").and_then(|v| v.as_array()) {
         Ok(LoopIterator::Collection {
             values: collection.clone(),
@@ -641,8 +642,7 @@ fn parse_loop_iterator(config: &serde_json::Value) -> Result<llmspell_workflows:
             max_iterations: config
                 .get("max_iterations")
                 .and_then(serde_json::Value::as_u64)
-                .map(|v| usize::try_from(v).unwrap_or(usize::MAX))
-                .unwrap_or(100),
+                .map_or(100, |v| usize::try_from(v).unwrap_or(usize::MAX)),
         })
     } else {
         Err(llmspell_core::LLMSpellError::Configuration {

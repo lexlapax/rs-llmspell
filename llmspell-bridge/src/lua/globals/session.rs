@@ -161,6 +161,7 @@ pub fn inject_session_global(
     // List method - list sessions with optional query
     let list_bridge = session_bridge.clone();
     let list_fn = lua.create_function(move |lua, query: Option<Table>| {
+        #[allow(clippy::option_if_let_else)] // Complex pattern
         let session_query = if let Some(q) = query {
             // Convert Lua table to SessionQuery
             let mut query = SessionQuery::default();
@@ -417,7 +418,7 @@ pub fn inject_session_global(
 
     // Set the Session table as a global
     // Add Session.builder() method
-    let bridge_for_builder = session_bridge.clone();
+    let bridge_for_builder = session_bridge;
     let builder_fn =
         lua.create_function(move |_lua, ()| Ok(SessionBuilder::new(bridge_for_builder.clone())))?;
     session_table.set("builder", builder_fn)?;

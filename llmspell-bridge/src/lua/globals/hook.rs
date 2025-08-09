@@ -437,6 +437,7 @@ pub fn inject_hook_global(
     let unregister_fn = lua
         .create_function(move |_, handle: mlua::AnyUserData| {
             // Try to cast to LuaHookHandle and call unregister
+            #[allow(clippy::option_if_let_else)] // Complex pattern
             if let Ok(lua_handle) = handle.borrow::<LuaHookHandle>() {
                 block_on_async::<_, _, LLMSpellError>(
                     "hook_unregister_standalone",

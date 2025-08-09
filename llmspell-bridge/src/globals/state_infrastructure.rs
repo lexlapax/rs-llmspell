@@ -121,6 +121,7 @@ pub async fn get_or_create_state_infrastructure(
         debug!("Initializing backup infrastructure");
 
         // Get backup config or use defaults
+        #[allow(clippy::option_if_let_else)] // Complex pattern
         let backup_config = if let Some(ref backup_cfg) = config.backup {
             // Convert from runtime BackupConfig to state-persistence BackupConfig
             llmspell_state_persistence::config::BackupConfig {

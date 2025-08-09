@@ -633,9 +633,7 @@ mod tests {
             metadata: HashMap::new(),
         };
 
-        aggregator
-            .register_capability(cap, "agent-1")
-            .unwrap();
+        aggregator.register_capability(cap, "agent-1").unwrap();
 
         // Check it was registered
         let provider_caps = aggregator.get_provider_capabilities("agent-1");

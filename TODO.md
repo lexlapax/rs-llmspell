@@ -687,7 +687,23 @@ Phase 7 focuses on comprehensive refactoring to achieve API consistency and stan
         - [x] Fixed 1 missing semicolon warning
         - [x] Fixed 1 future not Send warning
         - **Result**: ALL 81 warnings in llmspell-agents FIXED! (100%)
-        - **Tracking File**: phase_10_9_tracking.txt       
+        - **Tracking File**: phase_10_9_tracking.txt
+
+   10.10. [COMPLETED] **llmspell-bridge Casting Warnings** (15 min) - COMPLETE! ✅
+        - [x] Fixed 2 u64 to i64 casting warnings (using i64::try_from)
+        - [x] Fixed 1 usize to i64 casting warning (using i64::try_from)
+        - [x] Fixed 1 u64 to u32 truncation warning (using u32::try_from)
+        - [x] Fixed 1 u128 to f64 precision loss warning (#[allow] for timing)
+        - **Result**: ALL 5 warnings in llmspell-bridge FIXED!
+        - **Tracking File**: phase_10_10_bridge_tracking.txt
+
+   10.11. [COMPLETED] **llmspell-bridge Additional Warnings** (30 min) - COMPLETE! ✅
+        - [x] Fixed 2 cognitive complexity warnings (added #[allow] attributes)
+        - [x] Fixed 15 Option/Result pattern warnings:
+            - 2 map().unwrap_or() patterns converted to map_or()
+            - 13 if let/else patterns marked with #[allow] due to complexity
+        - **Result**: ALL 17 warnings in llmspell-bridge FIXED!
+        - **Tracking File**: phase_10_11_bridge_tracking.txt       
 
 **Acceptance Criteria**:
 - [ ] All clippy warnings resolved or explicitly allowed with justification

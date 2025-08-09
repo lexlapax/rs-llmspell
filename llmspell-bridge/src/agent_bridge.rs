@@ -852,7 +852,7 @@ impl AgentBridge {
                     "from": format!("{:?}", transition.from),
                     "to": format!("{:?}", transition.to),
                     "timestamp": datetime.to_rfc3339(),
-                    "elapsed": transition.duration.map(|d| d.as_secs_f64()).unwrap_or(0.0),
+                    "elapsed": transition.duration.map_or(0.0, |d| d.as_secs_f64()),
                     "reason": transition.reason,
                     "metadata": transition.metadata,
                 })
@@ -1718,6 +1718,7 @@ impl AgentBridge {
                 })?;
 
         // Get the agent to get its ID (or use agent_name as ID if agent not found)
+        #[allow(clippy::option_if_let_else)] // Complex pattern
         let agent_id = if let Some(agent) = self.get_agent(agent_name).await {
             agent.metadata().id.to_string()
         } else {
@@ -1762,7 +1763,7 @@ impl AgentBridge {
                 message: format!("Failed to get saved agents registry: {e}"),
                 source: None,
             })?;
-
+        #[allow(clippy::option_if_let_else)] // Complex pattern
         match saved_agents {
             Some(registry) => {
                 // Parse the registry
@@ -1790,6 +1791,7 @@ impl AgentBridge {
                 })?;
 
         // Get current registry
+        #[allow(clippy::option_if_let_else)] // Complex pattern
         let mut saved_agents = match state_manager
             .get(StateScope::Global, "saved_agents_registry")
             .await
@@ -1839,6 +1841,7 @@ impl AgentBridge {
                 })?;
 
         // Get current registry
+        #[allow(clippy::option_if_let_else)] // Complex pattern
         let saved_agents = match state_manager
             .get(StateScope::Global, "saved_agents_registry")
             .await

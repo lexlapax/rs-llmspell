@@ -62,7 +62,7 @@ impl StandardizedWorkflowFactory {
             .get("max_retry_attempts")
             .and_then(serde_json::Value::as_u64)
             .map(|max_retries| {
-                config.max_retry_attempts = max_retries as u32;
+                config.max_retry_attempts = u32::try_from(max_retries).unwrap_or(u32::MAX);
             });
 
         // Extract type-specific configuration

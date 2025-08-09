@@ -17,7 +17,7 @@ use uuid;
 
 /// Parse step configuration from Lua table
 #[allow(dead_code)]
-fn _parse_workflow_step(_lua: &Lua, step_table: Table) -> mlua::Result<WorkflowStep> {
+fn _parse_workflow_step(_lua: &Lua, step_table: &Table) -> mlua::Result<WorkflowStep> {
     let name: String = step_table.get("name")?;
     let step_type: String = step_table.get("type")?;
 
@@ -527,7 +527,7 @@ impl UserData for WorkflowBuilder {
 
         // Add step (for sequential, loop, and parallel workflows)
         methods.add_method_mut("add_step", |lua, this, step_table: Table| {
-            let step = _parse_workflow_step(lua, step_table)?;
+            let step = _parse_workflow_step(lua, &step_table)?;
             this.steps.push(step);
             Ok(this.clone())
         });
@@ -545,13 +545,13 @@ impl UserData for WorkflowBuilder {
         });
 
         methods.add_method_mut("add_then_step", |lua, this, step_table: Table| {
-            let step = _parse_workflow_step(lua, step_table)?;
+            let step = _parse_workflow_step(lua, &step_table)?;
             this.then_steps.push(step);
             Ok(this.clone())
         });
 
         methods.add_method_mut("add_else_step", |lua, this, step_table: Table| {
-            let step = _parse_workflow_step(lua, step_table)?;
+            let step = _parse_workflow_step(lua, &step_table)?;
             this.else_steps.push(step);
             Ok(this.clone())
         });
@@ -693,7 +693,7 @@ impl UserData for WorkflowBuilder {
 
             // Create workflow using bridge
             let bridge = this.bridge.clone();
-            let workflow_name = name.clone();
+            let workflow_name = name;
 
             let result = block_on_async(
                 "workflow_builder_create",
@@ -1406,7 +1406,7 @@ pub fn inject_workflow_global(
     // Note: executeAsync helper removed - all methods now use synchronous API
 
     // Add Workflow.builder() method
-    let bridge_for_builder = workflow_bridge.clone();
+    let bridge_for_builder = workflow_bridge;
     let builder_fn =
         lua.create_function(move |_lua, ()| Ok(WorkflowBuilder::new(bridge_for_builder.clone())))?;
     workflow_table.set("builder", builder_fn)?;

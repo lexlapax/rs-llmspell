@@ -150,6 +150,7 @@ async fn test_tool_performance_benchmarks() {
         }
 
         let elapsed = start.elapsed();
+        #[allow(clippy::cast_precision_loss)] // Acceptable for timing measurements
         let per_op = elapsed.as_micros() as f64 / f64::from(iterations) / 1000.0; // Convert to ms
 
         println!("{tool_name:<20} {per_op:.3}ms/op");

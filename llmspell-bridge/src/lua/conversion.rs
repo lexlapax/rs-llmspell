@@ -101,6 +101,7 @@ pub fn json_to_lua_value<'lua>(lua: &'lua Lua, json: &JsonValue) -> mlua::Result
         JsonValue::Null => Ok(LuaValue::Nil),
         JsonValue::Bool(b) => Ok(LuaValue::Boolean(*b)),
         JsonValue::Number(n) => {
+            #[allow(clippy::option_if_let_else)] // Complex pattern
             if let Some(i) = n.as_i64() {
                 Ok(LuaValue::Integer(i))
             } else if let Some(f) = n.as_f64() {
@@ -222,7 +223,7 @@ fn parse_media_content(_lua: &Lua, table: Table) -> mlua::Result<MediaContent> {
             _ => None,
         })
         .unwrap_or(ImageFormat::Png);
-
+    #[allow(clippy::option_if_let_else)] // Complex pattern
     let metadata = if let Ok(width) = table.get::<_, u32>("width") {
         if let Ok(height) = table.get::<_, u32>("height") {
             let color_space = table

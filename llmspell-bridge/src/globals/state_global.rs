@@ -660,11 +660,14 @@ impl GlobalObject for StateGlobal {
                                 backup_entry.set("id", backup.id.clone())?;
                                 backup_entry.set(
                                     "created_at",
-                                    backup
-                                        .created_at
-                                        .duration_since(std::time::UNIX_EPOCH)
-                                        .unwrap()
-                                        .as_secs() as i64,
+                                    i64::try_from(
+                                        backup
+                                            .created_at
+                                            .duration_since(std::time::UNIX_EPOCH)
+                                            .unwrap()
+                                            .as_secs(),
+                                    )
+                                    .unwrap_or(i64::MAX),
                                 )?;
                                 backup_entry.set("size_bytes", backup.size_bytes)?;
                                 backup_entry.set("is_incremental", backup.is_incremental)?;

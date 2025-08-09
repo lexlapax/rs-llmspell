@@ -97,7 +97,7 @@ pub fn create_fork_join_workflow(
             .add_step(WorkflowStep::new(
                 format!("{task_name}_execution"),
                 StepType::Agent {
-                    agent_id: ComponentId::from_name(&agent_id),
+                    agent_id: ComponentId::from_name(agent_id),
                     input: input.to_string(),
                 },
             ));
@@ -132,7 +132,7 @@ pub fn create_consensus_workflow(
             .add_step(WorkflowStep::new(
                 format!("{agent_id}_vote"),
                 StepType::Agent {
-                    agent_id: ComponentId::from_name(&agent_id),
+                    agent_id: ComponentId::from_name(agent_id),
                     input: serde_json::json!({
                         "task": "evaluate_options",
                         "options": options,
@@ -223,8 +223,11 @@ pub fn create_collaboration_workflow(
     collaboration_rounds: usize,
     initial_context: &Value,
 ) -> Result<llmspell_workflows::LoopWorkflow> {
-    let mut builder =
-        LoopWorkflowBuilder::new(name.to_string()).with_range(0, collaboration_rounds as i64, 1);
+    let mut builder = LoopWorkflowBuilder::new(name.to_string()).with_range(
+        0,
+        i64::try_from(collaboration_rounds).unwrap_or(i64::MAX),
+        1,
+    );
 
     // Each round, agents collaborate
     for (i, agent_id) in collaborating_agents.iter().enumerate() {

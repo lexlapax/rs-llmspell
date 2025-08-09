@@ -39,7 +39,7 @@ pub async fn get_or_create_session_infrastructure(
     let session_config = SessionManagerConfig::builder()
         .max_active_sessions(config.max_sessions)
         .default_session_timeout(chrono::Duration::seconds(
-            config.session_timeout_seconds as i64,
+            i64::try_from(config.session_timeout_seconds).unwrap_or(i64::MAX),
         ))
         .storage_path(std::path::PathBuf::from("./sessions"))
         .auto_persist(true)

@@ -1056,7 +1056,7 @@ impl UserData for AgentBuilder {
             // Create agent using bridge
             let bridge = this.bridge.clone();
             let agent_name_clone = name.clone();
-            let agent_name_for_create = name.clone();
+            let agent_name_for_create = name;
 
             block_on_async(
                 "agent_builder_create",
